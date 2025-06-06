@@ -1,7 +1,5 @@
 # Scratch
 
-Utility for experimenting.
-
 ## Directory Mirror Sync
 
 `dir_sync.py` provides a simple GUI tool to mirror a source directory to a target directory on Windows. It uses the `watchdog` package to detect file system changes and replicates them in real time.
