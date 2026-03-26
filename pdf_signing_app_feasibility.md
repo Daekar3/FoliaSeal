@@ -60,6 +60,12 @@ This implementation plan adopts an explicit compatibility policy for both **open
 
 This profile should be treated as a release-gating contract and reflected in QA compatibility matrices.
 
+### Consistency / precedence rules (to avoid requirement conflicts)
+- **Initial release scope:** viewing + signing only. Non-signing page-edit operations (add/remove/move/crop) are architectural extension points, not enabled end-user features in v1.
+- **Save strategy precedence:** in the default signing flow, save mode is incremental-only. Full rewrite is reserved for future non-signing operations and is explicitly out of scope for v1 signing.
+- **Version handling precedence:** app preserves the input header version by default; any required bump must be explicit, logged, and tied to a concrete feature requirement.
+- **PAdES/timestamp consistency:** production profile targets timestamped signatures (B-T style behavior). Optional no-TSA mode is a non-production/dev override and maps to non-timestamped baseline behavior.
+
 ---
 
 ## Specific functional requirements (expanded)
@@ -196,6 +202,7 @@ This profile should be treated as a release-gating contract and reflected in QA 
 - Save pipeline must define operation compatibility rules with signature preservation (e.g., page edits may require full rewrite and may invalidate prior signatures, whereas signing remains incremental).
 - UI must be structured so future page-edit tools can be added as new toolbar panels/dialogs without rewriting the signing form.
 - Audit/log schema must include operation type and revision strategy (incremental vs full rewrite) to support future mixed-operation workflows.
+- In v1, only `SignOperation` is enabled in production UI; other operation modules remain disabled until separately specified and approved.
 
 ---
 
