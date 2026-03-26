@@ -99,6 +99,49 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - location,
   - optional image stamp (PNG/JPEG).
 
+### FR-3A: Signature property definition model (explicit field-level requirements)
+- The signing UI must expose a dedicated **signature properties** panel/dialog before final signing.
+- User-configurable properties must include, at minimum:
+  - visible text content toggles for: distinguished name (DN), common name, email, signing date/time, reason, location, title, company,
+  - signer label formatting options (e.g., "Digitally signed by", custom prefix text),
+  - date/time format and timezone display mode,
+  - text layout template selection (single-line, multi-line, wrapped block),
+  - font family/size/style and text color,
+  - optional background and border style controls for the visible widget.
+- Each field must support a clear source rule:
+  - derived from certificate subject/SAN,
+  - manually overridden by user input,
+  - hidden from visible appearance while still retained in signed cryptographic attributes where applicable.
+- The app must provide a real-time preview that updates as property fields are changed.
+- The app must validate required/optional property combinations and prevent invalid templates from being signed (with inline guidance).
+
+### FR-3B: Adobe Acrobat / PDF-XChange Editor parity requirements
+- The visible-signature configuration workflow must mirror mainstream desktop expectations from Adobe Acrobat and PDF-XChange Editor:
+  - choose/create appearance template,
+  - place signature on page,
+  - adjust text/image fields in a focused properties panel,
+  - confirm and sign.
+- The v1 UX parity target is **interaction pattern parity**, not pixel-identical UI.
+- Requirement acceptance should be validated with side-by-side UX task testing against Acrobat/PDF-XChange on representative tasks:
+  - create new appearance,
+  - include/exclude identity fields (DN/email/title/company),
+  - place and resize signature,
+  - re-use saved preset for subsequent signing.
+
+### FR-3C: Signature presets (reusable appearance profiles)
+- User must be able to create, name, edit, duplicate, delete, import, and export **signature presets**.
+- A preset must persist all appearance/property settings needed to avoid reconfiguration on each signing action, including:
+  - enabled/disabled visible fields,
+  - field formatting and display order,
+  - text style/layout settings,
+  - image/stamp reference,
+  - default rectangle dimensions and anchor preferences (optional),
+  - timestamp display preferences.
+- Presets must be selectable from the signing flow in one action and immediately reflected in preview.
+- App must support a default preset and "last used preset" behavior configurable by user preference.
+- Presets are user-profile scoped and stored in a human-readable local configuration format (e.g., JSON/TOML) with schema versioning.
+- Preset loading failure/corruption must degrade gracefully (warn user, preserve signing ability with safe defaults).
+
 ## FR-4: Cryptographic signing
 - App generates detached CMS signature over PDF ByteRange.
 - App writes signature as incremental update.
