@@ -14,6 +14,8 @@ No alternative UI/distribution options are considered in this version.
 ## Project goal
 Build a Linux desktop app that signs existing PDFs using an existing `.p12/.pfx` certificate, applies a visible signature appearance, embeds an RFC 3161 timestamp token, and outputs Acrobat-compatible signed PDFs.
 
+Usability target for initial scope: provide an easy, intuitive PDF viewing + signing flow for non-technical users while keeping runtime footprint and startup time suitable for everyday desktop use.
+
 ---
 
 ## Review update: key gaps found and addressed
@@ -23,8 +25,40 @@ After re-reviewing feasibility assumptions and architecture, these were the main
 3. **Existing signatures/certification behavior needed explicit requirements**: incremental signing must preserve prior revisions and respect certification constraints.
 4. **Trust configuration for TSA/verification was under-defined**: system trust + optional custom trust anchors should be configurable.
 5. **Operational controls** (file locking, temp files, crash-safe output strategy) needed explicit coverage.
+6. **PDF version/standards scope was implicit**: supported ISO PDF versions and conformance profiles for open/save needed explicit policy.
 
 The sections below now include those requirements and architecture improvements.
+
+---
+
+## PDF standards and version compatibility profile
+
+This implementation plan adopts an explicit compatibility policy for both **opening** and **saving** PDFs:
+
+- **Normative base standards**
+  - ISO 32000-1 (PDF 1.7)
+  - ISO 32000-2 (PDF 2.0) for baseline structural parsing where accepted by the signing stack
+  - PAdES baseline profiles as implemented by pyHanko (for signature container semantics)
+
+- **Open/read support (input documents)**
+  - Target support: `%PDF-1.4` through `%PDF-2.0`.
+  - Files with **valid cross-reference tables/streams** and standard incremental update chains are in scope.
+  - Documents may already contain approval signatures and/or certification signatures; app will open and inspect permission constraints before allowing edits.
+  - Encrypted files are supported **only** when encryption mode is compatible with the selected PDF processing/signing libraries and the user can provide required credentials; unsupported encryption variants are rejected with explicit diagnostics.
+  - Malformed or repair-required files are out of scope for auto-healing; app rejects rather than silently rewriting structure.
+
+- **Save/write support (output documents)**
+  - Output is always written as an **incremental update** to preserve existing revisions/signatures.
+  - Output PDF header/version is preserved from input where possible; app does not perform full-document down-conversion/up-conversion as a feature.
+  - New signature revisions must be Acrobat-compatible for detached CMS signatures and RFC 3161 document timestamps.
+  - App writes standards-compliant signature dictionaries, ByteRange, and related objects expected by ISO PDF signature workflows.
+
+- **Conformance exclusions (initial release)**
+  - No guaranteed archival conformance transformation/validation (e.g., automatic PDF/A conversion).
+  - No guaranteed generation or remediation for PDF/UA tagging compliance.
+  - No support promise for non-standard vendor-private extensions unless pass-through incremental signing works without structural rewrite.
+
+This profile should be treated as a release-gating contract and reflected in QA compatibility matrices.
 
 ---
 
@@ -35,6 +69,7 @@ The sections below now include those requirements and architecture improvements.
 - User must choose a save location for output PDF.
 - App must never overwrite the input file in place.
 - App must block signing if input PDF is unreadable, encrypted in unsupported mode, or malformed.
+- App must validate that input PDF version is within supported open range (`PDF 1.4` to `PDF 2.0`) before enabling signing workflow.
 
 ## FR-2: Certificate handling
 - User can select `.p12` or `.pfx` file.
@@ -115,6 +150,52 @@ The sections below now include those requirements and architecture improvements.
 - UI remains responsive during signing, timestamping, and verification operations.
 - Long operations (>500 ms) show progress status.
 - User can cancel before final write step; cancellation is reported cleanly.
+- Initial viewer open (first page render) should complete within a practical desktop target budget on typical user hardware, and startup/first-render timings must be measured in QA.
+
+## FR-14: PDF standards and version compatibility requirements
+- App must implement and expose a compatibility policy for PDF standards support in user-visible help/docs.
+- **Opening support**:
+  - Must accept input PDFs declaring version `1.4` to `2.0`, subject to structural validity checks.
+  - Must support both classic xref tables and xref streams when parsing input.
+  - Must reject unsupported encryption/security handlers with actionable error text naming the unsupported mode.
+- **Saving support**:
+  - Must save signed output using incremental updates only; full rewrite mode is not permitted in default signing flow.
+  - Must preserve original input PDF version header unless a version bump is strictly required by signature features in use; any bump must be logged.
+  - Must generate PDF signatures compatible with ISO digital signature model (signature dictionary + ByteRange + CMS object embedding).
+- **Standards profile declarations**:
+  - Must declare PAdES baseline level targeted by the implementation (at minimum B-B/B-T equivalent behavior depending on timestamp policy).
+  - Must explicitly state that PDF/A and PDF/UA compliance conversion/repair is out of scope unless a future module is added.
+- **Validation and reporting**:
+  - Post-sign verification must report effective output PDF version, signature subfilter, and timestamp presence.
+  - Result dialog/log must include a standards-compatibility summary (e.g., "Opened as PDF 1.7, saved incrementally as PDF 1.7, PAdES-B-T style timestamped signature").
+
+## FR-15: Viewer usability and intuitive interaction requirements
+- App must provide core viewer controls expected by end users:
+  - page navigation (next/previous, jump-to-page),
+  - zoom in/out/reset and fit-to-width / fit-to-page,
+  - scroll and pan behavior consistent with desktop PDF readers.
+- Signature placement workflow should require minimal steps:
+  - select certificate,
+  - place box on page,
+  - confirm metadata,
+  - sign and save.
+- App must provide inline guidance and validation hints near the fields that commonly fail (certificate password, TSA URL, output path, rectangle bounds).
+- Keyboard accessibility must cover primary actions (open file, navigate pages, zoom, sign, cancel).
+- Error messages must be written in user-facing language first, with optional expandable technical details.
+
+## FR-16: Lightweight runtime and deployment requirements
+- Packaging must avoid unnecessary heavy dependencies beyond UI/rendering/signing requirements.
+- App must support a low-memory mode for large PDFs in preview (render current/nearby pages only, avoid full-document rasterization).
+- Preview rendering must use caching with bounded memory policy and predictable eviction behavior.
+- Bundle size, startup latency, and baseline idle memory usage must be measured and tracked as release metrics.
+
+## FR-17: Extensible document operations architecture requirements
+- Signing workflow must be isolated from generic document-editing operations through a stable `DocumentOperation` interface.
+- Document operations must be modeled as capability modules (e.g., `SignOperation`, future `AddPageOperation`, `RemovePageOperation`, `MovePageOperation`, `CropPageOperation`) with shared validation and permission checks.
+- Command orchestration layer must support registering/enabling/disabling operations without changing core UI navigation components.
+- Save pipeline must define operation compatibility rules with signature preservation (e.g., page edits may require full rewrite and may invalidate prior signatures, whereas signing remains incremental).
+- UI must be structured so future page-edit tools can be added as new toolbar panels/dialogs without rewriting the signing form.
+- Audit/log schema must include operation type and revision strategy (incremental vs full rewrite) to support future mixed-operation workflows.
 
 ---
 
@@ -142,17 +223,23 @@ Notes:
 ## 2) `application` (use-case orchestration)
 Primary service:
 - `SignPdfUseCase.execute(request: SigningRequest) -> SigningResult`
+- `RunDocumentOperationUseCase.execute(request: DocumentOperationRequest) -> DocumentOperationResult`
 
 Responsibilities:
 - Coordinate calls across cert loading, PDF signing, TSA, and verification.
 - Enforce policy (timestamp required, allowed algorithms, output path rules).
 - Produce deterministic result objects for UI and CLI reuse.
+- Route operation requests through a capability registry so additional page-edit operations can be introduced without rewriting signing orchestration.
 
 ## 3) `domain` (entities and policy)
 Core dataclasses/enums:
 - `SigningRequest`
 - `SignatureAppearance`
 - `TimestampPolicy`
+- `PdfCompatibilityProfile`
+- `DocumentOperationType`
+- `DocumentOperationRequest`
+- `DocumentOperationResult`
 - `SigningResult`
 - `FailureCode` enum
 
@@ -160,6 +247,7 @@ Responsibilities:
 - Define pure business types and validation rules.
 - Keep domain free of UI and library-specific objects.
 - Include `TrustProfile` and `CoordinateTransformResult` value objects used by application policy checks.
+- Encode operation compatibility policies (e.g., preserves signatures vs rewrites file).
 
 ## 4) `infra.cert` (PKCS#12 adapter)
 Responsibilities:
@@ -189,6 +277,13 @@ Responsibilities:
 
 Design notes:
 - Keep rendering backend replaceable (QtPdf vs pdfium adapter) behind one interface.
+- Expose navigation/zoom primitives reusable by both signing overlays and future page-edit tools.
+
+## 5c) `infra.pdf_ops` (future document operation adapters)
+Responsibilities:
+- Provide backend adapters for non-signing operations such as add/remove/move/crop page workflows.
+- Surface capability constraints (requires rewrite, may invalidate signatures, unsupported for certified docs).
+- Reuse shared parse/validate/write primitives with explicit strategy selection (incremental vs full rewrite).
 
 ## 6) `infra.tsa` (RFC 3161 client configuration)
 Responsibilities:
@@ -231,6 +326,8 @@ pdf-signer/
       result_dialog.py
     application/
       sign_pdf_use_case.py
+      run_document_operation_use_case.py
+      operation_registry.py
     domain/
       models.py
       policies.py
@@ -238,6 +335,7 @@ pdf-signer/
     infra/
       cert/pkcs12_loader.py
       pdf/pyhanko_signer.py
+      pdf_ops/page_operations_adapter.py
       render/pdf_preview_adapter.py
       render/coord_transform.py
       tsa/timestamper_factory.py
