@@ -504,27 +504,101 @@ Failure codes to expose in UI and logs:
 
 ---
 
-## Delivery milestones
+## Delivery milestones (updated development phase plan)
 
-## Milestone 1 (Week 1–2): Signing core
-- Implement domain/application/infra signing path (headless).
-- CLI harness for rapid validation.
-- Pass integration tests for basic sign + timestamp.
+To reflect the expanded requirements (especially FR-3A/3B/3C, FR-9 through FR-17), the implementation plan should be sequenced as a **phase-gated program** rather than a simple linear MVP.
 
-## Milestone 2 (Week 3–4): PySide6 desktop MVP
-- Build full signing workflow UI.
-- Add preview and result diagnostics.
-- Stabilize error handling and logs.
+## Phase 0 (Week 1): Foundations and architecture guardrails
+- Freeze v1 scope boundaries (signing-only in production UI; non-signing operations behind capability flags).
+- Establish repository skeleton and module boundaries (`presentation`, `application`, `domain`, `infra`) with `DocumentOperation` contracts.
+- Define configuration schemas for:
+  - trust profile,
+  - timestamp policy,
+  - signature preset persistence (with schema version field).
+- Create baseline CI checks (lint, unit test, packaging smoke stub).
 
-## Milestone 3 (Week 5): PyInstaller distribution
-- Finalize `.spec` and build scripts.
-- Produce one-dir release and smoke-test on clean Mint.
+**Exit criteria**
+- Architectural decision record approved.
+- Operation registry supports enabled/disabled capabilities.
+- Config schemas validated with round-trip tests.
 
-## Milestone 4 (Week 6): Hardening
-- Improve verification diagnostics.
-- Expand certificate edge-case handling.
-- Final QA across document varieties.
+## Phase 1 (Week 2–3): Signing core + standards policy engine
+- Implement headless `SignOperation` pipeline: certificate load, request validation, pyHanko signing, post-sign verification.
+- Enforce PDF compatibility policy (open range `1.4`–`2.0`, incremental-save-only behavior in signing flow, version-preservation rules).
+- Implement failure-code mapping and structured result model.
+- Implement temp-file + atomic move output strategy.
 
+**Exit criteria**
+- Deterministic integration tests pass for sign + timestamp-required success/fail paths.
+- Output reports include: effective PDF version, signature subfilter, timestamp presence, standards summary.
+- Existing signatures remain intact in incremental updates.
+
+## Phase 2 (Week 4): Viewer and coordinate correctness platform
+- Deliver render adapter abstraction (`infra.render`) with one selected backend and fallback diagnostics.
+- Implement view↔PDF coordinate transform utility covering zoom/pan/rotation/crop/media box differences.
+- Add viewer controls (navigate, zoom modes, fit-to-page/width, pan behavior) and low-memory render caching policy.
+- Build automated transform test matrix with known reference PDFs.
+
+**Exit criteria**
+- Coordinate transform tests pass across rotation/crop/zoom scenarios.
+- Interactive rectangle bounds are validated against final page box pre-sign.
+- Measured first-render and navigation responsiveness meet baseline UX targets.
+
+## Phase 3 (Week 5–6): Signature UX parity + properties system
+- Implement Acrobat/PDF-XChange-style flow: select appearance template → place/resize signature → edit properties → confirm sign.
+- Build full signature properties panel (FR-3A): field toggles, source rules (derived/override/hidden), text layout templates, font/color/background/border controls, datetime format/timezone settings.
+- Add real-time appearance preview with inline validation.
+- Conduct side-by-side task-based parity testing for representative workflows.
+
+**Exit criteria**
+- Users can complete all FR-3B parity tasks without fallback dialogs.
+- Invalid property combinations are blocked with actionable inline guidance.
+- Preview output consistently matches final signed appearance within accepted tolerance.
+
+## Phase 4 (Week 7): Signature preset management and profile durability
+- Implement preset lifecycle (create/edit/duplicate/delete/import/export).
+- Persist preset data in human-readable config with schema version migrations.
+- Add default-preset + last-used behavior controls.
+- Implement corruption/failure recovery path with safe defaults.
+
+**Exit criteria**
+- Presets load/apply in one action from signing flow.
+- Import/export compatibility tests pass across schema versions.
+- Corrupted preset file scenario degrades gracefully without blocking signing.
+
+## Phase 5 (Week 8): Trust, certification constraints, and hardening
+- Implement trust profile loader (system store + optional extra CA bundle + revocation policy modes).
+- Detect and enforce certification restrictions (DocMDP/permissions) with user-facing diagnostics.
+- Expand logging/audit model to include operation type and revision strategy.
+- Add cancellation/progress behavior for long-running operations.
+
+**Exit criteria**
+- Certification-restricted documents are blocked with explicit rationale.
+- TSA/trust failures map to stable failure codes and user-readable messages.
+- No sensitive data appears in logs under negative-path testing.
+
+## Phase 6 (Week 9): Packaging and runtime validation (Mint 22.3)
+- Finalize PyInstaller one-dir spec including Qt plugins and render backend runtime assets.
+- Produce reproducible build script and checksum output.
+- Run clean-VM smoke tests for startup, render, sign, timestamp, and offline error handling.
+
+**Exit criteria**
+- Bundle launches on clean Mint 22.3 without system Python dependencies.
+- No missing plugin/runtime dependency errors.
+- Signing workflow completes end-to-end in packaged artifact.
+
+## Phase 7 (Week 10): Full-system QA, compatibility matrix, and release readiness
+- Execute compatibility matrix across PDF versions (`1.4`–`2.0`), signed/unsigned inputs, and certification states.
+- Validate interoperability with Acrobat and Okular for signed output checks.
+- Measure and document release metrics: startup time, first render, idle memory, bundle size.
+- Publish user-facing compatibility/help documentation and known limitations.
+
+**Exit criteria**
+- All mandatory FRs accepted or formally deferred with release note rationale.
+- Release candidate signed off with documented residual risks.
+- Go/no-go decision based on objective quality gates.
+
+---
 ---
 
 ## Final recommendation
