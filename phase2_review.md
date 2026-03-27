@@ -34,15 +34,15 @@ Completed against FR-9/FR-16 foundations:
 - Viewer performance timing tracker now captures first-render and navigation samples for FR-13 instrumentation.
 
 Still missing before declaring Phase 2 complete:
-- Interactive viewer widget wiring that uses transform utilities for placement interactions.
-- Integration of timing tracker emission into the eventual Qt viewer workflow (metrics capture is implemented, but not yet wired into UI lifecycle).
+- Concrete Qt widget implementation that binds these workflow hooks to real mouse/paint events.
 - Runtime validation of Qt adapter behavior against an environment with PySide6/QtPdf installed.
 
 Work advanced in this update:
 - Added `ViewerSession` application helper to centralize page navigation and zoom controls (next/previous/jump, zoom in/out/reset, fit-to-width/page with clamps).
 - Added `QtPdfRenderBackend` scaffold in `infra.render` with lazy import diagnostics and request validation behavior.
 - Added `ViewerPerformanceTracker` in `application` to record first-render and navigation timing metrics for FR-13 evidence.
-- Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, and Qt backend fallback handling.
+- Added `ViewerWorkflow` integration helper to wire render backend calls, page geometry, selection-to-PDF coordinate transforms, and timing metrics in one UI-facing workflow contract.
+- Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, Qt backend fallback handling, and viewer workflow integration semantics.
 
 ## Suggested next implementation steps
 1. Wire `QtPdfRenderBackend` into a simple interactive Qt preview widget and verify rendering against sample PDFs.
