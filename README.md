@@ -26,8 +26,9 @@ Foundations for a Linux desktop PDF signing app.
   - Qt render backend scaffold with graceful diagnostics when Qt bindings are unavailable
   - `ViewerSession` helper for page navigation and zoom/fit interactions
   - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
-  - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for eventual Qt widget integration
-- unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, and viewer session behavior
+  - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for Qt widget integration
+  - Qt preview widget adapter (`presentation.qt`) with wheel zoom + drag-selection wiring to viewer workflow
+- unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, and Qt widget dependency diagnostics
 
 ## Local development
 
