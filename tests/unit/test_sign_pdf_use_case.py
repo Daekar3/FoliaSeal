@@ -202,6 +202,37 @@ def test_sign_use_case_rejects_paths_pointing_to_same_file_via_relative_path(
     assert result.failure_code == FailureCode.OUTPUT_PATH_INVALID
 
 
+def test_sign_use_case_maps_path_normalization_errors_to_stable_failure_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    def _raise_runtime_error(_input: str, _output: str) -> bool:
+        raise RuntimeError("Could not determine home directory")
+
+    monkeypatch.setattr(use_case, "_paths_conflict", _raise_runtime_error)
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.UNEXPECTED_INTERNAL_ERROR
+
+
 def test_sign_use_case_returns_post_verify_failed_when_timestamp_not_found(tmp_path: Path) -> None:
     request = _request(tmp_path)
     use_case = SignPdfUseCase(
