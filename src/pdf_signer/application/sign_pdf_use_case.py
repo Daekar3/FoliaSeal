@@ -11,7 +11,12 @@ from pdf_signer.application.pdf_compatibility import (
     PdfCompatibilityError,
     PdfCompatibilityProfile,
 )
-from pdf_signer.domain.errors import FailureCode
+from pdf_signer.domain.errors import (
+    CertificateLoadError,
+    CertificateWrongPasswordError,
+    FailureCode,
+    TsaUnavailableError,
+)
 from pdf_signer.domain.models import (
     SigningOutput,
     SigningRequest,
@@ -119,6 +124,24 @@ class SignPdfUseCase:
             return SigningResult(
                 success=False,
                 failure_code=FailureCode.INPUT_PDF_INVALID,
+                message=str(exc),
+            )
+        except CertificateWrongPasswordError as exc:
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.PKCS12_WRONG_PASSWORD,
+                message=str(exc),
+            )
+        except CertificateLoadError as exc:
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.PKCS12_LOAD_FAILED,
+                message=str(exc),
+            )
+        except TsaUnavailableError as exc:
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.TSA_UNREACHABLE,
                 message=str(exc),
             )
         except PermissionError as exc:

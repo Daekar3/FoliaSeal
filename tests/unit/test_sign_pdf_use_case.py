@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 
 from pdf_signer.application.sign_pdf_use_case import SignPdfUseCase
-from pdf_signer.domain.errors import FailureCode
+from pdf_signer.domain.errors import (
+    CertificateLoadError,
+    CertificateWrongPasswordError,
+    FailureCode,
+    TsaUnavailableError,
+)
 from pdf_signer.domain.models import SigningOutput, SigningRequest, VerificationSummary
 
 
@@ -234,6 +239,57 @@ def test_sign_use_case_maps_value_error_to_pdf_signing_failed(tmp_path: Path) ->
 
     assert result.success is False
     assert result.failure_code == FailureCode.PDF_SIGNING_FAILED
+
+
+def test_sign_use_case_maps_wrong_pkcs12_password(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=RaisingSigner(error=CertificateWrongPasswordError("bad passphrase")),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.PKCS12_WRONG_PASSWORD
+
+
+def test_sign_use_case_maps_pkcs12_load_failures(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=RaisingSigner(error=CertificateLoadError("broken pkcs12")),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.PKCS12_LOAD_FAILED
+
+
+def test_sign_use_case_maps_tsa_unreachable(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=RaisingSigner(error=TsaUnavailableError("tsa timeout")),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.TSA_UNREACHABLE
 
 
 def test_sign_use_case_maps_unexpected_errors_to_unexpected_internal_error(tmp_path: Path) -> None:
