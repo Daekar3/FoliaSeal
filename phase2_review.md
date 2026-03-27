@@ -26,3 +26,9 @@ Reviewer: Codex agent
 2. Build a lightweight render cache policy object and unit tests.
 3. Wire the transform helpers into a simple interactive preview widget prototype.
 4. Capture baseline first-render / navigation timing metrics for Phase 2 exit criteria.
+
+## Error review findings (2026-03-27 follow-up)
+- **Gap found:** coordinate transforms did not reject invalid page boxes (zero/negative width or height), which could silently produce nonsensical placements.
+- **Fix applied:** added explicit `PageBox` validation across conversion and bounds-check functions, with regression tests.
+- **Gap found:** no cache policy primitive existed yet for rendered page buffers.
+- **Fix applied:** added an in-memory LRU cache policy object (`RenderCachePolicy`) plus unit tests for hit, eviction, and invalidation behavior.

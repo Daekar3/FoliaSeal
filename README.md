@@ -22,6 +22,7 @@ Foundations for a Linux desktop PDF signing app.
   - render adapter abstraction (`infra.render`) and fallback backend diagnostics
   - deterministic view↔PDF coordinate transform utilities (zoom, pan, rotation, page-box offsets)
   - pre-sign PDF rectangle bounds validation helper
+  - page render LRU cache policy primitives for upcoming viewer integration
 - unit tests expanded for render adapter fallback behavior and coordinate-transform matrix checks
 
 ## Local development
