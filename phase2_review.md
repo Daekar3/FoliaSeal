@@ -24,7 +24,7 @@ Reviewer: Codex agent
 
 ## Phase 2 completeness status (2026-03-27 reassessment)
 
-**Assessment:** 🟡 In progress (closer to complete; final UI wiring pending).
+**Assessment:** 🟡 In progress (final runtime validation pending).
 
 Completed against FR-9/FR-16 foundations:
 - Render backend abstraction + fallback diagnostics are present.
@@ -34,21 +34,20 @@ Completed against FR-9/FR-16 foundations:
 - Viewer performance timing tracker now captures first-render and navigation samples for FR-13 instrumentation.
 
 Still missing before declaring Phase 2 complete:
-- Concrete Qt widget implementation that binds these workflow hooks to real mouse/paint events.
-- Runtime validation of Qt adapter behavior against an environment with PySide6/QtPdf installed.
+- Runtime validation of Qt adapter/widget behavior against an environment with PySide6/QtPdf installed.
 
 Work advanced in this update:
 - Added `ViewerSession` application helper to centralize page navigation and zoom controls (next/previous/jump, zoom in/out/reset, fit-to-width/page with clamps).
 - Added `QtPdfRenderBackend` scaffold in `infra.render` with lazy import diagnostics and request validation behavior.
 - Added `ViewerPerformanceTracker` in `application` to record first-render and navigation timing metrics for FR-13 evidence.
 - Added `ViewerWorkflow` integration helper to wire render backend calls, page geometry, selection-to-PDF coordinate transforms, and timing metrics in one UI-facing workflow contract.
-- Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, Qt backend fallback handling, and viewer workflow integration semantics.
+- Added a Qt preview widget adapter in `presentation.qt` that binds render refresh, wheel-zoom, paint, and drag-selection events to `ViewerWorkflow` hooks.
+- Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, Qt backend fallback handling, Qt widget dependency diagnostics, and viewer workflow integration semantics.
 
 ## Suggested next implementation steps
-1. Wire `QtPdfRenderBackend` into a simple interactive Qt preview widget and verify rendering against sample PDFs.
-2. Connect `ViewerPerformanceTracker` calls into first-render + page navigation UI lifecycle events.
-3. Wire transform helpers into placement interactions (drag/create signature rectangle) in the preview widget.
-4. Capture and document baseline timing metrics from a Qt-enabled environment for Phase 2 exit criteria.
+1. Validate `QtPdfRenderBackend` + `PdfViewerWidgetAdapter` rendering behavior end-to-end in a PySide6/QtPdf-enabled environment with sample PDFs.
+2. Add UI error handling for out-of-bounds selections and backend runtime failures in the Qt widget layer.
+3. Capture and document baseline timing metrics from a Qt-enabled environment for Phase 2 exit criteria.
 
 ## Error review findings (2026-03-27 follow-up)
 - **Gap found:** coordinate transforms did not reject invalid page boxes (zero/negative width or height), which could silently produce nonsensical placements.

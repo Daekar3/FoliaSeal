@@ -118,3 +118,19 @@ def test_selection_uses_live_pan_state_after_render() -> None:
     assert rect.x2 == pytest.approx(25.0)
     assert rect.y1 == pytest.approx(33.0)
     assert rect.y2 == pytest.approx(43.0)
+
+def test_zoom_controls_delegate_to_viewer_session() -> None:
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_FakeRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+
+    assert workflow.zoom_in() == pytest.approx(1.25)
+    assert workflow.zoom_out() == pytest.approx(1.0)
+    assert workflow.fit_to_width(viewport_width_px=400.0, page_width_px=200.0) == pytest.approx(2.0)
+    assert workflow.fit_to_page(
+        viewport_height_px=150.0,
+        page_height_px=200.0,
+    ) == pytest.approx(0.75)
+    assert workflow.reset_zoom() == pytest.approx(1.0)

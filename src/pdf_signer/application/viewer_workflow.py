@@ -58,6 +58,31 @@ class ViewerWorkflow:
     def timing_tracker(self) -> ViewerPerformanceTracker:
         return self._performance_tracker
 
+    @property
+    def session(self) -> ViewerSession:
+        return self._session
+
+    def zoom_in(self) -> float:
+        return self._session.zoom_in()
+
+    def zoom_out(self) -> float:
+        return self._session.zoom_out()
+
+    def reset_zoom(self) -> float:
+        return self._session.reset_zoom()
+
+    def fit_to_width(self, *, viewport_width_px: float, page_width_px: float) -> float:
+        return self._session.fit_to_width(
+            viewport_width_px=viewport_width_px,
+            page_width_px=page_width_px,
+        )
+
+    def fit_to_page(self, *, viewport_height_px: float, page_height_px: float) -> float:
+        return self._session.fit_to_page(
+            viewport_height_px=viewport_height_px,
+            page_height_px=page_height_px,
+        )
+
     def set_pan(self, *, pan_x: float, pan_y: float) -> None:
         self._pan_x = pan_x
         self._pan_y = pan_y
