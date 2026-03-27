@@ -101,3 +101,20 @@ def test_selection_rejects_out_of_page_bounds() -> None:
 
     with pytest.raises(ValueError, match="out of page bounds"):
         workflow.selection_to_pdf_rect(selection=ViewRect(x1=-20, y1=10, x2=10, y2=20))
+
+
+def test_selection_uses_live_pan_state_after_render() -> None:
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_FakeRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    workflow.render_current_page()
+    workflow.set_pan(pan_x=5.0, pan_y=3.0)
+
+    rect = workflow.selection_to_pdf_rect(selection=ViewRect(x1=10, y1=10, x2=30, y2=20))
+
+    assert rect.x1 == pytest.approx(5.0)
+    assert rect.x2 == pytest.approx(25.0)
+    assert rect.y1 == pytest.approx(33.0)
+    assert rect.y2 == pytest.approx(43.0)

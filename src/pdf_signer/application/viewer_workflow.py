@@ -119,7 +119,7 @@ class ViewerWorkflow:
         snapshot = self._require_snapshot()
         pdf_rect = view_rect_to_pdf_rect(
             view_rect=selection,
-            transform=ViewTransform(zoom=snapshot.zoom, pan_x=snapshot.pan_x, pan_y=snapshot.pan_y),
+            transform=ViewTransform(zoom=snapshot.zoom, pan_x=self._pan_x, pan_y=self._pan_y),
             page_box=snapshot.page_box,
             rotation=snapshot.rotation,
         )
