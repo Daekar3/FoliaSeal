@@ -10,22 +10,28 @@ class ConfigValidationError(ValueError):
     """Raised when a persisted config payload has invalid shape or types."""
 
 
+def _require_value(payload: dict[str, Any], field: str) -> Any:
+    if field not in payload:
+        raise ConfigValidationError(f"Field '{field}' is required.")
+    return payload[field]
+
+
 def _require_int(payload: dict[str, Any], field: str) -> int:
-    value = payload[field]
+    value = _require_value(payload, field)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigValidationError(f"Field '{field}' must be an int.")
     return value
 
 
 def _require_bool(payload: dict[str, Any], field: str) -> bool:
-    value = payload[field]
+    value = _require_value(payload, field)
     if not isinstance(value, bool):
         raise ConfigValidationError(f"Field '{field}' must be a bool.")
     return value
 
 
 def _require_str(payload: dict[str, Any], field: str) -> str:
-    value = payload[field]
+    value = _require_value(payload, field)
     if not isinstance(value, str):
         raise ConfigValidationError(f"Field '{field}' must be a str.")
     return value
