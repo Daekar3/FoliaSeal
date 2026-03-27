@@ -172,3 +172,41 @@ def test_mouse_release_event_handles_selection_conversion_failures(monkeypatch):
     widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=20))
 
     assert selected == []
+
+
+def test_mouse_release_event_reports_selection_mapping_errors(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = _build_workflow()
+    selected = []
+    errors = []
+
+    widget = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
+    widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=10, y=10))
+    widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=20))
+
+    assert selected == []
+    assert len(errors) == 1
+    assert "Failed to map selection" in errors[0]
+
+
+def test_refresh_reports_render_errors(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    class _BrokenWorkflow:
+        def render_current_page(self, *, elapsed_ms=None, navigation=False):
+            raise RuntimeError("render backend unavailable")
+
+    errors = []
+    widget = PdfViewerWidgetAdapter().create(
+        workflow=_BrokenWorkflow(),
+        on_error=errors.append,
+    )
+
+    widget.refresh()
+
+    assert len(errors) == 1
+    assert "Failed to render PDF preview" in errors[0]

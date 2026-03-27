@@ -41,6 +41,7 @@ class PdfViewerWidgetAdapter:
         *,
         workflow: ViewerWorkflow,
         on_selection: Callable[[object], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ) -> Any:
         bindings = self._bindings
 
@@ -49,15 +50,20 @@ class PdfViewerWidgetAdapter:
                 super().__init__()
                 self._workflow = workflow
                 self._on_selection = on_selection
+                self._on_error = on_error
                 self._pixmap: Any | None = None
                 self._drag_origin: Any | None = None
                 self._selection_rect: Any | None = None
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
-                result = self._workflow.render_current_page(
-                    elapsed_ms=elapsed_ms,
-                    navigation=navigation,
-                )
+                try:
+                    result = self._workflow.render_current_page(
+                        elapsed_ms=elapsed_ms,
+                        navigation=navigation,
+                    )
+                except Exception as exc:  # pragma: no cover - integration behavior
+                    self._emit_error(f"Failed to render PDF preview: {exc}")
+                    return
                 image = bindings.q_image(
                     result.rgba_bytes,
                     result.width_px,
@@ -122,12 +128,17 @@ class PdfViewerWidgetAdapter:
                             y2=float(rect.bottom()),
                         )
                     )
-                except (RuntimeError, ValueError):
+                except (RuntimeError, ValueError) as exc:
+                    self._emit_error(f"Failed to map selection into PDF coordinates: {exc}")
                     self.update()
                     return
                 if self._on_selection is not None:
                     self._on_selection(pdf_rect)
                 self.update()
+
+            def _emit_error(self, message: str) -> None:
+                if self._on_error is not None:
+                    self._on_error(message)
 
         return PdfPreviewWidget()
 
@@ -159,7 +170,12 @@ def build_qt_pdf_viewer_widget(
     *,
     workflow: ViewerWorkflow,
     on_selection: Callable[[object], None] | None = None,
+    on_error: Callable[[str], None] | None = None,
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
 
-    return PdfViewerWidgetAdapter().create(workflow=workflow, on_selection=on_selection)
+    return PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=on_selection,
+        on_error=on_error,
+    )
