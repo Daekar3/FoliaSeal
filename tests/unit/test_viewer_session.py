@@ -50,6 +50,22 @@ def test_fit_to_width_and_page_clamp_to_limits() -> None:
     assert session.fit_to_page(viewport_height_px=50, page_height_px=1000) == 0.25
 
 
+def test_initial_and_reset_zoom_are_clamped_to_configured_limits() -> None:
+    above_one = ViewerSession(
+        page_count=1,
+        zoom_limits=ViewerZoomLimits(minimum=1.5, maximum=4.0, step=1.25),
+    )
+    assert above_one.zoom == 1.5
+    assert above_one.reset_zoom() == 1.5
+
+    below_one = ViewerSession(
+        page_count=1,
+        zoom_limits=ViewerZoomLimits(minimum=0.25, maximum=0.8, step=1.25),
+    )
+    assert below_one.zoom == 0.8
+    assert below_one.reset_zoom() == 0.8
+
+
 @pytest.mark.parametrize(
     ("page_count", "limits"),
     [

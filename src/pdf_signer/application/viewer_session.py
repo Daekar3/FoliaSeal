@@ -38,7 +38,7 @@ class ViewerSession:
         self._current_page = 0
         self._zoom_limits = zoom_limits or ViewerZoomLimits()
         self._zoom_limits.validate()
-        self._zoom = 1.0
+        self._zoom = self._default_zoom()
 
     @property
     def page_count(self) -> int:
@@ -83,7 +83,7 @@ class ViewerSession:
         return self._zoom
 
     def reset_zoom(self) -> float:
-        self._zoom = 1.0
+        self._zoom = self._default_zoom()
         return self._zoom
 
     def fit_to_width(self, viewport_width_px: float, page_width_px: float) -> float:
@@ -101,3 +101,6 @@ class ViewerSession:
             raise ValueError("page extent must be greater than zero.")
         computed = viewport_extent / page_extent
         return min(max(computed, self._zoom_limits.minimum), self._zoom_limits.maximum)
+
+    def _default_zoom(self) -> float:
+        return min(max(1.0, self._zoom_limits.minimum), self._zoom_limits.maximum)
