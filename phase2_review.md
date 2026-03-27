@@ -24,7 +24,7 @@ Reviewer: Codex agent
 
 ## Phase 2 completeness status (2026-03-27 reassessment)
 
-**Assessment:** 🟡 In progress (final runtime validation pending).
+**Assessment:** 🟡 In progress (runtime validation + timing baselines pending).
 
 Completed against FR-9/FR-16 foundations:
 - Render backend abstraction + fallback diagnostics are present.
@@ -35,6 +35,7 @@ Completed against FR-9/FR-16 foundations:
 
 Still missing before declaring Phase 2 complete:
 - Runtime validation of Qt adapter/widget behavior against an environment with PySide6/QtPdf installed.
+- Capture baseline timing evidence from a Qt-enabled environment and record it against FR-13.
 
 Work advanced in this update:
 - Added `ViewerSession` application helper to centralize page navigation and zoom controls (next/previous/jump, zoom in/out/reset, fit-to-width/page with clamps).
@@ -42,12 +43,13 @@ Work advanced in this update:
 - Added `ViewerPerformanceTracker` in `application` to record first-render and navigation timing metrics for FR-13 evidence.
 - Added `ViewerWorkflow` integration helper to wire render backend calls, page geometry, selection-to-PDF coordinate transforms, and timing metrics in one UI-facing workflow contract.
 - Added a Qt preview widget adapter in `presentation.qt` that binds render refresh, wheel-zoom, paint, and drag-selection events to `ViewerWorkflow` hooks.
+- Added UI-level error callback wiring in the Qt preview widget so render failures and invalid/out-of-bounds selection attempts can surface actionable messages to the host UI.
 - Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, Qt backend fallback handling, Qt widget dependency diagnostics, and viewer workflow integration semantics.
 
 ## Suggested next implementation steps
 1. Validate `QtPdfRenderBackend` + `PdfViewerWidgetAdapter` rendering behavior end-to-end in a PySide6/QtPdf-enabled environment with sample PDFs.
-2. Add UI error handling for out-of-bounds selections and backend runtime failures in the Qt widget layer.
-3. Capture and document baseline timing metrics from a Qt-enabled environment for Phase 2 exit criteria.
+2. Capture and document baseline timing metrics from a Qt-enabled environment for Phase 2 exit criteria.
+3. Finalize a lightweight manual QA checklist (zoom/nav/selection/error surfaces) and attach evidence to the Phase 2 exit review.
 
 ## Error review findings (2026-03-27 follow-up)
 - **Gap found:** coordinate transforms did not reject invalid page boxes (zero/negative width or height), which could silently produce nonsensical placements.
