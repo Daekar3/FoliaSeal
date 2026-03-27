@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 
 class PdfCompatibilityError(ValueError):
@@ -13,8 +14,8 @@ class PdfCompatibilityError(ValueError):
 class PdfCompatibilityProfile:
     """Policy rules for opening/signing PDFs in the v1 signing flow."""
 
-    min_open_version: float = 1.4
-    max_open_version: float = 2.0
+    min_open_version: Decimal = Decimal("1.4")
+    max_open_version: Decimal = Decimal("2.0")
     preserve_input_version: bool = True
 
     def ensure_open_version_supported(self, input_pdf_version: str) -> None:
@@ -23,7 +24,7 @@ class PdfCompatibilityProfile:
         if parsed < self.min_open_version or parsed > self.max_open_version:
             raise PdfCompatibilityError(
                 f"Unsupported PDF version '{input_pdf_version}'. "
-                f"Supported range is {self.min_open_version:.1f} to {self.max_open_version:.1f}."
+                f"Supported range is {self.min_open_version} to {self.max_open_version}."
             )
 
     def ensure_output_version_policy(self, input_pdf_version: str, output_pdf_version: str) -> None:
@@ -53,8 +54,12 @@ class PdfCompatibilityProfile:
         )
 
     @staticmethod
-    def _parse_pdf_version(version: str) -> float:
+    def _parse_pdf_version(version: str) -> Decimal:
         try:
-            return float(version)
-        except ValueError as exc:
+            parsed = Decimal(version)
+        except InvalidOperation as exc:
             raise PdfCompatibilityError(f"Invalid PDF version string '{version}'.") from exc
+
+        if not parsed.is_finite():
+            raise PdfCompatibilityError(f"Invalid PDF version string '{version}'.")
+        return parsed
