@@ -19,6 +19,8 @@ from pdf_signer.infra.render.base import (
 class _QtBindings:
     qpdf_document: type[Any]
     qimage: type[Any]
+    qsize: type[Any]
+    qpdf_document_render_options: type[Any]
 
 
 class QtPdfRenderBackend:
@@ -50,9 +52,8 @@ class QtPdfRenderBackend:
 
     def get_page_geometry(self, document_path: str, page_index: int) -> PdfPageGeometry:
         document = self._open_document(document_path)
-        page = self._get_page(document, page_index)
-
-        media = tuple(float(v) for v in page.pageSizePoints())
+        page_index = self._validated_page_index(document, page_index)
+        media = tuple(float(v) for v in document.pagePointSize(page_index).toTuple())
         width, height = media
         media_box = (0.0, 0.0, width, height)
 
@@ -61,7 +62,7 @@ class QtPdfRenderBackend:
         return PdfPageGeometry(
             media_box=media_box,
             crop_box=media_box,
-            rotation=int(page.rotation()),
+            rotation=0,
         )
 
     def render_page(self, request: RenderPageRequest) -> RenderPageResult:
@@ -69,9 +70,11 @@ class QtPdfRenderBackend:
             raise ValueError("zoom must be greater than zero.")
 
         document = self._open_document(request.document_path)
-        page = self._get_page(document, request.page_index)
+        page_index = self._validated_page_index(document, request.page_index)
 
-        width_pts, height_pts = (float(v) for v in page.pageSizePoints())
+        width_pts, height_pts = (
+            float(v) for v in document.pagePointSize(page_index).toTuple()
+        )
         target_width = max(1, int(round(width_pts * request.zoom)))
         target_height = max(1, int(round(height_pts * request.zoom)))
 
@@ -82,12 +85,13 @@ class QtPdfRenderBackend:
         )
         image.fill(0)
 
-        painter = self._import_type("PySide6.QtGui", "QPainter")(image)
-        try:
-            render_opts = self._import_type("PySide6.QtPdf", "QPdfDocumentRenderOptions")()
-            page.render(painter, render_opts)
-        finally:
-            painter.end()
+        render_opts = self._bindings.qpdf_document_render_options()  # type: ignore[union-attr]
+        rendered = document.render(  # type: ignore[no-untyped-call]
+            page_index,
+            self._bindings.qsize(target_width, target_height),  # type: ignore[union-attr]
+            render_opts,
+        )
+        image = rendered.convertToFormat(self._bindings.qimage.Format_RGBA8888)  # type: ignore[union-attr]
 
         raw = image.bits().tobytes(target_width * target_height * 4)
         return RenderPageResult(width_px=target_width, height_px=target_height, rgba_bytes=raw)
@@ -103,11 +107,11 @@ class QtPdfRenderBackend:
             raise RuntimeError(f"Failed to load PDF document: {document_path}")
         return document
 
-    def _get_page(self, document: Any, page_index: int) -> Any:
+    def _validated_page_index(self, document: Any, page_index: int) -> int:
         page_count = int(document.pageCount())
         if page_index < 0 or page_index >= page_count:
             raise ValueError(f"page_index out of range for document: {page_index}")
-        return document.page(page_index)
+        return page_index
 
     def _require_available(self) -> None:
         if self._bindings is None:
@@ -117,10 +121,19 @@ class QtPdfRenderBackend:
         try:
             qpdf_document = self._import_type("PySide6.QtPdf", "QPdfDocument")
             qimage = self._import_type("PySide6.QtGui", "QImage")
+            qsize = self._import_type("PySide6.QtCore", "QSize")
+            qpdf_document_render_options = self._import_type(
+                "PySide6.QtPdf", "QPdfDocumentRenderOptions"
+            )
         except Exception as exc:  # pragma: no cover - driven by environment
             self._bindings_error = str(exc)
             return None
-        return _QtBindings(qpdf_document=qpdf_document, qimage=qimage)
+        return _QtBindings(
+            qpdf_document=qpdf_document,
+            qimage=qimage,
+            qsize=qsize,
+            qpdf_document_render_options=qpdf_document_render_options,
+        )
 
     @staticmethod
     def _import_type(module: str, symbol: str) -> Any:
