@@ -20,3 +20,15 @@ class FailureCode(str, Enum):  # noqa: UP042
     POST_VERIFY_FAILED = "post_verify_failed"
     ATOMIC_WRITE_FAILED = "atomic_write_failed"
     UNEXPECTED_INTERNAL_ERROR = "unexpected_internal_error"
+
+
+class CertificateLoadError(ValueError):
+    """Base class for certificate loading/validation failures."""
+
+
+class CertificateWrongPasswordError(CertificateLoadError):
+    """Raised when PKCS#12 passphrase validation fails."""
+
+
+class TsaUnavailableError(ValueError):
+    """Raised when timestamping authority cannot be reached."""
