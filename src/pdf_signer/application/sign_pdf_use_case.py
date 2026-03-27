@@ -65,14 +65,14 @@ class SignPdfUseCase:
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""
-        if self._paths_conflict(request.input_pdf_path, request.output_pdf_path):
-            return SigningResult(
-                success=False,
-                failure_code=FailureCode.OUTPUT_PATH_INVALID,
-                message="Output path must differ from input path.",
-            )
-
         try:
+            if self._paths_conflict(request.input_pdf_path, request.output_pdf_path):
+                return SigningResult(
+                    success=False,
+                    failure_code=FailureCode.OUTPUT_PATH_INVALID,
+                    message="Output path must differ from input path.",
+                )
+
             input_pdf_version = self.inspector.get_pdf_version(request.input_pdf_path)
             self.compatibility_profile.ensure_open_version_supported(input_pdf_version)
             self.certificate_loader.validate(request.certificate_path, request.passphrase)
