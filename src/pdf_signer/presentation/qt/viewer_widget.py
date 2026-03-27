@@ -113,14 +113,18 @@ class PdfViewerWidgetAdapter:
                 self._selection_rect = None
                 self._drag_origin = None
 
-                pdf_rect = self._workflow.selection_to_pdf_rect(
-                    selection=ViewRect(
-                        x1=float(rect.left()),
-                        y1=float(rect.top()),
-                        x2=float(rect.right()),
-                        y2=float(rect.bottom()),
+                try:
+                    pdf_rect = self._workflow.selection_to_pdf_rect(
+                        selection=ViewRect(
+                            x1=float(rect.left()),
+                            y1=float(rect.top()),
+                            x2=float(rect.right()),
+                            y2=float(rect.bottom()),
+                        )
                     )
-                )
+                except (RuntimeError, ValueError):
+                    self.update()
+                    return
                 if self._on_selection is not None:
                     self._on_selection(pdf_rect)
                 self.update()
