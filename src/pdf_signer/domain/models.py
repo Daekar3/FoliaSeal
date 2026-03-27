@@ -7,14 +7,14 @@ from enum import Enum
 from typing import Protocol
 
 
-class RevisionStrategy(str, Enum):
+class RevisionStrategy(str, Enum):  # noqa: UP042
     """How an operation writes output revisions."""
 
     INCREMENTAL = "incremental"
     FULL_REWRITE = "full_rewrite"
 
 
-class DocumentOperationType(str, Enum):
+class DocumentOperationType(str, Enum):  # noqa: UP042
     """Supported operation categories."""
 
     SIGN = "sign"
