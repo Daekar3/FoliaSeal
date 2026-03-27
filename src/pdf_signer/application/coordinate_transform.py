@@ -57,6 +57,11 @@ class PageBox:
     def height(self) -> float:
         return self.top - self.bottom
 
+    def validate(self) -> None:
+        """Ensure page dimensions are strictly positive."""
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("Page box must have positive width and height.")
+
 
 def _normalize_rotation(rotation: int) -> int:
     if rotation % 90 != 0:
@@ -103,6 +108,12 @@ def _display_to_pdf_local(
     return dy, page_box.height - dx
 
 
+def _validate_inputs(*, transform: ViewTransform, page_box: PageBox) -> None:
+    if transform.zoom <= 0:
+        raise ValueError("Zoom must be greater than zero.")
+    page_box.validate()
+
+
 def view_point_to_pdf(
     *,
     view_x: float,
@@ -112,10 +123,9 @@ def view_point_to_pdf(
     rotation: int,
 ) -> tuple[float, float]:
     """Convert one viewer-space point to PDF user-space coordinates."""
-    if transform.zoom <= 0:
-        raise ValueError("Zoom must be greater than zero.")
+    _validate_inputs(transform=transform, page_box=page_box)
 
-    display_width, display_height = _display_dimensions(page_box, rotation)
+    _, display_height = _display_dimensions(page_box, rotation)
     dx = (view_x - transform.pan_x) / transform.zoom
     dy = display_height - ((view_y - transform.pan_y) / transform.zoom)
     u, v = _display_to_pdf_local(page_box, rotation, dx, dy)
@@ -131,11 +141,9 @@ def pdf_point_to_view(
     rotation: int,
 ) -> tuple[float, float]:
     """Convert one PDF user-space point to viewer-space coordinates."""
-    if transform.zoom <= 0:
-        raise ValueError("Zoom must be greater than zero.")
+    _validate_inputs(transform=transform, page_box=page_box)
 
-    display_width, display_height = _display_dimensions(page_box, rotation)
-    _ = display_width  # documents intent for symmetry with inverse transform.
+    _, display_height = _display_dimensions(page_box, rotation)
     u = pdf_x - page_box.left
     v = pdf_y - page_box.bottom
     dx, dy = _pdf_local_to_display(page_box, rotation, u, v)
@@ -197,6 +205,7 @@ def pdf_rect_to_view_rect(
 
 def validate_pdf_rect_within_page(pdf_rect: PdfRect, *, page_box: PageBox) -> bool:
     """Validate that a rectangle stays fully within the target page box."""
+    page_box.validate()
     normalized_rect = pdf_rect.normalized()
     return (
         normalized_rect.x1 >= page_box.left
