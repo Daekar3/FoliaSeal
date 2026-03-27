@@ -23,7 +23,9 @@ Foundations for a Linux desktop PDF signing app.
   - deterministic view↔PDF coordinate transform utilities (zoom, pan, rotation, page-box offsets)
   - pre-sign PDF rectangle bounds validation helper
   - page render LRU cache policy primitives for upcoming viewer integration
+  - Qt render backend scaffold with graceful diagnostics when Qt bindings are unavailable
   - `ViewerSession` helper for page navigation and zoom/fit interactions
+  - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
 - unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, and viewer session behavior
 
 ## Local development

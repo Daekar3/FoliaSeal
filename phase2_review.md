@@ -24,27 +24,31 @@ Reviewer: Codex agent
 
 ## Phase 2 completeness status (2026-03-27 reassessment)
 
-**Assessment:** 🟡 In progress (not yet complete).
+**Assessment:** 🟡 In progress (closer to complete; final UI wiring pending).
 
 Completed against FR-9/FR-16 foundations:
 - Render backend abstraction + fallback diagnostics are present.
 - Coordinate transforms and rectangle bounds validation are implemented with tests.
 - LRU render cache policy primitives exist with deterministic eviction tests.
+- Qt render backend adapter scaffold now exists with runtime diagnostics when QtPdf bindings are unavailable.
+- Viewer performance timing tracker now captures first-render and navigation samples for FR-13 instrumentation.
 
 Still missing before declaring Phase 2 complete:
-- Concrete Qt render backend adapter implementation (page geometry + raster render path).
 - Interactive viewer widget wiring that uses transform utilities for placement interactions.
-- Explicit first-render and navigation timing instrumentation for performance exit criteria (FR-13).
+- Integration of timing tracker emission into the eventual Qt viewer workflow (metrics capture is implemented, but not yet wired into UI lifecycle).
+- Runtime validation of Qt adapter behavior against an environment with PySide6/QtPdf installed.
 
 Work advanced in this update:
 - Added `ViewerSession` application helper to centralize page navigation and zoom controls (next/previous/jump, zoom in/out/reset, fit-to-width/page with clamps).
-- Added unit tests to lock deterministic behavior and input validation for viewer interaction state.
+- Added `QtPdfRenderBackend` scaffold in `infra.render` with lazy import diagnostics and request validation behavior.
+- Added `ViewerPerformanceTracker` in `application` to record first-render and navigation timing metrics for FR-13 evidence.
+- Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, and Qt backend fallback handling.
 
 ## Suggested next implementation steps
-1. Add a concrete Qt-based render adapter behind `PdfRenderBackend`.
-2. Build a lightweight render cache policy object and unit tests.
-3. Wire the transform helpers into a simple interactive preview widget prototype.
-4. Capture baseline first-render / navigation timing metrics for Phase 2 exit criteria.
+1. Wire `QtPdfRenderBackend` into a simple interactive Qt preview widget and verify rendering against sample PDFs.
+2. Connect `ViewerPerformanceTracker` calls into first-render + page navigation UI lifecycle events.
+3. Wire transform helpers into placement interactions (drag/create signature rectangle) in the preview widget.
+4. Capture and document baseline timing metrics from a Qt-enabled environment for Phase 2 exit criteria.
 
 ## Error review findings (2026-03-27 follow-up)
 - **Gap found:** coordinate transforms did not reject invalid page boxes (zero/negative width or height), which could silently produce nonsensical placements.
