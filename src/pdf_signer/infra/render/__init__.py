@@ -8,8 +8,11 @@ from pdf_signer.infra.render.base import (
     RenderPageRequest,
     RenderPageResult,
 )
+from pdf_signer.infra.render.cache import RenderCacheKey, RenderCachePolicy
 
 __all__ = [
+    "RenderCacheKey",
+    "RenderCachePolicy",
     "NullPdfRenderBackend",
     "PdfPageGeometry",
     "PdfRenderBackend",
