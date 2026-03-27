@@ -139,6 +139,12 @@ class SignPdfUseCase:
                 failure_code=FailureCode.ATOMIC_WRITE_FAILED,
                 message=str(exc),
             )
+        except Exception as exc:  # pragma: no cover - defensive mapping for stable contracts.
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.UNEXPECTED_INTERNAL_ERROR,
+                message=str(exc),
+            )
 
     @staticmethod
     def _write_atomically(output_path: str, output_bytes: bytes) -> None:
