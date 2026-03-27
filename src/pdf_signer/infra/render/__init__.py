@@ -9,6 +9,7 @@ from pdf_signer.infra.render.base import (
     RenderPageResult,
 )
 from pdf_signer.infra.render.cache import RenderCacheKey, RenderCachePolicy
+from pdf_signer.infra.render.qt_backend import QtPdfRenderBackend
 
 __all__ = [
     "RenderCacheKey",
@@ -19,4 +20,5 @@ __all__ = [
     "RenderBackendDiagnostic",
     "RenderPageRequest",
     "RenderPageResult",
+    "QtPdfRenderBackend",
 ]
