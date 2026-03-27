@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
+
 from pdf_signer.application.sign_pdf_use_case import SignPdfUseCase
 from pdf_signer.domain.errors import FailureCode
 from pdf_signer.domain.models import SigningOutput, SigningRequest, VerificationSummary
@@ -36,6 +38,14 @@ class StubVerifier:
 
     def verify(self, output_pdf_path: str) -> VerificationSummary:
         return self.summary
+
+
+@dataclass
+class RaisingSigner:
+    error: Exception
+
+    def sign(self, request: SigningRequest) -> SigningOutput:
+        raise self.error
 
 
 def _request(tmp_path: Path) -> SigningRequest:
@@ -121,3 +131,153 @@ def test_sign_use_case_rejects_unsupported_input_version(tmp_path: Path) -> None
 
     assert result.success is False
     assert result.failure_code == FailureCode.INPUT_PDF_INVALID
+
+
+def test_sign_use_case_rejects_equal_input_and_output_paths(tmp_path: Path) -> None:
+    request = SigningRequest(
+        input_pdf_path=str(tmp_path / "same.pdf"),
+        output_pdf_path=str(tmp_path / "same.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=True,
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.OUTPUT_PATH_INVALID
+
+
+def test_sign_use_case_returns_post_verify_failed_when_timestamp_not_found(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=False)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.POST_VERIFY_FAILED
+
+
+def test_sign_use_case_allows_missing_timestamp_when_optional(tmp_path: Path) -> None:
+    request = SigningRequest(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=False,
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=False,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=False)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert result.timestamp_present is False
+
+
+def test_sign_use_case_maps_value_error_to_pdf_signing_failed(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=RaisingSigner(error=ValueError("signing failed")),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.PDF_SIGNING_FAILED
+
+
+def test_sign_use_case_maps_unexpected_errors_to_unexpected_internal_error(tmp_path: Path) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=RaisingSigner(error=RuntimeError("boom")),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.UNEXPECTED_INTERNAL_ERROR
+
+
+def test_sign_use_case_maps_oserror_during_atomic_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _request(tmp_path)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+    def _raise_oserror(_output_path: str, _output_bytes: bytes) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(SignPdfUseCase, "_write_atomically", staticmethod(_raise_oserror))
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.ATOMIC_WRITE_FAILED
