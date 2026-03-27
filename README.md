@@ -18,6 +18,11 @@ Foundations for a Linux desktop PDF signing app.
     (`OUTPUT_PATH_INVALID`, `PKCS12_WRONG_PASSWORD`, `PKCS12_LOAD_FAILED`,
     `TSA_UNREACHABLE`, `TIMESTAMP_REQUIRED_BUT_MISSING`, `POST_VERIFY_FAILED`,
     `PDF_SIGNING_FAILED`, `ATOMIC_WRITE_FAILED`, `UNEXPECTED_INTERNAL_ERROR`)
+- Phase 2 kickoff viewer foundations with:
+  - render adapter abstraction (`infra.render`) and fallback backend diagnostics
+  - deterministic view↔PDF coordinate transform utilities (zoom, pan, rotation, page-box offsets)
+  - pre-sign PDF rectangle bounds validation helper
+- unit tests expanded for render adapter fallback behavior and coordinate-transform matrix checks
 
 ## Local development
 
