@@ -63,6 +63,8 @@ class PdfViewerWidgetAdapter:
                     )
                 except Exception as exc:  # pragma: no cover - integration behavior
                     self._emit_error(f"Failed to render PDF preview: {exc}")
+                    if self._on_error is None:
+                        raise
                     return
                 image = bindings.q_image(
                     result.rgba_bytes,
