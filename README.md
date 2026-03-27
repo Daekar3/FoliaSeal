@@ -12,6 +12,9 @@ Foundations for a Linux desktop PDF signing app.
   - stable failure-code mapping and structured signing results
   - temp-file + atomic replace output writes
 - unit tests for schema validation, compatibility policy, operation registry behavior, and signing orchestration
+  - signing orchestration tests include success path plus explicit failure-code mapping checks
+    (`OUTPUT_PATH_INVALID`, `TIMESTAMP_REQUIRED_BUT_MISSING`, `POST_VERIFY_FAILED`,
+    `PDF_SIGNING_FAILED`, `ATOMIC_WRITE_FAILED`, `UNEXPECTED_INTERNAL_ERROR`)
 
 ## Local development
 
