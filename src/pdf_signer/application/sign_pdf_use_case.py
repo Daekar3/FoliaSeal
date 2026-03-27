@@ -65,7 +65,7 @@ class SignPdfUseCase:
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""
-        if request.input_pdf_path == request.output_pdf_path:
+        if self._paths_conflict(request.input_pdf_path, request.output_pdf_path):
             return SigningResult(
                 success=False,
                 failure_code=FailureCode.OUTPUT_PATH_INVALID,
@@ -170,11 +170,26 @@ class SignPdfUseCase:
             )
 
     @staticmethod
+    def _paths_conflict(input_pdf_path: str, output_pdf_path: str) -> bool:
+        """Return whether two paths refer to the same intended file."""
+        input_path = Path(input_pdf_path).expanduser().resolve(strict=False)
+        output_path = Path(output_pdf_path).expanduser().resolve(strict=False)
+        return input_path == output_path
+
+    @staticmethod
     def _write_atomically(output_path: str, output_bytes: bytes) -> None:
         """Write to temp file then atomically replace target path."""
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        with NamedTemporaryFile(dir=destination.parent, delete=False) as temp_file:
-            temp_file.write(output_bytes)
-            temp_name = temp_file.name
-        Path(temp_name).replace(destination)
+        temp_path: Path | None = None
+        try:
+            with NamedTemporaryFile(dir=destination.parent, delete=False) as temp_file:
+                temp_file.write(output_bytes)
+                temp_path = Path(temp_file.name)
+            temp_path.replace(destination)
+        finally:
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass

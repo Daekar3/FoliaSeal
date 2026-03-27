@@ -8,12 +8,15 @@ Foundations for a Linux desktop PDF signing app.
 - initial config schemas for trust profile, timestamp policy, and signature presets
 - Phase 1 headless signing orchestration (`SignPdfUseCase`) with:
   - compatibility policy enforcement for PDF `1.4` to `2.0`
+  - strict PDF version parsing (rejects invalid/non-finite version strings)
   - incremental-signing version-preservation checks
   - stable failure-code mapping and structured signing results
-  - temp-file + atomic replace output writes
+  - output-path conflict detection using normalized filesystem paths
+  - temp-file + atomic replace output writes with temp-file cleanup
 - unit tests for schema validation, compatibility policy, operation registry behavior, and signing orchestration
   - signing orchestration tests include success path plus explicit failure-code mapping checks
-    (`OUTPUT_PATH_INVALID`, `TIMESTAMP_REQUIRED_BUT_MISSING`, `POST_VERIFY_FAILED`,
+    (`OUTPUT_PATH_INVALID`, `PKCS12_WRONG_PASSWORD`, `PKCS12_LOAD_FAILED`,
+    `TSA_UNREACHABLE`, `TIMESTAMP_REQUIRED_BUT_MISSING`, `POST_VERIFY_FAILED`,
     `PDF_SIGNING_FAILED`, `ATOMIC_WRITE_FAILED`, `UNEXPECTED_INTERNAL_ERROR`)
 
 ## Local development

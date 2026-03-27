@@ -21,6 +21,16 @@ def test_rejects_versions_outside_supported_open_range() -> None:
         profile.ensure_open_version_supported("2.1")
 
 
+def test_rejects_non_finite_or_non_numeric_versions() -> None:
+    profile = PdfCompatibilityProfile()
+
+    with pytest.raises(PdfCompatibilityError):
+        profile.ensure_open_version_supported("nan")
+
+    with pytest.raises(PdfCompatibilityError):
+        profile.ensure_open_version_supported("not-a-version")
+
+
 def test_rejects_output_version_change_when_preservation_enabled() -> None:
     profile = PdfCompatibilityProfile(preserve_input_version=True)
 

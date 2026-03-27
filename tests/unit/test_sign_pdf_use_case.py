@@ -169,6 +169,39 @@ def test_sign_use_case_rejects_equal_input_and_output_paths(tmp_path: Path) -> N
     assert result.failure_code == FailureCode.OUTPUT_PATH_INVALID
 
 
+def test_sign_use_case_rejects_paths_pointing_to_same_file_via_relative_path(
+    tmp_path: Path,
+) -> None:
+    request = SigningRequest(
+        input_pdf_path=str(tmp_path / "same.pdf"),
+        output_pdf_path=str(tmp_path / "nested" / ".." / "same.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=True,
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.OUTPUT_PATH_INVALID
+
+
 def test_sign_use_case_returns_post_verify_failed_when_timestamp_not_found(tmp_path: Path) -> None:
     request = _request(tmp_path)
     use_case = SignPdfUseCase(
