@@ -76,3 +76,14 @@ def test_optional_str_rejects_non_string_values() -> None:
 
     with pytest.raises(ConfigValidationError):
         TrustProfile.from_dict(payload)
+
+
+def test_missing_required_field_raises_config_validation_error() -> None:
+    payload = {
+        "schema_version": 1,
+        "required": True,
+        "timeout_seconds": 10,
+    }
+
+    with pytest.raises(ConfigValidationError, match=r"Field 'tsa_url' is required\."):
+        TimestampPolicy.from_dict(payload)
