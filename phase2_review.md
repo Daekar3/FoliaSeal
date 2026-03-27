@@ -21,6 +21,25 @@ Reviewer: Codex agent
 - Added rectangle normalization + bounds validation utility for pre-sign checks.
 - Added unit tests that cover transform round-trips and invalid input guards.
 
+
+## Phase 2 completeness status (2026-03-27 reassessment)
+
+**Assessment:** 🟡 In progress (not yet complete).
+
+Completed against FR-9/FR-16 foundations:
+- Render backend abstraction + fallback diagnostics are present.
+- Coordinate transforms and rectangle bounds validation are implemented with tests.
+- LRU render cache policy primitives exist with deterministic eviction tests.
+
+Still missing before declaring Phase 2 complete:
+- Concrete Qt render backend adapter implementation (page geometry + raster render path).
+- Interactive viewer widget wiring that uses transform utilities for placement interactions.
+- Explicit first-render and navigation timing instrumentation for performance exit criteria (FR-13).
+
+Work advanced in this update:
+- Added `ViewerSession` application helper to centralize page navigation and zoom controls (next/previous/jump, zoom in/out/reset, fit-to-width/page with clamps).
+- Added unit tests to lock deterministic behavior and input validation for viewer interaction state.
+
 ## Suggested next implementation steps
 1. Add a concrete Qt-based render adapter behind `PdfRenderBackend`.
 2. Build a lightweight render cache policy object and unit tests.
