@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import platform
 import re
-from importlib.util import find_spec
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
 
 from pdf_signer.application.performance_timing import ViewerTimingSnapshot
