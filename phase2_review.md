@@ -192,3 +192,38 @@ Notes:
 2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples captured from that Qt runtime.
 3. **Step 4 (FR-16 runtime metrics):** startup latency still requires measured capture from app launch flow in the PyInstaller one-dir context (idle memory/bundle size collection path is now scripted).
 4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
+
+## Completion plan execution update (2026-03-28, tooling follow-up #3)
+
+Status after this patch: **🟡 Still in progress** (Qt-host runtime execution remains required), with startup-latency capture now scripted for FR-16 evidence collection.
+
+### Completed from the plan in this patch
+
+- **Step 4 (FR-16 runtime metrics): further partial completion via startup measurement automation.**
+  - Extended the `phase2-evidence` CLI with `--measure-startup-command ...` and `--startup-timeout-seconds` so startup latency can be measured directly from a PyInstaller one-dir executable instead of manual stopwatch transcription.
+  - Kept explicit override behavior: when `--startup-ms` is supplied, it takes precedence over command-based startup measurement.
+  - Added unit tests for startup-measurement wiring in both application helpers and CLI integration.
+- **Step 1 (runtime validation sweep): checklist alignment update.**
+  - Updated manual QA command guidance to use startup auto-measurement in the recommended evidence export command.
+
+### Updated recommended evidence command for Qt-enabled host
+
+```bash
+python -m pdf_signer phase2-evidence \
+  --first-render-ms <value> \
+  --navigation-ms <value> --navigation-ms <value> ... \
+  --collect-runtime-footprint \
+  --measure-startup-command <pyinstaller_one_dir_executable> \
+  --bundle-dir <pyinstaller_one_dir_output>
+```
+
+Notes:
+- Use `--startup-ms <value>` instead of `--measure-startup-command ...` when a custom launch benchmark pipeline is required.
+- Keep the existing FR-13 threshold expectation of at least 10 navigation samples.
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** still pending execution in a real Qt runtime (`PySide6` + `QtPdf`) with checklist pass/fail notes.
+2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples captured from that Qt runtime.
+3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values captured from an actual PyInstaller one-dir run.
+4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
