@@ -318,3 +318,26 @@ def test_key_press_event_wires_keyboard_affordances(monkeypatch):
     assert "go_previous_page" in workflow.actions
     assert ("jump_to_page", 0) in workflow.actions
     assert ("jump_to_page", 3) in workflow.actions
+    assert workflow.actions.count(("render", True)) == 4
+
+
+def test_key_press_event_reports_navigation_render_errors(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    class _BrokenNavigationWorkflow:
+        def __init__(self):
+            self.session = ViewerSession(page_count=2)
+
+        def go_next_page(self, *, elapsed_ms=None):
+            raise RuntimeError("render backend unavailable")
+
+    errors = []
+    widget = PdfViewerWidgetAdapter().create(
+        workflow=_BrokenNavigationWorkflow(),
+        on_error=errors.append,
+    )
+
+    widget.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_PageDown))
+
+    assert len(errors) == 1
+    assert "Unable to render PDF preview after navigating to the next page." in errors[0]
