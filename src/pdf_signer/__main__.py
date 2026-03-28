@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 from pdf_signer.application.performance_timing import ViewerPerformanceTracker
 from pdf_signer.application.phase2_evidence import (
@@ -123,6 +124,15 @@ def _build_parser() -> argparse.ArgumentParser:
             "When supplied, pass/total counts are derived automatically."
         ),
     )
+    evidence.add_argument(
+        "--write-markdown-file",
+        type=str,
+        default=None,
+        help=(
+            "Optional file path where the generated evidence markdown should be written. "
+            "Parent directories are created when needed."
+        ),
+    )
 
     return parser
 
@@ -198,6 +208,10 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         runtime_validation=runtime_validation,
     )
     print(report)
+    if args.write_markdown_file is not None:
+        output_path = Path(args.write_markdown_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(report + "\n", encoding="utf-8")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
