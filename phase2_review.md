@@ -264,3 +264,40 @@ Notes:
 2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples captured from that Qt runtime.
 3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values captured from an actual PyInstaller one-dir run.
 4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
+
+## Completion plan execution update (2026-03-28, tooling follow-up #5)
+
+Status after this patch: **🟡 Still in progress** (real Qt-host execution is still required), with checklist-to-evidence integration now reducing manual transcription risk for Step 1/Step 5 handoff.
+
+### Completed from the plan in this patch
+
+- **Step 1 (runtime validation sweep): process support further completed.**
+  - Added checklist parsing support to `phase2-evidence` so runtime validation pass/total and open issues can be derived directly from markdown `- [x]` / `- [ ]` entries.
+  - This keeps runtime QA status in sync with the source checklist and avoids manual recount errors when attaching evidence to this review.
+- **Step 5 (exit review update): evidence assembly workflow simplified.**
+  - Updated the Phase 2 manual QA checklist to use `--qa-checklist-file` in the recommended evidence command.
+  - Optional `--qa-issue` notes can now be appended on top of checklist-derived issues for environment-specific repro details.
+
+### Updated recommended evidence command for Qt-enabled host
+
+```bash
+python -m pdf_signer phase2-evidence \
+  --first-render-ms <value> \
+  --navigation-ms <value> --navigation-ms <value> ... \
+  --collect-runtime-footprint \
+  --measure-startup-command <pyinstaller_one_dir_executable> \
+  --bundle-dir <pyinstaller_one_dir_output> \
+  --qa-checklist-file phase2_manual_qa_checklist.md \
+  --qa-issue "<optional issue note>"
+```
+
+Notes:
+- `--qa-passed-checks/--qa-total-checks` remain available for non-checklist pipelines; explicit numeric flags still override checklist-derived values when both are provided.
+- Keep the FR-13 threshold expectation of at least 10 navigation samples.
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** still pending execution in a real Qt runtime (`PySide6` + `QtPdf`) with checklist checks marked from actual run results.
+2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples captured from that Qt runtime.
+3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values captured from an actual PyInstaller one-dir run.
+4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
