@@ -23,7 +23,7 @@ It captures the remaining runtime evidence needed to close Phase 2.
 ## Timing baseline evidence (FR-13)
 - [ ] Record first-render elapsed time in milliseconds.
 - [ ] Record at least 10 navigation samples in milliseconds.
-- [ ] Export `ViewerTimingSnapshot.to_markdown()` output into Phase 2 review notes.
+- [ ] Export timing evidence markdown (via `ViewerTimingSnapshot.to_markdown()` or `build_phase2_timing_evidence(...)`) into Phase 2 review notes.
 - [ ] Attach hardware + OS context (CPU model, memory, Linux distro/version).
 
 ## Exit criteria confirmation
