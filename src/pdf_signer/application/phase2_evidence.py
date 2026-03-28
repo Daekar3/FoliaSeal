@@ -6,6 +6,10 @@ import platform
 from dataclasses import dataclass
 
 from pdf_signer.application.performance_timing import ViewerTimingSnapshot
+from pdf_signer.application.runtime_metrics import (
+    RuntimeFootprintSnapshot,
+    build_runtime_footprint_quick_check,
+)
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,7 @@ def build_phase2_timing_evidence(
     timing: ViewerTimingSnapshot,
     environment: RuntimeEnvironmentSnapshot,
     minimum_navigation_samples: int = 10,
+    runtime_footprint: RuntimeFootprintSnapshot | None = None,
 ) -> str:
     """Build markdown evidence block for Phase 2 runtime/timing sign-off."""
 
@@ -67,4 +72,15 @@ def build_phase2_timing_evidence(
             ),
         ]
     )
+
+    if runtime_footprint is not None:
+        lines.extend(
+            [
+                "",
+                runtime_footprint.to_markdown(),
+                "",
+                build_runtime_footprint_quick_check(footprint=runtime_footprint),
+            ]
+        )
+
     return "\n".join(lines)
