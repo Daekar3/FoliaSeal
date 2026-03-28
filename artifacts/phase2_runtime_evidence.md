@@ -17,7 +17,7 @@
 
 ### Runtime footprint snapshot
 - Startup latency: not recorded
-- Idle memory: 15.24 MiB
+- Idle memory: 15.37 MiB
 - Bundle size (one-dir): not recorded
 
 ### FR-16 runtime metrics quick-check
@@ -26,9 +26,8 @@
 - ⚠️ PyInstaller one-dir bundle size recorded
 
 ### Runtime validation sweep
-- ⚠️ Checklist status: 0/20 checks passed
+- ⚠️ Checklist status: 0/19 checks passed
 - Open issues:
-  - Install runtime dependencies (`PySide6`, `QtPdf` modules available in Python import path).
   - Launch the app with a representative multi-page PDF (portrait + rotated page if available).
   - Confirm preview widget loads without dependency errors.
   - Initial render succeeds on page 1.

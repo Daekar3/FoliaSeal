@@ -3,11 +3,11 @@
 Date: 2026-03-27  
 Owner: PDF Signer engineering
 
-This checklist is intended for the first environment where `PySide6` + `QtPdf` are available.
-It captures the remaining runtime evidence needed to close Phase 2.
+This checklist is intended for an environment where `PySide6` + `QtPdf` are already available.
+It records the manual runtime execution needed to close Phase 2.
+Qt dependency readiness belongs in the generated runtime evidence artifact, not in this checklist.
 
-## Setup
-- [ ] Install runtime dependencies (`PySide6`, `QtPdf` modules available in Python import path).
+## Runtime session setup
 - [ ] Launch the app with a representative multi-page PDF (portrait + rotated page if available).
 - [ ] Confirm preview widget loads without dependency errors.
 
