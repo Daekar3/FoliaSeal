@@ -409,3 +409,53 @@ Status after this patch: **🟡 Still in progress** (Qt-enabled host execution r
 2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that Qt host.
 3. **Step 4 (FR-16 runtime metrics):** capture startup latency using `--measure-startup-command` against the PyInstaller one-dir executable and bundle size via `--bundle-dir` in the target packaging output.
 4. **Step 5 (exit gate):** paste the updated artifact output from the Qt host into this review and mark Phase 2 complete only after items 1-3 are evidenced.
+
+## Completion plan execution update (2026-03-28, tooling follow-up #9)
+
+Status after this patch: **🟡 Still in progress** (Phase 2 runtime validation remains blocked on end-to-end Qt host execution), with local development/test tooling clarified and Qt backend test coverage hardened.
+
+### Completed from the plan in this patch
+
+- **Local tooling/documentation reliability improved.**
+  - Updated local setup guidance to use `python3 -m venv .venv` for environments where `python` is not present before activation.
+  - Updated test guidance to prefer `python -m pytest -q`, which avoids PATH-dependent `pytest` launcher issues after venv activation.
+- **Qt backend regression coverage hardened.**
+  - Reworked the "Qt bindings missing" unit test to simulate unavailable bindings directly instead of assuming the host lacks `PySide6`.
+  - This keeps the backend availability test deterministic on both Qt-enabled and non-Qt-enabled developer machines.
+- **Qt raster buffer extraction hardened.**
+  - Updated the Qt render backend to support pointer-style `QImage.bits()` access patterns by preferring `.tobytes(expected_size)`, then `.setsize(expected_size)` + `bytes(...)`, with a guarded fallback.
+  - This resolved the unit-test failure mode triggered by Qt-like image buffer objects and better matches PySide binding behavior.
+
+### Verification
+
+- `.venv/bin/python -m pytest -q`
+- Result: `129 passed`
+
+## Completion plan execution update (2026-03-28, tooling follow-up #10)
+
+Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution evidence is still missing), with the Qt-readiness contradiction now resolved in favor of the active project venv.
+
+### Completed from the plan in this patch
+
+- **Step 1 evidence state clarified for the active dev environment.**
+  - Re-generated `artifacts/phase2_runtime_evidence.md` using the project venv:
+    - `.venv/bin/python -m pdf_signer phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
+  - Result from the active venv now confirms:
+    - `PySide6`: available
+    - `PySide6.QtPdf`: available
+- **Prior contradiction explicitly resolved.**
+  - The older review note claiming this host was not Qt-ready reflected an earlier non-venv interpreter run and is now obsolete.
+  - The checked-in evidence artifact is now aligned with the currently used `.venv`-based workflow.
+
+### Evidence artifact snapshot (current `.venv` run)
+
+- Runtime validation sweep: `0/20` checks passed.
+- Qt runtime readiness: ready (`PySide6` + `PySide6.QtPdf` available in `.venv`).
+- FR-16 quick-check: idle memory recorded (`15.24 MiB`); startup latency and bundle size still missing.
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 4 (FR-16 runtime metrics):** capture startup latency using `--measure-startup-command` against the PyInstaller one-dir executable and bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.

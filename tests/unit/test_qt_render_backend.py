@@ -4,7 +4,12 @@ from pdf_signer.infra.render import QtPdfRenderBackend, RenderPageRequest
 from pdf_signer.infra.render.qt_backend import _QtBindings
 
 
-def test_qt_backend_reports_unavailable_when_qt_bindings_missing() -> None:
+def test_qt_backend_reports_unavailable_when_qt_bindings_missing(monkeypatch) -> None:
+    def _missing_bindings(self):
+        self._bindings_error = "PySide6 import failed"
+        return None
+
+    monkeypatch.setattr(QtPdfRenderBackend, "_load_bindings", _missing_bindings)
     backend = QtPdfRenderBackend()
 
     diagnostic = backend.diagnostics()

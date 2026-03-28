@@ -24,22 +24,23 @@ Foundations for a Linux desktop PDF signing app.
   - pre-sign PDF rectangle bounds validation helper
   - page render LRU cache policy primitives for upcoming viewer integration
   - Qt render backend scaffold with graceful diagnostics when Qt bindings are unavailable
+  - Qt image-buffer extraction hardened for pointer-style `QImage.bits()` APIs used by PySide bindings
   - `ViewerSession` helper for page navigation and zoom/fit interactions
   - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
   - Phase 2 evidence formatter utilities to capture timing snapshots alongside runtime environment details
   - CLI helper (`python -m pdf_signer phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets, including optional auto-capture of startup latency (from a probe command), idle memory, and bundle-size metrics for FR-16 evidence
   - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for Qt widget integration
   - Qt preview widget adapter (`presentation.qt`) with wheel zoom + drag-selection wiring to viewer workflow
-- unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, and Qt widget dependency diagnostics
+- unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, Qt widget dependency diagnostics, and deterministic Qt backend availability coverage
 
 ## Local development
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
+python -m pip install -e .[dev]
 ruff check .
-pytest -q
+python -m pytest -q
 python -m pdf_signer
 ```
 
