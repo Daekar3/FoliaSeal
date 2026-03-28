@@ -35,12 +35,48 @@ class RuntimeEnvironmentSnapshot:
         )
 
 
+@dataclass(frozen=True)
+class RuntimeValidationSnapshot:
+    """Manual runtime validation sweep summary for Phase 2 review notes."""
+
+    passed_checks: int
+    total_checks: int
+    issues: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.total_checks < 1:
+            raise ValueError("total_checks must be at least 1.")
+        if self.passed_checks < 0:
+            raise ValueError("passed_checks must be greater than or equal to zero.")
+        if self.passed_checks > self.total_checks:
+            raise ValueError("passed_checks cannot exceed total_checks.")
+
+    def to_markdown(self) -> str:
+        """Render markdown summary for runtime validation checklist execution."""
+
+        status = "✅" if self.passed_checks == self.total_checks else "⚠️"
+        lines = [
+            "### Runtime validation sweep",
+            (
+                f"- {status} Checklist status: "
+                f"{self.passed_checks}/{self.total_checks} checks passed"
+            ),
+        ]
+        if self.issues:
+            lines.append("- Open issues:")
+            lines.extend(f"  - {issue}" for issue in self.issues)
+        else:
+            lines.append("- Open issues: none recorded")
+        return "\n".join(lines)
+
+
 def build_phase2_timing_evidence(
     *,
     timing: ViewerTimingSnapshot,
     environment: RuntimeEnvironmentSnapshot,
     minimum_navigation_samples: int = 10,
     runtime_footprint: RuntimeFootprintSnapshot | None = None,
+    runtime_validation: RuntimeValidationSnapshot | None = None,
 ) -> str:
     """Build markdown evidence block for Phase 2 runtime/timing sign-off."""
 
@@ -80,6 +116,14 @@ def build_phase2_timing_evidence(
                 runtime_footprint.to_markdown(),
                 "",
                 build_runtime_footprint_quick_check(footprint=runtime_footprint),
+            ]
+        )
+
+    if runtime_validation is not None:
+        lines.extend(
+            [
+                "",
+                runtime_validation.to_markdown(),
             ]
         )
 
