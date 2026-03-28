@@ -1,7 +1,7 @@
 # Phase 2 Manual QA Checklist (Qt-enabled environment)
 
 Date: 2026-03-27  
-Owner: PDF Signer engineering
+Owner: FoliaSeal engineering
 
 This checklist is intended for an environment where `PySide6` + `QtPdf` are already available.
 It records the manual runtime execution needed to close Phase 2.

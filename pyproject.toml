@@ -1,10 +1,10 @@
 [project]
-name = "pdf-signer"
+name = "foliaseal"
 version = "0.1.0"
 description = "PDF signing desktop app foundations"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "PDF Signer Team" }]
+authors = [{ name = "FoliaSeal Team" }]
 dependencies = []
 
 [project.optional-dependencies]

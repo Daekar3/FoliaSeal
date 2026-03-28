@@ -1,4 +1,4 @@
-"""PyInstaller one-dir build for the pdf-signer development CLI."""
+"""PyInstaller one-dir build for the FoliaSeal development CLI."""
 
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -25,7 +25,7 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    name="pdf-signer",
+    name="foliaseal",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -41,5 +41,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="pdf-signer",
+    name="foliaseal",
 )

@@ -171,13 +171,13 @@ def test_measure_startup_latency_ms_returns_elapsed_time(
     monkeypatch.setattr("pdf_signer.application.runtime_metrics.time.sleep", lambda _: None)
 
     measured = measure_startup_latency_ms(
-        command=["/tmp/pdf-signer", "--help"],
+        command=["/tmp/foliaseal", "--help"],
         timeout_seconds=15.0,
         ready_after_seconds=0.5,
     )
 
     assert measured == pytest.approx(250.0, abs=0.001)
-    assert calls["command"] == ["/tmp/pdf-signer", "--help"]
+    assert calls["command"] == ["/tmp/foliaseal", "--help"]
  
 
 def test_measure_startup_latency_ms_treats_long_running_command_as_ready(
@@ -211,7 +211,7 @@ def test_measure_startup_latency_ms_treats_long_running_command_as_ready(
     monkeypatch.setattr("pdf_signer.application.runtime_metrics.time.sleep", lambda _: None)
 
     measured = measure_startup_latency_ms(
-        command=["/tmp/pdf-signer"],
+        command=["/tmp/foliaseal"],
         timeout_seconds=5.0,
         ready_after_seconds=0.5,
     )
