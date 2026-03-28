@@ -96,3 +96,16 @@ You can then generate a fuller Phase 2 evidence block against the packaged app:
 `--measure-startup-command` now measures launch readiness rather than waiting for a normal process exit. Short-lived probe commands return their full runtime; long-running GUI commands are treated as started once they stay alive for the configured readiness window and are then terminated by the helper.
 
 If you do not yet have interactive first-render/navigation timings from a manual Qt session, you can still use the same command shape without the timing flags to refresh the packaging-side evidence in [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) while leaving the FR-13 items explicitly unrecorded.
+
+## Interactive Phase 2 harness
+
+To capture first-render and navigation timings during a real Qt session, launch the harness against a representative PDF:
+
+```bash
+.venv/bin/python -m foliaseal phase2-viewer-harness \
+  --pdf-path "/path/to/representative.pdf" \
+  --summary-json-path artifacts/phase2_harness_capture.json \
+  --evidence-command-path artifacts/phase2_evidence_command.sh
+```
+
+The harness opens the Qt viewer, records first-render and page-navigation timings automatically, logs selection/error events in the window, and prints a ready-to-run `phase2-evidence` command when you close it.

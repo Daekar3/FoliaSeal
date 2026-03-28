@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 from foliaseal.application.coordinate_transform import ViewRect
@@ -61,6 +62,7 @@ class PdfViewerWidgetAdapter:
                 self._pan_start_y = 0
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
+                start_time = perf_counter() if elapsed_ms is None else None
                 try:
                     result = self._workflow.render_current_page(
                         elapsed_ms=elapsed_ms,
@@ -75,6 +77,9 @@ class PdfViewerWidgetAdapter:
                     if self._on_error is None:
                         raise
                     return
+                if start_time is not None:
+                    measured_ms = (perf_counter() - start_time) * 1000.0
+                    self._record_timing(measured_ms=measured_ms, navigation=navigation)
                 self._apply_render_result(result)
 
             def paintEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
@@ -281,6 +286,7 @@ class PdfViewerWidgetAdapter:
                 self.update()
 
             def _navigate(self, *, action: Callable[[], Any], summary: str) -> None:
+                start_time = perf_counter()
                 try:
                     result = action()
                 except Exception as exc:  # pragma: no cover - integration behavior
@@ -288,7 +294,31 @@ class PdfViewerWidgetAdapter:
                     if self._on_error is None:
                         raise
                     return
+                measured_ms = (perf_counter() - start_time) * 1000.0
+                self._record_timing(measured_ms=measured_ms, navigation=True)
                 self._apply_render_result(result)
+
+            def go_to_next_page(self) -> None:
+                self._navigate(
+                    action=self._workflow.go_next_page,
+                    summary=(
+                        "Unable to render PDF preview after navigating to the next page. "
+                        "Please verify PDF backend availability and retry."
+                    ),
+                )
+
+            def go_to_previous_page(self) -> None:
+                self._navigate(
+                    action=self._workflow.go_previous_page,
+                    summary=(
+                        "Unable to render PDF preview after navigating to the previous page. "
+                        "Please verify PDF backend availability and retry."
+                    ),
+                )
+
+            def reset_zoom_view(self) -> None:
+                self._workflow.reset_zoom()
+                self.refresh(navigation=False)
 
             def _horizontal_scroll_bar(self) -> Any:
                 if self._scroll_container is None:
@@ -345,6 +375,15 @@ class PdfViewerWidgetAdapter:
                     float(self._vertical_scroll_bar().value()),
                 )
 
+            def _record_timing(self, *, measured_ms: float, navigation: bool) -> None:
+                tracker = getattr(self._workflow, "timing_tracker", None)
+                if tracker is None:
+                    return
+                if navigation:
+                    tracker.record_navigation(measured_ms)
+                else:
+                    tracker.record_first_render(measured_ms)
+
         return PdfPreviewWidget()
 
     def _load_bindings(self) -> QtWidgetBindings:
@@ -397,5 +436,14 @@ def build_qt_pdf_viewer_widget(
 
         def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
             preview_widget.refresh(elapsed_ms=elapsed_ms, navigation=navigation)
+
+        def go_to_next_page(self) -> None:
+            preview_widget.go_to_next_page()
+
+        def go_to_previous_page(self) -> None:
+            preview_widget.go_to_previous_page()
+
+        def reset_zoom_view(self) -> None:
+            preview_widget.reset_zoom_view()
 
     return ScrollablePdfViewer()
