@@ -93,7 +93,10 @@ class QtPdfRenderBackend:
         )
         image = rendered.convertToFormat(self._bindings.qimage.Format_RGBA8888)  # type: ignore[union-attr]
 
-        raw = bytes(image.bits())
+        raw = self._extract_image_bytes(
+            image=image,
+            expected_size=target_width * target_height * 4,
+        )
         return RenderPageResult(width_px=target_width, height_px=target_height, rgba_bytes=raw)
 
     def _open_document(self, document_path: str) -> Any:
@@ -116,6 +119,28 @@ class QtPdfRenderBackend:
     def _require_available(self) -> None:
         if self._bindings is None:
             raise RuntimeError(self.diagnostics().message)
+
+    @staticmethod
+    def _extract_image_bytes(*, image: Any, expected_size: int) -> bytes:
+        """Extract RGBA bytes from a QImage-like object across binding variants."""
+
+        if expected_size <= 0:
+            raise ValueError("expected_size must be greater than zero.")
+
+        bit_pointer = image.bits()
+        tobytes = getattr(bit_pointer, "tobytes", None)
+        if callable(tobytes):
+            return bytes(tobytes(expected_size))
+
+        setsize = getattr(bit_pointer, "setsize", None)
+        if callable(setsize):
+            setsize(expected_size)
+            return bytes(bit_pointer)
+
+        raw = bytes(bit_pointer)
+        if len(raw) < expected_size:
+            raise ValueError("Rendered image buffer is smaller than expected.")
+        return raw[:expected_size]
 
     def _load_bindings(self) -> _QtBindings | None:
         try:
