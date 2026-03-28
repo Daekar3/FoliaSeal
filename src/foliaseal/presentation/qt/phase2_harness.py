@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 import shlex
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter
@@ -26,6 +27,7 @@ class HarnessCapture:
     navigation_samples_ms: tuple[float, ...]
     selection_count: int
     last_selection_pdf_rect: tuple[float, float, float, float] | None
+    interaction_counts: dict[str, int]
     errors: tuple[str, ...]
 
     def to_json(self) -> str:
@@ -102,6 +104,7 @@ def run_phase2_viewer_harness(
 
     selections: list[PdfRect] = []
     errors: list[str] = []
+    interaction_counts: Counter[str] = Counter()
 
     app = bindings.q_application.instance() or bindings.q_application([])
     window = bindings.q_main_window()
@@ -141,6 +144,7 @@ def run_phase2_viewer_harness(
         )
 
     def on_selection(rect: PdfRect) -> None:
+        selections.append(rect)
         append_status(
             "Selection captured: "
             f"({rect.x1:.2f}, {rect.y1:.2f}) -> ({rect.x2:.2f}, {rect.y2:.2f})"
@@ -148,16 +152,23 @@ def run_phase2_viewer_harness(
         refresh_metrics()
 
     def on_error(message: str) -> None:
+        errors.append(message)
         append_status(f"Error: {message}")
+        refresh_metrics()
+
+    def on_interaction(name: str) -> None:
+        interaction_counts[name] += 1
         refresh_metrics()
 
     selections.clear()
     errors.clear()
+    interaction_counts.clear()
 
     viewer = build_qt_pdf_viewer_widget(
         workflow=workflow,
         on_selection=on_selection,
         on_error=on_error,
+        on_interaction=on_interaction,
     )
     layout.addWidget(viewer, 1)
     layout.addWidget(metrics_label)
@@ -248,6 +259,7 @@ def run_phase2_viewer_harness(
             if selections
             else None
         ),
+        interaction_counts=dict(sorted(interaction_counts.items())),
         errors=tuple(errors),
     )
     _write_optional_text(

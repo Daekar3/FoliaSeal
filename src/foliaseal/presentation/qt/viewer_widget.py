@@ -44,6 +44,7 @@ class PdfViewerWidgetAdapter:
         workflow: ViewerWorkflow,
         on_selection: Callable[[object], None] | None = None,
         on_error: Callable[[str], None] | None = None,
+        on_interaction: Callable[[str], None] | None = None,
     ) -> Any:
         bindings = self._bindings
 
@@ -53,6 +54,7 @@ class PdfViewerWidgetAdapter:
                 self._workflow = workflow
                 self._on_selection = on_selection
                 self._on_error = on_error
+                self._on_interaction = on_interaction
                 self._pixmap: Any | None = None
                 self._scroll_container: Any | None = None
                 self._drag_origin: Any | None = None
@@ -97,8 +99,10 @@ class PdfViewerWidgetAdapter:
             def wheelEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 delta = event.angleDelta().y()
                 if delta > 0:
+                    self._emit_interaction("wheel_zoom_in")
                     self._workflow.zoom_in()
                 elif delta < 0:
+                    self._emit_interaction("wheel_zoom_out")
                     self._workflow.zoom_out()
                 self.refresh(navigation=False)
                 event.accept()
@@ -110,6 +114,7 @@ class PdfViewerWidgetAdapter:
                     bindings.qt.Key_Plus,
                     bindings.qt.Key_Equal,
                 ):
+                    self._emit_interaction("key_zoom_in")
                     self._workflow.zoom_in()
                     self.refresh(navigation=False)
                     event.accept()
@@ -119,12 +124,14 @@ class PdfViewerWidgetAdapter:
                     bindings.qt.Key_Minus,
                     bindings.qt.Key_Underscore,
                 ):
+                    self._emit_interaction("key_zoom_out")
                     self._workflow.zoom_out()
                     self.refresh(navigation=False)
                     event.accept()
                     return
 
                 if key == bindings.qt.Key_0:
+                    self._emit_interaction("key_zoom_reset")
                     self._workflow.reset_zoom()
                     self.refresh(navigation=False)
                     event.accept()
@@ -135,6 +142,7 @@ class PdfViewerWidgetAdapter:
                     bindings.qt.Key_Down,
                     bindings.qt.Key_Right,
                 ):
+                    self._emit_interaction("key_page_next")
                     self._navigate(
                         action=self._workflow.go_next_page,
                         summary=(
@@ -150,6 +158,7 @@ class PdfViewerWidgetAdapter:
                     bindings.qt.Key_Up,
                     bindings.qt.Key_Left,
                 ):
+                    self._emit_interaction("key_page_previous")
                     self._navigate(
                         action=self._workflow.go_previous_page,
                         summary=(
@@ -161,6 +170,7 @@ class PdfViewerWidgetAdapter:
                     return
 
                 if key == bindings.qt.Key_Home:
+                    self._emit_interaction("key_jump_home")
                     self._navigate(
                         action=lambda: self._workflow.jump_to_page(0),
                         summary=(
@@ -172,6 +182,7 @@ class PdfViewerWidgetAdapter:
                     return
 
                 if key == bindings.qt.Key_End:
+                    self._emit_interaction("key_jump_end")
                     self._navigate(
                         action=lambda: self._workflow.jump_to_page(
                             self._workflow.session.page_count - 1
@@ -245,6 +256,7 @@ class PdfViewerWidgetAdapter:
                         selection=selection
                     )
                 except (RuntimeError, ValueError) as exc:
+                    self._emit_interaction("selection_error")
                     self._emit_error(
                         "Selection could not be placed on the PDF page. "
                         "Please keep the selection inside page bounds.",
@@ -253,6 +265,7 @@ class PdfViewerWidgetAdapter:
                     self.update()
                     return
                 if self._on_selection is not None:
+                    self._emit_interaction("selection_success")
                     self._on_selection(pdf_rect)
                 self.update()
 
@@ -384,6 +397,10 @@ class PdfViewerWidgetAdapter:
                 else:
                     tracker.record_first_render(measured_ms)
 
+            def _emit_interaction(self, name: str) -> None:
+                if self._on_interaction is not None:
+                    self._on_interaction(name)
+
         return PdfPreviewWidget()
 
     def _load_bindings(self) -> QtWidgetBindings:
@@ -416,6 +433,7 @@ def build_qt_pdf_viewer_widget(
     workflow: ViewerWorkflow,
     on_selection: Callable[[object], None] | None = None,
     on_error: Callable[[str], None] | None = None,
+    on_interaction: Callable[[str], None] | None = None,
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
 
@@ -424,6 +442,7 @@ def build_qt_pdf_viewer_widget(
         workflow=workflow,
         on_selection=on_selection,
         on_error=on_error,
+        on_interaction=on_interaction,
     )
 
     class ScrollablePdfViewer(adapter._bindings.q_scroll_area):  # type: ignore[misc,valid-type]
