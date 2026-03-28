@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+import platform
+import ctypes
 from pathlib import Path
-from resource import RUSAGE_SELF, getrusage
 from dataclasses import dataclass
 from math import isfinite
 
@@ -48,18 +49,80 @@ class RuntimeFootprintSnapshot:
 def collect_idle_memory_mib() -> float | None:
     """Collect current process memory footprint in MiB when available."""
 
+    rss_bytes = _collect_current_rss_bytes()
+    if rss_bytes is None:
+        return None
+
+    rss_mib = rss_bytes / (1024 * 1024)
+    if rss_mib < 0:
+        return None
+
+    return rss_mib
+
+
+def _collect_current_rss_bytes() -> int | None:
+    """Collect current resident set size for this process in bytes."""
+
+    system = platform.system()
+    if system == "Linux":
+        return _collect_current_rss_bytes_linux()
+    if system == "Darwin":
+        return _collect_current_rss_bytes_macos()
+    return None
+
+
+def _collect_current_rss_bytes_linux() -> int | None:
+    """Collect current RSS bytes on Linux from /proc/self/statm."""
+
     try:
-        usage = getrusage(RUSAGE_SELF)
-    except OSError:
+        with open("/proc/self/statm", encoding="utf-8") as statm_file:
+            statm_fields = statm_file.read().strip().split()
+        resident_pages = int(statm_fields[1])
+        page_size = os.sysconf("SC_PAGE_SIZE")
+    except (FileNotFoundError, IndexError, OSError, ValueError):
         return None
 
-    max_rss = float(usage.ru_maxrss)
-    if max_rss < 0:
+    rss_bytes = resident_pages * page_size
+    if rss_bytes < 0:
+        return None
+    return rss_bytes
+
+
+def _collect_current_rss_bytes_macos() -> int | None:
+    """Collect current RSS bytes on macOS via task_info."""
+
+    mach_task_self = ctypes.CDLL(None).mach_task_self
+    task_info = ctypes.CDLL(None).task_info
+
+    mach_task_self.restype = ctypes.c_uint
+    task = mach_task_self()
+
+    class MachTaskBasicInfo(ctypes.Structure):
+        _fields_ = [
+            ("virtual_size", ctypes.c_uint64),
+            ("resident_size", ctypes.c_uint64),
+            ("resident_size_max", ctypes.c_uint64),
+            ("user_time", ctypes.c_uint64),
+            ("system_time", ctypes.c_uint64),
+            ("policy", ctypes.c_int),
+            ("suspend_count", ctypes.c_int),
+        ]
+
+    info = MachTaskBasicInfo()
+    info_count = ctypes.c_uint(ctypes.sizeof(MachTaskBasicInfo) // ctypes.sizeof(ctypes.c_uint))
+    KERN_SUCCESS = 0
+    MACH_TASK_BASIC_INFO = 20
+
+    result = task_info(
+        task,
+        MACH_TASK_BASIC_INFO,
+        ctypes.byref(info),
+        ctypes.byref(info_count),
+    )
+    if result != KERN_SUCCESS:
         return None
 
-    if os.uname().sysname == "Darwin":
-        return max_rss / (1024 * 1024)
-    return max_rss / 1024
+    return int(info.resident_size)
 
 
 def measure_bundle_size_mib(*, bundle_dir: str) -> float:

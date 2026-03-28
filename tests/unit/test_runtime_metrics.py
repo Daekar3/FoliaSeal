@@ -2,6 +2,8 @@ from pathlib import Path
 import pytest
 
 from pdf_signer.application.runtime_metrics import (
+    _collect_current_rss_bytes,
+    _collect_current_rss_bytes_linux,
     RuntimeFootprintSnapshot,
     build_runtime_footprint_quick_check,
     collect_idle_memory_mib,
@@ -66,6 +68,36 @@ def test_collect_idle_memory_mib_returns_non_negative_or_none() -> None:
     measurement = collect_idle_memory_mib()
 
     assert measurement is None or measurement >= 0.0
+
+
+def test_collect_current_rss_bytes_linux_reads_resident_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_open(*args, **kwargs):  # type: ignore[no-untyped-def]
+        class _FakeFile:
+            def __enter__(self):  # type: ignore[no-untyped-def]
+                return self
+
+            def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
+                return False
+
+            def read(self) -> str:
+                return "12345 10 0 0 0 0 0\n"
+
+        return _FakeFile()
+
+    monkeypatch.setattr("builtins.open", fake_open)
+    monkeypatch.setattr("os.sysconf", lambda name: 4096)
+
+    assert _collect_current_rss_bytes_linux() == 40960
+
+
+def test_collect_current_rss_bytes_returns_none_on_unknown_platform(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    assert _collect_current_rss_bytes() is None
 
 
 def test_measure_bundle_size_mib_sums_directory_files(tmp_path: Path) -> None:
