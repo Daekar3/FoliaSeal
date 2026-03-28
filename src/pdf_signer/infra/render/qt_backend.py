@@ -137,7 +137,7 @@ class QtPdfRenderBackend:
         document_path: str,
         page_index: int,
         document: Any,
-    ) -> "_PdfPageMetadata":
+    ) -> _PdfPageMetadata:
         cache = getattr(self, "_metadata_cache", None)
         if cache is None:
             cache = {}
@@ -166,7 +166,7 @@ class QtPdfRenderBackend:
         return metadata
 
     @staticmethod
-    def _fallback_page_metadata(*, document: Any, page_index: int) -> "_PdfPageMetadata":
+    def _fallback_page_metadata(*, document: Any, page_index: int) -> _PdfPageMetadata:
         width_pts, height_pts = (
             float(v) for v in document.pagePointSize(page_index).toTuple()
         )
@@ -486,7 +486,6 @@ class _PdfValueParser:
         self._skip_ws_and_comments()
         second = self._try_read_token()
         if second is not None and _is_integer_token(first) and _is_integer_token(second):
-            saved_position = self._position
             self._skip_ws_and_comments()
             marker = self._try_read_token()
             if marker == b"R":
@@ -525,7 +524,10 @@ class _PdfValueParser:
                 self._position += 1
                 continue
             if current == 0x25:
-                while self._position < len(self._data) and self._data[self._position] not in b"\r\n":
+                while (
+                    self._position < len(self._data)
+                    and self._data[self._position] not in b"\r\n"
+                ):
                     self._position += 1
                 continue
             return

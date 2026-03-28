@@ -1,7 +1,10 @@
 import pytest
 
 from pdf_signer.infra.render import QtPdfRenderBackend, RenderPageRequest
-from pdf_signer.infra.render.qt_backend import _QtBindings, _load_pdf_page_metadata
+from pdf_signer.infra.render.qt_backend import (
+    _load_pdf_page_metadata,
+    _QtBindings,
+)
 
 
 def test_qt_backend_reports_unavailable_when_qt_bindings_missing(monkeypatch) -> None:
@@ -339,8 +342,10 @@ def test_load_pdf_page_metadata_resolves_inherited_boxes_and_rotation(tmp_path) 
 << /Type /Catalog /Pages 2 0 R >>
 endobj
 2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 612 792] /CropBox [18 36 594 756] /Rotate 90 >>
-endobj
+"""
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 612 792]"
+        b" /CropBox [18 36 594 756] /Rotate 90 >>\n"
+        b"""endobj
 3 0 obj
 << /Type /Page /Parent 2 0 R >>
 endobj
