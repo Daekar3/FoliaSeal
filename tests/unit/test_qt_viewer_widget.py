@@ -268,6 +268,25 @@ def test_mouse_release_event_handles_selection_conversion_failures(monkeypatch):
     assert selected == []
 
 
+def test_plain_click_does_not_emit_selection(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    class _WorkflowWithSelection:
+        def selection_to_pdf_rect(self, *, selection):
+            return selection
+
+    selected = []
+    widget = PdfViewerWidgetAdapter().create(
+        workflow=_WorkflowWithSelection(),
+        on_selection=selected.append,
+    )
+
+    widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=30))
+    widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=30))
+
+    assert selected == []
+
+
 def test_mouse_release_event_reports_selection_mapping_errors(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
     workflow = _build_workflow()

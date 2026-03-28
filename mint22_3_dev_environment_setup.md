@@ -178,6 +178,8 @@ Run it:
 
 ```bash
 PYTHONPATH=src python -m foliaseal
+# After `pip install -e .[dev]`, the same entry point is also available as:
+foliaseal
 ```
 
 (If module path errors occur, use the next section's editable install setup.)
@@ -214,7 +216,7 @@ pip install -e .[dev]
 Now run:
 
 ```bash
-python -m foliaseal
+foliaseal
 ```
 
 (Replace your `__main__.py` content with package-based code as needed.)
