@@ -23,14 +23,14 @@ Foundations for a Linux desktop PDF signing app.
   - deterministic view↔PDF coordinate transform utilities (zoom, pan, rotation, page-box offsets)
   - pre-sign PDF rectangle bounds validation helper
   - page render LRU cache policy primitives for upcoming viewer integration
-  - Qt render backend scaffold with graceful diagnostics when Qt bindings are unavailable
+  - Qt render backend that augments QtPdf rendering with cached parsed PDF page metadata when available, while falling back to QtPdf page-size geometry for documents the lightweight parser cannot decode
   - Qt image-buffer extraction hardened for pointer-style `QImage.bits()` APIs used by PySide bindings
   - `ViewerSession` helper for page navigation and zoom/fit interactions
   - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
   - Phase 2 evidence formatter utilities to capture timing snapshots alongside runtime environment details
-  - CLI helper (`python -m pdf_signer phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets, including optional auto-capture of startup latency (from a probe command), idle memory, and bundle-size metrics for FR-16 evidence
+  - CLI helper (`python -m pdf_signer phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets, including optional auto-capture of startup launch-readiness from a probe command or long-running GUI executable, plus idle memory and bundle-size metrics for FR-16 evidence
   - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for Qt widget integration
-  - Qt preview widget adapter (`presentation.qt`) with wheel zoom + drag-selection wiring to viewer workflow
+  - Qt preview widget adapter (`presentation.qt`) with wheel zoom, scrollbar-backed pan syncing, and drag-selection wiring to viewer workflow
 - unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, Qt widget dependency diagnostics, and deterministic Qt backend availability coverage
 
 ## Local development
@@ -84,7 +84,10 @@ python3 -m pdf_signer phase2-evidence \
   --navigation-ms 46.57 \
   --navigation-ms 52.18 \
   --measure-startup-command dist/pdf-signer/pdf-signer \
+  --startup-ready-after-seconds 0.75 \
   --collect-runtime-footprint \
   --bundle-dir dist/pdf-signer \
   --check-qt-runtime
 ```
+
+`--measure-startup-command` now measures launch readiness rather than waiting for a normal process exit. Short-lived probe commands return their full runtime; long-running GUI commands are treated as started once they stay alive for the configured readiness window and are then terminated by the helper.

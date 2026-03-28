@@ -439,6 +439,9 @@ def test_middle_drag_pans_scrollbars(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 
     class _WorkflowWithRender:
+        def __init__(self):
+            self.pan_updates = []
+
         def render_current_page(self, *, elapsed_ms=None, navigation=False):
             return type(
                 "_RenderResult",
@@ -450,9 +453,13 @@ def test_middle_drag_pans_scrollbars(monkeypatch):
                 },
             )()
 
+        def set_pan(self, *, pan_x, pan_y):
+            self.pan_updates.append((pan_x, pan_y))
+
     from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
-    widget = build_qt_pdf_viewer_widget(workflow=_WorkflowWithRender())
+    workflow = _WorkflowWithRender()
+    widget = build_qt_pdf_viewer_widget(workflow=workflow)
     preview = widget.widget
     widget.horizontalScrollBar().setValue(100)
     widget.verticalScrollBar().setValue(80)
@@ -465,6 +472,7 @@ def test_middle_drag_pans_scrollbars(monkeypatch):
     assert widget.horizontalScrollBar().value() == 80
     assert widget.verticalScrollBar().value() == 55
     assert preview.mouse_grabbed is False
+    assert workflow.pan_updates[-1] == (-80.0, -55.0)
 
 
 def test_middle_drag_does_not_emit_selection(monkeypatch):
@@ -505,6 +513,9 @@ def test_shift_left_drag_pans_scrollbars(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 
     class _WorkflowWithRender:
+        def __init__(self):
+            self.pan_updates = []
+
         def render_current_page(self, *, elapsed_ms=None, navigation=False):
             return type(
                 "_RenderResult",
@@ -516,9 +527,13 @@ def test_shift_left_drag_pans_scrollbars(monkeypatch):
                 },
             )()
 
+        def set_pan(self, *, pan_x, pan_y):
+            self.pan_updates.append((pan_x, pan_y))
+
     from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
-    widget = build_qt_pdf_viewer_widget(workflow=_WorkflowWithRender())
+    workflow = _WorkflowWithRender()
+    widget = build_qt_pdf_viewer_widget(workflow=workflow)
     preview = widget.widget
     widget.horizontalScrollBar().setValue(120)
     widget.verticalScrollBar().setValue(90)
@@ -545,12 +560,16 @@ def test_shift_left_drag_pans_scrollbars(monkeypatch):
     assert widget.horizontalScrollBar().value() == 90
     assert widget.verticalScrollBar().value() == 70
     assert preview.mouse_grabbed is False
+    assert workflow.pan_updates[-1] == (-90.0, -70.0)
 
 
-def test_plain_left_drag_emits_selection(monkeypatch):
+def test_plain_left_drag_emits_selection_with_viewport_relative_coords(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 
     class _WorkflowWithSelection:
+        def __init__(self):
+            self.pan_updates = []
+
         def render_current_page(self, *, elapsed_ms=None, navigation=False):
             return type(
                 "_RenderResult",
@@ -562,27 +581,34 @@ def test_plain_left_drag_emits_selection(monkeypatch):
                 },
             )()
 
+        def set_pan(self, *, pan_x, pan_y):
+            self.pan_updates.append((pan_x, pan_y))
+
         def selection_to_pdf_rect(self, *, selection):
             return selection
 
     from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     selected = []
+    workflow = _WorkflowWithSelection()
     widget = build_qt_pdf_viewer_widget(
-        workflow=_WorkflowWithSelection(),
+        workflow=workflow,
         on_selection=selected.append,
     )
     preview = widget.widget
+    widget.horizontalScrollBar().setValue(100)
+    widget.verticalScrollBar().setValue(80)
 
-    preview.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=10, y=15))
-    preview.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=30, y=35))
-    preview.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=30, y=35))
+    preview.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=110, y=95))
+    preview.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=130, y=115))
+    preview.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=130, y=115))
 
     assert len(selected) == 1
     assert selected[0].x1 == 10.0
     assert selected[0].y1 == 15.0
     assert selected[0].x2 == 30.0
     assert selected[0].y2 == 35.0
+    assert workflow.pan_updates[-1] == (-100.0, -80.0)
 
 
 def test_hide_event_releases_active_middle_drag(monkeypatch):

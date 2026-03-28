@@ -65,10 +65,10 @@ Work advanced in this update:
 
 | Requirement | Current status | Evidence in repo | Gap to close |
 |---|---|---|---|
-| **FR-9** (rendering + coordinate mapping + bounds validation) | **Mostly complete** at implementation/test level. | Render abstraction + fallback backend, Qt backend scaffold, coordinate transforms, and bounds validation helpers are implemented and tested. | Execute end-to-end runtime validation in a Qt-enabled environment to confirm real rendering and selection behavior under actual `PySide6`/`QtPdf` runtime conditions. |
+| **FR-9** (rendering + coordinate mapping + bounds validation) | **Mostly complete** at implementation/test level. | Render abstraction + fallback backend, Qt backend now uses cached parsed `MediaBox`/`CropBox`/`Rotate` metadata when available and falls back to QtPdf page-size geometry otherwise, and coordinate transforms/bounds validation helpers are implemented and tested. | Execute end-to-end runtime validation in a Qt-enabled environment to confirm real rendering and selection behavior under actual `PySide6`/`QtPdf` runtime conditions. |
 | **FR-12** (output integrity / crash safety) | **Complete for signing flow** from Phase 1 and already available to Phase 2 integration. | `SignPdfUseCase` includes temp-file writes, atomic replace, and failure mapping for write failures. | No Phase 2-specific code gap; only keep regression coverage green while wiring viewer -> signing flow. |
 | **FR-13** (performance/UX constraints + timing measurement) | **Partially complete**. Instrumentation exists; baseline evidence is still missing. | `ViewerPerformanceTracker`, timing snapshot markdown export, and `phase2-evidence` CLI helper are present. | Capture first-render and >=10 navigation timing samples on representative hardware and attach signed-off evidence to this review. |
-| **FR-15** (viewer usability and intuitive interaction) | **Partially complete**. Core navigation/zoom/selection scaffolding is implemented. | `ViewerSession`, `ViewerWorkflow`, and Qt preview widget adapter support zoom/nav/drag selection and callback/error wiring. | Manual runtime QA is still needed for interaction polish, keyboard accessibility coverage, and user-facing error quality checks. |
+| **FR-15** (viewer usability and intuitive interaction) | **Partially complete**. Core navigation/zoom/selection scaffolding is implemented. | `ViewerSession`, `ViewerWorkflow`, and Qt preview widget adapter support zoom/nav/drag selection, scrollbar-backed pan syncing, and callback/error wiring. | Manual runtime QA is still needed for interaction polish, keyboard accessibility coverage, and user-facing error quality checks. |
 | **FR-16** (lightweight runtime + bounded cache + runtime metrics) | **Partially complete**. Bounded cache primitive exists. | `RenderCachePolicy` LRU behavior and invalidation semantics are implemented with tests. | Measure startup latency and baseline memory/bundle metrics in target packaging environment; validate low-memory behavior with large PDFs. |
 | **FR-17** (extensible document operations architecture) | **Complete for Phase 2 expectations**. | `DocumentOperation` contract + operation registry are in place with enable/disable behavior and unit tests. | No blocking Phase 2 gap; continue to keep sign-only operation enabled in production UI path. |
 
@@ -157,6 +157,85 @@ python -m pdf_signer phase2-evidence \
 2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples from that Qt runtime.
 3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values from PyInstaller one-dir build output.
 4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
+
+## Completion plan execution update (2026-03-28, startup readiness follow-up)
+
+Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-16 startup-measurement workflow corrected so it no longer depends on a GUI process exiting normally.
+
+### Completed from the plan in this patch
+
+- **FR-16 startup measurement semantics corrected in code.**
+  - Updated `measure_startup_latency_ms()` to measure launch readiness instead of waiting for full process exit.
+  - Short-lived probe commands still return their runtime; long-running GUI-style commands are now treated as started once they remain alive for a configurable readiness window, after which the helper terminates them.
+  - Added CLI support for `--startup-ready-after-seconds` so the readiness window can be tuned per environment while keeping `--startup-ms` as the explicit override path.
+- **Documentation aligned with the corrected workflow.**
+  - Updated the README and manual QA checklist to describe `--measure-startup-command` as launch-readiness measurement rather than direct full-runtime timing from the packaged GUI executable.
+
+### Verification
+
+- `.venv/bin/python -m pytest -q tests/unit/test_runtime_metrics.py tests/unit/test_main_cli.py`
+- Result: `26 passed`
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 4 (FR-16 runtime metrics):** capture startup readiness using `--measure-startup-command` plus `--startup-ready-after-seconds`, and capture bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.
+
+## Completion plan execution update (2026-03-28, geometry fallback follow-up)
+
+Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-9 geometry path now retaining a compatibility fallback for Qt-readable PDFs that the lightweight parser cannot decode.
+
+### Completed from the plan in this patch
+
+- **FR-9 compatibility fallback restored in code.**
+  - Updated the Qt backend metadata path so parse failures no longer bubble out as geometry lookup failures for otherwise Qt-readable PDFs.
+  - When lightweight metadata parsing fails, `QtPdfRenderBackend` now falls back to QtPdf page-size geometry (`media_box == crop_box`, `rotation == 0`) for that page and caches the fallback result for the current file signature.
+  - This preserves the improved geometry path for parseable PDFs while avoiding repeated failures and repeated parsing work on documents outside the lightweight parser’s coverage.
+- **Regression coverage expanded.**
+  - Added unit tests to verify fallback geometry is returned when metadata parsing fails and that the fallback result is cached across repeated lookups.
+- **Documentation aligned with the fix.**
+  - Updated the README and FR-9 status notes in this review to describe the backend as using parsed metadata when available and falling back safely when it is not.
+
+### Verification
+
+- `.venv/bin/python -m pytest -q tests/unit/test_qt_render_backend.py tests/unit/test_viewer_workflow.py`
+- Result: `18 passed`
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 4 (FR-16 runtime metrics):** capture startup readiness using `--measure-startup-command` plus `--startup-ready-after-seconds`, and capture bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.
+
+## Completion plan execution update (2026-03-28, geometry cache follow-up)
+
+Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-9 geometry fix now avoiding repeated full-document metadata reparsing on the render path.
+
+### Completed from the plan in this patch
+
+- **FR-9 geometry lookup performance hardened in code.**
+  - Added backend-local caching for parsed page metadata so repeated `get_page_geometry()` calls reuse previously parsed `MediaBox`/`CropBox`/`Rotate` values instead of rereading and reparsing the entire PDF on each render.
+  - Added file-signature invalidation using the source file’s modification time and size so geometry is refreshed when the PDF changes on disk.
+  - Hardened the backend helper to lazily initialize the cache for test-created instances as well as normal runtime instances.
+- **Regression coverage expanded.**
+  - Added unit tests for repeated geometry-request cache hits and for invalidation when the document signature changes.
+- **Documentation aligned with the fix.**
+  - Updated the README and FR-9 status notes in this review to describe the geometry metadata path as cached, not reloaded on every render.
+
+### Verification
+
+- `.venv/bin/python -m pytest -q tests/unit/test_qt_render_backend.py tests/unit/test_viewer_workflow.py`
+- Result: `16 passed`
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 4 (FR-16 runtime metrics):** capture startup readiness using `--measure-startup-command` plus `--startup-ready-after-seconds`, and capture bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.
 
 ## Completion plan execution update (2026-03-28, tooling follow-up #6)
 
@@ -452,6 +531,56 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 - Runtime validation sweep: `0/20` checks passed.
 - Qt runtime readiness: ready (`PySide6` + `PySide6.QtPdf` available in `.venv`).
 - FR-16 quick-check: idle memory recorded (`15.24 MiB`); startup latency and bundle size still missing.
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 4 (FR-16 runtime metrics):** capture startup latency using `--measure-startup-command` against the PyInstaller one-dir executable and bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.
+
+## Completion plan execution update (2026-03-28, pan/selection correctness follow-up)
+
+Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-15 pan/selection integration gap corrected at implementation level.
+
+### Completed from the plan in this patch
+
+- **FR-15 interaction correctness hardened in code.**
+  - Updated the Qt preview widget so scrollbar-backed panning now synchronizes the effective pan offsets into `ViewerWorkflow`.
+  - Normalized drag-selection rectangles into viewport-relative coordinates before calling `selection_to_pdf_rect()`, keeping placement math aligned after middle-drag or shift-drag panning.
+  - Added regression tests to verify both scrollbar pan synchronization and correct viewport-relative selection coordinates after scrolling.
+- **Documentation aligned with the fix.**
+  - Updated the README and FR-15 status notes in this review to describe the widget as keeping pan and drag-selection state synchronized.
+
+### Verification
+
+- `.venv/bin/python -m pytest -q tests/unit/test_qt_viewer_widget.py tests/unit/test_viewer_workflow.py`
+- Result: `20 passed`
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 4 (FR-16 runtime metrics):** capture startup latency using `--measure-startup-command` against the PyInstaller one-dir executable and bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.
+
+## Completion plan execution update (2026-03-28, geometry correctness follow-up)
+
+Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-9 geometry gap in the Qt backend corrected at implementation level.
+
+### Completed from the plan in this patch
+
+- **FR-9 geometry correctness hardened in code.**
+  - Updated `QtPdfRenderBackend.get_page_geometry()` to preserve page geometry from parsed PDF page dictionaries instead of flattening every page to `crop_box == media_box` and `rotation == 0`.
+  - Added lightweight page-tree metadata extraction for inherited `MediaBox`, `CropBox`, and `/Rotate` values so viewer coordinate transforms now receive the effective page box and rotation for each page.
+  - Added regression coverage for inherited page-tree metadata and the no-`CropBox` fallback-to-`MediaBox` behavior.
+- **Documentation aligned with the fix.**
+  - Updated the repository README and this review to describe the Qt backend as preserving page geometry metadata rather than treating it as scaffold-only behavior.
+
+### Verification
+
+- `.venv/bin/python -m pytest -q tests/unit/test_qt_render_backend.py tests/unit/test_coordinate_transform.py tests/unit/test_viewer_workflow.py`
+- Result: `35 passed`
 
 ### Remaining blocking actions
 

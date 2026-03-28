@@ -120,24 +120,62 @@ def measure_startup_latency_ms(
     *,
     command: list[str],
     timeout_seconds: float = 30.0,
+    ready_after_seconds: float = 0.5,
 ) -> float:
-    """Measure wall-clock process startup latency for a command."""
+    """Measure command launch readiness without requiring normal process exit.
+
+    Short-lived probe commands return their full runtime. Long-running GUI-style
+    commands are treated as "started" once they stay alive for the readiness
+    window, after which the helper terminates them.
+    """
 
     if not command:
         raise ValueError("command must include at least one argument")
     if not isfinite(timeout_seconds) or timeout_seconds <= 0.0:
         raise ValueError("timeout_seconds must be a finite number greater than zero")
+    if not isfinite(ready_after_seconds) or ready_after_seconds <= 0.0:
+        raise ValueError("ready_after_seconds must be a finite number greater than zero")
+    if ready_after_seconds > timeout_seconds:
+        raise ValueError("ready_after_seconds cannot exceed timeout_seconds")
 
     start = time.perf_counter()
-    subprocess.run(
+    process = subprocess.Popen(
         command,
-        check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        timeout=timeout_seconds,
     )
-    end = time.perf_counter()
-    return (end - start) * 1000.0
+    deadline = start + timeout_seconds
+    readiness_deadline = start + ready_after_seconds
+
+    try:
+        while True:
+            now = time.perf_counter()
+            returncode = process.poll()
+            if returncode is not None:
+                if returncode != 0:
+                    raise subprocess.CalledProcessError(returncode, command)
+                return (now - start) * 1000.0
+
+            if now >= readiness_deadline:
+                process.terminate()
+                try:
+                    process.wait(timeout=1.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=1.0)
+                return (now - start) * 1000.0
+
+            if now >= deadline:
+                process.kill()
+                process.wait(timeout=1.0)
+                raise subprocess.TimeoutExpired(command, timeout_seconds)
+
+            time.sleep(0.01)
+    except Exception:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=1.0)
+        raise
 
 
 def _format_metric_status(metric: float | None, label: str) -> str:

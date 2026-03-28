@@ -1,7 +1,7 @@
 import pytest
 
 from pdf_signer.infra.render import QtPdfRenderBackend, RenderPageRequest
-from pdf_signer.infra.render.qt_backend import _QtBindings
+from pdf_signer.infra.render.qt_backend import _QtBindings, _load_pdf_page_metadata
 
 
 def test_qt_backend_reports_unavailable_when_qt_bindings_missing(monkeypatch) -> None:
@@ -39,6 +39,136 @@ def test_qt_backend_rejects_non_positive_zoom(tmp_path) -> None:
 
 
 def test_qt_backend_geometry_uses_qpdfdocument_page_apis(monkeypatch) -> None:
+    class _Document:
+        def pageCount(self):
+            return 1
+
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._document_signature",
+        lambda path: (123, 456),
+    )
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        lambda **_: type(
+            "_Metadata",
+            (),
+            {
+                "media_box": (0.0, 0.0, 612.0, 792.0),
+                "crop_box": (18.0, 36.0, 594.0, 756.0),
+                "rotation": 90,
+            },
+        )(),
+    )
+
+    geometry = backend.get_page_geometry("any.pdf", page_index=0)
+
+    assert geometry.media_box == (0.0, 0.0, 612.0, 792.0)
+    assert geometry.crop_box == (18.0, 36.0, 594.0, 756.0)
+    assert geometry.rotation == 90
+
+
+def test_qt_backend_geometry_caches_metadata_for_repeated_requests(monkeypatch) -> None:
+    class _Document:
+        def pageCount(self):
+            return 2
+
+    calls: list[int] = []
+
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    backend._metadata_cache = {}
+    monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._document_signature",
+        lambda path: (123, 456),
+    )
+
+    def fake_load_pdf_page_metadata(*, document_path, page_index):
+        calls.append(page_index)
+        return type(
+            "_Metadata",
+            (),
+            {
+                "media_box": (0.0, 0.0, 612.0, 792.0),
+                "crop_box": (0.0, 0.0, 612.0, 792.0),
+                "rotation": 0,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        fake_load_pdf_page_metadata,
+    )
+
+    first = backend.get_page_geometry("any.pdf", page_index=0)
+    second = backend.get_page_geometry("any.pdf", page_index=0)
+
+    assert first == second
+    assert calls == [0]
+
+
+def test_qt_backend_geometry_invalidates_metadata_cache_when_file_signature_changes(
+    monkeypatch,
+) -> None:
+    class _Document:
+        def pageCount(self):
+            return 1
+
+    signatures = iter([(123, 456), (124, 456)])
+    rotations = iter([0, 90])
+
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    backend._metadata_cache = {}
+    monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._document_signature",
+        lambda path: next(signatures),
+    )
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        lambda **_: type(
+            "_Metadata",
+            (),
+            {
+                "media_box": (0.0, 0.0, 612.0, 792.0),
+                "crop_box": (0.0, 0.0, 612.0, 792.0),
+                "rotation": next(rotations),
+            },
+        )(),
+    )
+
+    first = backend.get_page_geometry("any.pdf", page_index=0)
+    second = backend.get_page_geometry("any.pdf", page_index=0)
+
+    assert first.rotation == 0
+    assert second.rotation == 90
+
+
+def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
+    monkeypatch,
+) -> None:
     class _Size:
         def toTuple(self):
             return (612.0, 792.0)
@@ -59,13 +189,71 @@ def test_qt_backend_geometry_uses_qpdfdocument_page_apis(monkeypatch) -> None:
         qsize=object,
         qpdf_document_render_options=object,
     )
+    backend._metadata_cache = {}
     monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._document_signature",
+        lambda path: (123, 456),
+    )
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        lambda **_: (_ for _ in ()).throw(ValueError("object stream unsupported")),
+    )
 
     geometry = backend.get_page_geometry("any.pdf", page_index=0)
 
     assert geometry.media_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.crop_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.rotation == 0
+
+
+def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
+    monkeypatch,
+) -> None:
+    class _Size:
+        def toTuple(self):
+            return (400.0, 600.0)
+
+    class _Document:
+        def pageCount(self):
+            return 1
+
+        def pagePointSize(self, page_index):
+            assert page_index == 0
+            return _Size()
+
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    backend._metadata_cache = {}
+    monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._document_signature",
+        lambda path: (123, 456),
+    )
+
+    calls = {"count": 0}
+
+    def fail_parser(**kwargs):
+        calls["count"] += 1
+        raise ValueError("compressed xref stream unsupported")
+
+    monkeypatch.setattr(
+        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        fail_parser,
+    )
+
+    first = backend.get_page_geometry("any.pdf", page_index=0)
+    second = backend.get_page_geometry("any.pdf", page_index=0)
+
+    assert first == second
+    assert first.media_box == (0.0, 0.0, 400.0, 600.0)
+    assert calls["count"] == 1
 
 
 def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
@@ -141,3 +329,55 @@ def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
     assert image_size.width == 2
     assert image_size.height == 2
     assert isinstance(render_opts, _RenderOptions)
+
+
+def test_load_pdf_page_metadata_resolves_inherited_boxes_and_rotation(tmp_path) -> None:
+    pdf_path = tmp_path / "metadata.pdf"
+    pdf_path.write_bytes(
+        b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 612 792] /CropBox [18 36 594 756] /Rotate 90 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF
+"""
+    )
+
+    metadata = _load_pdf_page_metadata(document_path=str(pdf_path), page_index=0)
+
+    assert metadata.media_box == (0.0, 0.0, 612.0, 792.0)
+    assert metadata.crop_box == (18.0, 36.0, 594.0, 756.0)
+    assert metadata.rotation == 90
+
+
+def test_load_pdf_page_metadata_falls_back_to_media_box_when_crop_missing(tmp_path) -> None:
+    pdf_path = tmp_path / "metadata_no_crop.pdf"
+    pdf_path.write_bytes(
+        b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [10 20 410 620] >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF
+"""
+    )
+
+    metadata = _load_pdf_page_metadata(document_path=str(pdf_path), page_index=0)
+
+    assert metadata.media_box == (10.0, 20.0, 410.0, 620.0)
+    assert metadata.crop_box == (10.0, 20.0, 410.0, 620.0)
+    assert metadata.rotation == 0

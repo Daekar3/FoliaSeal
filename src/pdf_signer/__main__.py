@@ -72,6 +72,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Timeout used with --measure-startup-command.",
     )
     evidence.add_argument(
+        "--startup-ready-after-seconds",
+        type=float,
+        default=0.5,
+        help=(
+            "Readiness window used with --measure-startup-command. "
+            "Long-running GUI commands are treated as started once they stay alive "
+            "for this many seconds."
+        ),
+    )
+    evidence.add_argument(
         "--idle-memory-mib",
         type=float,
         default=None,
@@ -159,6 +169,7 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         startup_ms = measure_startup_latency_ms(
             command=args.measure_startup_command,
             timeout_seconds=args.startup_timeout_seconds,
+            ready_after_seconds=args.startup_ready_after_seconds,
         )
 
     runtime_footprint = RuntimeFootprintSnapshot(
