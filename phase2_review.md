@@ -104,3 +104,24 @@ Work advanced in this update:
 - **Day 3:** Packaging metrics capture + final review update (engineering lead).
 
 This sequence minimizes rework by validating runtime behavior first, then measuring finalized performance/bundle characteristics.
+
+## Completion plan execution update (2026-03-28)
+
+Status after this patch: **🟡 Still in progress** (runtime Qt validation + measured FR-13/FR-16 evidence remain blocking).
+
+### Completed from the plan in this patch
+
+- **Step 3 (FR-15 usability hardening): partially completed in code.**
+  - Added keyboard affordances in `PdfViewerWidgetAdapter` for zoom and page navigation:
+    - Zoom: `+`, `-`, `0` (reset)
+    - Navigation: `PgUp`/`PgDn`, arrow keys, `Home`/`End`
+  - Improved error callback wording to be clarity-first with appended technical details for diagnostics.
+  - Added/updated unit coverage for keyboard wiring and revised error-message behavior.
+- Updated `phase2_manual_qa_checklist.md` to explicitly include keyboard interaction checks and FR-16 runtime footprint evidence capture.
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** still blocked on a Qt-enabled host (`PySide6` + `QtPdf`) for end-to-end interaction verification.
+2. **Step 2 (performance evidence capture / FR-13):** still pending collection of first-render + >=10 navigation samples from real Qt runtime.
+3. **Step 4 (FR-16 runtime metrics):** still pending startup latency, idle memory, and bundle size measurements in PyInstaller one-dir context.
+4. **Step 5 (exit gate):** status cannot move to complete until items 1-3 are evidenced and linked here.

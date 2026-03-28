@@ -14,7 +14,9 @@ It captures the remaining runtime evidence needed to close Phase 2.
 ## Viewer interaction checks
 - [ ] Initial render succeeds on page 1.
 - [ ] Mouse-wheel zoom-in and zoom-out update preview scale correctly.
+- [ ] Keyboard zoom shortcuts work (`+`, `-`, `0` reset).
 - [ ] Page navigation next/previous works and stays within valid bounds.
+- [ ] Keyboard page navigation works (`PgUp`/`PgDn`, arrows, `Home`/`End`).
 - [ ] Jump-to-page behavior handles first page, middle page, and last page.
 - [ ] Drag-selection overlay is visible while dragging.
 - [ ] Drag-selection callback returns a valid in-bounds PDF rectangle.
@@ -29,4 +31,5 @@ It captures the remaining runtime evidence needed to close Phase 2.
 ## Exit criteria confirmation
 - [ ] No unhandled exceptions in widget refresh, zoom, navigation, or selection flow.
 - [ ] Timing evidence attached to Phase 2 review document.
+- [ ] Runtime footprint metrics (startup/idle memory/bundle size) attached to Phase 2 review document.
 - [ ] Mark Phase 2 as complete once runtime + timing requirements are satisfied.

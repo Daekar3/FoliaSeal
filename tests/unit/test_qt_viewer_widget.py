@@ -45,6 +45,19 @@ def test_qt_viewer_widget_adapter_raises_actionable_error_without_pyside6(monkey
 
 class _FakeQt:
     LeftButton = 1
+    Key_Plus = 10
+    Key_Equal = 11
+    Key_Minus = 12
+    Key_Underscore = 13
+    Key_0 = 14
+    Key_PageDown = 15
+    Key_Down = 16
+    Key_Right = 17
+    Key_PageUp = 18
+    Key_Up = 19
+    Key_Left = 20
+    Key_Home = 21
+    Key_End = 22
 
 
 class _FakePoint:
@@ -71,6 +84,18 @@ class _FakeMouseEvent:
 
     def position(self):
         return self._position
+
+
+class _FakeKeyEvent:
+    def __init__(self, *, key: int):
+        self._key = key
+        self.accepted = False
+
+    def key(self):
+        return self._key
+
+    def accept(self):
+        self.accepted = True
 
 
 class _FakeRect:
@@ -112,6 +137,9 @@ class _FakeWidget:
         return None
 
     def mouseReleaseEvent(self, event):  # noqa: N802
+        return None
+
+    def keyPressEvent(self, event):  # noqa: N802
         return None
 
 
@@ -190,7 +218,7 @@ def test_mouse_release_event_reports_selection_mapping_errors(monkeypatch):
 
     assert selected == []
     assert len(errors) == 1
-    assert "Failed to map selection" in errors[0]
+    assert "Selection could not be placed on the PDF page." in errors[0]
 
 
 def test_refresh_reports_render_errors(monkeypatch):
@@ -209,7 +237,7 @@ def test_refresh_reports_render_errors(monkeypatch):
     widget.refresh()
 
     assert len(errors) == 1
-    assert "Failed to render PDF preview" in errors[0]
+    assert "Unable to render PDF preview." in errors[0]
 
 
 def test_refresh_reraises_render_errors_without_error_callback(monkeypatch):
@@ -223,3 +251,70 @@ def test_refresh_reraises_render_errors_without_error_callback(monkeypatch):
 
     with pytest.raises(RuntimeError, match="render backend unavailable"):
         widget.refresh()
+
+
+def test_key_press_event_wires_keyboard_affordances(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    class _WorkflowWithKeyboardActions:
+        def __init__(self):
+            self.actions = []
+            self.session = ViewerSession(page_count=4)
+
+        def render_current_page(self, *, elapsed_ms=None, navigation=False):
+            self.actions.append(("render", navigation))
+            return type(
+                "_RenderResult",
+                (),
+                {
+                    "rgba_bytes": b"\x00" * 16,
+                    "width_px": 2,
+                    "height_px": 2,
+                },
+            )()
+
+        def zoom_in(self):
+            self.actions.append("zoom_in")
+            return 1.0
+
+        def zoom_out(self):
+            self.actions.append("zoom_out")
+            return 1.0
+
+        def reset_zoom(self):
+            self.actions.append("reset_zoom")
+            return 1.0
+
+        def go_next_page(self, *, elapsed_ms=None):
+            self.actions.append("go_next_page")
+            return self.render_current_page(elapsed_ms=elapsed_ms, navigation=True)
+
+        def go_previous_page(self, *, elapsed_ms=None):
+            self.actions.append("go_previous_page")
+            return self.render_current_page(elapsed_ms=elapsed_ms, navigation=True)
+
+        def jump_to_page(self, page_index):
+            self.actions.append(("jump_to_page", page_index))
+            return self.render_current_page(navigation=True)
+
+    workflow = _WorkflowWithKeyboardActions()
+    widget = PdfViewerWidgetAdapter().create(workflow=workflow)
+
+    for key in (
+        _FakeQt.Key_Plus,
+        _FakeQt.Key_Minus,
+        _FakeQt.Key_0,
+        _FakeQt.Key_PageDown,
+        _FakeQt.Key_PageUp,
+        _FakeQt.Key_Home,
+        _FakeQt.Key_End,
+    ):
+        widget.keyPressEvent(_FakeKeyEvent(key=key))
+
+    assert "zoom_in" in workflow.actions
+    assert "zoom_out" in workflow.actions
+    assert "reset_zoom" in workflow.actions
+    assert "go_next_page" in workflow.actions
+    assert "go_previous_page" in workflow.actions
+    assert ("jump_to_page", 0) in workflow.actions
+    assert ("jump_to_page", 3) in workflow.actions
