@@ -6,6 +6,9 @@ Owner: FoliaSeal engineering
 This checklist is intended for an environment where `PySide6` + `QtPdf` are already available.
 It records the manual runtime execution needed to close Phase 2.
 Qt dependency readiness belongs in the generated runtime evidence artifact, not in this checklist.
+Use this file as the immutable template. The harness now writes a run-specific copy to
+`artifacts/phase2_manual_qa_results.md`; that generated results file is what
+`phase2-evidence --qa-checklist-file ...` should consume.
 
 ## Runtime session setup
 - [ ] Launch the app with a representative multi-page PDF (portrait + rotated page if available).
@@ -26,8 +29,9 @@ Qt dependency readiness belongs in the generated runtime evidence artifact, not 
 - [ ] Record first-render elapsed time in milliseconds.
 - [ ] Record at least 10 navigation samples in milliseconds.
 - [ ] Export timing evidence markdown into Phase 2 review notes (recommended command):
-  - `python -m foliaseal phase2-evidence --first-render-ms <value> --navigation-ms <value> ... --collect-runtime-footprint --measure-startup-command <pyinstaller_one_dir_executable_or_probe_command> --startup-ready-after-seconds <value> --bundle-dir <pyinstaller_one_dir_output> --qa-checklist-file phase2_manual_qa_checklist.md --qa-issue "<optional issue note>" --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
+  - `python -m foliaseal phase2-evidence --first-render-ms <value> --navigation-ms <value> ... --collect-runtime-footprint --measure-startup-command <pyinstaller_one_dir_executable_or_probe_command> --startup-ready-after-seconds <value> --bundle-dir <pyinstaller_one_dir_output> --qa-checklist-file artifacts/phase2_manual_qa_results.md --qa-issue "<optional issue note>" --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - `--measure-startup-command` measures launch readiness. Use a short-lived probe command when available; for a GUI executable, set `--startup-ready-after-seconds` to the window that should count as a successful launch.
+  - The harness seeds `artifacts/phase2_manual_qa_results.md` automatically; review that file and check any remaining manual-only items before running the evidence command.
   - Paste `artifacts/phase2_runtime_evidence.md` into `phase2_review.md` under the latest completion-plan update section.
 - [ ] Attach hardware + OS context (CPU model, memory, Linux distro/version).
 

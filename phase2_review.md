@@ -546,6 +546,11 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 
 Status after this patch: **✅ Complete** (interactive runtime validation, timing evidence, and runtime footprint evidence are all attached and validated).
 
+Note for any future rerun of the manual validation flow: the immutable checklist template is
+[`phase2_manual_qa_checklist.md`](/home/daekar/SignPDF/Scratch/phase2_manual_qa_checklist.md), but the evidence command should consume the run-specific results file written by the harness at
+[`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
+Older review entries that point `--qa-checklist-file` at the template checklist are superseded by that newer evidence flow.
+
 ### Completed from the plan in this patch
 
 - **Step 1 (runtime validation sweep): completed.**
