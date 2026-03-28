@@ -204,6 +204,7 @@ class PdfViewerWidgetAdapter:
                     delta_y = current.y() - self._pan_origin.y()
                     self._horizontal_scroll_bar().setValue(self._pan_start_x - delta_x)
                     self._vertical_scroll_bar().setValue(self._pan_start_y - delta_y)
+                    self._sync_pan_from_scrollbars()
                     event.accept()
                     return
                 if self._drag_origin is None:
@@ -227,13 +228,10 @@ class PdfViewerWidgetAdapter:
                 self._drag_origin = None
 
                 try:
+                    self._sync_pan_from_scrollbars()
+                    selection = self._selection_in_viewport_coords(rect)
                     pdf_rect = self._workflow.selection_to_pdf_rect(
-                        selection=ViewRect(
-                            x1=float(rect.left()),
-                            y1=float(rect.top()),
-                            x2=float(rect.right()),
-                            y2=float(rect.bottom()),
-                        )
+                        selection=selection
                     )
                 except (RuntimeError, ValueError) as exc:
                     self._emit_error(
@@ -249,6 +247,7 @@ class PdfViewerWidgetAdapter:
 
             def attach_scroll_container(self, scroll_container: Any) -> None:
                 self._scroll_container = scroll_container
+                self._sync_pan_from_scrollbars()
 
             def hideEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 if self._pan_origin is not None:
@@ -311,6 +310,30 @@ class PdfViewerWidgetAdapter:
                 modifiers = event.modifiers()
                 shift_mask = bindings.qt.KeyboardModifier.ShiftModifier
                 return bool(modifiers & shift_mask)
+
+            def _selection_in_viewport_coords(self, rect: Any) -> ViewRect:
+                pan_x, pan_y = self._current_pan_offsets()
+                return ViewRect(
+                    x1=float(rect.left()) - pan_x,
+                    y1=float(rect.top()) - pan_y,
+                    x2=float(rect.right()) - pan_x,
+                    y2=float(rect.bottom()) - pan_y,
+                )
+
+            def _sync_pan_from_scrollbars(self) -> None:
+                setter = getattr(self._workflow, "set_pan", None)
+                if not callable(setter):
+                    return
+                pan_x, pan_y = self._current_pan_offsets()
+                setter(pan_x=-pan_x, pan_y=-pan_y)
+
+            def _current_pan_offsets(self) -> tuple[float, float]:
+                if self._scroll_container is None:
+                    return 0.0, 0.0
+                return (
+                    float(self._horizontal_scroll_bar().value()),
+                    float(self._vertical_scroll_bar().value()),
+                )
 
         return PdfPreviewWidget()
 

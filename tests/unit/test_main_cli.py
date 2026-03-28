@@ -74,7 +74,7 @@ def test_main_phase2_evidence_measures_startup_command_when_requested(
 ) -> None:
     monkeypatch.setattr(
         "pdf_signer.__main__.measure_startup_latency_ms",
-        lambda command, timeout_seconds: 432.1,
+        lambda command, timeout_seconds, ready_after_seconds: 432.1,
     )
 
     __main__.main(
@@ -82,6 +82,8 @@ def test_main_phase2_evidence_measures_startup_command_when_requested(
             "phase2-evidence",
             "--measure-startup-command",
             "python3",
+            "--startup-ready-after-seconds",
+            "0.75",
         ]
     )
 

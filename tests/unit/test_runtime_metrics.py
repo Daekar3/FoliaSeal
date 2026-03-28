@@ -138,25 +138,87 @@ def test_measure_startup_latency_ms_returns_elapsed_time(
 ) -> None:
     calls: dict[str, object] = {}
 
-    def fake_run(*args, **kwargs):  # type: ignore[no-untyped-def]
-        calls["command"] = args[0]
-        calls["timeout"] = kwargs["timeout"]
+    class _Process:
+        def __init__(self) -> None:
+            self.poll_count = 0
 
-    samples = iter([100.0, 100.25])
-    monkeypatch.setattr("pdf_signer.application.runtime_metrics.subprocess.run", fake_run)
+        def poll(self):  # type: ignore[no-untyped-def]
+            self.poll_count += 1
+            if self.poll_count == 1:
+                return None
+            return 0
+
+        def terminate(self):  # type: ignore[no-untyped-def]
+            raise AssertionError("terminate should not be used for short-lived probe command")
+
+        def wait(self, timeout):  # type: ignore[no-untyped-def]
+            calls["wait_timeout"] = timeout
+            return 0
+
+        def kill(self):  # type: ignore[no-untyped-def]
+            raise AssertionError("kill should not be used for short-lived probe command")
+
+    def fake_popen(*args, **kwargs):  # type: ignore[no-untyped-def]
+        calls["command"] = args[0]
+        return _Process()
+
+    samples = iter([100.0, 100.10, 100.25])
+    monkeypatch.setattr("pdf_signer.application.runtime_metrics.subprocess.Popen", fake_popen)
     monkeypatch.setattr(
         "pdf_signer.application.runtime_metrics.time.perf_counter",
         lambda: next(samples),
     )
+    monkeypatch.setattr("pdf_signer.application.runtime_metrics.time.sleep", lambda _: None)
 
     measured = measure_startup_latency_ms(
         command=["/tmp/pdf-signer", "--help"],
         timeout_seconds=15.0,
+        ready_after_seconds=0.5,
     )
 
     assert measured == pytest.approx(250.0, abs=0.001)
     assert calls["command"] == ["/tmp/pdf-signer", "--help"]
-    assert calls["timeout"] == 15.0
+ 
+
+def test_measure_startup_latency_ms_treats_long_running_command_as_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {"terminated": False}
+
+    class _Process:
+        def poll(self):  # type: ignore[no-untyped-def]
+            return None
+
+        def terminate(self):  # type: ignore[no-untyped-def]
+            calls["terminated"] = True
+
+        def wait(self, timeout):  # type: ignore[no-untyped-def]
+            calls["wait_timeout"] = timeout
+            return 0
+
+        def kill(self):  # type: ignore[no-untyped-def]
+            raise AssertionError("kill should not be used when readiness is reached")
+
+    monkeypatch.setattr(
+        "pdf_signer.application.runtime_metrics.subprocess.Popen",
+        lambda *args, **kwargs: _Process(),
+    )
+    samples = iter([10.0, 10.2, 10.55])
+    monkeypatch.setattr(
+        "pdf_signer.application.runtime_metrics.time.perf_counter",
+        lambda: next(samples),
+    )
+    monkeypatch.setattr("pdf_signer.application.runtime_metrics.time.sleep", lambda _: None)
+
+    measured = measure_startup_latency_ms(
+        command=["/tmp/pdf-signer"],
+        timeout_seconds=5.0,
+        ready_after_seconds=0.5,
+    )
+
+    assert measured == pytest.approx(550.0, abs=0.001)
+    assert calls["terminated"] is True
+    assert calls["wait_timeout"] == 1.0
 
 
 def test_measure_startup_latency_ms_rejects_invalid_arguments() -> None:
@@ -164,3 +226,11 @@ def test_measure_startup_latency_ms_rejects_invalid_arguments() -> None:
         measure_startup_latency_ms(command=[])
     with pytest.raises(ValueError, match="greater than zero"):
         measure_startup_latency_ms(command=["python3"], timeout_seconds=0.0)
+    with pytest.raises(ValueError, match="greater than zero"):
+        measure_startup_latency_ms(command=["python3"], ready_after_seconds=0.0)
+    with pytest.raises(ValueError, match="cannot exceed timeout_seconds"):
+        measure_startup_latency_ms(
+            command=["python3"],
+            timeout_seconds=1.0,
+            ready_after_seconds=2.0,
+        )
