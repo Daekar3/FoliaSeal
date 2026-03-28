@@ -20,6 +20,7 @@ class QtWidgetBindings:
     """Dynamically imported PySide6 symbols used by the widget."""
 
     q_widget: type[Any]
+    q_scroll_area: type[Any]
     q_painter: type[Any]
     q_color: type[Any]
     q_pen: type[Any]
@@ -52,8 +53,12 @@ class PdfViewerWidgetAdapter:
                 self._on_selection = on_selection
                 self._on_error = on_error
                 self._pixmap: Any | None = None
+                self._scroll_container: Any | None = None
                 self._drag_origin: Any | None = None
                 self._selection_rect: Any | None = None
+                self._pan_origin: Any | None = None
+                self._pan_start_x = 0
+                self._pan_start_y = 0
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
                 try:
@@ -177,6 +182,15 @@ class PdfViewerWidgetAdapter:
                 super().keyPressEvent(event)
 
             def mousePressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                if self._is_pan_press(event):
+                    if self._scroll_container is None:
+                        return super().mousePressEvent(event)
+                    self._pan_origin = event.position().toPoint()
+                    self._pan_start_x = self._horizontal_scroll_bar().value()
+                    self._pan_start_y = self._vertical_scroll_bar().value()
+                    self.grabMouse()
+                    event.accept()
+                    return
                 if event.button() != bindings.qt.LeftButton:
                     return super().mousePressEvent(event)
                 self._drag_origin = event.position().toPoint()
@@ -184,6 +198,14 @@ class PdfViewerWidgetAdapter:
                 self.update()
 
             def mouseMoveEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                if self._pan_origin is not None:
+                    current = event.position().toPoint()
+                    delta_x = current.x() - self._pan_origin.x()
+                    delta_y = current.y() - self._pan_origin.y()
+                    self._horizontal_scroll_bar().setValue(self._pan_start_x - delta_x)
+                    self._vertical_scroll_bar().setValue(self._pan_start_y - delta_y)
+                    event.accept()
+                    return
                 if self._drag_origin is None:
                     return super().mouseMoveEvent(event)
                 current = event.position().toPoint()
@@ -191,6 +213,11 @@ class PdfViewerWidgetAdapter:
                 self.update()
 
             def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                if self._pan_origin is not None and self._is_pan_release(event):
+                    self._pan_origin = None
+                    self.releaseMouse()
+                    event.accept()
+                    return
                 if self._drag_origin is None or event.button() != bindings.qt.LeftButton:
                     return super().mouseReleaseEvent(event)
 
@@ -219,6 +246,15 @@ class PdfViewerWidgetAdapter:
                 if self._on_selection is not None:
                     self._on_selection(pdf_rect)
                 self.update()
+
+            def attach_scroll_container(self, scroll_container: Any) -> None:
+                self._scroll_container = scroll_container
+
+            def hideEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                if self._pan_origin is not None:
+                    self._pan_origin = None
+                    self.releaseMouse()
+                super().hideEvent(event)
 
             def _emit_error(self, summary: str, exc: Exception | None = None) -> None:
                 if self._on_error is not None:
@@ -249,6 +285,33 @@ class PdfViewerWidgetAdapter:
                     return
                 self._apply_render_result(result)
 
+            def _horizontal_scroll_bar(self) -> Any:
+                if self._scroll_container is None:
+                    raise RuntimeError("Scroll container is not attached.")
+                return self._scroll_container.horizontalScrollBar()
+
+            def _vertical_scroll_bar(self) -> Any:
+                if self._scroll_container is None:
+                    raise RuntimeError("Scroll container is not attached.")
+                return self._scroll_container.verticalScrollBar()
+
+            def _is_pan_press(self, event: Any) -> bool:
+                return event.button() == bindings.qt.MiddleButton or (
+                    event.button() == bindings.qt.LeftButton
+                    and self._has_shift_modifier(event)
+                )
+
+            def _is_pan_release(self, event: Any) -> bool:
+                return event.button() in (
+                    bindings.qt.MiddleButton,
+                    bindings.qt.LeftButton,
+                )
+
+            def _has_shift_modifier(self, event: Any) -> bool:
+                modifiers = event.modifiers()
+                shift_mask = bindings.qt.KeyboardModifier.ShiftModifier
+                return bool(modifiers & shift_mask)
+
         return PdfPreviewWidget()
 
     def _load_bindings(self) -> QtWidgetBindings:
@@ -264,6 +327,7 @@ class PdfViewerWidgetAdapter:
 
         return QtWidgetBindings(
             q_widget=getattr(qt_widgets, "QWidget"),
+            q_scroll_area=getattr(qt_widgets, "QScrollArea"),
             q_painter=getattr(qt_gui, "QPainter"),
             q_color=getattr(qt_gui, "QColor"),
             q_pen=getattr(qt_gui, "QPen"),
@@ -283,8 +347,22 @@ def build_qt_pdf_viewer_widget(
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
 
-    return PdfViewerWidgetAdapter().create(
+    adapter = PdfViewerWidgetAdapter()
+    preview_widget = adapter.create(
         workflow=workflow,
         on_selection=on_selection,
         on_error=on_error,
     )
+
+    class ScrollablePdfViewer(adapter._bindings.q_scroll_area):  # type: ignore[misc,valid-type]
+        def __init__(self) -> None:
+            super().__init__()
+            self.setWidget(preview_widget)
+            self.setWidgetResizable(False)
+            self.setFocusProxy(preview_widget)
+            preview_widget.attach_scroll_container(self)
+
+        def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
+            preview_widget.refresh(elapsed_ms=elapsed_ms, navigation=navigation)
+
+    return ScrollablePdfViewer()

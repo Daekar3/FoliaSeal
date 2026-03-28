@@ -42,3 +42,48 @@ ruff check .
 pytest -q
 python -m pdf_signer
 ```
+
+## PyInstaller build
+
+Build a one-dir bundle for FR-16 evidence capture:
+
+```bash
+.venv/bin/pip install -e .[dev]
+./scripts/build_pyinstaller.sh
+```
+
+This produces:
+
+- bundle directory: `dist/pdf-signer`
+- executable: `dist/pdf-signer/pdf-signer`
+
+You can then generate a fuller Phase 2 evidence block against the packaged app:
+
+```bash
+python3 -m pdf_signer phase2-evidence \
+  --first-render-ms 47.54 \
+  --navigation-ms 49.35 \
+  --navigation-ms 45.06 \
+  --navigation-ms 47.68 \
+  --navigation-ms 49.00 \
+  --navigation-ms 47.79 \
+  --navigation-ms 41.84 \
+  --navigation-ms 47.68 \
+  --navigation-ms 48.70 \
+  --navigation-ms 47.14 \
+  --navigation-ms 42.44 \
+  --navigation-ms 47.98 \
+  --navigation-ms 48.33 \
+  --navigation-ms 53.64 \
+  --navigation-ms 42.77 \
+  --navigation-ms 47.17 \
+  --navigation-ms 48.19 \
+  --navigation-ms 54.07 \
+  --navigation-ms 43.07 \
+  --navigation-ms 46.57 \
+  --navigation-ms 52.18 \
+  --measure-startup-command dist/pdf-signer/pdf-signer \
+  --collect-runtime-footprint \
+  --bundle-dir dist/pdf-signer \
+  --check-qt-runtime
+```
