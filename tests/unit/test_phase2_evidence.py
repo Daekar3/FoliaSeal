@@ -2,6 +2,7 @@ import pytest
 
 from pdf_signer.application.performance_timing import ViewerTimingSnapshot
 from pdf_signer.application.phase2_evidence import (
+    QtRuntimeReadinessSnapshot,
     RuntimeEnvironmentSnapshot,
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
@@ -200,3 +201,63 @@ def test_parse_checklist_markdown_rejects_files_without_checkboxes(tmp_path) -> 
 
     with pytest.raises(ValueError, match="did not contain markdown checkbox"):
         parse_checklist_markdown(checklist_path=str(checklist_path))
+
+
+def test_qt_runtime_readiness_markdown_shows_missing_dependencies() -> None:
+    readiness = QtRuntimeReadinessSnapshot(
+        pyside6_available=False,
+        qtpdf_available=False,
+    )
+
+    rendered = readiness.to_markdown()
+
+    assert "### Qt runtime readiness" in rendered
+    assert "- ⚠️ Ready for Qt host runtime validation" in rendered
+    assert "- ⚠️ PySide6 import available" in rendered
+    assert "- ⚠️ PySide6.QtPdf import available" in rendered
+
+
+def test_build_phase2_timing_evidence_includes_qt_runtime_readiness() -> None:
+    snapshot = ViewerTimingSnapshot(
+        first_render_ms=50.0,
+        average_navigation_ms=25.0,
+        min_navigation_ms=20.0,
+        max_navigation_ms=30.0,
+        sample_count=10,
+    )
+    environment = RuntimeEnvironmentSnapshot(
+        os_name="Linux",
+        os_version="6.8.0",
+        machine="x86_64",
+        processor="ExampleCPU",
+        python_version="3.12.3",
+    )
+
+    report = build_phase2_timing_evidence(
+        timing=snapshot,
+        environment=environment,
+        qt_runtime_readiness=QtRuntimeReadinessSnapshot(
+            pyside6_available=True,
+            qtpdf_available=False,
+        ),
+    )
+
+    assert "### Qt runtime readiness" in report
+    assert "- ✅ PySide6 import available" in report
+    assert "- ⚠️ PySide6.QtPdf import available" in report
+
+
+def test_runtime_readiness_collect_handles_missing_parent_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_find_spec(name: str):  # type: ignore[no-untyped-def]
+        if name == "PySide6.QtPdf":
+            raise ModuleNotFoundError("No module named 'PySide6'")
+        return None
+
+    monkeypatch.setattr("pdf_signer.application.phase2_evidence.find_spec", fake_find_spec)
+
+    collected = QtRuntimeReadinessSnapshot.collect()
+
+    assert collected.pyside6_available is False
+    assert collected.qtpdf_available is False

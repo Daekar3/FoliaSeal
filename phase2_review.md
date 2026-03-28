@@ -196,6 +196,44 @@ Notes:
 3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values captured from an actual PyInstaller one-dir run.
 4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
 
+## Completion plan execution update (2026-03-28, tooling follow-up #7)
+
+Status after this patch: **🟡 Still in progress** (real Qt-host execution remains required), with Step 1 preflight diagnostics now captured directly by the evidence workflow.
+
+### Completed from the plan in this patch
+
+- **Step 1 (runtime validation sweep): process support further completed.**
+  - Added Qt runtime readiness diagnostics (`PySide6` + `PySide6.QtPdf` import availability) to the `phase2-evidence` output via `--check-qt-runtime`.
+  - This creates an explicit preflight signal that distinguishes “not yet executed” from “host not ready,” reducing ambiguity in handoff notes.
+- **Step 5 (exit review update): evidence artifact updated in this environment.**
+  - Ran:
+    - `PYTHONPATH=src python -m pdf_signer phase2-evidence --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
+  - Result in this host confirms runtime sweep is currently blocked by missing Qt dependencies:
+    - `PySide6`: unavailable
+    - `PySide6.QtPdf`: unavailable
+
+### Updated recommended evidence command for Qt-enabled host
+
+```bash
+python -m pdf_signer phase2-evidence \
+  --first-render-ms <value> \
+  --navigation-ms <value> --navigation-ms <value> ... \
+  --collect-runtime-footprint \
+  --measure-startup-command <pyinstaller_one_dir_executable> \
+  --bundle-dir <pyinstaller_one_dir_output> \
+  --qa-checklist-file phase2_manual_qa_checklist.md \
+  --qa-issue "<optional issue note>" \
+  --check-qt-runtime \
+  --write-markdown-file artifacts/phase2_runtime_evidence.md
+```
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** still pending execution in a real Qt runtime (`PySide6` + `QtPdf`) with checklist checks marked from actual run results.
+2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples captured from that Qt runtime.
+3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values captured from an actual PyInstaller one-dir run.
+4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
+
 ## Completion plan execution update (2026-03-28, tooling follow-up #2)
 
 Status after this patch: **🟡 Still in progress** (Qt-host execution still required), with FR-16 evidence collection now partially automated.
