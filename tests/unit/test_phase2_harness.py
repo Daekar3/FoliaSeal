@@ -1,5 +1,7 @@
 from foliaseal.presentation.qt.phase2_harness import (
+    DEFAULT_CHECKLIST_RESULTS_PATH,
     HarnessCapture,
+    build_checklist_results_markdown,
     build_phase2_evidence_command,
 )
 
@@ -21,7 +23,7 @@ def test_build_phase2_evidence_command_includes_captured_timings() -> None:
     assert "--navigation-ms 21.20" in command
     assert "--navigation-ms 22.30" in command
     assert "--collect-runtime-footprint" in command
-    assert "--qa-checklist-file phase2_manual_qa_checklist.md" in command
+    assert f"--qa-checklist-file {DEFAULT_CHECKLIST_RESULTS_PATH}" in command
 
 
 def test_build_phase2_evidence_command_omits_first_render_when_missing() -> None:
@@ -55,3 +57,40 @@ def test_harness_capture_json_includes_interaction_counts() -> None:
 
     assert '"interaction_counts"' in rendered
     assert '"key_jump_home": 1' in rendered
+
+
+def test_build_checklist_results_markdown_prefills_detected_checks(tmp_path) -> None:
+    template_path = tmp_path / "checklist.md"
+    template_path.write_text(
+        "\n".join(
+            [
+                "# Template",
+                "- [ ] Initial render succeeds on page 1.",
+                "- [ ] Keyboard zoom shortcuts work (`+`, `-`, `0` reset).",
+                "- [ ] Drag-selection overlay is visible while dragging.",
+                "- [ ] Record at least 10 navigation samples in milliseconds.",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    capture = HarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        first_render_ms=10.0,
+        navigation_samples_ms=tuple(float(i) for i in range(10)),
+        selection_count=0,
+        last_selection_pdf_rect=None,
+        interaction_counts={"key_zoom_in": 1, "key_zoom_out": 1, "key_zoom_reset": 1},
+        errors=(),
+    )
+
+    rendered = build_checklist_results_markdown(
+        capture,
+        checklist_template_path=str(template_path),
+    )
+
+    assert "Source checklist" in rendered
+    assert "- [x] Initial render succeeds on page 1." in rendered
+    assert "- [x] Keyboard zoom shortcuts work (`+`, `-`, `0` reset)." in rendered
+    assert "- [ ] Drag-selection overlay is visible while dragging." in rendered
+    assert "- [x] Record at least 10 navigation samples in milliseconds." in rendered

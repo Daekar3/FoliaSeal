@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 import shlex
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -16,6 +17,9 @@ from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+
+DEFAULT_CHECKLIST_TEMPLATE_PATH = "phase2_manual_qa_checklist.md"
+DEFAULT_CHECKLIST_RESULTS_PATH = "artifacts/phase2_manual_qa_results.md"
 
 
 @dataclass(frozen=True)
@@ -43,7 +47,7 @@ def build_phase2_evidence_command(
     packaged_executable: str = "dist/foliaseal/foliaseal",
     startup_ready_after_seconds: float = 0.75,
     bundle_dir: str = "dist/foliaseal",
-    checklist_path: str = "phase2_manual_qa_checklist.md",
+    checklist_path: str = DEFAULT_CHECKLIST_RESULTS_PATH,
     artifact_path: str = "artifacts/phase2_runtime_evidence.md",
 ) -> str:
     """Build a shell command that folds captured timings into the evidence CLI."""
@@ -77,11 +81,45 @@ def build_phase2_evidence_command(
     return " ".join(parts)
 
 
+def build_checklist_results_markdown(
+    capture: HarnessCapture,
+    *,
+    checklist_template_path: str = DEFAULT_CHECKLIST_TEMPLATE_PATH,
+) -> str:
+    """Render a run-specific QA checklist seeded from the immutable template."""
+
+    template = Path(checklist_template_path).read_text(encoding="utf-8")
+    auto_checked_items = _derive_auto_checked_items(capture)
+    checkbox_pattern = re.compile(r"^(\s*-\s*)\[(?: |x|X)\](\s+)(.+)$")
+
+    rendered_lines = [
+        "# Phase 2 Manual QA Results",
+        "",
+        f"Source checklist: `{checklist_template_path}`",
+        f"Captured PDF: `{capture.pdf_path}`",
+        "",
+        "Update any remaining unchecked items after reviewing the manual session.",
+        "This file is the one that `phase2-evidence --qa-checklist-file ...` should consume.",
+        "",
+    ]
+    for raw_line in template.splitlines():
+        match = checkbox_pattern.match(raw_line)
+        if not match:
+            rendered_lines.append(raw_line)
+            continue
+        prefix, spacing, item_text = match.groups()
+        marker = "x" if item_text.strip() in auto_checked_items else " "
+        rendered_lines.append(f"{prefix}[{marker}]{spacing}{item_text}")
+    return "\n".join(rendered_lines) + "\n"
+
+
 def run_phase2_viewer_harness(
     *,
     pdf_path: str,
     summary_json_path: str | None = None,
     evidence_command_path: str | None = None,
+    checklist_results_path: str = DEFAULT_CHECKLIST_RESULTS_PATH,
+    checklist_template_path: str = DEFAULT_CHECKLIST_TEMPLATE_PATH,
 ) -> HarnessCapture:
     """Launch an interactive Qt viewer harness for manual Phase 2 validation."""
 
@@ -266,7 +304,18 @@ def run_phase2_viewer_harness(
         target_path=summary_json_path,
         content=capture.to_json() + "\n",
     )
-    evidence_command = build_phase2_evidence_command(capture)
+    checklist_results = build_checklist_results_markdown(
+        capture,
+        checklist_template_path=checklist_template_path,
+    )
+    _write_optional_text(
+        target_path=checklist_results_path,
+        content=checklist_results,
+    )
+    evidence_command = build_phase2_evidence_command(
+        capture,
+        checklist_path=checklist_results_path,
+    )
     _write_optional_text(
         target_path=evidence_command_path,
         content=evidence_command + "\n",
@@ -274,6 +323,8 @@ def run_phase2_viewer_harness(
     print("Phase 2 harness capture")
     print(capture.to_json())
     print()
+    print(f"Checklist results file: {checklist_results_path}")
+    print("Review it, check any remaining manual-only items, then run:")
     print("Evidence command:")
     print(evidence_command)
     return capture
@@ -333,6 +384,59 @@ def _metrics_text(*, first_render_ms: float | None, navigation_samples: int) -> 
         f"First render: {first_render} | "
         f"Navigation samples captured: {navigation_samples}"
     )
+
+
+def _derive_auto_checked_items(capture: HarnessCapture) -> set[str]:
+    interaction_counts = capture.interaction_counts
+    auto_checked: set[str] = set()
+
+    if capture.first_render_ms is not None:
+        auto_checked.add("Confirm preview widget loads without dependency errors.")
+        auto_checked.add("Initial render succeeds on page 1.")
+        auto_checked.add("Record first-render elapsed time in milliseconds.")
+
+    if (
+        interaction_counts.get("key_zoom_in", 0) > 0
+        and interaction_counts.get("key_zoom_out", 0) > 0
+        and interaction_counts.get("key_zoom_reset", 0) > 0
+    ):
+        auto_checked.add("Keyboard zoom shortcuts work (`+`, `-`, `0` reset).")
+
+    if (
+        interaction_counts.get("key_page_next", 0) > 0
+        and interaction_counts.get("key_page_previous", 0) > 0
+    ):
+        auto_checked.add(
+            "Page navigation next/previous works and stays within valid bounds."
+        )
+
+    if (
+        interaction_counts.get("key_page_next", 0) > 0
+        and interaction_counts.get("key_page_previous", 0) > 0
+        and interaction_counts.get("key_jump_home", 0) > 0
+        and interaction_counts.get("key_jump_end", 0) > 0
+    ):
+        auto_checked.add(
+            "Keyboard page navigation works (`PgUp`/`PgDn`, arrows, `Home`/`End`)."
+        )
+        auto_checked.add(
+            "Jump-to-page behavior handles first page, middle page, and last page."
+        )
+
+    if capture.selection_count > 0 and capture.last_selection_pdf_rect is not None:
+        auto_checked.add(
+            "Drag-selection callback returns a valid in-bounds PDF rectangle."
+        )
+
+    if interaction_counts.get("selection_error", 0) > 0:
+        auto_checked.add(
+            "Out-of-bounds selection produces an actionable UI error message."
+        )
+
+    if len(capture.navigation_samples_ms) >= 10:
+        auto_checked.add("Record at least 10 navigation samples in milliseconds.")
+
+    return auto_checked
 
 
 def _write_optional_text(*, target_path: str | None, content: str) -> None:

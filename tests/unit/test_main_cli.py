@@ -250,10 +250,14 @@ def test_main_phase2_viewer_harness_dispatches_to_qt_harness(
         pdf_path: str,
         summary_json_path: str | None,
         evidence_command_path: str | None,
+        checklist_results_path: str,
+        checklist_template_path: str,
     ) -> None:
         captured["pdf_path"] = pdf_path
         captured["summary_json_path"] = summary_json_path
         captured["evidence_command_path"] = evidence_command_path
+        captured["checklist_results_path"] = checklist_results_path
+        captured["checklist_template_path"] = checklist_template_path
 
     monkeypatch.setattr(
         "foliaseal.__main__.run_phase2_viewer_harness",
@@ -276,4 +280,6 @@ def test_main_phase2_viewer_harness_dispatches_to_qt_harness(
         "pdf_path": "/tmp/sample.pdf",
         "summary_json_path": "/tmp/capture.json",
         "evidence_command_path": "/tmp/evidence-command.sh",
+        "checklist_results_path": "artifacts/phase2_manual_qa_results.md",
+        "checklist_template_path": "phase2_manual_qa_checklist.md",
     }

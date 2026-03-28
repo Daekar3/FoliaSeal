@@ -19,7 +19,11 @@ from foliaseal.application.runtime_metrics import (
     collect_runtime_footprint_snapshot,
     measure_startup_latency_ms,
 )
-from foliaseal.presentation.qt.phase2_harness import run_phase2_viewer_harness
+from foliaseal.presentation.qt.phase2_harness import (
+    DEFAULT_CHECKLIST_RESULTS_PATH,
+    DEFAULT_CHECKLIST_TEMPLATE_PATH,
+    run_phase2_viewer_harness,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -173,6 +177,19 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional file path where the generated phase2-evidence command should be written.",
     )
+    harness.add_argument(
+        "--checklist-results-path",
+        default=DEFAULT_CHECKLIST_RESULTS_PATH,
+        help=(
+            "File path where the run-specific manual QA checklist results should be "
+            "written for later use with --qa-checklist-file."
+        ),
+    )
+    harness.add_argument(
+        "--checklist-template-path",
+        default=DEFAULT_CHECKLIST_TEMPLATE_PATH,
+        help="Template checklist used to seed the run-specific checklist results file.",
+    )
 
     return parser
 
@@ -272,6 +289,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             pdf_path=args.pdf_path,
             summary_json_path=args.summary_json_path,
             evidence_command_path=args.evidence_command_path,
+            checklist_results_path=args.checklist_results_path,
+            checklist_template_path=args.checklist_template_path,
         )
         return
 
