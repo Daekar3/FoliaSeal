@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from pdf_signer.application.operation_registry import OperationRegistry
-from pdf_signer.domain.models import (
+from foliaseal.application.operation_registry import OperationRegistry
+from foliaseal.domain.models import (
     DocumentOperationRequest,
     DocumentOperationResult,
     DocumentOperationType,

@@ -81,7 +81,7 @@ Work advanced in this update:
 
 2. **Performance evidence capture (blocking)**
    - Gather first-render latency and at least 10 navigation samples from the Qt runtime.
-   - Generate evidence markdown with `python -m pdf_signer phase2-evidence ...`.
+   - Generate evidence markdown with `python -m foliaseal phase2-evidence ...`.
    - Paste evidence into this review and mark FR-13 complete only when thresholds/samples are documented.
 
 3. **FR-15 usability hardening (likely small follow-up patch)**
@@ -143,7 +143,7 @@ Status after this patch: **🟡 Still in progress** (Qt-host runtime execution r
 ### Recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --startup-ms <value> \
@@ -253,7 +253,7 @@ Status after this patch: **🟡 Still in progress** (real Qt-host execution is s
 ### Updated recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --collect-runtime-footprint \
@@ -286,7 +286,7 @@ Status after this patch: **🟡 Still in progress** (real Qt-host execution rema
   - This creates an explicit preflight signal that distinguishes “not yet executed” from “host not ready,” reducing ambiguity in handoff notes.
 - **Step 5 (exit review update): evidence artifact updated in this environment.**
   - Ran:
-    - `PYTHONPATH=src python -m pdf_signer phase2-evidence --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - `PYTHONPATH=src python -m foliaseal phase2-evidence --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Result in this host confirms runtime sweep is currently blocked by missing Qt dependencies:
     - `PySide6`: unavailable
     - `PySide6.QtPdf`: unavailable
@@ -294,7 +294,7 @@ Status after this patch: **🟡 Still in progress** (real Qt-host execution rema
 ### Updated recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --collect-runtime-footprint \
@@ -329,7 +329,7 @@ Status after this patch: **🟡 Still in progress** (Qt-host execution still req
 ### Updated recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --startup-ms <value> \
@@ -364,7 +364,7 @@ Status after this patch: **🟡 Still in progress** (Qt-host runtime execution r
 ### Updated recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --collect-runtime-footprint \
@@ -398,7 +398,7 @@ Status after this patch: **🟡 Still in progress** (Qt-host runtime execution r
 ### Updated recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --collect-runtime-footprint \
@@ -436,7 +436,7 @@ Status after this patch: **🟡 Still in progress** (real Qt-host execution is s
 ### Updated recommended evidence command for Qt-enabled host
 
 ```bash
-python -m pdf_signer phase2-evidence \
+python -m foliaseal phase2-evidence \
   --first-render-ms <value> \
   --navigation-ms <value> --navigation-ms <value> ... \
   --collect-runtime-footprint \
@@ -465,7 +465,7 @@ Status after this patch: **🟡 Still in progress** (Qt-enabled host execution r
 
 - **Step 1 (runtime validation sweep): attempted and documented in generated evidence artifact.**
   - Executed the evidence workflow with checklist parsing and Qt readiness checks enabled:
-    - `PYTHONPATH=src python -m pdf_signer phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - `PYTHONPATH=src python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Current host result remains blocked for runtime sweep execution:
     - `PySide6`: unavailable
     - `PySide6.QtPdf`: unavailable
@@ -518,7 +518,7 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 
 - **Step 1 evidence state clarified for the active dev environment.**
   - Re-generated `artifacts/phase2_runtime_evidence.md` using the project venv:
-    - `.venv/bin/python -m pdf_signer phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Result from the active venv now confirms:
     - `PySide6`: available
     - `PySide6.QtPdf`: available

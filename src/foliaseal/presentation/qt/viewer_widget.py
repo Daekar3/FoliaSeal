@@ -7,8 +7,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from pdf_signer.application.coordinate_transform import ViewRect
-from pdf_signer.application.viewer_workflow import ViewerWorkflow
+from foliaseal.application.coordinate_transform import ViewRect
+from foliaseal.application.viewer_workflow import ViewerWorkflow
 
 
 class QtViewerBindingsUnavailable(RuntimeError):

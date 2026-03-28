@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
 
-from pdf_signer.domain.errors import FailureCode
+from foliaseal.domain.errors import FailureCode
 
 
 class RevisionStrategy(str, Enum):  # noqa: UP042

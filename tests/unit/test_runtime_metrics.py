@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pdf_signer.application.runtime_metrics import (
+from foliaseal.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
     _collect_current_rss_bytes,
     _collect_current_rss_bytes_linux,
@@ -98,7 +98,7 @@ def test_collect_current_rss_bytes_returns_none_when_linux_statm_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "pdf_signer.application.runtime_metrics._collect_current_rss_bytes_linux",
+        "foliaseal.application.runtime_metrics._collect_current_rss_bytes_linux",
         lambda: None,
     )
 
@@ -163,12 +163,12 @@ def test_measure_startup_latency_ms_returns_elapsed_time(
         return _Process()
 
     samples = iter([100.0, 100.10, 100.25])
-    monkeypatch.setattr("pdf_signer.application.runtime_metrics.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("foliaseal.application.runtime_metrics.subprocess.Popen", fake_popen)
     monkeypatch.setattr(
-        "pdf_signer.application.runtime_metrics.time.perf_counter",
+        "foliaseal.application.runtime_metrics.time.perf_counter",
         lambda: next(samples),
     )
-    monkeypatch.setattr("pdf_signer.application.runtime_metrics.time.sleep", lambda _: None)
+    monkeypatch.setattr("foliaseal.application.runtime_metrics.time.sleep", lambda _: None)
 
     measured = measure_startup_latency_ms(
         command=["/tmp/foliaseal", "--help"],
@@ -200,15 +200,15 @@ def test_measure_startup_latency_ms_treats_long_running_command_as_ready(
             raise AssertionError("kill should not be used when readiness is reached")
 
     monkeypatch.setattr(
-        "pdf_signer.application.runtime_metrics.subprocess.Popen",
+        "foliaseal.application.runtime_metrics.subprocess.Popen",
         lambda *args, **kwargs: _Process(),
     )
     samples = iter([10.0, 10.2, 10.55])
     monkeypatch.setattr(
-        "pdf_signer.application.runtime_metrics.time.perf_counter",
+        "foliaseal.application.runtime_metrics.time.perf_counter",
         lambda: next(samples),
     )
-    monkeypatch.setattr("pdf_signer.application.runtime_metrics.time.sleep", lambda _: None)
+    monkeypatch.setattr("foliaseal.application.runtime_metrics.time.sleep", lambda _: None)
 
     measured = measure_startup_latency_ms(
         command=["/tmp/foliaseal"],

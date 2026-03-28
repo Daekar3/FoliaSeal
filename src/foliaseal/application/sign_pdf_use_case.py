@@ -7,17 +7,17 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Protocol
 
-from pdf_signer.application.pdf_compatibility import (
+from foliaseal.application.pdf_compatibility import (
     PdfCompatibilityError,
     PdfCompatibilityProfile,
 )
-from pdf_signer.domain.errors import (
+from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
     FailureCode,
     TsaUnavailableError,
 )
-from pdf_signer.domain.models import (
+from foliaseal.domain.models import (
     SigningOutput,
     SigningRequest,
     SigningResult,

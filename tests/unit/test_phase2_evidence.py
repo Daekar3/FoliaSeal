@@ -1,14 +1,14 @@
 import pytest
 
-from pdf_signer.application.performance_timing import ViewerTimingSnapshot
-from pdf_signer.application.phase2_evidence import (
+from foliaseal.application.performance_timing import ViewerTimingSnapshot
+from foliaseal.application.phase2_evidence import (
     QtRuntimeReadinessSnapshot,
     RuntimeEnvironmentSnapshot,
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
     parse_checklist_markdown,
 )
-from pdf_signer.application.runtime_metrics import RuntimeFootprintSnapshot
+from foliaseal.application.runtime_metrics import RuntimeFootprintSnapshot
 
 
 def test_build_phase2_timing_evidence_includes_environment_and_statuses() -> None:
@@ -255,7 +255,7 @@ def test_runtime_readiness_collect_handles_missing_parent_module(
             raise ModuleNotFoundError("No module named 'PySide6'")
         return None
 
-    monkeypatch.setattr("pdf_signer.application.phase2_evidence.find_spec", fake_find_spec)
+    monkeypatch.setattr("foliaseal.application.phase2_evidence.find_spec", fake_find_spec)
 
     collected = QtRuntimeReadinessSnapshot.collect()
 

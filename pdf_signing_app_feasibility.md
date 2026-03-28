@@ -368,7 +368,7 @@ Responsibilities:
 foliaseal/
   pyproject.toml
   README.md
-  src/pdf_signer/
+  src/foliaseal/
     presentation/qt/
       main_window.py
       signing_form.py

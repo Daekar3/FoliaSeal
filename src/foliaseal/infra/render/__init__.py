@@ -1,6 +1,6 @@
 """Render adapter interfaces and fallbacks."""
 
-from pdf_signer.infra.render.base import (
+from foliaseal.infra.render.base import (
     NullPdfRenderBackend,
     PdfPageGeometry,
     PdfRenderBackend,
@@ -8,8 +8,8 @@ from pdf_signer.infra.render.base import (
     RenderPageRequest,
     RenderPageResult,
 )
-from pdf_signer.infra.render.cache import RenderCacheKey, RenderCachePolicy
-from pdf_signer.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.infra.render.cache import RenderCacheKey, RenderCachePolicy
+from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 
 __all__ = [
     "RenderCacheKey",

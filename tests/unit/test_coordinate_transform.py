@@ -1,6 +1,6 @@
 import pytest
 
-from pdf_signer.application.coordinate_transform import (
+from foliaseal.application.coordinate_transform import (
     PageBox,
     PdfRect,
     ViewRect,

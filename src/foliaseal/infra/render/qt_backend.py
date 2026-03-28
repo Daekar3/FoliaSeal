@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from pdf_signer.infra.render.base import (
+from foliaseal.infra.render.base import (
     PdfPageGeometry,
     RenderBackendDiagnostic,
     RenderPageRequest,

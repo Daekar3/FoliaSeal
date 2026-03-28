@@ -6,15 +6,15 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from pdf_signer.application.performance_timing import ViewerPerformanceTracker
-from pdf_signer.application.phase2_evidence import (
+from foliaseal.application.performance_timing import ViewerPerformanceTracker
+from foliaseal.application.phase2_evidence import (
     QtRuntimeReadinessSnapshot,
     RuntimeEnvironmentSnapshot,
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
     parse_checklist_markdown,
 )
-from pdf_signer.application.runtime_metrics import (
+from foliaseal.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
     collect_runtime_footprint_snapshot,
     measure_startup_latency_ms,

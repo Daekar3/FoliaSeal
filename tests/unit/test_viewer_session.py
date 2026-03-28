@@ -1,6 +1,6 @@
 import pytest
 
-from pdf_signer.application.viewer_session import ViewerSession, ViewerZoomLimits
+from foliaseal.application.viewer_session import ViewerSession, ViewerZoomLimits
 
 
 def test_navigation_boundaries_and_jump() -> None:

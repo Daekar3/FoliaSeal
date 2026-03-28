@@ -3,11 +3,11 @@
 from PyInstaller.utils.hooks import collect_submodules
 
 
-hiddenimports = collect_submodules("pdf_signer")
+hiddenimports = collect_submodules("foliaseal")
 
 
 a = Analysis(
-    ["src/pdf_signer/__main__.py"],
+    ["src/foliaseal/__main__.py"],
     pathex=["src"],
     binaries=[],
     datas=[],

@@ -18,7 +18,7 @@ Reviewer: Codex agent
 **Result:** ✅ Pass.
 
 Evidence:
-- Package namespaces exist under `src/pdf_signer/` including `application`, `domain`, `infra`, `presentation` and `presentation/qt`.
+- Package namespaces exist under `src/foliaseal/` including `application`, `domain`, `infra`, `presentation` and `presentation/qt`.
 
 ### 2) `DocumentOperation` contract + operation registry with enable/disable
 **Requirement:** domain contract and registry support capability flags.
