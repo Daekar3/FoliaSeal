@@ -16,14 +16,14 @@
 - ⚠️ Navigation sample count (0/10)
 
 ### Runtime footprint snapshot
-- Startup latency: not recorded
-- Idle memory: 15.37 MiB
-- Bundle size (one-dir): not recorded
+- Startup latency: 110.82 ms
+- Idle memory: 15.36 MiB
+- Bundle size (one-dir): 22.61 MiB
 
 ### FR-16 runtime metrics quick-check
-- ⚠️ Startup latency recorded
+- ✅ Startup latency recorded
 - ✅ Idle memory recorded
-- ⚠️ PyInstaller one-dir bundle size recorded
+- ✅ PyInstaller one-dir bundle size recorded
 
 ### Runtime validation sweep
 - ⚠️ Checklist status: 0/19 checks passed
