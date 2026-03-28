@@ -5,6 +5,7 @@ from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
     build_phase2_timing_evidence,
 )
+from pdf_signer.application.runtime_metrics import RuntimeFootprintSnapshot
 
 
 def test_build_phase2_timing_evidence_includes_environment_and_statuses() -> None:
@@ -81,6 +82,39 @@ def test_build_phase2_timing_evidence_rejects_invalid_threshold() -> None:
             environment=environment,
             minimum_navigation_samples=0,
         )
+
+
+def test_build_phase2_timing_evidence_includes_runtime_footprint_block() -> None:
+    snapshot = ViewerTimingSnapshot(
+        first_render_ms=20.0,
+        average_navigation_ms=12.0,
+        min_navigation_ms=10.0,
+        max_navigation_ms=14.0,
+        sample_count=10,
+    )
+    environment = RuntimeEnvironmentSnapshot(
+        os_name="Linux",
+        os_version="6.8.0",
+        machine="x86_64",
+        processor="ExampleCPU",
+        python_version="3.12.3",
+    )
+    runtime = RuntimeFootprintSnapshot(
+        startup_ms=650.0,
+        idle_memory_mib=180.0,
+        bundle_size_mib=60.0,
+    )
+
+    report = build_phase2_timing_evidence(
+        timing=snapshot,
+        environment=environment,
+        runtime_footprint=runtime,
+    )
+
+    assert "### Runtime footprint snapshot" in report
+    assert "- Startup latency: 650.00 ms" in report
+    assert "### FR-16 runtime metrics quick-check" in report
+    assert "- ✅ PyInstaller one-dir bundle size recorded" in report
 
 
 def test_runtime_environment_collect_returns_non_empty_fields() -> None:
