@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from pdf_signer import __main__
@@ -42,3 +44,25 @@ def test_main_phase2_evidence_rejects_negative_timing_values() -> None:
 def test_main_phase2_evidence_rejects_invalid_runtime_footprint_values() -> None:
     with pytest.raises(ValueError, match="idle_memory_mib"):
         __main__.main(["phase2-evidence", "--idle-memory-mib", "nan"])
+
+
+def test_main_phase2_evidence_collects_bundle_size_when_requested(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    bundle_dir = tmp_path / "dist"
+    bundle_dir.mkdir()
+    (bundle_dir / "artifact.bin").write_bytes(b"z" * 1024 * 1024)
+
+    __main__.main(
+        [
+            "phase2-evidence",
+            "--collect-runtime-footprint",
+            "--bundle-dir",
+            str(bundle_dir),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "### Runtime footprint snapshot" in output
+    assert "- Bundle size (one-dir): 1.00 MiB" in output

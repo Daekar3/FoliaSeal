@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import ctypes
+import os
+import platform
 from dataclasses import dataclass
 from math import isfinite
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,118 @@ class RuntimeFootprintSnapshot:
                 f"- Bundle size (one-dir): {bundle_size}",
             ]
         )
+
+
+def collect_idle_memory_mib() -> float | None:
+    """Collect current process memory footprint in MiB when available."""
+
+    rss_bytes = _collect_current_rss_bytes()
+    if rss_bytes is None:
+        return None
+
+    rss_mib = rss_bytes / (1024 * 1024)
+    if rss_mib < 0:
+        return None
+
+    return rss_mib
+
+
+def _collect_current_rss_bytes() -> int | None:
+    """Collect current resident set size for this process in bytes."""
+
+    system = platform.system()
+    if system == "Linux":
+        return _collect_current_rss_bytes_linux()
+    if system == "Darwin":
+        return _collect_current_rss_bytes_macos()
+    return None
+
+
+def _collect_current_rss_bytes_linux() -> int | None:
+    """Collect current RSS bytes on Linux from /proc/self/statm."""
+
+    try:
+        with open("/proc/self/statm", encoding="utf-8") as statm_file:
+            statm_fields = statm_file.read().strip().split()
+        resident_pages = int(statm_fields[1])
+        page_size = os.sysconf("SC_PAGE_SIZE")
+    except (FileNotFoundError, IndexError, OSError, ValueError):
+        return None
+
+    rss_bytes = resident_pages * page_size
+    if rss_bytes < 0:
+        return None
+    return rss_bytes
+
+
+def _collect_current_rss_bytes_macos() -> int | None:
+    """Collect current RSS bytes on macOS via task_info."""
+
+    mach_task_self = ctypes.CDLL(None).mach_task_self
+    task_info = ctypes.CDLL(None).task_info
+
+    mach_task_self.restype = ctypes.c_uint
+    task = mach_task_self()
+
+    class MachTaskBasicInfo(ctypes.Structure):
+        _fields_ = [
+            ("virtual_size", ctypes.c_uint64),
+            ("resident_size", ctypes.c_uint64),
+            ("resident_size_max", ctypes.c_uint64),
+            ("user_time", ctypes.c_uint64),
+            ("system_time", ctypes.c_uint64),
+            ("policy", ctypes.c_int),
+            ("suspend_count", ctypes.c_int),
+        ]
+
+    info = MachTaskBasicInfo()
+    info_count = ctypes.c_uint(ctypes.sizeof(MachTaskBasicInfo) // ctypes.sizeof(ctypes.c_uint))
+    KERN_SUCCESS = 0
+    MACH_TASK_BASIC_INFO = 20
+
+    result = task_info(
+        task,
+        MACH_TASK_BASIC_INFO,
+        ctypes.byref(info),
+        ctypes.byref(info_count),
+    )
+    if result != KERN_SUCCESS:
+        return None
+
+    return int(info.resident_size)
+
+
+def measure_bundle_size_mib(*, bundle_dir: str) -> float:
+    """Measure total filesystem size for a PyInstaller one-dir output."""
+
+    root = Path(bundle_dir)
+    if not root.exists():
+        raise ValueError(f"bundle_dir does not exist: {bundle_dir}")
+    if not root.is_dir():
+        raise ValueError(f"bundle_dir must be a directory: {bundle_dir}")
+
+    total_bytes = 0
+    for path in root.rglob("*"):
+        if path.is_file():
+            total_bytes += path.stat().st_size
+    return total_bytes / (1024 * 1024)
+
+
+def collect_runtime_footprint_snapshot(
+    *,
+    startup_ms: float | None = None,
+    bundle_dir: str | None = None,
+) -> RuntimeFootprintSnapshot:
+    """Collect a runtime footprint snapshot from local process and bundle directory."""
+
+    bundle_size_mib = (
+        measure_bundle_size_mib(bundle_dir=bundle_dir) if bundle_dir is not None else None
+    )
+    return RuntimeFootprintSnapshot(
+        startup_ms=startup_ms,
+        idle_memory_mib=collect_idle_memory_mib(),
+        bundle_size_mib=bundle_size_mib,
+    )
 
 
 def _format_metric_status(metric: float | None, label: str) -> str:
