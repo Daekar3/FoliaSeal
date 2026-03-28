@@ -31,6 +31,7 @@ class PdfPageGeometry:
     media_box: tuple[float, float, float, float]
     crop_box: tuple[float, float, float, float]
     rotation: int
+    coordinate_mapping_ready: bool = True
 
 
 @dataclass(frozen=True)

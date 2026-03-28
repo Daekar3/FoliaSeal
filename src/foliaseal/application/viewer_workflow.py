@@ -27,6 +27,7 @@ class ViewerRenderSnapshot:
     pan_y: float
     page_box: PageBox
     rotation: int
+    coordinate_mapping_ready: bool
     image_width_px: int
     image_height_px: int
 
@@ -113,6 +114,7 @@ class ViewerWorkflow:
             pan_y=self._pan_y,
             page_box=page_box,
             rotation=geometry.rotation,
+            coordinate_mapping_ready=geometry.coordinate_mapping_ready,
             image_width_px=render.width_px,
             image_height_px=render.height_px,
         )
@@ -142,6 +144,11 @@ class ViewerWorkflow:
 
     def selection_to_pdf_rect(self, *, selection: ViewRect) -> PdfRect:
         snapshot = self._require_snapshot()
+        if not snapshot.coordinate_mapping_ready:
+            raise RuntimeError(
+                "Selection mapping is unavailable because authoritative PDF page geometry "
+                "could not be read for this page."
+            )
         pdf_rect = view_rect_to_pdf_rect(
             view_rect=selection,
             transform=ViewTransform(zoom=snapshot.zoom, pan_x=self._pan_x, pan_y=self._pan_y),

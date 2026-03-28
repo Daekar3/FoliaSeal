@@ -119,6 +119,29 @@ def test_selection_uses_live_pan_state_after_render() -> None:
     assert rect.y1 == pytest.approx(33.0)
     assert rect.y2 == pytest.approx(43.0)
 
+
+def test_selection_rejects_pages_without_authoritative_geometry() -> None:
+    class _FallbackGeometryBackend(_FakeRenderBackend):
+        def get_page_geometry(self, document_path: str, page_index: int) -> PdfPageGeometry:
+            geometry = super().get_page_geometry(document_path, page_index)
+            return PdfPageGeometry(
+                media_box=geometry.media_box,
+                crop_box=geometry.crop_box,
+                rotation=geometry.rotation,
+                coordinate_mapping_ready=False,
+            )
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_FallbackGeometryBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    workflow.render_current_page()
+
+    with pytest.raises(RuntimeError, match="authoritative PDF page geometry"):
+        workflow.selection_to_pdf_rect(selection=ViewRect(x1=10, y1=10, x2=30, y2=20))
+
+
 def test_zoom_controls_delegate_to_viewer_session() -> None:
     workflow = ViewerWorkflow(
         document_path="/tmp/sample.pdf",
