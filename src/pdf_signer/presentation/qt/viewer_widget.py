@@ -62,7 +62,11 @@ class PdfViewerWidgetAdapter:
                         navigation=navigation,
                     )
                 except Exception as exc:  # pragma: no cover - integration behavior
-                    self._emit_error(f"Failed to render PDF preview: {exc}")
+                    self._emit_error(
+                        "Unable to render PDF preview. "
+                        "Please verify PDF backend availability and retry.",
+                        exc,
+                    )
                     if self._on_error is None:
                         raise
                     return
@@ -98,6 +102,67 @@ class PdfViewerWidgetAdapter:
                 self.refresh(navigation=False)
                 event.accept()
 
+            def keyPressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                key = event.key()
+
+                if key in (
+                    bindings.qt.Key_Plus,
+                    bindings.qt.Key_Equal,
+                ):
+                    self._workflow.zoom_in()
+                    self.refresh(navigation=False)
+                    event.accept()
+                    return
+
+                if key in (
+                    bindings.qt.Key_Minus,
+                    bindings.qt.Key_Underscore,
+                ):
+                    self._workflow.zoom_out()
+                    self.refresh(navigation=False)
+                    event.accept()
+                    return
+
+                if key == bindings.qt.Key_0:
+                    self._workflow.reset_zoom()
+                    self.refresh(navigation=False)
+                    event.accept()
+                    return
+
+                if key in (
+                    bindings.qt.Key_PageDown,
+                    bindings.qt.Key_Down,
+                    bindings.qt.Key_Right,
+                ):
+                    self._workflow.go_next_page()
+                    self.refresh(navigation=True)
+                    event.accept()
+                    return
+
+                if key in (
+                    bindings.qt.Key_PageUp,
+                    bindings.qt.Key_Up,
+                    bindings.qt.Key_Left,
+                ):
+                    self._workflow.go_previous_page()
+                    self.refresh(navigation=True)
+                    event.accept()
+                    return
+
+                if key == bindings.qt.Key_Home:
+                    self._workflow.jump_to_page(0)
+                    self.refresh(navigation=True)
+                    event.accept()
+                    return
+
+                if key == bindings.qt.Key_End:
+                    self._workflow.jump_to_page(self._workflow.session.page_count - 1)
+                    self.refresh(navigation=True)
+                    event.accept()
+                    return
+
+                super().keyPressEvent(event)
+
             def mousePressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 if event.button() != bindings.qt.LeftButton:
                     return super().mousePressEvent(event)
@@ -131,16 +196,23 @@ class PdfViewerWidgetAdapter:
                         )
                     )
                 except (RuntimeError, ValueError) as exc:
-                    self._emit_error(f"Failed to map selection into PDF coordinates: {exc}")
+                    self._emit_error(
+                        "Selection could not be placed on the PDF page. "
+                        "Please keep the selection inside page bounds.",
+                        exc,
+                    )
                     self.update()
                     return
                 if self._on_selection is not None:
                     self._on_selection(pdf_rect)
                 self.update()
 
-            def _emit_error(self, message: str) -> None:
+            def _emit_error(self, summary: str, exc: Exception | None = None) -> None:
                 if self._on_error is not None:
-                    self._on_error(message)
+                    if exc is None:
+                        self._on_error(summary)
+                        return
+                    self._on_error(f"{summary} (details: {exc})")
 
         return PdfPreviewWidget()
 
