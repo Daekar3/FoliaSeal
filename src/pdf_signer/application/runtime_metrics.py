@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import ctypes
 import os
 import platform
-import ctypes
-from pathlib import Path
 from dataclasses import dataclass
 from math import isfinite
+from pathlib import Path
 
 
 @dataclass(frozen=True)

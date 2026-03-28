@@ -1,10 +1,11 @@
 from pathlib import Path
+
 import pytest
 
 from pdf_signer.application.runtime_metrics import (
+    RuntimeFootprintSnapshot,
     _collect_current_rss_bytes,
     _collect_current_rss_bytes_linux,
-    RuntimeFootprintSnapshot,
     build_runtime_footprint_quick_check,
     collect_idle_memory_mib,
     collect_runtime_footprint_snapshot,
