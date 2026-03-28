@@ -1,9 +1,9 @@
 ## Phase 2 runtime evidence
 ### Viewer timing snapshot
-- First render: 51.39 ms
-- Navigation average: 44.30 ms
-- Navigation min/max: 39.29 ms / 49.17 ms
-- Navigation samples: 33
+- First render: 51.96 ms
+- Navigation average: 46.05 ms
+- Navigation min/max: 40.36 ms / 53.19 ms
+- Navigation samples: 26
 
 ### Runtime environment
 - OS: Linux (#19~24.04.2-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar  6 23:08:46 UTC 2)
@@ -13,11 +13,11 @@
 
 ### Exit criteria quick-check
 - ✅ First-render timing recorded
-- ✅ Navigation sample count (33/10)
+- ✅ Navigation sample count (26/10)
 
 ### Runtime footprint snapshot
-- Startup latency: 90.76 ms
-- Idle memory: 15.77 MiB
+- Startup latency: 90.78 ms
+- Idle memory: 15.96 MiB
 - Bundle size (one-dir): 22.61 MiB
 
 ### FR-16 runtime metrics quick-check

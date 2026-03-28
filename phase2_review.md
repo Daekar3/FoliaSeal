@@ -561,12 +561,12 @@ Older review entries that point `--qa-checklist-file` at the template checklist 
     - actionable out-of-bounds selection messaging
   - Combined with the prior interactive pass, the runtime validation checklist is now complete.
 - **Step 2 (performance evidence capture / FR-13): completed.**
-  - Final measured first render: `51.39 ms`
-  - Final measured navigation samples: `33`
-  - Final navigation average/min/max: `44.30 ms` / `39.29 ms` / `49.17 ms`
+  - Final measured first render: `51.96 ms`
+  - Final measured navigation samples: `26`
+  - Final navigation average/min/max: `46.05 ms` / `40.36 ms` / `53.19 ms`
 - **Step 4 (FR-16 runtime metrics): complete and refreshed.**
-  - Startup latency: `90.76 ms`
-  - Idle memory: `15.77 MiB`
+  - Startup latency: `90.78 ms`
+  - Idle memory: `15.96 MiB`
   - Bundle size: `22.61 MiB`
 - **Step 5 (exit gate): completed.**
   - Updated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) to `19/19` checklist checks passed with no open issues.
@@ -575,13 +575,53 @@ Older review entries that point `--qa-checklist-file` at the template checklist 
 ### Final evidence snapshot
 
 - Runtime validation sweep: `19/19` checks passed
-- First render: `51.39 ms`
-- Navigation samples: `33`
-- Navigation average/min/max: `44.30 ms` / `39.29 ms` / `49.17 ms`
-- Startup latency: `90.76 ms`
-- Idle memory: `15.77 MiB`
+- First render: `51.96 ms`
+- Navigation samples: `26`
+- Navigation average/min/max: `46.05 ms` / `40.36 ms` / `53.19 ms`
+- Startup latency: `90.78 ms`
+- Idle memory: `15.96 MiB`
 - Bundle size: `22.61 MiB`
 - Qt runtime readiness: ready (`PySide6` + `PySide6.QtPdf` available)
+
+### Attached refreshed evidence artifact
+
+```md
+## Phase 2 runtime evidence
+### Viewer timing snapshot
+- First render: 51.96 ms
+- Navigation average: 46.05 ms
+- Navigation min/max: 40.36 ms / 53.19 ms
+- Navigation samples: 26
+
+### Runtime environment
+- OS: Linux (#19~24.04.2-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar  6 23:08:46 UTC 2)
+- Machine: x86_64
+- Processor: x86_64
+- Python: 3.12.3
+
+### Exit criteria quick-check
+- ✅ First-render timing recorded
+- ✅ Navigation sample count (26/10)
+
+### Runtime footprint snapshot
+- Startup latency: 90.78 ms
+- Idle memory: 15.96 MiB
+- Bundle size (one-dir): 22.61 MiB
+
+### FR-16 runtime metrics quick-check
+- ✅ Startup latency recorded
+- ✅ Idle memory recorded
+- ✅ PyInstaller one-dir bundle size recorded
+
+### Runtime validation sweep
+- ✅ Checklist status: 19/19 checks passed
+- Open issues: none recorded
+
+### Qt runtime readiness
+- ✅ Ready for Qt host runtime validation
+- ✅ PySide6 import available
+- ✅ PySide6.QtPdf import available
+```
 
 ### Phase 2 close-out
 
@@ -594,12 +634,19 @@ Phase 2 is complete. The viewer/coordinate platform now has:
 
 Status after this patch: **🟡 Still in progress** (interactive Qt runtime validation and FR-13 timing capture still block completion), with fresh packaged-app FR-16 evidence now captured from the current repository state.
 
+Historical note: this section reflects the packaging-only state before the final interactive sign-off was completed.
+The command example below is retained for historical traceability only and is superseded by the final evidence flow in
+[`phase2_review.md`](/home/daekar/SignPDF/Scratch/phase2_review.md#L545), which uses the run-specific checklist results file at
+[`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
+
 ### Completed from the plan in this patch
 
 - **Step 4 (FR-16 runtime metrics): partially advanced with current packaged artifact measurements.**
   - Rebuilt the PyInstaller one-dir bundle with `./scripts/build_pyinstaller.sh`.
   - Re-generated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) against the packaged executable using:
     - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - Superseded for final sign-off by the run-specific checklist workflow:
+      `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file artifacts/phase2_manual_qa_results.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Current packaged-app measurements from this environment:
     - Startup latency: `110.82 ms`
     - Idle memory: `15.36 MiB`
