@@ -9,8 +9,8 @@ from pdf_signer.application.runtime_metrics import (
     build_runtime_footprint_quick_check,
     collect_idle_memory_mib,
     collect_runtime_footprint_snapshot,
-    measure_startup_latency_ms,
     measure_bundle_size_mib,
+    measure_startup_latency_ms,
 )
 
 
