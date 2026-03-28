@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import ctypes
 import os
-import platform
 import subprocess
 import time
 from dataclasses import dataclass
@@ -63,14 +61,9 @@ def collect_idle_memory_mib() -> float | None:
 
 
 def _collect_current_rss_bytes() -> int | None:
-    """Collect current resident set size for this process in bytes."""
+    """Collect current resident set size for this process in bytes on Linux."""
 
-    system = platform.system()
-    if system == "Linux":
-        return _collect_current_rss_bytes_linux()
-    if system == "Darwin":
-        return _collect_current_rss_bytes_macos()
-    return None
+    return _collect_current_rss_bytes_linux()
 
 
 def _collect_current_rss_bytes_linux() -> int | None:
@@ -88,43 +81,6 @@ def _collect_current_rss_bytes_linux() -> int | None:
     if rss_bytes < 0:
         return None
     return rss_bytes
-
-
-def _collect_current_rss_bytes_macos() -> int | None:
-    """Collect current RSS bytes on macOS via task_info."""
-
-    mach_task_self = ctypes.CDLL(None).mach_task_self
-    task_info = ctypes.CDLL(None).task_info
-
-    mach_task_self.restype = ctypes.c_uint
-    task = mach_task_self()
-
-    class MachTaskBasicInfo(ctypes.Structure):
-        _fields_ = [
-            ("virtual_size", ctypes.c_uint64),
-            ("resident_size", ctypes.c_uint64),
-            ("resident_size_max", ctypes.c_uint64),
-            ("user_time", ctypes.c_uint64),
-            ("system_time", ctypes.c_uint64),
-            ("policy", ctypes.c_int),
-            ("suspend_count", ctypes.c_int),
-        ]
-
-    info = MachTaskBasicInfo()
-    info_count = ctypes.c_uint(ctypes.sizeof(MachTaskBasicInfo) // ctypes.sizeof(ctypes.c_uint))
-    KERN_SUCCESS = 0
-    MACH_TASK_BASIC_INFO = 20
-
-    result = task_info(
-        task,
-        MACH_TASK_BASIC_INFO,
-        ctypes.byref(info),
-        ctypes.byref(info_count),
-    )
-    if result != KERN_SUCCESS:
-        return None
-
-    return int(info.resident_size)
 
 
 def measure_bundle_size_mib(*, bundle_dir: str) -> float:

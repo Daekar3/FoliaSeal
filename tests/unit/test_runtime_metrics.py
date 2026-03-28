@@ -94,10 +94,13 @@ def test_collect_current_rss_bytes_linux_reads_resident_pages(
     assert _collect_current_rss_bytes_linux() == 40960
 
 
-def test_collect_current_rss_bytes_returns_none_on_unknown_platform(
+def test_collect_current_rss_bytes_returns_none_when_linux_statm_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("platform.system", lambda: "Windows")
+    monkeypatch.setattr(
+        "pdf_signer.application.runtime_metrics._collect_current_rss_bytes_linux",
+        lambda: None,
+    )
 
     assert _collect_current_rss_bytes() is None
 
