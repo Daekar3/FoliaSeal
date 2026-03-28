@@ -16,18 +16,6 @@ Build a Linux desktop app that signs existing PDFs using an existing `.p12/.pfx`
 
 Usability target for initial scope: provide an easy, intuitive PDF viewing + signing flow for non-technical users while keeping runtime footprint and startup time suitable for everyday desktop use.
 
-## v1 allowed capabilities (explicit allowlist)
-Only the following capabilities are allowed in v1 production scope:
-
-1. Open/view exactly one PDF in the active signing session.
-2. Select a signing certificate in `.p12` or `.pfx` format.
-3. Place a visible signature rectangle on a rendered page.
-4. Sign using incremental-update output semantics.
-5. Request/embed an RFC 3161 timestamp token (production default behavior).
-6. Save signed output as a new file (never in-place overwrite of input).
-
-Any capability not on this list is deferred unless explicitly approved.
-
 ---
 
 ## Review update: key gaps found and addressed
