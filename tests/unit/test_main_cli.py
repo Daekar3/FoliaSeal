@@ -136,3 +136,54 @@ def test_main_phase2_evidence_includes_runtime_validation_summary(
 def test_main_phase2_evidence_rejects_partial_runtime_validation_args() -> None:
     with pytest.raises(ValueError, match="must be provided together"):
         __main__.main(["phase2-evidence", "--qa-total-checks", "9"])
+
+
+def test_main_phase2_evidence_derives_runtime_validation_from_checklist_file(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    checklist_path = tmp_path / "checklist.md"
+    checklist_path.write_text(
+        "\n".join(
+            [
+                "- [x] Initial render succeeds on page 1.",
+                "- [ ] Keyboard page navigation works.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    __main__.main(
+        [
+            "phase2-evidence",
+            "--qa-checklist-file",
+            str(checklist_path),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "### Runtime validation sweep" in output
+    assert "Checklist status: 1/2 checks passed" in output
+    assert "Keyboard page navigation works." in output
+
+
+def test_main_phase2_evidence_merges_extra_issue_notes_with_checklist_derived_summary(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    checklist_path = tmp_path / "checklist.md"
+    checklist_path.write_text("- [x] Initial render succeeds on page 1.", encoding="utf-8")
+
+    __main__.main(
+        [
+            "phase2-evidence",
+            "--qa-checklist-file",
+            str(checklist_path),
+            "--qa-issue",
+            "Observed transient zoom jitter at 300%.",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "Checklist status: 1/1 checks passed" in output
+    assert "Observed transient zoom jitter at 300%." in output

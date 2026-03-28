@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import platform
+import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from pdf_signer.application.performance_timing import ViewerTimingSnapshot
 from pdf_signer.application.runtime_metrics import (
@@ -68,6 +70,45 @@ class RuntimeValidationSnapshot:
         else:
             lines.append("- Open issues: none recorded")
         return "\n".join(lines)
+
+
+def parse_checklist_markdown(*, checklist_path: str) -> RuntimeValidationSnapshot:
+    """Build runtime validation counts from a markdown checklist file."""
+
+    path = Path(checklist_path)
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"Unable to read checklist file: {checklist_path}") from exc
+
+    checked_pattern = re.compile(r"^\s*-\s*\[[xX]\]\s+(.+)$")
+    unchecked_pattern = re.compile(r"^\s*-\s*\[\s\]\s+(.+)$")
+
+    passed = 0
+    total = 0
+    issues: list[str] = []
+    for raw_line in content.splitlines():
+        checked_match = checked_pattern.match(raw_line)
+        if checked_match:
+            passed += 1
+            total += 1
+            continue
+
+        unchecked_match = unchecked_pattern.match(raw_line)
+        if unchecked_match:
+            total += 1
+            issues.append(unchecked_match.group(1).strip())
+
+    if total < 1:
+        raise ValueError(
+            "Checklist file did not contain markdown checkbox items (- [ ] or - [x])."
+        )
+
+    return RuntimeValidationSnapshot(
+        passed_checks=passed,
+        total_checks=total,
+        issues=tuple(issues),
+    )
 
 
 def build_phase2_timing_evidence(
