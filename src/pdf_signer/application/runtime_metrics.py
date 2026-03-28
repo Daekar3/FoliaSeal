@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+from resource import RUSAGE_SELF, getrusage
 from dataclasses import dataclass
 from math import isfinite
 
@@ -40,6 +43,56 @@ class RuntimeFootprintSnapshot:
                 f"- Bundle size (one-dir): {bundle_size}",
             ]
         )
+
+
+def collect_idle_memory_mib() -> float | None:
+    """Collect current process memory footprint in MiB when available."""
+
+    try:
+        usage = getrusage(RUSAGE_SELF)
+    except OSError:
+        return None
+
+    max_rss = float(usage.ru_maxrss)
+    if max_rss < 0:
+        return None
+
+    if os.uname().sysname == "Darwin":
+        return max_rss / (1024 * 1024)
+    return max_rss / 1024
+
+
+def measure_bundle_size_mib(*, bundle_dir: str) -> float:
+    """Measure total filesystem size for a PyInstaller one-dir output."""
+
+    root = Path(bundle_dir)
+    if not root.exists():
+        raise ValueError(f"bundle_dir does not exist: {bundle_dir}")
+    if not root.is_dir():
+        raise ValueError(f"bundle_dir must be a directory: {bundle_dir}")
+
+    total_bytes = 0
+    for path in root.rglob("*"):
+        if path.is_file():
+            total_bytes += path.stat().st_size
+    return total_bytes / (1024 * 1024)
+
+
+def collect_runtime_footprint_snapshot(
+    *,
+    startup_ms: float | None = None,
+    bundle_dir: str | None = None,
+) -> RuntimeFootprintSnapshot:
+    """Collect a runtime footprint snapshot from local process and bundle directory."""
+
+    bundle_size_mib = (
+        measure_bundle_size_mib(bundle_dir=bundle_dir) if bundle_dir is not None else None
+    )
+    return RuntimeFootprintSnapshot(
+        startup_ms=startup_ms,
+        idle_memory_mib=collect_idle_memory_mib(),
+        bundle_size_mib=bundle_size_mib,
+    )
 
 
 def _format_metric_status(metric: float | None, label: str) -> str:

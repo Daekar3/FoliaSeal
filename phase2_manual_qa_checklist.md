@@ -25,7 +25,8 @@ It captures the remaining runtime evidence needed to close Phase 2.
 ## Timing baseline evidence (FR-13)
 - [ ] Record first-render elapsed time in milliseconds.
 - [ ] Record at least 10 navigation samples in milliseconds.
-- [ ] Export timing evidence markdown (via `ViewerTimingSnapshot.to_markdown()` or `build_phase2_timing_evidence(...)`) into Phase 2 review notes.
+- [ ] Export timing evidence markdown into Phase 2 review notes (recommended command):
+  - `python -m pdf_signer phase2-evidence --first-render-ms <value> --navigation-ms <value> ... --collect-runtime-footprint --startup-ms <value> --bundle-dir <pyinstaller_one_dir_output>`
 - [ ] Attach hardware + OS context (CPU model, memory, Linux distro/version).
 
 ## Exit criteria confirmation
