@@ -10,6 +10,7 @@ from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
+    parse_checklist_markdown,
 )
 from pdf_signer.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
@@ -113,6 +114,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Runtime QA issue/repro note. Repeat for multiple issues.",
     )
+    evidence.add_argument(
+        "--qa-checklist-file",
+        type=str,
+        default=None,
+        help=(
+            "Path to a markdown checklist file with - [x]/- [ ] items. "
+            "When supplied, pass/total counts are derived automatically."
+        ),
+    )
 
     return parser
 
@@ -157,15 +167,27 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         )
 
     runtime_validation = None
+    if args.qa_checklist_file is not None:
+        runtime_validation = parse_checklist_markdown(
+            checklist_path=args.qa_checklist_file
+        )
+
     if args.qa_passed_checks is not None or args.qa_total_checks is not None:
         if args.qa_passed_checks is None or args.qa_total_checks is None:
             raise ValueError(
                 "--qa-passed-checks and --qa-total-checks must be provided together."
             )
-        runtime_validation = RuntimeValidationSnapshot(
+        manual_validation = RuntimeValidationSnapshot(
             passed_checks=args.qa_passed_checks,
             total_checks=args.qa_total_checks,
             issues=tuple(args.qa_issues),
+        )
+        runtime_validation = manual_validation
+    elif runtime_validation is not None and args.qa_issues:
+        runtime_validation = RuntimeValidationSnapshot(
+            passed_checks=runtime_validation.passed_checks,
+            total_checks=runtime_validation.total_checks,
+            issues=runtime_validation.issues + tuple(args.qa_issues),
         )
 
     report = build_phase2_timing_evidence(

@@ -5,6 +5,7 @@ from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
+    parse_checklist_markdown,
 )
 from pdf_signer.application.runtime_metrics import RuntimeFootprintSnapshot
 
@@ -169,3 +170,33 @@ def test_runtime_validation_snapshot_rejects_invalid_counts() -> None:
 
     with pytest.raises(ValueError, match="cannot exceed total_checks"):
         RuntimeValidationSnapshot(passed_checks=6, total_checks=5)
+
+
+def test_parse_checklist_markdown_builds_runtime_validation_snapshot(
+    tmp_path,
+) -> None:
+    checklist_path = tmp_path / "checklist.md"
+    checklist_path.write_text(
+        "\n".join(
+            [
+                "- [x] Initial render succeeds on page 1.",
+                "- [ ] Keyboard page navigation works.",
+                "- [X] Drag-selection callback returns a valid in-bounds PDF rectangle.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    parsed = parse_checklist_markdown(checklist_path=str(checklist_path))
+
+    assert parsed.passed_checks == 2
+    assert parsed.total_checks == 3
+    assert parsed.issues == ("Keyboard page navigation works.",)
+
+
+def test_parse_checklist_markdown_rejects_files_without_checkboxes(tmp_path) -> None:
+    checklist_path = tmp_path / "notes.md"
+    checklist_path.write_text("No checklist entries here.", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="did not contain markdown checkbox"):
+        parse_checklist_markdown(checklist_path=str(checklist_path))
