@@ -37,3 +37,8 @@ def test_main_phase2_evidence_prints_markdown(capsys: pytest.CaptureFixture[str]
 def test_main_phase2_evidence_rejects_negative_timing_values() -> None:
     with pytest.raises(ValueError, match="greater than or equal to zero"):
         __main__.main(["phase2-evidence", "--navigation-ms", "-1"])
+
+
+def test_main_phase2_evidence_rejects_invalid_runtime_footprint_values() -> None:
+    with pytest.raises(ValueError, match="idle_memory_mib"):
+        __main__.main(["phase2-evidence", "--idle-memory-mib", "nan"])
