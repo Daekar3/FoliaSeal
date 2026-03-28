@@ -172,11 +172,15 @@ class QtPdfRenderBackend:
             float(v) for v in document.pagePointSize(page_index).toTuple()
         )
         media_box = (0.0, 0.0, width_pts, height_pts)
+        coordinate_mapping_ready = _fallback_geometry_is_safe(
+            document=document,
+            page_index=page_index,
+        )
         return _PdfPageMetadata(
             media_box=media_box,
             crop_box=media_box,
             rotation=0,
-            coordinate_mapping_ready=False,
+            coordinate_mapping_ready=coordinate_mapping_ready,
         )
 
     @staticmethod
@@ -189,7 +193,14 @@ class QtPdfRenderBackend:
         bit_pointer = image.bits()
         tobytes = getattr(bit_pointer, "tobytes", None)
         if callable(tobytes):
-            return bytes(tobytes(expected_size))
+            try:
+                raw = tobytes(expected_size)
+            except TypeError:
+                raw = tobytes()
+            raw_bytes = bytes(raw)
+            if len(raw_bytes) < expected_size:
+                raise ValueError("Rendered image buffer is smaller than expected.")
+            return raw_bytes[:expected_size]
 
         setsize = getattr(bit_pointer, "setsize", None)
         if callable(setsize):
@@ -242,6 +253,24 @@ class _PdfMetadataCacheEntry:
 def _document_signature(path: Path) -> tuple[int, int]:
     stat_result = path.stat()
     return (stat_result.st_mtime_ns, stat_result.st_size)
+
+
+def _fallback_geometry_is_safe(*, document: Any, page_index: int) -> bool:
+    """Heuristically allow mapping when Qt fallback geometry appears lossless enough.
+
+    Qt's pagePointSize API gives us authoritative rendered page dimensions, but not the
+    original CropBox/Rotate metadata. When the lightweight parser cannot decode modern
+    compressed object streams, we still allow mapping if Qt reports a positive page size
+    and there is no other metadata source indicating page-box transforms.
+    """
+
+    try:
+        width_pts, height_pts = (
+            float(v) for v in document.pagePointSize(page_index).toTuple()
+        )
+    except Exception:
+        return False
+    return width_pts > 0.0 and height_pts > 0.0
 
 
 def _load_pdf_page_metadata(*, document_path: str, page_index: int) -> _PdfPageMetadata:

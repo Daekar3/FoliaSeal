@@ -126,6 +126,11 @@ def run_phase2_viewer_harness(
     def append_status(message: str) -> None:
         status.appendPlainText(message)
 
+    def refocus_viewer() -> None:
+        focus_setter = getattr(viewer, "setFocus", None)
+        if callable(focus_setter):
+            focus_setter()
+
     def refresh_metrics() -> None:
         snapshot = workflow.timing_tracker.snapshot()
         metrics_label.setText(
@@ -163,11 +168,13 @@ def run_phase2_viewer_harness(
     def do_refresh() -> None:
         viewer.refresh()
         refresh_metrics()
+        refocus_viewer()
 
     def navigate(action_name: str) -> None:
         action = getattr(viewer, action_name)
         action()
         refresh_metrics()
+        refocus_viewer()
 
     def fit_width() -> None:
         viewport = viewer.viewport()
@@ -183,6 +190,7 @@ def run_phase2_viewer_harness(
         )
         viewer.refresh()
         refresh_metrics()
+        refocus_viewer()
 
     def fit_page() -> None:
         viewport = viewer.viewport()
@@ -198,6 +206,7 @@ def run_phase2_viewer_harness(
         )
         viewer.refresh()
         refresh_metrics()
+        refocus_viewer()
 
     controls = [
         ("Refresh", do_refresh),
@@ -221,6 +230,7 @@ def run_phase2_viewer_harness(
     refresh_metrics()
 
     window.show()
+    refocus_viewer()
     app.exec()
 
     capture = HarnessCapture(
