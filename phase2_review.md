@@ -377,3 +377,35 @@ Notes:
 2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples captured from that Qt runtime.
 3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values captured from an actual PyInstaller one-dir run.
 4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.
+
+## Completion plan execution update (2026-03-28, execution follow-up #8)
+
+Status after this patch: **🟡 Still in progress** (Qt-enabled host execution remains the gating factor), with this environment now carrying a fresh generated evidence artifact and explicit checklist-derived gap report.
+
+### Completed from the plan in this patch
+
+- **Step 1 (runtime validation sweep): attempted and documented in generated evidence artifact.**
+  - Executed the evidence workflow with checklist parsing and Qt readiness checks enabled:
+    - `PYTHONPATH=src python -m pdf_signer phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
+  - Current host result remains blocked for runtime sweep execution:
+    - `PySide6`: unavailable
+    - `PySide6.QtPdf`: unavailable
+  - Checklist-derived status in this environment: `0/20` checks passed (expected for a non-Qt host and unexecuted manual run).
+- **Step 4 (FR-16 runtime metrics): incremental evidence captured in this host.**
+  - Auto-captured idle-memory metric from the running process: `13.38 MiB`.
+  - Startup latency and one-dir bundle size are still not recorded in this host run.
+- **Step 5 (exit review update): evidence artifact refreshed.**
+  - Updated `artifacts/phase2_runtime_evidence.md` as the current source-of-truth handoff artifact for the next Qt-enabled execution pass.
+
+### Evidence artifact snapshot (from this environment)
+
+- Runtime validation sweep: `0/20` checks passed.
+- Qt runtime readiness: not ready (`PySide6` + `PySide6.QtPdf` unavailable).
+- FR-16 quick-check: idle memory recorded; startup latency and bundle size still missing.
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute checklist on a real Qt runtime host (`PySide6` + `QtPdf`) and update checklist checkboxes from actual run outcomes.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that Qt host.
+3. **Step 4 (FR-16 runtime metrics):** capture startup latency using `--measure-startup-command` against the PyInstaller one-dir executable and bundle size via `--bundle-dir` in the target packaging output.
+4. **Step 5 (exit gate):** paste the updated artifact output from the Qt host into this review and mark Phase 2 complete only after items 1-3 are evidenced.
