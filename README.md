@@ -109,3 +109,4 @@ To capture first-render and navigation timings during a real Qt session, launch 
 ```
 
 The harness opens the Qt viewer, records first-render and page-navigation timings automatically, logs selection/error events in the window, and prints a ready-to-run `phase2-evidence` command when you close it.
+It also writes a JSON capture with the recorded timing samples and any saved selection callback count, which makes it easy to see what was exercised during the manual session.

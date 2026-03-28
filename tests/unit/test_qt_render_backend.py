@@ -209,7 +209,7 @@ def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
     assert geometry.media_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.crop_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.rotation == 0
-    assert geometry.coordinate_mapping_ready is False
+    assert geometry.coordinate_mapping_ready is True
 
 
 def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
@@ -258,8 +258,47 @@ def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
 
     assert first == second
     assert first.media_box == (0.0, 0.0, 400.0, 600.0)
-    assert first.coordinate_mapping_ready is False
+    assert first.coordinate_mapping_ready is True
     assert calls["count"] == 1
+
+
+def test_qt_backend_fallback_geometry_marks_mapping_unavailable_when_page_size_invalid(
+    monkeypatch,
+) -> None:
+    class _Size:
+        def toTuple(self):
+            return (0.0, 600.0)
+
+    class _Document:
+        def pageCount(self):
+            return 1
+
+        def pagePointSize(self, page_index):
+            assert page_index == 0
+            return _Size()
+
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    backend._metadata_cache = {}
+    monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
+    monkeypatch.setattr(
+        "foliaseal.infra.render.qt_backend._document_signature",
+        lambda path: (123, 456),
+    )
+    monkeypatch.setattr(
+        "foliaseal.infra.render.qt_backend._load_pdf_page_metadata",
+        lambda **_: (_ for _ in ()).throw(ValueError("object stream unsupported")),
+    )
+
+    geometry = backend.get_page_geometry("any.pdf", page_index=0)
+
+    assert geometry.coordinate_mapping_ready is False
 
 
 def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
@@ -335,6 +374,20 @@ def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
     assert image_size.width == 2
     assert image_size.height == 2
     assert isinstance(render_opts, _RenderOptions)
+
+
+def test_qt_backend_extract_image_bytes_supports_memoryview_style_tobytes() -> None:
+    class _Bits:
+        def tobytes(self):
+            return b"\x00" * 16
+
+    class _Image:
+        def bits(self):
+            return _Bits()
+
+    raw = QtPdfRenderBackend._extract_image_bytes(image=_Image(), expected_size=16)
+
+    assert raw == b"\x00" * 16
 
 
 def test_load_pdf_page_metadata_resolves_inherited_boxes_and_rotation(tmp_path) -> None:

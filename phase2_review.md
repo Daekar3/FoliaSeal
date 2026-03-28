@@ -572,6 +572,51 @@ Status after this patch: **🟡 Still in progress** (interactive Qt runtime vali
 2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
 3. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-2 are evidenced.
 
+## Completion plan execution update (2026-03-28, interactive harness evidence follow-up)
+
+Status after this patch: **🟡 Still in progress** (FR-13 timing evidence is now captured and FR-16 is evidenced; a small subset of manual QA checklist items remains unverified in the saved harness capture).
+
+### Completed from the plan in this patch
+
+- **Step 1 (runtime validation sweep): materially advanced with real interactive Qt execution.**
+  - Added an interactive `phase2-viewer-harness` CLI flow that opens a representative PDF in the Qt viewer, records first-render and navigation timings automatically, and writes a JSON capture plus a ready-to-run `phase2-evidence` command.
+  - Fixed two runtime issues discovered during harness use:
+    - Qt image-byte extraction now supports both pointer-style and memoryview-style `QImage.bits().tobytes(...)` behavior.
+    - Harness focus is restored to the viewer after toolbar actions so `PgUp` / `PgDn` route correctly to page navigation.
+  - Relaxed the fallback geometry gate so selection mapping remains available when Qt can provide sane page dimensions even if the lightweight PDF parser cannot decode compressed object streams in PDFs such as `/ObjStm`-based `1.6` files.
+- **Step 2 (performance evidence capture / FR-13): completed for baseline measurement.**
+  - Interactive harness run executed against `/home/daekar/Downloads/2019.04.24 Savor MC.PDF`.
+  - Captured first render: `49.81 ms`.
+  - Captured navigation samples: `32`.
+  - Captured navigation average/min/max: `57.25 ms` / `44.12 ms` / `65.35 ms`.
+- **Step 4 (FR-16 runtime metrics): refreshed alongside the same evidence generation pass.**
+  - Current packaged-app measurements in this environment:
+    - Startup latency: `90.76 ms`
+    - Idle memory: `15.73 MiB`
+    - Bundle size: `22.61 MiB`
+- **Evidence artifacts updated.**
+  - Refreshed [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) with the measured interactive timings.
+  - Added [`artifacts/phase2_harness_capture.json`](/home/daekar/SignPDF/Scratch/artifacts/phase2_harness_capture.json) and [`artifacts/phase2_evidence_command.sh`](/home/daekar/SignPDF/Scratch/artifacts/phase2_evidence_command.sh) as reproducible outputs from the manual run.
+
+### Evidence artifact snapshot (interactive harness run)
+
+- First render: `49.81 ms`
+- Navigation samples: `32`
+- Navigation average/min/max: `57.25 ms` / `44.12 ms` / `65.35 ms`
+- Startup latency: `90.76 ms`
+- Idle memory: `15.73 MiB`
+- Bundle size: `22.61 MiB`
+- Runtime validation sweep status recorded conservatively as `8/19` checks passed
+
+### Remaining blocking actions
+
+1. **Manual QA confirmation cleanup:** explicitly verify the remaining unrecorded items from the saved harness pass:
+   - keyboard zoom shortcuts (`+`, `-`, `0`)
+   - `Home` / `End` jump behavior
+   - drag-selection callback capture
+   - out-of-bounds selection error messaging
+2. **Step 5 (exit gate):** once the remaining checklist items above are explicitly confirmed, update the runtime validation status and mark Phase 2 complete.
+
 ## Completion plan execution update (2026-03-28, pan/selection correctness follow-up)
 
 Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-15 pan/selection integration gap corrected at implementation level.

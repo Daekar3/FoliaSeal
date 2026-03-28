@@ -1,9 +1,9 @@
 ## Phase 2 runtime evidence
 ### Viewer timing snapshot
-- First render: not recorded
-- Navigation average: not recorded
-- Navigation min/max: not recorded / not recorded
-- Navigation samples: 0
+- First render: 49.81 ms
+- Navigation average: 57.25 ms
+- Navigation min/max: 44.12 ms / 65.35 ms
+- Navigation samples: 32
 
 ### Runtime environment
 - OS: Linux (#19~24.04.2-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar  6 23:08:46 UTC 2)
@@ -12,12 +12,12 @@
 - Python: 3.12.3
 
 ### Exit criteria quick-check
-- ⚠️ First-render timing recorded
-- ⚠️ Navigation sample count (0/10)
+- ✅ First-render timing recorded
+- ✅ Navigation sample count (32/10)
 
 ### Runtime footprint snapshot
-- Startup latency: 110.82 ms
-- Idle memory: 15.36 MiB
+- Startup latency: 90.76 ms
+- Idle memory: 15.73 MiB
 - Bundle size (one-dir): 22.61 MiB
 
 ### FR-16 runtime metrics quick-check
@@ -26,27 +26,10 @@
 - ✅ PyInstaller one-dir bundle size recorded
 
 ### Runtime validation sweep
-- ⚠️ Checklist status: 0/19 checks passed
+- ⚠️ Checklist status: 8/19 checks passed
 - Open issues:
-  - Launch the app with a representative multi-page PDF (portrait + rotated page if available).
-  - Confirm preview widget loads without dependency errors.
-  - Initial render succeeds on page 1.
-  - Mouse-wheel zoom-in and zoom-out update preview scale correctly.
-  - Keyboard zoom shortcuts work (`+`, `-`, `0` reset).
-  - Page navigation next/previous works and stays within valid bounds.
-  - Keyboard page navigation works (`PgUp`/`PgDn`, arrows, `Home`/`End`).
-  - Jump-to-page behavior handles first page, middle page, and last page.
-  - Drag-selection overlay is visible while dragging.
-  - Drag-selection callback returns a valid in-bounds PDF rectangle.
-  - Out-of-bounds selection produces an actionable UI error message.
-  - Record first-render elapsed time in milliseconds.
-  - Record at least 10 navigation samples in milliseconds.
-  - Export timing evidence markdown into Phase 2 review notes (recommended command):
-  - Attach hardware + OS context (CPU model, memory, Linux distro/version).
-  - No unhandled exceptions in widget refresh, zoom, navigation, or selection flow.
-  - Timing evidence attached to Phase 2 review document.
-  - Runtime footprint metrics (startup/idle memory/bundle size) attached to Phase 2 review document.
-  - Mark Phase 2 as complete once runtime + timing requirements are satisfied.
+  - Keyboard zoom shortcuts (+, -, 0) plus Home/End jump behavior were not explicitly reconfirmed in the recorded run.
+  - Harness capture reported selection_count=0, so drag-selection callback and out-of-bounds selection messaging remain unverified in the saved artifact.
 
 ### Qt runtime readiness
 - ✅ Ready for Qt host runtime validation
