@@ -77,6 +77,7 @@ def test_qt_backend_geometry_uses_qpdfdocument_page_apis(monkeypatch) -> None:
     assert geometry.media_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.crop_box == (18.0, 36.0, 594.0, 756.0)
     assert geometry.rotation == 90
+    assert geometry.coordinate_mapping_ready is True
 
 
 def test_qt_backend_geometry_caches_metadata_for_repeated_requests(monkeypatch) -> None:
@@ -208,6 +209,7 @@ def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
     assert geometry.media_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.crop_box == (0.0, 0.0, 612.0, 792.0)
     assert geometry.rotation == 0
+    assert geometry.coordinate_mapping_ready is False
 
 
 def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
@@ -256,6 +258,7 @@ def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
 
     assert first == second
     assert first.media_box == (0.0, 0.0, 400.0, 600.0)
+    assert first.coordinate_mapping_ready is False
     assert calls["count"] == 1
 
 

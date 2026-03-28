@@ -23,7 +23,7 @@ Foundations for a Linux desktop PDF signing app.
   - deterministic view↔PDF coordinate transform utilities (zoom, pan, rotation, page-box offsets)
   - pre-sign PDF rectangle bounds validation helper
   - page render LRU cache policy primitives for upcoming viewer integration
-  - Qt render backend that augments QtPdf rendering with cached parsed PDF page metadata when available, while falling back to QtPdf page-size geometry for documents the lightweight parser cannot decode
+  - Qt render backend that augments QtPdf rendering with cached parsed PDF page metadata when available, while falling back to QtPdf page-size geometry for documents the lightweight parser cannot decode and disabling selection-to-PDF mapping on those lossy fallback pages
   - Qt image-buffer extraction hardened for pointer-style `QImage.bits()` APIs used by PySide bindings
   - `ViewerSession` helper for page navigation and zoom/fit interactions
   - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics

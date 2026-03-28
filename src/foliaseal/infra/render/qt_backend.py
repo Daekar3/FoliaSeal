@@ -74,6 +74,7 @@ class QtPdfRenderBackend:
             media_box=metadata.media_box,
             crop_box=metadata.crop_box,
             rotation=metadata.rotation,
+            coordinate_mapping_ready=getattr(metadata, "coordinate_mapping_ready", True),
         )
 
     def render_page(self, request: RenderPageRequest) -> RenderPageResult:
@@ -175,6 +176,7 @@ class QtPdfRenderBackend:
             media_box=media_box,
             crop_box=media_box,
             rotation=0,
+            coordinate_mapping_ready=False,
         )
 
     @staticmethod
@@ -228,6 +230,7 @@ class _PdfPageMetadata:
     media_box: tuple[float, float, float, float]
     crop_box: tuple[float, float, float, float]
     rotation: int
+    coordinate_mapping_ready: bool = True
 
 
 @dataclass
