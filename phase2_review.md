@@ -41,10 +41,12 @@ Work advanced in this update:
 - Added `ViewerSession` application helper to centralize page navigation and zoom controls (next/previous/jump, zoom in/out/reset, fit-to-width/page with clamps).
 - Added `QtPdfRenderBackend` scaffold in `infra.render` with lazy import diagnostics and request validation behavior.
 - Added `ViewerPerformanceTracker` in `application` to record first-render and navigation timing metrics for FR-13 evidence.
+- Expanded `ViewerTimingSnapshot` to include min/max navigation latency and a markdown exporter for evidence capture in review notes.
 - Added `ViewerWorkflow` integration helper to wire render backend calls, page geometry, selection-to-PDF coordinate transforms, and timing metrics in one UI-facing workflow contract.
 - Added a Qt preview widget adapter in `presentation.qt` that binds render refresh, wheel-zoom, paint, and drag-selection events to `ViewerWorkflow` hooks.
 - Added UI-level error callback wiring in the Qt preview widget so render failures and invalid/out-of-bounds selection attempts can surface actionable messages to the host UI.
 - Added unit tests to lock deterministic behavior and input validation for viewer interaction state, timing metrics, Qt backend fallback handling, Qt widget dependency diagnostics, and viewer workflow integration semantics.
+- Added a dedicated manual QA checklist document for Qt-enabled runtime validation and FR-13 baseline capture.
 
 ## Suggested next implementation steps
 1. Validate `QtPdfRenderBackend` + `PdfViewerWidgetAdapter` rendering behavior end-to-end in a PySide6/QtPdf-enabled environment with sample PDFs.
