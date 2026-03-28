@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 
 
 @dataclass(frozen=True)
@@ -46,11 +47,34 @@ def _format_metric_status(metric: float | None, label: str) -> str:
     return f"- {icon} {label}"
 
 
+def _is_valid_runtime_metric(metric: float | None) -> bool:
+    return metric is None or (isfinite(metric) and metric >= 0.0)
+
+
+def validate_runtime_footprint_metrics(*, footprint: RuntimeFootprintSnapshot) -> None:
+    invalid_metrics: list[str] = []
+    if not _is_valid_runtime_metric(footprint.startup_ms):
+        invalid_metrics.append("startup_ms")
+    if not _is_valid_runtime_metric(footprint.idle_memory_mib):
+        invalid_metrics.append("idle_memory_mib")
+    if not _is_valid_runtime_metric(footprint.bundle_size_mib):
+        invalid_metrics.append("bundle_size_mib")
+
+    if invalid_metrics:
+        metrics = ", ".join(invalid_metrics)
+        raise ValueError(
+            "Runtime footprint metrics must be finite and greater than or equal to zero. "
+            f"Invalid fields: {metrics}."
+        )
+
+
 def build_runtime_footprint_quick_check(
     *,
     footprint: RuntimeFootprintSnapshot,
 ) -> str:
     """Build quick-check markdown bullets for FR-16 measurement completeness."""
+
+    validate_runtime_footprint_metrics(footprint=footprint)
 
     return "\n".join(
         [
