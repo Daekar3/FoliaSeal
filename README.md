@@ -1,4 +1,4 @@
-# PDF Signer
+# FoliaSeal
 
 Foundations for a Linux desktop PDF signing app.
 
@@ -55,8 +55,8 @@ Build a one-dir bundle for FR-16 evidence capture:
 
 This produces:
 
-- bundle directory: `dist/pdf-signer`
-- executable: `dist/pdf-signer/pdf-signer`
+- bundle directory: `dist/foliaseal`
+- executable: `dist/foliaseal/foliaseal`
 
 You can then generate a fuller Phase 2 evidence block against the packaged app:
 
@@ -83,10 +83,10 @@ python3 -m pdf_signer phase2-evidence \
   --navigation-ms 43.07 \
   --navigation-ms 46.57 \
   --navigation-ms 52.18 \
-  --measure-startup-command dist/pdf-signer/pdf-signer \
+  --measure-startup-command dist/foliaseal/foliaseal \
   --startup-ready-after-seconds 0.75 \
   --collect-runtime-footprint \
-  --bundle-dir dist/pdf-signer \
+  --bundle-dir dist/foliaseal \
   --check-qt-runtime
 ```
 

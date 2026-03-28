@@ -66,8 +66,8 @@ Choose a location (example `~/projects`):
 ```bash
 mkdir -p ~/projects
 cd ~/projects
-mkdir pdf-signer
-cd pdf-signer
+mkdir foliaseal
+cd foliaseal
 ```
 
 ---
@@ -80,7 +80,7 @@ git init
 ---
 
 ## 6) Create and activate a virtual environment
-From inside `~/projects/pdf-signer`:
+From inside `~/projects/foliaseal`:
 
 ```bash
 python3 -m venv .venv
@@ -148,7 +148,7 @@ In VS Code Extensions panel, install:
 Then select interpreter:
 1. `Ctrl+Shift+P`
 2. **Python: Select Interpreter**
-3. Choose: `.../pdf-signer/.venv/bin/python`
+3. Choose: `.../foliaseal/.venv/bin/python`
 
 ---
 
@@ -156,7 +156,7 @@ Then select interpreter:
 In project root, create this structure:
 
 ```text
-pdf-signer/
+foliaseal/
   .venv/
   src/pdf_signer/
     __init__.py
@@ -170,7 +170,7 @@ Commands:
 mkdir -p src/pdf_signer tests
 touch src/pdf_signer/__init__.py
 cat > src/pdf_signer/__main__.py <<'PY'
-print("pdf-signer dev environment is working")
+print("FoliaSeal dev environment is working")
 PY
 ```
 
@@ -189,7 +189,7 @@ Create `pyproject.toml`:
 
 ```toml
 [project]
-name = "pdf-signer"
+name = "foliaseal"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -253,16 +253,16 @@ build/
 From project root:
 
 ```bash
-pyinstaller --onedir --name pdf-signer src/pdf_signer/__main__.py
+pyinstaller --onedir --name foliaseal src/pdf_signer/__main__.py
 ```
 
 Expected output folder:
-- `dist/pdf-signer/`
+- `dist/foliaseal/`
 
 Run the built executable:
 
 ```bash
-./dist/pdf-signer/pdf-signer
+./dist/foliaseal/foliaseal
 ```
 
 If it prints your test message, packaging basics work.
@@ -296,7 +296,7 @@ Fix:
 Every coding session:
 
 ```bash
-cd ~/projects/pdf-signer
+cd ~/projects/foliaseal
 source .venv/bin/activate
 code .
 ```

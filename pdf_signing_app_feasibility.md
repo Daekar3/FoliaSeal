@@ -365,7 +365,7 @@ Responsibilities:
 ## Proposed repository layout
 
 ```text
-pdf-signer/
+foliaseal/
   pyproject.toml
   README.md
   src/pdf_signer/
@@ -464,7 +464,7 @@ Failure codes to expose in UI and logs:
   - required SSL/cert resources.
 
 ## Artifact shape
-- `dist/pdf-signer/` directory containing executable + bundled libs.
+- `dist/foliaseal/` directory containing executable + bundled libs.
 - Add release checksum file (`SHA256SUMS`).
 
 ## Packaging checklist

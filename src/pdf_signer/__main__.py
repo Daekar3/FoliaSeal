@@ -22,7 +22,7 @@ from pdf_signer.application.runtime_metrics import (
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="pdf-signer")
+    parser = argparse.ArgumentParser(prog="foliaseal")
     subparsers = parser.add_subparsers(dest="command")
 
     evidence = subparsers.add_parser(
@@ -247,7 +247,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         _run_phase2_evidence(args)
         return
 
-    print("pdf-signer phase 0 skeleton ready")
+    print("FoliaSeal phase 0 skeleton ready")
 
 
 if __name__ == "__main__":

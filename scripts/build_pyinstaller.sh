@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 PYINSTALLER_BIN="${PYINSTALLER_BIN:-$ROOT_DIR/.venv/bin/pyinstaller}"
-SPEC_FILE="${SPEC_FILE:-$ROOT_DIR/pdf-signer.spec}"
+SPEC_FILE="${SPEC_FILE:-$ROOT_DIR/foliaseal.spec}"
 
 if [[ ! -x "$PYINSTALLER_BIN" ]]; then
   echo "PyInstaller executable not found at: $PYINSTALLER_BIN" >&2
@@ -18,11 +18,11 @@ if [[ ! -f "$SPEC_FILE" ]]; then
   exit 1
 fi
 
-rm -rf "$ROOT_DIR/build/pdf-signer" "$ROOT_DIR/dist/pdf-signer"
+rm -rf "$ROOT_DIR/build/foliaseal" "$ROOT_DIR/dist/foliaseal"
 
 "$PYINSTALLER_BIN" --noconfirm --clean "$SPEC_FILE"
 
 echo
 echo "PyInstaller build complete."
-echo "Bundle directory: $ROOT_DIR/dist/pdf-signer"
-echo "Executable: $ROOT_DIR/dist/pdf-signer/pdf-signer"
+echo "Bundle directory: $ROOT_DIR/dist/foliaseal"
+echo "Executable: $ROOT_DIR/dist/foliaseal/foliaseal"

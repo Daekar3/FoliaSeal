@@ -11,7 +11,7 @@ def test_main_without_subcommand_prints_default_message(capsys: pytest.CaptureFi
     __main__.main([])
 
     output = capsys.readouterr().out
-    assert "pdf-signer phase 0 skeleton ready" in output
+    assert "FoliaSeal phase 0 skeleton ready" in output
 
 
 def test_main_phase2_evidence_prints_markdown(capsys: pytest.CaptureFixture[str]) -> None:
