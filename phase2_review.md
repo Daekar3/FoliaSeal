@@ -67,8 +67,8 @@ Work advanced in this update:
 |---|---|---|---|
 | **FR-9** (rendering + coordinate mapping + bounds validation) | **Mostly complete** at implementation/test level. | Render abstraction + fallback backend, Qt backend now uses cached parsed `MediaBox`/`CropBox`/`Rotate` metadata when available and falls back to QtPdf page-size geometry otherwise, and coordinate transforms/bounds validation helpers are implemented and tested. | Execute end-to-end runtime validation in a Qt-enabled environment to confirm real rendering and selection behavior under actual `PySide6`/`QtPdf` runtime conditions. |
 | **FR-12** (output integrity / crash safety) | **Complete for signing flow** from Phase 1 and already available to Phase 2 integration. | `SignPdfUseCase` includes temp-file writes, atomic replace, and failure mapping for write failures. | No Phase 2-specific code gap; only keep regression coverage green while wiring viewer -> signing flow. |
-| **FR-13** (performance/UX constraints + timing measurement) | **Partially complete**. Instrumentation exists; baseline evidence is still missing. | `ViewerPerformanceTracker`, timing snapshot markdown export, and `phase2-evidence` CLI helper are present. | Capture first-render and >=10 navigation timing samples on representative hardware and attach signed-off evidence to this review. |
-| **FR-15** (viewer usability and intuitive interaction) | **Partially complete**. Core navigation/zoom/selection scaffolding is implemented. | `ViewerSession`, `ViewerWorkflow`, and Qt preview widget adapter support zoom/nav/drag selection, scrollbar-backed pan syncing, and callback/error wiring. | Manual runtime QA is still needed for interaction polish, keyboard accessibility coverage, and user-facing error quality checks. |
+| **FR-13** (performance/UX constraints + timing measurement) | **Partially complete**. Viewer timing instrumentation exists, but full requirement coverage is not yet evidenced and long-operation UX is not yet documented as implemented. | `ViewerPerformanceTracker`, timing snapshot markdown export, and `phase2-evidence` CLI helper are present. | Capture first-render and >=10 navigation timing samples on representative hardware, and close the remaining progress/cancellation/responsiveness requirement gap before marking FR-13 complete. |
+| **FR-15** (viewer usability and intuitive interaction) | **Partially complete**. Core navigation/zoom/selection scaffolding is implemented, but the broader keyboard-accessibility expectation is not yet fully covered. | `ViewerSession`, `ViewerWorkflow`, and Qt preview widget adapter support zoom/nav/drag selection, scrollbar-backed pan syncing, and callback/error wiring. | Manual runtime QA is still needed for interaction polish and error quality checks, and keyboard affordances for open/sign/cancel still need to be defined or implemented before marking FR-15 complete. |
 | **FR-16** (lightweight runtime + bounded cache + runtime metrics) | **Partially complete**. Bounded cache primitive exists. | `RenderCachePolicy` LRU behavior and invalidation semantics are implemented with tests. | Measure startup latency and baseline memory/bundle metrics in target packaging environment; validate low-memory behavior with large PDFs. |
 | **FR-17** (extensible document operations architecture) | **Complete for Phase 2 expectations**. | `DocumentOperation` contract + operation registry are in place with enable/disable behavior and unit tests. | No blocking Phase 2 gap; continue to keep sign-only operation enabled in production UI path. |
 
@@ -525,12 +525,15 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 - **Prior contradiction explicitly resolved.**
   - The older review note claiming this host was not Qt-ready reflected an earlier non-venv interpreter run and is now obsolete.
   - The checked-in evidence artifact is now aligned with the currently used `.venv`-based workflow.
+- **Documentation scope clarified.**
+  - `phase2_manual_qa_checklist.md` now tracks only the manual runtime execution steps that require an actual interactive Qt session.
+  - `artifacts/phase2_runtime_evidence.md` remains the generated source of truth for Qt readiness, timing snapshots, runtime footprint metrics, and checklist-derived pass/fail counts.
 
 ### Evidence artifact snapshot (current `.venv` run)
 
-- Runtime validation sweep: `0/20` checks passed.
+- Runtime validation sweep: `0/19` checks passed.
 - Qt runtime readiness: ready (`PySide6` + `PySide6.QtPdf` available in `.venv`).
-- FR-16 quick-check: idle memory recorded (`15.24 MiB`); startup latency and bundle size still missing.
+- FR-16 quick-check: idle memory recorded (`15.37 MiB`); startup latency and bundle size still missing.
 
 ### Remaining blocking actions
 
