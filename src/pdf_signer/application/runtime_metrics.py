@@ -5,6 +5,8 @@ from __future__ import annotations
 import ctypes
 import os
 import platform
+import subprocess
+import time
 from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
@@ -156,6 +158,30 @@ def collect_runtime_footprint_snapshot(
         idle_memory_mib=collect_idle_memory_mib(),
         bundle_size_mib=bundle_size_mib,
     )
+
+
+def measure_startup_latency_ms(
+    *,
+    command: list[str],
+    timeout_seconds: float = 30.0,
+) -> float:
+    """Measure wall-clock process startup latency for a command."""
+
+    if not command:
+        raise ValueError("command must include at least one argument")
+    if not isfinite(timeout_seconds) or timeout_seconds <= 0.0:
+        raise ValueError("timeout_seconds must be a finite number greater than zero")
+
+    start = time.perf_counter()
+    subprocess.run(
+        command,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=timeout_seconds,
+    )
+    end = time.perf_counter()
+    return (end - start) * 1000.0
 
 
 def _format_metric_status(metric: float | None, label: str) -> str:
