@@ -187,3 +187,27 @@ def test_main_phase2_evidence_merges_extra_issue_notes_with_checklist_derived_su
     output = capsys.readouterr().out
     assert "Checklist status: 1/1 checks passed" in output
     assert "Observed transient zoom jitter at 300%." in output
+
+
+def test_main_phase2_evidence_writes_markdown_file_when_requested(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output_file = tmp_path / "evidence" / "phase2_runtime.md"
+
+    __main__.main(
+        [
+            "phase2-evidence",
+            "--first-render-ms",
+            "44.0",
+            "--write-markdown-file",
+            str(output_file),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "## Phase 2 runtime evidence" in output
+    assert output_file.exists()
+    written = output_file.read_text(encoding="utf-8")
+    assert written.endswith("\n")
+    assert "## Phase 2 runtime evidence" in written
