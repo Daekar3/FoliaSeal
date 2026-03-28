@@ -110,3 +110,29 @@ def test_main_phase2_evidence_prefers_explicit_startup_ms_over_measured_command(
 
     output = capsys.readouterr().out
     assert "- Startup latency: 111.00 ms" in output
+
+
+def test_main_phase2_evidence_includes_runtime_validation_summary(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    __main__.main(
+        [
+            "phase2-evidence",
+            "--qa-passed-checks",
+            "8",
+            "--qa-total-checks",
+            "9",
+            "--qa-issue",
+            "Selection mapping failed on one rotated sample.",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "### Runtime validation sweep" in output
+    assert "Checklist status: 8/9 checks passed" in output
+    assert "Selection mapping failed on one rotated sample." in output
+
+
+def test_main_phase2_evidence_rejects_partial_runtime_validation_args() -> None:
+    with pytest.raises(ValueError, match="must be provided together"):
+        __main__.main(["phase2-evidence", "--qa-total-checks", "9"])

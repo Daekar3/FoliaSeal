@@ -3,6 +3,7 @@ import pytest
 from pdf_signer.application.performance_timing import ViewerTimingSnapshot
 from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
+    RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
 )
 from pdf_signer.application.runtime_metrics import RuntimeFootprintSnapshot
@@ -125,3 +126,46 @@ def test_runtime_environment_collect_returns_non_empty_fields() -> None:
     assert collected.machine
     assert collected.processor
     assert collected.python_version
+
+
+def test_build_phase2_timing_evidence_includes_runtime_validation_block() -> None:
+    snapshot = ViewerTimingSnapshot(
+        first_render_ms=20.0,
+        average_navigation_ms=12.0,
+        min_navigation_ms=10.0,
+        max_navigation_ms=14.0,
+        sample_count=10,
+    )
+    environment = RuntimeEnvironmentSnapshot(
+        os_name="Linux",
+        os_version="6.8.0",
+        machine="x86_64",
+        processor="ExampleCPU",
+        python_version="3.12.3",
+    )
+    validation = RuntimeValidationSnapshot(
+        passed_checks=8,
+        total_checks=9,
+        issues=("Selection callback failed on rotated page sample.",),
+    )
+
+    report = build_phase2_timing_evidence(
+        timing=snapshot,
+        environment=environment,
+        runtime_validation=validation,
+    )
+
+    assert "### Runtime validation sweep" in report
+    assert "Checklist status: 8/9 checks passed" in report
+    assert "Selection callback failed on rotated page sample." in report
+
+
+def test_runtime_validation_snapshot_rejects_invalid_counts() -> None:
+    with pytest.raises(ValueError, match="at least 1"):
+        RuntimeValidationSnapshot(passed_checks=0, total_checks=0)
+
+    with pytest.raises(ValueError, match="greater than or equal to zero"):
+        RuntimeValidationSnapshot(passed_checks=-1, total_checks=5)
+
+    with pytest.raises(ValueError, match="cannot exceed total_checks"):
+        RuntimeValidationSnapshot(passed_checks=6, total_checks=5)
