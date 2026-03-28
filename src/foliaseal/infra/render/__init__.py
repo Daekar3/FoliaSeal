@@ -9,13 +9,17 @@ from foliaseal.infra.render.base import (
     RenderPageResult,
 )
 from foliaseal.infra.render.cache import RenderCacheKey, RenderCachePolicy
-from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.infra.render.qt_backend import (
+    PdfPageGeometryUnavailableError,
+    QtPdfRenderBackend,
+)
 
 __all__ = [
     "RenderCacheKey",
     "RenderCachePolicy",
     "NullPdfRenderBackend",
     "PdfPageGeometry",
+    "PdfPageGeometryUnavailableError",
     "PdfRenderBackend",
     "RenderBackendDiagnostic",
     "RenderPageRequest",

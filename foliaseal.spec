@@ -1,16 +1,16 @@
 """PyInstaller one-dir build for the FoliaSeal development CLI."""
 
-from PyInstaller.utils.hooks import collect_submodules
+from foliaseal.build import collect_runtime_assets
 
 
-hiddenimports = collect_submodules("foliaseal")
+hiddenimports, datas, binaries = collect_runtime_assets()
 
 
 a = Analysis(
     ["src/foliaseal/__main__.py"],
     pathex=["src"],
-    binaries=[],
-    datas=[],
+    binaries=binaries,
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

@@ -2,6 +2,7 @@ import pytest
 
 from foliaseal.infra.render import QtPdfRenderBackend, RenderPageRequest
 from foliaseal.infra.render.qt_backend import (
+    PdfPageGeometryUnavailableError,
     _load_pdf_page_metadata,
     _QtBindings,
 )
@@ -169,20 +170,12 @@ def test_qt_backend_geometry_invalidates_metadata_cache_when_file_signature_chan
     assert second.rotation == 90
 
 
-def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
+def test_qt_backend_geometry_raises_when_parser_fails(
     monkeypatch,
 ) -> None:
-    class _Size:
-        def toTuple(self):
-            return (612.0, 792.0)
-
     class _Document:
         def pageCount(self):
             return 1
-
-        def pagePointSize(self, page_index):
-            assert page_index == 0
-            return _Size()
 
     backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
     backend._bindings_error = None
@@ -203,27 +196,16 @@ def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
         lambda **_: (_ for _ in ()).throw(ValueError("object stream unsupported")),
     )
 
-    geometry = backend.get_page_geometry("any.pdf", page_index=0)
-
-    assert geometry.media_box == (0.0, 0.0, 612.0, 792.0)
-    assert geometry.crop_box == (0.0, 0.0, 612.0, 792.0)
-    assert geometry.rotation == 0
+    with pytest.raises(PdfPageGeometryUnavailableError, match="object stream unsupported"):
+        backend.get_page_geometry("any.pdf", page_index=0)
 
 
-def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
+def test_qt_backend_geometry_retries_after_parser_failure_without_caching_guesswork(
     monkeypatch,
 ) -> None:
-    class _Size:
-        def toTuple(self):
-            return (400.0, 600.0)
-
     class _Document:
         def pageCount(self):
             return 1
-
-        def pagePointSize(self, page_index):
-            assert page_index == 0
-            return _Size()
 
     backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
     backend._bindings_error = None
@@ -251,12 +233,12 @@ def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
         fail_parser,
     )
 
-    first = backend.get_page_geometry("any.pdf", page_index=0)
-    second = backend.get_page_geometry("any.pdf", page_index=0)
+    with pytest.raises(PdfPageGeometryUnavailableError):
+        backend.get_page_geometry("any.pdf", page_index=0)
+    with pytest.raises(PdfPageGeometryUnavailableError):
+        backend.get_page_geometry("any.pdf", page_index=0)
 
-    assert first == second
-    assert first.media_box == (0.0, 0.0, 400.0, 600.0)
-    assert calls["count"] == 1
+    assert calls["count"] == 2
 
 
 def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:

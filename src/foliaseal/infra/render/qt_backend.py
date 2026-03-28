@@ -30,6 +30,10 @@ class _PdfIndirectRef:
     generation: int = 0
 
 
+class PdfPageGeometryUnavailableError(RuntimeError):
+    """Raised when the backend cannot determine reliable page geometry."""
+
+
 _WHITESPACE = b" \t\r\n\x0c\x00"
 _DELIMITERS = b"()<>[]{}/%"
 
@@ -157,25 +161,16 @@ class QtPdfRenderBackend:
                     document_path=document_path,
                     page_index=page_index,
                 )
-            except Exception:
-                metadata = self._fallback_page_metadata(
-                    document=document,
-                    page_index=page_index,
-                )
+            except Exception as exc:
+                raise PdfPageGeometryUnavailableError(
+                    "Unable to determine precise page geometry for "
+                    f"{document_path!r} page {page_index}. "
+                    "FoliaSeal will not guess crop-box or rotation values because "
+                    "that can mis-map selections on rotated or cropped PDFs. "
+                    f"Details: {exc}"
+                ) from exc
             entry.page_metadata[page_index] = metadata
         return metadata
-
-    @staticmethod
-    def _fallback_page_metadata(*, document: Any, page_index: int) -> _PdfPageMetadata:
-        width_pts, height_pts = (
-            float(v) for v in document.pagePointSize(page_index).toTuple()
-        )
-        media_box = (0.0, 0.0, width_pts, height_pts)
-        return _PdfPageMetadata(
-            media_box=media_box,
-            crop_box=media_box,
-            rotation=0,
-        )
 
     @staticmethod
     def _extract_image_bytes(*, image: Any, expected_size: int) -> bytes:
