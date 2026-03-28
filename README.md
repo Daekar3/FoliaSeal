@@ -62,7 +62,7 @@ This produces:
 You can then generate a fuller Phase 2 evidence block against the packaged app:
 
 ```bash
-foliaseal phase2-evidence \
+.venv/bin/python -m foliaseal phase2-evidence \
   --first-render-ms 47.54 \
   --navigation-ms 49.35 \
   --navigation-ms 45.06 \
@@ -88,7 +88,11 @@ foliaseal phase2-evidence \
   --startup-ready-after-seconds 0.75 \
   --collect-runtime-footprint \
   --bundle-dir dist/foliaseal \
-  --check-qt-runtime
+  --check-qt-runtime \
+  --qa-checklist-file phase2_manual_qa_checklist.md \
+  --write-markdown-file artifacts/phase2_runtime_evidence.md
 ```
 
 `--measure-startup-command` now measures launch readiness rather than waiting for a normal process exit. Short-lived probe commands return their full runtime; long-running GUI commands are treated as started once they stay alive for the configured readiness window and are then terminated by the helper.
+
+If you do not yet have interactive first-render/navigation timings from a manual Qt session, you can still use the same command shape without the timing flags to refresh the packaging-side evidence in [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) while leaving the FR-13 items explicitly unrecorded.

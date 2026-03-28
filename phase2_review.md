@@ -542,6 +542,36 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 3. **Step 4 (FR-16 runtime metrics):** capture startup latency using `--measure-startup-command` against the PyInstaller one-dir executable and bundle size via `--bundle-dir` in the target packaging output.
 4. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-3 are evidenced.
 
+## Completion plan execution update (2026-03-28, packaging evidence follow-up)
+
+Status after this patch: **🟡 Still in progress** (interactive Qt runtime validation and FR-13 timing capture still block completion), with fresh packaged-app FR-16 evidence now captured from the current repository state.
+
+### Completed from the plan in this patch
+
+- **Step 4 (FR-16 runtime metrics): partially advanced with current packaged artifact measurements.**
+  - Rebuilt the PyInstaller one-dir bundle with `./scripts/build_pyinstaller.sh`.
+  - Re-generated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) against the packaged executable using:
+    - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
+  - Current packaged-app measurements from this environment:
+    - Startup latency: `110.82 ms`
+    - Idle memory: `15.36 MiB`
+    - Bundle size: `22.61 MiB`
+- **Documentation aligned with the packaged evidence path.**
+  - Updated the README evidence example to use the project venv entry point and to write directly into `artifacts/phase2_runtime_evidence.md`, matching the command used for local verification.
+
+### Evidence artifact snapshot (current packaged run)
+
+- Runtime validation sweep: `0/19` checks passed.
+- Qt runtime readiness: ready (`PySide6` + `PySide6.QtPdf` available in `.venv`).
+- FR-16 quick-check: startup latency, idle memory, and bundle size are now all recorded in the artifact.
+- FR-13 timing evidence remains unrecorded in this headless run (`first render` and `navigation samples` are still missing).
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** execute the checklist from an actual interactive Qt app session and update checklist checkboxes from observed results instead of leaving the checklist fully unchecked.
+2. **Step 2 (performance evidence capture / FR-13):** collect measured first-render latency and at least 10 navigation samples from that interactive Qt run.
+3. **Step 5 (exit gate):** paste the updated artifact output from the completed Qt run into this review and mark Phase 2 complete only after items 1-2 are evidenced.
+
 ## Completion plan execution update (2026-03-28, pan/selection correctness follow-up)
 
 Status after this patch: **🟡 Still in progress** (runtime execution evidence is still missing), with the FR-15 pan/selection integration gap corrected at implementation level.
