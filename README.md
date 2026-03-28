@@ -27,6 +27,7 @@ Foundations for a Linux desktop PDF signing app.
   - `ViewerSession` helper for page navigation and zoom/fit interactions
   - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
   - Phase 2 evidence formatter utilities to capture timing snapshots alongside runtime environment details
+  - CLI helper (`python -m pdf_signer phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets
   - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for Qt widget integration
   - Qt preview widget adapter (`presentation.qt`) with wheel zoom + drag-selection wiring to viewer workflow
 - unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, and Qt widget dependency diagnostics
