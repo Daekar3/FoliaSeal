@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pdf_signer.application.performance_timing import ViewerPerformanceTracker
 from pdf_signer.application.phase2_evidence import (
+    QtRuntimeReadinessSnapshot,
     RuntimeEnvironmentSnapshot,
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
@@ -133,6 +134,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "Parent directories are created when needed."
         ),
     )
+    evidence.add_argument(
+        "--check-qt-runtime",
+        action="store_true",
+        help=(
+            "Append Qt dependency readiness diagnostics "
+            "(PySide6 + PySide6.QtPdf import availability)."
+        ),
+    )
 
     return parser
 
@@ -199,6 +208,9 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
             total_checks=runtime_validation.total_checks,
             issues=runtime_validation.issues + tuple(args.qa_issues),
         )
+    qt_runtime_readiness = (
+        QtRuntimeReadinessSnapshot.collect() if args.check_qt_runtime else None
+    )
 
     report = build_phase2_timing_evidence(
         timing=tracker.snapshot(),
@@ -206,6 +218,7 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         minimum_navigation_samples=args.minimum_navigation_samples,
         runtime_footprint=runtime_footprint,
         runtime_validation=runtime_validation,
+        qt_runtime_readiness=qt_runtime_readiness,
     )
     print(report)
     if args.write_markdown_file is not None:

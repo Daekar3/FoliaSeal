@@ -211,3 +211,28 @@ def test_main_phase2_evidence_writes_markdown_file_when_requested(
     written = output_file.read_text(encoding="utf-8")
     assert written.endswith("\n")
     assert "## Phase 2 runtime evidence" in written
+
+
+def test_main_phase2_evidence_appends_qt_runtime_diagnostics_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "pdf_signer.__main__.QtRuntimeReadinessSnapshot.collect",
+        lambda: __main__.QtRuntimeReadinessSnapshot(
+            pyside6_available=True,
+            qtpdf_available=False,
+        ),
+    )
+
+    __main__.main(
+        [
+            "phase2-evidence",
+            "--check-qt-runtime",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "### Qt runtime readiness" in output
+    assert "- ✅ PySide6 import available" in output
+    assert "- ⚠️ PySide6.QtPdf import available" in output

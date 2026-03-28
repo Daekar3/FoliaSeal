@@ -26,7 +26,7 @@ It captures the remaining runtime evidence needed to close Phase 2.
 - [ ] Record first-render elapsed time in milliseconds.
 - [ ] Record at least 10 navigation samples in milliseconds.
 - [ ] Export timing evidence markdown into Phase 2 review notes (recommended command):
-  - `python -m pdf_signer phase2-evidence --first-render-ms <value> --navigation-ms <value> ... --collect-runtime-footprint --measure-startup-command <pyinstaller_one_dir_executable> --bundle-dir <pyinstaller_one_dir_output> --qa-checklist-file phase2_manual_qa_checklist.md --qa-issue "<optional issue note>" --write-markdown-file artifacts/phase2_runtime_evidence.md`
+  - `python -m pdf_signer phase2-evidence --first-render-ms <value> --navigation-ms <value> ... --collect-runtime-footprint --measure-startup-command <pyinstaller_one_dir_executable> --bundle-dir <pyinstaller_one_dir_output> --qa-checklist-file phase2_manual_qa_checklist.md --qa-issue "<optional issue note>" --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Paste `artifacts/phase2_runtime_evidence.md` into `phase2_review.md` under the latest completion-plan update section.
 - [ ] Attach hardware + OS context (CPU model, memory, Linux distro/version).
 

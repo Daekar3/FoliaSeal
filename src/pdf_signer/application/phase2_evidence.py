@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import platform
 import re
+from importlib.util import find_spec
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,6 +73,50 @@ class RuntimeValidationSnapshot:
         return "\n".join(lines)
 
 
+@dataclass(frozen=True)
+class QtRuntimeReadinessSnapshot:
+    """Qt runtime dependency readiness for Step 1 execution gating."""
+
+    pyside6_available: bool
+    qtpdf_available: bool
+
+    @classmethod
+    def collect(cls) -> QtRuntimeReadinessSnapshot:
+        """Collect Qt dependency availability using import discovery."""
+
+        pyside6_available = _module_available("PySide6")
+        qtpdf_available = _module_available("PySide6.QtPdf")
+        return cls(
+            pyside6_available=pyside6_available,
+            qtpdf_available=qtpdf_available,
+        )
+
+    def to_markdown(self) -> str:
+        """Render dependency readiness markdown for runtime validation planning."""
+
+        pyside_status = "✅" if self.pyside6_available else "⚠️"
+        qtpdf_status = "✅" if self.qtpdf_available else "⚠️"
+        overall_ready = self.pyside6_available and self.qtpdf_available
+        overall_status = "✅" if overall_ready else "⚠️"
+        return "\n".join(
+            [
+                "### Qt runtime readiness",
+                f"- {overall_status} Ready for Qt host runtime validation",
+                f"- {pyside_status} PySide6 import available",
+                f"- {qtpdf_status} PySide6.QtPdf import available",
+            ]
+        )
+
+
+def _module_available(module_name: str) -> bool:
+    """Return True when import metadata exists for the module."""
+
+    try:
+        return find_spec(module_name) is not None
+    except ModuleNotFoundError:
+        return False
+
+
 def parse_checklist_markdown(*, checklist_path: str) -> RuntimeValidationSnapshot:
     """Build runtime validation counts from a markdown checklist file."""
 
@@ -118,6 +163,7 @@ def build_phase2_timing_evidence(
     minimum_navigation_samples: int = 10,
     runtime_footprint: RuntimeFootprintSnapshot | None = None,
     runtime_validation: RuntimeValidationSnapshot | None = None,
+    qt_runtime_readiness: QtRuntimeReadinessSnapshot | None = None,
 ) -> str:
     """Build markdown evidence block for Phase 2 runtime/timing sign-off."""
 
@@ -165,6 +211,13 @@ def build_phase2_timing_evidence(
             [
                 "",
                 runtime_validation.to_markdown(),
+            ]
+        )
+    if qt_runtime_readiness is not None:
+        lines.extend(
+            [
+                "",
+                qt_runtime_readiness.to_markdown(),
             ]
         )
 
