@@ -70,16 +70,7 @@ class PdfViewerWidgetAdapter:
                     if self._on_error is None:
                         raise
                     return
-                image = bindings.q_image(
-                    result.rgba_bytes,
-                    result.width_px,
-                    result.height_px,
-                    result.width_px * 4,
-                    bindings.q_image.Format_RGBA8888,
-                )
-                self._pixmap = bindings.q_pixmap.fromImage(image.copy())
-                self.setMinimumSize(result.width_px, result.height_px)
-                self.update()
+                self._apply_render_result(result)
 
             def paintEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 painter = bindings.q_painter(self)
@@ -134,8 +125,13 @@ class PdfViewerWidgetAdapter:
                     bindings.qt.Key_Down,
                     bindings.qt.Key_Right,
                 ):
-                    self._workflow.go_next_page()
-                    self.refresh(navigation=True)
+                    self._navigate(
+                        action=self._workflow.go_next_page,
+                        summary=(
+                            "Unable to render PDF preview after navigating to the next page. "
+                            "Please verify PDF backend availability and retry."
+                        ),
+                    )
                     event.accept()
                     return
 
@@ -144,20 +140,37 @@ class PdfViewerWidgetAdapter:
                     bindings.qt.Key_Up,
                     bindings.qt.Key_Left,
                 ):
-                    self._workflow.go_previous_page()
-                    self.refresh(navigation=True)
+                    self._navigate(
+                        action=self._workflow.go_previous_page,
+                        summary=(
+                            "Unable to render PDF preview after navigating to the previous page. "
+                            "Please verify PDF backend availability and retry."
+                        ),
+                    )
                     event.accept()
                     return
 
                 if key == bindings.qt.Key_Home:
-                    self._workflow.jump_to_page(0)
-                    self.refresh(navigation=True)
+                    self._navigate(
+                        action=lambda: self._workflow.jump_to_page(0),
+                        summary=(
+                            "Unable to render PDF preview after jumping to the first page. "
+                            "Please verify PDF backend availability and retry."
+                        ),
+                    )
                     event.accept()
                     return
 
                 if key == bindings.qt.Key_End:
-                    self._workflow.jump_to_page(self._workflow.session.page_count - 1)
-                    self.refresh(navigation=True)
+                    self._navigate(
+                        action=lambda: self._workflow.jump_to_page(
+                            self._workflow.session.page_count - 1
+                        ),
+                        summary=(
+                            "Unable to render PDF preview after jumping to the last page. "
+                            "Please verify PDF backend availability and retry."
+                        ),
+                    )
                     event.accept()
                     return
 
@@ -213,6 +226,28 @@ class PdfViewerWidgetAdapter:
                         self._on_error(summary)
                         return
                     self._on_error(f"{summary} (details: {exc})")
+
+            def _apply_render_result(self, result: Any) -> None:
+                image = bindings.q_image(
+                    result.rgba_bytes,
+                    result.width_px,
+                    result.height_px,
+                    result.width_px * 4,
+                    bindings.q_image.Format_RGBA8888,
+                )
+                self._pixmap = bindings.q_pixmap.fromImage(image.copy())
+                self.setMinimumSize(result.width_px, result.height_px)
+                self.update()
+
+            def _navigate(self, *, action: Callable[[], Any], summary: str) -> None:
+                try:
+                    result = action()
+                except Exception as exc:  # pragma: no cover - integration behavior
+                    self._emit_error(summary, exc)
+                    if self._on_error is None:
+                        raise
+                    return
+                self._apply_render_result(result)
 
         return PdfPreviewWidget()
 
