@@ -223,6 +223,12 @@ class PdfViewerWidgetAdapter:
                     return super().mouseReleaseEvent(event)
 
                 current = event.position().toPoint()
+                if not self._is_selection_drag(self._drag_origin, current):
+                    self._selection_rect = None
+                    self._drag_origin = None
+                    self.update()
+                    event.accept()
+                    return
                 rect = bindings.q_rect(self._drag_origin, current).normalized()
                 self._selection_rect = None
                 self._drag_origin = None
@@ -310,6 +316,10 @@ class PdfViewerWidgetAdapter:
                 modifiers = event.modifiers()
                 shift_mask = bindings.qt.KeyboardModifier.ShiftModifier
                 return bool(modifiers & shift_mask)
+
+            @staticmethod
+            def _is_selection_drag(origin: Any, current: Any) -> bool:
+                return origin.x() != current.x() or origin.y() != current.y()
 
             def _selection_in_viewport_coords(self, rect: Any) -> ViewRect:
                 pan_x, pan_y = self._current_pan_offsets()
