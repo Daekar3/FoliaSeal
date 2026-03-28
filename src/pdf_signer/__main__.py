@@ -10,7 +10,10 @@ from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
     build_phase2_timing_evidence,
 )
-from pdf_signer.application.runtime_metrics import RuntimeFootprintSnapshot
+from pdf_signer.application.runtime_metrics import (
+    RuntimeFootprintSnapshot,
+    collect_runtime_footprint_snapshot,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -59,6 +62,20 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="PyInstaller one-dir bundle size in MiB.",
     )
+    evidence.add_argument(
+        "--collect-runtime-footprint",
+        action="store_true",
+        help=(
+            "Collect idle memory from the local process and optionally measure "
+            "bundle size from --bundle-dir when explicit metrics are not supplied."
+        ),
+    )
+    evidence.add_argument(
+        "--bundle-dir",
+        type=str,
+        default=None,
+        help="Path to a PyInstaller one-dir output folder for auto bundle-size measurement.",
+    )
 
     return parser
 
@@ -71,15 +88,35 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
     for sample in args.navigation_ms:
         tracker.record_navigation(sample)
 
+    runtime_footprint = RuntimeFootprintSnapshot(
+        startup_ms=args.startup_ms,
+        idle_memory_mib=args.idle_memory_mib,
+        bundle_size_mib=args.bundle_size_mib,
+    )
+    if args.collect_runtime_footprint:
+        auto_snapshot = collect_runtime_footprint_snapshot(
+            startup_ms=args.startup_ms,
+            bundle_dir=args.bundle_dir,
+        )
+        runtime_footprint = RuntimeFootprintSnapshot(
+            startup_ms=args.startup_ms,
+            idle_memory_mib=(
+                args.idle_memory_mib
+                if args.idle_memory_mib is not None
+                else auto_snapshot.idle_memory_mib
+            ),
+            bundle_size_mib=(
+                args.bundle_size_mib
+                if args.bundle_size_mib is not None
+                else auto_snapshot.bundle_size_mib
+            ),
+        )
+
     report = build_phase2_timing_evidence(
         timing=tracker.snapshot(),
         environment=RuntimeEnvironmentSnapshot.collect(),
         minimum_navigation_samples=args.minimum_navigation_samples,
-        runtime_footprint=RuntimeFootprintSnapshot(
-            startup_ms=args.startup_ms,
-            idle_memory_mib=args.idle_memory_mib,
-            bundle_size_mib=args.bundle_size_mib,
-        ),
+        runtime_footprint=runtime_footprint,
     )
     print(report)
 
