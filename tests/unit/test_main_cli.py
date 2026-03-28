@@ -238,3 +238,42 @@ def test_main_phase2_evidence_appends_qt_runtime_diagnostics_when_requested(
     assert "### Qt runtime readiness" in output
     assert "- ✅ PySide6 import available" in output
     assert "- ⚠️ PySide6.QtPdf import available" in output
+
+
+def test_main_phase2_viewer_harness_dispatches_to_qt_harness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    def fake_run_phase2_viewer_harness(
+        *,
+        pdf_path: str,
+        summary_json_path: str | None,
+        evidence_command_path: str | None,
+    ) -> None:
+        captured["pdf_path"] = pdf_path
+        captured["summary_json_path"] = summary_json_path
+        captured["evidence_command_path"] = evidence_command_path
+
+    monkeypatch.setattr(
+        "foliaseal.__main__.run_phase2_viewer_harness",
+        fake_run_phase2_viewer_harness,
+    )
+
+    __main__.main(
+        [
+            "phase2-viewer-harness",
+            "--pdf-path",
+            "/tmp/sample.pdf",
+            "--summary-json-path",
+            "/tmp/capture.json",
+            "--evidence-command-path",
+            "/tmp/evidence-command.sh",
+        ]
+    )
+
+    assert captured == {
+        "pdf_path": "/tmp/sample.pdf",
+        "summary_json_path": "/tmp/capture.json",
+        "evidence_command_path": "/tmp/evidence-command.sh",
+    }

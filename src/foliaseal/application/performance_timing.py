@@ -83,6 +83,12 @@ class ViewerPerformanceTracker:
             sample_count=len(self._navigation_samples_ms),
         )
 
+    @property
+    def navigation_samples_ms(self) -> tuple[float, ...]:
+        """Return captured navigation timings in insertion order."""
+
+        return tuple(self._navigation_samples_ms)
+
     def reset(self) -> None:
         self._first_render_ms = None
         self._navigation_samples_ms.clear()

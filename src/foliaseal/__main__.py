@@ -19,6 +19,7 @@ from foliaseal.application.runtime_metrics import (
     collect_runtime_footprint_snapshot,
     measure_startup_latency_ms,
 )
+from foliaseal.presentation.qt.phase2_harness import run_phase2_viewer_harness
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -153,6 +154,26 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    harness = subparsers.add_parser(
+        "phase2-viewer-harness",
+        help="Launch the interactive Qt viewer harness for Phase 2 manual validation.",
+    )
+    harness.add_argument(
+        "--pdf-path",
+        required=True,
+        help="Path to the PDF to open in the interactive validation harness.",
+    )
+    harness.add_argument(
+        "--summary-json-path",
+        default=None,
+        help="Optional file path where the harness capture JSON should be written.",
+    )
+    harness.add_argument(
+        "--evidence-command-path",
+        default=None,
+        help="Optional file path where the generated phase2-evidence command should be written.",
+    )
+
     return parser
 
 
@@ -245,6 +266,13 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "phase2-evidence":
         _run_phase2_evidence(args)
+        return
+    if args.command == "phase2-viewer-harness":
+        run_phase2_viewer_harness(
+            pdf_path=args.pdf_path,
+            summary_json_path=args.summary_json_path,
+            evidence_command_path=args.evidence_command_path,
+        )
         return
 
     print("FoliaSeal phase 0 skeleton ready")
