@@ -58,3 +58,49 @@ Work advanced in this update:
 - **Fix applied:** added explicit `PageBox` validation across conversion and bounds-check functions, with regression tests.
 - **Gap found:** no cache policy primitive existed yet for rendered page buffers.
 - **Fix applied:** added an in-memory LRU cache policy object (`RenderCachePolicy`) plus unit tests for hit, eviction, and invalidation behavior.
+
+## Progress-to-requirements comparison and finish plan (2026-03-28)
+
+### Requirement-by-requirement status
+
+| Requirement | Current status | Evidence in repo | Gap to close |
+|---|---|---|---|
+| **FR-9** (rendering + coordinate mapping + bounds validation) | **Mostly complete** at implementation/test level. | Render abstraction + fallback backend, Qt backend scaffold, coordinate transforms, and bounds validation helpers are implemented and tested. | Execute end-to-end runtime validation in a Qt-enabled environment to confirm real rendering and selection behavior under actual `PySide6`/`QtPdf` runtime conditions. |
+| **FR-12** (output integrity / crash safety) | **Complete for signing flow** from Phase 1 and already available to Phase 2 integration. | `SignPdfUseCase` includes temp-file writes, atomic replace, and failure mapping for write failures. | No Phase 2-specific code gap; only keep regression coverage green while wiring viewer -> signing flow. |
+| **FR-13** (performance/UX constraints + timing measurement) | **Partially complete**. Instrumentation exists; baseline evidence is still missing. | `ViewerPerformanceTracker`, timing snapshot markdown export, and `phase2-evidence` CLI helper are present. | Capture first-render and >=10 navigation timing samples on representative hardware and attach signed-off evidence to this review. |
+| **FR-15** (viewer usability and intuitive interaction) | **Partially complete**. Core navigation/zoom/selection scaffolding is implemented. | `ViewerSession`, `ViewerWorkflow`, and Qt preview widget adapter support zoom/nav/drag selection and callback/error wiring. | Manual runtime QA is still needed for interaction polish, keyboard accessibility coverage, and user-facing error quality checks. |
+| **FR-16** (lightweight runtime + bounded cache + runtime metrics) | **Partially complete**. Bounded cache primitive exists. | `RenderCachePolicy` LRU behavior and invalidation semantics are implemented with tests. | Measure startup latency and baseline memory/bundle metrics in target packaging environment; validate low-memory behavior with large PDFs. |
+| **FR-17** (extensible document operations architecture) | **Complete for Phase 2 expectations**. | `DocumentOperation` contract + operation registry are in place with enable/disable behavior and unit tests. | No blocking Phase 2 gap; continue to keep sign-only operation enabled in production UI path. |
+
+### Phase 2 completion plan
+
+1. **Runtime validation sweep (blocking)**
+   - Run the manual checklist in a machine with `PySide6` + `QtPdf` installed.
+   - Validate initial render, wheel zoom, page navigation, jump-to-page, drag selection, and out-of-bounds error surfaces.
+   - Record pass/fail and concrete repro notes for any issue.
+
+2. **Performance evidence capture (blocking)**
+   - Gather first-render latency and at least 10 navigation samples from the Qt runtime.
+   - Generate evidence markdown with `python -m pdf_signer phase2-evidence ...`.
+   - Paste evidence into this review and mark FR-13 complete only when thresholds/samples are documented.
+
+3. **FR-15 usability hardening (likely small follow-up patch)**
+   - Verify keyboard affordances for primary viewer/signing actions.
+   - Review user-facing error text for clarity-first wording with optional technical detail.
+   - Apply focused fixes discovered during manual QA.
+
+4. **FR-16 runtime metrics (blocking for sign-off)**
+   - Measure startup latency, first-render latency, idle memory, and bundle size in the PyInstaller one-dir build context.
+   - Add measured values to release notes/Phase 2 evidence appendix.
+
+5. **Phase 2 exit review update (final gate)**
+   - Update this document’s overall status from “In progress” to “Complete” only after steps 1-4 are evidenced.
+   - Attach links/paths to QA checklist results and timing/metric artifacts.
+
+### Recommended execution order and ownership
+
+- **Day 1:** Runtime QA + timing capture (engineering + QA).
+- **Day 2:** Fixes from QA findings, rerun targeted checks (engineering).
+- **Day 3:** Packaging metrics capture + final review update (engineering lead).
+
+This sequence minimizes rework by validating runtime behavior first, then measuring finalized performance/bundle characteristics.
