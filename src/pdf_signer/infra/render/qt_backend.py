@@ -93,7 +93,7 @@ class QtPdfRenderBackend:
         )
         image = rendered.convertToFormat(self._bindings.qimage.Format_RGBA8888)  # type: ignore[union-attr]
 
-        raw = image.bits().tobytes(target_width * target_height * 4)
+        raw = bytes(image.bits())
         return RenderPageResult(width_px=target_width, height_px=target_height, rgba_bytes=raw)
 
     def _open_document(self, document_path: str) -> Any:
