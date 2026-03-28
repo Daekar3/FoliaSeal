@@ -125,3 +125,35 @@ Status after this patch: **🟡 Still in progress** (runtime Qt validation + mea
 2. **Step 2 (performance evidence capture / FR-13):** still pending collection of first-render + >=10 navigation samples from real Qt runtime.
 3. **Step 4 (FR-16 runtime metrics):** still pending startup latency, idle memory, and bundle size measurements in PyInstaller one-dir context.
 4. **Step 5 (exit gate):** status cannot move to complete until items 1-3 are evidenced and linked here.
+
+## Completion plan execution update (2026-03-28, follow-up)
+
+Status after this patch: **🟡 Still in progress** (Qt-host runtime execution remains required), with evidence tooling expanded to unblock collection.
+
+### Completed from the plan in this patch
+
+- **Step 2 (performance evidence capture): partially completed via tooling hardening.**
+  - Extended `phase2-evidence` reporting so one command can now emit FR-13 timing and FR-16 runtime-footprint evidence sections together.
+  - Added explicit evidence fields for startup latency, idle memory, and PyInstaller one-dir bundle size.
+  - Added FR-16 quick-check status bullets (recorded/missing) to reduce ambiguity during sign-off review.
+- **Step 4 (FR-16 runtime metrics): partially completed via capture workflow support.**
+  - Added a runtime footprint snapshot formatter in application layer (`startup_ms`, `idle_memory_mib`, `bundle_size_mib`) for consistent evidence markdown output.
+  - Added unit test coverage to lock output formatting and missing-metric warning semantics.
+
+### Recommended evidence command for Qt-enabled host
+
+```bash
+python -m pdf_signer phase2-evidence \
+  --first-render-ms <value> \
+  --navigation-ms <value> --navigation-ms <value> ... \
+  --startup-ms <value> \
+  --idle-memory-mib <value> \
+  --bundle-size-mib <value>
+```
+
+### Remaining blocking actions
+
+1. **Step 1 (runtime validation sweep):** still blocked on execution in a real Qt runtime (`PySide6` + `QtPdf`) with checklist pass/fail notes.
+2. **Step 2 (performance evidence capture / FR-13):** still pending real measured first-render + >=10 navigation samples from that Qt runtime.
+3. **Step 4 (FR-16 runtime metrics):** still pending measured startup/idle-memory/bundle-size values from PyInstaller one-dir build output.
+4. **Step 5 (exit gate):** cannot mark Phase 2 complete until measured evidence from items 1-3 is attached here.

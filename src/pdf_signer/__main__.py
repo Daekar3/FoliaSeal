@@ -10,6 +10,7 @@ from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
     build_phase2_timing_evidence,
 )
+from pdf_signer.application.runtime_metrics import RuntimeFootprintSnapshot
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -40,6 +41,24 @@ def _build_parser() -> argparse.ArgumentParser:
         default=10,
         help="Minimum sample threshold used for quick-check status.",
     )
+    evidence.add_argument(
+        "--startup-ms",
+        type=float,
+        default=None,
+        help="Application startup latency in milliseconds.",
+    )
+    evidence.add_argument(
+        "--idle-memory-mib",
+        type=float,
+        default=None,
+        help="Steady-state idle memory in MiB.",
+    )
+    evidence.add_argument(
+        "--bundle-size-mib",
+        type=float,
+        default=None,
+        help="PyInstaller one-dir bundle size in MiB.",
+    )
 
     return parser
 
@@ -56,6 +75,11 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         timing=tracker.snapshot(),
         environment=RuntimeEnvironmentSnapshot.collect(),
         minimum_navigation_samples=args.minimum_navigation_samples,
+        runtime_footprint=RuntimeFootprintSnapshot(
+            startup_ms=args.startup_ms,
+            idle_memory_mib=args.idle_memory_mib,
+            bundle_size_mib=args.bundle_size_mib,
+        ),
     )
     print(report)
 
