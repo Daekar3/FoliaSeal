@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from pdf_signer.application.performance_timing import ViewerPerformanceTracker
 from pdf_signer.application.phase2_evidence import (
     RuntimeEnvironmentSnapshot,
+    RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
 )
 from pdf_signer.application.runtime_metrics import (
@@ -93,6 +94,25 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a PyInstaller one-dir output folder for auto bundle-size measurement.",
     )
+    evidence.add_argument(
+        "--qa-passed-checks",
+        type=int,
+        default=None,
+        help="Manual QA checklist pass count for runtime validation summary.",
+    )
+    evidence.add_argument(
+        "--qa-total-checks",
+        type=int,
+        default=None,
+        help="Manual QA checklist total check count for runtime validation summary.",
+    )
+    evidence.add_argument(
+        "--qa-issue",
+        dest="qa_issues",
+        action="append",
+        default=[],
+        help="Runtime QA issue/repro note. Repeat for multiple issues.",
+    )
 
     return parser
 
@@ -136,11 +156,24 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
             ),
         )
 
+    runtime_validation = None
+    if args.qa_passed_checks is not None or args.qa_total_checks is not None:
+        if args.qa_passed_checks is None or args.qa_total_checks is None:
+            raise ValueError(
+                "--qa-passed-checks and --qa-total-checks must be provided together."
+            )
+        runtime_validation = RuntimeValidationSnapshot(
+            passed_checks=args.qa_passed_checks,
+            total_checks=args.qa_total_checks,
+            issues=tuple(args.qa_issues),
+        )
+
     report = build_phase2_timing_evidence(
         timing=tracker.snapshot(),
         environment=RuntimeEnvironmentSnapshot.collect(),
         minimum_navigation_samples=args.minimum_navigation_samples,
         runtime_footprint=runtime_footprint,
+        runtime_validation=runtime_validation,
     )
     print(report)
 
