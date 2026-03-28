@@ -1,6 +1,6 @@
 import pytest
 
-from pdf_signer.infra.config.schemas import (
+from foliaseal.infra.config.schemas import (
     ConfigValidationError,
     SignaturePreset,
     TimestampPolicy,

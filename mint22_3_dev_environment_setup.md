@@ -158,7 +158,7 @@ In project root, create this structure:
 ```text
 foliaseal/
   .venv/
-  src/pdf_signer/
+  src/foliaseal/
     __init__.py
     __main__.py
   tests/
@@ -167,9 +167,9 @@ foliaseal/
 Commands:
 
 ```bash
-mkdir -p src/pdf_signer tests
-touch src/pdf_signer/__init__.py
-cat > src/pdf_signer/__main__.py <<'PY'
+mkdir -p src/foliaseal tests
+touch src/foliaseal/__init__.py
+cat > src/foliaseal/__main__.py <<'PY'
 print("FoliaSeal dev environment is working")
 PY
 ```
@@ -177,7 +177,7 @@ PY
 Run it:
 
 ```bash
-PYTHONPATH=src python -m pdf_signer
+PYTHONPATH=src python -m foliaseal
 ```
 
 (If module path errors occur, use the next section's editable install setup.)
@@ -214,7 +214,7 @@ pip install -e .[dev]
 Now run:
 
 ```bash
-python -m pdf_signer
+python -m foliaseal
 ```
 
 (Replace your `__main__.py` content with package-based code as needed.)
@@ -253,7 +253,7 @@ build/
 From project root:
 
 ```bash
-pyinstaller --onedir --name foliaseal src/pdf_signer/__main__.py
+pyinstaller --onedir --name foliaseal src/foliaseal/__main__.py
 ```
 
 Expected output folder:

@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
 
-from pdf_signer.application.performance_timing import ViewerTimingSnapshot
-from pdf_signer.application.runtime_metrics import (
+from foliaseal.application.performance_timing import ViewerTimingSnapshot
+from foliaseal.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
     build_runtime_footprint_quick_check,
 )

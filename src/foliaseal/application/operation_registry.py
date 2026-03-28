@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pdf_signer.domain.models import DocumentOperation, DocumentOperationType
+from foliaseal.domain.models import DocumentOperation, DocumentOperationType
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pdf_signer import __main__
+from foliaseal import __main__
 
 
 def test_main_without_subcommand_prints_default_message(capsys: pytest.CaptureFixture[str]) -> None:
@@ -73,7 +73,7 @@ def test_main_phase2_evidence_measures_startup_command_when_requested(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(
-        "pdf_signer.__main__.measure_startup_latency_ms",
+        "foliaseal.__main__.measure_startup_latency_ms",
         lambda command, timeout_seconds, ready_after_seconds: 432.1,
     )
 
@@ -98,7 +98,7 @@ def test_main_phase2_evidence_prefers_explicit_startup_ms_over_measured_command(
     def fail_if_called(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise AssertionError("measure_startup_latency_ms should not be called")
 
-    monkeypatch.setattr("pdf_signer.__main__.measure_startup_latency_ms", fail_if_called)
+    monkeypatch.setattr("foliaseal.__main__.measure_startup_latency_ms", fail_if_called)
 
     __main__.main(
         [
@@ -220,7 +220,7 @@ def test_main_phase2_evidence_appends_qt_runtime_diagnostics_when_requested(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(
-        "pdf_signer.__main__.QtRuntimeReadinessSnapshot.collect",
+        "foliaseal.__main__.QtRuntimeReadinessSnapshot.collect",
         lambda: __main__.QtRuntimeReadinessSnapshot(
             pyside6_available=True,
             qtpdf_available=False,

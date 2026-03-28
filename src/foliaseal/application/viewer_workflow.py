@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pdf_signer.application.coordinate_transform import (
+from foliaseal.application.coordinate_transform import (
     PageBox,
     PdfRect,
     ViewRect,
@@ -12,9 +12,9 @@ from pdf_signer.application.coordinate_transform import (
     validate_pdf_rect_within_page,
     view_rect_to_pdf_rect,
 )
-from pdf_signer.application.performance_timing import ViewerPerformanceTracker
-from pdf_signer.application.viewer_session import ViewerSession
-from pdf_signer.infra.render import PdfRenderBackend, RenderPageRequest, RenderPageResult
+from foliaseal.application.performance_timing import ViewerPerformanceTracker
+from foliaseal.application.viewer_session import ViewerSession
+from foliaseal.infra.render import PdfRenderBackend, RenderPageRequest, RenderPageResult
 
 
 @dataclass(frozen=True)

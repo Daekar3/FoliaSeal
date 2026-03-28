@@ -3,14 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from pdf_signer.application.sign_pdf_use_case import SignPdfUseCase
-from pdf_signer.domain.errors import (
+from foliaseal.application.sign_pdf_use_case import SignPdfUseCase
+from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
     FailureCode,
     TsaUnavailableError,
 )
-from pdf_signer.domain.models import SigningOutput, SigningRequest, VerificationSummary
+from foliaseal.domain.models import SigningOutput, SigningRequest, VerificationSummary
 
 
 @dataclass

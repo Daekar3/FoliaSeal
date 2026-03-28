@@ -1,6 +1,6 @@
 import pytest
 
-from pdf_signer.application.performance_timing import ViewerPerformanceTracker
+from foliaseal.application.performance_timing import ViewerPerformanceTracker
 
 
 def test_tracker_records_first_render_once_and_navigation_average() -> None:

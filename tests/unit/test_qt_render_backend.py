@@ -1,7 +1,7 @@
 import pytest
 
-from pdf_signer.infra.render import QtPdfRenderBackend, RenderPageRequest
-from pdf_signer.infra.render.qt_backend import (
+from foliaseal.infra.render import QtPdfRenderBackend, RenderPageRequest
+from foliaseal.infra.render.qt_backend import (
     _load_pdf_page_metadata,
     _QtBindings,
 )
@@ -56,11 +56,11 @@ def test_qt_backend_geometry_uses_qpdfdocument_page_apis(monkeypatch) -> None:
     )
     monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._document_signature",
+        "foliaseal.infra.render.qt_backend._document_signature",
         lambda path: (123, 456),
     )
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        "foliaseal.infra.render.qt_backend._load_pdf_page_metadata",
         lambda **_: type(
             "_Metadata",
             (),
@@ -97,7 +97,7 @@ def test_qt_backend_geometry_caches_metadata_for_repeated_requests(monkeypatch) 
     backend._metadata_cache = {}
     monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._document_signature",
+        "foliaseal.infra.render.qt_backend._document_signature",
         lambda path: (123, 456),
     )
 
@@ -114,7 +114,7 @@ def test_qt_backend_geometry_caches_metadata_for_repeated_requests(monkeypatch) 
         )()
 
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        "foliaseal.infra.render.qt_backend._load_pdf_page_metadata",
         fake_load_pdf_page_metadata,
     )
 
@@ -146,11 +146,11 @@ def test_qt_backend_geometry_invalidates_metadata_cache_when_file_signature_chan
     backend._metadata_cache = {}
     monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._document_signature",
+        "foliaseal.infra.render.qt_backend._document_signature",
         lambda path: next(signatures),
     )
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        "foliaseal.infra.render.qt_backend._load_pdf_page_metadata",
         lambda **_: type(
             "_Metadata",
             (),
@@ -195,11 +195,11 @@ def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
     backend._metadata_cache = {}
     monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._document_signature",
+        "foliaseal.infra.render.qt_backend._document_signature",
         lambda path: (123, 456),
     )
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        "foliaseal.infra.render.qt_backend._load_pdf_page_metadata",
         lambda **_: (_ for _ in ()).throw(ValueError("object stream unsupported")),
     )
 
@@ -236,7 +236,7 @@ def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
     backend._metadata_cache = {}
     monkeypatch.setattr(backend, "_open_document", lambda _: _Document())
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._document_signature",
+        "foliaseal.infra.render.qt_backend._document_signature",
         lambda path: (123, 456),
     )
 
@@ -247,7 +247,7 @@ def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
         raise ValueError("compressed xref stream unsupported")
 
     monkeypatch.setattr(
-        "pdf_signer.infra.render.qt_backend._load_pdf_page_metadata",
+        "foliaseal.infra.render.qt_backend._load_pdf_page_metadata",
         fail_parser,
     )
 

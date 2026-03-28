@@ -1,4 +1,4 @@
-from pdf_signer.infra.render import RenderCacheKey, RenderCachePolicy, RenderPageResult
+from foliaseal.infra.render import RenderCacheKey, RenderCachePolicy, RenderPageResult
 
 
 def _sample_result(seed: int) -> RenderPageResult:

@@ -1,6 +1,6 @@
 import pytest
 
-from pdf_signer.infra.render import NullPdfRenderBackend, RenderPageRequest
+from foliaseal.infra.render import NullPdfRenderBackend, RenderPageRequest
 
 
 def test_null_render_backend_reports_unavailable_diagnostic() -> None:

@@ -28,7 +28,7 @@ Foundations for a Linux desktop PDF signing app.
   - `ViewerSession` helper for page navigation and zoom/fit interactions
   - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
   - Phase 2 evidence formatter utilities to capture timing snapshots alongside runtime environment details
-  - CLI helper (`python -m pdf_signer phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets, including optional auto-capture of startup launch-readiness from a probe command or long-running GUI executable, plus idle memory and bundle-size metrics for FR-16 evidence
+  - CLI helper (`python -m foliaseal phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets, including optional auto-capture of startup launch-readiness from a probe command or long-running GUI executable, plus idle memory and bundle-size metrics for FR-16 evidence
   - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for Qt widget integration
   - Qt preview widget adapter (`presentation.qt`) with wheel zoom, scrollbar-backed pan syncing, and drag-selection wiring to viewer workflow
 - unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, Qt widget dependency diagnostics, and deterministic Qt backend availability coverage
@@ -41,7 +41,7 @@ source .venv/bin/activate
 python -m pip install -e .[dev]
 ruff check .
 python -m pytest -q
-python -m pdf_signer
+python -m foliaseal
 ```
 
 ## PyInstaller build
@@ -61,7 +61,7 @@ This produces:
 You can then generate a fuller Phase 2 evidence block against the packaged app:
 
 ```bash
-python3 -m pdf_signer phase2-evidence \
+python3 -m foliaseal phase2-evidence \
   --first-render-ms 47.54 \
   --navigation-ms 49.35 \
   --navigation-ms 45.06 \

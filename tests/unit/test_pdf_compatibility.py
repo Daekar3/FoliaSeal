@@ -1,6 +1,6 @@
 import pytest
 
-from pdf_signer.application.pdf_compatibility import PdfCompatibilityError, PdfCompatibilityProfile
+from foliaseal.application.pdf_compatibility import PdfCompatibilityError, PdfCompatibilityProfile
 
 
 def test_accepts_versions_in_supported_open_range() -> None:

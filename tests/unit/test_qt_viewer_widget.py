@@ -2,10 +2,10 @@ import importlib
 
 import pytest
 
-from pdf_signer.application.viewer_session import ViewerSession
-from pdf_signer.application.viewer_workflow import ViewerWorkflow
-from pdf_signer.presentation.qt import PdfViewerWidgetAdapter, QtViewerBindingsUnavailable
-from pdf_signer.presentation.qt.viewer_widget import (
+from foliaseal.application.viewer_session import ViewerSession
+from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.presentation.qt import PdfViewerWidgetAdapter, QtViewerBindingsUnavailable
+from foliaseal.presentation.qt.viewer_widget import (
     QtWidgetBindings,
 )
 
@@ -424,7 +424,7 @@ def test_build_qt_pdf_viewer_widget_wraps_preview_in_scroll_area(monkeypatch):
                 },
             )()
 
-    from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     widget = build_qt_pdf_viewer_widget(workflow=_WorkflowWithRender())
     widget.refresh()
@@ -456,7 +456,7 @@ def test_middle_drag_pans_scrollbars(monkeypatch):
         def set_pan(self, *, pan_x, pan_y):
             self.pan_updates.append((pan_x, pan_y))
 
-    from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     workflow = _WorkflowWithRender()
     widget = build_qt_pdf_viewer_widget(workflow=workflow)
@@ -493,7 +493,7 @@ def test_middle_drag_does_not_emit_selection(monkeypatch):
         def selection_to_pdf_rect(self, *, selection):
             return selection
 
-    from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     selected = []
     widget = build_qt_pdf_viewer_widget(
@@ -530,7 +530,7 @@ def test_shift_left_drag_pans_scrollbars(monkeypatch):
         def set_pan(self, *, pan_x, pan_y):
             self.pan_updates.append((pan_x, pan_y))
 
-    from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     workflow = _WorkflowWithRender()
     widget = build_qt_pdf_viewer_widget(workflow=workflow)
@@ -587,7 +587,7 @@ def test_plain_left_drag_emits_selection_with_viewport_relative_coords(monkeypat
         def selection_to_pdf_rect(self, *, selection):
             return selection
 
-    from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     selected = []
     workflow = _WorkflowWithSelection()
@@ -626,7 +626,7 @@ def test_hide_event_releases_active_middle_drag(monkeypatch):
                 },
             )()
 
-    from pdf_signer.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
     widget = build_qt_pdf_viewer_widget(workflow=_WorkflowWithRender())
     preview = widget.widget

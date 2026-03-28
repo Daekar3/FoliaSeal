@@ -1,9 +1,9 @@
 import pytest
 
-from pdf_signer.application.coordinate_transform import ViewRect
-from pdf_signer.application.viewer_session import ViewerSession
-from pdf_signer.application.viewer_workflow import ViewerWorkflow
-from pdf_signer.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
+from foliaseal.application.coordinate_transform import ViewRect
+from foliaseal.application.viewer_session import ViewerSession
+from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 
 
 class _FakeRenderBackend:
