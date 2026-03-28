@@ -13,6 +13,7 @@ from pdf_signer.application.phase2_evidence import (
 from pdf_signer.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
     collect_runtime_footprint_snapshot,
+    measure_startup_latency_ms,
 )
 
 
@@ -49,6 +50,22 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Application startup latency in milliseconds.",
+    )
+    evidence.add_argument(
+        "--measure-startup-command",
+        nargs="+",
+        default=None,
+        help=(
+            "Command to execute for startup-latency measurement (for example, "
+            "a PyInstaller one-dir executable path). Measured value is used only "
+            "when --startup-ms is not supplied."
+        ),
+    )
+    evidence.add_argument(
+        "--startup-timeout-seconds",
+        type=float,
+        default=30.0,
+        help="Timeout used with --measure-startup-command.",
     )
     evidence.add_argument(
         "--idle-memory-mib",
@@ -88,18 +105,25 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
     for sample in args.navigation_ms:
         tracker.record_navigation(sample)
 
+    startup_ms = args.startup_ms
+    if startup_ms is None and args.measure_startup_command is not None:
+        startup_ms = measure_startup_latency_ms(
+            command=args.measure_startup_command,
+            timeout_seconds=args.startup_timeout_seconds,
+        )
+
     runtime_footprint = RuntimeFootprintSnapshot(
-        startup_ms=args.startup_ms,
+        startup_ms=startup_ms,
         idle_memory_mib=args.idle_memory_mib,
         bundle_size_mib=args.bundle_size_mib,
     )
     if args.collect_runtime_footprint:
         auto_snapshot = collect_runtime_footprint_snapshot(
-            startup_ms=args.startup_ms,
+            startup_ms=startup_ms,
             bundle_dir=args.bundle_dir,
         )
         runtime_footprint = RuntimeFootprintSnapshot(
-            startup_ms=args.startup_ms,
+            startup_ms=startup_ms,
             idle_memory_mib=(
                 args.idle_memory_mib
                 if args.idle_memory_mib is not None

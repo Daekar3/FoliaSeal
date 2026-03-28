@@ -10,6 +10,7 @@ from pdf_signer.application.runtime_metrics import (
     collect_idle_memory_mib,
     collect_runtime_footprint_snapshot,
     measure_bundle_size_mib,
+    measure_startup_latency_ms,
 )
 
 
@@ -127,3 +128,36 @@ def test_collect_runtime_footprint_snapshot_reads_bundle_size(tmp_path: Path) ->
     assert snapshot.startup_ms == 300.0
     assert snapshot.bundle_size_mib == pytest.approx(2.0, abs=0.01)
     assert snapshot.idle_memory_mib is None or snapshot.idle_memory_mib >= 0.0
+
+
+def test_measure_startup_latency_ms_returns_elapsed_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run(*args, **kwargs):  # type: ignore[no-untyped-def]
+        calls["command"] = args[0]
+        calls["timeout"] = kwargs["timeout"]
+
+    samples = iter([100.0, 100.25])
+    monkeypatch.setattr("pdf_signer.application.runtime_metrics.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pdf_signer.application.runtime_metrics.time.perf_counter",
+        lambda: next(samples),
+    )
+
+    measured = measure_startup_latency_ms(
+        command=["/tmp/pdf-signer", "--help"],
+        timeout_seconds=15.0,
+    )
+
+    assert measured == pytest.approx(250.0, abs=0.001)
+    assert calls["command"] == ["/tmp/pdf-signer", "--help"]
+    assert calls["timeout"] == 15.0
+
+
+def test_measure_startup_latency_ms_rejects_invalid_arguments() -> None:
+    with pytest.raises(ValueError, match="at least one argument"):
+        measure_startup_latency_ms(command=[])
+    with pytest.raises(ValueError, match="greater than zero"):
+        measure_startup_latency_ms(command=["python3"], timeout_seconds=0.0)
