@@ -29,6 +29,7 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
@@ -89,6 +90,7 @@ class ProfileControls:
     profile_combo: Any
     profile_name: Any
     save_button: Any
+    delete_button: Any
 
 
 class SigningRequestExecutor(Protocol):
@@ -447,18 +449,27 @@ class SignaturePropertiesPanel:
         bindings: QtSigningWidgetBindings,
         workflow: SigningDraftWorkflow,
         preset_catalog: SignaturePresetCatalog | None = None,
+        preset_catalog_store: SignaturePresetCatalogStore | None = None,
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ) -> None:
         self._bindings = bindings
         self._workflow = workflow
-        self._profile_catalog = preset_catalog or SignaturePresetCatalog(
-            schema_version=1,
-            profiles=(),
-        )
+        self._profile_catalog_store = preset_catalog_store
+        if preset_catalog is not None:
+            self._profile_catalog = preset_catalog
+        elif preset_catalog_store is not None:
+            self._profile_catalog = preset_catalog_store.load_catalog()
+        else:
+            self._profile_catalog = SignaturePresetCatalog(
+                schema_version=1,
+                profiles=(),
+            )
         self._selected_profile_name: str | None = None
         self._on_change = on_change
         self._on_page_change = on_page_change
+        self._on_error = on_error
         self._suspend_updates = False
         self._placement_initialized = workflow.signature_rect is not None
         self._control_issue: SigningDraftValidationIssue | None = None
@@ -682,13 +693,13 @@ class SignaturePropertiesPanel:
     def save_current_profile(self) -> SignaturePreset | None:
         name = _text(self._profile_controls.profile_name).strip()
         if not name:
-            self._emit_error("Profile name is required before saving.")
+            self._show_profile_error("Profile name is required before saving.")
             return None
 
         try:
             preset = self._workflow.capture_signature_preset(name)
         except ValueError as exc:
-            self._emit_error(str(exc))
+            self._show_profile_error(str(exc))
             return None
         try:
             existing = self._profile_catalog.profile_named(name)
@@ -710,6 +721,8 @@ class SignaturePropertiesPanel:
                 return None
 
         self._profile_catalog = self._profile_catalog.upsert_profile(preset)
+        if self._profile_catalog_store is not None:
+            self._profile_catalog_store.save_profile(preset)
         self._selected_profile_name = preset.name
         self._suspend_updates = True
         try:
@@ -719,6 +732,44 @@ class SignaturePropertiesPanel:
         self.load_from_workflow()
         self._notify_change()
         return preset
+
+    def delete_current_profile(self) -> SignaturePresetCatalog | None:
+        selected_name = _combo_text(self._profile_controls.profile_combo)
+        if selected_name == PROFILE_PLACEHOLDER or not selected_name.strip():
+            self._show_profile_error("Select a saved profile before deleting it.")
+            return None
+
+        try:
+            self._profile_catalog.profile_named(selected_name)
+        except KeyError:
+            self._show_profile_error(f"Profile '{selected_name}' is not available.")
+            return None
+
+        message_box = self._bindings.q_message_box
+        yes_value = getattr(message_box, "Yes", None)
+        if yes_value is None:
+            standard_button = getattr(message_box, "StandardButton", None)
+            yes_value = getattr(standard_button, "Yes", None)
+        result = message_box.question(
+            self.widget,
+            "Delete profile?",
+            f"Delete profile '{selected_name}'?",
+        )
+        if result != yes_value:
+            return None
+
+        updated_catalog = self._profile_catalog.remove_profile(selected_name)
+        self._profile_catalog = updated_catalog
+        if self._profile_catalog_store is not None:
+            self._profile_catalog_store.delete_profile(selected_name)
+        self._selected_profile_name = None
+        self._suspend_updates = True
+        try:
+            self._reload_profile_controls(selected_name=None)
+        finally:
+            self._suspend_updates = False
+        self._notify_change()
+        return updated_catalog
 
     def _build_placement_controls(self) -> PlacementControls:
         bindings = self._bindings
@@ -772,10 +823,11 @@ class SignaturePropertiesPanel:
         profile_name = bindings.q_line_edit()
         profile_name.setPlaceholderText("Enter a profile name")
         save_button = bindings.q_push_button("Save profile")
+        delete_button = bindings.q_push_button("Delete profile")
 
         layout.addRow("Saved profile", profile_combo)
         layout.addRow("Profile name", profile_name)
-        layout.addRow("", save_button)
+        layout.addRow("", _compose_row(bindings, save_button, delete_button))
 
         profile_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
             lambda _text: self._on_profile_selected()
@@ -786,12 +838,14 @@ class SignaturePropertiesPanel:
                 lambda _index: self._on_profile_selected()
             )
         save_button.clicked.connect(self.save_current_profile)  # type: ignore[attr-defined]
+        delete_button.clicked.connect(self.delete_current_profile)  # type: ignore[attr-defined]
 
         return ProfileControls(
             container=container,
             profile_combo=profile_combo,
             profile_name=profile_name,
             save_button=save_button,
+            delete_button=delete_button,
         )
 
     def _build_appearance_controls(self) -> Any:
@@ -1304,6 +1358,17 @@ class SignaturePropertiesPanel:
         if self._on_change is not None:
             self._on_change()
 
+    def _emit_error(self, message: str) -> None:
+        if self._on_error is not None:
+            self._on_error(message)
+
+    def _show_profile_error(self, message: str) -> None:
+        warning = getattr(self._bindings.q_message_box, "warning", None)
+        if callable(warning):
+            warning(self.widget, "Profile error", message)
+            return
+        self._emit_error(message)
+
     def _heading(self, text: str) -> Any:
         label = self._bindings.q_label(text)
         if hasattr(label, "setStyleSheet"):
@@ -1361,6 +1426,7 @@ class SigningWorkspaceWidget:
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
         preset_catalog: SignaturePresetCatalog | None = None,
+        preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
@@ -1393,8 +1459,10 @@ class SigningWorkspaceWidget:
             bindings=bindings,
             workflow=signing_workflow,
             preset_catalog=preset_catalog,
+            preset_catalog_store=preset_catalog_store,
             on_change=self._handle_panel_change,
             on_page_change=self._handle_page_change,
+            on_error=self._emit_error,
         )
         self._properties_scroll = bindings.q_scroll_area()
         scroll_setter = getattr(self._properties_scroll, "setWidgetResizable", None)
@@ -1561,6 +1629,7 @@ class SigningWorkspaceWidget:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
 
     def _emit_error(self, message: str) -> None:
+        self._set_sign_result_text(message, success=False)
         if self._on_error is not None:
             self._on_error(message)
             return
@@ -1590,6 +1659,7 @@ class SigningShellAdapter:
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
         preset_catalog: SignaturePresetCatalog | None = None,
+        preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
@@ -1600,6 +1670,7 @@ class SigningShellAdapter:
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
             preset_catalog=preset_catalog,
+            preset_catalog_store=preset_catalog_store,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
             on_error=on_error,
@@ -1642,6 +1713,7 @@ def build_qt_signing_shell(
     viewer_workflow: ViewerWorkflow,
     signing_workflow: SigningDraftWorkflow,
     preset_catalog: SignaturePresetCatalog | None = None,
+    preset_catalog_store: SignaturePresetCatalogStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
@@ -1654,6 +1726,7 @@ def build_qt_signing_shell(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
         preset_catalog=preset_catalog,
+        preset_catalog_store=preset_catalog_store,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         on_error=on_error,

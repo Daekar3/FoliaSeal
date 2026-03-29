@@ -447,3 +447,14 @@ class SignaturePresetCatalog:
             schema_version=self.schema_version,
             profiles=tuple(updated),
         )
+
+    def remove_profile(self, name: str) -> SignaturePresetCatalog:
+        """Return a new catalog without the named profile."""
+        normalized_name = _require_non_empty_str_value(name, "name")
+        updated = [profile for profile in self.profiles if profile.name != normalized_name]
+        if len(updated) == len(self.profiles):
+            raise KeyError(normalized_name)
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            profiles=tuple(updated),
+        )
