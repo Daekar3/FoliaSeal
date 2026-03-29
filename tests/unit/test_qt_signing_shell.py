@@ -127,6 +127,11 @@ class _FakeComboBox(_FakeWidget):
         if not self._current and self._items:
             self._current = self._items[0]
 
+    def addItem(self, item):  # noqa: N802
+        self._items.append(item)
+        if not self._current:
+            self._current = item
+
     def setCurrentText(self, text):  # noqa: N802
         self._current = text
         self.currentTextChanged.emit(text)
@@ -143,6 +148,12 @@ class _FakeComboBox(_FakeWidget):
     def setCurrentIndex(self, index):  # noqa: N802
         self._current = self._items[index]
         self.currentTextChanged.emit(self._current)
+
+    def count(self):  # noqa: N802
+        return len(self._items)
+
+    def itemText(self, index):  # noqa: N802
+        return self._items[index]
 
 
 class _FakeSpinBox(_FakeWidget):
@@ -325,7 +336,9 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget.properties_panel.validation_text() == "Ready to sign."
     assert widget._signing_workspace._sign_button._enabled is True
     assert "1. Edit appearance" in widget._signing_workspace._flow_steps_label.text()
-    assert "Current stage: Confirm and sign." in widget._signing_workspace._flow_stage_label.text()
+    assert "Current stage: Review preview and confirm sign." in (
+        widget._signing_workspace._flow_stage_label.text()
+    )
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
 
@@ -354,7 +367,9 @@ def test_signing_shell_surfaces_a_stage_guide(monkeypatch, tmp_path: Path) -> No
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
 
-    assert "Current stage: Confirm and sign." in widget._signing_workspace._flow_stage_label.text()
+    assert "Current stage: Review preview and confirm sign." in (
+        widget._signing_workspace._flow_stage_label.text()
+    )
 
 
 def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Path) -> None:
@@ -461,13 +476,17 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert "Layout:" in appearance_summary
     assert "Visible fields:" in appearance_summary
     assert "Image stamp: /tmp/stamp.png" in appearance_summary
+    assert preview_controls.stamp_label.text() == "Stamp: stamp.png"
     assert preview_controls.title_label.text() == "Digitally signed by"
+    assert preview_controls.detail_label.text() != ""
     assert "Placement: page 1" in preview_controls.placement_label.text()
     assert "Appearance: Digitally signed by" in preview_controls.appearance_label.text()
     assert "Visible fields:" in preview_controls.field_label.text()
     assert "Text style:" in preview_controls.style_label.text()
     assert "Datetime format: %d/%m/%Y %H:%M" in preview_controls.metadata_label.text()
     assert "Image stamp: /tmp/stamp.png" in preview_controls.metadata_label.text()
+    assert "Datetime format: %d/%m/%Y %H:%M" in preview_controls.footer_label.text()
+    assert "Text style:" in preview_controls.footer_label.text()
     assert (
         widget._signing_workspace.properties_panel._appearance_controls.font_family._items[:3]
         == ["Sans Serif", "Serif", "Monospace"]
@@ -478,6 +497,48 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     )
     assert preview_controls.status_label.text() == "Ready to sign"
     assert preview_text.count("Visible signature preview") == 1
+    assert "Stamp: stamp.png" in preview_text
+
+
+def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        datetime_format="custom-format",
+        text_style=signing_shell_module.SignatureTextStyle(
+            font_family="Custom Font",
+            font_size_pt=9.5,
+            bold=True,
+            italic=False,
+            text_color_hex="#123456",
+        ),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.load_from_workflow()
+    widget.properties_panel.load_from_workflow()
+
+    datetime_combo = widget.properties_panel._appearance_controls.datetime_format
+    font_combo = widget.properties_panel._appearance_controls.font_family
+
+    assert datetime_combo._items.count("custom-format") == 1
+    assert font_combo._items.count("Custom Font") == 1
 
 
 def test_signing_shell_warning_only_issue_keeps_readiness_enabled(

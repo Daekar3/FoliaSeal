@@ -106,7 +106,10 @@ class PreviewControls:
 
     container: Any
     card_container: Any
+    stamp_label: Any
     title_label: Any
+    detail_label: Any
+    footer_label: Any
     placement_label: Any
     appearance_label: Any
     field_label: Any
@@ -156,11 +159,12 @@ def _set_combo_text(combo: Any, value: str, *, allow_custom: bool = False) -> No
         setter(value)
         return
     if allow_custom:
-        adder = getattr(combo, "addItem", None)
-        if callable(adder):
-            adder(value)
-        elif hasattr(combo, "addItems"):
-            combo.addItems((value,))
+        if value not in _combo_items(combo):
+            adder = getattr(combo, "addItem", None)
+            if callable(adder):
+                adder(value)
+            elif hasattr(combo, "addItems"):
+                combo.addItems((value,))
         if callable(setter):
             setter(value)
         return
@@ -173,6 +177,17 @@ def _combo_text(combo: Any) -> str:
     if callable(getter):
         return str(getter())
     return ""
+
+
+def _combo_items(combo: Any) -> tuple[str, ...]:
+    count_getter = getattr(combo, "count", None)
+    item_text_getter = getattr(combo, "itemText", None)
+    if callable(count_getter) and callable(item_text_getter):
+        return tuple(str(item_text_getter(index)) for index in range(int(count_getter())))
+    items = getattr(combo, "_items", None)
+    if items is not None:
+        return tuple(str(item) for item in items)
+    return ()
 
 
 def _set_checked(check_box: Any, value: bool) -> None:
@@ -341,7 +356,10 @@ class SignaturePropertiesPanel:
         return "\n".join(
             [
                 "Visible signature preview",
+                _text(self._preview_controls.stamp_label),
                 _text(self._preview_controls.title_label),
+                _text(self._preview_controls.detail_label),
+                _text(self._preview_controls.footer_label),
                 _text(self._preview_controls.placement_label),
                 _text(self._preview_controls.appearance_label),
                 _text(self._preview_controls.field_label),
@@ -412,7 +430,24 @@ class SignaturePropertiesPanel:
         layout.setContentsMargins(10, 14, 10, 10)
         layout.setSpacing(4)
 
+        card_container = bindings.q_group_box("")
+        if hasattr(card_container, "setStyleSheet"):
+            card_container.setStyleSheet(
+                "QGroupBox {"
+                " border: 1px solid #d8d8d8;"
+                " border-radius: 6px;"
+                " padding: 10px;"
+                " background: #ffffff;"
+                "}"
+            )
+        card_layout = bindings.q_hbox_layout(card_container)
+        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setSpacing(10)
+
+        stamp_label = bindings.q_label("")
         title_label = bindings.q_label("")
+        detail_label = bindings.q_label("")
+        footer_label = bindings.q_label("")
         placement_label = bindings.q_label("")
         appearance_label = bindings.q_label("")
         field_label = bindings.q_label("")
@@ -421,8 +456,12 @@ class SignaturePropertiesPanel:
         issue_label = bindings.q_label("")
         status_label = bindings.q_label("")
 
+        if hasattr(stamp_label, "setWordWrap"):
+            stamp_label.setWordWrap(True)
         for label in (
             title_label,
+            detail_label,
+            footer_label,
             placement_label,
             appearance_label,
             field_label,
@@ -434,13 +473,30 @@ class SignaturePropertiesPanel:
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
 
+        if hasattr(stamp_label, "setStyleSheet"):
+            stamp_label.setStyleSheet(
+                "font-weight: 600; border: 1px dashed #c0c0c0; padding: 8px; min-width: 92px;"
+            )
         if hasattr(title_label, "setStyleSheet"):
             title_label.setStyleSheet("font-weight: 700; font-size: 12pt;")
+        if hasattr(detail_label, "setStyleSheet"):
+            detail_label.setStyleSheet("font-size: 10pt;")
+        if hasattr(footer_label, "setStyleSheet"):
+            footer_label.setStyleSheet("color: #555555;")
         if hasattr(status_label, "setStyleSheet"):
             status_label.setStyleSheet("font-style: italic;")
 
+        details_container = bindings.q_widget()
+        details_layout = bindings.q_vbox_layout(details_container)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        details_layout.setSpacing(4)
+        for label in (title_label, detail_label, footer_label):
+            details_layout.addWidget(label)
+
+        card_layout.addWidget(stamp_label)
+        card_layout.addWidget(details_container, 1)
+        layout.addWidget(card_container)
         for label in (
-            title_label,
             placement_label,
             appearance_label,
             field_label,
@@ -453,8 +509,11 @@ class SignaturePropertiesPanel:
 
         return PreviewControls(
             container=container,
-            card_container=container,
+            card_container=card_container,
+            stamp_label=stamp_label,
             title_label=title_label,
+            detail_label=detail_label,
+            footer_label=footer_label,
             placement_label=placement_label,
             appearance_label=appearance_label,
             field_label=field_label,
@@ -880,8 +939,22 @@ class SignaturePropertiesPanel:
             (line.text for line in snapshot.lines if line.kind.value == "status"),
             "",
         )
+        stamp_line = "Stamp: none"
+        if preview.image_stamp_path:
+            stamp_path = preview.image_stamp_path
+            stamp_line = f"Stamp: {stamp_path.rsplit('/', 1)[-1]}"
+        detail_lines = field_lines or ["No visible fields selected"]
+        footer_parts = []
+        if metadata_lines:
+            footer_parts.append(" | ".join(metadata_lines))
+        if style_lines:
+            footer_parts.append(" | ".join(style_lines))
+        footer_line = "\n".join(footer_parts) if footer_parts else "Style metadata unavailable"
 
+        self._preview_controls.stamp_label.setText(stamp_line)
         self._preview_controls.title_label.setText(title_line)
+        self._preview_controls.detail_label.setText("\n".join(detail_lines))
+        self._preview_controls.footer_label.setText(footer_line)
         self._preview_controls.placement_label.setText(placement_line)
         self._preview_controls.appearance_label.setText(appearance_line)
         self._preview_controls.field_label.setText(
@@ -1176,7 +1249,7 @@ class SigningWorkspaceWidget:
         if self._draft_workflow.signature_rect is None:
             return "Current stage: Edit appearance and place signature."
         if preview.can_submit:
-            return "Current stage: Confirm and sign."
+            return "Current stage: Review preview and confirm sign."
         return "Current stage: Review preview and refine placement."
 
     def _emit_error(self, message: str) -> None:
