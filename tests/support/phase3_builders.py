@@ -18,7 +18,7 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
     SigningRequest,
 )
-from foliaseal.infra.config.schemas import SignaturePreset
+from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
 
 
 def build_signature_rect(
@@ -157,6 +157,28 @@ def build_signature_preset(
             width_pt=220.0,
             height_pt=80.0,
             anchor=SignatureAnchor.BOTTOM_RIGHT,
+        ),
+    )
+
+
+def build_signature_preset_catalog(
+    *,
+    schema_version: int = 1,
+    profiles: tuple[SignaturePreset, ...] | None = None,
+) -> SignaturePresetCatalog:
+    """Build a representative named profile catalog."""
+    return SignaturePresetCatalog(
+        schema_version=schema_version,
+        profiles=profiles
+        or (
+            build_signature_preset(name="Default"),
+            build_signature_preset(
+                name="Compact",
+                appearance=build_signature_appearance(
+                    signer_label_prefix="Signed by",
+                    show_field_names=False,
+                ),
+            ),
         ),
     )
 

@@ -46,6 +46,14 @@ Current status note:
 - `SigningDraftWorkflow` should own the in-session signing draft state for Phase 3.
   - It should track the chosen page, placement rectangle, appearance/property settings, and validation state.
   - It should not duplicate viewer coordinate math or Qt event handling.
+- Named appearance profiles are now part of the current Phase 3 shell workflow.
+  - A user can save the current appearance under a distinct user-provided name.
+  - Saved profiles can be selected from a dropdown in the shell.
+  - Saving to an existing name uses explicit overwrite confirmation.
+  - The next profile-lifecycle step is to persist those saved profiles across relaunches in a
+    clearly labeled `Signature Profiles` directory using a human-readable JSON or similarly
+    inspectable text format.
+  - The next shell refinement is a delete-current-profile action with explicit confirmation.
 - `render_signing_preview()` should turn the normalized draft state into a preview representation.
   - It should be treated as the single source of truth for preview formatting.
   - The Qt shell should reuse it rather than rebuilding preview semantics in widget code.
@@ -57,7 +65,9 @@ Current status note:
   - It should reuse the Qt preview widget adapter for render/zoom/navigation behavior.
   - It should keep properties editing, preview refresh, and sign confirmation in the application/UI layers rather than re-implementing viewer math.
 - Overlay resize and placement interactions are currently the main acceptance risk area.
-  - The signing shell and harness exist, but the next manual pass should focus first on whether overlay dragging, resizing, and viewer/shell synchronization now feel stable enough to resume broader FR-3B acceptance.
+  - The signing shell and harness exist, and the next manual pass should focus on whether overlay dragging, resizing, and viewer/shell synchronization remain stable enough to support broader FR-3B acceptance.
+- The shell can now call an injected signing executor and surface success/failure results.
+  - The remaining open implementation item is the concrete production signing backend that should be supplied to that executor seam for full end-to-end output verification.
 - The key integration rule is to avoid duplicating semantics across layers.
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.

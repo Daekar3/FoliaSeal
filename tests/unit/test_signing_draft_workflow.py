@@ -13,10 +13,12 @@ from foliaseal.domain.models import (
     SignatureFieldBinding,
     SignatureFieldSource,
     SignatureLayoutTemplate,
+    SignaturePlacementDefaults,
     SignatureRect,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
+from foliaseal.infra.config.schemas import SignaturePreset
 
 
 def _appearance() -> SignatureAppearance:
@@ -235,3 +237,54 @@ def test_workflow_reports_missing_draft_components_as_validation_issues(
         "signature_rect_missing",
         "signature_appearance_missing",
     }
+
+
+def test_workflow_can_capture_and_apply_named_profile(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = _appearance()
+    placement_defaults = SignaturePlacementDefaults(
+        width_pt=180.0,
+        height_pt=72.0,
+    )
+    workflow.set_signature_appearance(appearance)
+    workflow.signature_placement_defaults = placement_defaults
+
+    captured = workflow.capture_signature_preset("Team Standard")
+
+    assert captured == SignaturePreset(
+        schema_version=1,
+        name="Team Standard",
+        appearance=appearance,
+        placement_defaults=placement_defaults,
+    )
+
+    workflow.clear_signature_appearance()
+    workflow.signature_placement_defaults = None
+    workflow.apply_signature_preset(captured)
+
+    assert workflow.current_signature_appearance == appearance
+    assert workflow.signature_placement_defaults == placement_defaults
+
+
+def test_workflow_captures_placement_defaults_from_current_rectangle(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=12.0,
+            bottom_pt=18.0,
+            width_pt=160.0,
+            height_pt=64.0,
+        )
+    )
+
+    captured = workflow.capture_signature_preset("Compact")
+
+    assert captured.name == "Compact"
+    assert captured.placement_defaults == SignaturePlacementDefaults(
+        width_pt=160.0,
+        height_pt=64.0,
+    )

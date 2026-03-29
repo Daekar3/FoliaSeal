@@ -8,12 +8,22 @@ from foliaseal.application import (
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
-from foliaseal.domain.models import SignatureFieldKey, SignatureTextStyle
+from foliaseal.domain.errors import FailureCode
+from foliaseal.domain.models import (
+    SignatureFieldKey,
+    SignaturePlacementDefaults,
+    SignatureTextStyle,
+    SigningResult,
+)
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.phase3_builders import (
+    build_signature_appearance,
+    build_signature_preset,
+    build_signature_preset_catalog,
+)
 
 
 class _FakeSignal:
@@ -143,6 +153,10 @@ class _FakeComboBox(_FakeWidget):
         self.currentTextChanged = _FakeSignal()
         self.currentIndexChanged = _FakeSignal()
 
+    def clear(self):  # noqa: N802
+        self._items = []
+        self._current = ""
+
     def addItems(self, items):  # noqa: N802
         self._items.extend(items)
         if not self._current and self._items:
@@ -179,6 +193,19 @@ class _FakeComboBox(_FakeWidget):
 
     def itemText(self, index):  # noqa: N802
         return self._items[index]
+
+
+class _FakeMessageBox:
+    Yes = 1
+    No = 0
+
+    def __init__(self) -> None:
+        self.calls = []
+        self.next_result = self.Yes
+
+    def question(self, parent, title, text):  # noqa: N802
+        self.calls.append((parent, title, text))
+        return self.next_result
 
 
 class _FakeSpinBox(_FakeWidget):
@@ -308,6 +335,16 @@ class _FakeViewerWidget(_FakeWidget):
         self.overlay_signature_rect = None
 
 
+class _FakeSigningExecutor:
+    def __init__(self, result: SigningResult) -> None:
+        self.result = result
+        self.calls = []
+
+    def execute(self, request):
+        self.calls.append(request)
+        return self.result
+
+
 def _fake_bindings() -> QtSigningWidgetBindings:
     return QtSigningWidgetBindings(
         q_widget=_FakeWidget,
@@ -320,6 +357,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_line_edit=_FakeLineEdit,
         q_check_box=_FakeCheckBox,
         q_combo_box=_FakeComboBox,
+        q_message_box=_FakeMessageBox(),
         q_double_spin_box=_FakeDoubleSpinBox,
         q_spin_box=_FakeSpinBox,
         q_push_button=_FakePushButton,
@@ -387,6 +425,88 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget._signing_workspace._sign_button._enabled is True
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
+
+
+def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            output_pdf_version="1.7",
+            signature_subfilter="adbe.pkcs7.detached",
+            timestamp_present=True,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    request = widget.submit_sign_request()
+
+    assert request is not None
+    assert executor.calls == [request]
+    assert widget._signing_workspace.last_signing_result is not None
+    assert widget._signing_workspace.last_signing_result.success is True
+    assert widget.sign_result_label.text() == "Signing completed successfully."
+
+
+def test_signing_shell_reports_sign_failure_when_executor_returns_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    errors = []
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=False,
+            failure_code=FailureCode.POST_VERIFY_FAILED,
+            message="Post-sign verification failed.",
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+        on_error=errors.append,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    request = widget.submit_sign_request()
+
+    assert request is not None
+    assert executor.calls == [request]
+    assert widget._signing_workspace.last_signing_result is not None
+    assert widget._signing_workspace.last_signing_result.success is False
+    assert errors == ["Post-sign verification failed."]
+    assert widget.sign_result_label.text() == "Post-sign verification failed."
 
 
 def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path: Path) -> None:
@@ -867,6 +987,143 @@ def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
 
     assert datetime_combo._items.count("custom-format") == 1
     assert font_combo._items.count("Custom Font") == 1
+
+
+def test_signing_shell_named_profile_save_and_reload_round_trip(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    panel = widget.properties_panel
+    panel._profile_controls.profile_name.setText("My Profile")
+    panel._appearance_controls.signer_label_prefix.setText("Signed by Me")
+    panel._appearance_controls.show_field_names.setChecked(True)
+    panel._placement_controls.width_spin.setValue(144.0)
+    panel._placement_controls.height_spin.setValue(36.0)
+    panel._profile_controls.save_button.click()
+
+    assert panel._profile_catalog.profile_names()[-1] == "My Profile"
+    assert panel._profile_controls.profile_combo.currentText() == "My Profile"
+    assert panel._profile_controls.profile_name.text() == "My Profile"
+    assert panel._profile_catalog.profile_named("My Profile").placement_defaults == (
+        SignaturePlacementDefaults(
+            width_pt=144.0,
+            height_pt=36.0,
+        )
+    )
+
+    panel._appearance_controls.signer_label_prefix.setText("Temporary Draft")
+    assert panel._profile_controls.profile_combo.currentText() == "Current draft"
+
+    panel._profile_controls.profile_combo.setCurrentText("My Profile")
+
+    assert panel._appearance_controls.signer_label_prefix.text() == "Signed by Me"
+    assert panel._appearance_controls.show_field_names.isChecked() is True
+    assert panel._placement_controls.width_spin.value() == 144.0
+    assert panel._placement_controls.height_spin.value() == 36.0
+
+
+def test_signing_shell_named_profile_selection_restores_placement_defaults_without_forcing_rect(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    preset = build_signature_preset(
+        name="Compact",
+        placement_defaults=SignaturePlacementDefaults(
+            width_pt=144.0,
+            height_pt=36.0,
+        ),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
+    )
+
+    panel = widget.properties_panel
+    assert widget._signing_workspace._draft_workflow.signature_rect is None
+
+    panel._profile_controls.profile_combo.setCurrentText("Compact")
+
+    assert panel._profile_controls.profile_name.text() == "Compact"
+    assert panel._placement_controls.width_spin.value() == 144.0
+    assert panel._placement_controls.height_spin.value() == 36.0
+    assert widget._signing_workspace._draft_workflow.signature_rect is None
+
+
+def test_signing_shell_named_profile_overwrite_requires_confirmation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+
+    existing = build_signature_preset(
+        name="Team Standard",
+        appearance=build_signature_appearance(signer_label_prefix="Signed by Team"),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(profiles=(existing,)),
+    )
+
+    panel = widget.properties_panel
+    panel._appearance_controls.signer_label_prefix.setText("Signed by Current Draft")
+    panel._profile_controls.profile_name.setText("Team Standard")
+
+    fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.No
+    result = panel.save_current_profile()
+
+    assert result is None
+    assert fake_bindings.q_message_box.calls
+    assert panel._profile_catalog.profile_named("Team Standard").appearance == existing.appearance
+
+    fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.Yes
+    result = panel.save_current_profile()
+
+    assert result is not None
+    assert result.name == "Team Standard"
+    assert panel._profile_catalog.profile_named("Team Standard").appearance.signer_label_prefix == (
+        "Signed by Current Draft"
+    )
+    assert panel._profile_controls.profile_combo.currentText() == "Team Standard"
 
 
 def test_signing_shell_warning_only_issue_keeps_readiness_enabled(

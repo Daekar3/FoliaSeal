@@ -36,18 +36,23 @@ Validated so far:
 - core placement and resize mechanics now behave well enough in the Qt harness
 - the richer signing request, draft workflow, preview semantics, and signing integration exist
 - the harness is useful for validating geometry, settings propagation, and request capture
+- named profile save/select UI is now in place with explicit overwrite confirmation
+- the shell can drive an executor-backed sign/apply-output path and surface success/failure
 
 Not yet achieved:
 
 - a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
 - a real end-user concept of "appearance" in the GUI
 - a product-quality appearance preview and coherent signing flow
+- a concrete production signing backend supplied to the new shell executor seam
 
 Interpretation:
 
 - `phase3-signing-harness` is an engineering validation tool
 - it is not the final Phase 3 GUI target
 - harness success should be treated as implementation progress, not final acceptance
+- the named-profile contract and shell workflow now exist, but the final production
+  signing backend still needs to be supplied by the application layer
 
 ## Scope Boundary
 
@@ -1371,6 +1376,216 @@ Definition of done:
 When to assign:
 
 - after Brief Q and Brief R land
+
+## Follow-Up Named Profiles and Real Output Wave
+
+This wave now consists primarily of finishing the concrete production signing backend behind the
+executor seam before true acceptance:
+
+- reusable named appearance profiles are implemented in the current shell workflow
+- executor-backed signed-output application is available at the shell seam
+- the remaining gap is the concrete production signing backend and final acceptance validation
+
+For this wave to count as complete, the resulting UX must let a user:
+
+- save the current appearance configuration as a profile with a distinct user-provided name
+- see saved appearance profiles in a dropdown list
+- reselect a saved profile from that dropdown in the current signing flow
+- relaunch the app or harness and still see previously saved profiles
+- delete a no-longer-needed profile from the UI with a confirmation step
+
+### Named Profiles and Real Output Acceptance Target
+
+This wave should be considered complete when:
+
+- a user can save the current appearance as a named profile
+- a user is prompted for an explicit overwrite confirmation when saving a duplicate profile name
+- saved profiles are selectable from a dropdown in the signing UI
+- selecting a saved profile repopulates the current appearance state correctly
+- named profiles persist across relaunches in a clearly labeled `Signature Profiles` directory
+- persisted profiles are stored in a human-readable JSON or similarly inspectable text format
+- the shell provides a delete-current-profile action with explicit confirmation
+- the shell can drive an executor-backed sign/apply-output path rather than request capture alone
+- a concrete production signing backend is wired into that executor seam
+- the acceptance artifacts can distinguish implemented profile reuse from still-future preset work
+
+### Brief T: Named Appearance Profile Contract and Persistence
+
+You are implementing the profile model and persistence needed for named appearance reuse in Phase 3.
+
+Objectives:
+
+- support saving the current appearance configuration as a named profile
+- support loading named profiles into the current signing workflow
+- keep the scope focused on named appearance profiles rather than full Phase 4 preset management
+
+Primary files you own:
+
+- `src/foliaseal/domain/models.py`
+- `src/foliaseal/infra/config/schemas.py`
+- relevant persistence/application glue as needed
+- tests in `tests/unit/`
+
+Files you should avoid editing unless absolutely necessary:
+
+- most Qt layout/shell code
+- signing-engine integration
+
+Requirements to satisfy:
+
+- named appearance profiles with distinct user-provided names
+- a contract suitable for dropdown selection in the UI
+
+Expected deliverables:
+
+- a profile model or schema that includes a user-visible profile name
+- persistence support sufficient for the UI to list profiles across relaunches
+- load/save behavior for named profiles
+- a storage layout rooted in a clearly labeled `Signature Profiles` directory
+- a human-readable JSON or similarly inspectable on-disk format for saved profiles
+- tests covering:
+  - save a named profile
+  - reject invalid or duplicate names if required by the chosen design
+  - restore a saved profile into appearance state
+  - reload saved profiles after process restart or catalog reload
+
+Implementation notes:
+
+- this is not full preset lifecycle parity yet; keep the scope to what Phase 3 needs
+- optimize for the UI requirement that profiles appear in a dropdown and can be reselected
+
+Definition of done:
+
+- the shell can depend on a stable, named profile contract for save/select behavior
+
+When to assign:
+
+- first in this wave
+
+### Brief U: Named Profile UI and Dropdown Workflow
+
+You are implementing the Phase 3 UI for saving and selecting named appearance profiles.
+
+Objectives:
+
+- let the user save the current appearance with a distinct name
+- present saved profiles in a dropdown
+- reload a selected profile into the current appearance draft
+- prompt for explicit overwrite confirmation when the user saves a duplicate profile name
+- let the user delete the currently loaded profile with explicit confirmation
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- related Qt support modules if needed
+- relevant shell tests in `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- signing-engine code
+- deeper persistence/model work owned by Brief T
+
+Requirements to satisfy:
+
+- named profile save/select UX in the current signing shell
+
+Expected deliverables:
+
+- profile dropdown in the signing UI
+- save-current-profile action with user-provided name
+- explicit overwrite confirmation for duplicate names
+- delete-current-profile action with explicit confirmation for the selected profile
+- selection behavior that reapplies the chosen profile to the current appearance
+- tests covering save/select/delete behavior and profile repopulation
+
+Implementation notes:
+
+- optimize for a focused Phase 3 workflow, not broad profile management screens
+- keep the UI understandable without opening a separate profile-management mode
+
+Definition of done:
+
+- a user can save a named profile, reselect it from a dropdown after relaunch, and delete it safely from the same signing flow
+
+Status:
+
+- implemented
+
+### Brief V: Real Sign-and-Apply Output Flow
+
+You are replacing request-capture-only behavior with a real sign/apply-output path from the shell.
+
+Objectives:
+
+- let the shell perform the actual sign/apply-output flow
+- make it possible to verify signed output from the user workflow rather than only captured requests
+
+Primary files you own:
+
+- application/signing integration code
+- shell wiring needed to trigger the real flow
+- relevant integration tests
+
+Files you should avoid editing unless absolutely necessary:
+
+- named-profile schema/UI ownership unless a small integration touch is required
+
+Requirements to satisfy:
+
+- real signed-output application from the current shell
+
+Expected deliverables:
+
+- shell-triggered signing path that produces real output
+- user-visible success/failure handling
+- tests covering valid output creation and failure reporting
+
+Implementation notes:
+
+- preserve the richer appearance payload already built in Phase 3
+- keep the workflow compatible with named profile reuse
+
+Definition of done:
+
+- a user can sign from the shell and inspect a real output PDF
+- the executor seam is ready for the concrete production backend
+
+When to assign:
+
+- after T/U are stable enough that the final workflow inputs are not moving heavily
+
+### Brief W: Named Profiles and Real Output Review
+
+You are doing a review-only pass on the named-profiles and real-output wave.
+
+Objectives:
+
+- verify named profile save/select behavior
+- verify dropdown-driven profile reuse matches the saved configuration
+- verify saved profiles survive relaunch through the on-disk profile directory
+- verify delete-profile UX uses explicit confirmation and removes the profile from subsequent sessions
+- verify the shell now supports real sign/apply-output behavior
+- identify regressions or remaining acceptance blockers
+
+Primary files to review:
+
+- profile contract/persistence files from Brief T
+- shell files from Brief U
+- signing integration files from Brief V
+- relevant tests in `tests/unit/`
+
+Requirements to satisfy:
+
+- use the review-agent template in this document
+- return findings, residual risks, and go/no-go
+
+Definition of done:
+
+- the team has a concrete review gate before the next acceptance-oriented manual pass
+
+When to assign:
+
+- after T, U, and V land
 
 ## Agent-Ready Assignment Briefs
 
