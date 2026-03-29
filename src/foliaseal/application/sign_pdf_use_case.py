@@ -18,6 +18,14 @@ from foliaseal.domain.errors import (
     TsaUnavailableError,
 )
 from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignatureBoxStyle,
+    SignatureFieldKey,
+    SignatureFieldSource,
+    SignatureLayoutTemplate,
+    SignatureRect,
+    SignatureTextStyle,
+    SignatureTimezoneDisplayMode,
     SigningOutput,
     SigningRequest,
     SigningResult,
@@ -42,7 +50,7 @@ class CertificateLoader(Protocol):
 class PdfSigner(Protocol):
     """Signs a PDF and returns output bytes + metadata."""
 
-    def sign(self, request: SigningRequest) -> SigningOutput:
+    def sign(self, request: SigningBackendRequest) -> SigningOutput:
         """Perform the signing operation."""
 
 
@@ -51,6 +59,103 @@ class SignatureVerifier(Protocol):
 
     def verify(self, output_pdf_path: str) -> VerificationSummary:
         """Return structured verification summary."""
+
+
+@dataclass(frozen=True)
+class SigningBackendFieldBinding:
+    """Backend-facing representation of one visible signature field."""
+
+    field_key: SignatureFieldKey
+    source: SignatureFieldSource
+    show_in_visible_appearance: bool
+    override_text: str | None
+    display_label: str | None
+
+
+@dataclass(frozen=True)
+class SigningBackendAppearance:
+    """Backend-facing signature appearance payload."""
+
+    signer_label_prefix: str
+    layout_template: SignatureLayoutTemplate
+    timezone_display_mode: SignatureTimezoneDisplayMode
+    datetime_format: str
+    field_bindings: tuple[SigningBackendFieldBinding, ...]
+    text_style: SignatureTextStyle
+    box_style: SignatureBoxStyle
+    image_stamp_path: str | None = None
+
+    @classmethod
+    def from_signature_appearance(
+        cls,
+        appearance: SignatureAppearance,
+    ) -> SigningBackendAppearance:
+        """Map the normalized domain appearance into the backend payload."""
+        return cls(
+            signer_label_prefix=appearance.signer_label_prefix,
+            layout_template=appearance.layout_template,
+            timezone_display_mode=appearance.timezone_display_mode,
+            datetime_format=appearance.datetime_format,
+            field_bindings=tuple(
+                SigningBackendFieldBinding(
+                    field_key=field_key,
+                    source=binding.source,
+                    show_in_visible_appearance=binding.show_in_visible_appearance,
+                    override_text=binding.override_text,
+                    display_label=binding.display_label,
+                )
+                for field_key, binding in appearance.iter_field_bindings()
+            ),
+            text_style=appearance.text_style,
+            box_style=appearance.box_style,
+            image_stamp_path=appearance.image_stamp_path,
+        )
+
+
+@dataclass(frozen=True)
+class SigningBackendRequest:
+    """Backend-facing signing request assembled by the use case."""
+
+    input_pdf_path: str
+    output_pdf_path: str
+    certificate_path: str
+    passphrase: str
+    tsa_url: str
+    timestamp_required: bool
+    certificate_alias: str | None
+    signature_rect: SignatureRect | None
+    signature_appearance: SigningBackendAppearance | None
+
+    @classmethod
+    def from_signing_request(cls, request: SigningRequest) -> SigningBackendRequest:
+        """Normalize the public signing request into the backend payload."""
+        if request.signature_rect is None and request.signature_appearance is None:
+            appearance = None
+        elif request.signature_rect is not None and request.signature_appearance is not None:
+            appearance = SigningBackendAppearance.from_signature_appearance(
+                request.signature_appearance
+            )
+        else:
+            raise SigningBackendRequestError(
+                "signature_rect and signature_appearance must be provided together "
+                "for a visible signature."
+            )
+
+        return cls(
+            input_pdf_path=request.input_pdf_path,
+            output_pdf_path=request.output_pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            tsa_url=request.tsa_url,
+            timestamp_required=request.timestamp_required,
+            certificate_alias=request.certificate_alias,
+            signature_rect=request.signature_rect,
+            signature_appearance=appearance,
+        )
+
+
+class SigningBackendRequestError(ValueError):
+    """Raised when a public signing request cannot be normalized for signing."""
 
 
 @dataclass
@@ -73,11 +178,12 @@ class SignPdfUseCase:
                     message="Output path must differ from input path.",
                 )
 
+            backend_request = SigningBackendRequest.from_signing_request(request)
             input_pdf_version = self.inspector.get_pdf_version(request.input_pdf_path)
             self.compatibility_profile.ensure_open_version_supported(input_pdf_version)
             self.certificate_loader.validate(request.certificate_path, request.passphrase)
 
-            output = self.signer.sign(request)
+            output = self.signer.sign(backend_request)
             if request.timestamp_required and not output.timestamp_present:
                 return SigningResult(
                     success=False,
@@ -118,6 +224,12 @@ class SignPdfUseCase:
             return SigningResult(
                 success=False,
                 failure_code=FailureCode.INPUT_PDF_INVALID,
+                message=str(exc),
+            )
+        except SigningBackendRequestError as exc:
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.SIGNATURE_RECT_INVALID,
                 message=str(exc),
             )
         except FileNotFoundError as exc:

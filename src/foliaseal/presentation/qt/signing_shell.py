@@ -775,6 +775,7 @@ class SigningWorkspaceWidget:
     def refresh_viewer(self) -> None:
         self._viewer_widget.refresh()
         self._sync_placement_context_from_viewer()
+        self._sync_signature_overlay()
         self.properties_panel.refresh_preview()
         self._refresh_sign_button_state()
 
@@ -798,6 +799,7 @@ class SigningWorkspaceWidget:
             height_pt=pdf_rect.y2 - pdf_rect.y1,
         )
         self.properties_panel.set_signature_rect(signature_rect)
+        self._sync_signature_overlay()
         self._sync_placement_context_from_viewer()
         self._refresh_sign_button_state()
 
@@ -810,6 +812,7 @@ class SigningWorkspaceWidget:
 
     def _handle_panel_change(self) -> None:
         self._sync_placement_context_from_viewer()
+        self._sync_signature_overlay()
         self._refresh_sign_button_state()
 
     def _handle_page_change(self, page_number: int) -> None:
@@ -821,6 +824,7 @@ class SigningWorkspaceWidget:
             self._emit_error(f"Unable to change PDF page: {exc}")
             return
         self._sync_placement_context_from_viewer()
+        self._sync_signature_overlay()
         self._refresh_sign_button_state()
 
     def _sync_placement_context_from_viewer(self) -> None:
@@ -840,6 +844,11 @@ class SigningWorkspaceWidget:
                 rotation=snapshot.rotation,
             )
         )
+
+    def _sync_signature_overlay(self) -> None:
+        setter = getattr(self._viewer_widget, "set_signature_overlay", None)
+        if callable(setter):
+            setter(self._draft_workflow.signature_rect)
 
     def _refresh_sign_button_state(self) -> None:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())

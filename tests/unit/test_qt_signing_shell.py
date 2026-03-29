@@ -218,6 +218,7 @@ class _FakeViewerWidget(_FakeWidget):
         self.on_error = on_error
         self.on_interaction = on_interaction
         self.refresh_calls = []
+        self.overlay_signature_rect = None
 
     def refresh(self, *, elapsed_ms=None, navigation=False):
         self.refresh_calls.append((elapsed_ms, navigation))
@@ -226,6 +227,12 @@ class _FakeViewerWidget(_FakeWidget):
     def emit_selection(self, pdf_rect):
         if self.on_selection is not None:
             self.on_selection(pdf_rect)
+
+    def set_signature_overlay(self, signature_rect):
+        self.overlay_signature_rect = signature_rect
+
+    def clear_signature_overlay(self):
+        self.overlay_signature_rect = None
 
 
 def _fake_bindings() -> QtSigningWidgetBindings:
@@ -299,6 +306,7 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert request.signature_rect.page_index == 0
     assert request.signature_rect.left_pt == 10.0
     assert request.signature_appearance is not None
+    assert widget.viewer_widget.overlay_signature_rect == request.signature_rect
     assert widget.properties_panel.preview.can_submit is True
     assert widget.properties_panel.validation_text() == "Ready to sign."
     assert widget._signing_workspace._sign_button._enabled is True
