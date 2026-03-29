@@ -226,6 +226,9 @@ class _FakePainter:
     def __init__(self, widget):
         self.widget = widget
 
+    def fillRect(self, *args):
+        return None
+
     def drawPixmap(self, *args):
         return None
 

@@ -421,6 +421,7 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
         widget.properties_panel._appearance_controls.timezone_display_mode.currentText()
         == "UTC"
     )
+    assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
     assert list(widget.properties_panel.field_controls.keys()) == [
         SignatureFieldKey.DISTINGUISHED_NAME,
         SignatureFieldKey.COMMON_NAME,
@@ -574,6 +575,49 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert "alice@example.com" in preview_text
     assert "Single line" not in preview_text
     assert "UTC" not in preview_text
+
+
+def test_signing_shell_preview_respects_small_font_sizes(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        text_style=SignatureTextStyle(
+            font_family="Source Sans 3",
+            font_size_pt=6.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#123456",
+        ),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    assert "font-size: 6.5pt;" in widget.properties_panel.preview_controls.title_label.style
+    assert "font-size: 6.5pt;" in widget.properties_panel.preview_controls.detail_label.style
 
 
 def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
