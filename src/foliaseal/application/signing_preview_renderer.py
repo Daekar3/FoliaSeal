@@ -364,14 +364,18 @@ def _compare_preview_fields_to_appearance(
                     )
                 )
         elif binding.source == SignatureFieldSource.DERIVED:
-            if not preview_field.text or preview_field.hint != "from certificate":
+            expected_hint = (
+                "sign time"
+                if field_key == SignatureFieldKey.SIGNING_TIME
+                else "from certificate"
+            )
+            if not preview_field.text or preview_field.hint != expected_hint:
                 issues.append(
                     SigningPreviewParityIssue(
                         code="derived_field_structure_mismatch",
                         message=(
                             "Derived field parity is structural only; preview must show a "
-                            "visible placeholder and certificate hint, but not an exact "
-                            "signer value."
+                            "visible placeholder and the correct derivation hint."
                         ),
                         field_name=field_key.value,
                     )

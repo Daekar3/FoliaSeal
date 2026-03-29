@@ -1,10 +1,8 @@
 {
   "errors": [],
-  "first_render_ms": 51.198871806263924,
+  "first_render_ms": 51.45584302954376,
   "interaction_counts": {
-    "selection_success": 1,
-    "wheel_zoom_in": 4,
-    "wheel_zoom_out": 3
+    "selection_success": 1
   },
   "last_signature_has_visible_appearance": true,
   "last_signature_output_path": "/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf",

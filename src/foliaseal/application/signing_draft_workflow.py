@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Self
 
@@ -116,6 +117,17 @@ def _field_label(field_key: SignatureFieldKey) -> str:
 
 def _derived_preview_text(field_key: SignatureFieldKey) -> str:
     return _field_label(field_key)
+
+
+def _preview_signing_time(
+    *,
+    datetime_format: str,
+    timezone_mode: SignatureTimezoneDisplayMode,
+) -> str:
+    timestamp = datetime.now(UTC)
+    if timezone_mode == SignatureTimezoneDisplayMode.LOCAL:
+        timestamp = timestamp.astimezone()
+    return timestamp.strftime(datetime_format)
 
 
 def _issue(
@@ -372,6 +384,12 @@ class SigningDraftWorkflow:
             if binding.source == SignatureFieldSource.OVERRIDE:
                 text = binding.override_text or ""
                 hint = None
+            elif field_key == SignatureFieldKey.SIGNING_TIME:
+                text = _preview_signing_time(
+                    datetime_format=appearance.datetime_format,
+                    timezone_mode=appearance.timezone_display_mode,
+                )
+                hint = "sign time"
             else:
                 text = binding.display_label or _derived_preview_text(field_key)
                 hint = "from certificate"

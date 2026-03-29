@@ -376,15 +376,11 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget.properties_panel.preview.can_submit is True
     assert widget.properties_panel.validation_text() == "Ready to sign."
     assert widget._signing_workspace._sign_button._enabled is True
-    assert "1. Edit appearance" in widget._signing_workspace._flow_steps_label.text()
-    assert "Current stage: Review preview and confirm sign." in (
-        widget._signing_workspace._flow_stage_label.text()
-    )
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
 
 
-def test_signing_shell_surfaces_a_stage_guide(monkeypatch, tmp_path: Path) -> None:
+def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -401,16 +397,9 @@ def test_signing_shell_surfaces_a_stage_guide(monkeypatch, tmp_path: Path) -> No
         signing_workflow=_workflow(tmp_path),
     )
 
-    assert "1. Edit appearance" in widget._signing_workspace._flow_steps_label.text()
-    assert "Current stage: Edit appearance and place signature." in (
-        widget._signing_workspace._flow_stage_label.text()
-    )
-
-    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
-
-    assert "Current stage: Review preview and confirm sign." in (
-        widget._signing_workspace._flow_stage_label.text()
-    )
+    assert not hasattr(widget._signing_workspace, "_flow_summary_box")
+    assert widget.properties_scroll.widget is widget.properties_panel.container
+    assert widget.properties_scroll.widget_resizable is True
 
 
 def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Path) -> None:
@@ -519,12 +508,19 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert "Image stamp: /tmp/stamp.png" in appearance_summary
     assert preview_controls.stamp_label.pixmap() is not None
     assert preview_controls.stamp_label.pixmap().path == "/tmp/stamp.png"
-    assert preview_controls.stamp_label.text() == "Stamp preview"
+    assert preview_controls.stamp_label.text() == ""
     assert preview_controls.stamp_label.fixed_size == (154, 108)
     assert preview_controls.stamp_label.alignment == _FakeQt.AlignCenter
     assert preview_controls.title_label.text() == "Digitally signed by"
-    assert preview_controls.detail_label.text() == "Visible signature appearance"
-    assert preview_controls.footer_label.text() == "Signature preview ready"
+    detail_text = preview_controls.detail_label.text()
+    assert "Distinguished name" in detail_text
+    assert "Common name" in detail_text
+    assert "alice@example.com" in detail_text
+    assert "Approved" in detail_text
+    assert "Director" in detail_text
+    assert "FoliaSeal" in detail_text
+    assert "Location" not in detail_text
+    assert preview_controls.footer_label.text() == "Multi-line | UTC"
     assert "Placement:" not in preview_text
     assert "Datetime format:" not in preview_text
     assert "Image stamp:" not in preview_text
@@ -537,7 +533,8 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         == "Source Sans 3"
     )
     assert preview_text.count("Visible signature preview") == 1
-    assert "Stamp preview" in preview_text
+    assert "Digitally signed by" in preview_text
+    assert "alice@example.com" in preview_text
 
 
 def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
