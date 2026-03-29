@@ -31,6 +31,7 @@ class Phase3HarnessCapture:
     selection_count: int
     sign_request_count: int
     last_signature_page_index: int | None
+    last_signature_page_number: int | None
     last_signature_has_visible_appearance: bool
     last_signature_output_path: str | None
     preview_available: bool
@@ -72,9 +73,9 @@ def build_phase3_checklist_results_markdown(
         f"- Selection interactions captured: {capture.selection_count}",
         f"- Sign requests captured: {capture.sign_request_count}",
         (
-            f"- Last signature page index: {capture.last_signature_page_index}"
-            if capture.last_signature_page_index is not None
-            else "- Last signature page index: not captured"
+            f"- Last signature page number: {capture.last_signature_page_number}"
+            if capture.last_signature_page_number is not None
+            else "- Last signature page number: not captured"
         ),
         (
             "- Last sign request had visible appearance: "
@@ -225,15 +226,19 @@ def run_phase3_signing_harness(
 
     preview_text = shell.properties_panel.preview_text()
     validation_text = shell.properties_panel.validation_text()
+    last_signature_page_index = (
+        sign_requests[-1].signature_rect.page_index
+        if sign_requests and sign_requests[-1].signature_rect is not None
+        else None
+    )
     capture = Phase3HarnessCapture(
         pdf_path=str(source_path),
         first_render_ms=viewer_workflow.timing_tracker.snapshot().first_render_ms,
         selection_count=interaction_counts.get("selection_success", 0),
         sign_request_count=len(sign_requests),
-        last_signature_page_index=(
-            sign_requests[-1].signature_rect.page_index
-            if sign_requests and sign_requests[-1].signature_rect is not None
-            else None
+        last_signature_page_index=last_signature_page_index,
+        last_signature_page_number=(
+            last_signature_page_index + 1 if last_signature_page_index is not None else None
         ),
         last_signature_has_visible_appearance=(
             sign_requests[-1].has_visible_signature_settings() if sign_requests else False
