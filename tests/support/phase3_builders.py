@@ -79,11 +79,11 @@ def build_signature_appearance(
         SignatureFieldKey.DISTINGUISHED_NAME,
         SignatureFieldKey.COMMON_NAME,
         SignatureFieldKey.EMAIL,
+        SignatureFieldKey.TITLE,
+        SignatureFieldKey.COMPANY,
         SignatureFieldKey.SIGNING_TIME,
         SignatureFieldKey.REASON,
         SignatureFieldKey.LOCATION,
-        SignatureFieldKey.TITLE,
-        SignatureFieldKey.COMPANY,
     )
     return SignatureAppearance(
         signer_label_prefix=signer_label_prefix,

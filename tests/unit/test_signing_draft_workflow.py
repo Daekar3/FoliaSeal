@@ -100,17 +100,20 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
         "distinguished_name",
         "common_name",
         "email",
+        "title",
+        "company",
         "signing_time",
         "reason",
         "location",
-        "title",
-        "company",
     ]
     assert preview.fields[1].text == "Common name"
     assert preview.fields[1].hint == "from certificate"
     assert preview.fields[2].text == "alice@example.com"
-    assert preview.fields[4].visible is True
-    assert preview.fields[5].visible is False
+    assert preview.fields[3].text == "Title"
+    assert preview.fields[3].visible is True
+    assert preview.fields[4].text == "Company"
+    assert preview.fields[5].visible is True
+    assert preview.fields[7].visible is False
     assert request.certificate_alias == "signing-cert"
     assert request.signature_appearance == workflow.current_signature_appearance
     assert request.signature_rect == workflow.current_signature_rect
