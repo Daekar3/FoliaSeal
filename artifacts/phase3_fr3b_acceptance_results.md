@@ -11,7 +11,7 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 6
+- Selection interactions captured: 8
 - Sign requests captured: 1
 - Last signature page index: 0
 - Last sign request had visible appearance: yes
@@ -34,6 +34,33 @@ Purpose:
 - Capture task-level pass/fail results, notes, and any observed parity gaps against Acrobat or PDF-XChange style workflows.
 - Keep this file as a planning and QA artifact only.
 
+Current status note:
+
+- Phase 3 is not yet accepted.
+- The current blocker for FR-3B acceptance is overlay interaction quality during placement and resize.
+- The next manual run should answer the overlay remediation question first before spending time on broader parity judgments.
+
+## Overlay remediation gate
+
+Complete this section first. If the overlay gate fails, stop the acceptance run and record notes before moving on to broader FR-3B tasks.
+
+- [ ] Resize handles no longer snap or jump unexpectedly during drag.
+- [ ] Placement remains visually stable while the overlay is being resized.
+- [ ] No placement exception is raised during overlay resize or reposition.
+- [ ] Overlay state remains synchronized with the viewer after repeated drags.
+- [ ] Zoom or pan does not cause obvious overlay drift during placement or resize.
+
+Gate result:
+
+- [ ] Overlay gate passed
+- [ ] Overlay gate failed
+
+Overlay notes:
+
+- Record which handle or drag path was used.
+- Record whether the failure was visual drift, snapping, inversion, exception, or stale synchronization.
+- If this gate fails, the rest of the worksheet should be treated as informational only.
+
 ## Session setup
 
 - [x] Launch the Phase 3 desktop build in an environment with the relevant PDF signing UI enabled.
@@ -45,7 +72,7 @@ Purpose:
 Notes:
 
 - Document the PDF used for testing, including page count and any notable page rotation or crop behavior.
-- Document any environment-specific limitations that affect appearance preview or placement behavior.
+- Document any environment-specific limitations that affect appearance preview or overlay placement behavior.
 
 ## FR-3B Acceptance Tasks
 
@@ -111,6 +138,7 @@ Checks:
 - [ ] The rectangle preview appears while dragging.
 - [x] The resulting placement lands on the expected page area.
 - [ ] The placement respects zoom and pan state.
+- [ ] The overlay does not drift, snap, or jump during the placement interaction.
 
 Pass/Fail:
 
@@ -120,7 +148,7 @@ Pass/Fail:
 Notes:
 
 - Record the page number and approximate location of the placed rectangle.
-- Record any coordinate drift, clipping, or selection ambiguity.
+- Record any coordinate drift, clipping, snapping, jumping, or selection ambiguity.
 
 ### 4. Resize or fine-tune signature placement
 
@@ -134,6 +162,9 @@ Checks:
 - [ ] Numeric x/y/width/height fine-tuning is available when expected.
 - [ ] Fine-tuned values are reflected in the preview.
 - [ ] Fine-tuned values remain valid after the user changes other appearance settings.
+- [ ] Resize handle dragging feels predictable enough for end users.
+- [ ] No resize step causes the rectangle to invert or jump unexpectedly.
+- [ ] No exception appears during resize or fine-tuning.
 
 Pass/Fail:
 
@@ -144,6 +175,7 @@ Notes:
 
 - Record the before/after rectangle values.
 - Record any mismatch between the on-screen rectangle and the saved placement values.
+- Record which resize path was used and whether the issue was interaction quality or data mismatch.
 
 ### 5. Confirm and sign from the focused properties flow
 
@@ -196,6 +228,7 @@ Notes:
 
 Use this section to capture comparison notes against Acrobat or PDF-XChange style behavior.
 
+- [ ] Overlay placement and resize behavior is now stable enough to compare fairly with Acrobat or PDF-XChange.
 - [ ] Interaction pattern feels comparable for the representative task set.
 - [ ] Layout and properties workflow are understandable without fallback dialogs.
 - [ ] Preview behavior matches the signed output closely enough for acceptance.
@@ -228,3 +261,4 @@ Summary notes:
 
 - Record the final judgment for FR-3B acceptance.
 - Include any constraints that should be carried into Phase 4 or future parity testing.
+- If the overlay gate failed, call that out explicitly as the reason Phase 3 remains blocked.

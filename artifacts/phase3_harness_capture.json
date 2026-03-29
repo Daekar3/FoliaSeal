@@ -1,17 +1,16 @@
 {
   "errors": [],
-  "first_render_ms": 52.15186392888427,
+  "first_render_ms": 52.17147385701537,
   "interaction_counts": {
-    "selection_success": 6,
-    "wheel_zoom_in": 13,
-    "wheel_zoom_out": 11
+    "selection_success": 8,
+    "wheel_zoom_in": 2
   },
   "last_signature_has_visible_appearance": true,
   "last_signature_output_path": "/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf",
   "last_signature_page_index": 0,
   "pdf_path": "/home/daekar/Downloads/2019.04.24 Savor MC.PDF",
   "preview_available": true,
-  "selection_count": 6,
+  "selection_count": 8,
   "sign_request_count": 1,
   "validation_text": "Ready to sign."
 }
