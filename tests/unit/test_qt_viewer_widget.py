@@ -796,7 +796,7 @@ def test_middle_drag_pans_scrollbars(monkeypatch):
     assert widget.horizontalScrollBar().value() == 80
     assert widget.verticalScrollBar().value() == 55
     assert preview.mouse_grabbed is False
-    assert workflow.pan_updates[-1] == (-80.0, -55.0)
+    assert workflow.pan_updates[-1] == (0.0, 0.0)
 
 
 def test_middle_drag_does_not_emit_selection(monkeypatch):
@@ -884,10 +884,10 @@ def test_shift_left_drag_pans_scrollbars(monkeypatch):
     assert widget.horizontalScrollBar().value() == 90
     assert widget.verticalScrollBar().value() == 70
     assert preview.mouse_grabbed is False
-    assert workflow.pan_updates[-1] == (-90.0, -70.0)
+    assert workflow.pan_updates[-1] == (0.0, 0.0)
 
 
-def test_plain_left_drag_emits_selection_with_viewport_relative_coords(monkeypatch):
+def test_plain_left_drag_emits_selection_with_widget_relative_coords(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 
     class _WorkflowWithSelection:
@@ -928,11 +928,46 @@ def test_plain_left_drag_emits_selection_with_viewport_relative_coords(monkeypat
     preview.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=130, y=115))
 
     assert len(selected) == 1
-    assert selected[0].x1 == 10.0
-    assert selected[0].y1 == 15.0
-    assert selected[0].x2 == 30.0
-    assert selected[0].y2 == 35.0
-    assert workflow.pan_updates[-1] == (-100.0, -80.0)
+    assert selected[0].x1 == 110.0
+    assert selected[0].y1 == 95.0
+    assert selected[0].x2 == 130.0
+    assert selected[0].y2 == 115.0
+    assert workflow.pan_updates[-1] == (0.0, 0.0)
+
+
+def test_plain_left_drag_with_real_workflow_remains_in_bounds_after_scroll(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    errors = []
+    widget = build_qt_pdf_viewer_widget(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
+    widget.refresh()
+    widget.horizontalScrollBar().setValue(18)
+    widget.verticalScrollBar().setValue(24)
+    preview = widget.widget
+
+    preview.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=30, y=60))
+    preview.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=60, y=80))
+    preview.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=60, y=80))
+
+    assert errors == []
+    assert len(selected) == 1
+    normalized = selected[0].normalized()
+    assert normalized.x1 == 30.0
+    assert normalized.y1 == 20.0
+    assert normalized.x2 == 60.0
+    assert normalized.y2 == 40.0
 
 
 def test_hide_event_releases_active_middle_drag(monkeypatch):
