@@ -37,6 +37,12 @@ Foundations for a Linux desktop PDF signing app.
 
 The next implementation step is expected to add a signing-focused workflow layer on top of the existing viewer platform. These are the intended seams for downstream work and testing, even before the full UI is complete.
 
+Current status note:
+
+- Phase 3 is not yet accepted.
+- The current manual blocker is overlay interaction quality during placement and resize.
+- Until the overlay remediation wave is revalidated, treat placement/resize behavior as under active correction rather than as accepted UX.
+
 - `SigningDraftWorkflow` should own the in-session signing draft state for Phase 3.
   - It should track the chosen page, placement rectangle, appearance/property settings, and validation state.
   - It should not duplicate viewer coordinate math or Qt event handling.
@@ -50,8 +56,8 @@ The next implementation step is expected to add a signing-focused workflow layer
   - It should reuse `ViewerWorkflow` for page rendering, geometry, and selection-to-PDF mapping.
   - It should reuse the Qt preview widget adapter for render/zoom/navigation behavior.
   - It should keep properties editing, preview refresh, and sign confirmation in the application/UI layers rather than re-implementing viewer math.
-- Interactive resize handles are still a Phase 3 UI gap unless a later task adds them explicitly.
-  - For now, treat placement and fine-tuning as the target contract, not as a promise that every editor-style affordance is already present.
+- Overlay resize and placement interactions are currently the main acceptance risk area.
+  - The signing shell and harness exist, but the next manual pass should focus first on whether overlay dragging, resizing, and viewer/shell synchronization now feel stable enough to resume broader FR-3B acceptance.
 - The key integration rule is to avoid duplicating semantics across layers.
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
@@ -141,6 +147,12 @@ Review that generated checklist, check any remaining manual-only observations, a
 
 To make Phase 3 acceptance easier, there is also an interactive signing-shell harness that writes a structured capture and a partially completed FR-3B worksheet for you.
 
+Current acceptance note:
+
+- The harness helps collect a consistent record, but it does not prove that overlay placement/resize quality is acceptable.
+- Use the next manual pass to answer the overlay remediation question first: does placement and resize now feel stable, predictable, and exception-free?
+- Do not treat pre-checked harness items as sufficient to clear the placement/resize acceptance gate on their own.
+
 Run it against a representative PDF:
 
 ```bash
@@ -159,6 +171,9 @@ What it does:
 
 What still remains manual:
 
+- overlay placement and resize quality judgment
+- whether handle dragging feels predictable enough for end users
+- whether any placement exception still appears during resize
 - parity judgment against Acrobat or PDF-XChange
 - qualitative UX notes
 - signed-output fidelity judgments

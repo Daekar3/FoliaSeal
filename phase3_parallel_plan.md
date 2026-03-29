@@ -678,6 +678,126 @@ After the parallel workstreams merge, run an integration pass that checks:
 - failure messages remain user-facing first
 - tests cover the happy path and at least one invalid-property-path case
 
+## Phase 3 Overlay Remediation Wave
+
+This section applies after the first manual Phase 3 acceptance run exposed that the
+current overlay interaction is not acceptable for FR-3B.
+
+### Trigger for this wave
+
+Manual acceptance found:
+
+- persistent odd snapping/jumping while dragging overlay resize handles
+- resize behavior that does not feel predictable enough for end users
+- acceptance cannot proceed on the placement/resize task until overlay behavior is fixed
+
+### Goal
+
+Stabilize the visible signature overlay so placement and resize feel intentional,
+predictable, and acceptance-testable.
+
+### Scope for this wave
+
+In scope:
+
+- overlay interaction model
+- resize-handle behavior
+- overlay synchronization between viewer and shell
+- overlay-specific regression tests
+- acceptance/docs updates that reflect the corrected behavior
+
+Out of scope for this wave:
+
+- broader preset lifecycle work
+- non-overlay appearance features
+- large redesigns of signing orchestration
+- unrelated parity refinements unless directly required by overlay correctness
+
+### Remediation workstreams
+
+#### Overlay-Fix
+
+Primary owner:
+
+- `presentation.qt` implementation worker
+
+Responsibilities:
+
+- correct the resize interaction model
+- eliminate snapping/jumping caused by unstable handle math or coordinate conversions
+- keep overlay updates synchronized with the existing draft workflow contract
+- preserve current placement semantics unless a narrow, clearly justified change is required
+
+Suggested owned files:
+
+- `src/foliaseal/presentation/qt/viewer_widget.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+
+Expected deliverables:
+
+- stable handle dragging
+- rectangle resizing that does not invert or jump unexpectedly
+- better behavior across zoom/pan states
+- no uncaught placement exceptions from overlay interaction
+
+#### Overlay-Verification
+
+Primary owner:
+
+- focused test/review agent
+
+Responsibilities:
+
+- add or expand overlay-specific regression tests
+- verify all four corners behave predictably
+- verify overlay behavior remains stable with zoom/pan and repeated drags
+- verify shell synchronization after overlay updates
+- verify no new regressions were introduced in the viewer widget or shell
+
+Suggested owned files:
+
+- `tests/unit/test_qt_viewer_widget.py`
+- `tests/unit/test_qt_signing_shell.py`
+- optional focused review notes if needed
+
+Expected deliverables:
+
+- regression coverage for the reported manual bug
+- confidence that overlay behavior is stable enough for another acceptance run
+
+#### Overlay-Docs
+
+Primary owner:
+
+- docs/planning worker
+
+Responsibilities:
+
+- keep README and acceptance artifacts honest about the current overlay state
+- update any acceptance guidance that changed because of the overlay fix
+- avoid overpromising capabilities that remain future work
+
+Suggested owned files:
+
+- `README.md`
+- `artifacts/phase3_fr3b_acceptance_checklist.md`
+- optional acceptance notes artifact
+
+Expected deliverables:
+
+- concise documentation of the corrected overlay interaction
+- clear acceptance instructions for the next manual pass
+
+### Acceptance bar for ending this wave
+
+Do not resume broader Phase 3 work until all of the following are true:
+
+- overlay handle dragging no longer feels erratic in manual use
+- no placement exception is raised during overlay resizing
+- focused overlay/viewer/shell tests pass
+- acceptance instructions are current
+- a fresh manual rerun confirms the placement/resize task is no longer blocked by overlay behavior
+
 ## Recommended Reference Use In Future Chats
 
 When opening a new chat or spawning a new agent, reference this file directly:

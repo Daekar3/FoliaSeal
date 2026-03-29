@@ -89,6 +89,12 @@ class _FakePosition:
     def __init__(self, point: _FakePoint):
         self._point = point
 
+    def x(self):
+        return self._point.x()
+
+    def y(self):
+        return self._point.y()
+
     def toPoint(self):
         return self._point
 
@@ -323,7 +329,12 @@ def test_overlay_corner_handle_resizes_persistent_signature_overlay(monkeypatch)
         session=ViewerSession(page_count=1),
     )
     selected = []
-    preview = PdfViewerWidgetAdapter().create(workflow=workflow, on_selection=selected.append)
+    errors = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
     preview.refresh()
 
     preview.set_signature_overlay(
@@ -366,6 +377,7 @@ def test_overlay_corner_handle_resizes_persistent_signature_overlay(monkeypatch)
     )
 
     assert len(selected) == 1
+    assert errors == []
     normalized = selected[0].normalized()
     assert normalized.x1 > 20.0
     assert normalized.x2 == 60.0
@@ -381,7 +393,12 @@ def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):
         session=ViewerSession(page_count=1),
     )
     selected = []
-    preview = PdfViewerWidgetAdapter().create(workflow=workflow, on_selection=selected.append)
+    errors = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
     preview.refresh()
 
     preview.set_signature_overlay(
@@ -424,6 +441,72 @@ def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):
     )
 
     assert len(selected) == 1
+    assert errors == []
+    normalized = selected[0].normalized()
+    assert normalized.x2 > normalized.x1
+    assert normalized.y2 > normalized.y1
+
+
+def test_overlay_resize_handle_remains_stable_with_pan_offset(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    workflow.set_pan(pan_x=-18.0, pan_y=-24.0)
+
+    selected = []
+    errors = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
+    preview.refresh()
+
+    preview.set_signature_overlay(
+        SignatureRect(
+            page_index=0,
+            left_pt=20.0,
+            bottom_pt=30.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    view_rect = pdf_rect_to_view_rect(
+        pdf_rect=PdfRect(x1=20.0, y1=30.0, x2=60.0, y2=50.0),
+        transform=ViewTransform(zoom=1.0, pan_x=-18.0, pan_y=-24.0),
+        page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+        rotation=0,
+    )
+
+    preview.mousePressEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x2),
+            y=int(view_rect.y2),
+        )
+    )
+    preview.mouseMoveEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x2 + 12),
+            y=int(view_rect.y2 + 10),
+        )
+    )
+    preview.mouseReleaseEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x2 + 12),
+            y=int(view_rect.y2 + 10),
+        )
+    )
+
+    assert len(selected) == 1
+    assert errors == []
     normalized = selected[0].normalized()
     assert normalized.x2 > normalized.x1
     assert normalized.y2 > normalized.y1
