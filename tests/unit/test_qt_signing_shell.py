@@ -141,6 +141,7 @@ class _FakeComboBox(_FakeWidget):
         self._items = []
         self._current = ""
         self.currentTextChanged = _FakeSignal()
+        self.currentIndexChanged = _FakeSignal()
 
     def addItems(self, items):  # noqa: N802
         self._items.extend(items)
@@ -155,6 +156,9 @@ class _FakeComboBox(_FakeWidget):
     def setCurrentText(self, text):  # noqa: N802
         self._current = text
         self.currentTextChanged.emit(text)
+        found = self.findText(text)
+        if found >= 0:
+            self.currentIndexChanged.emit(found)
 
     def currentText(self):
         return self._current
@@ -168,6 +172,7 @@ class _FakeComboBox(_FakeWidget):
     def setCurrentIndex(self, index):  # noqa: N802
         self._current = self._items[index]
         self.currentTextChanged.emit(self._current)
+        self.currentIndexChanged.emit(index)
 
     def count(self):  # noqa: N802
         return len(self._items)
@@ -414,7 +419,7 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
     assert len(widget.properties_panel._placement_controls.container.layout.rows) == 3
     assert (
         widget.properties_panel._appearance_controls.timezone_display_mode.currentText()
-        == "utc"
+        == "UTC"
     )
     assert list(widget.properties_panel.field_controls.keys()) == [
         SignatureFieldKey.DISTINGUISHED_NAME,
@@ -643,11 +648,45 @@ def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
     source_combo = distinguished_name_controls.source_combo
 
     assert not hasattr(distinguished_name_controls, "visible_check")
-    assert source_combo.findText("hidden") != -1
-    source_combo.setCurrentText("hidden")
+    assert source_combo.findText("Hidden") != -1
+    source_combo.setCurrentText("Hidden")
     widget.properties_panel.refresh_preview()
 
     assert widget.properties_panel.preview.fields[0].visible is False
+
+
+def test_signing_shell_signing_time_hidden_source_hides_preview_field(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    signing_time_controls = widget.properties_panel.field_controls[
+        SignatureFieldKey.SIGNING_TIME
+    ]
+    signing_time_controls.source_combo.setCurrentText("Hidden")
+    widget.properties_panel.refresh_preview()
+
+    preview_field = next(
+        field
+        for field in widget.properties_panel.preview.fields
+        if field.field_key == SignatureFieldKey.SIGNING_TIME
+    )
+    assert preview_field.visible is False
 
 
 def test_signing_shell_wrapped_block_preview_groups_tail_fields(

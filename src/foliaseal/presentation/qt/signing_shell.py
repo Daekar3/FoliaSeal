@@ -160,10 +160,25 @@ def _field_label(field_key: SignatureFieldKey) -> str:
     return labels[field_key]
 
 
+def _enum_display_text(
+    value: SignatureFieldSource
+    | SignatureLayoutTemplate
+    | SignatureTimezoneDisplayMode
+    | str,
+) -> str:
+    if isinstance(value, SignatureTimezoneDisplayMode):
+        return "UTC" if value == SignatureTimezoneDisplayMode.UTC else "Local"
+    if isinstance(value, SignatureLayoutTemplate):
+        return value.value.replace("_", " ").title()
+    if isinstance(value, SignatureFieldSource):
+        return value.value.title()
+    return str(value)
+
+
 def _enum_combo_items(
     enum_cls: type[SignatureFieldSource | SignatureLayoutTemplate | SignatureTimezoneDisplayMode],
 ) -> tuple[str, ...]:
-    return tuple(member.value for member in enum_cls)
+    return tuple(_enum_display_text(member) for member in enum_cls)
 
 
 def _choice_combo_items(*, preferred: str, options: tuple[str, ...]) -> tuple[str, ...]:
@@ -276,6 +291,9 @@ def _text(line_edit: Any) -> str:
 
 
 def _selected_enum(value: str, enum_cls: type[Any]) -> Any:
+    for member in enum_cls:
+        if value == member.value or value == _enum_display_text(member):
+            return member
     try:
         return enum_cls(value)
     except ValueError as exc:
@@ -743,22 +761,22 @@ class SignaturePropertiesPanel:
 
         text_layout.addRow("Signer label prefix", signer_label_prefix)
         text_layout.addRow(
-            "Layout / timezone",
+            "Layout / Timezone",
             _compose_row(bindings, layout_template, timezone_display_mode),
         )
         text_layout.addRow(
-            "Datetime / font",
+            "Datetime / Font",
             _compose_row(bindings, datetime_format, font_family),
         )
         text_layout.addRow(
-            "Style / size",
+            "Style / Size",
             _compose_row(bindings, font_size, bold, italic),
         )
         text_layout.addRow("Text color", text_color)
 
         box_layout.addRow("Image stamp", image_stamp_path)
         box_layout.addRow(
-            "Border / background",
+            "Border / Background",
             _compose_row(bindings, border_show, border_color, border_width, background_color),
         )
 
@@ -839,6 +857,11 @@ class SignaturePropertiesPanel:
             source_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
                 lambda _text, key=field_key: self._on_field_source_changed(key)
             )
+            index_changed = getattr(source_combo, "currentIndexChanged", None)
+            if hasattr(index_changed, "connect"):
+                index_changed.connect(  # type: ignore[attr-defined]
+                    lambda _index, key=field_key: self._on_field_source_changed(key)
+                )
             override_edit.textChanged.connect(  # type: ignore[attr-defined]
                 lambda _text, key=field_key: self._on_field_changed(key)
             )
@@ -871,10 +894,13 @@ class SignaturePropertiesPanel:
     def _load_appearance_controls(self) -> None:
         appearance = self._workflow.signature_appearance or SignatureAppearance()
         _set_text(self._appearance_controls.signer_label_prefix, appearance.signer_label_prefix)
-        _set_combo_text(self._appearance_controls.layout_template, appearance.layout_template.value)
+        _set_combo_text(
+            self._appearance_controls.layout_template,
+            _enum_display_text(appearance.layout_template),
+        )
         _set_combo_text(
             self._appearance_controls.timezone_display_mode,
-            appearance.timezone_display_mode.value,
+            _enum_display_text(appearance.timezone_display_mode),
         )
         _set_checked(self._appearance_controls.show_field_names, appearance.show_field_names)
         _set_combo_text(
@@ -913,7 +939,7 @@ class SignaturePropertiesPanel:
         appearance = self._workflow.signature_appearance or SignatureAppearance()
         for field_key, binding in appearance.iter_field_bindings():
             controls = self.field_controls[field_key]
-            _set_combo_text(controls.source_combo, binding.source.value)
+            _set_combo_text(controls.source_combo, _enum_display_text(binding.source))
             _set_text(controls.override_edit, binding.override_text or "")
             self._sync_field_control_state(field_key)
 
@@ -965,7 +991,7 @@ class SignaturePropertiesPanel:
     def _build_field_binding(self, field_key: SignatureFieldKey) -> SignatureFieldBinding:
         controls = self.field_controls[field_key]
         source = _selected_enum(_combo_text(controls.source_combo), SignatureFieldSource)
-        if field_key == SignatureFieldKey.SIGNING_TIME:
+        if field_key == SignatureFieldKey.SIGNING_TIME and source == SignatureFieldSource.OVERRIDE:
             source = SignatureFieldSource.DERIVED
         override_text = _text(controls.override_edit) or None
         if source != SignatureFieldSource.OVERRIDE:
