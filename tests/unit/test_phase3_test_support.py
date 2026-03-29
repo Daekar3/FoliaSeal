@@ -10,6 +10,7 @@ from foliaseal.domain.models import (
 from tests.support.phase3_builders import (
     build_signature_appearance,
     build_signature_preset,
+    build_signature_preset_catalog,
     build_signature_rect,
     build_signing_request,
     invalid_signature_field_binding_hidden_visible_kwargs,
@@ -19,6 +20,9 @@ from tests.support.phase3_builders import (
 def test_phase3_builders_produce_consistent_valid_contracts(tmp_path: Path) -> None:
     appearance = build_signature_appearance()
     preset = build_signature_preset(appearance=appearance)
+    catalog = build_signature_preset_catalog(
+        profiles=(preset,),
+    )
     rect = build_signature_rect(page_index=3)
     request = build_signing_request(
         tmp_path,
@@ -31,6 +35,7 @@ def test_phase3_builders_produce_consistent_valid_contracts(tmp_path: Path) -> N
         width_pt=220.0,
         height_pt=80.0,
     )
+    assert catalog.profile_names() == ("default",)
     assert request.signature_rect == rect
     assert request.signature_appearance == appearance
 

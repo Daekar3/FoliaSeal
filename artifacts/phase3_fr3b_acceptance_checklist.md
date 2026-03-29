@@ -17,8 +17,15 @@ Purpose:
 Current status note:
 
 - Phase 3 is not yet accepted.
-- The current blocker for FR-3B acceptance is overlay interaction quality during placement and resize.
-- The next manual run should answer the overlay remediation question first before spending time on broader parity judgments.
+- Overlay interaction quality during placement and resize is no longer the primary blocker.
+- Named appearance profile save/select behavior is now implemented in the shell, including:
+  - saving the current appearance under a user-provided name
+  - confirming overwrite when a name already exists
+  - selecting a saved profile from a dropdown
+- The current open workflow gap is the concrete production signing backend behind the shell's
+  executor seam and the final end-to-end acceptance pass against real signed output.
+- Some worksheet items below are therefore not yet testable in the current build and should be
+  marked as such rather than treated as failures.
 
 ## Overlay remediation gate
 
@@ -60,11 +67,12 @@ Notes:
 
 Goal:
 
-- Verify that a user can create or start from a new visible signature appearance profile in the focused properties flow.
+- Verify that a user can start from and edit the current visible signature appearance draft in the
+  focused properties flow.
 
 Checks:
 
-- [ ] A new appearance can be started without leaving the signing flow.
+- [x] The current appearance draft can be edited without leaving the signing flow.
 - [ ] The focused properties panel shows the available appearance controls.
 - [ ] The appearance preview updates when the user changes appearance settings.
 - [ ] The created appearance can be applied to the current signature draft.
@@ -78,6 +86,8 @@ Notes:
 
 - Record which controls were changed and whether the preview updated immediately.
 - Record any controls that were missing, mislabeled, or required a fallback path.
+- Saved appearance profiles are covered separately below; use the named-profile section for
+  save/select/overwrite behavior.
 
 ### 2. Include or exclude identity fields
 
@@ -185,7 +195,8 @@ Notes:
 
 Goal:
 
-- Verify that a user can reuse the current appearance shape or in-session configuration without rebuilding the entire appearance from scratch.
+- Verify that a user can reuse the current appearance shape or in-session configuration without
+  rebuilding the entire appearance from scratch, if the current build exposes such a workflow.
 
 Checks:
 
@@ -203,6 +214,41 @@ Notes:
 
 - Record what was reused and whether it matched the earlier configuration shape.
 - Record whether reuse was explicit, automatic, or via a preset-like in-session action.
+- If the current build does not yet expose a reusable profile flow, mark this section as not yet
+  testable and note the limitation explicitly.
+
+### 7. Save and select a named appearance profile
+
+Goal:
+
+- Verify that a user can save the current appearance as a named profile and later select it from a dropdown.
+
+Checks:
+
+- [ ] The current appearance can be saved under a user-provided name.
+- [ ] Saving with an existing name prompts for explicit overwrite confirmation.
+- [ ] Saved profiles appear in a dropdown list.
+- [ ] Selecting a profile from the dropdown restores its appearance settings.
+- [ ] Selecting a profile from the dropdown restores its placement defaults when intended.
+- [ ] Saved profiles are still available after relaunch.
+- [ ] Persisted profiles live in a clearly labeled `Signature Profiles` directory.
+- [ ] Persisted profiles are stored in a human-readable JSON or similarly inspectable text format.
+- [ ] The UI offers a delete-current-profile action.
+- [ ] Deleting a profile prompts for explicit confirmation.
+- [ ] Deleted profiles no longer appear in the dropdown after confirmation.
+
+Pass/Fail:
+
+- [ ] Pass
+- [ ] Fail
+
+Notes:
+
+- Record whether the profile name was user-entered, overwritten, or selected from the list.
+- Record where persisted profiles are stored on disk and whether the location is understandable to
+  a user inspecting the filesystem.
+- Record whether deletion removed only the intended profile and whether the confirmation copy was
+  clear.
 
 ## Parity observations
 
@@ -242,3 +288,5 @@ Summary notes:
 - Record the final judgment for FR-3B acceptance.
 - Include any constraints that should be carried into Phase 4 or future parity testing.
 - If the overlay gate failed, call that out explicitly as the reason Phase 3 remains blocked.
+- If the signing executor seam still lacks the concrete production backend in the current build,
+  call that out explicitly as a remaining Phase 3 gap rather than a failed manual test.

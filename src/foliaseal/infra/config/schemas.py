@@ -53,6 +53,12 @@ def _require_int(payload: dict[str, Any], field: str) -> int:
     return value
 
 
+def _require_int_value(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigValidationError(f"Field '{field}' must be an int.")
+    return value
+
+
 def _require_float(payload: dict[str, Any], field: str) -> float:
     value = _require_value(payload, field)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -77,6 +83,12 @@ def _require_str(payload: dict[str, Any], field: str) -> str:
 def _require_non_empty_str(payload: dict[str, Any], field: str) -> str:
     value = _require_str(payload, field)
     if not value.strip():
+        raise ConfigValidationError(f"Field '{field}' must be a non-empty str.")
+    return value
+
+
+def _require_non_empty_str_value(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
         raise ConfigValidationError(f"Field '{field}' must be a non-empty str.")
     return value
 
@@ -315,6 +327,23 @@ class SignaturePreset:
     appearance: SignatureAppearance
     placement_defaults: SignaturePlacementDefaults | None = None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "schema_version",
+            _require_int_value(self.schema_version, "schema_version"),
+        )
+        object.__setattr__(self, "name", _require_non_empty_str_value(self.name, "name"))
+        if not isinstance(self.appearance, SignatureAppearance):
+            raise ConfigValidationError("Field 'appearance' must be a SignatureAppearance.")
+        if self.placement_defaults is not None and not isinstance(
+            self.placement_defaults,
+            SignaturePlacementDefaults,
+        ):
+            raise ConfigValidationError(
+                "Field 'placement_defaults' must be a SignaturePlacementDefaults value or None."
+            )
+
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> SignaturePreset:
         """Build from persisted mapping."""
@@ -335,3 +364,86 @@ class SignaturePreset:
             "appearance": _serialize_appearance(self.appearance),
             "placement_defaults": _serialize_placement_defaults(self.placement_defaults),
         }
+
+
+@dataclass(frozen=True)
+class SignaturePresetCatalog:
+    """Ordered collection of named signature profiles for dropdown selection."""
+
+    schema_version: int
+    profiles: tuple[SignaturePreset, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "schema_version",
+            _require_int_value(self.schema_version, "schema_version"),
+        )
+        if not isinstance(self.profiles, tuple):
+            raise ConfigValidationError("Field 'profiles' must be a tuple.")
+        seen_names: set[str] = set()
+        normalized_profiles: list[SignaturePreset] = []
+        for profile in self.profiles:
+            if not isinstance(profile, SignaturePreset):
+                raise ConfigValidationError(
+                    "Field 'profiles' must contain SignaturePreset values only."
+                )
+            if profile.name in seen_names:
+                raise ConfigValidationError("Field 'profiles' must not contain duplicate names.")
+            seen_names.add(profile.name)
+            normalized_profiles.append(profile)
+        object.__setattr__(self, "profiles", tuple(normalized_profiles))
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> SignaturePresetCatalog:
+        """Build from persisted mapping."""
+        raw_profiles = _require_value(payload, "profiles")
+        if not isinstance(raw_profiles, list):
+            raise ConfigValidationError("Field 'profiles' must be a list.")
+        profiles: list[SignaturePreset] = []
+        for entry in raw_profiles:
+            if not isinstance(entry, dict):
+                raise ConfigValidationError("Field 'profiles' must contain objects only.")
+            profiles.append(SignaturePreset.from_dict(entry))
+        return cls(
+            schema_version=_require_int(payload, "schema_version"),
+            profiles=tuple(profiles),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a persisted mapping."""
+        return {
+            "schema_version": self.schema_version,
+            "profiles": [profile.to_dict() for profile in self.profiles],
+        }
+
+    def profile_names(self) -> tuple[str, ...]:
+        """Return the profile names in stable dropdown order."""
+        return tuple(profile.name for profile in self.profiles)
+
+    def profile_named(self, name: str) -> SignaturePreset:
+        """Return a profile by its user-visible name."""
+        normalized_name = _require_non_empty_str_value(name, "name")
+        for profile in self.profiles:
+            if profile.name == normalized_name:
+                return profile
+        raise KeyError(normalized_name)
+
+    def upsert_profile(self, profile: SignaturePreset) -> SignaturePresetCatalog:
+        """Return a new catalog with the profile inserted or replaced by name."""
+        if not isinstance(profile, SignaturePreset):
+            raise ConfigValidationError("profile must be a SignaturePreset value.")
+        updated: list[SignaturePreset] = []
+        replaced = False
+        for existing in self.profiles:
+            if existing.name == profile.name:
+                updated.append(profile)
+                replaced = True
+            else:
+                updated.append(existing)
+        if not replaced:
+            updated.append(profile)
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            profiles=tuple(updated),
+        )

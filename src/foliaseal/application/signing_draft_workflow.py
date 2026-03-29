@@ -21,11 +21,13 @@ from foliaseal.domain.models import (
     SignatureFieldKey,
     SignatureFieldSource,
     SignatureLayoutTemplate,
+    SignaturePlacementDefaults,
     SignatureRect,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
 )
+from foliaseal.infra.config.schemas import SignaturePreset
 
 
 class SigningDraftValidationError(ValueError):
@@ -158,6 +160,7 @@ class SigningDraftWorkflow:
     certificate_alias: str | None = None
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
+    signature_placement_defaults: SignaturePlacementDefaults | None = None
     placement_context: SignaturePlacementContext | None = None
 
     @classmethod
@@ -178,6 +181,7 @@ class SigningDraftWorkflow:
             certificate_alias=request.certificate_alias,
             signature_rect=request.signature_rect,
             signature_appearance=request.signature_appearance,
+            signature_placement_defaults=None,
             placement_context=placement_context,
         )
 
@@ -285,6 +289,38 @@ class SigningDraftWorkflow:
     def clear_signature_appearance(self) -> None:
         """Remove the current visible-signature appearance draft."""
         self.signature_appearance = None
+
+    def capture_signature_preset(
+        self,
+        name: str,
+        *,
+        schema_version: int = 1,
+        placement_defaults: SignaturePlacementDefaults | None = None,
+    ) -> SignaturePreset:
+        """Capture the current appearance draft as a named reusable profile."""
+        if self.signature_appearance is None:
+            raise ValueError("A signature appearance must exist before saving a profile.")
+
+        effective_placement_defaults = placement_defaults
+        if effective_placement_defaults is None:
+            effective_placement_defaults = self.signature_placement_defaults
+        if effective_placement_defaults is None and self.signature_rect is not None:
+            effective_placement_defaults = SignaturePlacementDefaults(
+                width_pt=self.signature_rect.width_pt,
+                height_pt=self.signature_rect.height_pt,
+            )
+
+        return SignaturePreset(
+            schema_version=schema_version,
+            name=name,
+            appearance=self.signature_appearance,
+            placement_defaults=effective_placement_defaults,
+        )
+
+    def apply_signature_preset(self, preset: SignaturePreset) -> None:
+        """Load a named reusable profile into the current draft."""
+        self.signature_appearance = preset.appearance
+        self.signature_placement_defaults = preset.placement_defaults
 
     def validation_issues(self) -> tuple[SigningDraftValidationIssue, ...]:
         """Return blocking and non-blocking problems for the current draft."""

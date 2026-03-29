@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Protocol
 
 from foliaseal.application import (
     SignaturePlacementContext,
@@ -27,7 +27,9 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
+    SigningResult,
 )
+from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
 SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
@@ -40,6 +42,8 @@ SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
     SignatureFieldKey.REASON,
     SignatureFieldKey.LOCATION,
 )
+
+PROFILE_PLACEHOLDER = "Current draft"
 
 
 class QtSigningBindingsUnavailable(RuntimeError):
@@ -60,6 +64,7 @@ class QtSigningWidgetBindings:
     q_line_edit: type[Any]
     q_check_box: type[Any]
     q_combo_box: type[Any]
+    q_message_box: type[Any]
     q_pixmap: type[Any]
     q_double_spin_box: type[Any]
     q_spin_box: type[Any]
@@ -74,6 +79,23 @@ class FieldControls:
     container: Any
     source_combo: Any
     override_edit: Any
+
+
+@dataclass(frozen=True)
+class ProfileControls:
+    """Controls used to manage named appearance profiles."""
+
+    container: Any
+    profile_combo: Any
+    profile_name: Any
+    save_button: Any
+
+
+class SigningRequestExecutor(Protocol):
+    """Executes a validated signing request and returns a signing result."""
+
+    def execute(self, request: SigningRequest) -> SigningResult:
+        """Apply the signing request and return the result."""
 
 
 @dataclass(frozen=True)
@@ -108,6 +130,7 @@ class AppearanceControls:
     border_color: Any
     border_width: Any
     background_color: Any
+    show_field_names: Any
 
 
 @dataclass(frozen=True)
@@ -423,11 +446,17 @@ class SignaturePropertiesPanel:
         *,
         bindings: QtSigningWidgetBindings,
         workflow: SigningDraftWorkflow,
+        preset_catalog: SignaturePresetCatalog | None = None,
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
     ) -> None:
         self._bindings = bindings
         self._workflow = workflow
+        self._profile_catalog = preset_catalog or SignaturePresetCatalog(
+            schema_version=1,
+            profiles=(),
+        )
+        self._selected_profile_name: str | None = None
         self._on_change = on_change
         self._on_page_change = on_page_change
         self._suspend_updates = False
@@ -437,6 +466,7 @@ class SignaturePropertiesPanel:
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
 
+        self._profile_controls = self._build_profile_controls()
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
@@ -444,6 +474,7 @@ class SignaturePropertiesPanel:
         self.preview_controls = self._preview_controls
         self._validation_label = bindings.q_label("")
 
+        self._layout.addWidget(self._profile_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
         self._layout.addWidget(self._appearance_controls.show_field_names)
@@ -498,6 +529,7 @@ class SignaturePropertiesPanel:
     def load_from_workflow(self) -> None:
         self._suspend_updates = True
         try:
+            self._load_profile_controls()
             self._load_placement_controls()
             self._load_appearance_controls()
             self._load_field_controls()
@@ -643,8 +675,50 @@ class SignaturePropertiesPanel:
 
     def set_signature_appearance(self, signature_appearance: SignatureAppearance | None) -> None:
         self._workflow.set_signature_appearance(signature_appearance)
+        self._selected_profile_name = None
         self.load_from_workflow()
         self._notify_change()
+
+    def save_current_profile(self) -> SignaturePreset | None:
+        name = _text(self._profile_controls.profile_name).strip()
+        if not name:
+            self._emit_error("Profile name is required before saving.")
+            return None
+
+        try:
+            preset = self._workflow.capture_signature_preset(name)
+        except ValueError as exc:
+            self._emit_error(str(exc))
+            return None
+        try:
+            existing = self._profile_catalog.profile_named(name)
+        except KeyError:
+            existing = None
+
+        if existing is not None:
+            message_box = self._bindings.q_message_box
+            yes_value = getattr(message_box, "Yes", None)
+            if yes_value is None:
+                standard_button = getattr(message_box, "StandardButton", None)
+                yes_value = getattr(standard_button, "Yes", None)
+            result = message_box.question(
+                self.widget,
+                "Overwrite profile?",
+                f"Profile '{name}' already exists. Overwrite it?",
+            )
+            if result != yes_value:
+                return None
+
+        self._profile_catalog = self._profile_catalog.upsert_profile(preset)
+        self._selected_profile_name = preset.name
+        self._suspend_updates = True
+        try:
+            self._reload_profile_controls(selected_name=preset.name)
+        finally:
+            self._suspend_updates = False
+        self.load_from_workflow()
+        self._notify_change()
+        return preset
 
     def _build_placement_controls(self) -> PlacementControls:
         bindings = self._bindings
@@ -685,6 +759,39 @@ class SignaturePropertiesPanel:
             bottom_spin=bottom_spin,
             width_spin=width_spin,
             height_spin=height_spin,
+        )
+
+    def _build_profile_controls(self) -> ProfileControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Named profiles")
+        layout = bindings.q_form_layout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        profile_combo = bindings.q_combo_box()
+        profile_name = bindings.q_line_edit()
+        profile_name.setPlaceholderText("Enter a profile name")
+        save_button = bindings.q_push_button("Save profile")
+
+        layout.addRow("Saved profile", profile_combo)
+        layout.addRow("Profile name", profile_name)
+        layout.addRow("", save_button)
+
+        profile_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
+            lambda _text: self._on_profile_selected()
+        )
+        index_changed = getattr(profile_combo, "currentIndexChanged", None)
+        if hasattr(index_changed, "connect"):
+            index_changed.connect(  # type: ignore[attr-defined]
+                lambda _index: self._on_profile_selected()
+            )
+        save_button.clicked.connect(self.save_current_profile)  # type: ignore[attr-defined]
+
+        return ProfileControls(
+            container=container,
+            profile_combo=profile_combo,
+            profile_name=profile_name,
+            save_button=save_button,
         )
 
     def _build_appearance_controls(self) -> Any:
@@ -879,8 +986,13 @@ class SignaturePropertiesPanel:
             _set_spin_value(self._placement_controls.page_spin, 1)
             _set_spin_value(self._placement_controls.left_spin, 24.0)
             _set_spin_value(self._placement_controls.bottom_spin, 18.0)
-            _set_spin_value(self._placement_controls.width_spin, 72.0)
-            _set_spin_value(self._placement_controls.height_spin, 24.0)
+            placement_defaults = self._workflow.signature_placement_defaults
+            if placement_defaults is not None:
+                _set_spin_value(self._placement_controls.width_spin, placement_defaults.width_pt)
+                _set_spin_value(self._placement_controls.height_spin, placement_defaults.height_pt)
+            else:
+                _set_spin_value(self._placement_controls.width_spin, 72.0)
+                _set_spin_value(self._placement_controls.height_spin, 24.0)
             self._placement_initialized = False
             return
 
@@ -934,6 +1046,30 @@ class SignaturePropertiesPanel:
             self._appearance_controls.background_color,
             appearance.box_style.background_color_hex,
         )
+
+    def _reload_profile_controls(self, *, selected_name: str | None = None) -> None:
+        profile_combo = self._profile_controls.profile_combo
+        clear = getattr(profile_combo, "clear", None)
+        if callable(clear):
+            clear()
+        elif hasattr(profile_combo, "_items"):
+            profile_combo._items = []  # type: ignore[attr-defined]
+            profile_combo._current = ""  # type: ignore[attr-defined]
+
+        profile_combo.addItem(PROFILE_PLACEHOLDER)
+        profile_combo.addItems(self._profile_catalog.profile_names())
+        current_name = (
+            selected_name if selected_name in self._profile_catalog.profile_names() else None
+        )
+        _set_combo_text(profile_combo, current_name or PROFILE_PLACEHOLDER)
+        if current_name is None:
+            if not _text(self._profile_controls.profile_name).strip():
+                _set_text(self._profile_controls.profile_name, "")
+        else:
+            _set_text(self._profile_controls.profile_name, current_name)
+
+    def _load_profile_controls(self) -> None:
+        self._reload_profile_controls(selected_name=self._selected_profile_name)
 
     def _load_field_controls(self) -> None:
         appearance = self._workflow.signature_appearance or SignatureAppearance()
@@ -1001,6 +1137,36 @@ class SignaturePropertiesPanel:
             show_in_visible_appearance=source != SignatureFieldSource.HIDDEN,
             override_text=override_text,
         )
+
+    def _on_profile_selected(self) -> None:
+        if self._suspend_updates:
+            return
+        selected_name = _combo_text(self._profile_controls.profile_combo)
+        if selected_name == PROFILE_PLACEHOLDER or not selected_name.strip():
+            self._selected_profile_name = None
+            self._notify_change()
+            return
+        try:
+            preset = self._profile_catalog.profile_named(selected_name)
+        except KeyError:
+            self._selected_profile_name = None
+            self._notify_change()
+            return
+
+        self._selected_profile_name = preset.name
+        self._workflow.apply_signature_preset(preset)
+        self.load_from_workflow()
+        self._notify_change()
+
+    def _mark_profile_dirty(self) -> None:
+        if self._selected_profile_name is None:
+            return
+        self._selected_profile_name = None
+        self._suspend_updates = True
+        try:
+            self._reload_profile_controls(selected_name=None)
+        finally:
+            self._suspend_updates = False
 
     def _build_rect_from_controls(self) -> SignatureRect:
         return SignatureRect(
@@ -1158,24 +1324,28 @@ class SignaturePropertiesPanel:
     def _on_any_control_changed(self, *_args: object) -> None:
         if self._suspend_updates:
             return
+        self._mark_profile_dirty()
         self.apply_changes()
 
     def _on_field_changed(self, field_key: SignatureFieldKey) -> None:
         if self._suspend_updates:
             return
         self._sync_field_control_state(field_key)
+        self._mark_profile_dirty()
         self.apply_changes()
 
     def _on_field_source_changed(self, field_key: SignatureFieldKey) -> None:
         if self._suspend_updates:
             return
         self._sync_field_control_state(field_key)
+        self._mark_profile_dirty()
         self.apply_changes()
 
     def _on_placement_changed(self, *_args: object) -> None:
         if self._suspend_updates:
             return
         self._placement_initialized = True
+        self._mark_profile_dirty()
         self.apply_changes()
         if self._on_page_change is not None:
             self._on_page_change(int(_spin_value(self._placement_controls.page_spin)))
@@ -1190,6 +1360,8 @@ class SigningWorkspaceWidget:
         bindings: QtSigningWidgetBindings,
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
+        preset_catalog: SignaturePresetCatalog | None = None,
+        sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
@@ -1197,9 +1369,11 @@ class SigningWorkspaceWidget:
         self._bindings = bindings
         self._viewer_workflow = viewer_workflow
         self._draft_workflow = signing_workflow
+        self._sign_executor = sign_executor
         self._on_sign_request = on_sign_request
         self._on_error = on_error
         self._on_status_change = on_status_change
+        self._last_signing_result: SigningResult | None = None
         self.widget = bindings.q_widget()
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
@@ -1218,6 +1392,7 @@ class SigningWorkspaceWidget:
         self.properties_panel = SignaturePropertiesPanel(
             bindings=bindings,
             workflow=signing_workflow,
+            preset_catalog=preset_catalog,
             on_change=self._handle_panel_change,
             on_page_change=self._handle_page_change,
         )
@@ -1230,15 +1405,23 @@ class SigningWorkspaceWidget:
             widget_setter(self.properties_panel.container)
         self._sign_button = bindings.q_push_button("Confirm and sign")
         self._sign_button.clicked.connect(self.submit_sign_request)  # type: ignore[attr-defined]
+        self._result_label = bindings.q_label("")
+        if hasattr(self._result_label, "setWordWrap"):
+            self._result_label.setWordWrap(True)
+        if hasattr(self._result_label, "setStyleSheet"):
+            self._result_label.setStyleSheet("color: #444;")
 
         self._main_row.addWidget(self._viewer_widget, 3)
         self._main_row.addWidget(self._properties_scroll, 2)
         self._layout.addLayout(self._main_row)
         self._layout.addWidget(self._sign_button)
+        self._layout.addWidget(self._result_label)
 
         self.widget.properties_panel = self.properties_panel  # type: ignore[attr-defined]
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
+        self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
+        self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
         self.widget._signing_workspace = self  # type: ignore[attr-defined]
@@ -1264,12 +1447,49 @@ class SigningWorkspaceWidget:
     def submit_sign_request(self) -> SigningRequest | None:
         self.properties_panel.apply_changes()
         if not self.properties_panel.is_ready_to_sign():
+            self._last_signing_result = None
+            self._set_sign_result_text("")
             self._emit_error(self.properties_panel.validation_text())
             return None
         request = self._draft_workflow.build_signing_request()
         if self._on_sign_request is not None:
             self._on_sign_request(request)
+        if self._sign_executor is not None:
+            try:
+                result = self._sign_executor.execute(request)
+            except Exception as exc:  # pragma: no cover - defensive integration guard
+                failure_message = f"Signing failed: {exc}"
+                self._last_signing_result = SigningResult(
+                    success=False,
+                    failure_code=None,
+                    message=failure_message,
+                )
+                self._set_sign_result_text(failure_message, success=False)
+                self._emit_error(failure_message)
+                self.widget.last_signing_result = self._last_signing_result  # type: ignore[attr-defined]
+                return request
+            self._last_signing_result = result
+            self.widget.last_signing_result = result  # type: ignore[attr-defined]
+            if result.success:
+                self._set_sign_result_text(result.message, success=True)
+                if self._on_status_change is not None:
+                    self._on_status_change("sign_success")
+            else:
+                self._set_sign_result_text(result.message, success=False)
+                if self._on_error is not None:
+                    self._on_error(result.message)
+                if self._on_status_change is not None:
+                    self._on_status_change("sign_failure")
+            return request
+        self._last_signing_result = None
+        self.widget.last_signing_result = None  # type: ignore[attr-defined]
+        self._set_sign_result_text("")
         return request
+
+    @property
+    def last_signing_result(self) -> SigningResult | None:
+        """Return the most recent signing result, if a real executor ran."""
+        return self._last_signing_result
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         page_index = self._viewer_workflow.session.current_page
@@ -1346,6 +1566,17 @@ class SigningWorkspaceWidget:
             return
         raise RuntimeError(message)
 
+    def _set_sign_result_text(self, message: str, *, success: bool | None = None) -> None:
+        self._result_label.setText(message)
+        if not hasattr(self._result_label, "setStyleSheet"):
+            return
+        if success is True:
+            self._result_label.setStyleSheet("color: #1f6f2a; font-weight: 600;")
+        elif success is False:
+            self._result_label.setStyleSheet("color: #9f1d1d; font-weight: 600;")
+        else:
+            self._result_label.setStyleSheet("color: #444;")
+
 
 class SigningShellAdapter:
     """Factory for the Phase 3 Qt signing shell."""
@@ -1358,6 +1589,8 @@ class SigningShellAdapter:
         *,
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
+        preset_catalog: SignaturePresetCatalog | None = None,
+        sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
@@ -1366,6 +1599,8 @@ class SigningShellAdapter:
             bindings=self._bindings,
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
+            preset_catalog=preset_catalog,
+            sign_executor=sign_executor,
             on_sign_request=on_sign_request,
             on_error=on_error,
             on_status_change=on_status_change,
@@ -1393,6 +1628,7 @@ class SigningShellAdapter:
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
             q_check_box=getattr(qt_widgets, "QCheckBox"),
             q_combo_box=getattr(qt_widgets, "QComboBox"),
+            q_message_box=getattr(qt_widgets, "QMessageBox"),
             q_pixmap=getattr(qt_gui, "QPixmap"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
             q_spin_box=getattr(qt_widgets, "QSpinBox"),
@@ -1405,6 +1641,8 @@ def build_qt_signing_shell(
     *,
     viewer_workflow: ViewerWorkflow,
     signing_workflow: SigningDraftWorkflow,
+    preset_catalog: SignaturePresetCatalog | None = None,
+    sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
@@ -1415,6 +1653,8 @@ def build_qt_signing_shell(
     return adapter.create(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
+        preset_catalog=preset_catalog,
+        sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,
