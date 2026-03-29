@@ -27,6 +27,28 @@ Current implementation baseline:
 
 This phase should bridge those pieces into a real signing UX.
 
+## Current Status
+
+As of 2026-03-29, Phase 3 should still be treated as in implementation.
+
+Validated so far:
+
+- core placement and resize mechanics now behave well enough in the Qt harness
+- the richer signing request, draft workflow, preview semantics, and signing integration exist
+- the harness is useful for validating geometry, settings propagation, and request capture
+
+Not yet achieved:
+
+- a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
+- a real end-user concept of "appearance" in the GUI
+- a product-quality appearance preview and coherent signing flow
+
+Interpretation:
+
+- `phase3-signing-harness` is an engineering validation tool
+- it is not the final Phase 3 GUI target
+- harness success should be treated as implementation progress, not final acceptance
+
 ## Scope Boundary
 
 Phase 3 includes:
@@ -437,6 +459,236 @@ Phase 3 should be considered complete when all of the following are true:
 - the preview semantics match the final signing payload
 - the GUI can submit an enriched signing request through the existing signing pipeline
 - representative FR-3B parity tasks can be completed without fallback dialogs
+
+Until those conditions are met in the intended end-user workflow, Phase 3 should remain open even
+if the harness validates individual mechanics successfully.
+
+## Remaining Product Work Before FR-3B Acceptance
+
+The current harness exposed an important distinction: implementation validation has progressed
+meaningfully, but the intended signing workflow is not complete enough for final acceptance.
+
+Remaining Phase 3 product-facing work should focus on:
+
+- introducing a real visible-appearance concept in the GUI rather than exposing only raw settings
+- shaping those controls into an intentional signing flow comparable to Acrobat/PDF-XChange
+- adding a meaningful appearance preview rather than a primarily diagnostic readout
+- replacing placeholder or awkward controls with more intentional product controls
+  - example: constrained font selection instead of free-text font entry
+- validating the resulting flow against representative Acrobat-like user tasks only after that UI exists
+
+Future Phase 3 reviews should clearly separate:
+
+- implementation validation
+- true feature acceptance
+
+## Remaining Phase 3 Build Plan
+
+This section defines the remaining product-facing Phase 3 work needed before true `FR-3B`
+acceptance should be attempted.
+
+Reference model:
+
+- Adobe Acrobat's visible-signature workflow supports selecting or creating a signature appearance,
+  choosing which text/graphic elements appear, placing the signature on the page, reviewing a
+  meaningful appearance, and then confirming the sign action.
+- Relevant Adobe references consulted on 2026-03-29:
+  - custom signature appearances:
+    `https://www.adobe.com/devnet-docs/acrobatetk/tools/DigSigDC/appearances.html`
+  - personalize digital signatures:
+    `https://helpx.adobe.com/acrobat/desktop/e-sign-documents/fill-sign-documents/personlize-digital-sign.html`
+  - modify e-signatures:
+    `https://helpx.adobe.com/acrobat/kb/change-e-signature.html`
+
+### Intended User Flow
+
+The remaining FoliaSeal Phase 3 flow should aim for this shape:
+
+1. Enter signing mode for the current PDF.
+2. Choose an appearance or start editing the current appearance draft.
+3. Configure meaningful appearance options in a focused UI.
+4. Place the signature on the page.
+5. Adjust placement with direct manipulation and numeric refinement.
+6. Review a meaningful appearance preview that resembles the final visible signature.
+7. Confirm/sign from the same focused flow.
+
+The current harness helps validate mechanics underneath this flow, but should not be treated as
+the destination UI.
+
+### Product Gaps To Close
+
+The current implementation still needs:
+
+- a real user-facing "appearance" concept
+- a clearer distinction between appearance editing and low-level/debug settings
+- a meaningful appearance preview instead of mostly textual readout
+- a more intentional signing flow shell
+- more product-grade controls for constrained values
+  - font family/style should not remain raw free-text if a controlled list is more appropriate
+- final manual validation against the intended user flow rather than the harness alone
+
+### Recommended Workstreams For The Remaining Phase 3 Work
+
+#### Workstream F: Signing Flow UX architecture
+
+Purpose:
+
+- turn the current shell/harness structure into a coherent end-user signing flow
+
+Primary outputs:
+
+- revised signing flow structure
+- clearer stage progression in the GUI
+- focused action model around edit appearance, place signature, preview, and sign
+
+Owned files:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- adjacent Qt flow/layout modules as needed
+
+Deliverables:
+
+- define a clear entry into signing mode
+- structure the shell around the intended signing steps
+- remove or demote implementation/debug affordances that should not dominate the final UI
+- make the sign action feel like the final step of a coherent flow rather than a bare command button
+
+Acceptance target:
+
+- a user can describe what stage of signing they are in without reading developer notes
+
+#### Workstream G: Appearance model to product UI mapping
+
+Purpose:
+
+- introduce a real "appearance" concept in the UI, even if full preset lifecycle remains Phase 4
+
+Primary outputs:
+
+- appearance section or panel that feels intentional
+- explicit notion of current appearance draft
+- clearer mapping between visible fields, graphics, and layout choices
+
+Owned files:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- appearance-oriented presentation modules if split out
+- limited application-layer glue if required
+
+Deliverables:
+
+- present appearance editing as a named concept in the UI
+- group controls by appearance concerns rather than exposing an undifferentiated settings dump
+- support the current draft appearance clearly
+- leave full saved preset management for Phase 4
+
+Acceptance target:
+
+- `FR-3B` task language like "create a new appearance" or "modify the current appearance" makes sense to a tester
+
+#### Workstream H: Real appearance preview
+
+Purpose:
+
+- make the preview feel like a visible signature preview rather than a diagnostic text area
+
+Primary outputs:
+
+- improved preview rendering in the Qt UI
+- better visual relationship between appearance settings and the preview
+
+Owned files:
+
+- preview-related Qt presentation code
+- preview renderer integration points
+
+Deliverables:
+
+- show the current visible signature in a more product-like preview form
+- make image, text fields, layout, and style choices legible in that preview
+- keep preview semantics aligned with the signing payload
+
+Acceptance target:
+
+- a tester can understand what the final visible signature will roughly look like without interpreting internal fields manually
+
+#### Workstream I: Product-grade controls and form affordances
+
+Purpose:
+
+- replace obviously placeholder controls with more intentional ones
+
+Primary outputs:
+
+- dropdowns/choice controls where appropriate
+- improved labels and grouped controls
+- reduced dependence on free-text entry for constrained values
+
+Owned files:
+
+- Qt form/panel code
+
+Deliverables:
+
+- audit current controls for product readiness
+- convert constrained fields to dropdowns/selectors where appropriate
+- reduce ambiguity in labels and validation messages
+
+Acceptance target:
+
+- the form feels like a product UI, not just a parameter editor
+
+#### Workstream J: Final Phase 3 acceptance pass
+
+Purpose:
+
+- validate the rebuilt flow against the intended `FR-3B` experience
+
+Primary outputs:
+
+- rewritten acceptance worksheet aligned to the actual Phase 3 UI
+- final manual validation notes
+
+Owned files:
+
+- `artifacts/phase3_fr3b_acceptance_checklist.md`
+- `artifacts/phase3_fr3b_acceptance_results.md`
+- supporting docs as needed
+
+Deliverables:
+
+- replace harness-centric or misleading checklist language
+- validate the final user flow rather than raw mechanics only
+- record follow-up items that properly belong to Phase 4
+
+Acceptance target:
+
+- acceptance artifacts match the actual product being evaluated
+
+### Safe Parallelization Plan
+
+These remaining workstreams can still be parallelized carefully:
+
+1. Start `Workstream F` first.
+   - It defines the high-level shell and interaction model other UI work should fit into.
+
+2. Start `Workstream G` shortly after F defines the shell structure.
+   - G can shape the appearance concept and grouping without waiting for every preview detail.
+
+3. Start `Workstream H` once G exposes the appearance grouping and F stabilizes where preview lives.
+   - H should avoid inventing a competing UX structure.
+
+4. Start `Workstream I` after F/G identify which controls are real product controls versus temporary placeholders.
+   - This is a good sidecar stream because it can improve form affordances without owning the whole shell.
+
+5. Start `Workstream J` only after F/G/H/I have landed enough UI to be honestly testable as a user flow.
+
+### Coordination Notes
+
+- Keep the harness, but treat it as a developer validation tool.
+- Do not confuse harness success with user-flow acceptance.
+- If the desired Acrobat-style flow needs clarification at any point, prefer checking with the user
+  before locking down major UI structure.
 
 ## Agent-Ready Assignment Briefs
 
