@@ -92,6 +92,7 @@ class SigningDraftPreview:
     signer_label_prefix: str | None
     layout_template: SignatureLayoutTemplate | None
     timezone_display_mode: SignatureTimezoneDisplayMode | None
+    show_field_names: bool
     datetime_format: str | None
     text_style: SignatureTextStyle | None
     box_style: SignatureBoxStyle | None
@@ -329,6 +330,7 @@ class SigningDraftWorkflow:
             signer_label_prefix=appearance.signer_label_prefix if appearance else None,
             layout_template=appearance.layout_template if appearance else None,
             timezone_display_mode=appearance.timezone_display_mode if appearance else None,
+            show_field_names=appearance.show_field_names if appearance else False,
             datetime_format=appearance.datetime_format if appearance else None,
             text_style=appearance.text_style if appearance else None,
             box_style=appearance.box_style if appearance else None,

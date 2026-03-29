@@ -108,6 +108,7 @@ def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
     assert isinstance(use_case.signer.last_request, SigningBackendRequest)
     assert use_case.signer.last_request.signature_appearance is not None
     assert use_case.signer.last_request.signature_appearance.datetime_format == "%Y-%m-%d %H:%M"
+    assert use_case.signer.last_request.signature_appearance.show_field_names is False
     assert (
         use_case.signer.last_request.signature_appearance.image_stamp_path
         == "/tmp/stamp.png"

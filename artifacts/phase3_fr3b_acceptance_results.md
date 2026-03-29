@@ -11,8 +11,8 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 4
-- Sign requests captured: 2
+- Selection interactions captured: 1
+- Sign requests captured: 1
 - Last signature page number: 3
 - Last sign request had visible appearance: yes
 - Last sign request output path: `/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf`
@@ -158,7 +158,7 @@ Goal:
 
 Checks:
 
-- [x] The placed rectangle can be resized or repositioned in the workflow.
+- [ ] The placed rectangle can be resized or repositioned in the workflow.
 - [ ] Numeric x/y/width/height fine-tuning is available when expected.
 - [ ] Fine-tuned values are reflected in the preview.
 - [ ] Fine-tuned values remain valid after the user changes other appearance settings.

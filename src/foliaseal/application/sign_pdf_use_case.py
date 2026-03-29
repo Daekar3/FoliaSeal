@@ -79,6 +79,7 @@ class SigningBackendAppearance:
     signer_label_prefix: str
     layout_template: SignatureLayoutTemplate
     timezone_display_mode: SignatureTimezoneDisplayMode
+    show_field_names: bool
     datetime_format: str
     field_bindings: tuple[SigningBackendFieldBinding, ...]
     text_style: SignatureTextStyle
@@ -95,6 +96,7 @@ class SigningBackendAppearance:
             signer_label_prefix=appearance.signer_label_prefix,
             layout_template=appearance.layout_template,
             timezone_display_mode=appearance.timezone_display_mode,
+            show_field_names=appearance.show_field_names,
             datetime_format=appearance.datetime_format,
             field_bindings=tuple(
                 SigningBackendFieldBinding(

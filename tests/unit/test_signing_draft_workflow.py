@@ -92,6 +92,7 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert preview.signer_label_prefix == "Digitally signed by"
     assert preview.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK
     assert preview.timezone_display_mode == SignatureTimezoneDisplayMode.UTC
+    assert preview.show_field_names is False
     assert preview.datetime_format == "%Y-%m-%d %H:%M"
     assert preview.text_style == _appearance().text_style
     assert preview.box_style == _appearance().box_style

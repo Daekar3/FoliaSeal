@@ -164,6 +164,7 @@ def _serialize_appearance(value: SignatureAppearance) -> dict[str, Any]:
         "signer_label_prefix": value.signer_label_prefix,
         "layout_template": _serialize_enum(value.layout_template),
         "timezone_display_mode": _serialize_enum(value.timezone_display_mode),
+        "show_field_names": value.show_field_names,
         "datetime_format": value.datetime_format,
         "field_order": [field_key.value for field_key in value.field_order],
         "distinguished_name": _serialize_field_binding(value.distinguished_name),
@@ -203,6 +204,7 @@ def _deserialize_appearance(payload: dict[str, Any]) -> SignatureAppearance:
             "timezone_display_mode",
             SignatureTimezoneDisplayMode,
         ),  # type: ignore[arg-type]
+        show_field_names=_require_bool(payload, "show_field_names"),
         datetime_format=_require_non_empty_str(payload, "datetime_format"),
         field_order=_deserialize_field_order(payload),
         distinguished_name=_deserialize_field_binding(

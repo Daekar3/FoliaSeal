@@ -32,6 +32,7 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         build_signature_appearance(
             datetime_format="%Y-%m-%d %H:%M",
             image_stamp_path="/tmp/stamp.png",
+            show_field_names=True,
         )
     )
     workflow.set_placement_context(
@@ -80,6 +81,26 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         line.kind.value == "status" and line.text == "Ready to sign"
         for line in snapshot.lines
     )
+
+
+def test_preview_renderer_defaults_to_value_only_field_text(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    workflow.set_signature_rect(build_signature_rect(page_index=2))
+
+    preview = workflow.preview()
+    snapshot = render_signing_preview(preview)
+
+    field_lines = [line.text for line in snapshot.lines if line.kind.value == "field"]
+
+    assert preview.show_field_names is False
+    assert field_lines[0].startswith("[visible] Distinguished name (derived")
+    assert field_lines[1].startswith("[visible] Common name (derived")
+    assert field_lines[2] == "[visible] alice@example.com (override)"
+    assert field_lines[3] == "[visible] Director (override)"
+    assert field_lines[4] == "[visible] FoliaSeal (override)"
+    assert field_lines[5].startswith("[visible] 2026-")
+    assert field_lines[6] == "[visible] Approved (override)"
 
 
 def test_preview_parity_report_matches_the_final_request(tmp_path: Path) -> None:

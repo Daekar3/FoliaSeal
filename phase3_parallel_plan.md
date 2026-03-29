@@ -1224,6 +1224,154 @@ When to assign:
 
 - after Brief N and Brief O land
 
+## Follow-Up Visible Fields Simplification Wave
+
+This short wave exists because the visible-fields area still carries redundant controls and more
+label clutter than the intended signing workflow needs.
+
+The goals of this wave are:
+
+- remove redundant visibility controls
+- make the visible-fields section denser and easier to scan
+- add an appearance-level `Show field names` toggle so users can choose labeled or value-only
+  preview text
+
+This wave should be handled in sequence because the `Show field names` setting is a shared contract
+change that the shell simplification should build on directly.
+
+### Visible Fields Simplification Acceptance Target
+
+This wave should be considered complete when:
+
+- field visibility is controlled by source selection alone
+- the redundant visibility checkboxes are gone
+- the visible-fields section uses space more efficiently
+- `Show field names` defaults to `False`
+- the preview clearly switches between labeled and value-only rendering
+
+### Brief Q: Visible Fields Simplification
+
+You are simplifying the visible-fields UI so it no longer carries redundant visibility controls.
+
+Objectives:
+
+- remove the separate visibility checkbox layer
+- make the field rows denser and easier to scan
+- rely on the source control as the single truth for whether a field is shown
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant shell tests in `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- domain/application model layers
+- signing-engine code
+- viewer geometry
+
+Requirements to satisfy:
+
+- the visible-fields simplification goals in this document
+
+Expected deliverables:
+
+- remove the visible-field checkboxes from the shell
+- ensure `hidden` in the source control is the only not-shown mechanism
+- compress the visible-fields layout where practical without harming readability
+
+Implementation notes:
+
+- do not add the `Show field names` contract here unless a tiny compatibility hook is unavoidable
+- keep this brief focused on shell simplification
+
+Definition of done:
+
+- the visible-fields area is less redundant and more space-efficient
+
+When to assign:
+
+- first in this wave
+
+### Brief R: Show Field Names Contract and Preview Behavior
+
+You are adding a user-facing `Show field names` setting and wiring it through preview behavior.
+
+Objectives:
+
+- add an appearance-level toggle named `Show field names`
+- default it to `False`
+- make the preview render either `Label: value` or `value` based on that toggle
+
+Primary files you own:
+
+- `src/foliaseal/domain/models.py`
+- `src/foliaseal/application/signing_draft_workflow.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant tests in:
+  - `tests/unit/test_signature_appearance_models.py`
+  - `tests/unit/test_signing_draft_workflow.py`
+  - `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- signing-engine integration
+- unrelated shell flow/layout work
+
+Requirements to satisfy:
+
+- the visible-fields rendering goals in this document
+
+Expected deliverables:
+
+- new appearance-level `show_field_names` setting
+- default contract set to `False`
+- preview rendering that shows labels only when enabled
+- test coverage for both labeled and value-only modes
+
+Implementation notes:
+
+- preserve the existing field-order and layout-template behavior
+- this is a contract change, so update tests at every affected layer
+
+Definition of done:
+
+- preview text cleanly switches between labeled and value-only rendering
+
+When to assign:
+
+- after Brief Q lands
+
+### Brief S: Visible Fields Review
+
+You are doing a review-only pass on the visible-fields simplification wave.
+
+Objectives:
+
+- verify the source-only visibility model is clearer
+- verify `Show field names` behaves correctly for the preview
+- catch remaining redundancy, ambiguity, or missing tests
+
+Primary files to review:
+
+- `src/foliaseal/domain/models.py`
+- `src/foliaseal/application/signing_draft_workflow.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant tests in `tests/unit/`
+
+Requirements to satisfy:
+
+- use the review-agent template in this document
+- return findings, residual risks, and go/no-go
+
+Definition of done:
+
+- the team has a concrete review gate before the next manual pass
+
+When to assign:
+
+- after Brief Q and Brief R land
+
 ## Agent-Ready Assignment Briefs
 
 These briefs are written so they can be copied into separate agent threads with minimal editing.

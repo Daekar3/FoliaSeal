@@ -72,7 +72,6 @@ class FieldControls:
     """Controls used to edit one visible signature field."""
 
     container: Any
-    visible_check: Any
     source_combo: Any
     override_edit: Any
 
@@ -327,11 +326,14 @@ def _hex_to_css_color(value: str, *, fallback: str) -> str:
 
 
 def _preview_detail_text(preview: SigningDraftPreview) -> str:
-    visible_fields = [
-        f"{field.label}: {field.text}"
-        for field in preview.fields
-        if field.visible and field.text
-    ]
+    visible_fields = []
+    for field in preview.fields:
+        if not field.visible or not field.text:
+            continue
+        if preview.show_field_names:
+            visible_fields.append(f"{field.label}: {field.text}")
+        else:
+            visible_fields.append(field.text)
     if not visible_fields:
         return "No visible fields selected"
     if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
@@ -380,7 +382,7 @@ def _build_preview_issue(
     code: str,
     message: str,
     field_name: str | None = None,
-) -> SigningDraftValidationIssue:
+    ) -> SigningDraftValidationIssue:
     return SigningDraftValidationIssue(
         code=code,
         message=message,
@@ -426,6 +428,7 @@ class SignaturePropertiesPanel:
 
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
+        self._layout.addWidget(self._appearance_controls.show_field_names)
         for controls in self.field_controls.values():
             self._layout.addWidget(controls.container)
         self._layout.addWidget(self._heading("Placement"))
@@ -736,6 +739,7 @@ class SignaturePropertiesPanel:
         border_width.setSingleStep(0.5)
         background_color = bindings.q_line_edit()
         background_color.setPlaceholderText("#FFFFFF")
+        show_field_names = bindings.q_check_box("Show field names")
 
         text_layout.addRow("Signer label prefix", signer_label_prefix)
         text_layout.addRow(
@@ -776,6 +780,7 @@ class SignaturePropertiesPanel:
             border_color,
             border_width,
             background_color,
+            show_field_names,
         ):
             self._connect_change_signal(control)
 
@@ -798,6 +803,7 @@ class SignaturePropertiesPanel:
                 "border_color": border_color,
                 "border_width": border_width,
                 "background_color": background_color,
+                "show_field_names": show_field_names,
             },
         )()
 
@@ -808,10 +814,11 @@ class SignaturePropertiesPanel:
             container = bindings.q_widget()
             layout = bindings.q_hbox_layout(container)
             layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(4)
+            layout.setSpacing(6)
 
-            visible_check = bindings.q_check_box()
             label = bindings.q_label(_field_label(field_key))
+            if hasattr(label, "setMinimumWidth"):
+                label.setMinimumWidth(132)
             source_combo = bindings.q_combo_box()
             source_items = _enum_combo_items(SignatureFieldSource)
             if field_key == SignatureFieldKey.SIGNING_TIME:
@@ -825,14 +832,10 @@ class SignaturePropertiesPanel:
             else:
                 override_edit.setPlaceholderText("Override text")
 
-            layout.addWidget(visible_check)
             layout.addWidget(label)
             layout.addWidget(source_combo)
             layout.addWidget(override_edit)
 
-            visible_check.stateChanged.connect(  # type: ignore[attr-defined]
-                lambda _state, key=field_key: self._on_field_changed(key)
-            )
             source_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
                 lambda _text, key=field_key: self._on_field_source_changed(key)
             )
@@ -842,7 +845,6 @@ class SignaturePropertiesPanel:
 
             controls[field_key] = FieldControls(
                 container=container,
-                visible_check=visible_check,
                 source_combo=source_combo,
                 override_edit=override_edit,
             )
@@ -874,6 +876,7 @@ class SignaturePropertiesPanel:
             self._appearance_controls.timezone_display_mode,
             appearance.timezone_display_mode.value,
         )
+        _set_checked(self._appearance_controls.show_field_names, appearance.show_field_names)
         _set_combo_text(
             self._appearance_controls.datetime_format,
             appearance.datetime_format,
@@ -910,7 +913,6 @@ class SignaturePropertiesPanel:
         appearance = self._workflow.signature_appearance or SignatureAppearance()
         for field_key, binding in appearance.iter_field_bindings():
             controls = self.field_controls[field_key]
-            _set_checked(controls.visible_check, binding.show_in_visible_appearance)
             _set_combo_text(controls.source_combo, binding.source.value)
             _set_text(controls.override_edit, binding.override_text or "")
             self._sync_field_control_state(field_key)
@@ -944,6 +946,7 @@ class SignaturePropertiesPanel:
                 _combo_text(self._appearance_controls.timezone_display_mode),
                 SignatureTimezoneDisplayMode,
             ),
+            show_field_names=_is_checked(self._appearance_controls.show_field_names),
             datetime_format=_combo_text(self._appearance_controls.datetime_format),
             field_order=SIGNATURE_FIELD_DISPLAY_ORDER,
             distinguished_name=field_bindings[SignatureFieldKey.DISTINGUISHED_NAME],
@@ -964,13 +967,12 @@ class SignaturePropertiesPanel:
         source = _selected_enum(_combo_text(controls.source_combo), SignatureFieldSource)
         if field_key == SignatureFieldKey.SIGNING_TIME:
             source = SignatureFieldSource.DERIVED
-        visible = _is_checked(controls.visible_check)
         override_text = _text(controls.override_edit) or None
         if source != SignatureFieldSource.OVERRIDE:
             override_text = None
         return SignatureFieldBinding(
             source=source,
-            show_in_visible_appearance=visible,
+            show_in_visible_appearance=source != SignatureFieldSource.HIDDEN,
             override_text=override_text,
         )
 
@@ -1091,18 +1093,13 @@ class SignaturePropertiesPanel:
         controls = self.field_controls[field_key]
         source = _selected_enum(_combo_text(controls.source_combo), SignatureFieldSource)
         if field_key == SignatureFieldKey.SIGNING_TIME:
-            controls.visible_check.setEnabled(True)
             controls.override_edit.setEnabled(False)
             return
         if source == SignatureFieldSource.HIDDEN:
-            _set_checked(controls.visible_check, False)
-            controls.visible_check.setEnabled(False)
             controls.override_edit.setEnabled(False)
         elif source == SignatureFieldSource.OVERRIDE:
-            controls.visible_check.setEnabled(True)
             controls.override_edit.setEnabled(True)
         else:
-            controls.visible_check.setEnabled(True)
             controls.override_edit.setEnabled(False)
 
     def _notify_change(self) -> None:
