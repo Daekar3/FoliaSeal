@@ -33,6 +33,30 @@ Foundations for a Linux desktop PDF signing app.
   - Qt preview widget adapter (`presentation.qt`) with wheel zoom, scrollbar-backed pan syncing, and drag-selection wiring to viewer workflow
 - unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, Qt widget dependency diagnostics, and deterministic Qt backend availability coverage
 
+## Phase 3 integration contracts
+
+The next implementation step is expected to add a signing-focused workflow layer on top of the existing viewer platform. These are the intended seams for downstream work and testing, even before the full UI is complete.
+
+- `SigningDraftWorkflow` should own the in-session signing draft state for Phase 3.
+  - It should track the chosen page, placement rectangle, appearance/property settings, and validation state.
+  - It should not duplicate viewer coordinate math or Qt event handling.
+- `render_signing_preview()` should turn the normalized draft state into a preview representation.
+  - It should be treated as the single source of truth for preview formatting.
+  - The Qt shell should reuse it rather than rebuilding preview semantics in widget code.
+- `compare_preview_to_request()` should be a narrow consistency check between the preview model and the final signing request.
+  - It should be used to catch drift between the visible draft and the request payload.
+  - It should not become a second preview renderer or a substitute for validation.
+- The Qt signing shell should sit on top of the existing viewer platform.
+  - It should reuse `ViewerWorkflow` for page rendering, geometry, and selection-to-PDF mapping.
+  - It should reuse the Qt preview widget adapter for render/zoom/navigation behavior.
+  - It should keep properties editing, preview refresh, and sign confirmation in the application/UI layers rather than re-implementing viewer math.
+- Interactive resize handles are still a Phase 3 UI gap unless a later task adds them explicitly.
+  - For now, treat placement and fine-tuning as the target contract, not as a promise that every editor-style affordance is already present.
+- The key integration rule is to avoid duplicating semantics across layers.
+  - Workflow code should normalize the draft.
+  - Preview code should render that normalized state.
+  - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
+
 ## Local development
 
 ```bash

@@ -166,16 +166,7 @@ def _selected_enum(value: str, enum_cls: type[Any]) -> Any:
 def _format_preview_text(
     preview: SigningDraftPreview,
 ) -> str:
-    lines = [line.text for line in render_signing_preview(preview).lines]
-    datetime_format = getattr(preview, "datetime_format", None)
-    if datetime_format is not None:
-        lines.append(f"Datetime format: {datetime_format}")
-    image_stamp_path = getattr(preview, "image_stamp_path", None)
-    if image_stamp_path is not None:
-        lines.append(f"Image stamp: {image_stamp_path}")
-    else:
-        lines.append("Image stamp: none")
-    return "\n".join(lines)
+    return "\n".join(line.text for line in render_signing_preview(preview).lines)
 
 
 def _build_preview_issue(
@@ -247,7 +238,11 @@ class SignaturePropertiesPanel:
 
     def is_ready_to_sign(self) -> bool:
         preview = self._current_preview()
-        return preview.can_submit and self._control_issue is None
+        if not preview.can_submit:
+            return False
+        if self._control_issue is None:
+            return True
+        return self._control_issue.severity != SigningDraftValidationSeverity.ERROR
 
     def validation_text(self) -> str:
         text = _text(self._validation_label)
@@ -624,18 +619,36 @@ class SignaturePropertiesPanel:
         if self._control_issue is None:
             return preview
         combined_issues = preview.issues + (self._control_issue,)
+        can_submit = preview.can_submit
+        if self._control_issue.severity == SigningDraftValidationSeverity.ERROR:
+            can_submit = False
         return replace(
             preview,
             issues=combined_issues,
-            can_submit=False,
+            can_submit=can_submit,
         )
 
     def _format_validation_text(self, preview: SigningDraftPreview) -> str:
-        if preview.can_submit and not preview.issues:
-            return "Ready to sign."
+        blocking_issues = [
+            issue
+            for issue in preview.issues
+            if issue.severity == SigningDraftValidationSeverity.ERROR
+        ]
+        warning_issues = [
+            issue
+            for issue in preview.issues
+            if issue.severity == SigningDraftValidationSeverity.WARNING
+        ]
+        if not blocking_issues:
+            lines = ["Ready to sign."]
+            lines.extend(
+                f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
+                for issue in warning_issues
+            )
+            return "\n".join(lines)
         return "\n".join(
             f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
-            for issue in preview.issues
+            for issue in blocking_issues
         )
 
     def _sync_field_control_state(self, field_key: SignatureFieldKey) -> None:

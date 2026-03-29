@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application import (
+    SigningDraftValidationIssue,
+    SigningDraftValidationSeverity,
+    SigningDraftWorkflow,
+)
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -370,8 +374,52 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
 
     preview_text = widget.properties_panel.preview_text()
 
-    assert "Datetime format: %d/%m/%Y %H:%M" in preview_text
-    assert "Image stamp: /tmp/stamp.png" in preview_text
+    assert preview_text.count("Datetime format: %d/%m/%Y %H:%M") == 1
+    assert preview_text.count("Image stamp: /tmp/stamp.png") == 1
+
+
+def test_signing_shell_warning_only_issue_keeps_readiness_enabled(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+    widget.properties_panel._control_issue = SigningDraftValidationIssue(
+        code="preview_warning",
+        message="Preview is stale but still usable.",
+        field_name="signature_appearance",
+        severity=SigningDraftValidationSeverity.WARNING,
+    )
+    widget.properties_panel.refresh_preview()
+
+    assert widget.properties_panel.preview.can_submit is True
+    assert widget.properties_panel.is_ready_to_sign() is True
+    assert widget._signing_workspace._sign_button._enabled is True
+    validation_text = widget.properties_panel.validation_text()
+    assert validation_text.startswith("Ready to sign.")
+    assert "WARNING preview_warning: Preview is stale but still usable." in validation_text
 
 
 def test_signing_shell_blocks_invalid_appearance_and_reports_validation(
