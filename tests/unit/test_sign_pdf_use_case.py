@@ -11,6 +11,7 @@ from foliaseal.domain.errors import (
     TsaUnavailableError,
 )
 from foliaseal.domain.models import SigningOutput, SigningRequest, VerificationSummary
+from tests.support.phase3_builders import build_signing_request
 
 
 @dataclass
@@ -54,14 +55,7 @@ class RaisingSigner:
 
 
 def _request(tmp_path: Path) -> SigningRequest:
-    return SigningRequest(
-        input_pdf_path=str(tmp_path / "input.pdf"),
-        output_pdf_path=str(tmp_path / "output.pdf"),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        tsa_url="https://tsa.example.com",
-        timestamp_required=True,
-    )
+    return build_signing_request(tmp_path)
 
 
 def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
@@ -139,13 +133,10 @@ def test_sign_use_case_rejects_unsupported_input_version(tmp_path: Path) -> None
 
 
 def test_sign_use_case_rejects_equal_input_and_output_paths(tmp_path: Path) -> None:
-    request = SigningRequest(
-        input_pdf_path=str(tmp_path / "same.pdf"),
-        output_pdf_path=str(tmp_path / "same.pdf"),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        tsa_url="https://tsa.example.com",
-        timestamp_required=True,
+    request = build_signing_request(
+        tmp_path,
+        input_name="same.pdf",
+        output_name="same.pdf",
     )
     use_case = SignPdfUseCase(
         inspector=StubInspector(),
@@ -172,13 +163,10 @@ def test_sign_use_case_rejects_equal_input_and_output_paths(tmp_path: Path) -> N
 def test_sign_use_case_rejects_paths_pointing_to_same_file_via_relative_path(
     tmp_path: Path,
 ) -> None:
-    request = SigningRequest(
-        input_pdf_path=str(tmp_path / "same.pdf"),
-        output_pdf_path=str(tmp_path / "nested" / ".." / "same.pdf"),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        tsa_url="https://tsa.example.com",
-        timestamp_required=True,
+    request = build_signing_request(
+        tmp_path,
+        input_name="same.pdf",
+        output_name="nested/../same.pdf",
     )
     use_case = SignPdfUseCase(
         inspector=StubInspector(),
