@@ -136,3 +136,30 @@ To capture first-render and navigation timings during a real Qt session, launch 
 The harness opens the Qt viewer, records first-render and page-navigation timings automatically, logs selection/error events in the window, and prints a ready-to-run `phase2-evidence` command when you close it.
 It also writes a JSON capture with the recorded timing samples and any saved selection callback count, plus a run-specific checklist results file at [`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
 Review that generated checklist, check any remaining manual-only observations, and then run the printed evidence command so the final markdown report and checklist status come from the same run artifacts.
+
+## Phase 3 acceptance harness
+
+To make Phase 3 acceptance easier, there is also an interactive signing-shell harness that writes a structured capture and a partially completed FR-3B worksheet for you.
+
+Run it against a representative PDF:
+
+```bash
+.venv/bin/python -m foliaseal phase3-signing-harness \
+  --pdf-path "/path/to/representative.pdf" \
+  --summary-json-path artifacts/phase3_harness_capture.json \
+  --checklist-results-path artifacts/phase3_fr3b_acceptance_results.md
+```
+
+What it does:
+
+- launches the current Qt signing shell on the chosen PDF
+- records a structured capture of preview availability, selection count, sign-request count, and any surfaced errors
+- writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
+- automatically checks the acceptance items that can be observed directly from the harness
+
+What still remains manual:
+
+- parity judgment against Acrobat or PDF-XChange
+- qualitative UX notes
+- signed-output fidelity judgments
+- any task steps that require human interpretation rather than observable harness events
