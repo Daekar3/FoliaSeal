@@ -72,7 +72,7 @@ class PdfViewerWidgetAdapter:
                 self._overlay_drag_handle: str | None = None
                 self._overlay_drag_view_rect: ViewRect | None = None
                 self._overlay_drag_start_view_rect: ViewRect | None = None
-                self._overlay_handle_half_size = 4.0
+                self._overlay_handle_half_size = 6.0
                 self._overlay_min_span_px = 8.0
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
@@ -98,19 +98,19 @@ class PdfViewerWidgetAdapter:
 
             def paintEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 painter = bindings.q_painter(self)
-                if self._pixmap is not None:
-                    painter.drawPixmap(0, 0, self._pixmap)
+                try:
+                    if self._pixmap is not None:
+                        painter.drawPixmap(0, 0, self._pixmap)
 
-                if self._selection_rect is not None:
-                    painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
-                    painter.drawRect(self._selection_rect.normalized())
+                    if self._selection_rect is not None:
+                        painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
+                        painter.drawRect(self._selection_rect.normalized())
 
-                overlay_rect = self._current_overlay_qrect()
-                if overlay_rect is not None:
-                    self._draw_overlay(painter, overlay_rect)
-
-                painter.end()
-                super().paintEvent(event)
+                    overlay_rect = self._current_overlay_qrect()
+                    if overlay_rect is not None:
+                        self._draw_overlay(painter, overlay_rect)
+                finally:
+                    painter.end()
 
             def wheelEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 delta = event.angleDelta().y()
@@ -243,7 +243,7 @@ class PdfViewerWidgetAdapter:
                         self.update()
                         event.accept()
                         return
-                self._drag_origin = point
+                self._drag_origin = point.toPoint()
                 self._selection_rect = bindings.q_rect(self._drag_origin, self._drag_origin)
                 self.update()
 
