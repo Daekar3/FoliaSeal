@@ -1,0 +1,16 @@
+{
+  "errors": [],
+  "first_render_ms": 50.326322903856635,
+  "interaction_counts": {
+    "wheel_zoom_in": 3,
+    "wheel_zoom_out": 4
+  },
+  "last_signature_has_visible_appearance": false,
+  "last_signature_output_path": null,
+  "last_signature_page_index": null,
+  "pdf_path": "/home/daekar/Downloads/2019.04.24 Savor MC.PDF",
+  "preview_available": true,
+  "selection_count": 0,
+  "sign_request_count": 0,
+  "validation_text": "Ready to sign."
+}
