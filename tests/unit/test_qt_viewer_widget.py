@@ -512,6 +512,86 @@ def test_overlay_resize_handle_remains_stable_with_pan_offset(monkeypatch):
     assert normalized.y2 > normalized.y1
 
 
+def test_overlay_resize_handle_preserves_grab_offset_without_snapping(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    errors = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
+    preview.refresh()
+
+    preview.set_signature_overlay(
+        SignatureRect(
+            page_index=0,
+            left_pt=20.0,
+            bottom_pt=30.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    view_rect = pdf_rect_to_view_rect(
+        pdf_rect=PdfRect(x1=20.0, y1=30.0, x2=60.0, y2=50.0),
+        transform=ViewTransform(zoom=1.0, pan_x=0.0, pan_y=0.0),
+        page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+        rotation=0,
+    )
+
+    start_x = int(min(view_rect.x1, view_rect.x2) + 4)
+    start_y = int(min(view_rect.y1, view_rect.y2) + 3)
+    end_x = start_x + 10
+    end_y = start_y + 8
+
+    preview.mousePressEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=start_x,
+            y=start_y,
+        )
+    )
+    preview.mouseMoveEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=end_x,
+            y=end_y,
+        )
+    )
+    preview.mouseReleaseEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=end_x,
+            y=end_y,
+        )
+    )
+
+    assert len(selected) == 1
+    assert errors == []
+    expected_view_top = min(view_rect.y1, view_rect.y2) + 8.0
+    expected_view_bottom = max(view_rect.y1, view_rect.y2)
+    expected = workflow.selection_to_pdf_rect(
+        selection=type(view_rect)(
+            x1=min(view_rect.x1, view_rect.x2) + 10.0,
+            y1=expected_view_top,
+            x2=max(view_rect.x1, view_rect.x2),
+            y2=expected_view_bottom,
+        )
+    ).normalized()
+    normalized = selected[0].normalized()
+    assert normalized.x1 == pytest.approx(expected.x1)
+    assert normalized.y1 == pytest.approx(expected.y1)
+    assert normalized.x2 == pytest.approx(expected.x2)
+    assert normalized.y2 == pytest.approx(expected.y2)
+
+
 def test_mouse_release_event_reports_selection_mapping_errors(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
     workflow = _build_workflow()
