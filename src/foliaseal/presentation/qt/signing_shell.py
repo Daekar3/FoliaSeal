@@ -804,13 +804,18 @@ class SigningWorkspaceWidget:
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         page_index = self._viewer_workflow.session.current_page
-        signature_rect = SignatureRect(
-            page_index=page_index,
-            left_pt=pdf_rect.x1,
-            bottom_pt=pdf_rect.y1,
-            width_pt=pdf_rect.x2 - pdf_rect.x1,
-            height_pt=pdf_rect.y2 - pdf_rect.y1,
-        )
+        normalized_rect = pdf_rect.normalized()
+        try:
+            signature_rect = SignatureRect(
+                page_index=page_index,
+                left_pt=normalized_rect.x1,
+                bottom_pt=normalized_rect.y1,
+                width_pt=normalized_rect.x2 - normalized_rect.x1,
+                height_pt=normalized_rect.y2 - normalized_rect.y1,
+            )
+        except ValueError as exc:
+            self._emit_error(f"Unable to apply signature placement: {exc}")
+            return
         self.properties_panel.set_signature_rect(signature_rect)
         self._sync_signature_overlay()
         self._sync_placement_context_from_viewer()

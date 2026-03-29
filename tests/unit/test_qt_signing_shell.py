@@ -328,6 +328,34 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget.properties_scroll.widget_resizable is True
 
 
+def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=40.0, y1=30.0, x2=10.0, y2=12.0))
+    request = widget.submit_sign_request()
+
+    assert request is not None
+    assert request.signature_rect is not None
+    assert request.signature_rect.left_pt == 10.0
+    assert request.signature_rect.bottom_pt == 12.0
+    assert request.signature_rect.width_pt == 30.0
+    assert request.signature_rect.height_pt == 18.0
+
+
 def test_signing_shell_page_selection_and_resize_controls_update_workflow(
     monkeypatch,
     tmp_path: Path,
