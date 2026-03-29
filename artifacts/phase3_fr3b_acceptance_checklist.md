@@ -221,7 +221,7 @@ Notes:
 
 Goal:
 
-- Verify that a user can save the current appearance as a named profile and later select it from a dropdown.
+- Verify that a user can save, relaunch, reselect, and delete named appearance profiles from the shell.
 
 Checks:
 
@@ -235,7 +235,9 @@ Checks:
 - [ ] Persisted profiles are stored in a human-readable JSON or similarly inspectable text format.
 - [ ] The UI offers a delete-current-profile action.
 - [ ] Deleting a profile prompts for explicit confirmation.
+- [ ] Canceling delete leaves the profile intact.
 - [ ] Deleted profiles no longer appear in the dropdown after confirmation.
+- [ ] Deleted profiles remain absent after relaunch.
 
 Pass/Fail:
 
@@ -247,8 +249,10 @@ Notes:
 - Record whether the profile name was user-entered, overwritten, or selected from the list.
 - Record where persisted profiles are stored on disk and whether the location is understandable to
   a user inspecting the filesystem.
-- Record whether deletion removed only the intended profile and whether the confirmation copy was
-  clear.
+- Record whether deletion removed only the intended profile, whether cancel preserved it, and
+  whether the confirmation copy was clear.
+- If persistence or delete behavior is not yet implemented in the current build, mark the relevant
+  checks as not yet testable instead of failed.
 
 ## Parity observations
 

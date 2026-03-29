@@ -1587,6 +1587,151 @@ When to assign:
 
 - after T, U, and V land
 
+## Follow-Up Profile Persistence and Deletion Wave
+
+This wave focuses on closing the remaining named-profile lifecycle gaps discovered during manual
+review:
+
+- saved profiles must persist across relaunches
+- persisted profiles must live in a clearly labeled `Signature Profiles` directory
+- persisted profiles must be stored in a human-readable JSON or similarly inspectable text format
+- the shell must support deleting the currently selected profile with explicit confirmation
+
+### Profile Persistence and Deletion Acceptance Target
+
+This wave should be considered complete when:
+
+- a user can save a named profile and still see it after relaunching the app or harness
+- persisted profiles are written beneath a clearly labeled `Signature Profiles` directory
+- persisted profiles use a human-readable JSON or similarly inspectable text format
+- selecting a persisted profile repopulates the current appearance state correctly
+- the shell offers a delete-current-profile action
+- deleting a profile requires explicit confirmation
+- a deleted profile no longer appears in the dropdown after confirmation or relaunch
+
+### Brief X: Persistent Profile Storage
+
+You are implementing on-disk persistence for named appearance profiles.
+
+Objectives:
+
+- persist named appearance profiles across relaunches
+- use a clearly labeled `Signature Profiles` directory
+- use a human-readable JSON or similarly inspectable text format
+- keep the contract focused on Phase 3 profile lifecycle needs rather than full preset management
+
+Primary files you own:
+
+- `src/foliaseal/infra/config/schemas.py`
+- `src/foliaseal/application/signing_draft_workflow.py`
+- new infra/application persistence helpers as needed
+- relevant tests in `tests/unit/`
+
+Files you should avoid editing unless absolutely necessary:
+
+- most Qt layout/shell code
+- signing backend integration
+
+Requirements to satisfy:
+
+- stable load/save behavior for named profiles across process restart
+- a storage location understandable to a user inspecting the filesystem
+
+Expected deliverables:
+
+- persistence helpers for reading and writing the profile catalog
+- a clearly named storage directory contract for saved profiles
+- human-readable serialized profile files
+- tests covering:
+  - save profiles to disk
+  - reload profiles from disk
+  - preserve stable dropdown ordering if required by the chosen design
+  - handle empty/missing storage directories gracefully
+
+Implementation notes:
+
+- optimize for clarity and inspectability over cleverness
+- avoid dragging in broad Phase 4 preset-management scope
+
+Definition of done:
+
+- the shell can rely on a persistent profile catalog that survives relaunches
+
+### Brief Y: Delete Profile UI and Persistence Wiring
+
+You are implementing safe delete behavior and wiring the shell to the persistent profile catalog.
+
+Objectives:
+
+- load persisted profiles into the shell on startup
+- let the user delete the currently selected profile
+- require explicit confirmation before deletion
+- keep save/select/delete behavior coherent in the same focused workflow
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- any light application glue needed to load persisted profiles into the shell
+- relevant shell tests in `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- deeper persistence/model work owned by Brief X
+- signing backend integration
+
+Requirements to satisfy:
+
+- persisted profiles appear in the shell after relaunch
+- delete-current-profile UX with explicit confirmation
+
+Expected deliverables:
+
+- shell wiring that loads the persistent profile catalog
+- delete-current-profile action in the named-profiles area
+- explicit confirmation before deleting the selected profile
+- dropdown refresh behavior after delete/save/select
+- tests covering:
+  - persisted profiles appear after reload
+  - delete confirmation accept path
+  - delete confirmation cancel path
+  - deleted profiles no longer appear in the dropdown
+
+Implementation notes:
+
+- keep the UI focused and compact
+- optimize for preventing accidental destructive clicks
+
+Definition of done:
+
+- a user can save, relaunch, reselect, and delete profiles safely from the shell
+
+### Brief Z: Profile Persistence and Deletion Review
+
+You are doing a review-only pass on persistent named profiles and safe deletion.
+
+Objectives:
+
+- verify persisted profiles survive relaunch
+- verify storage location and format are understandable
+- verify delete-current-profile behavior is safe and explicit
+- identify regressions or remaining acceptance blockers
+
+Primary files to review:
+
+- persistence files from Brief X
+- shell and integration files from Brief Y
+- relevant tests in `tests/unit/`
+- related docs and acceptance artifacts if changed
+
+Requirements to satisfy:
+
+- use the review-agent template in this document
+- return findings, residual risks, and go/no-go
+
+Definition of done:
+
+- the team has a concrete review gate before the next manual save/relaunch/delete pass
+
 ## Agent-Ready Assignment Briefs
 
 These briefs are written so they can be copied into separate agent threads with minimal editing.

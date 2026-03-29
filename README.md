@@ -18,42 +18,21 @@ Foundations for a Linux desktop PDF signing app.
     (`OUTPUT_PATH_INVALID`, `PKCS12_WRONG_PASSWORD`, `PKCS12_LOAD_FAILED`,
     `TSA_UNREACHABLE`, `TIMESTAMP_REQUIRED_BUT_MISSING`, `POST_VERIFY_FAILED`,
     `PDF_SIGNING_FAILED`, `ATOMIC_WRITE_FAILED`, `UNEXPECTED_INTERNAL_ERROR`)
-- Phase 2 kickoff viewer foundations with:
-  - render adapter abstraction (`infra.render`) and fallback backend diagnostics
-  - deterministic view↔PDF coordinate transform utilities (zoom, pan, rotation, page-box offsets)
-  - pre-sign PDF rectangle bounds validation helper
-  - page render LRU cache policy primitives for upcoming viewer integration
-  - Qt render backend that augments QtPdf rendering with cached parsed PDF page metadata when available, while falling back to QtPdf page-size geometry for documents the lightweight parser cannot decode and disabling selection-to-PDF mapping on those lossy fallback pages
-  - Qt image-buffer extraction hardened for pointer-style `QImage.bits()` APIs used by PySide bindings
-  - `ViewerSession` helper for page navigation and zoom/fit interactions
-  - `ViewerPerformanceTracker` helper for first-render and navigation timing metrics
-  - Phase 2 evidence formatter utilities to capture timing snapshots alongside runtime environment details
-  - CLI helper (`foliaseal phase2-evidence ...` or `python -m foliaseal phase2-evidence ...`) to generate Phase 2 markdown timing evidence snippets, including optional auto-capture of startup launch-readiness from a probe command or long-running GUI executable, plus idle memory and bundle-size metrics for FR-16 evidence
-  - `ViewerWorkflow` helper that wires renderer output, page geometry, selection transforms, and timing capture for Qt widget integration
-  - Qt preview widget adapter (`presentation.qt`) with wheel zoom, scrollbar-backed pan syncing, and drag-selection wiring to viewer workflow
-- unit tests expanded for render adapter fallback behavior, coordinate transforms, cache policy, viewer session behavior, Qt widget dependency diagnostics, and deterministic Qt backend availability coverage
+- Phase 2 viewer foundations with render adapters, coordinate transforms, viewer workflow helpers, Qt preview wiring, and timing/evidence utilities that are still available for historical verification and lower-level regression checks
 
 ## Phase 3 integration contracts
 
-The next implementation step is expected to add a signing-focused workflow layer on top of the existing viewer platform. These are the intended seams for downstream work and testing, even before the full UI is complete.
+Phase 3 builds the first end-user signing workflow on top of the Phase 2 viewer platform.
 
-Current status note:
+Current capabilities:
 
-- Phase 3 is not yet accepted.
-- The current manual blocker is overlay interaction quality during placement and resize.
-- Until the overlay remediation wave is revalidated, treat placement/resize behavior as under active correction rather than as accepted UX.
-
-- `SigningDraftWorkflow` should own the in-session signing draft state for Phase 3.
+- `SigningDraftWorkflow` owns the in-session signing draft state for Phase 3.
   - It should track the chosen page, placement rectangle, appearance/property settings, and validation state.
   - It should not duplicate viewer coordinate math or Qt event handling.
 - Named appearance profiles are now part of the current Phase 3 shell workflow.
   - A user can save the current appearance under a distinct user-provided name.
   - Saved profiles can be selected from a dropdown in the shell.
   - Saving to an existing name uses explicit overwrite confirmation.
-  - The next profile-lifecycle step is to persist those saved profiles across relaunches in a
-    clearly labeled `Signature Profiles` directory using a human-readable JSON or similarly
-    inspectable text format.
-  - The next shell refinement is a delete-current-profile action with explicit confirmation.
 - `render_signing_preview()` should turn the normalized draft state into a preview representation.
   - It should be treated as the single source of truth for preview formatting.
   - The Qt shell should reuse it rather than rebuilding preview semantics in widget code.
@@ -64,14 +43,21 @@ Current status note:
   - It should reuse `ViewerWorkflow` for page rendering, geometry, and selection-to-PDF mapping.
   - It should reuse the Qt preview widget adapter for render/zoom/navigation behavior.
   - It should keep properties editing, preview refresh, and sign confirmation in the application/UI layers rather than re-implementing viewer math.
-- Overlay resize and placement interactions are currently the main acceptance risk area.
-  - The signing shell and harness exist, and the next manual pass should focus on whether overlay dragging, resizing, and viewer/shell synchronization remain stable enough to support broader FR-3B acceptance.
+- The signing shell and harness now support meaningful manual review of:
+  - placement and resize behavior
+  - appearance editing and preview behavior
+  - named profile save/select workflows
+  - executor-backed sign/apply integration seams
 - The shell can now call an injected signing executor and surface success/failure results.
-  - The remaining open implementation item is the concrete production signing backend that should be supplied to that executor seam for full end-to-end output verification.
 - The key integration rule is to avoid duplicating semantics across layers.
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
   - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
+
+Not yet production-ready:
+
+- a concrete production signing backend behind the shell's executor seam
+- final end-to-end FR-3B acceptance validation
 
 ## Local development
 
@@ -87,7 +73,7 @@ python -m foliaseal
 
 ## PyInstaller build
 
-Build a one-dir bundle for FR-16 evidence capture:
+Build a one-dir bundle for packaging and runtime evidence capture:
 
 ```bash
 .venv/bin/pip install -e .[dev]
@@ -99,59 +85,17 @@ This produces:
 - bundle directory: `dist/foliaseal`
 - executable: `dist/foliaseal/foliaseal`
 
-You can then generate a fuller Phase 2 evidence block against the packaged app:
+Phase 2 evidence commands and prior runtime notes are still available in:
+
+- [phase2_manual_qa_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md)
+- [phase2_runtime_evidence.md](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md)
+
+For lower-level viewer regression checks, you can still run:
 
 ```bash
-.venv/bin/python -m foliaseal phase2-evidence \
-  --first-render-ms 47.54 \
-  --navigation-ms 49.35 \
-  --navigation-ms 45.06 \
-  --navigation-ms 47.68 \
-  --navigation-ms 49.00 \
-  --navigation-ms 47.79 \
-  --navigation-ms 41.84 \
-  --navigation-ms 47.68 \
-  --navigation-ms 48.70 \
-  --navigation-ms 47.14 \
-  --navigation-ms 42.44 \
-  --navigation-ms 47.98 \
-  --navigation-ms 48.33 \
-  --navigation-ms 53.64 \
-  --navigation-ms 42.77 \
-  --navigation-ms 47.17 \
-  --navigation-ms 48.19 \
-  --navigation-ms 54.07 \
-  --navigation-ms 43.07 \
-  --navigation-ms 46.57 \
-  --navigation-ms 52.18 \
-  --measure-startup-command dist/foliaseal/foliaseal \
-  --startup-ready-after-seconds 0.75 \
-  --collect-runtime-footprint \
-  --bundle-dir dist/foliaseal \
-  --check-qt-runtime \
-  --qa-checklist-file artifacts/phase2_manual_qa_results.md \
-  --write-markdown-file artifacts/phase2_runtime_evidence.md
+.venv/bin/python -m foliaseal phase2-viewer-harness --pdf-path "/path/to/representative.pdf"
+.venv/bin/python -m foliaseal phase2-evidence --write-markdown-file artifacts/phase2_runtime_evidence.md
 ```
-
-`--measure-startup-command` now measures launch readiness rather than waiting for a normal process exit. Short-lived probe commands return their full runtime; long-running GUI commands are treated as started once they stay alive for the configured readiness window and are then terminated by the helper.
-
-If you do not yet have interactive first-render/navigation timings from a manual Qt session, you can still use the same command shape without the timing flags to refresh the packaging-side evidence in [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) while leaving the FR-13 items explicitly unrecorded.
-
-## Interactive Phase 2 harness
-
-To capture first-render and navigation timings during a real Qt session, launch the harness against a representative PDF:
-
-```bash
-.venv/bin/python -m foliaseal phase2-viewer-harness \
-  --pdf-path "/path/to/representative.pdf" \
-  --summary-json-path artifacts/phase2_harness_capture.json \
-  --evidence-command-path artifacts/phase2_evidence_command.sh \
-  --checklist-results-path artifacts/phase2_manual_qa_results.md
-```
-
-The harness opens the Qt viewer, records first-render and page-navigation timings automatically, logs selection/error events in the window, and prints a ready-to-run `phase2-evidence` command when you close it.
-It also writes a JSON capture with the recorded timing samples and any saved selection callback count, plus a run-specific checklist results file at [`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
-Review that generated checklist, check any remaining manual-only observations, and then run the printed evidence command so the final markdown report and checklist status come from the same run artifacts.
 
 ## Phase 3 acceptance harness
 
@@ -159,9 +103,9 @@ To make Phase 3 acceptance easier, there is also an interactive signing-shell ha
 
 Current acceptance note:
 
-- The harness helps collect a consistent record, but it does not prove that overlay placement/resize quality is acceptable.
-- Use the next manual pass to answer the overlay remediation question first: does placement and resize now feel stable, predictable, and exception-free?
-- Do not treat pre-checked harness items as sufficient to clear the placement/resize acceptance gate on their own.
+- The harness helps collect a consistent record, but it does not prove final Phase 3 readiness on its own.
+- Use it as a manual-review aid for placement, appearance behavior, named-profile workflows, and signing-flow validation.
+- For the current acceptance focus and unresolved items, rely on the Phase 3 checklist and results artifacts rather than treating this README as the project status log.
 
 Run it against a representative PDF:
 
@@ -181,10 +125,14 @@ What it does:
 
 What still remains manual:
 
-- overlay placement and resize quality judgment
-- whether handle dragging feels predictable enough for end users
-- whether any placement exception still appears during resize
+- whether handle dragging still feels predictable enough for end users
 - parity judgment against Acrobat or PDF-XChange
 - qualitative UX notes
 - signed-output fidelity judgments
 - any task steps that require human interpretation rather than observable harness events
+
+See also:
+
+- [phase3_fr3b_acceptance_checklist.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_checklist.md)
+- [phase3_fr3b_acceptance_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
+- [phase3_parallel_plan.md](/home/daekar/SignPDF/Scratch/phase3_parallel_plan.md)

@@ -15,6 +15,10 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SigningResult,
 )
+from foliaseal.infra.config.profile_storage import (
+    PROFILE_DIRECTORY_NAME,
+    SignaturePresetCatalogStore,
+)
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
@@ -206,6 +210,10 @@ class _FakeMessageBox:
     def question(self, parent, title, text):  # noqa: N802
         self.calls.append((parent, title, text))
         return self.next_result
+
+    def warning(self, parent, title, text):  # noqa: N802
+        self.calls.append((parent, title, text))
+        return self.Yes
 
 
 class _FakeSpinBox(_FakeWidget):
@@ -1004,10 +1012,12 @@ def test_signing_shell_named_profile_save_and_reload_round_trip(
         lambda self: _fake_bindings(),
     )
 
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    store.save_catalog(build_signature_preset_catalog())
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
-        preset_catalog=build_signature_preset_catalog(),
+        preset_catalog_store=store,
     )
 
     panel = widget.properties_panel
@@ -1037,6 +1047,55 @@ def test_signing_shell_named_profile_save_and_reload_round_trip(
     assert panel._appearance_controls.show_field_names.isChecked() is True
     assert panel._placement_controls.width_spin.value() == 144.0
     assert panel._placement_controls.height_spin.value() == 36.0
+
+    relaunch_widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+    relaunch_panel = relaunch_widget.properties_panel
+
+    assert relaunch_panel._profile_catalog.profile_names() == ("Default", "Compact", "My Profile")
+    assert relaunch_panel._profile_controls.profile_combo.findText("My Profile") != -1
+    assert relaunch_panel._profile_controls.profile_combo.currentText() == "Current draft"
+
+
+def test_signing_shell_named_profile_save_without_name_reports_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    errors: list[str] = []
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+        on_error=errors.append,
+    )
+
+    panel = widget.properties_panel
+    panel._profile_controls.profile_name.setText("")
+
+    result = panel.save_current_profile()
+
+    assert result is None
+    assert errors == []
+    assert store.load_catalog().profile_names() == ()
+    assert fake_bindings.q_message_box.calls[-1][1:] == (
+        "Profile error",
+        "Profile name is required before saving.",
+    )
 
 
 def test_signing_shell_named_profile_selection_restores_placement_defaults_without_forcing_rect(
@@ -1076,6 +1135,90 @@ def test_signing_shell_named_profile_selection_restores_placement_defaults_witho
     assert panel._placement_controls.width_spin.value() == 144.0
     assert panel._placement_controls.height_spin.value() == 36.0
     assert widget._signing_workspace._draft_workflow.signature_rect is None
+
+
+def test_signing_shell_named_profile_delete_can_be_canceled_and_keeps_profile(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    store.save_catalog(build_signature_preset_catalog())
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+
+    panel = widget.properties_panel
+    panel._profile_controls.profile_combo.setCurrentText("Compact")
+    fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.No
+
+    result = panel.delete_current_profile()
+
+    assert result is None
+    assert store.load_catalog().profile_names() == ("Default", "Compact")
+    assert panel._profile_controls.profile_combo.currentText() == "Compact"
+    assert panel._profile_catalog.profile_names() == ("Default", "Compact")
+
+
+def test_signing_shell_named_profile_delete_requires_confirmation_and_refreshes_catalog(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    store.save_catalog(build_signature_preset_catalog())
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+
+    panel = widget.properties_panel
+    panel._profile_controls.profile_combo.setCurrentText("Compact")
+    fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.Yes
+
+    result = panel.delete_current_profile()
+
+    assert result is not None
+    assert result.profile_names() == ("Default",)
+    assert store.load_catalog().profile_names() == ("Default",)
+    assert panel._profile_controls.profile_combo.currentText() == "Current draft"
+    assert panel._profile_catalog.profile_names() == ("Default",)
+    assert panel._profile_controls.profile_combo.findText("Compact") == -1
+
+    relaunched_widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+    relaunched_panel = relaunched_widget.properties_panel
+
+    assert relaunched_panel._profile_catalog.profile_names() == ("Default",)
+    assert relaunched_panel._profile_controls.profile_combo.findText("Compact") == -1
 
 
 def test_signing_shell_named_profile_overwrite_requires_confirmation(

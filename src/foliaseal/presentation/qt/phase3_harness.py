@@ -15,6 +15,7 @@ from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
+from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
@@ -133,6 +134,7 @@ def run_phase3_signing_harness(
         tsa_url="https://tsa.example.invalid",
         timestamp_required=True,
     )
+    profile_store = SignaturePresetCatalogStore.default()
 
     sign_requests: list[SigningRequest] = []
     errors: list[str] = []
@@ -169,6 +171,7 @@ def run_phase3_signing_harness(
     shell = build_qt_signing_shell(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
+        preset_catalog_store=profile_store,
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,

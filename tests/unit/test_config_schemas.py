@@ -93,6 +93,20 @@ def test_signature_preset_catalog_upserts_by_name() -> None:
     assert updated.profile_names() == ("Default",)
 
 
+def test_signature_preset_catalog_removes_by_name() -> None:
+    original = SignaturePresetCatalog(
+        schema_version=1,
+        profiles=(
+            build_signature_preset(name="Default"),
+            build_signature_preset(name="Compact"),
+        ),
+    )
+
+    updated = original.remove_profile("Default")
+
+    assert updated.profile_names() == ("Compact",)
+
+
 def test_signature_preset_catalog_rejects_duplicate_names() -> None:
     with pytest.raises(ConfigValidationError, match="must not contain duplicate names"):
         SignaturePresetCatalog(
