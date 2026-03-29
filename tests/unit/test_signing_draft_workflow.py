@@ -54,6 +54,7 @@ def _appearance() -> SignatureAppearance:
             italic=False,
             text_color_hex="#112233",
         ),
+        image_stamp_path="/tmp/stamp.png",
     )
 
 
@@ -89,6 +90,12 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert preview.page_index == 2
     assert preview.signature_rect == request.signature_rect
     assert preview.signer_label_prefix == "Digitally signed by"
+    assert preview.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK
+    assert preview.timezone_display_mode == SignatureTimezoneDisplayMode.UTC
+    assert preview.datetime_format == "%Y-%m-%d %H:%M"
+    assert preview.text_style == _appearance().text_style
+    assert preview.box_style == _appearance().box_style
+    assert preview.image_stamp_path == "/tmp/stamp.png"
     assert [field.field_key.value for field in preview.fields] == [
         "distinguished_name",
         "common_name",
@@ -152,6 +159,30 @@ def test_workflow_supports_numeric_rectangle_fine_tuning(tmp_path: Path) -> None
     assert updated.height_pt == pytest.approx(72.0)
 
 
+def test_workflow_warns_when_geometry_is_unavailable_but_allows_submission(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=10.0,
+            bottom_pt=10.0,
+            width_pt=120.0,
+            height_pt=40.0,
+        )
+    )
+
+    issues = workflow.validation_issues()
+
+    assert [issue.code for issue in issues] == ["signature_rect_geometry_unavailable"]
+    assert issues[0].severity.value == "warning"
+    assert workflow.can_build_request() is True
+    assert workflow.preview().can_submit is True
+    assert workflow.build_signing_request().signature_rect is not None
+
+
 def test_workflow_flags_out_of_bounds_rectangles_when_geometry_is_known(
     tmp_path: Path,
 ) -> None:
@@ -166,7 +197,7 @@ def test_workflow_flags_out_of_bounds_rectangles_when_geometry_is_known(
     workflow.set_signature_appearance(_appearance())
     workflow.set_signature_rect(
         SignatureRect(
-            page_index=0,
+            page_index=1,
             left_pt=95.0,
             bottom_pt=10.0,
             width_pt=10.0,
@@ -176,7 +207,8 @@ def test_workflow_flags_out_of_bounds_rectangles_when_geometry_is_known(
 
     issues = workflow.validation_issues()
 
-    assert {issue.code for issue in issues} == {"signature_rect_out_of_bounds"}
+    assert [issue.code for issue in issues] == ["signature_rect_page_mismatch"]
+    assert all(issue.code != "signature_rect_out_of_bounds" for issue in issues)
 
 
 def test_workflow_reports_missing_draft_components_as_validation_issues(

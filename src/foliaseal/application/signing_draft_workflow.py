@@ -91,8 +91,10 @@ class SigningDraftPreview:
     signer_label_prefix: str | None
     layout_template: SignatureLayoutTemplate | None
     timezone_display_mode: SignatureTimezoneDisplayMode | None
+    datetime_format: str | None
     text_style: SignatureTextStyle | None
     box_style: SignatureBoxStyle | None
+    image_stamp_path: str | None
     fields: tuple[SigningDraftPreviewField, ...]
     issues: tuple[SigningDraftValidationIssue, ...]
     can_submit: bool
@@ -315,17 +317,22 @@ class SigningDraftWorkflow:
             signer_label_prefix=appearance.signer_label_prefix if appearance else None,
             layout_template=appearance.layout_template if appearance else None,
             timezone_display_mode=appearance.timezone_display_mode if appearance else None,
+            datetime_format=appearance.datetime_format if appearance else None,
             text_style=appearance.text_style if appearance else None,
             box_style=appearance.box_style if appearance else None,
+            image_stamp_path=appearance.image_stamp_path if appearance else None,
             fields=fields,
             issues=issues,
-            can_submit=not issues,
+            can_submit=self.can_build_request(),
         )
 
     def build_signing_request(self) -> SigningRequest:
         """Build the final signing request or raise with validation issues."""
         issues = self.validation_issues()
-        if issues:
+        if any(
+            issue.severity == SigningDraftValidationSeverity.ERROR
+            for issue in issues
+        ):
             raise SigningDraftValidationError(issues)
 
         return SigningRequest(
@@ -390,7 +397,15 @@ class SigningDraftWorkflow:
         issues: list[SigningDraftValidationIssue] = []
         context = self.placement_context
         if context is None:
-            return ()
+            issues.append(
+                _issue(
+                    "signature_rect_geometry_unavailable",
+                    "Signature placement geometry is unavailable; bounds cannot be verified yet.",
+                    field_name="signature_rect",
+                    severity=SigningDraftValidationSeverity.WARNING,
+                )
+            )
+            return tuple(issues)
 
         if rect.page_index != context.page_index:
             issues.append(
@@ -400,6 +415,7 @@ class SigningDraftWorkflow:
                     field_name="signature_rect",
                 )
             )
+            return tuple(issues)
 
         pdf_rect = PdfRect(
             x1=rect.left_pt,

@@ -8,6 +8,7 @@ from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPag
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
+from tests.support.phase3_builders import build_signature_appearance
 
 
 class _FakeSignal:
@@ -295,6 +296,7 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert request.signature_rect.left_pt == 10.0
     assert request.signature_appearance is not None
     assert widget.properties_panel.preview.can_submit is True
+    assert widget.properties_panel.validation_text() == "Ready to sign."
     assert widget._signing_workspace._sign_button._enabled is True
 
 
@@ -329,6 +331,47 @@ def test_signing_shell_page_selection_and_resize_controls_update_workflow(
     assert widget._signing_workspace._draft_workflow.signature_rect.width_pt == 40.0
     assert widget._signing_workspace._draft_workflow.signature_rect.height_pt == 20.0
     assert widget._signing_workspace._sign_button._enabled is True
+
+
+def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        datetime_format="%d/%m/%Y %H:%M",
+        image_stamp_path="/tmp/stamp.png",
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.signature_rect
+        or widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    preview_text = widget.properties_panel.preview_text()
+
+    assert "Datetime format: %d/%m/%Y %H:%M" in preview_text
+    assert "Image stamp: /tmp/stamp.png" in preview_text
 
 
 def test_signing_shell_blocks_invalid_appearance_and_reports_validation(

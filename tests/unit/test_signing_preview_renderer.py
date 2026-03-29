@@ -1,7 +1,12 @@
+from dataclasses import replace
 from pathlib import Path
 
 from foliaseal.application import compare_preview_to_request, render_signing_preview
-from foliaseal.application.signing_draft_workflow import SigningDraftWorkflow
+from foliaseal.application.coordinate_transform import PageBox
+from foliaseal.application.signing_draft_workflow import (
+    SignaturePlacementContext,
+    SigningDraftWorkflow,
+)
 from tests.support.phase3_builders import (
     build_signature_appearance,
     build_signature_rect,
@@ -23,7 +28,19 @@ def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
 
 def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
-    workflow.set_signature_appearance(build_signature_appearance())
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path="/tmp/stamp.png",
+        )
+    )
+    workflow.set_placement_context(
+        SignaturePlacementContext(
+            page_index=2,
+            page_box=PageBox(left=0.0, bottom=0.0, right=400.0, top=300.0),
+            rotation=0,
+        )
+    )
     workflow.set_signature_rect(build_signature_rect(page_index=2))
 
     preview = workflow.preview()
@@ -49,6 +66,18 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
     )
     assert any(
         line.kind.value == "summary" and "Text style: Source Sans 3" in line.text
+        for line in snapshot.lines
+    )
+    assert any(
+        line.kind.value == "summary" and "Datetime format: %Y-%m-%d %H:%M" in line.text
+        for line in snapshot.lines
+    )
+    assert any(
+        line.kind.value == "summary" and "Image stamp: /tmp/stamp.png" in line.text
+        for line in snapshot.lines
+    )
+    assert any(
+        line.kind.value == "status" and line.text == "Ready to sign"
         for line in snapshot.lines
     )
 
@@ -84,3 +113,54 @@ def test_preview_parity_report_detects_request_drift(tmp_path: Path) -> None:
 
     assert report.is_consistent is False
     assert {issue.code for issue in report.issues} == {"signature_rect_mismatch"}
+
+
+def test_preview_parity_uses_structural_checks_for_derived_fields(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = build_signature_appearance()
+    workflow.set_signature_appearance(appearance)
+    workflow.set_signature_rect(build_signature_rect(page_index=2))
+
+    preview = workflow.preview()
+    derived_field = preview.fields[1]
+    mutated_preview = replace(
+        preview,
+        fields=(
+            preview.fields[0],
+            replace(
+                derived_field,
+                text="Any derived text is structural here",
+            ),
+            *preview.fields[2:],
+        ),
+    )
+
+    report = compare_preview_to_request(mutated_preview, workflow.build_signing_request())
+
+    assert report.is_consistent is True
+    assert report.issues == ()
+
+
+def test_preview_parity_reports_metadata_drift(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = build_signature_appearance(
+        datetime_format="%d/%m/%Y",
+        image_stamp_path="/tmp/stamp.png",
+    )
+    workflow.set_signature_appearance(appearance)
+    workflow.set_signature_rect(build_signature_rect(page_index=2))
+
+    preview = workflow.preview()
+    drifted_preview = replace(
+        preview,
+        datetime_format="%Y-%m-%d %H:%M",
+        image_stamp_path="/tmp/other-stamp.png",
+    )
+
+    report = compare_preview_to_request(drifted_preview, workflow.build_signing_request())
+
+    assert report.is_consistent is False
+    assert {issue.code for issue in report.issues} == {
+        "datetime_format_mismatch",
+        "image_stamp_path_mismatch",
+    }
