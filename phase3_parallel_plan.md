@@ -687,3 +687,65 @@ When opening a new chat or spawning a new agent, reference this file directly:
 Suggested instruction:
 
 "Please use `phase3_parallel_plan.md` as the Phase 3 coordination document. Follow the ownership boundaries and deliverables for the assigned workstream, and avoid unrelated refactors."
+
+## Reusable Review Agent Template
+
+Use this template when spawning a review-only agent so the review output stays concrete and consistent.
+
+### When to use it
+
+Use this template for:
+
+- pre-merge review passes
+- post-stabilization regression checks
+- pre-integration checks before starting a downstream workstream
+- final acceptance-oriented review sweeps
+
+### Review prompt template
+
+Copy and adapt the following:
+
+```text
+Use /home/daekar/SignPDF/Scratch/phase3_parallel_plan.md as the shared coordination document. This is a review-only task.
+
+Review scope:
+- <list the exact workstreams, files, or follow-up patches>
+
+Your tasks:
+- inspect for bugs
+- inspect for regressions introduced by recent changes
+- inspect for contract drift between the relevant layers
+- inspect for missing tests, especially around the changed semantics
+- inspect for docs/export/update gaps that could confuse downstream work
+
+Return exactly this structure:
+1. Findings
+- ordered by severity, highest first
+- each finding must include concrete file references
+- focus on correctness issues, behavioral mismatches, API inconsistencies, missing tests, or docs/export gaps
+- if there are no findings, write exactly: No findings
+
+2. Residual risks
+- brief
+
+3. Go/no-go recommendation
+- one of: go, go with caveats, hold
+- one sentence why
+
+Important constraints:
+- findings first
+- do not return an acknowledgment, plan, or status note
+- do not make code changes unless a tiny clarification patch is clearly necessary; prefer reporting
+- avoid unrelated refactors
+```
+
+### Coordinator notes
+
+To keep review agents on task consistently:
+
+1. Always require a fixed output structure.
+2. Always forbid acknowledgment-only or plan-only responses.
+3. Keep review scope narrow and explicit.
+4. Require concrete file references in every finding.
+5. Require an explicit go/no-go recommendation at the end.
+6. If a reviewer returns a scope acknowledgment instead of findings, interrupt immediately and restate the required structure.

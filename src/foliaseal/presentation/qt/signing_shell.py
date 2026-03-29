@@ -163,8 +163,18 @@ def _selected_enum(value: str, enum_cls: type[Any]) -> Any:
         raise ValueError(f"Value must be one of: {allowed}.") from exc
 
 
-def _format_preview_text(preview: SigningDraftPreview) -> str:
+def _format_preview_text(
+    preview: SigningDraftPreview,
+) -> str:
     lines = [line.text for line in render_signing_preview(preview).lines]
+    datetime_format = getattr(preview, "datetime_format", None)
+    if datetime_format is not None:
+        lines.append(f"Datetime format: {datetime_format}")
+    image_stamp_path = getattr(preview, "image_stamp_path", None)
+    if image_stamp_path is not None:
+        lines.append(f"Image stamp: {image_stamp_path}")
+    else:
+        lines.append("Image stamp: none")
     return "\n".join(lines)
 
 
@@ -621,8 +631,8 @@ class SignaturePropertiesPanel:
         )
 
     def _format_validation_text(self, preview: SigningDraftPreview) -> str:
-        if not preview.issues:
-            return "No validation issues."
+        if preview.can_submit and not preview.issues:
+            return "Ready to sign."
         return "\n".join(
             f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
             for issue in preview.issues

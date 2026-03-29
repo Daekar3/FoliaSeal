@@ -131,6 +131,15 @@ def _style_summary(preview: SigningDraftPreview) -> tuple[str, ...]:
     )
 
 
+def _metadata_summary(preview: SigningDraftPreview) -> tuple[str, ...]:
+    datetime_format = preview.datetime_format if preview.datetime_format is not None else "missing"
+    image_stamp_path = preview.image_stamp_path if preview.image_stamp_path is not None else "none"
+    return (
+        f"Datetime format: {datetime_format}",
+        f"Image stamp: {image_stamp_path}",
+    )
+
+
 def _format_field_line(field: SigningDraftPreviewField) -> str:
     status = "visible" if field.visible else "hidden"
     if not field.visible:
@@ -147,47 +156,6 @@ def _format_issue_line(issue: SigningDraftValidationIssue) -> str:
     return f"{issue.severity.value.upper()} {issue.code}{field_suffix}: {issue.message}"
 
 
-def _render_fields_from_appearance(
-    appearance: SignatureAppearance,
-) -> tuple[SigningDraftPreviewField, ...]:
-    fields: list[SigningDraftPreviewField] = []
-    for field_key, binding in appearance.iter_field_bindings():
-        label = _field_label(field_key)
-        if (
-            not binding.show_in_visible_appearance
-            or binding.source == SignatureFieldSource.HIDDEN
-        ):
-            fields.append(
-                SigningDraftPreviewField(
-                    field_key=field_key,
-                    label=label,
-                    text="",
-                    visible=False,
-                    source=binding.source,
-                )
-            )
-            continue
-
-        if binding.source == SignatureFieldSource.OVERRIDE:
-            text = binding.override_text or ""
-            hint = None
-        else:
-            text = binding.display_label or label
-            hint = "from certificate"
-
-        fields.append(
-            SigningDraftPreviewField(
-                field_key=field_key,
-                label=label,
-                text=text,
-                visible=True,
-                source=binding.source,
-                hint=hint,
-            )
-        )
-    return tuple(fields)
-
-
 def render_signing_preview(preview: SigningDraftPreview) -> SigningPreviewRenderSnapshot:
     """Render the normalized preview into deterministic text lines."""
     lines: list[SigningPreviewLine] = [
@@ -195,6 +163,11 @@ def render_signing_preview(preview: SigningDraftPreview) -> SigningPreviewRender
         SigningPreviewLine(SigningPreviewLineKind.SUMMARY, _rect_summary(preview.signature_rect)),
         SigningPreviewLine(SigningPreviewLineKind.SUMMARY, _appearance_summary(preview)),
     ]
+
+    lines.extend(
+        SigningPreviewLine(SigningPreviewLineKind.SUMMARY, summary)
+        for summary in _metadata_summary(preview)
+    )
 
     lines.extend(
         SigningPreviewLine(SigningPreviewLineKind.SUMMARY, summary)
@@ -284,6 +257,24 @@ def compare_preview_to_request(
             )
         )
 
+    if preview.datetime_format != request_appearance.datetime_format:
+        issues.append(
+            SigningPreviewParityIssue(
+                code="datetime_format_mismatch",
+                message="Preview datetime format does not match the final request.",
+                field_name="datetime_format",
+            )
+        )
+
+    if preview.image_stamp_path != request_appearance.image_stamp_path:
+        issues.append(
+            SigningPreviewParityIssue(
+                code="image_stamp_path_mismatch",
+                message="Preview image stamp path does not match the final request.",
+                field_name="image_stamp_path",
+            )
+        )
+
     if preview.text_style != request_appearance.text_style:
         issues.append(
             SigningPreviewParityIssue(
@@ -302,15 +293,97 @@ def compare_preview_to_request(
             )
         )
 
-    expected_fields = _render_fields_from_appearance(request_appearance)
-    if preview.fields != expected_fields:
-        issues.append(
-            SigningPreviewParityIssue(
-                code="field_render_mismatch",
-                message="Preview field rendering does not match the final request.",
-                field_name="signature_appearance",
-            )
-        )
+    issues.extend(_compare_preview_fields_to_appearance(preview.fields, request_appearance))
 
     return SigningPreviewParityReport(is_consistent=not issues, issues=tuple(issues))
 
+
+def _compare_preview_fields_to_appearance(
+    preview_fields: tuple[SigningDraftPreviewField, ...],
+    appearance: SignatureAppearance,
+) -> list[SigningPreviewParityIssue]:
+    issues: list[SigningPreviewParityIssue] = []
+    expected_bindings = appearance.iter_field_bindings()
+
+    if len(preview_fields) != len(expected_bindings):
+        issues.append(
+            SigningPreviewParityIssue(
+                code="field_count_mismatch",
+                message="Preview field count does not match the final request.",
+                field_name="signature_appearance",
+            )
+        )
+        return issues
+
+    for preview_field, (field_key, binding) in zip(preview_fields, expected_bindings, strict=True):
+        expected_label = _field_label(field_key)
+        expected_visible = (
+            binding.show_in_visible_appearance
+            and binding.source != SignatureFieldSource.HIDDEN
+        )
+
+        if preview_field.field_key != field_key:
+            issues.append(
+                SigningPreviewParityIssue(
+                    code="field_order_mismatch",
+                    message="Preview field order does not match the final request.",
+                    field_name="signature_appearance",
+                )
+            )
+            continue
+
+        if preview_field.label != expected_label:
+            issues.append(
+                SigningPreviewParityIssue(
+                    code="field_label_mismatch",
+                    message="Preview field labels do not match the final request.",
+                    field_name=field_key.value,
+                )
+            )
+
+        if preview_field.visible != expected_visible or preview_field.source != binding.source:
+            issues.append(
+                SigningPreviewParityIssue(
+                    code="field_visibility_mismatch",
+                    message="Preview field visibility does not match the final request.",
+                    field_name=field_key.value,
+                )
+            )
+            continue
+
+        if binding.source == SignatureFieldSource.OVERRIDE:
+            if (
+                preview_field.text != (binding.override_text or "")
+                or preview_field.hint is not None
+            ):
+                issues.append(
+                    SigningPreviewParityIssue(
+                        code="override_field_mismatch",
+                        message="Override field rendering does not match the final request.",
+                        field_name=field_key.value,
+                    )
+                )
+        elif binding.source == SignatureFieldSource.DERIVED:
+            if not preview_field.text or preview_field.hint != "from certificate":
+                issues.append(
+                    SigningPreviewParityIssue(
+                        code="derived_field_structure_mismatch",
+                        message=(
+                            "Derived field parity is structural only; preview must show a "
+                            "visible placeholder and certificate hint, but not an exact "
+                            "signer value."
+                        ),
+                        field_name=field_key.value,
+                    )
+                )
+        else:
+            if preview_field.text or preview_field.hint is not None:
+                issues.append(
+                    SigningPreviewParityIssue(
+                        code="hidden_field_mismatch",
+                        message="Hidden field rendering does not match the final request.",
+                        field_name=field_key.value,
+                    )
+                )
+
+    return issues
