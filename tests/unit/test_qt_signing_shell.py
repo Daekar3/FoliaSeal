@@ -8,6 +8,7 @@ from foliaseal.application import (
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.domain.models import SignatureTextStyle
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
@@ -74,12 +75,27 @@ class _FakeLabel(_FakeWidget):
     def __init__(self, text="") -> None:
         super().__init__()
         self._text = text
+        self._pixmap = None
+        self.alignment = None
+        self.fixed_size = None
 
     def setText(self, text):  # noqa: N802
         self._text = text
 
     def text(self):
         return self._text
+
+    def setPixmap(self, pixmap):  # noqa: N802
+        self._pixmap = pixmap
+
+    def pixmap(self):
+        return self._pixmap
+
+    def setAlignment(self, alignment):  # noqa: N802
+        self.alignment = alignment
+
+    def setFixedSize(self, width, height):  # noqa: N802
+        self.fixed_size = (width, height)
 
 
 class _FakeLineEdit(_FakeWidget):
@@ -198,6 +214,28 @@ class _FakePushButton(_FakeWidget):
         self.clicked.emit()
 
 
+class _FakePixmap:
+    def __init__(self, path: str = "", width: int = 120, height: int = 80) -> None:
+        self.path = path
+        self.width = width
+        self.height = height
+
+    def isNull(self):  # noqa: N802
+        return not self.path
+
+    def scaled(self, width, height, *_args):  # noqa: N802
+        if not self.path:
+            return _FakePixmap("")
+        aspect = self.width / self.height if self.height else 1.0
+        if width / height > aspect:
+            scaled_height = height
+            scaled_width = max(1, int(height * aspect))
+        else:
+            scaled_width = width
+            scaled_height = max(1, int(width / aspect))
+        return _FakePixmap(self.path, scaled_width, scaled_height)
+
+
 class _FakeScrollArea(_FakeWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -212,7 +250,9 @@ class _FakeScrollArea(_FakeWidget):
 
 
 class _FakeQt:
-    pass
+    AlignCenter = 4
+    KeepAspectRatio = 1
+    SmoothTransformation = 2
 
 
 class _FakeRenderBackend:
@@ -274,6 +314,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_double_spin_box=_FakeDoubleSpinBox,
         q_spin_box=_FakeSpinBox,
         q_push_button=_FakePushButton,
+        q_pixmap=_FakePixmap,
         qt=_FakeQt,
     )
 
@@ -476,17 +517,17 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert "Layout:" in appearance_summary
     assert "Visible fields:" in appearance_summary
     assert "Image stamp: /tmp/stamp.png" in appearance_summary
-    assert preview_controls.stamp_label.text() == "Stamp: stamp.png"
+    assert preview_controls.stamp_label.pixmap() is not None
+    assert preview_controls.stamp_label.pixmap().path == "/tmp/stamp.png"
+    assert preview_controls.stamp_label.text() == "Stamp preview"
+    assert preview_controls.stamp_label.fixed_size == (154, 108)
+    assert preview_controls.stamp_label.alignment == _FakeQt.AlignCenter
     assert preview_controls.title_label.text() == "Digitally signed by"
-    assert preview_controls.detail_label.text() != ""
-    assert "Placement: page 1" in preview_controls.placement_label.text()
-    assert "Appearance: Digitally signed by" in preview_controls.appearance_label.text()
-    assert "Visible fields:" in preview_controls.field_label.text()
-    assert "Text style:" in preview_controls.style_label.text()
-    assert "Datetime format: %d/%m/%Y %H:%M" in preview_controls.metadata_label.text()
-    assert "Image stamp: /tmp/stamp.png" in preview_controls.metadata_label.text()
-    assert "Datetime format: %d/%m/%Y %H:%M" in preview_controls.footer_label.text()
-    assert "Text style:" in preview_controls.footer_label.text()
+    assert preview_controls.detail_label.text() == "Visible signature appearance"
+    assert preview_controls.footer_label.text() == "Signature preview ready"
+    assert "Placement:" not in preview_text
+    assert "Datetime format:" not in preview_text
+    assert "Image stamp:" not in preview_text
     assert (
         widget._signing_workspace.properties_panel._appearance_controls.font_family._items[:3]
         == ["Sans Serif", "Serif", "Monospace"]
@@ -495,9 +536,8 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         widget._signing_workspace.properties_panel._appearance_controls.font_family.currentText()
         == "Source Sans 3"
     )
-    assert preview_controls.status_label.text() == "Ready to sign"
     assert preview_text.count("Visible signature preview") == 1
-    assert "Stamp: stamp.png" in preview_text
+    assert "Stamp preview" in preview_text
 
 
 def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
@@ -517,7 +557,7 @@ def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
 
     appearance = build_signature_appearance(
         datetime_format="custom-format",
-        text_style=signing_shell_module.SignatureTextStyle(
+        text_style=SignatureTextStyle(
             font_family="Custom Font",
             font_size_pt=9.5,
             bold=True,

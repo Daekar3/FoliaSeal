@@ -2,6 +2,7 @@ from pathlib import Path
 
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
+    _instructions_text,
     build_phase3_checklist_results_markdown,
 )
 
@@ -93,3 +94,9 @@ def test_phase3_checklist_results_markdown_leaves_manual_items_unchecked(
     )
 
     assert "- [ ] The placed rectangle can be resized or repositioned in the workflow." in markdown
+
+
+def test_phase3_harness_instructions_do_not_embed_pdf_path() -> None:
+    text = _instructions_text()
+    assert "Loaded PDF:" not in text
+    assert "signature draft" in text

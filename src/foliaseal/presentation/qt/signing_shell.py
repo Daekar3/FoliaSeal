@@ -50,6 +50,7 @@ class QtSigningWidgetBindings:
     q_line_edit: type[Any]
     q_check_box: type[Any]
     q_combo_box: type[Any]
+    q_pixmap: type[Any]
     q_double_spin_box: type[Any]
     q_spin_box: type[Any]
     q_push_button: type[Any]
@@ -110,13 +111,6 @@ class PreviewControls:
     title_label: Any
     detail_label: Any
     footer_label: Any
-    placement_label: Any
-    appearance_label: Any
-    field_label: Any
-    style_label: Any
-    metadata_label: Any
-    issue_label: Any
-    status_label: Any
 
 
 def _field_label(field_key: SignatureFieldKey) -> str:
@@ -188,6 +182,25 @@ def _combo_items(combo: Any) -> tuple[str, ...]:
     if items is not None:
         return tuple(str(item) for item in items)
     return ()
+
+
+def _load_stamp_pixmap(bindings: QtSigningWidgetBindings, path: str) -> Any | None:
+    if not path:
+        return None
+    pixmap = bindings.q_pixmap(path)
+    is_null = getattr(pixmap, "isNull", None)
+    if callable(is_null) and is_null():
+        return None
+    scaled = getattr(pixmap, "scaled", None)
+    if callable(scaled):
+        keep_aspect = getattr(bindings.qt, "KeepAspectRatio", None)
+        smooth = getattr(bindings.qt, "SmoothTransformation", None)
+        if keep_aspect is not None and smooth is not None:
+            candidate = scaled(148, 92, keep_aspect, smooth)
+            is_candidate_null = getattr(candidate, "isNull", None)
+            if not callable(is_candidate_null) or not is_candidate_null():
+                return candidate
+    return pixmap
 
 
 def _set_checked(check_box: Any, value: bool) -> None:
@@ -360,13 +373,6 @@ class SignaturePropertiesPanel:
                 _text(self._preview_controls.title_label),
                 _text(self._preview_controls.detail_label),
                 _text(self._preview_controls.footer_label),
-                _text(self._preview_controls.placement_label),
-                _text(self._preview_controls.appearance_label),
-                _text(self._preview_controls.field_label),
-                _text(self._preview_controls.style_label),
-                _text(self._preview_controls.metadata_label),
-                _text(self._preview_controls.issue_label),
-                _text(self._preview_controls.status_label),
             ]
         )
 
@@ -440,7 +446,7 @@ class SignaturePropertiesPanel:
                 " background: #ffffff;"
                 "}"
             )
-        card_layout = bindings.q_hbox_layout(card_container)
+        card_layout = bindings.q_vbox_layout(card_container)
         card_layout.setContentsMargins(10, 10, 10, 10)
         card_layout.setSpacing(10)
 
@@ -448,43 +454,28 @@ class SignaturePropertiesPanel:
         title_label = bindings.q_label("")
         detail_label = bindings.q_label("")
         footer_label = bindings.q_label("")
-        placement_label = bindings.q_label("")
-        appearance_label = bindings.q_label("")
-        field_label = bindings.q_label("")
-        style_label = bindings.q_label("")
-        metadata_label = bindings.q_label("")
-        issue_label = bindings.q_label("")
-        status_label = bindings.q_label("")
 
         if hasattr(stamp_label, "setWordWrap"):
             stamp_label.setWordWrap(True)
-        for label in (
-            title_label,
-            detail_label,
-            footer_label,
-            placement_label,
-            appearance_label,
-            field_label,
-            style_label,
-            metadata_label,
-            issue_label,
-            status_label,
-        ):
+        for label in (title_label, detail_label, footer_label):
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
+        if hasattr(stamp_label, "setAlignment"):
+            align_center = getattr(bindings.qt, "AlignCenter", None)
+            if align_center is not None:
+                stamp_label.setAlignment(align_center)
 
         if hasattr(stamp_label, "setStyleSheet"):
             stamp_label.setStyleSheet(
-                "font-weight: 600; border: 1px dashed #c0c0c0; padding: 8px; min-width: 92px;"
+                "font-weight: 600; color: #222222; border: 1px solid #c0c0c0;"
+                " padding: 10px; min-width: 160px; min-height: 104px;"
             )
         if hasattr(title_label, "setStyleSheet"):
-            title_label.setStyleSheet("font-weight: 700; font-size: 12pt;")
+            title_label.setStyleSheet("font-weight: 700; font-size: 12pt; color: #161616;")
         if hasattr(detail_label, "setStyleSheet"):
-            detail_label.setStyleSheet("font-size: 10pt;")
+            detail_label.setStyleSheet("font-size: 10pt; color: #2b2b2b;")
         if hasattr(footer_label, "setStyleSheet"):
-            footer_label.setStyleSheet("color: #555555;")
-        if hasattr(status_label, "setStyleSheet"):
-            status_label.setStyleSheet("font-style: italic;")
+            footer_label.setStyleSheet("color: #3c3c3c; font-style: italic;")
 
         details_container = bindings.q_widget()
         details_layout = bindings.q_vbox_layout(details_container)
@@ -496,16 +487,6 @@ class SignaturePropertiesPanel:
         card_layout.addWidget(stamp_label)
         card_layout.addWidget(details_container, 1)
         layout.addWidget(card_container)
-        for label in (
-            placement_label,
-            appearance_label,
-            field_label,
-            style_label,
-            metadata_label,
-            issue_label,
-            status_label,
-        ):
-            layout.addWidget(label)
 
         return PreviewControls(
             container=container,
@@ -514,13 +495,6 @@ class SignaturePropertiesPanel:
             title_label=title_label,
             detail_label=detail_label,
             footer_label=footer_label,
-            placement_label=placement_label,
-            appearance_label=appearance_label,
-            field_label=field_label,
-            style_label=style_label,
-            metadata_label=metadata_label,
-            issue_label=issue_label,
-            status_label=status_label,
         )
 
     def set_signature_rect(self, signature_rect: SignatureRect | None) -> None:
@@ -901,75 +875,30 @@ class SignaturePropertiesPanel:
             (line.text for line in snapshot.lines if line.kind.value == "title"),
             preview.title,
         )
-        if preview.signature_rect is None:
-            placement_line = "Placement: missing"
-        else:
-            placement_line = (
-                "Placement: "
-                f"page {preview.signature_rect.page_index + 1} "
-                f"left={preview.signature_rect.left_pt:g} "
-                f"bottom={preview.signature_rect.bottom_pt:g} "
-                f"width={preview.signature_rect.width_pt:g} "
-                f"height={preview.signature_rect.height_pt:g}"
-            )
-        appearance_line = next(
-            (
-                line.text
-                for line in snapshot.lines
-                if line.kind.value == "summary"
-                and line.text.startswith("Appearance: ")
-            ),
-            "Appearance: missing",
-        )
-        field_lines = [line.text for line in snapshot.lines if line.kind.value == "field"]
-        style_lines = [
-            line.text
-            for line in snapshot.lines
-            if line.kind.value == "summary"
-            and line.text.startswith(("Text style: ", "Box style: "))
-        ]
-        metadata_lines = [
-            line.text
-            for line in snapshot.lines
-            if line.kind.value == "summary"
-            and line.text.startswith(("Datetime format: ", "Image stamp: "))
-        ]
-        issue_lines = [line.text for line in snapshot.lines if line.kind.value == "issue"]
-        status_line = next(
-            (line.text for line in snapshot.lines if line.kind.value == "status"),
-            "",
-        )
-        stamp_line = "Stamp: none"
+        stamp_pixmap = None
         if preview.image_stamp_path:
-            stamp_path = preview.image_stamp_path
-            stamp_line = f"Stamp: {stamp_path.rsplit('/', 1)[-1]}"
-        detail_lines = field_lines or ["No visible fields selected"]
-        footer_parts = []
-        if metadata_lines:
-            footer_parts.append(" | ".join(metadata_lines))
-        if style_lines:
-            footer_parts.append(" | ".join(style_lines))
-        footer_line = "\n".join(footer_parts) if footer_parts else "Style metadata unavailable"
-
-        self._preview_controls.stamp_label.setText(stamp_line)
+            stamp_pixmap = _load_stamp_pixmap(self._bindings, preview.image_stamp_path)
+        if stamp_pixmap is not None and hasattr(self._preview_controls.stamp_label, "setPixmap"):
+            self._preview_controls.stamp_label.setPixmap(stamp_pixmap)
+            if hasattr(self._preview_controls.stamp_label, "setText"):
+                self._preview_controls.stamp_label.setText("Stamp preview")
+            if hasattr(self._preview_controls.stamp_label, "setFixedSize"):
+                size_width = getattr(stamp_pixmap, "width", None)
+                size_height = getattr(stamp_pixmap, "height", None)
+                if callable(size_width):
+                    size_width = size_width()
+                if callable(size_height):
+                    size_height = size_height()
+                if isinstance(size_width, int) and isinstance(size_height, int):
+                    self._preview_controls.stamp_label.setFixedSize(
+                        size_width + 16,
+                        size_height + 16,
+                    )
+        else:
+            self._preview_controls.stamp_label.setText("Stamp preview unavailable")
         self._preview_controls.title_label.setText(title_line)
-        self._preview_controls.detail_label.setText("\n".join(detail_lines))
-        self._preview_controls.footer_label.setText(footer_line)
-        self._preview_controls.placement_label.setText(placement_line)
-        self._preview_controls.appearance_label.setText(appearance_line)
-        self._preview_controls.field_label.setText(
-            "Visible fields: " + (", ".join(field_lines) if field_lines else "None")
-        )
-        self._preview_controls.style_label.setText(
-            " | ".join(style_lines) if style_lines else "Style: unavailable"
-        )
-        self._preview_controls.metadata_label.setText(
-            " | ".join(metadata_lines) if metadata_lines else "Metadata: unavailable"
-        )
-        self._preview_controls.issue_label.setText(
-            " | ".join(issue_lines) if issue_lines else "Issues: none"
-        )
-        self._preview_controls.status_label.setText(status_line)
+        self._preview_controls.detail_label.setText("Visible signature appearance")
+        self._preview_controls.footer_label.setText("Signature preview ready")
 
     def _current_preview(self) -> SigningDraftPreview:
         preview = self._workflow.preview()
@@ -1286,6 +1215,8 @@ class SigningShellAdapter:
     def _load_bindings(self) -> QtSigningWidgetBindings:
         try:
             qt_widgets = importlib.import_module("PySide6.QtWidgets")
+            qt_core = importlib.import_module("PySide6.QtCore")
+            qt_gui = importlib.import_module("PySide6.QtGui")
         except Exception as exc:  # pragma: no cover - environment dependent
             raise QtSigningBindingsUnavailable(
                 "PySide6 QtWidgets are required for the Qt signing shell. "
@@ -1303,10 +1234,11 @@ class SigningShellAdapter:
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
             q_check_box=getattr(qt_widgets, "QCheckBox"),
             q_combo_box=getattr(qt_widgets, "QComboBox"),
+            q_pixmap=getattr(qt_gui, "QPixmap"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
             q_spin_box=getattr(qt_widgets, "QSpinBox"),
             q_push_button=getattr(qt_widgets, "QPushButton"),
-            qt=None,
+            qt=getattr(qt_core, "Qt"),
         )
 
 
