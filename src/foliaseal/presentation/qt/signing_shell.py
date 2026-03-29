@@ -78,6 +78,44 @@ class PlacementControls:
     height_spin: Any
 
 
+@dataclass(frozen=True)
+class AppearanceControls:
+    """Controls and summary used to edit the current appearance draft."""
+
+    container: Any
+    summary_label: Any
+    signer_label_prefix: Any
+    layout_template: Any
+    timezone_display_mode: Any
+    datetime_format: Any
+    font_family: Any
+    font_size: Any
+    bold: Any
+    italic: Any
+    text_color: Any
+    image_stamp_path: Any
+    border_show: Any
+    border_color: Any
+    border_width: Any
+    background_color: Any
+
+
+@dataclass(frozen=True)
+class PreviewControls:
+    """Widgets used to present the visible-signature preview."""
+
+    container: Any
+    card_container: Any
+    title_label: Any
+    placement_label: Any
+    appearance_label: Any
+    field_label: Any
+    style_label: Any
+    metadata_label: Any
+    issue_label: Any
+    status_label: Any
+
+
 def _field_label(field_key: SignatureFieldKey) -> str:
     labels = {
         SignatureFieldKey.DISTINGUISHED_NAME: "Distinguished name",
@@ -98,16 +136,36 @@ def _enum_combo_items(
     return tuple(member.value for member in enum_cls)
 
 
-def _set_combo_text(combo: Any, value: str) -> None:
-    setter = getattr(combo, "setCurrentText", None)
-    if callable(setter):
-        setter(value)
-        return
+def _choice_combo_items(*, preferred: str, options: tuple[str, ...]) -> tuple[str, ...]:
+    items = [preferred] if preferred not in options else []
+    items.extend(options)
+    return tuple(items)
+
+
+def _set_combo_text(combo: Any, value: str, *, allow_custom: bool = False) -> None:
     index = getattr(combo, "findText", None)
     if callable(index):
         found = index(value)
         if found >= 0:
-            combo.setCurrentIndex(found)
+            setter = getattr(combo, "setCurrentIndex", None)
+            if callable(setter):
+                setter(found)
+            return
+    setter = getattr(combo, "setCurrentText", None)
+    if callable(setter) and not allow_custom:
+        setter(value)
+        return
+    if allow_custom:
+        adder = getattr(combo, "addItem", None)
+        if callable(adder):
+            adder(value)
+        elif hasattr(combo, "addItems"):
+            combo.addItems((value,))
+        if callable(setter):
+            setter(value)
+        return
+    if callable(setter):
+        setter(value)
 
 
 def _combo_text(combo: Any) -> str:
@@ -164,10 +222,39 @@ def _selected_enum(value: str, enum_cls: type[Any]) -> Any:
         raise ValueError(f"Value must be one of: {allowed}.") from exc
 
 
-def _format_preview_text(
-    preview: SigningDraftPreview,
-) -> str:
-    return "\n".join(line.text for line in render_signing_preview(preview).lines)
+def _format_appearance_summary(appearance: SignatureAppearance) -> str:
+    visible_fields = [
+        _field_label(field_key)
+        for field_key, binding in appearance.iter_field_bindings()
+        if binding.show_in_visible_appearance
+    ]
+    visible_fields_text = ", ".join(visible_fields) if visible_fields else "None"
+    text_style = appearance.text_style
+    box_style = appearance.box_style
+    border_text = "on" if box_style.show_border else "off"
+    stamp_text = appearance.image_stamp_path or "None"
+    return "\n".join(
+        [
+            "Current appearance draft",
+            f"Layout: {appearance.layout_template.value}",
+            f"Timezone: {appearance.timezone_display_mode.value}",
+            f"Datetime format: {appearance.datetime_format}",
+            f"Visible fields: {visible_fields_text}",
+            (
+                "Text style: "
+                f"{text_style.font_family}, {text_style.font_size_pt:g}pt, "
+                f"{'bold' if text_style.bold else 'regular'}, "
+                f"{'italic' if text_style.italic else 'upright'}, "
+                f"{text_style.text_color_hex}"
+            ),
+            (
+                "Box style: "
+                f"border {border_text}, {box_style.border_color_hex}, "
+                f"{box_style.border_width_pt:g}pt, {box_style.background_color_hex}"
+            ),
+            f"Image stamp: {stamp_text}",
+        ]
+    )
 
 
 def _build_preview_issue(
@@ -209,18 +296,19 @@ class SignaturePropertiesPanel:
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
-        self._preview_label = bindings.q_label("")
+        self._preview_controls = self._build_preview_controls()
+        self.preview_controls = self._preview_controls
         self._validation_label = bindings.q_label("")
 
         self._layout.addWidget(self._heading("Placement"))
         self._layout.addWidget(self._placement_controls.container)
-        self._layout.addWidget(self._heading("Appearance"))
+        self._layout.addWidget(self._heading("Appearance draft"))
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
         for controls in self.field_controls.values():
             self._layout.addWidget(controls.container)
         self._layout.addWidget(self._heading("Preview"))
-        self._layout.addWidget(self._preview_label)
+        self._layout.addWidget(self._preview_controls.container)
         self._layout.addWidget(self._heading("Validation"))
         self._layout.addWidget(self._validation_label)
 
@@ -250,11 +338,27 @@ class SignaturePropertiesPanel:
         return text
 
     def preview_text(self) -> str:
-        return _text(self._preview_label)
+        return "\n".join(
+            [
+                "Visible signature preview",
+                _text(self._preview_controls.title_label),
+                _text(self._preview_controls.placement_label),
+                _text(self._preview_controls.appearance_label),
+                _text(self._preview_controls.field_label),
+                _text(self._preview_controls.style_label),
+                _text(self._preview_controls.metadata_label),
+                _text(self._preview_controls.issue_label),
+                _text(self._preview_controls.status_label),
+            ]
+        )
 
     def refresh_preview(self) -> SigningDraftPreview:
         preview = self._current_preview()
-        self._preview_label.setText(_format_preview_text(preview))
+        appearance = self._workflow.signature_appearance or SignatureAppearance()
+        self._appearance_controls.summary_label.setText(
+            _format_appearance_summary(appearance)
+        )
+        self._update_preview_controls(preview)
         self._validation_label.setText(self._format_validation_text(preview))
         return preview
 
@@ -284,6 +388,81 @@ class SignaturePropertiesPanel:
         preview = self.refresh_preview()
         self._notify_change()
         return preview
+
+    def _build_preview_controls(self) -> PreviewControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Visible signature preview")
+        if hasattr(container, "setStyleSheet"):
+            container.setStyleSheet(
+                "QGroupBox {"
+                " border: 1px solid #cfcfcf;"
+                " border-radius: 8px;"
+                " margin-top: 10px;"
+                " padding: 8px;"
+                " background: #fcfcfc;"
+                "}"
+                "QGroupBox::title {"
+                " subcontrol-origin: margin;"
+                " left: 8px;"
+                " padding: 0 4px;"
+                " font-weight: 600;"
+                "}"
+            )
+        layout = bindings.q_vbox_layout(container)
+        layout.setContentsMargins(10, 14, 10, 10)
+        layout.setSpacing(4)
+
+        title_label = bindings.q_label("")
+        placement_label = bindings.q_label("")
+        appearance_label = bindings.q_label("")
+        field_label = bindings.q_label("")
+        style_label = bindings.q_label("")
+        metadata_label = bindings.q_label("")
+        issue_label = bindings.q_label("")
+        status_label = bindings.q_label("")
+
+        for label in (
+            title_label,
+            placement_label,
+            appearance_label,
+            field_label,
+            style_label,
+            metadata_label,
+            issue_label,
+            status_label,
+        ):
+            if hasattr(label, "setWordWrap"):
+                label.setWordWrap(True)
+
+        if hasattr(title_label, "setStyleSheet"):
+            title_label.setStyleSheet("font-weight: 700; font-size: 12pt;")
+        if hasattr(status_label, "setStyleSheet"):
+            status_label.setStyleSheet("font-style: italic;")
+
+        for label in (
+            title_label,
+            placement_label,
+            appearance_label,
+            field_label,
+            style_label,
+            metadata_label,
+            issue_label,
+            status_label,
+        ):
+            layout.addWidget(label)
+
+        return PreviewControls(
+            container=container,
+            card_container=container,
+            title_label=title_label,
+            placement_label=placement_label,
+            appearance_label=appearance_label,
+            field_label=field_label,
+            style_label=style_label,
+            metadata_label=metadata_label,
+            issue_label=issue_label,
+            status_label=status_label,
+        )
 
     def set_signature_rect(self, signature_rect: SignatureRect | None) -> None:
         self._suspend_updates = True
@@ -354,9 +533,23 @@ class SignaturePropertiesPanel:
 
     def _build_appearance_controls(self) -> Any:
         bindings = self._bindings
-        container = bindings.q_widget()
-        layout = bindings.q_form_layout(container)
+        container = bindings.q_group_box("Current appearance draft")
+        layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        summary_label = bindings.q_label("")
+        if hasattr(summary_label, "setWordWrap"):
+            summary_label.setWordWrap(True)
+        layout.addWidget(summary_label)
+
+        text_group = bindings.q_group_box("Text and layout")
+        text_layout = bindings.q_form_layout(text_group)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        box_group = bindings.q_group_box("Box and stamp")
+        box_layout = bindings.q_form_layout(box_group)
+        box_layout.setContentsMargins(0, 0, 0, 0)
 
         signer_label_prefix = bindings.q_line_edit()
         signer_label_prefix.setPlaceholderText("Digitally signed by")
@@ -367,11 +560,26 @@ class SignaturePropertiesPanel:
         timezone_display_mode = bindings.q_combo_box()
         timezone_display_mode.addItems(_enum_combo_items(SignatureTimezoneDisplayMode))
 
-        datetime_format = bindings.q_line_edit()
-        datetime_format.setPlaceholderText("%Y-%m-%d %H:%M:%S %Z")
+        datetime_format = bindings.q_combo_box()
+        datetime_format.addItems(
+            _choice_combo_items(
+                preferred="%Y-%m-%d %H:%M:%S %Z",
+                options=(
+                    "%Y-%m-%d %H:%M:%S %Z",
+                    "%Y-%m-%d %H:%M",
+                    "%d/%m/%Y %H:%M",
+                    "%b %d, %Y %I:%M %p",
+                ),
+            )
+        )
 
-        font_family = bindings.q_line_edit()
-        font_family.setPlaceholderText("Sans Serif")
+        font_family = bindings.q_combo_box()
+        font_family.addItems(
+            _choice_combo_items(
+                preferred="Sans Serif",
+                options=("Sans Serif", "Serif", "Monospace", "Cursive", "Fantasy"),
+            )
+        )
 
         font_size = bindings.q_double_spin_box()
         font_size.setRange(4.0, 48.0)
@@ -397,20 +605,24 @@ class SignaturePropertiesPanel:
         background_color = bindings.q_line_edit()
         background_color.setPlaceholderText("#FFFFFF")
 
-        layout.addRow("Signer label prefix", signer_label_prefix)
-        layout.addRow("Layout template", layout_template)
-        layout.addRow("Timezone display", timezone_display_mode)
-        layout.addRow("Datetime format", datetime_format)
-        layout.addRow("Font family", font_family)
-        layout.addRow("Font size", font_size)
-        layout.addRow("", bold)
-        layout.addRow("", italic)
-        layout.addRow("Text color", text_color)
-        layout.addRow("Image stamp", image_stamp_path)
-        layout.addRow("", border_show)
-        layout.addRow("Border color", border_color)
-        layout.addRow("Border width", border_width)
-        layout.addRow("Background color", background_color)
+        text_layout.addRow("Signer label prefix", signer_label_prefix)
+        text_layout.addRow("Layout template", layout_template)
+        text_layout.addRow("Timezone display", timezone_display_mode)
+        text_layout.addRow("Datetime format", datetime_format)
+        text_layout.addRow("Font family", font_family)
+        text_layout.addRow("Font size", font_size)
+        text_layout.addRow("", bold)
+        text_layout.addRow("", italic)
+        text_layout.addRow("Text color", text_color)
+
+        box_layout.addRow("Image stamp", image_stamp_path)
+        box_layout.addRow("", border_show)
+        box_layout.addRow("Border color", border_color)
+        box_layout.addRow("Border width", border_width)
+        box_layout.addRow("Background color", background_color)
+
+        layout.addWidget(text_group)
+        layout.addWidget(box_group)
 
         for control in (
             signer_label_prefix,
@@ -435,6 +647,7 @@ class SignaturePropertiesPanel:
             (),
             {
                 "container": container,
+                "summary_label": summary_label,
                 "signer_label_prefix": signer_label_prefix,
                 "layout_template": layout_template,
                 "timezone_display_mode": timezone_display_mode,
@@ -516,8 +729,16 @@ class SignaturePropertiesPanel:
             self._appearance_controls.timezone_display_mode,
             appearance.timezone_display_mode.value,
         )
-        _set_text(self._appearance_controls.datetime_format, appearance.datetime_format)
-        _set_text(self._appearance_controls.font_family, appearance.text_style.font_family)
+        _set_combo_text(
+            self._appearance_controls.datetime_format,
+            appearance.datetime_format,
+            allow_custom=True,
+        )
+        _set_combo_text(
+            self._appearance_controls.font_family,
+            appearance.text_style.font_family,
+            allow_custom=True,
+        )
         _set_spin_value(self._appearance_controls.font_size, appearance.text_style.font_size_pt)
         _set_checked(self._appearance_controls.bold, appearance.text_style.bold)
         _set_checked(self._appearance_controls.italic, appearance.text_style.italic)
@@ -551,7 +772,7 @@ class SignaturePropertiesPanel:
 
     def _build_appearance_from_controls(self) -> SignatureAppearance:
         text_style = SignatureTextStyle(
-            font_family=_text(self._appearance_controls.font_family),
+            font_family=_combo_text(self._appearance_controls.font_family),
             font_size_pt=_spin_value(self._appearance_controls.font_size),
             bold=_is_checked(self._appearance_controls.bold),
             italic=_is_checked(self._appearance_controls.italic),
@@ -578,7 +799,7 @@ class SignaturePropertiesPanel:
                 _combo_text(self._appearance_controls.timezone_display_mode),
                 SignatureTimezoneDisplayMode,
             ),
-            datetime_format=_text(self._appearance_controls.datetime_format),
+            datetime_format=_combo_text(self._appearance_controls.datetime_format),
             field_order=tuple(SignatureFieldKey),
             distinguished_name=field_bindings[SignatureFieldKey.DISTINGUISHED_NAME],
             common_name=field_bindings[SignatureFieldKey.COMMON_NAME],
@@ -614,6 +835,68 @@ class SignaturePropertiesPanel:
             width_pt=_spin_value(self._placement_controls.width_spin),
             height_pt=_spin_value(self._placement_controls.height_spin),
         )
+
+    def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
+        snapshot = render_signing_preview(preview)
+        title_line = next(
+            (line.text for line in snapshot.lines if line.kind.value == "title"),
+            preview.title,
+        )
+        if preview.signature_rect is None:
+            placement_line = "Placement: missing"
+        else:
+            placement_line = (
+                "Placement: "
+                f"page {preview.signature_rect.page_index + 1} "
+                f"left={preview.signature_rect.left_pt:g} "
+                f"bottom={preview.signature_rect.bottom_pt:g} "
+                f"width={preview.signature_rect.width_pt:g} "
+                f"height={preview.signature_rect.height_pt:g}"
+            )
+        appearance_line = next(
+            (
+                line.text
+                for line in snapshot.lines
+                if line.kind.value == "summary"
+                and line.text.startswith("Appearance: ")
+            ),
+            "Appearance: missing",
+        )
+        field_lines = [line.text for line in snapshot.lines if line.kind.value == "field"]
+        style_lines = [
+            line.text
+            for line in snapshot.lines
+            if line.kind.value == "summary"
+            and line.text.startswith(("Text style: ", "Box style: "))
+        ]
+        metadata_lines = [
+            line.text
+            for line in snapshot.lines
+            if line.kind.value == "summary"
+            and line.text.startswith(("Datetime format: ", "Image stamp: "))
+        ]
+        issue_lines = [line.text for line in snapshot.lines if line.kind.value == "issue"]
+        status_line = next(
+            (line.text for line in snapshot.lines if line.kind.value == "status"),
+            "",
+        )
+
+        self._preview_controls.title_label.setText(title_line)
+        self._preview_controls.placement_label.setText(placement_line)
+        self._preview_controls.appearance_label.setText(appearance_line)
+        self._preview_controls.field_label.setText(
+            "Visible fields: " + (", ".join(field_lines) if field_lines else "None")
+        )
+        self._preview_controls.style_label.setText(
+            " | ".join(style_lines) if style_lines else "Style: unavailable"
+        )
+        self._preview_controls.metadata_label.setText(
+            " | ".join(metadata_lines) if metadata_lines else "Metadata: unavailable"
+        )
+        self._preview_controls.issue_label.setText(
+            " | ".join(issue_lines) if issue_lines else "Issues: none"
+        )
+        self._preview_controls.status_label.setText(status_line)
 
     def _current_preview(self) -> SigningDraftPreview:
         preview = self._workflow.preview()
@@ -736,6 +1019,18 @@ class SigningWorkspaceWidget:
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
+
+        self._flow_summary_box = bindings.q_group_box("Signing flow")
+        self._flow_summary_layout = bindings.q_vbox_layout(self._flow_summary_box)
+        self._flow_summary_layout.setContentsMargins(8, 8, 8, 8)
+        self._flow_summary_layout.setSpacing(4)
+        self._flow_steps_label = bindings.q_label(
+            "1. Edit appearance\n2. Place signature\n3. Review preview\n4. Confirm and sign"
+        )
+        self._flow_stage_label = bindings.q_label("")
+        self._flow_summary_layout.addWidget(self._flow_steps_label)
+        self._flow_summary_layout.addWidget(self._flow_stage_label)
+
         self._main_row = bindings.q_hbox_layout()
         self._main_row.setContentsMargins(0, 0, 0, 0)
         self._main_row.setSpacing(8)
@@ -762,6 +1057,7 @@ class SigningWorkspaceWidget:
         self._sign_button = bindings.q_push_button("Confirm and sign")
         self._sign_button.clicked.connect(self.submit_sign_request)  # type: ignore[attr-defined]
 
+        self._layout.addWidget(self._flow_summary_box)
         self._main_row.addWidget(self._viewer_widget, 3)
         self._main_row.addWidget(self._properties_scroll, 2)
         self._layout.addLayout(self._main_row)
@@ -870,6 +1166,18 @@ class SigningWorkspaceWidget:
 
     def _refresh_sign_button_state(self) -> None:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
+        self._refresh_flow_summary()
+
+    def _refresh_flow_summary(self) -> None:
+        self._flow_stage_label.setText(self._current_flow_stage_text())
+
+    def _current_flow_stage_text(self) -> str:
+        preview = self.properties_panel.preview
+        if self._draft_workflow.signature_rect is None:
+            return "Current stage: Edit appearance and place signature."
+        if preview.can_submit:
+            return "Current stage: Confirm and sign."
+        return "Current stage: Review preview and refine placement."
 
     def _emit_error(self, message: str) -> None:
         if self._on_error is not None:
