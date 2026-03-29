@@ -324,8 +324,37 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget.properties_panel.preview.can_submit is True
     assert widget.properties_panel.validation_text() == "Ready to sign."
     assert widget._signing_workspace._sign_button._enabled is True
+    assert "1. Edit appearance" in widget._signing_workspace._flow_steps_label.text()
+    assert "Current stage: Confirm and sign." in widget._signing_workspace._flow_stage_label.text()
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
+
+
+def test_signing_shell_surfaces_a_stage_guide(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    assert "1. Edit appearance" in widget._signing_workspace._flow_steps_label.text()
+    assert "Current stage: Edit appearance and place signature." in (
+        widget._signing_workspace._flow_stage_label.text()
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+
+    assert "Current stage: Confirm and sign." in widget._signing_workspace._flow_stage_label.text()
 
 
 def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Path) -> None:
@@ -424,10 +453,31 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         )
     )
 
+    appearance_summary = widget.properties_panel._appearance_controls.summary_label.text()
     preview_text = widget.properties_panel.preview_text()
+    preview_controls = widget.properties_panel.preview_controls
 
-    assert preview_text.count("Datetime format: %d/%m/%Y %H:%M") == 1
-    assert preview_text.count("Image stamp: /tmp/stamp.png") == 1
+    assert "Current appearance draft" in appearance_summary
+    assert "Layout:" in appearance_summary
+    assert "Visible fields:" in appearance_summary
+    assert "Image stamp: /tmp/stamp.png" in appearance_summary
+    assert preview_controls.title_label.text() == "Digitally signed by"
+    assert "Placement: page 1" in preview_controls.placement_label.text()
+    assert "Appearance: Digitally signed by" in preview_controls.appearance_label.text()
+    assert "Visible fields:" in preview_controls.field_label.text()
+    assert "Text style:" in preview_controls.style_label.text()
+    assert "Datetime format: %d/%m/%Y %H:%M" in preview_controls.metadata_label.text()
+    assert "Image stamp: /tmp/stamp.png" in preview_controls.metadata_label.text()
+    assert (
+        widget._signing_workspace.properties_panel._appearance_controls.font_family._items[:3]
+        == ["Sans Serif", "Serif", "Monospace"]
+    )
+    assert (
+        widget._signing_workspace.properties_panel._appearance_controls.font_family.currentText()
+        == "Source Sans 3"
+    )
+    assert preview_controls.status_label.text() == "Ready to sign"
+    assert preview_text.count("Visible signature preview") == 1
 
 
 def test_signing_shell_warning_only_issue_keeps_readiness_enabled(
