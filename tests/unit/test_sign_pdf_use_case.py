@@ -3,15 +3,26 @@ from pathlib import Path
 
 import pytest
 
-from foliaseal.application.sign_pdf_use_case import SignPdfUseCase
+from foliaseal.application.sign_pdf_use_case import (
+    SigningBackendRequest,
+    SignPdfUseCase,
+)
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
     FailureCode,
     TsaUnavailableError,
 )
-from foliaseal.domain.models import SigningOutput, SigningRequest, VerificationSummary
-from tests.support.phase3_builders import build_signing_request
+from foliaseal.domain.models import (
+    SignatureFieldKey,
+    SigningOutput,
+    SigningRequest,
+    VerificationSummary,
+)
+from tests.support.phase3_builders import (
+    build_signature_appearance,
+    build_signing_request,
+)
 
 
 @dataclass
@@ -33,8 +44,12 @@ class StubCertificateLoader:
 @dataclass
 class StubSigner:
     output: SigningOutput
+    called: bool = False
+    last_request: object | None = None
 
-    def sign(self, request: SigningRequest) -> SigningOutput:
+    def sign(self, request) -> SigningOutput:
+        self.called = True
+        self.last_request = request
         return self.output
 
 
@@ -59,7 +74,12 @@ def _request(tmp_path: Path) -> SigningRequest:
 
 
 def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
-    request = _request(tmp_path)
+    request = build_signing_request(
+        tmp_path,
+        signature_appearance=build_signature_appearance(
+            image_stamp_path="/tmp/stamp.png",
+        ),
+    )
     output = SigningOutput(
         output_bytes=b"signed-pdf",
         output_pdf_version="1.7",
@@ -84,6 +104,19 @@ def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
     assert result.timestamp_present is True
     assert result.standards_summary is not None
     assert (tmp_path / "output.pdf").read_bytes() == b"signed-pdf"
+    assert use_case.signer.called is True
+    assert isinstance(use_case.signer.last_request, SigningBackendRequest)
+    assert use_case.signer.last_request.signature_appearance is not None
+    assert use_case.signer.last_request.signature_appearance.datetime_format == "%Y-%m-%d %H:%M"
+    assert (
+        use_case.signer.last_request.signature_appearance.image_stamp_path
+        == "/tmp/stamp.png"
+    )
+    assert len(use_case.signer.last_request.signature_appearance.field_bindings) == 8
+    assert (
+        use_case.signer.last_request.signature_appearance.field_bindings[0].field_key
+        == SignatureFieldKey.DISTINGUISHED_NAME
+    )
 
 
 def test_sign_use_case_fails_when_timestamp_required_but_missing(tmp_path: Path) -> None:
@@ -274,6 +307,73 @@ def test_sign_use_case_allows_missing_timestamp_when_optional(tmp_path: Path) ->
 
     assert result.success is True
     assert result.timestamp_present is False
+
+
+def test_sign_use_case_allows_invisible_signing_requests(tmp_path: Path) -> None:
+    request = SigningRequest(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=True,
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert isinstance(use_case.signer.last_request, SigningBackendRequest)
+    assert use_case.signer.last_request.signature_appearance is None
+
+
+def test_sign_use_case_rejects_partial_visible_signature_settings(
+    tmp_path: Path,
+) -> None:
+    request = SigningRequest(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=True,
+        signature_rect=build_signing_request(tmp_path).signature_rect,
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.SIGNATURE_RECT_INVALID
+    assert use_case.signer.called is False
 
 
 def test_sign_use_case_maps_value_error_to_pdf_signing_failed(tmp_path: Path) -> None:

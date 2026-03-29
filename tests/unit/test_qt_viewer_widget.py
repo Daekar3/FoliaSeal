@@ -2,8 +2,16 @@ import importlib
 
 import pytest
 
+from foliaseal.application.coordinate_transform import (
+    PageBox,
+    PdfRect,
+    ViewTransform,
+    pdf_rect_to_view_rect,
+)
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.domain.models import SignatureRect
+from foliaseal.infra.render import PdfPageGeometry, RenderPageResult
 from foliaseal.presentation.qt import PdfViewerWidgetAdapter, QtViewerBindingsUnavailable
 from foliaseal.presentation.qt.viewer_widget import (
     QtWidgetBindings,
@@ -241,6 +249,25 @@ class _FakePixmap:
         return cls()
 
 
+class _OverlayRenderBackend:
+    def render_page(self, request):  # pragma: no cover - simple test helper
+        return RenderPageResult(
+            width_px=200,
+            height_px=200,
+            rgba_bytes=b"\x00" * (200 * 200 * 4),
+        )
+
+    def get_page_geometry(self, document_path: str, page_index: int):  # pragma: no cover
+        return PdfPageGeometry(
+            media_box=(0.0, 0.0, 100.0, 100.0),
+            crop_box=(0.0, 0.0, 100.0, 100.0),
+            rotation=0,
+        )
+
+    def diagnostics(self):  # pragma: no cover
+        raise NotImplementedError
+
+
 def _fake_bindings() -> QtWidgetBindings:
     return QtWidgetBindings(
         q_widget=_FakeWidget,
@@ -285,6 +312,69 @@ def test_plain_click_does_not_emit_selection(monkeypatch):
     widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=30))
 
     assert selected == []
+
+
+def test_overlay_corner_handle_resizes_persistent_signature_overlay(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow, on_selection=selected.append)
+    preview.refresh()
+
+    preview.set_signature_overlay(
+        SignatureRect(
+            page_index=0,
+            left_pt=20.0,
+            bottom_pt=30.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    view_rect = pdf_rect_to_view_rect(
+        pdf_rect=PdfRect(x1=20.0, y1=30.0, x2=60.0, y2=50.0),
+        transform=ViewTransform(zoom=1.0, pan_x=0.0, pan_y=0.0),
+        page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+        rotation=0,
+    )
+
+    preview.mousePressEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x1),
+            y=int(view_rect.y1),
+        )
+    )
+    preview.mouseMoveEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x1 + 10),
+            y=int(view_rect.y1 + 8),
+        )
+    )
+    preview.mouseReleaseEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x1 + 10),
+            y=int(view_rect.y1 + 8),
+        )
+    )
+
+    assert len(selected) == 1
+    expected = workflow.selection_to_pdf_rect(
+        selection=type(view_rect)(
+            x1=view_rect.x1 + 10,
+            y1=view_rect.y1 + 8,
+            x2=view_rect.x2,
+            y2=view_rect.y2,
+        )
+    )
+    assert selected[0] == expected
 
 
 def test_mouse_release_event_reports_selection_mapping_errors(monkeypatch):

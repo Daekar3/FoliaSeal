@@ -8,8 +8,14 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
-from foliaseal.application.coordinate_transform import ViewRect
+from foliaseal.application.coordinate_transform import (
+    PdfRect,
+    ViewRect,
+    ViewTransform,
+    pdf_rect_to_view_rect,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.domain.models import SignatureRect
 
 
 class QtViewerBindingsUnavailable(RuntimeError):
@@ -62,6 +68,11 @@ class PdfViewerWidgetAdapter:
                 self._pan_origin: Any | None = None
                 self._pan_start_x = 0
                 self._pan_start_y = 0
+                self._overlay_signature_rect: SignatureRect | None = None
+                self._overlay_drag_handle: str | None = None
+                self._overlay_drag_rect: Any | None = None
+                self._overlay_drag_start_rect: Any | None = None
+                self._overlay_handle_half_size = 4.0
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
                 start_time = perf_counter() if elapsed_ms is None else None
@@ -92,6 +103,12 @@ class PdfViewerWidgetAdapter:
                 if self._selection_rect is not None:
                     painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
                     painter.drawRect(self._selection_rect.normalized())
+
+                overlay_rect = None
+                if self._overlay_drag_handle is None:
+                    overlay_rect = self._current_overlay_qrect()
+                if overlay_rect is not None:
+                    self._draw_overlay(painter, overlay_rect)
 
                 painter.end()
                 super().paintEvent(event)
@@ -209,7 +226,24 @@ class PdfViewerWidgetAdapter:
                     return
                 if event.button() != bindings.qt.LeftButton:
                     return super().mousePressEvent(event)
-                self._drag_origin = event.position().toPoint()
+                point = event.position().toPoint()
+                overlay_rect = self._current_overlay_qrect()
+                if overlay_rect is not None:
+                    handle = self._hit_test_overlay_handle(overlay_rect, point)
+                    if handle is not None:
+                        self._overlay_drag_handle = handle
+                        self._overlay_drag_start_rect = overlay_rect
+                        self._overlay_drag_rect = self._overlay_resize_rect(
+                            overlay_rect=overlay_rect,
+                            handle=handle,
+                            current=point,
+                        )
+                        self._selection_rect = self._overlay_drag_rect
+                        self.grabMouse()
+                        self.update()
+                        event.accept()
+                        return
+                self._drag_origin = point
                 self._selection_rect = bindings.q_rect(self._drag_origin, self._drag_origin)
                 self.update()
 
@@ -223,6 +257,19 @@ class PdfViewerWidgetAdapter:
                     self._sync_pan_from_scrollbars()
                     event.accept()
                     return
+                if self._overlay_drag_handle is not None:
+                    current = event.position().toPoint()
+                    if self._overlay_drag_start_rect is None:
+                        return super().mouseMoveEvent(event)
+                    self._overlay_drag_rect = self._overlay_resize_rect(
+                        overlay_rect=self._overlay_drag_start_rect,
+                        handle=self._overlay_drag_handle,
+                        current=current,
+                    )
+                    self._selection_rect = self._overlay_drag_rect
+                    self.update()
+                    event.accept()
+                    return
                 if self._drag_origin is None:
                     return super().mouseMoveEvent(event)
                 current = event.position().toPoint()
@@ -233,6 +280,24 @@ class PdfViewerWidgetAdapter:
                 if self._pan_origin is not None and self._is_pan_release(event):
                     self._pan_origin = None
                     self.releaseMouse()
+                    event.accept()
+                    return
+                if (
+                    self._overlay_drag_handle is not None
+                    and event.button() == bindings.qt.LeftButton
+                ):
+                    current = event.position().toPoint()
+                    if self._overlay_drag_start_rect is None:
+                        self._reset_overlay_drag_state()
+                        event.accept()
+                        return
+                    self._overlay_drag_rect = self._overlay_resize_rect(
+                        overlay_rect=self._overlay_drag_start_rect,
+                        handle=self._overlay_drag_handle,
+                        current=current,
+                    )
+                    self._apply_overlay_drag_selection()
+                    self._reset_overlay_drag_state()
                     event.accept()
                     return
                 if self._drag_origin is None or event.button() != bindings.qt.LeftButton:
@@ -267,6 +332,14 @@ class PdfViewerWidgetAdapter:
                 if self._on_selection is not None:
                     self._emit_interaction("selection_success")
                     self._on_selection(pdf_rect)
+                self.update()
+
+            def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
+                self._overlay_signature_rect = signature_rect
+                self.update()
+
+            def clear_signature_overlay(self) -> None:
+                self._overlay_signature_rect = None
                 self.update()
 
             def attach_scroll_container(self, scroll_container: Any) -> None:
@@ -388,6 +461,133 @@ class PdfViewerWidgetAdapter:
                     float(self._vertical_scroll_bar().value()),
                 )
 
+            def _current_overlay_qrect(self) -> Any | None:
+                view_rect = self._current_overlay_view_rect()
+                if view_rect is None:
+                    return None
+                return bindings.q_rect(
+                    bindings.q_point(int(view_rect.x1), int(view_rect.y1)),
+                    bindings.q_point(int(view_rect.x2), int(view_rect.y2)),
+                )
+
+            def _current_overlay_view_rect(self) -> ViewRect | None:
+                overlay = self._overlay_signature_rect
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if overlay is None or snapshot is None:
+                    return None
+                if overlay.page_index != snapshot.page_index:
+                    return None
+                pdf_rect = PdfRect(
+                    x1=overlay.left_pt,
+                    y1=overlay.bottom_pt,
+                    x2=overlay.left_pt + overlay.width_pt,
+                    y2=overlay.bottom_pt + overlay.height_pt,
+                )
+                return pdf_rect_to_view_rect(
+                    pdf_rect=pdf_rect,
+                    transform=ViewTransform(
+                        zoom=snapshot.zoom,
+                        pan_x=snapshot.pan_x,
+                        pan_y=snapshot.pan_y,
+                    ),
+                    page_box=snapshot.page_box,
+                    rotation=snapshot.rotation,
+                )
+
+            def _draw_overlay(self, painter: Any, overlay_rect: Any) -> None:
+                painter.setPen(bindings.q_pen(bindings.q_color(255, 102, 0), 2))
+                painter.drawRect(overlay_rect.normalized())
+                for handle_point in self._overlay_handle_points(overlay_rect):
+                    painter.drawRect(
+                        bindings.q_rect(
+                            bindings.q_point(
+                                int(handle_point.x() - self._overlay_handle_half_size),
+                                int(handle_point.y() - self._overlay_handle_half_size),
+                            ),
+                            bindings.q_point(
+                                int(handle_point.x() + self._overlay_handle_half_size),
+                                int(handle_point.y() + self._overlay_handle_half_size),
+                            ),
+                        )
+                    )
+
+            def _overlay_handle_points(self, overlay_rect: Any) -> tuple[Any, ...]:
+                return (
+                    bindings.q_point(int(overlay_rect.left()), int(overlay_rect.top())),
+                    bindings.q_point(int(overlay_rect.right()), int(overlay_rect.top())),
+                    bindings.q_point(int(overlay_rect.left()), int(overlay_rect.bottom())),
+                    bindings.q_point(int(overlay_rect.right()), int(overlay_rect.bottom())),
+                )
+
+            def _hit_test_overlay_handle(self, overlay_rect: Any, point: Any) -> str | None:
+                half_size = self._overlay_handle_half_size
+                handle_targets = {
+                    "top_left": (overlay_rect.left(), overlay_rect.top()),
+                    "top_right": (overlay_rect.right(), overlay_rect.top()),
+                    "bottom_left": (overlay_rect.left(), overlay_rect.bottom()),
+                    "bottom_right": (overlay_rect.right(), overlay_rect.bottom()),
+                }
+                for handle_name, (x_coord, y_coord) in handle_targets.items():
+                    if abs(float(point.x()) - float(x_coord)) <= half_size and abs(
+                        float(point.y()) - float(y_coord)
+                    ) <= half_size:
+                        return handle_name
+                return None
+
+            def _overlay_resize_rect(self, *, overlay_rect: Any, handle: str, current: Any) -> Any:
+                left = float(overlay_rect.left())
+                right = float(overlay_rect.right())
+                top = float(overlay_rect.top())
+                bottom = float(overlay_rect.bottom())
+                current_x = float(current.x())
+                current_y = float(current.y())
+
+                if handle == "top_left":
+                    left = current_x
+                    top = current_y
+                elif handle == "top_right":
+                    right = current_x
+                    top = current_y
+                elif handle == "bottom_left":
+                    left = current_x
+                    bottom = current_y
+                elif handle == "bottom_right":
+                    right = current_x
+                    bottom = current_y
+                return bindings.q_rect(
+                    bindings.q_point(int(left), int(top)),
+                    bindings.q_point(int(right), int(bottom)),
+                ).normalized()
+
+            def _apply_overlay_drag_selection(self) -> None:
+                if self._overlay_drag_rect is None:
+                    return
+                try:
+                    self._sync_pan_from_scrollbars()
+                    selection = self._selection_in_viewport_coords(self._overlay_drag_rect)
+                    pdf_rect = self._workflow.selection_to_pdf_rect(selection=selection)
+                except (RuntimeError, ValueError) as exc:
+                    self._emit_interaction("selection_error")
+                    self._emit_error(
+                        "Selection could not be placed on the PDF page. "
+                        "Please keep the selection inside page bounds.",
+                        exc,
+                    )
+                    self.update()
+                    return
+                if self._on_selection is not None:
+                    self._emit_interaction("selection_success")
+                    self._on_selection(pdf_rect)
+                self.update()
+
+            def _reset_overlay_drag_state(self) -> None:
+                self._overlay_drag_handle = None
+                self._overlay_drag_rect = None
+                self._overlay_drag_start_rect = None
+                self._selection_rect = None
+                self.releaseMouse()
+                self.update()
+
             def _record_timing(self, *, measured_ms: float, navigation: bool) -> None:
                 tracker = getattr(self._workflow, "timing_tracker", None)
                 if tracker is None:
@@ -464,5 +664,11 @@ def build_qt_pdf_viewer_widget(
 
         def reset_zoom_view(self) -> None:
             preview_widget.reset_zoom_view()
+
+        def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
+            preview_widget.set_signature_overlay(signature_rect)
+
+        def clear_signature_overlay(self) -> None:
+            preview_widget.clear_signature_overlay()
 
     return ScrollablePdfViewer()
