@@ -24,6 +24,11 @@ from foliaseal.presentation.qt.phase2_harness import (
     DEFAULT_CHECKLIST_TEMPLATE_PATH,
     run_phase2_viewer_harness,
 )
+from foliaseal.presentation.qt.phase3_harness import (
+    DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
+    DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
+    run_phase3_signing_harness,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -191,6 +196,34 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Template checklist used to seed the run-specific checklist results file.",
     )
 
+    phase3_harness = subparsers.add_parser(
+        "phase3-signing-harness",
+        help="Launch the interactive Qt signing harness for Phase 3 acceptance.",
+    )
+    phase3_harness.add_argument(
+        "--pdf-path",
+        required=True,
+        help="Path to the PDF to open in the interactive signing harness.",
+    )
+    phase3_harness.add_argument(
+        "--summary-json-path",
+        default=None,
+        help="Optional file path where the harness capture JSON should be written.",
+    )
+    phase3_harness.add_argument(
+        "--checklist-results-path",
+        default=DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
+        help=(
+            "File path where the run-specific Phase 3 acceptance results should be "
+            "written."
+        ),
+    )
+    phase3_harness.add_argument(
+        "--checklist-template-path",
+        default=DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
+        help="Template checklist used to seed the run-specific Phase 3 results file.",
+    )
+
     return parser
 
 
@@ -289,6 +322,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             pdf_path=args.pdf_path,
             summary_json_path=args.summary_json_path,
             evidence_command_path=args.evidence_command_path,
+            checklist_results_path=args.checklist_results_path,
+            checklist_template_path=args.checklist_template_path,
+        )
+        return
+    if args.command == "phase3-signing-harness":
+        run_phase3_signing_harness(
+            pdf_path=args.pdf_path,
+            summary_json_path=args.summary_json_path,
             checklist_results_path=args.checklist_results_path,
             checklist_template_path=args.checklist_template_path,
         )
