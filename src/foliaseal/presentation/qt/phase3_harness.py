@@ -152,27 +152,6 @@ def run_phase3_signing_harness(
 
     window.setCentralWidget(central)
 
-    harness_panel = bindings.q_group_box("Harness diagnostics")
-    harness_layout = bindings.q_v_box_layout(harness_panel)
-    harness_layout.setContentsMargins(10, 10, 10, 10)
-    harness_layout.setSpacing(6)
-
-    pdf_path_label = bindings.q_label(f"Loaded PDF: {source_path}")
-    pdf_path_label.setWordWrap(True)
-    instructions = bindings.q_label(_instructions_text())
-    instructions.setWordWrap(True)
-
-    status = bindings.q_plain_text_edit()
-    status.setReadOnly(True)
-    status.setMaximumBlockCount(300)
-    status.setMinimumHeight(260)
-
-    for widget in (pdf_path_label, instructions, status):
-        harness_layout.addWidget(widget)
-
-    def append_status(message: str) -> None:
-        status.appendPlainText(message)
-
     def refocus_shell() -> None:
         focus_setter = getattr(shell, "setFocus", None)
         if callable(focus_setter):
@@ -180,16 +159,9 @@ def run_phase3_signing_harness(
 
     def on_sign_request(request: SigningRequest) -> None:
         sign_requests.append(request)
-        append_status(
-            "Sign request captured: "
-            f"page={request.signature_rect.page_index if request.signature_rect else 'n/a'}, "
-            f"visible={'yes' if request.has_visible_signature_settings() else 'no'}, "
-            f"output={request.output_pdf_path}"
-        )
 
     def on_error(message: str) -> None:
         errors.append(message)
-        append_status(f"Error: {message}")
 
     def on_status_change(name: str) -> None:
         interaction_counts[name] += 1
@@ -201,8 +173,7 @@ def run_phase3_signing_harness(
         on_error=on_error,
         on_status_change=on_status_change,
     )
-    body_layout.addWidget(shell, 3)
-    body_layout.addWidget(harness_panel, 1)
+    body_layout.addWidget(shell, 1)
 
     def do_refresh() -> None:
         shell.refresh_viewer()
@@ -229,8 +200,7 @@ def run_phase3_signing_harness(
 
     start = perf_counter()
     shell.refresh_viewer()
-    elapsed_ms = (perf_counter() - start) * 1000.0
-    append_status(f"Initial shell render completed in {elapsed_ms:.2f} ms.")
+    _elapsed_ms = (perf_counter() - start) * 1000.0
 
     window.show()
     refocus_shell()
@@ -315,14 +285,6 @@ def _load_page_count(*, bindings: _QtHarnessBindings, pdf_path: str) -> int:
     if status != bindings.qpdf_document.Error.None_:
         raise RuntimeError(f"Failed to load PDF document: {pdf_path}")
     return int(document.pageCount())
-
-
-def _instructions_text() -> str:
-    return (
-        "Use the signing shell to place, resize, configure, and submit a signature draft. "
-        "Close the window when finished to write a structured capture and a pre-filled "
-        "Phase 3 acceptance worksheet."
-    )
 
 
 def _derive_phase3_auto_checked_items(capture: Phase3HarnessCapture) -> set[str]:
