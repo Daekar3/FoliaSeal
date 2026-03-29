@@ -323,7 +323,7 @@ class PdfViewerWidgetAdapter:
 
                 try:
                     self._sync_pan_from_scrollbars()
-                    selection = self._selection_in_viewport_coords(rect)
+                    selection = self._selection_in_view_coords(rect)
                     pdf_rect = self._workflow.selection_to_pdf_rect(
                         selection=selection
                     )
@@ -444,21 +444,23 @@ class PdfViewerWidgetAdapter:
             def _is_selection_drag(origin: Any, current: Any) -> bool:
                 return origin.x() != current.x() or origin.y() != current.y()
 
-            def _selection_in_viewport_coords(self, rect: Any) -> ViewRect:
-                pan_x, pan_y = self._current_pan_offsets()
+            def _selection_in_view_coords(self, rect: Any) -> ViewRect:
                 return ViewRect(
-                    x1=float(rect.left()) - pan_x,
-                    y1=float(rect.top()) - pan_y,
-                    x2=float(rect.right()) - pan_x,
-                    y2=float(rect.bottom()) - pan_y,
+                    x1=float(rect.left()),
+                    y1=float(rect.top()),
+                    x2=float(rect.right()),
+                    y2=float(rect.bottom()),
                 )
 
             def _sync_pan_from_scrollbars(self) -> None:
                 setter = getattr(self._workflow, "set_pan", None)
                 if not callable(setter):
                     return
-                pan_x, pan_y = self._current_pan_offsets()
-                setter(pan_x=-pan_x, pan_y=-pan_y)
+                # QScrollArea already repositions the child widget, so mouse and paint
+                # coordinates stay in the widget's own document-space. Feeding scroll
+                # offsets back into the workflow would double-apply pan during
+                # selection/overlay transforms.
+                setter(pan_x=0.0, pan_y=0.0)
 
             def _current_pan_offsets(self) -> tuple[float, float]:
                 if self._scroll_container is None:

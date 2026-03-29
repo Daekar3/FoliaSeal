@@ -11,9 +11,9 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 1
+- Selection interactions captured: 11
 - Sign requests captured: 1
-- Last signature page index: 2
+- Last signature page number: 3
 - Last sign request had visible appearance: yes
 - Last sign request output path: `/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf`
 - Current validation text: `Ready to sign.`
@@ -44,15 +44,15 @@ Current status note:
 
 Complete this section first. If the overlay gate fails, stop the acceptance run and record notes before moving on to broader FR-3B tasks.
 
-- [ ] Resize handles no longer snap or jump unexpectedly during drag.
-- [ ] Placement remains visually stable while the overlay is being resized.
-- [ ] No placement exception is raised during overlay resize or reposition.
-- [ ] Overlay state remains synchronized with the viewer after repeated drags.
-- [ ] Zoom or pan does not cause obvious overlay drift during placement or resize.
+- [x] Resize handles no longer snap or jump unexpectedly during drag.
+- [x] Placement remains visually stable while the overlay is being resized.
+- [x] No placement exception is raised during overlay resize or reposition.
+- [x] Overlay state remains synchronized with the viewer after repeated drags.
+- [x] Zoom or pan does not cause obvious overlay drift during placement or resize.
 
 Gate result:
 
-- [ ] Overlay gate passed
+- [x] Overlay gate passed
 - [ ] Overlay gate failed
 
 Overlay notes:
@@ -64,7 +64,7 @@ Overlay notes:
 ## Session setup
 
 - [x] Launch the Phase 3 desktop build in an environment with the relevant PDF signing UI enabled.
-- [ ] Open a representative PDF that includes at least one page suitable for signature placement.
+- [x] Open a representative PDF that includes at least one page suitable for signature placement.
 - [x] Confirm the signature properties flow is reachable from the main signing UI.
 - [x] Confirm the viewer preview renders before any signing action is attempted.
 - [x] Confirm the selected PDF can be used without unexpected dependency or backend errors.
@@ -158,7 +158,7 @@ Goal:
 
 Checks:
 
-- [ ] The placed rectangle can be resized or repositioned in the workflow.
+- [x] The placed rectangle can be resized or repositioned in the workflow.
 - [ ] Numeric x/y/width/height fine-tuning is available when expected.
 - [ ] Fine-tuned values are reflected in the preview.
 - [ ] Fine-tuned values remain valid after the user changes other appearance settings.
