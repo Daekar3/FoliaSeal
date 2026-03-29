@@ -1,12 +1,10 @@
 {
-  "errors": [
-    "Unable to change PDF page: page_index is out of range."
-  ],
-  "first_render_ms": 50.97115901298821,
+  "errors": [],
+  "first_render_ms": 51.94867681711912,
   "interaction_counts": {
-    "selection_success": 3,
-    "wheel_zoom_in": 12,
-    "wheel_zoom_out": 9
+    "selection_success": 4,
+    "wheel_zoom_in": 4,
+    "wheel_zoom_out": 4
   },
   "last_signature_has_visible_appearance": true,
   "last_signature_output_path": "/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf",
@@ -14,7 +12,7 @@
   "last_signature_page_number": 3,
   "pdf_path": "/home/daekar/Downloads/2019.04.24 Savor MC.PDF",
   "preview_available": true,
-  "selection_count": 3,
-  "sign_request_count": 1,
+  "selection_count": 4,
+  "sign_request_count": 2,
   "validation_text": "Ready to sign."
 }

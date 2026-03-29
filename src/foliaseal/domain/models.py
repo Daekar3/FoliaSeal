@@ -306,7 +306,7 @@ class SignatureAppearance:
 
     signer_label_prefix: str = "Digitally signed by"
     layout_template: SignatureLayoutTemplate = SignatureLayoutTemplate.SINGLE_LINE
-    timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.LOCAL
+    timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.UTC
     datetime_format: str = "%Y-%m-%d %H:%M:%S %Z"
     field_order: tuple[SignatureFieldKey, ...] = (
         SignatureFieldKey.DISTINGUISHED_NAME,

@@ -1076,6 +1076,154 @@ When to assign:
 
 - after Brief K and Brief L land
 
+## Follow-Up Preview and Form Refinement Wave
+
+This short wave exists because the shell is now much closer to a product UI, but there are still
+layout-efficiency and preview-composition issues that make it feel heavier than it should.
+
+The goals of this wave are:
+
+- increase form density on the right-side controls without reducing clarity
+- remove redundant preview chrome
+- make the preview composition respond more meaningfully to layout template choice
+- keep the preview compact and plausible for small real-world signatures
+- make UTC the default timezone consistently
+
+### Refinement Acceptance Target
+
+This wave should be considered complete when:
+
+- the right-side controls use space more efficiently
+- the preview no longer shows an overlapping internal title
+- layout-template changes produce visibly different preview composition
+- UTC is the default timezone for a fresh workflow
+- visible-field checkboxes read naturally without redundant checkbox text
+
+### Brief N: Form Density and Labeling
+
+You are refining the signing form so it uses space more efficiently and reads more naturally.
+
+Objectives:
+
+- make the right-side controls denser without harming clarity
+- improve visible-field labeling
+- set UTC as the default timezone consistently
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `src/foliaseal/domain/models.py` only if needed for the default timezone contract
+- relevant tests in `tests/unit/test_qt_signing_shell.py`
+- relevant model tests in `tests/unit/test_signature_appearance_models.py` if the default contract changes
+
+Files you should avoid editing unless absolutely necessary:
+
+- signing-engine code
+- low-level viewer geometry
+- harness CLI behavior
+
+Requirements to satisfy:
+
+- the follow-up refinement goals in this document
+
+Expected deliverables:
+
+- denser `Text and layout` rows where compatible controls can share horizontal space
+- denser `Placement` rows for page/coordinates/size
+- visible-field checkboxes moved immediately to the left of the actual field labels
+- removal of the redundant checkbox text `Visible`
+- UTC as the default timezone for a fresh workflow
+
+Implementation notes:
+
+- prefer layout clarity over maximum compression
+- if the timezone default changes at the domain level, update tests so the contract is explicit
+
+Definition of done:
+
+- the form feels meaningfully tighter and the fresh-workflow timezone default is UTC
+
+When to assign:
+
+- first in this wave
+
+### Brief O: Layout-Template-Specific Preview Composition
+
+You are refining the visible-signature preview so its structure changes meaningfully with the
+selected layout template.
+
+Objectives:
+
+- remove redundant preview title chrome
+- make the signer label prefix the top element
+- give `single_line` and `multi_line` visibly different, useful compositions
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant preview/layout tests in `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- domain/application layers unless a tiny preview contract tweak is truly needed
+- unrelated shell flow code
+
+Requirements to satisfy:
+
+- the preview-composition goals in this document
+
+Expected deliverables:
+
+- remove the extra internal `Visible signature preview` text from the preview area
+- signer label prefix always appears as the top element
+- `single_line` layout places stamp below the prefix and content below the stamp
+- `multi_line` layout places stamp to the left and multiline content to the right
+- preserve compact vertical space where possible
+
+Implementation notes:
+
+- the preview should stay output-facing and compact
+- optimize for small signatures, not poster-sized cards
+
+Definition of done:
+
+- layout-template changes produce meaningfully different preview composition without reintroducing
+  settings leakage
+
+When to assign:
+
+- after Brief N or immediately after if the shell structure is still compatible
+
+### Brief P: Form/Preview Refinement Review
+
+You are doing a review-only pass on the refinement wave.
+
+Objectives:
+
+- verify that the denser form still reads clearly
+- verify that preview composition behaves correctly for `single_line` and `multi_line`
+- catch remaining redundancy, overlap, or wasted-space regressions
+
+Primary files to review:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `src/foliaseal/domain/models.py` if the timezone default changed
+- `tests/unit/test_qt_signing_shell.py`
+- `tests/unit/test_signature_appearance_models.py` if touched
+
+Requirements to satisfy:
+
+- use the review-agent template in this document
+- return findings, residual risks, and go/no-go
+
+Definition of done:
+
+- the team has a concrete review gate before the next manual pass
+
+When to assign:
+
+- after Brief N and Brief O land
+
 ## Agent-Ready Assignment Briefs
 
 These briefs are written so they can be copied into separate agent threads with minimal editing.
