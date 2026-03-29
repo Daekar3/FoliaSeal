@@ -1,16 +1,14 @@
 {
   "errors": [],
-  "first_render_ms": 52.513452945277095,
-  "interaction_counts": {
-    "selection_success": 2
-  },
-  "last_signature_has_visible_appearance": true,
-  "last_signature_output_path": "/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf",
-  "last_signature_page_index": 1,
-  "last_signature_page_number": 2,
-  "pdf_path": "/home/daekar/Downloads/2019.04.24 Savor MC.PDF",
+  "first_render_ms": 9.940013056620955,
+  "interaction_counts": {},
+  "last_signature_has_visible_appearance": false,
+  "last_signature_output_path": null,
+  "last_signature_page_index": null,
+  "last_signature_page_number": null,
+  "pdf_path": "/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed).pdf",
   "preview_available": true,
-  "selection_count": 2,
-  "sign_request_count": 1,
-  "validation_text": "Ready to sign."
+  "selection_count": 0,
+  "sign_request_count": 0,
+  "validation_text": "Place a signature on the page to continue."
 }

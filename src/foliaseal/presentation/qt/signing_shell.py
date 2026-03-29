@@ -382,7 +382,7 @@ def _preview_text_style(preview: SigningDraftPreview) -> str:
     if preview.text_style is None:
         return "color: #1f1f1f;"
     family = preview.text_style.font_family
-    size = max(preview.text_style.font_size_pt, 8.0)
+    size = preview.text_style.font_size_pt
     weight = "700" if preview.text_style.bold else "500"
     style = "italic" if preview.text_style.italic else "normal"
     color = _hex_to_css_color(preview.text_style.text_color_hex, fallback="#1f1f1f")
@@ -1103,6 +1103,12 @@ class SignaturePropertiesPanel:
             for issue in preview.issues
             if issue.severity == SigningDraftValidationSeverity.WARNING
         ]
+        if (
+            len(blocking_issues) == 1
+            and not warning_issues
+            and blocking_issues[0].code == "signature_rect_missing"
+        ):
+            return "Place a signature on the page to continue."
         if not blocking_issues:
             lines = ["Ready to sign."]
             lines.extend(

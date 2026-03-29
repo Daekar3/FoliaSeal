@@ -101,6 +101,11 @@ class PdfViewerWidgetAdapter:
             def paintEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 painter = bindings.q_painter(self)
                 try:
+                    fill_rect = getattr(painter, "fillRect", None)
+                    widget_rect = getattr(self, "rect", None)
+                    if callable(fill_rect) and callable(widget_rect):
+                        fill_rect(widget_rect(), bindings.q_color(255, 255, 255))
+
                     if self._pixmap is not None:
                         painter.drawPixmap(0, 0, self._pixmap)
 
