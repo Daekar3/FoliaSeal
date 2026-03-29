@@ -54,11 +54,11 @@ class _FakeLayout:
         if parent is not None and hasattr(parent, "setLayout"):
             parent.setLayout(self)
 
-    def addWidget(self, widget):  # noqa: N802
-        self.items.append(widget)
+    def addWidget(self, widget, *args):  # noqa: N802
+        self.items.append((widget, args))
 
-    def addLayout(self, layout):  # noqa: N802
-        self.items.append(layout)
+    def addLayout(self, layout, *args):  # noqa: N802
+        self.items.append((layout, args))
 
     def addRow(self, *args):  # noqa: N802
         self.rows.append(args)
@@ -187,6 +187,19 @@ class _FakePushButton(_FakeWidget):
         self.clicked.emit()
 
 
+class _FakeScrollArea(_FakeWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.widget = None
+        self.widget_resizable = False
+
+    def setWidgetResizable(self, value):  # noqa: N802
+        self.widget_resizable = bool(value)
+
+    def setWidget(self, widget):  # noqa: N802
+        self.widget = widget
+
+
 class _FakeQt:
     pass
 
@@ -241,6 +254,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_vbox_layout=_FakeLayout,
         q_hbox_layout=_FakeLayout,
         q_form_layout=_FakeLayout,
+        q_scroll_area=_FakeScrollArea,
         q_group_box=_FakeWidget,
         q_label=_FakeLabel,
         q_line_edit=_FakeLineEdit,
@@ -310,6 +324,8 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget.properties_panel.preview.can_submit is True
     assert widget.properties_panel.validation_text() == "Ready to sign."
     assert widget._signing_workspace._sign_button._enabled is True
+    assert widget.properties_scroll.widget is widget.properties_panel.container
+    assert widget.properties_scroll.widget_resizable is True
 
 
 def test_signing_shell_page_selection_and_resize_controls_update_workflow(

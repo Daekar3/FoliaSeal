@@ -44,6 +44,7 @@ class QtSigningWidgetBindings:
     q_vbox_layout: type[Any]
     q_hbox_layout: type[Any]
     q_form_layout: type[Any]
+    q_scroll_area: type[Any]
     q_group_box: type[Any]
     q_label: type[Any]
     q_line_edit: type[Any]
@@ -735,6 +736,9 @@ class SigningWorkspaceWidget:
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
+        self._main_row = bindings.q_hbox_layout()
+        self._main_row.setContentsMargins(0, 0, 0, 0)
+        self._main_row.setSpacing(8)
 
         self._viewer_widget = build_qt_pdf_viewer_widget(
             workflow=viewer_workflow,
@@ -748,15 +752,24 @@ class SigningWorkspaceWidget:
             on_change=self._handle_panel_change,
             on_page_change=self._handle_page_change,
         )
+        self._properties_scroll = bindings.q_scroll_area()
+        scroll_setter = getattr(self._properties_scroll, "setWidgetResizable", None)
+        if callable(scroll_setter):
+            scroll_setter(True)
+        widget_setter = getattr(self._properties_scroll, "setWidget", None)
+        if callable(widget_setter):
+            widget_setter(self.properties_panel.container)
         self._sign_button = bindings.q_push_button("Confirm and sign")
         self._sign_button.clicked.connect(self.submit_sign_request)  # type: ignore[attr-defined]
 
-        self._layout.addWidget(self._viewer_widget)
-        self._layout.addWidget(self.properties_panel.container)
+        self._main_row.addWidget(self._viewer_widget, 3)
+        self._main_row.addWidget(self._properties_scroll, 2)
+        self._layout.addLayout(self._main_row)
         self._layout.addWidget(self._sign_button)
 
         self.widget.properties_panel = self.properties_panel  # type: ignore[attr-defined]
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
+        self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
         self.widget._signing_workspace = self  # type: ignore[attr-defined]
@@ -898,6 +911,7 @@ class SigningShellAdapter:
             q_vbox_layout=getattr(qt_widgets, "QVBoxLayout"),
             q_hbox_layout=getattr(qt_widgets, "QHBoxLayout"),
             q_form_layout=getattr(qt_widgets, "QFormLayout"),
+            q_scroll_area=getattr(qt_widgets, "QScrollArea"),
             q_group_box=getattr(qt_widgets, "QGroupBox"),
             q_label=getattr(qt_widgets, "QLabel"),
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
