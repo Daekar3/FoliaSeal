@@ -1589,17 +1589,19 @@ When to assign:
 
 ## Follow-Up Profile Persistence and Deletion Wave
 
-This wave focuses on closing the remaining named-profile lifecycle gaps discovered during manual
-review:
+This wave focused on closing the remaining named-profile lifecycle gaps discovered during manual
+review.
 
-- saved profiles must persist across relaunches
-- persisted profiles must live in a clearly labeled `Signature Profiles` directory
-- persisted profiles must be stored in a human-readable JSON or similarly inspectable text format
-- the shell must support deleting the currently selected profile with explicit confirmation
+Implemented in this wave:
+
+- saved profiles persist across relaunches
+- persisted profiles live in a clearly labeled `Signature Profiles` directory
+- persisted profiles are stored in a human-readable JSON or similarly inspectable text format
+- the shell supports deleting the currently selected profile with explicit confirmation
 
 ### Profile Persistence and Deletion Acceptance Target
 
-This wave should be considered complete when:
+This wave is considered complete when:
 
 - a user can save a named profile and still see it after relaunching the app or harness
 - persisted profiles are written beneath a clearly labeled `Signature Profiles` directory
@@ -1611,7 +1613,9 @@ This wave should be considered complete when:
 
 ### Brief X: Persistent Profile Storage
 
-You are implementing on-disk persistence for named appearance profiles.
+Status: implemented
+
+You implemented on-disk persistence for named appearance profiles.
 
 Objectives:
 
@@ -1659,7 +1663,9 @@ Definition of done:
 
 ### Brief Y: Delete Profile UI and Persistence Wiring
 
-You are implementing safe delete behavior and wiring the shell to the persistent profile catalog.
+Status: implemented
+
+You implemented safe delete behavior and wired the shell to the persistent profile catalog.
 
 Objectives:
 
@@ -1707,7 +1713,9 @@ Definition of done:
 
 ### Brief Z: Profile Persistence and Deletion Review
 
-You are doing a review-only pass on persistent named profiles and safe deletion.
+Status: completed
+
+This review-only pass covered persistent named profiles and safe deletion.
 
 Objectives:
 

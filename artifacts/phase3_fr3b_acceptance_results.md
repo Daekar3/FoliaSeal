@@ -271,8 +271,6 @@ Notes:
   a user inspecting the filesystem.
 - Record whether deletion removed only the intended profile, whether cancel preserved it, and
   whether the confirmation copy was clear.
-- If persistence or delete behavior is not yet implemented in the current build, mark the relevant
-  checks as not yet testable instead of failed.
 
 ## Parity observations
 
