@@ -11,9 +11,9 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 8
+- Selection interactions captured: 16
 - Sign requests captured: 1
-- Last signature page index: 0
+- Last signature page index: 1
 - Last sign request had visible appearance: yes
 - Last sign request output path: `/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf`
 - Current validation text: `Ready to sign.`

@@ -72,6 +72,8 @@ class PdfViewerWidgetAdapter:
                 self._overlay_drag_handle: str | None = None
                 self._overlay_drag_view_rect: ViewRect | None = None
                 self._overlay_drag_start_view_rect: ViewRect | None = None
+                self._overlay_drag_offset_x = 0.0
+                self._overlay_drag_offset_y = 0.0
                 self._overlay_handle_half_size = 6.0
                 self._overlay_min_span_px = 8.0
 
@@ -232,11 +234,14 @@ class PdfViewerWidgetAdapter:
                     if handle is not None:
                         self._overlay_drag_handle = handle
                         self._overlay_drag_start_view_rect = overlay_rect
+                        handle_x, handle_y = self._overlay_handle_target(overlay_rect, handle)
+                        self._overlay_drag_offset_x = float(point.x()) - handle_x
+                        self._overlay_drag_offset_y = float(point.y()) - handle_y
                         self._overlay_drag_view_rect = self._overlay_resize_view_rect(
                             overlay_rect=overlay_rect,
                             handle=handle,
-                            current_x=float(point.x()),
-                            current_y=float(point.y()),
+                            current_x=handle_x,
+                            current_y=handle_y,
                         )
                         self._selection_rect = None
                         self.grabMouse()
@@ -264,8 +269,8 @@ class PdfViewerWidgetAdapter:
                     self._overlay_drag_view_rect = self._overlay_resize_view_rect(
                         overlay_rect=self._overlay_drag_start_view_rect,
                         handle=self._overlay_drag_handle,
-                        current_x=float(current.x()),
-                        current_y=float(current.y()),
+                        current_x=float(current.x()) - self._overlay_drag_offset_x,
+                        current_y=float(current.y()) - self._overlay_drag_offset_y,
                     )
                     self._selection_rect = None
                     self.update()
@@ -295,8 +300,8 @@ class PdfViewerWidgetAdapter:
                     self._overlay_drag_view_rect = self._overlay_resize_view_rect(
                         overlay_rect=self._overlay_drag_start_view_rect,
                         handle=self._overlay_drag_handle,
-                        current_x=float(current.x()),
-                        current_y=float(current.y()),
+                        current_x=float(current.x()) - self._overlay_drag_offset_x,
+                        current_y=float(current.y()) - self._overlay_drag_offset_y,
                     )
                     self._apply_overlay_drag_selection()
                     self._reset_overlay_drag_state()
@@ -533,12 +538,12 @@ class PdfViewerWidgetAdapter:
                         )
                     )
 
-            def _overlay_handle_points(self, overlay_rect: ViewRect) -> tuple[Any, ...]:
+            def _overlay_handle_points(self, overlay_rect: Any) -> tuple[Any, ...]:
                 return (
-                    bindings.q_point(int(overlay_rect.x1), int(overlay_rect.y1)),
-                    bindings.q_point(int(overlay_rect.x2), int(overlay_rect.y1)),
-                    bindings.q_point(int(overlay_rect.x1), int(overlay_rect.y2)),
-                    bindings.q_point(int(overlay_rect.x2), int(overlay_rect.y2)),
+                    bindings.q_point(int(overlay_rect.left()), int(overlay_rect.top())),
+                    bindings.q_point(int(overlay_rect.right()), int(overlay_rect.top())),
+                    bindings.q_point(int(overlay_rect.left()), int(overlay_rect.bottom())),
+                    bindings.q_point(int(overlay_rect.right()), int(overlay_rect.bottom())),
                 )
 
             def _hit_test_overlay_handle(
@@ -547,18 +552,40 @@ class PdfViewerWidgetAdapter:
                 point: Any,
             ) -> str | None:
                 half_size = self._overlay_handle_half_size
-                handle_targets = {
-                    "top_left": (overlay_rect.x1, overlay_rect.y1),
-                    "top_right": (overlay_rect.x2, overlay_rect.y1),
-                    "bottom_left": (overlay_rect.x1, overlay_rect.y2),
-                    "bottom_right": (overlay_rect.x2, overlay_rect.y2),
-                }
+                handle_targets = self._overlay_handle_targets(overlay_rect)
                 for handle_name, (x_coord, y_coord) in handle_targets.items():
                     if abs(float(point.x()) - float(x_coord)) <= half_size and abs(
                         float(point.y()) - float(y_coord)
                     ) <= half_size:
                         return handle_name
                 return None
+
+            def _overlay_handle_target(
+                self,
+                overlay_rect: ViewRect,
+                handle: str,
+            ) -> tuple[float, float]:
+                return self._overlay_handle_targets(overlay_rect)[handle]
+
+            @staticmethod
+            def _overlay_handle_targets(overlay_rect: ViewRect) -> dict[str, tuple[float, float]]:
+                left, right, top, bottom = PdfPreviewWidget._normalized_view_bounds(overlay_rect)
+                return {
+                    "top_left": (left, top),
+                    "top_right": (right, top),
+                    "bottom_left": (left, bottom),
+                    "bottom_right": (right, bottom),
+                }
+
+            @staticmethod
+            def _normalized_view_bounds(
+                overlay_rect: ViewRect,
+            ) -> tuple[float, float, float, float]:
+                left = min(float(overlay_rect.x1), float(overlay_rect.x2))
+                right = max(float(overlay_rect.x1), float(overlay_rect.x2))
+                top = min(float(overlay_rect.y1), float(overlay_rect.y2))
+                bottom = max(float(overlay_rect.y1), float(overlay_rect.y2))
+                return left, right, top, bottom
 
             def _overlay_resize_view_rect(
                 self,
@@ -568,16 +595,10 @@ class PdfViewerWidgetAdapter:
                 current_x: float,
                 current_y: float,
             ) -> ViewRect:
-                left = float(overlay_rect.x1)
-                right = float(overlay_rect.x2)
-                top = float(overlay_rect.y1)
-                bottom = float(overlay_rect.y2)
+                left, right, top, bottom = self._normalized_view_bounds(overlay_rect)
                 page_bounds = self._current_page_view_bounds()
                 if page_bounds is not None:
-                    min_x = min(page_bounds.x1, page_bounds.x2)
-                    max_x = max(page_bounds.x1, page_bounds.x2)
-                    min_y = min(page_bounds.y1, page_bounds.y2)
-                    max_y = max(page_bounds.y1, page_bounds.y2)
+                    min_x, max_x, min_y, max_y = self._normalized_view_bounds(page_bounds)
                     current_x = min(max(current_x, min_x), max_x)
                     current_y = min(max(current_y, min_y), max_y)
                 min_span = self._overlay_min_span_px
@@ -621,6 +642,8 @@ class PdfViewerWidgetAdapter:
                 self._overlay_drag_handle = None
                 self._overlay_drag_view_rect = None
                 self._overlay_drag_start_view_rect = None
+                self._overlay_drag_offset_x = 0.0
+                self._overlay_drag_offset_y = 0.0
                 self._selection_rect = None
                 self.releaseMouse()
                 self.update()
