@@ -30,6 +30,17 @@ from foliaseal.domain.models import (
 )
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
+SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
+    SignatureFieldKey.DISTINGUISHED_NAME,
+    SignatureFieldKey.COMMON_NAME,
+    SignatureFieldKey.EMAIL,
+    SignatureFieldKey.TITLE,
+    SignatureFieldKey.COMPANY,
+    SignatureFieldKey.SIGNING_TIME,
+    SignatureFieldKey.REASON,
+    SignatureFieldKey.LOCATION,
+)
+
 
 class QtSigningBindingsUnavailable(RuntimeError):
     """Raised when PySide6 widget bindings are unavailable."""
@@ -350,6 +361,12 @@ def _build_preview_issue(
     )
 
 
+def _set_widget_visible(widget: Any, visible: bool) -> None:
+    setter = getattr(widget, "setVisible", None)
+    if callable(setter):
+        setter(visible)
+
+
 class SignaturePropertiesPanel:
     """Signature editing controls and preview/validation summary."""
 
@@ -379,7 +396,6 @@ class SignaturePropertiesPanel:
         self.preview_controls = self._preview_controls
         self._validation_label = bindings.q_label("")
 
-        self._layout.addWidget(self._heading("Appearance draft"))
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
         for controls in self.field_controls.values():
@@ -427,10 +443,6 @@ class SignaturePropertiesPanel:
 
     def refresh_preview(self) -> SigningDraftPreview:
         preview = self._current_preview()
-        appearance = self._workflow.signature_appearance or SignatureAppearance()
-        self._appearance_controls.summary_label.setText(
-            _format_appearance_summary(appearance)
-        )
         self._update_preview_controls(preview)
         self._validation_label.setText(self._format_validation_text(preview))
         return preview
@@ -480,10 +492,10 @@ class SignaturePropertiesPanel:
                 " padding: 0 4px;"
                 " font-weight: 600;"
                 "}"
-            )
+        )
         layout = bindings.q_vbox_layout(container)
-        layout.setContentsMargins(10, 14, 10, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 10, 8, 8)
+        layout.setSpacing(4)
 
         card_container = bindings.q_group_box("")
         if hasattr(card_container, "setStyleSheet"):
@@ -491,13 +503,13 @@ class SignaturePropertiesPanel:
                 "QGroupBox {"
                 " border: 1px solid #d8d8d8;"
                 " border-radius: 6px;"
-                " padding: 10px;"
+                " padding: 6px;"
                 " background: #ffffff;"
                 "}"
             )
         card_layout = bindings.q_vbox_layout(card_container)
-        card_layout.setContentsMargins(12, 12, 12, 12)
-        card_layout.setSpacing(8)
+        card_layout.setContentsMargins(8, 8, 8, 8)
+        card_layout.setSpacing(4)
 
         stamp_label = bindings.q_label("")
         title_label = bindings.q_label("")
@@ -517,19 +529,18 @@ class SignaturePropertiesPanel:
         if hasattr(stamp_label, "setStyleSheet"):
             stamp_label.setStyleSheet(
                 "font-weight: 600; color: #1f2937; border: 1px dashed #94a3b8;"
-                " padding: 8px; min-width: 160px; min-height: 104px; background: #f8fafc;"
+                " padding: 4px; background: #f8fafc;"
             )
         if hasattr(title_label, "setStyleSheet"):
-            title_label.setStyleSheet("font-weight: 700; font-size: 12pt; color: #111827;")
+            title_label.setStyleSheet("font-weight: 700; font-size: 10.5pt; color: #111827;")
         if hasattr(detail_label, "setStyleSheet"):
-            detail_label.setStyleSheet("font-size: 10pt; color: #111827;")
+            detail_label.setStyleSheet("font-size: 9pt; color: #111827;")
         if hasattr(footer_label, "setStyleSheet"):
             footer_label.setStyleSheet("color: #374151;")
 
         card_layout.addWidget(stamp_label)
         card_layout.addWidget(title_label)
         card_layout.addWidget(detail_label)
-        card_layout.addWidget(footer_label)
         layout.addWidget(card_container)
 
         return PreviewControls(
@@ -610,7 +621,7 @@ class SignaturePropertiesPanel:
 
     def _build_appearance_controls(self) -> Any:
         bindings = self._bindings
-        container = bindings.q_group_box("Current appearance draft")
+        container = bindings.q_group_box("Appearance")
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -618,7 +629,6 @@ class SignaturePropertiesPanel:
         summary_label = bindings.q_label("")
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
-        layout.addWidget(summary_label)
 
         text_group = bindings.q_group_box("Text and layout")
         text_layout = bindings.q_form_layout(text_group)
@@ -745,7 +755,7 @@ class SignaturePropertiesPanel:
     def _build_field_controls(self) -> dict[SignatureFieldKey, FieldControls]:
         bindings = self._bindings
         controls: dict[SignatureFieldKey, FieldControls] = {}
-        for field_key in SignatureFieldKey:
+        for field_key in SIGNATURE_FIELD_DISPLAY_ORDER:
             container = bindings.q_widget()
             layout = bindings.q_hbox_layout(container)
             layout.setContentsMargins(0, 0, 0, 0)
@@ -872,7 +882,7 @@ class SignaturePropertiesPanel:
 
         field_bindings = {
             field_key: self._build_field_binding(field_key)
-            for field_key in SignatureFieldKey
+            for field_key in SIGNATURE_FIELD_DISPLAY_ORDER
         }
         return SignatureAppearance(
             signer_label_prefix=_text(self._appearance_controls.signer_label_prefix),
@@ -885,15 +895,15 @@ class SignaturePropertiesPanel:
                 SignatureTimezoneDisplayMode,
             ),
             datetime_format=_combo_text(self._appearance_controls.datetime_format),
-            field_order=tuple(SignatureFieldKey),
+            field_order=SIGNATURE_FIELD_DISPLAY_ORDER,
             distinguished_name=field_bindings[SignatureFieldKey.DISTINGUISHED_NAME],
             common_name=field_bindings[SignatureFieldKey.COMMON_NAME],
             email=field_bindings[SignatureFieldKey.EMAIL],
+            title=field_bindings[SignatureFieldKey.TITLE],
+            company=field_bindings[SignatureFieldKey.COMPANY],
             signing_time=field_bindings[SignatureFieldKey.SIGNING_TIME],
             reason=field_bindings[SignatureFieldKey.REASON],
             location=field_bindings[SignatureFieldKey.LOCATION],
-            title=field_bindings[SignatureFieldKey.TITLE],
-            company=field_bindings[SignatureFieldKey.COMPANY],
             text_style=text_style,
             box_style=box_style,
             image_stamp_path=_text(self._appearance_controls.image_stamp_path) or None,
@@ -930,6 +940,7 @@ class SignaturePropertiesPanel:
             stamp_pixmap = _load_stamp_pixmap(self._bindings, preview.image_stamp_path)
         if stamp_pixmap is not None and hasattr(self._preview_controls.stamp_label, "setPixmap"):
             self._preview_controls.stamp_label.setPixmap(stamp_pixmap)
+            _set_widget_visible(self._preview_controls.stamp_label, True)
             if hasattr(self._preview_controls.stamp_label, "setText"):
                 self._preview_controls.stamp_label.setText("")
             if hasattr(self._preview_controls.stamp_label, "setFixedSize"):
@@ -945,11 +956,16 @@ class SignaturePropertiesPanel:
                         size_height + 16,
                     )
         else:
-            if hasattr(self._preview_controls.stamp_label, "setPixmap"):
-                self._preview_controls.stamp_label.setPixmap(None)
-            self._preview_controls.stamp_label.setText("No stamp image")
+            clear = getattr(self._preview_controls.stamp_label, "clear", None)
+            if callable(clear):
+                clear()
+            elif hasattr(self._preview_controls.stamp_label, "setPixmap"):
+                # Test doubles may not expose QLabel.clear().
+                self._preview_controls.stamp_label.setPixmap("")
+            _set_widget_visible(self._preview_controls.stamp_label, False)
+            self._preview_controls.stamp_label.setText("")
             if hasattr(self._preview_controls.stamp_label, "setFixedSize"):
-                self._preview_controls.stamp_label.setFixedSize(160, 104)
+                self._preview_controls.stamp_label.setFixedSize(96, 64)
         border_css, background_color = _preview_box_styles(preview)
         text_css = _preview_text_style(preview)
         if hasattr(self._preview_controls.card_container, "setStyleSheet"):
@@ -958,7 +974,7 @@ class SignaturePropertiesPanel:
                 f" {border_css}"
                 " border-radius: 6px;"
                 f" background: {background_color};"
-                " padding: 12px;"
+                " padding: 8px;"
                 "}"
             )
         visible_detail = _preview_detail_text(preview)
@@ -971,22 +987,7 @@ class SignaturePropertiesPanel:
             self._preview_controls.detail_label.setStyleSheet(text_css)
         self._preview_controls.title_label.setText(title_line)
         self._preview_controls.detail_label.setText(visible_detail)
-        footer_parts = []
-        if preview.layout_template is not None:
-            footer_parts.append(
-                "Single line"
-                if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-                else "Multi-line"
-                if preview.layout_template == SignatureLayoutTemplate.MULTI_LINE
-                else "Wrapped block"
-            )
-        if preview.timezone_display_mode is not None:
-            footer_parts.append(
-                "Local time"
-                if preview.timezone_display_mode == SignatureTimezoneDisplayMode.LOCAL
-                else "UTC"
-            )
-        self._preview_controls.footer_label.setText(" | ".join(footer_parts))
+        self._preview_controls.footer_label.setText("")
 
     def _current_preview(self) -> SigningDraftPreview:
         preview = self._workflow.preview()

@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 
 from foliaseal.domain.models import (
+    SignatureAppearance,
     SignatureFieldBinding,
+    SignatureFieldKey,
     SignatureRect,
 )
 from tests.support.phase3_builders import (
@@ -56,6 +58,21 @@ def test_signature_appearance_rejects_duplicate_field_order() -> None:
         build_signature_appearance(
             **invalid_signature_appearance_duplicate_field_order_kwargs(),
         )
+
+
+def test_signature_appearance_defaults_to_signer_first_field_order() -> None:
+    appearance = SignatureAppearance()
+
+    assert appearance.field_order == (
+        SignatureFieldKey.DISTINGUISHED_NAME,
+        SignatureFieldKey.COMMON_NAME,
+        SignatureFieldKey.EMAIL,
+        SignatureFieldKey.TITLE,
+        SignatureFieldKey.COMPANY,
+        SignatureFieldKey.SIGNING_TIME,
+        SignatureFieldKey.REASON,
+        SignatureFieldKey.LOCATION,
+    )
 
 
 def test_signature_rect_requires_positive_size() -> None:

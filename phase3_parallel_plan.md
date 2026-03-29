@@ -929,6 +929,153 @@ When to assign:
 
 - only after F/G/H/I have landed enough UI to be honestly evaluated as a user flow
 
+## Follow-Up Preview Cleanup Wave
+
+This short follow-up wave exists because the rebuilt shell is now directionally correct, but the
+preview still contains product-UI leftovers and space-inefficient rendering choices.
+
+The goals of this wave are:
+
+- remove non-essential summary chrome from the product shell
+- ensure the preview contains only plausible visible-signature output
+- improve field ordering so signer identity reads naturally
+- make the stamp region and overall preview behave more like a compact real signature box
+
+The preview in this wave should be treated as output-facing, not as a place to restate settings.
+
+### Preview Cleanup Acceptance Target
+
+This wave should be considered complete when:
+
+- the `Current appearance draft` summary block is gone from the product shell
+- preview footer metadata like layout mode or timezone mode is gone
+- visible fields appear in a signer-first order that feels natural to users
+- the stamp area adapts sensibly to image aspect ratio
+- the preview feels plausible for small real-world signatures instead of a roomy info panel
+
+### Brief K: Preview UX Cleanup
+
+You are cleaning up the visible-signature preview so it behaves like output rather than settings
+instrumentation.
+
+Objectives:
+
+- remove redundant summary chrome from the product shell
+- ensure the preview shows only what plausibly belongs in the visible signature
+- reorder fields so signer identity reads naturally
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant preview-facing tests in `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- signing-engine implementation
+- low-level viewer geometry code
+- harness CLI wiring except where strictly needed to keep tests aligned
+
+Requirements to satisfy:
+
+- the product-facing preview goals in this follow-up wave
+
+Expected deliverables:
+
+- remove the `Current appearance draft` summary section from the shell
+- remove preview footer metadata such as layout mode and timezone mode
+- ensure settings like field lists, placement values, and raw configuration labels do not appear
+  inside the visible signature preview
+- reorder rendered fields so signer identity fields appear before signing time and other
+  signature-event details
+
+Implementation notes:
+
+- treat the preview as output-only
+- controls may influence rendering, but control names/settings should not appear inside the
+  preview unless they correspond to actual rendered text
+
+Definition of done:
+
+- the preview no longer feels like a diagnostic card with settings leakage
+
+When to assign:
+
+- immediately
+
+### Brief L: Stamp and Compact Preview Layout
+
+You are making the preview compact and visually plausible for small real-world signatures.
+
+Objectives:
+
+- improve stamp sizing and aspect-ratio behavior
+- reduce wasted space in the preview layout
+- make the preview work better at small signature sizes
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant preview/layout tests in `tests/unit/test_qt_signing_shell.py`
+
+Files you should avoid editing unless absolutely necessary:
+
+- broad shell flow decisions outside the preview region
+- application/domain model layers unless a tiny preview contract fix is needed
+
+Requirements to satisfy:
+
+- compact visible-signature preview behavior for Phase 3 product UI
+
+Expected deliverables:
+
+- stamp region that adapts more naturally to image aspect ratio
+- tighter spacing, sizing, and typography for compact signature previews
+- preview layout that feels plausible for small signatures instead of a spacious info card
+
+Implementation notes:
+
+- optimize the preview for the common case where signatures are relatively small
+- preserve readability while reducing unnecessary padding and empty space
+
+Definition of done:
+
+- the preview remains legible but no longer feels oversized or rigid
+
+When to assign:
+
+- immediately, in parallel with Brief K
+
+### Brief M: Preview Cleanup Review
+
+You are doing a review-only pass on the preview cleanup wave.
+
+Objectives:
+
+- verify that the preview now contains only plausible output content
+- catch remaining settings leakage, ordering mistakes, or compact-layout regressions
+
+Primary files you own:
+
+- none for implementation
+
+Primary files to review:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `tests/unit/test_qt_signing_shell.py`
+
+Requirements to satisfy:
+
+- use the review-agent template in this document
+- return findings, residual risks, and go/no-go
+
+Definition of done:
+
+- the team has a concrete review gate before the next manual pass
+
+When to assign:
+
+- after Brief K and Brief L land
+
 ## Agent-Ready Assignment Briefs
 
 These briefs are written so they can be copied into separate agent threads with minimal editing.

@@ -312,11 +312,11 @@ class SignatureAppearance:
         SignatureFieldKey.DISTINGUISHED_NAME,
         SignatureFieldKey.COMMON_NAME,
         SignatureFieldKey.EMAIL,
+        SignatureFieldKey.TITLE,
+        SignatureFieldKey.COMPANY,
         SignatureFieldKey.SIGNING_TIME,
         SignatureFieldKey.REASON,
         SignatureFieldKey.LOCATION,
-        SignatureFieldKey.TITLE,
-        SignatureFieldKey.COMPANY,
     )
     distinguished_name: SignatureFieldBinding = field(default_factory=SignatureFieldBinding)
     common_name: SignatureFieldBinding = field(default_factory=SignatureFieldBinding)
@@ -365,11 +365,11 @@ class SignatureAppearance:
             SignatureFieldKey.DISTINGUISHED_NAME,
             SignatureFieldKey.COMMON_NAME,
             SignatureFieldKey.EMAIL,
+            SignatureFieldKey.TITLE,
+            SignatureFieldKey.COMPANY,
             SignatureFieldKey.SIGNING_TIME,
             SignatureFieldKey.REASON,
             SignatureFieldKey.LOCATION,
-            SignatureFieldKey.TITLE,
-            SignatureFieldKey.COMPANY,
         }
         if set(self.field_order) != required_keys or len(self.field_order) != len(required_keys):
             raise ValueError(
