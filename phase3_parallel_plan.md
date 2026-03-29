@@ -690,6 +690,245 @@ These remaining workstreams can still be parallelized carefully:
 - If the desired Acrobat-style flow needs clarification at any point, prefer checking with the user
   before locking down major UI structure.
 
+## Agent-Ready Briefs For Remaining Phase 3 Work
+
+These briefs are for the remaining product-facing Phase 3 work, after the harness and geometry
+layers have been stabilized.
+
+### Brief F: Signing Flow UX Architecture
+
+You are implementing the remaining Phase 3 signing flow shell using an Acrobat-like workflow as the
+reference model.
+
+Objectives:
+
+- turn the current shell/harness structure into a coherent end-user signing flow
+- make the flow stages legible to users
+- ensure the sign action feels like the final step of a guided flow rather than a bare command
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- adjacent Qt flow/layout modules as needed
+- relevant UI tests
+
+Files you should avoid editing unless absolutely necessary:
+
+- deep domain/config internals
+- signing-engine implementation
+- preview renderer internals owned by Brief H
+
+Requirements to satisfy:
+
+- FR-3
+- FR-3B
+- the intended Acrobat-like visible-signature flow in `phase3_parallel_plan.md`
+
+Expected deliverables:
+
+- a clearer signing-mode shell
+- explicit structure around:
+  - edit appearance
+  - place signature
+  - review preview
+  - confirm/sign
+- demotion or removal of debug-style affordances that should not dominate the product UI
+
+Implementation notes:
+
+- reuse the existing viewer and stable rectangle behavior
+- do not invent a competing data model in the UI
+- prefer layout/flow clarity over adding more low-level controls
+
+Definition of done:
+
+- a tester can understand what stage of signing they are in without reading developer notes
+
+When to assign:
+
+- first in the next Phase 3 wave
+
+### Brief G: Appearance Concept and UI Mapping
+
+You are introducing a real user-facing "appearance" concept in the Phase 3 GUI.
+
+Objectives:
+
+- make "appearance" a meaningful concept in the UI
+- group visible-signature controls into an intentional appearance-editing experience
+- support the current draft appearance clearly, without taking on full Phase 4 preset lifecycle work
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- appearance-oriented presentation modules if split out
+- limited application-layer glue if required
+- relevant tests
+
+Files you should avoid editing unless absolutely necessary:
+
+- signing-engine implementation
+- broad flow architecture decisions owned by Brief F
+- preview rendering internals owned by Brief H
+
+Requirements to satisfy:
+
+- FR-3
+- FR-3A
+- FR-3B language around creating or modifying a visible appearance
+
+Expected deliverables:
+
+- a named appearance section or mode in the UI
+- grouped controls for text fields, graphics, and layout choices
+- a clearer distinction between appearance editing and placement controls
+
+Implementation notes:
+
+- the goal is not full saved preset management yet
+- the goal is to make "current appearance draft" understandable to a human tester
+
+Definition of done:
+
+- `FR-3B` task language like "create a new appearance" or "modify the current appearance" makes sense in the UI
+
+When to assign:
+
+- after Brief F establishes the shell structure, or shortly after if the shell direction is already clear
+
+### Brief H: Real Appearance Preview
+
+You are making the visible-signature preview feel like an actual appearance preview rather than a
+diagnostic text area.
+
+Objectives:
+
+- improve the preview so users can understand what the visible signature will roughly look like
+- keep preview semantics aligned with the signing payload
+
+Primary files you own:
+
+- preview-related Qt presentation code
+- preview renderer integration points
+- relevant tests
+
+Files you should avoid editing unless absolutely necessary:
+
+- broad shell structure owned by Brief F
+- appearance grouping decisions owned by Brief G
+- signing-engine implementation
+
+Requirements to satisfy:
+
+- FR-3A real-time preview requirement
+- the remaining product-preview goals in `phase3_parallel_plan.md`
+
+Expected deliverables:
+
+- a more product-like preview surface
+- visible representation of image/text/layout/style choices
+- tests that keep the preview aligned with the underlying signing payload
+
+Implementation notes:
+
+- do not overfit to the temporary harness
+- the preview should be understandable without reading raw field names
+
+Definition of done:
+
+- a tester can look at the preview and meaningfully infer the final visible signature appearance
+
+When to assign:
+
+- after F/G clarify where the preview belongs and how appearance is grouped
+
+### Brief I: Product-Grade Controls and Form Affordances
+
+You are upgrading obviously placeholder controls into more intentional product controls.
+
+Objectives:
+
+- reduce dependence on raw free-text for constrained values
+- improve labels, grouping, and general form usability
+
+Primary files you own:
+
+- Qt form/panel code
+- relevant UI tests
+
+Files you should avoid editing unless absolutely necessary:
+
+- signing engine integration
+- broad flow architecture owned by Brief F
+- preview ownership from Brief H
+
+Requirements to satisfy:
+
+- the product-readiness goals in `phase3_parallel_plan.md`
+
+Expected deliverables:
+
+- an audit of current controls that still feel like developer placeholders
+- improved control types where appropriate
+  - example: dropdown/select controls for constrained font choices
+- clearer labels and more intentional affordances
+
+Implementation notes:
+
+- optimize for end-user clarity, not parameter completeness
+- coordinate with F/G so control upgrades support the intended flow instead of fighting it
+
+Definition of done:
+
+- the form feels like a product UI rather than a parameter editor
+
+When to assign:
+
+- after F/G identify which controls belong in the true product flow
+
+### Brief J: Final Phase 3 Acceptance Alignment
+
+You are preparing the final acceptance pass for the rebuilt Phase 3 user flow.
+
+Objectives:
+
+- align the acceptance artifacts with the actual product UI
+- stop using harness-centric language as a proxy for final workflow acceptance
+
+Primary files you own:
+
+- `artifacts/phase3_fr3b_acceptance_checklist.md`
+- `artifacts/phase3_fr3b_acceptance_results.md`
+- supporting README/docs updates if needed
+
+Files you should avoid editing unless absolutely necessary:
+
+- core product implementation code
+
+Requirements to satisfy:
+
+- FR-3B acceptance alignment
+- the implementation-vs-acceptance distinction established in `phase3_parallel_plan.md`
+
+Expected deliverables:
+
+- a rewritten acceptance checklist tied to the actual end-user flow
+- final manual validation notes structure
+- clear separation between Phase 3 acceptance and Phase 4 follow-up items
+
+Implementation notes:
+
+- do not start this too early
+- this brief should follow actual UI progress, not lead it
+
+Definition of done:
+
+- acceptance artifacts match the product being evaluated instead of the temporary harness
+
+When to assign:
+
+- only after F/G/H/I have landed enough UI to be honestly evaluated as a user flow
+
 ## Agent-Ready Assignment Briefs
 
 These briefs are written so they can be copied into separate agent threads with minimal editing.
