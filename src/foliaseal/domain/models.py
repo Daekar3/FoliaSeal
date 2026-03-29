@@ -307,6 +307,7 @@ class SignatureAppearance:
     signer_label_prefix: str = "Digitally signed by"
     layout_template: SignatureLayoutTemplate = SignatureLayoutTemplate.SINGLE_LINE
     timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.UTC
+    show_field_names: bool = False
     datetime_format: str = "%Y-%m-%d %H:%M:%S %Z"
     field_order: tuple[SignatureFieldKey, ...] = (
         SignatureFieldKey.DISTINGUISHED_NAME,
@@ -342,6 +343,11 @@ class SignatureAppearance:
             raise ValueError(
                 "timezone_display_mode must be a SignatureTimezoneDisplayMode value."
             )
+        object.__setattr__(
+            self,
+            "show_field_names",
+            _require_bool(self.show_field_names, "show_field_names"),
+        )
         object.__setattr__(
             self,
             "datetime_format",

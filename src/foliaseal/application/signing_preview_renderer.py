@@ -140,15 +140,16 @@ def _metadata_summary(preview: SigningDraftPreview) -> tuple[str, ...]:
     )
 
 
-def _format_field_line(field: SigningDraftPreviewField) -> str:
+def _format_field_line(field: SigningDraftPreviewField, *, show_field_names: bool) -> str:
     status = "visible" if field.visible else "hidden"
     if not field.visible:
         return f"[{status}] {field.label}"
 
     source = field.source.value
+    label_text = f"{field.label}: " if show_field_names else ""
     if field.hint is not None:
-        return f"[{status}] {field.label}: {field.text} ({source}, {field.hint})"
-    return f"[{status}] {field.label}: {field.text} ({source})"
+        return f"[{status}] {label_text}{field.text} ({source}, {field.hint})"
+    return f"[{status}] {label_text}{field.text} ({source})"
 
 
 def _format_issue_line(issue: SigningDraftValidationIssue) -> str:
@@ -175,7 +176,10 @@ def render_signing_preview(preview: SigningDraftPreview) -> SigningPreviewRender
     )
 
     lines.extend(
-        SigningPreviewLine(SigningPreviewLineKind.FIELD, _format_field_line(field))
+        SigningPreviewLine(
+            SigningPreviewLineKind.FIELD,
+            _format_field_line(field, show_field_names=preview.show_field_names),
+        )
         for field in preview.fields
     )
     lines.extend(
@@ -254,6 +258,15 @@ def compare_preview_to_request(
                 code="timezone_display_mode_mismatch",
                 message="Preview timezone mode does not match the final request.",
                 field_name="timezone_display_mode",
+            )
+        )
+
+    if preview.show_field_names != request_appearance.show_field_names:
+        issues.append(
+            SigningPreviewParityIssue(
+                code="show_field_names_mismatch",
+                message="Preview field-name display mode does not match the final request.",
+                field_name="show_field_names",
             )
         )
 

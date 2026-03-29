@@ -413,11 +413,6 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
     ) == 2
     assert len(widget.properties_panel._placement_controls.container.layout.rows) == 3
     assert (
-        widget.properties_panel.field_controls[SignatureFieldKey.DISTINGUISHED_NAME]
-        .visible_check._text
-        == ""
-    )
-    assert (
         widget.properties_panel._appearance_controls.timezone_display_mode.currentText()
         == "utc"
     )
@@ -512,6 +507,7 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     appearance = build_signature_appearance(
         datetime_format="%d/%m/%Y %H:%M",
         image_stamp_path="/tmp/stamp.png",
+        show_field_names=True,
     )
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
@@ -551,8 +547,8 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert preview_controls.title_label.text() == "Digitally signed by"
     detail_text = preview_controls.multi_detail_label.text()
     detail_lines = detail_text.splitlines()
-    assert detail_lines[0].startswith("Distinguished name:")
-    assert detail_lines[1].startswith("Common name:")
+    assert detail_lines[0] == "Distinguished name: Distinguished name"
+    assert detail_lines[1] == "Common name: Common name"
     assert detail_lines[2] == "Email: alice@example.com"
     assert detail_lines[3] == "Title: Director"
     assert detail_lines[4] == "Company: FoliaSeal"
@@ -609,14 +605,49 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
         for field in widget.properties_panel.preview_controls.detail_label.text().split("|")
     ]
 
-    assert detail_fields[0].startswith("Distinguished name:")
-    assert detail_fields[1].startswith("Common name:")
-    assert detail_fields[2].startswith("Email:")
-    assert detail_fields[3].startswith("Title:")
-    assert detail_fields[4].startswith("Company:")
-    assert detail_fields[5]
-    assert detail_fields[6].startswith("Reason:")
-    assert detail_fields[7].startswith("Location:")
+    assert widget.properties_panel._appearance_controls.show_field_names.isChecked() is False
+    assert len(detail_fields) == 8
+    assert detail_fields[0] == "Distinguished name"
+    assert detail_fields[1] == "Common name"
+    assert detail_fields[2] == "Email"
+    assert detail_fields[3] == "Title"
+    assert detail_fields[4] == "Company"
+    assert detail_fields[5].startswith("202")
+    assert detail_fields[6] == "Reason"
+    assert detail_fields[7] == "Location"
+
+
+def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    distinguished_name_controls = widget.properties_panel.field_controls[
+        SignatureFieldKey.DISTINGUISHED_NAME
+    ]
+    source_combo = distinguished_name_controls.source_combo
+
+    assert not hasattr(distinguished_name_controls, "visible_check")
+    assert source_combo.findText("hidden") != -1
+    source_combo.setCurrentText("hidden")
+    widget.properties_panel.refresh_preview()
+
+    assert widget.properties_panel.preview.fields[0].visible is False
 
 
 def test_signing_shell_wrapped_block_preview_groups_tail_fields(
@@ -636,6 +667,7 @@ def test_signing_shell_wrapped_block_preview_groups_tail_fields(
 
     appearance = build_signature_appearance(
         layout_template=signing_shell_module.SignatureLayoutTemplate.WRAPPED_BLOCK,
+        show_field_names=True,
     )
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
@@ -662,6 +694,55 @@ def test_signing_shell_wrapped_block_preview_groups_tail_fields(
     assert "Company: FoliaSeal" in detail_lines[2]
     assert "Signing time:" in detail_lines[2]
     assert "Reason: Approved" in detail_lines[2]
+
+
+def test_signing_shell_wrapped_block_preview_uses_value_only_text_by_default(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=signing_shell_module.SignatureLayoutTemplate.WRAPPED_BLOCK,
+        show_field_names=False,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    detail_lines = widget.properties_panel.preview_controls.multi_detail_label.text().splitlines()
+
+    assert len(detail_lines) == 3
+    assert detail_lines[0] == "Distinguished name"
+    assert detail_lines[1] == "Common name"
+    assert "alice@example.com" in detail_lines[2]
+    assert "Director" in detail_lines[2]
+    assert "FoliaSeal" in detail_lines[2]
+    assert "Approved" in detail_lines[2]
+    assert "Email:" not in detail_lines[2]
+    assert "Title:" not in detail_lines[2]
+    assert "Company:" not in detail_lines[2]
+    assert "Reason:" not in detail_lines[2]
 
 
 def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(

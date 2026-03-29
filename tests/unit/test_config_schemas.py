@@ -45,6 +45,7 @@ def test_signature_preset_round_trip() -> None:
 
     assert reconstructed == original
     assert payload["appearance"]["layout_template"] == "multi_line"
+    assert payload["appearance"]["show_field_names"] is False
     assert payload["placement_defaults"]["anchor"] == "bottom_right"
 
 
