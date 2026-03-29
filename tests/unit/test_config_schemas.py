@@ -6,6 +6,7 @@ from foliaseal.infra.config.schemas import (
     TimestampPolicy,
     TrustProfile,
 )
+from tests.support.phase3_builders import build_signature_preset
 
 
 def test_trust_profile_round_trip() -> None:
@@ -37,21 +38,14 @@ def test_timestamp_policy_round_trip() -> None:
 
 
 def test_signature_preset_round_trip() -> None:
-    original = SignaturePreset(
-        schema_version=1,
-        name="default",
-        show_common_name=True,
-        show_email=False,
-        show_signing_time=True,
-        reason="Approved",
-        location="Austin",
-        datetime_format="%Y-%m-%d %H:%M:%S %Z",
-    )
+    original = build_signature_preset()
 
     payload = original.to_dict()
     reconstructed = SignaturePreset.from_dict(payload)
 
     assert reconstructed == original
+    assert payload["appearance"]["layout_template"] == "multi_line"
+    assert payload["placement_defaults"]["anchor"] == "bottom_right"
 
 
 def test_bool_fields_do_not_accept_string_values() -> None:
