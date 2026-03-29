@@ -1,16 +1,19 @@
 {
-  "errors": [],
-  "first_render_ms": 50.326322903856635,
+  "errors": [
+    "ERROR signature_rect_missing: Signature placement is required before signing."
+  ],
+  "first_render_ms": 52.83893086016178,
   "interaction_counts": {
-    "wheel_zoom_in": 3,
-    "wheel_zoom_out": 4
+    "selection_success": 10,
+    "wheel_zoom_in": 7,
+    "wheel_zoom_out": 6
   },
-  "last_signature_has_visible_appearance": false,
-  "last_signature_output_path": null,
-  "last_signature_page_index": null,
+  "last_signature_has_visible_appearance": true,
+  "last_signature_output_path": "/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf",
+  "last_signature_page_index": 0,
   "pdf_path": "/home/daekar/Downloads/2019.04.24 Savor MC.PDF",
   "preview_available": true,
-  "selection_count": 0,
-  "sign_request_count": 0,
+  "selection_count": 10,
+  "sign_request_count": 4,
   "validation_text": "Ready to sign."
 }

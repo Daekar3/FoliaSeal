@@ -11,11 +11,11 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 0
-- Sign requests captured: 0
-- Last signature page index: not captured
-- Last sign request had visible appearance: no
-- Last sign request output path: not captured
+- Selection interactions captured: 10
+- Sign requests captured: 4
+- Last signature page index: 0
+- Last sign request had visible appearance: yes
+- Last sign request output path: `/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf`
 - Current validation text: `Ready to sign.`
 
 # Phase 3 FR-3B Acceptance Checklist and Task Worksheet
@@ -40,7 +40,7 @@ Purpose:
 - [ ] Open a representative PDF that includes at least one page suitable for signature placement.
 - [x] Confirm the signature properties flow is reachable from the main signing UI.
 - [x] Confirm the viewer preview renders before any signing action is attempted.
-- [x] Confirm the selected PDF can be used without unexpected dependency or backend errors.
+- [ ] Confirm the selected PDF can be used without unexpected dependency or backend errors.
 
 Notes:
 
@@ -106,10 +106,10 @@ Goal:
 
 Checks:
 
-- [ ] The user can choose the target page before placement.
-- [ ] The user can draw a signature rectangle on the preview.
+- [x] The user can choose the target page before placement.
+- [x] The user can draw a signature rectangle on the preview.
 - [ ] The rectangle preview appears while dragging.
-- [ ] The resulting placement lands on the expected page area.
+- [x] The resulting placement lands on the expected page area.
 - [ ] The placement respects zoom and pan state.
 
 Pass/Fail:
@@ -130,7 +130,7 @@ Goal:
 
 Checks:
 
-- [ ] The placed rectangle can be resized or repositioned in the workflow.
+- [x] The placed rectangle can be resized or repositioned in the workflow.
 - [ ] Numeric x/y/width/height fine-tuning is available when expected.
 - [ ] Fine-tuned values are reflected in the preview.
 - [ ] Fine-tuned values remain valid after the user changes other appearance settings.
@@ -153,8 +153,8 @@ Goal:
 
 Checks:
 
-- [ ] The sign action is available from the properties flow.
-- [ ] The app shows the expected confirmation or summary before signing, if applicable.
+- [x] The sign action is available from the properties flow.
+- [x] The app shows the expected confirmation or summary before signing, if applicable.
 - [ ] The signing action completes successfully for a valid request.
 - [ ] The signed output is produced at the expected location.
 - [ ] The UI reports success or failure clearly after the sign action.

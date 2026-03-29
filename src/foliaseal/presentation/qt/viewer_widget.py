@@ -73,6 +73,7 @@ class PdfViewerWidgetAdapter:
                 self._overlay_drag_rect: Any | None = None
                 self._overlay_drag_start_rect: Any | None = None
                 self._overlay_handle_half_size = 4.0
+                self._overlay_min_span_px = 8.0
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
                 start_time = perf_counter() if elapsed_ms is None else None
@@ -541,19 +542,20 @@ class PdfViewerWidgetAdapter:
                 bottom = float(overlay_rect.bottom())
                 current_x = float(current.x())
                 current_y = float(current.y())
+                min_span = self._overlay_min_span_px
 
                 if handle == "top_left":
-                    left = current_x
-                    top = current_y
+                    left = min(current_x, right - min_span)
+                    top = min(current_y, bottom - min_span)
                 elif handle == "top_right":
-                    right = current_x
-                    top = current_y
+                    right = max(current_x, left + min_span)
+                    top = min(current_y, bottom - min_span)
                 elif handle == "bottom_left":
-                    left = current_x
-                    bottom = current_y
+                    left = min(current_x, right - min_span)
+                    bottom = max(current_y, top + min_span)
                 elif handle == "bottom_right":
-                    right = current_x
-                    bottom = current_y
+                    right = max(current_x, left + min_span)
+                    bottom = max(current_y, top + min_span)
                 return bindings.q_rect(
                     bindings.q_point(int(left), int(top)),
                     bindings.q_point(int(right), int(bottom)),
