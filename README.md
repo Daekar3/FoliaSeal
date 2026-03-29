@@ -33,6 +33,9 @@ Current capabilities:
   - A user can save the current appearance under a distinct user-provided name.
   - Saved profiles can be selected from a dropdown in the shell.
   - Saving to an existing name uses explicit overwrite confirmation.
+  - Saved profiles now persist across relaunches in the user-visible `Signature Profiles`
+    storage area.
+  - The shell supports delete-current-profile with explicit confirmation.
 - `render_signing_preview()` should turn the normalized draft state into a preview representation.
   - It should be treated as the single source of truth for preview formatting.
   - The Qt shell should reuse it rather than rebuilding preview semantics in widget code.
