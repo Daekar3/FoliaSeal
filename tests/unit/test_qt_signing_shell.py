@@ -404,6 +404,23 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
     assert not hasattr(widget._signing_workspace, "_flow_summary_box")
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
+    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
+    assert len(
+        widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
+    ) == 5
+    assert len(
+        widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
+    ) == 2
+    assert len(widget.properties_panel._placement_controls.container.layout.rows) == 3
+    assert (
+        widget.properties_panel.field_controls[SignatureFieldKey.DISTINGUISHED_NAME]
+        .visible_check._text
+        == ""
+    )
+    assert (
+        widget.properties_panel._appearance_controls.timezone_display_mode.currentText()
+        == "utc"
+    )
     assert list(widget.properties_panel.field_controls.keys()) == [
         SignatureFieldKey.DISTINGUISHED_NAME,
         SignatureFieldKey.COMMON_NAME,
@@ -512,27 +529,35 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         )
     )
 
-    appearance_summary = widget.properties_panel._appearance_controls.summary_label.text()
     preview_text = widget.properties_panel.preview_text()
     preview_controls = widget.properties_panel.preview_controls
 
-    assert appearance_summary == ""
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
-    assert preview_controls.stamp_label.pixmap() is not None
-    assert preview_controls.stamp_label.pixmap().path == "/tmp/stamp.png"
-    assert preview_controls.stamp_label.text() == ""
-    assert preview_controls.stamp_label.fixed_size == (154, 108)
-    assert preview_controls.stamp_label.visible is True
-    assert preview_controls.stamp_label.alignment == _FakeQt.AlignCenter
+    assert len(
+        widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
+    ) == 5
+    assert len(
+        widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
+    ) == 2
+    assert preview_controls.multi_body_container.layout.items[0][0].pixmap() is not None
+    assert (
+        preview_controls.multi_body_container.layout.items[0][0].pixmap().path
+        == "/tmp/stamp.png"
+    )
+    assert preview_controls.multi_body_container.layout.items[0][0].text() == ""
+    assert preview_controls.multi_body_container.layout.items[0][0].fixed_size == (154, 108)
+    assert preview_controls.multi_body_container.layout.items[0][0].visible is True
+    assert preview_controls.multi_body_container.layout.items[0][0].alignment == _FakeQt.AlignCenter
     assert preview_controls.title_label.text() == "Digitally signed by"
-    detail_text = preview_controls.detail_label.text()
+    detail_text = preview_controls.multi_detail_label.text()
     detail_lines = detail_text.splitlines()
-    assert detail_lines[0] == "Distinguished name"
-    assert detail_lines[1] == "Common name"
-    assert detail_lines[2] == "alice@example.com"
-    assert detail_lines[3] == "Director"
-    assert detail_lines[4] == "FoliaSeal"
-    assert detail_lines[6] == "Approved"
+    assert detail_lines[0].startswith("Distinguished name:")
+    assert detail_lines[1].startswith("Common name:")
+    assert detail_lines[2] == "Email: alice@example.com"
+    assert detail_lines[3] == "Title: Director"
+    assert detail_lines[4] == "Company: FoliaSeal"
+    assert detail_lines[5].startswith("Signing time:")
+    assert detail_lines[6] == "Reason: Approved"
     assert len(detail_lines) == 7
     assert preview_controls.footer_label.text() == ""
     assert len(preview_controls.card_container.layout.items) == 3
@@ -544,7 +569,6 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         widget._signing_workspace.properties_panel._appearance_controls.font_family.currentText()
         == "Source Sans 3"
     )
-    assert preview_text.count("Visible signature preview") == 1
     assert "Digitally signed by" in preview_text
     assert "alice@example.com" in preview_text
     assert "Single line" not in preview_text
@@ -585,14 +609,59 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
         for field in widget.properties_panel.preview_controls.detail_label.text().split("|")
     ]
 
-    assert detail_fields[0] == "Distinguished name"
-    assert detail_fields[1] == "Common name"
-    assert detail_fields[2] == "Email"
-    assert detail_fields[3] == "Title"
-    assert detail_fields[4] == "Company"
+    assert detail_fields[0].startswith("Distinguished name:")
+    assert detail_fields[1].startswith("Common name:")
+    assert detail_fields[2].startswith("Email:")
+    assert detail_fields[3].startswith("Title:")
+    assert detail_fields[4].startswith("Company:")
     assert detail_fields[5]
-    assert detail_fields[6] == "Reason"
-    assert detail_fields[7] == "Location"
+    assert detail_fields[6].startswith("Reason:")
+    assert detail_fields[7].startswith("Location:")
+
+
+def test_signing_shell_wrapped_block_preview_groups_tail_fields(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=signing_shell_module.SignatureLayoutTemplate.WRAPPED_BLOCK,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    detail_lines = widget.properties_panel.preview_controls.multi_detail_label.text().splitlines()
+
+    assert len(detail_lines) == 3
+    assert detail_lines[0].startswith("Distinguished name:")
+    assert detail_lines[1].startswith("Common name:")
+    assert "Email: alice@example.com" in detail_lines[2]
+    assert "Title: Director" in detail_lines[2]
+    assert "Company: FoliaSeal" in detail_lines[2]
+    assert "Signing time:" in detail_lines[2]
+    assert "Reason: Approved" in detail_lines[2]
 
 
 def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
