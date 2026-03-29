@@ -35,6 +35,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
         selection_count=1,
         sign_request_count=1,
         last_signature_page_index=0,
+        last_signature_page_number=1,
         last_signature_has_visible_appearance=True,
         last_signature_output_path="/tmp/sample-signed.pdf",
         preview_available=True,
@@ -49,6 +50,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     )
 
     assert "Phase 3 FR-3B Acceptance Results" in markdown
+    assert "- Last signature page number: 1" in markdown
     assert (
         "- [x] Confirm the signature properties flow is reachable from the main signing UI."
         in markdown
@@ -76,6 +78,7 @@ def test_phase3_checklist_results_markdown_leaves_manual_items_unchecked(
         selection_count=0,
         sign_request_count=0,
         last_signature_page_index=None,
+        last_signature_page_number=None,
         last_signature_has_visible_appearance=False,
         last_signature_output_path=None,
         preview_available=False,
