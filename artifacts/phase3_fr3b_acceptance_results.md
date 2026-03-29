@@ -11,8 +11,8 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 10
-- Sign requests captured: 4
+- Selection interactions captured: 6
+- Sign requests captured: 1
 - Last signature page index: 0
 - Last sign request had visible appearance: yes
 - Last sign request output path: `/home/daekar/Downloads/2019.04.24 Savor MC-signed.pdf`
@@ -40,7 +40,7 @@ Purpose:
 - [ ] Open a representative PDF that includes at least one page suitable for signature placement.
 - [x] Confirm the signature properties flow is reachable from the main signing UI.
 - [x] Confirm the viewer preview renders before any signing action is attempted.
-- [ ] Confirm the selected PDF can be used without unexpected dependency or backend errors.
+- [x] Confirm the selected PDF can be used without unexpected dependency or backend errors.
 
 Notes:
 
