@@ -12,6 +12,7 @@ from time import perf_counter
 from typing import Any
 
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
@@ -135,6 +136,7 @@ def run_phase3_signing_harness(
         timestamp_required=True,
     )
     profile_store = SignaturePresetCatalogStore.default()
+    sign_executor = build_phase3_signing_executor()
 
     sign_requests: list[SigningRequest] = []
     errors: list[str] = []
@@ -172,6 +174,7 @@ def run_phase3_signing_harness(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
         preset_catalog_store=profile_store,
+        sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,

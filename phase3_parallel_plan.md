@@ -37,6 +37,7 @@ Validated so far:
 - the richer signing request, draft workflow, preview semantics, and signing integration exist
 - the harness is useful for validating geometry, settings propagation, and request capture
 - named profile save/select UI is now in place with explicit overwrite confirmation
+- persistent named profile storage and delete-current-profile behavior are implemented
 - the shell can drive an executor-backed sign/apply-output path and surface success/failure
 
 Not yet achieved:
@@ -51,8 +52,8 @@ Interpretation:
 - `phase3-signing-harness` is an engineering validation tool
 - it is not the final Phase 3 GUI target
 - harness success should be treated as implementation progress, not final acceptance
-- the named-profile contract and shell workflow now exist, but the final production
-  signing backend still needs to be supplied by the application layer
+- the executor seam now has a concrete bridge, but the final production signing backend still
+  needs to be refined/supplied by the application layer for true acceptance
 
 ## Scope Boundary
 
@@ -70,14 +71,14 @@ Phase 3 does not need full preset lifecycle management yet.
 That belongs primarily to Phase 4:
 
 - create/edit/duplicate/delete/import/export preset persistence UX
-- default/last-used preset behavior
-- corruption recovery flows
+  - default/last-used preset behavior
+  - corruption recovery flows
 
 It is acceptable in Phase 3 to support:
 
 - built-in appearance templates
 - a single in-memory current draft
-- temporary serialization helpers needed by the model layer
+  - temporary serialization helpers needed by the model layer
 
 ## Design Principles
 
@@ -1739,6 +1740,162 @@ Requirements to satisfy:
 Definition of done:
 
 - the team has a concrete review gate before the next manual save/relaunch/delete pass
+
+## Follow-Up Concrete Signing Backend and End-to-End Acceptance Wave
+
+This wave focuses on the main remaining Phase 3 engineering gap:
+
+- wiring a concrete production signing backend into the shell's executor seam
+- replacing the current output-artifact bridge with a true cryptographic signing backend
+- validating that the end-to-end output is a genuinely signed PDF whose visible appearance matches
+  the configured placement and appearance closely enough for Phase 3 acceptance work to become
+  meaningful
+
+### Concrete Backend and Acceptance Target
+
+This wave should be considered complete when:
+
+- the shell can trigger a concrete backend path that writes a genuinely signed PDF
+- success/failure messaging is coherent in the shell for the real backend path
+- the harness/manual flow can inspect a truly signed output file rather than only an output artifact
+- acceptance artifacts clearly distinguish real-output verification from remaining Phase 4 work
+- the team has a concrete review gate and a focused manual end-to-end pass
+
+### Brief AA: Concrete Signing Backend Integration
+
+You are implementing the concrete production signing backend behind the executor seam.
+
+Objectives:
+
+- connect the current shell executor path to a true cryptographic signing backend
+- replace the current output-artifact bridge with genuinely signed output from the Phase 3 flow
+- keep the integration incremental by extending existing signing orchestration rather than
+  replacing it
+
+Primary files you own:
+
+- `src/foliaseal/application/sign_pdf_use_case.py`
+- relevant application/backend integration files
+- light shell wiring only where needed to connect the executor seam
+- relevant tests in `tests/unit/`
+
+Files you should avoid editing unless absolutely necessary:
+
+- broad profile lifecycle UI
+- unrelated documentation artifacts
+
+Requirements to satisfy:
+
+- true cryptographic signed-output generation from the shell flow
+- user-visible success/failure handling for the concrete backend path
+- compatibility with the richer Phase 3 appearance payload
+
+Expected deliverables:
+
+- a concrete cryptographic executor/backend path usable by the signing shell
+- shell-triggered output creation that writes a genuinely signed PDF where expected
+- tests covering successful output creation and failure reporting
+
+Implementation notes:
+
+- preserve the existing executor seam rather than bypassing it
+- keep the workflow compatible with named profile reuse and the current preview model
+
+Definition of done:
+
+- a user can sign from the shell and inspect a genuinely signed PDF
+
+### Brief AB: End-to-End Acceptance Artifact Prep
+
+You are preparing the acceptance artifacts for real-output testing.
+
+Objectives:
+
+- update the Phase 3 acceptance checklist/results so the next manual pass can record
+  concrete backend execution and true signed-output inspection
+- keep the artifacts honest about what is now implemented versus what remains Phase 4 work
+
+Primary files you own:
+
+- `artifacts/phase3_fr3b_acceptance_checklist.md`
+- `artifacts/phase3_fr3b_acceptance_results.md`
+
+Files you should avoid editing unless absolutely necessary:
+
+- shell code
+- backend integration files
+
+Requirements to satisfy:
+
+- the next manual pass can record:
+  - real sign execution
+  - true signed-output creation
+  - output inspection versus preview/settings
+  - remaining backend or fidelity gaps
+
+Expected deliverables:
+
+- refined acceptance checks for end-to-end true signed-output validation
+- clearer note sections for preview-vs-output comparison
+- removal of stale wording that treats output-artifact creation as true signing
+
+Definition of done:
+
+- the acceptance artifacts are ready for a true signed-output manual pass once the cryptographic backend lands
+
+### Brief AC: Backend Integration Reconnaissance
+
+You are doing a low-risk read-only pass to identify the concrete integration points for the
+production signing backend.
+
+Objectives:
+
+- identify what already exists in `SignPdfUseCase` and related backend contracts
+- identify the narrowest path to connect the shell executor to true cryptographic signing
+- surface risks before the main worker lands changes
+
+Primary files to inspect:
+
+- `src/foliaseal/application/sign_pdf_use_case.py`
+- related backend/application files
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- relevant tests in `tests/unit/`
+
+Requirements to satisfy:
+
+- do not edit files
+- return a short integration-risk memo with likely touch points and risks
+
+Definition of done:
+
+- the main backend worker has a clearer map of the integration surface
+
+### Brief AD: Concrete Backend Review
+
+You are doing a review-only pass on the concrete backend integration wave.
+
+Objectives:
+
+- verify the concrete backend path is actually wired end-to-end and performs true signing
+- verify shell success/failure handling is coherent
+- verify acceptance artifacts match the new true signed-output behavior
+- identify regressions or remaining Phase 3 blockers
+
+Primary files to review:
+
+- backend integration files from Brief AA
+- relevant shell wiring
+- acceptance artifacts from Brief AB
+- relevant tests in `tests/unit/`
+
+Requirements to satisfy:
+
+- use the review-agent template in this document
+- return findings, residual risks, and go/no-go
+
+Definition of done:
+
+- the team has a concrete review gate before the next end-to-end manual pass
 
 ## Agent-Ready Assignment Briefs
 

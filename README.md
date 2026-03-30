@@ -59,7 +59,7 @@ Current capabilities:
 
 Not yet production-ready:
 
-- a concrete production signing backend behind the shell's executor seam
+- concrete backend refinement behind the shell's executor seam for true FR-3B acceptance
 - final end-to-end FR-3B acceptance validation
 
 ## Local development
