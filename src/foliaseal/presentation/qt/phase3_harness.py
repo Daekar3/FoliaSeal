@@ -133,7 +133,7 @@ def run_phase3_signing_harness(
         certificate_path="demo-cert.p12",
         passphrase="demo-passphrase",
         tsa_url="https://tsa.example.invalid",
-        timestamp_required=True,
+        timestamp_required=False,
     )
     profile_store = SignaturePresetCatalogStore.default()
     sign_executor = build_phase3_signing_executor()
