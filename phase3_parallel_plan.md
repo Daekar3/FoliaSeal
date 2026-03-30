@@ -39,21 +39,23 @@ Validated so far:
 - named profile save/select UI is now in place with explicit overwrite confirmation
 - persistent named profile storage and delete-current-profile behavior are implemented
 - the shell can drive an executor-backed sign/apply-output path and surface success/failure
+- the concrete backend now produces a genuinely cryptographically signed PDF through `pyHanko`
 
 Not yet achieved:
 
 - a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
 - a real end-user concept of "appearance" in the GUI
 - a product-quality appearance preview and coherent signing flow
-- a concrete production signing backend supplied to the new shell executor seam
+- TSA-backed timestamping and timestamp-required signing flows
+- final end-to-end FR-3B acceptance against representative signed output
 
 Interpretation:
 
 - `phase3-signing-harness` is an engineering validation tool
 - it is not the final Phase 3 GUI target
 - harness success should be treated as implementation progress, not final acceptance
-- the executor seam now has a concrete bridge, but the final production signing backend still
-  needs to be refined/supplied by the application layer for true acceptance
+- the executor seam now has a concrete cryptographic backend
+- the remaining backend gap is honest TSA/timestamp support rather than basic PDF signing
 
 ## Scope Boundary
 
@@ -1743,7 +1745,7 @@ Definition of done:
 
 ## Follow-Up Concrete Signing Backend and End-to-End Acceptance Wave
 
-This wave focuses on the main remaining Phase 3 engineering gap:
+This wave focused on the main remaining Phase 3 engineering gap:
 
 - wiring a concrete production signing backend into the shell's executor seam
 - replacing the current output-artifact bridge with a true cryptographic signing backend
@@ -1753,7 +1755,7 @@ This wave focuses on the main remaining Phase 3 engineering gap:
 
 ### Concrete Backend and Acceptance Target
 
-This wave should be considered complete when:
+This wave is considered complete when:
 
 - the shell can trigger a concrete backend path that writes a genuinely signed PDF
 - success/failure messaging is coherent in the shell for the real backend path
@@ -1789,17 +1791,24 @@ Requirements to satisfy:
 - true cryptographic signed-output generation from the shell flow
 - user-visible success/failure handling for the concrete backend path
 - compatibility with the richer Phase 3 appearance payload
+- use a real signing-capable Python dependency if needed rather than trying to build PDF signing
+  directly on top of raw `openssl` calls alone
 
 Expected deliverables:
 
 - a concrete cryptographic executor/backend path usable by the signing shell
 - shell-triggered output creation that writes a genuinely signed PDF where expected
 - tests covering successful output creation and failure reporting
+- dependency updates required for the chosen signing backend
 
 Implementation notes:
 
 - preserve the existing executor seam rather than bypassing it
 - keep the workflow compatible with named profile reuse and the current preview model
+- prefer adopting a PDF-signing-capable Python library, with `pyHanko` as the default direction
+  unless a better-integrated alternative is justified
+- do not spend time polishing the current output-artifact bridge; replace its placeholder
+  certificate loader, signer, and verifier internals with real implementations
 
 Definition of done:
 

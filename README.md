@@ -50,8 +50,10 @@ Current capabilities:
   - placement and resize behavior
   - appearance editing and preview behavior
   - named profile save/select workflows
-  - executor-backed sign/apply integration seams
+  - executor-backed sign/apply behavior
 - The shell can now call an injected signing executor and surface success/failure results.
+- The current concrete signing backend now produces a genuinely cryptographically signed PDF
+  through `pyHanko`.
 - The key integration rule is to avoid duplicating semantics across layers.
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
@@ -59,7 +61,7 @@ Current capabilities:
 
 Not yet production-ready:
 
-- concrete backend refinement behind the shell's executor seam for true FR-3B acceptance
+- TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
 
 ## Local development
@@ -132,6 +134,7 @@ What still remains manual:
 - parity judgment against Acrobat or PDF-XChange
 - qualitative UX notes
 - signed-output fidelity judgments
+- timestamping behavior and any timestamp-required failure paths
 - any task steps that require human interpretation rather than observable harness events
 
 See also:

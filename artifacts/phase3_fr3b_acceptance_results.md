@@ -42,8 +42,9 @@ Current status note:
   - saving the current appearance under a user-provided name
   - confirming overwrite when a name already exists
   - selecting a saved profile from a dropdown
-- The current open workflow gap is the concrete production signing backend behind the shell's
-  executor seam and the final end-to-end acceptance pass against true signed output.
+- The concrete signing backend now produces a genuinely cryptographically signed PDF.
+- The current open workflow gaps are TSA-backed timestamping, timestamp-required flows, and the
+  final end-to-end acceptance pass against representative signed output.
 - Some worksheet items below are therefore not yet testable in the current build and should be
   marked as such rather than treated as failures.
 
@@ -191,19 +192,20 @@ Notes:
 
 Goal:
 
-- Verify that the user can complete the signing action from the focused properties workflow and inspect the produced output artifact from the current backend path.
+- Verify that the user can complete the signing action from the focused properties workflow and inspect the produced signed PDF from the current backend path.
 
 Checks:
 
 - [ ] The sign action is available from the properties flow.
 - [ ] The app shows the expected confirmation or summary before signing, if applicable.
-- [ ] The signing action completes successfully for a valid request using the current backend path.
+- [ ] The signing action completes successfully for a valid non-timestamp-required request using the current backend path.
 - [ ] The signed output is produced at the expected location.
 - [ ] The signed output can be opened and inspected after signing.
-- [ ] The produced output artifact matches the intended preview and settings closely enough for plumbing validation.
-- [ ] The worksheet can distinguish output-artifact plumbing from true cryptographic signing.
+- [ ] The produced signed PDF matches the intended preview and settings closely enough for acceptance.
+- [ ] The worksheet distinguishes true cryptographic signing from still-missing TSA-backed timestamping.
 - [ ] The UI reports success or failure clearly after the sign action.
 - [ ] The run record captures the output file path and any backend failure code if signing fails.
+- [ ] If timestamp-required signing is attempted without TSA support, the failure is reported clearly.
 
 Pass/Fail:
 
@@ -215,8 +217,8 @@ Notes:
 - Record any signing validation warnings shown to the user.
 - Record the output file path, whether the output can be opened, and any preview-vs-output
   differences.
-- Record any backend failure code, exception message, or output-artifact mismatch if signing fails.
-- Record whether the output path is still only plumbing or a true signed PDF once the backend lands.
+- Record any backend failure code, exception message, or signed-output mismatch if signing fails.
+- Record whether timestamping was intentionally disabled, unavailable, or explicitly rejected.
 
 ### 6. Reuse prior configuration shape in-session
 
@@ -317,5 +319,5 @@ Summary notes:
 - Record the final judgment for FR-3B acceptance.
 - Include any constraints that should be carried into Phase 4 or future parity testing.
 - If the overlay gate failed, call that out explicitly as the reason Phase 3 remains blocked.
-- If the signing executor seam still lacks the concrete production backend in the current build,
-  call that out explicitly as the reason true signed-output validation is not yet complete.
+- If TSA-backed timestamping or timestamp-required flows remain unsupported in the current build,
+  call that out explicitly as the reason timestamp-oriented acceptance is not yet complete.
