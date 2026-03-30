@@ -181,6 +181,7 @@ Checks:
 - [ ] The signed output is produced at the expected location.
 - [ ] The signed output can be opened and inspected after signing.
 - [ ] The produced output artifact matches the intended preview and settings closely enough for plumbing validation.
+- [ ] The worksheet can distinguish output-artifact plumbing from true cryptographic signing.
 - [ ] The UI reports success or failure clearly after the sign action.
 - [ ] The run record captures the output file path and any backend failure code if signing fails.
 
@@ -195,6 +196,7 @@ Notes:
 - Record the output file path, whether the output can be opened, and any preview-vs-output
   differences.
 - Record any backend failure code, exception message, or output-artifact mismatch if signing fails.
+- Record whether the output path is still only plumbing or a true signed PDF once the backend lands.
 
 ### 6. Reuse prior configuration shape in-session
 
