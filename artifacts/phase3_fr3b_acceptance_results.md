@@ -43,7 +43,7 @@ Current status note:
   - confirming overwrite when a name already exists
   - selecting a saved profile from a dropdown
 - The current open workflow gap is the concrete production signing backend behind the shell's
-  executor seam and the final end-to-end acceptance pass against real signed output.
+  executor seam and the final end-to-end acceptance pass against true signed output.
 - Some worksheet items below are therefore not yet testable in the current build and should be
   marked as such rather than treated as failures.
 
@@ -191,15 +191,18 @@ Notes:
 
 Goal:
 
-- Verify that the user can complete the signing action from the focused properties workflow without leaving the Phase 3 signing path.
+- Verify that the user can complete the signing action from the focused properties workflow and inspect the produced output artifact from the current backend path.
 
 Checks:
 
 - [ ] The sign action is available from the properties flow.
 - [ ] The app shows the expected confirmation or summary before signing, if applicable.
-- [ ] The signing action completes successfully for a valid request.
+- [ ] The signing action completes successfully for a valid request using the current backend path.
 - [ ] The signed output is produced at the expected location.
+- [ ] The signed output can be opened and inspected after signing.
+- [ ] The produced output artifact matches the intended preview and settings closely enough for plumbing validation.
 - [ ] The UI reports success or failure clearly after the sign action.
+- [ ] The run record captures the output file path and any backend failure code if signing fails.
 
 Pass/Fail:
 
@@ -209,7 +212,9 @@ Pass/Fail:
 Notes:
 
 - Record any signing validation warnings shown to the user.
-- Record the output file path and whether the output matched the intended request.
+- Record the output file path, whether the output can be opened, and any preview-vs-output
+  differences.
+- Record any backend failure code, exception message, or output-artifact mismatch if signing fails.
 
 ### 6. Reuse prior configuration shape in-session
 
@@ -311,4 +316,4 @@ Summary notes:
 - Include any constraints that should be carried into Phase 4 or future parity testing.
 - If the overlay gate failed, call that out explicitly as the reason Phase 3 remains blocked.
 - If the signing executor seam still lacks the concrete production backend in the current build,
-  call that out explicitly as a remaining Phase 3 gap rather than a failed manual test.
+  call that out explicitly as the reason true signed-output validation is not yet complete.
