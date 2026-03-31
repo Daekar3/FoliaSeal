@@ -392,3 +392,41 @@ def test_workflow_captures_placement_defaults_from_current_rectangle(
         width_pt=160.0,
         height_pt=64.0,
     )
+
+
+def test_workflow_allows_empty_signer_label_prefix_and_keeps_preview_clean(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        SignatureAppearance(
+            signer_label_prefix="",
+            common_name=SignatureFieldBinding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            email=SignatureFieldBinding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            signing_time=SignatureFieldBinding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+        )
+    )
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=220.0,
+            height_pt=80.0,
+        )
+    )
+
+    preview = workflow.preview()
+
+    assert preview.signer_label_prefix == ""
+    assert preview.title == ""
+    assert preview.can_submit is True

@@ -51,6 +51,7 @@ class Phase3HarnessCapture:
     preview_snapshot: dict[str, Any]
     sign_request_snapshot: dict[str, Any] | None
     backend_reservation_snapshot: dict[str, Any] | None
+    backend_reservation_error: str | None
     output_file_exists: bool
     output_file_size_bytes: int | None
     output_signature_count: int | None
@@ -161,6 +162,11 @@ def build_phase3_checklist_results_markdown(
             f"{_snapshot_reservation_margin_bottom(capture.backend_reservation_snapshot)}"
             if capture.backend_reservation_snapshot is not None
             else "- Backend reservation content bottom margin: not captured"
+        ),
+        (
+            f"- Backend reservation error: `{capture.backend_reservation_error}`"
+            if capture.backend_reservation_error
+            else "- Backend reservation error: none"
         ),
         (
             f"- Preview layout template: {capture.preview_snapshot['layout_template']}"
@@ -375,6 +381,9 @@ def run_phase3_signing_harness(
     backend_reservation_snapshot = (
         _snapshot_backend_reservation(sign_requests[-1]) if sign_requests else None
     )
+    backend_reservation_error = (
+        _backend_reservation_error(sign_requests[-1]) if sign_requests else None
+    )
     last_signature_page_index = (
         sign_requests[-1].signature_rect.page_index
         if sign_requests and sign_requests[-1].signature_rect is not None
@@ -416,6 +425,7 @@ def run_phase3_signing_harness(
             _snapshot_signing_request(sign_requests[-1]) if sign_requests else None
         ),
         backend_reservation_snapshot=backend_reservation_snapshot,
+        backend_reservation_error=backend_reservation_error,
         output_file_exists=output_exists,
         output_file_size_bytes=output_size_bytes,
         output_signature_count=output_signature_count,
@@ -605,6 +615,10 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
     if request.signature_rect is None or request.signature_appearance is None:
         return None
 
+    snapshot = {
+        "layout_template": request.signature_appearance.layout_template.value,
+        "signature_rect": _snapshot_signature_rect(request.signature_rect),
+    }
     try:
         appearance = request.signature_appearance
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
@@ -622,20 +636,47 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
             stamp_background=stamp_background,
             signature_rect=request.signature_rect,
         )
-    except Exception:
+        snapshot.update(
+            {
+                "stamp_text": stamp_text,
+                "stamp_text_length": len(stamp_text),
+                "stamp_text_line_count": len(stamp_text.splitlines()) if stamp_text else 0,
+                "stamp_background_present": stamp_background is not None,
+                "text_style": _snapshot_text_style(appearance.text_style),
+                "box_style": _snapshot_box_style(appearance.box_style),
+                "background_layout": _snapshot_layout_rule(style.background_layout),
+                "content_layout": _snapshot_layout_rule(style.inner_content_layout),
+            }
+        )
+    except Exception as exc:
+        snapshot["error"] = str(exc)
+        return snapshot
+    return snapshot
+
+
+def _backend_reservation_error(request: SigningRequest) -> str | None:
+    if request.signature_rect is None or request.signature_appearance is None:
         return None
-    return {
-        "layout_template": appearance.layout_template.value,
-        "signature_rect": _snapshot_signature_rect(request.signature_rect),
-        "stamp_text": stamp_text,
-        "stamp_text_length": len(stamp_text),
-        "stamp_text_line_count": len(stamp_text.splitlines()) if stamp_text else 0,
-        "stamp_background_present": stamp_background is not None,
-        "text_style": _snapshot_text_style(appearance.text_style),
-        "box_style": _snapshot_box_style(appearance.box_style),
-        "background_layout": _snapshot_layout_rule(style.background_layout),
-        "content_layout": _snapshot_layout_rule(style.inner_content_layout),
-    }
+    try:
+        appearance = request.signature_appearance
+        signer = _load_simple_signer(request.certificate_path, request.passphrase)
+        signing_time = _current_signing_time(appearance.timezone_display_mode)
+        stamp_text = _build_stamp_text(
+            appearance=appearance,
+            signer=signer,
+            signing_time=signing_time,
+            signature_rect=request.signature_rect,
+        )
+        stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
+        _build_stamp_style(
+            appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=request.signature_rect,
+        )
+    except Exception as exc:
+        return str(exc)
+    return None
 
 
 def _snapshot_layout_rule(layout_rule) -> dict[str, Any] | None:

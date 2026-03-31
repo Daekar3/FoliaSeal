@@ -54,6 +54,18 @@ def test_signature_preset_round_trip() -> None:
     assert payload["placement_defaults"]["anchor"] == "bottom_right"
 
 
+def test_signature_preset_round_trip_allows_blank_signer_label_prefix() -> None:
+    original = build_signature_preset(
+        appearance=build_signature_appearance(signer_label_prefix=""),
+    )
+
+    payload = original.to_dict()
+    reconstructed = SignaturePreset.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["appearance"]["signer_label_prefix"] == ""
+
+
 def test_signature_preset_rejects_blank_name() -> None:
     with pytest.raises(ConfigValidationError, match="Field 'name' must be a non-empty str"):
         SignaturePreset(

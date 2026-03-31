@@ -15,6 +15,7 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
+from foliaseal.application.phase3_signing_backend import _wrap_visible_signature_fragments
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -380,7 +381,25 @@ def _preview_detail_text(preview: SigningDraftPreview) -> str:
     if not visible_fields:
         return "No visible fields selected"
     if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        return " | ".join(visible_fields)
+        if preview.signature_rect is not None and preview.text_style is not None:
+            try:
+                return _wrap_visible_signature_fragments(
+                    visible_fields,
+                    text_style=preview.text_style,
+                    max_text_width_pt=max(1, int(round(preview.signature_rect.width_pt)) - 8),
+                    max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
+                )
+            except ValueError:
+                pass
+        if len(visible_fields) <= 1:
+            return " | ".join(visible_fields)
+        line_count = 2 if len(visible_fields) <= 4 else 3
+        chunk_size = max(1, (len(visible_fields) + line_count - 1) // line_count)
+        wrapped_lines = [
+            " | ".join(visible_fields[index : index + chunk_size])
+            for index in range(0, len(visible_fields), chunk_size)
+        ]
+        return "\n".join(wrapped_lines)
     if preview.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
         lines = list(visible_fields[:2])
         if len(visible_fields) > 2:
@@ -525,11 +544,14 @@ class SignaturePropertiesPanel:
 
     def preview_text(self) -> str:
         preview = self._current_preview()
+        title = _text(self._preview_controls.title_label)
         if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
             detail = _text(self._preview_controls.detail_label)
         else:
             detail = _text(self._preview_controls.multi_detail_label)
-        return "\n".join([_text(self._preview_controls.title_label), detail]).strip()
+        if not title:
+            return detail.strip()
+        return "\n".join([title, detail]).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
         preview = self._current_preview()
@@ -1292,6 +1314,7 @@ class SignaturePropertiesPanel:
         if hasattr(self._preview_controls.multi_detail_label, "setStyleSheet"):
             self._preview_controls.multi_detail_label.setStyleSheet(text_css)
         self._preview_controls.title_label.setText(title_line)
+        _set_widget_visible(self._preview_controls.title_label, bool(title_line))
         self._preview_controls.detail_label.setText(visible_detail if single_line_layout else "")
         self._preview_controls.multi_detail_label.setText(
             "" if single_line_layout else visible_detail

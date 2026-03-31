@@ -83,6 +83,12 @@ def _require_non_empty_str(value: object, field_name: str) -> str:
     return value
 
 
+def _require_str(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string.")
+    return value
+
+
 def _require_optional_non_empty_str(value: object, field_name: str) -> str | None:
     if value is None:
         return None
@@ -335,7 +341,7 @@ class SignatureAppearance:
         object.__setattr__(
             self,
             "signer_label_prefix",
-            _require_non_empty_str(self.signer_label_prefix, "signer_label_prefix"),
+            _require_str(self.signer_label_prefix, "signer_label_prefix").strip(),
         )
         if not isinstance(self.layout_template, SignatureLayoutTemplate):
             raise ValueError("layout_template must be a SignatureLayoutTemplate value.")

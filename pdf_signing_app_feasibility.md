@@ -555,9 +555,15 @@ Failure codes to expose in UI and logs:
 
 ---
 
-## Delivery milestones (updated development phase plan)
+## Delivery milestones (historical development phase plan)
 
 To reflect the expanded requirements (especially FR-3A/3B/3C, FR-9 through FR-17), the implementation plan should be sequenced as a **phase-gated program** rather than a simple linear MVP.
+
+Historical note:
+
+- The week-based Phase 0–3 milestones below are retained as project history/context.
+- For current post-Phase-3 planning, use the refactored roadmap further down in this document.
+- The refactored roadmap is the operative plan for remaining work.
 
 ## Phase 0 (Week 1): Foundations and architecture guardrails
 - Freeze v1 scope boundaries (signing-only in production UI; non-signing operations behind capability flags).

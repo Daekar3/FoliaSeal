@@ -1,8 +1,17 @@
 import json
 from pathlib import Path
 
+from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignatureFieldBinding,
+    SignatureFieldKey,
+    SignatureLayoutTemplate,
+    SignatureRect,
+    SigningRequest,
+)
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
+    _snapshot_backend_reservation,
     build_phase3_checklist_results_markdown,
 )
 
@@ -181,6 +190,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
                 },
             },
         },
+        backend_reservation_error=None,
         output_file_exists=True,
         output_file_size_bytes=12345,
         output_signature_count=1,
@@ -276,6 +286,7 @@ def test_phase3_checklist_results_markdown_leaves_manual_items_unchecked(
         },
         sign_request_snapshot=None,
         backend_reservation_snapshot=None,
+        backend_reservation_error=None,
         output_file_exists=False,
         output_file_size_bytes=None,
         output_signature_count=None,
@@ -316,6 +327,7 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
             preview_snapshot={"opaque": opaque_handle},
             sign_request_snapshot=None,
             backend_reservation_snapshot=None,
+            backend_reservation_error=None,
             output_file_exists=False,
             output_file_size_bytes=None,
             output_signature_count=None,
@@ -330,3 +342,50 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
         payload = json.loads(capture.to_json())
 
     assert payload["preview_snapshot"]["opaque"].startswith("<_io.BufferedReader")
+
+
+def test_backend_reservation_snapshot_retains_error_details_for_bad_request() -> None:
+    appearance = SignatureAppearance(
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        common_name=SignatureFieldBinding(),
+        email=SignatureFieldBinding(),
+        title=SignatureFieldBinding(),
+        company=SignatureFieldBinding(),
+        signing_time=SignatureFieldBinding(),
+        reason=SignatureFieldBinding(),
+        location=SignatureFieldBinding(),
+        field_order=(
+            SignatureFieldKey.DISTINGUISHED_NAME,
+            SignatureFieldKey.COMMON_NAME,
+            SignatureFieldKey.EMAIL,
+            SignatureFieldKey.TITLE,
+            SignatureFieldKey.COMPANY,
+            SignatureFieldKey.SIGNING_TIME,
+            SignatureFieldKey.REASON,
+            SignatureFieldKey.LOCATION,
+        ),
+    )
+    request = SigningRequest(
+        input_pdf_path="/tmp/sample.pdf",
+        output_pdf_path="/tmp/sample-signed.pdf",
+        certificate_path="/tmp/missing-cert.p12",
+        passphrase="passphrase",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        signature_rect=SignatureRect(
+            page_index=0,
+            left_pt=10.0,
+            bottom_pt=20.0,
+            width_pt=30.0,
+            height_pt=40.0,
+        ),
+        signature_appearance=appearance,
+    )
+
+    snapshot = _snapshot_backend_reservation(request)
+
+    assert snapshot is not None
+    assert snapshot["layout_template"] == "single_line"
+    assert snapshot["signature_rect"]["page_number"] == 1
+    assert "missing-cert.p12" in snapshot["error"]

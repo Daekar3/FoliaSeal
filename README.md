@@ -61,6 +61,8 @@ Current capabilities:
 
 Not yet production-ready:
 
+- visible-signature preview/output parity for all realistic rectangle shapes
+- final end-to-end visible-signature fidelity validation against representative signed PDFs
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
 
@@ -75,6 +77,9 @@ Roadmap note:
   - trust/certification hardening,
   - remaining profile portability work,
   - packaging and full release validation.
+- The current visible-signature contract is text-first: honor the selected text size in points,
+  reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
+  fail honestly only when the chosen rectangle cannot support that result.
 
 ## Local development
 

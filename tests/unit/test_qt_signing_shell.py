@@ -6,11 +6,13 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.phase3_signing_backend import _wrap_visible_signature_fragments
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
 from foliaseal.domain.models import (
     SignatureFieldKey,
+    SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureTextStyle,
     SigningResult,
@@ -780,21 +782,19 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
         )
     )
 
-    detail_fields = [
-        field.strip()
-        for field in widget.properties_panel.preview_controls.detail_label.text().split("|")
+    preview = widget.properties_panel.preview
+    visible_fragments = [
+        field.text for field in preview.fields if field.visible and field.text
     ]
+    expected_detail_text = _wrap_visible_signature_fragments(
+        visible_fragments,
+        text_style=preview.text_style,
+        max_text_width_pt=max(1, int(round(preview.signature_rect.width_pt)) - 8),
+        max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
+    )
 
     assert widget.properties_panel._appearance_controls.show_field_names.isChecked() is False
-    assert len(detail_fields) == 8
-    assert detail_fields[0] == "Distinguished name"
-    assert detail_fields[1] == "Common name"
-    assert detail_fields[2] == "Email"
-    assert detail_fields[3] == "Title"
-    assert detail_fields[4] == "Company"
-    assert detail_fields[5].startswith("202")
-    assert detail_fields[6] == "Reason"
-    assert detail_fields[7] == "Location"
+    assert widget.properties_panel.preview_controls.detail_label.text() == expected_detail_text
 
 
 def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
@@ -1316,7 +1316,7 @@ def test_signing_shell_warning_only_issue_keeps_readiness_enabled(
     assert "WARNING preview_warning: Preview is stale but still usable." in validation_text
 
 
-def test_signing_shell_blocks_invalid_appearance_and_reports_validation(
+def test_signing_shell_allows_blank_signer_label_prefix_and_frees_title_line(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1338,14 +1338,66 @@ def test_signing_shell_blocks_invalid_appearance_and_reports_validation(
         on_error=errors.append,
     )
 
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
     widget.properties_panel._appearance_controls.signer_label_prefix.setText("")
 
-    assert widget.properties_panel.preview.can_submit is False
-    assert "signer_label_prefix" in widget.properties_panel.validation_text()
+    assert widget.properties_panel.preview.can_submit is True
+    assert widget.properties_panel.preview.signer_label_prefix == ""
+    assert widget.properties_panel.preview.title == ""
+    assert widget.properties_panel.preview_controls.title_label.visible is False
+    assert widget.properties_panel.validation_text().startswith("Ready to sign.")
 
     request = widget.submit_sign_request()
 
-    assert request is None
-    assert errors
-    assert "signer_label_prefix" in errors[-1]
-    assert widget._signing_workspace._sign_button._enabled is False
+    assert request is not None
+    assert errors == []
+    assert widget._signing_workspace._sign_button._enabled is True
+
+
+def test_signing_shell_single_line_preview_matches_backend_wrapping(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    preview = widget.properties_panel.preview
+    visible_fragments = [
+        field.label if preview.show_field_names else field.text
+        for field in preview.fields
+        if field.visible and field.text
+    ]
+    expected = _wrap_visible_signature_fragments(
+        visible_fragments,
+        text_style=preview.text_style,
+        max_text_width_pt=max(1, int(round(preview.signature_rect.width_pt)) - 8),
+        max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
+    )
+
+    assert widget.properties_panel.preview_controls.detail_label.text() == expected
