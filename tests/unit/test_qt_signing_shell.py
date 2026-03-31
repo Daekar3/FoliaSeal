@@ -14,6 +14,7 @@ from foliaseal.domain.models import (
     SignatureFieldKey,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
+    SignatureStampPosition,
     SignatureTextStyle,
     SigningResult,
 )
@@ -50,12 +51,16 @@ class _FakeWidget:
         self.layout = None
         self.children = []
         self.style = None
+        self.visible = True
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
 
     def setEnabled(self, value):  # noqa: N802
         self.enabled = value
+
+    def setVisible(self, value):  # noqa: N802
+        self.visible = bool(value)
 
     def setStyleSheet(self, style):  # noqa: N802
         self.style = style
@@ -545,7 +550,7 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
-    ) == 5
+    ) == 6
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
     ) == 2
@@ -554,6 +559,7 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
         widget.properties_panel._appearance_controls.timezone_display_mode.currentText()
         == "UTC"
     )
+    assert widget.properties_panel._appearance_controls.stamp_position.currentText() == "Top"
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
     assert list(widget.properties_panel.field_controls.keys()) == [
         SignatureFieldKey.DISTINGUISHED_NAME,
@@ -646,6 +652,7 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     appearance = build_signature_appearance(
         datetime_format="%d/%m/%Y %H:%M",
         image_stamp_path="/tmp/stamp.png",
+        stamp_position=SignatureStampPosition.LEFT,
         show_field_names=True,
     )
     widget = build_qt_signing_shell(
@@ -670,7 +677,7 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
-    ) == 5
+    ) == 6
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
     ) == 2
@@ -708,6 +715,190 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert "alice@example.com" in preview_text
     assert "Single line" not in preview_text
     assert "UTC" not in preview_text
+
+
+def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        image_stamp_path="/tmp/stamp.png",
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=120.0,
+            height_pt=60.0,
+        )
+    )
+
+    preview_controls = widget.properties_panel.preview_controls
+
+    assert preview_controls.single_body_container.visible is True
+    assert preview_controls.multi_body_container.visible is False
+    assert preview_controls.single_body_container.layout.items[0][0] is (
+        preview_controls.detail_label
+    )
+    assert preview_controls.single_body_container.layout.items[1][0] is (
+        preview_controls.stamp_label
+    )
+    assert preview_controls.stamp_label.visible is True
+    assert preview_controls.detail_label.visible is True
+
+
+def test_signing_shell_stamp_position_right_places_stamp_to_the_right(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path="/tmp/stamp.png",
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=120.0,
+            height_pt=60.0,
+        )
+    )
+
+    preview_controls = widget.properties_panel.preview_controls
+
+    assert preview_controls.single_body_container.visible is False
+    assert preview_controls.multi_body_container.visible is True
+    assert preview_controls.multi_body_container.layout.items[0][0] is (
+        preview_controls.multi_detail_label
+    )
+    assert preview_controls.multi_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
+    assert preview_controls.multi_body_container.layout.items[1][0] is (
+        preview_controls.multi_stamp_label
+    )
+    assert preview_controls.multi_body_container.layout.items[1][1] == (0, _FakeQt.AlignCenter)
+    assert preview_controls.multi_stamp_label.visible is True
+    assert preview_controls.multi_detail_label.visible is True
+
+
+def test_signing_shell_stamp_position_left_centers_text_beside_stamp(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path="/tmp/stamp.png",
+        signer_label_prefix="",
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=120.0,
+            height_pt=60.0,
+        )
+    )
+
+    preview_controls = widget.properties_panel.preview_controls
+
+    assert preview_controls.title_label.visible is False
+    assert preview_controls.single_body_container.visible is False
+    assert preview_controls.multi_body_container.visible is True
+    assert preview_controls.multi_body_container.layout.items[0][0] is (
+        preview_controls.multi_stamp_label
+    )
+    assert preview_controls.multi_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
+    assert preview_controls.multi_body_container.layout.items[1][0] is (
+        preview_controls.multi_detail_label
+    )
+    assert preview_controls.multi_body_container.layout.items[1][1] == (0, _FakeQt.AlignCenter)
+
+
+def test_signing_shell_stamp_position_control_updates_workflow(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    panel = widget.properties_panel
+    panel._appearance_controls.stamp_position.setCurrentText("Right")
+
+    assert (
+        widget._signing_workspace._draft_workflow.signature_appearance.stamp_position
+        == SignatureStampPosition.RIGHT
+    )
+    assert panel.preview.stamp_position == SignatureStampPosition.RIGHT
+    assert "Stamp position: right" in signing_shell_module._format_appearance_summary(
+        widget._signing_workspace._draft_workflow.signature_appearance
+    )
 
 
 def test_signing_shell_preview_respects_small_font_sizes(
@@ -881,6 +1072,7 @@ def test_signing_shell_wrapped_block_preview_groups_tail_fields(
 
     appearance = build_signature_appearance(
         layout_template=signing_shell_module.SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.LEFT,
         show_field_names=True,
     )
     widget = build_qt_signing_shell(
@@ -927,6 +1119,7 @@ def test_signing_shell_wrapped_block_preview_uses_value_only_text_by_default(
 
     appearance = build_signature_appearance(
         layout_template=signing_shell_module.SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.LEFT,
         show_field_names=False,
     )
     widget = build_qt_signing_shell(
@@ -1401,3 +1594,103 @@ def test_signing_shell_single_line_preview_matches_backend_wrapping(
     )
 
     assert widget.properties_panel.preview_controls.detail_label.text() == expected
+
+
+def test_signing_shell_single_line_horizontal_preview_text_uses_active_detail_label(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path="/tmp/stamp.png",
+        signer_label_prefix="",
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=36.0,
+        )
+    )
+
+    detail = widget.properties_panel._preview_controls.multi_detail_label.text()
+
+    assert widget.properties_panel.preview_controls.single_body_container.visible is False
+    assert widget.properties_panel.preview_controls.multi_body_container.visible is True
+    assert detail
+    assert widget.properties_panel.preview_text() == detail.strip()
+
+
+def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path="/tmp/stamp.png",
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=36.0,
+        )
+    )
+
+    preview = widget.properties_panel.preview
+    visible_fragments = [
+        field.label if preview.show_field_names else field.text
+        for field in preview.fields
+        if field.visible and field.text
+    ]
+    full_width = max(1, int(round(preview.signature_rect.width_pt)) - 8)
+    constrained_width = max(
+        1,
+        full_width - max(48, int(round(preview.signature_rect.width_pt * 0.35))) - 6,
+    )
+    expected = _wrap_visible_signature_fragments(
+        visible_fragments,
+        text_style=preview.text_style,
+        max_text_width_pt=constrained_width,
+        max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
+    )
+
+    assert widget.properties_panel.preview_controls.multi_detail_label.text() == expected

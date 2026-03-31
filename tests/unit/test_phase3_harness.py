@@ -54,6 +54,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
             "title": "Alice Example",
             "signer_label_prefix": "Digitally signed by",
             "layout_template": "single_line",
+            "stamp_position": "top",
             "timezone_display_mode": "utc",
             "show_field_names": False,
             "datetime_format": "%Y-%m-%d %H:%M:%S %Z",
@@ -110,6 +111,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
             "signature_appearance": {
                 "signer_label_prefix": "Digitally signed by",
                 "layout_template": "single_line",
+                "stamp_position": "top",
                 "timezone_display_mode": "utc",
                 "show_field_names": False,
                 "datetime_format": "%Y-%m-%d %H:%M:%S %Z",
@@ -142,6 +144,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
         },
         backend_reservation_snapshot={
             "layout_template": "single_line",
+            "stamp_position": "top",
             "signature_rect": {
                 "page_index": 0,
                 "page_number": 1,
@@ -228,14 +231,17 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     assert "- Output signature subfilter: /adbe.pkcs7.detached" in markdown
     assert "- Output signature md algorithm: sha256" in markdown
     assert "- Backend reservation layout template: single_line" in markdown
+    assert "- Backend reservation stamp position: top" in markdown
     assert "- Backend reservation stamp text length: 33" in markdown
     assert "- Backend reservation stamp background: no" in markdown
     assert "- Backend reservation background scaling: stretch_to_fit" in markdown
     assert "- Backend reservation content scaling: no_scaling" in markdown
     assert "- Backend reservation content bottom margin: 14" in markdown
     assert "- Last request layout template: single_line" in markdown
+    assert "- Last request stamp position: top" in markdown
     assert "- Last request show field names: no" in markdown
     assert "- Preview layout template: single_line" in markdown
+    assert "- Preview stamp position: top" in markdown
     assert "- Preview show field names: no" in markdown
     assert (
         "- [x] Confirm the signature properties flow is reachable from the main signing UI."

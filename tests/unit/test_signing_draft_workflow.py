@@ -21,6 +21,7 @@ from foliaseal.domain.models import (
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
@@ -134,6 +135,7 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert preview.signature_rect == request.signature_rect
     assert preview.signer_label_prefix == "Digitally signed by"
     assert preview.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK
+    assert preview.stamp_position == SignatureStampPosition.TOP
     assert preview.timezone_display_mode == SignatureTimezoneDisplayMode.UTC
     assert preview.show_field_names is False
     assert preview.datetime_format == "%Y-%m-%d %H:%M"

@@ -1,5 +1,6 @@
 import pytest
 
+from foliaseal.domain.models import SignatureStampPosition
 from foliaseal.infra.config.schemas import (
     ConfigValidationError,
     SignaturePreset,
@@ -50,6 +51,7 @@ def test_signature_preset_round_trip() -> None:
 
     assert reconstructed == original
     assert payload["appearance"]["layout_template"] == "multi_line"
+    assert payload["appearance"]["stamp_position"] == "left"
     assert payload["appearance"]["show_field_names"] is False
     assert payload["placement_defaults"]["anchor"] == "bottom_right"
 
@@ -64,6 +66,27 @@ def test_signature_preset_round_trip_allows_blank_signer_label_prefix() -> None:
 
     assert reconstructed == original
     assert payload["appearance"]["signer_label_prefix"] == ""
+
+
+def test_signature_preset_round_trip_allows_stamp_position_variants() -> None:
+    original = build_signature_preset(
+        appearance=build_signature_appearance(stamp_position=SignatureStampPosition.RIGHT)
+    )
+
+    payload = original.to_dict()
+    reconstructed = SignaturePreset.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["appearance"]["stamp_position"] == "right"
+
+
+def test_signature_preset_from_dict_defaults_missing_stamp_position_to_top() -> None:
+    payload = build_signature_preset().to_dict()
+    payload["appearance"].pop("stamp_position")
+
+    reconstructed = SignaturePreset.from_dict(payload)
+
+    assert reconstructed.appearance.stamp_position == SignatureStampPosition.TOP
 
 
 def test_signature_preset_rejects_blank_name() -> None:

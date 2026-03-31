@@ -14,6 +14,7 @@ from foliaseal.domain.models import (
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
@@ -59,6 +60,7 @@ def build_signature_appearance(
     *,
     signer_label_prefix: str | None = "Digitally signed by",
     layout_template: SignatureLayoutTemplate = SignatureLayoutTemplate.MULTI_LINE,
+    stamp_position: SignatureStampPosition | None = None,
     timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.UTC,
     show_field_names: bool = False,
     datetime_format: str = "%Y-%m-%d %H:%M",
@@ -86,9 +88,17 @@ def build_signature_appearance(
         SignatureFieldKey.REASON,
         SignatureFieldKey.LOCATION,
     )
+    effective_stamp_position = stamp_position
+    if effective_stamp_position is None:
+        effective_stamp_position = (
+            SignatureStampPosition.TOP
+            if layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            else SignatureStampPosition.LEFT
+        )
     return SignatureAppearance(
         signer_label_prefix=signer_label_prefix or "",
         layout_template=layout_template,
+        stamp_position=effective_stamp_position,
         timezone_display_mode=timezone_display_mode,
         show_field_names=show_field_names,
         datetime_format=datetime_format,

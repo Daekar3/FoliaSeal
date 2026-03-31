@@ -7,6 +7,7 @@ from foliaseal.domain.models import (
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTimezoneDisplayMode,
 )
 from tests.support.phase3_builders import (
@@ -81,6 +82,7 @@ def test_signature_appearance_defaults_to_utc_timezone() -> None:
 
     assert appearance.timezone_display_mode == SignatureTimezoneDisplayMode.UTC
     assert appearance.show_field_names is False
+    assert appearance.stamp_position == SignatureStampPosition.TOP
 
 
 def test_signature_rect_requires_positive_size() -> None:
