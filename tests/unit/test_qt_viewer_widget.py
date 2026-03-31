@@ -131,6 +131,26 @@ class _FakeKeyEvent:
         self.accepted = True
 
 
+class _FakeWheelDelta:
+    def __init__(self, y: int):
+        self._y = y
+
+    def y(self):
+        return self._y
+
+
+class _FakeWheelEvent:
+    def __init__(self, *, delta_y: int):
+        self._delta = _FakeWheelDelta(delta_y)
+        self.accepted = False
+
+    def angleDelta(self):
+        return self._delta
+
+    def accept(self):
+        self.accepted = True
+
+
 class _FakeRect:
     def __init__(self, p1: _FakePoint, p2: _FakePoint):
         self._x1 = p1.x()
@@ -160,12 +180,17 @@ class _FakeWidget:
     def __init__(self):
         self.update_calls = 0
         self.mouse_grabbed = False
+        self.minimum_size = None
+        self.size = None
 
     def update(self):
         self.update_calls += 1
 
     def setMinimumSize(self, width: int, height: int):  # noqa: N802
-        return None
+        self.minimum_size = (width, height)
+
+    def resize(self, width: int, height: int):  # noqa: N802
+        self.size = (width, height)
 
     def grabMouse(self):  # noqa: N802
         self.mouse_grabbed = True
@@ -264,6 +289,31 @@ class _OverlayRenderBackend:
             width_px=200,
             height_px=200,
             rgba_bytes=b"\x00" * (200 * 200 * 4),
+        )
+
+    def get_page_geometry(self, document_path: str, page_index: int):  # pragma: no cover
+        return PdfPageGeometry(
+            media_box=(0.0, 0.0, 100.0, 100.0),
+            crop_box=(0.0, 0.0, 100.0, 100.0),
+            rotation=0,
+        )
+
+    def diagnostics(self):  # pragma: no cover
+        raise NotImplementedError
+
+
+class _ZoomSensitiveRenderBackend:
+    def render_page(self, request):
+        if request.zoom < 1.0:
+            return RenderPageResult(
+                width_px=140,
+                height_px=180,
+                rgba_bytes=b"\x00" * (140 * 180 * 4),
+            )
+        return RenderPageResult(
+            width_px=260,
+            height_px=320,
+            rgba_bytes=b"\x00" * (260 * 320 * 4),
         )
 
     def get_page_geometry(self, document_path: str, page_index: int):  # pragma: no cover
@@ -631,6 +681,26 @@ def test_refresh_reports_render_errors(monkeypatch):
 
     assert len(errors) == 1
     assert "Unable to render PDF preview." in errors[0]
+
+
+def test_zoom_refresh_resizes_widget_with_rendered_page(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_ZoomSensitiveRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    widget = PdfViewerWidgetAdapter().create(workflow=workflow)
+
+    widget.refresh()
+    assert widget.minimum_size == (260, 320)
+    assert widget.size == (260, 320)
+
+    widget.wheelEvent(_FakeWheelEvent(delta_y=-120))
+
+    assert widget.minimum_size == (140, 180)
+    assert widget.size == (140, 180)
 
 
 def test_refresh_reraises_render_errors_without_error_callback(monkeypatch):

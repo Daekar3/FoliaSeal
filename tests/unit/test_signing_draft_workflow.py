@@ -1,6 +1,12 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import NameOID
 
 from foliaseal.application.coordinate_transform import PageBox, ViewRect, ViewTransform
 from foliaseal.application.signing_draft_workflow import (
@@ -72,6 +78,41 @@ def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
     )
 
 
+def _write_test_pkcs12(path: Path, *, passphrase: str, common_name: str = "Alice Example") -> None:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "FoliaSeal"),
+            x509.NameAttribute(NameOID.TITLE, "Board Secretary"),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "QA"),
+            x509.NameAttribute(NameOID.EMAIL_ADDRESS, "alice@example.com"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "Wytheville"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Virginia"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    path.write_bytes(
+        pkcs12.serialize_key_and_certificates(
+            name=common_name.encode("utf-8"),
+            key=key,
+            cert=cert,
+            cas=None,
+            encryption_algorithm=serialization.BestAvailableEncryption(passphrase.encode("utf-8")),
+        )
+    )
+
+
 def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
     workflow.set_signature_appearance(_appearance())
@@ -120,6 +161,69 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert request.certificate_alias == "signing-cert"
     assert request.signature_appearance == workflow.current_signature_appearance
     assert request.signature_rect == workflow.current_signature_rect
+
+
+def test_workflow_preview_uses_certificate_values_when_pkcs12_is_readable(tmp_path: Path) -> None:
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        SignatureAppearance(
+            common_name=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+            email=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+            title=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+            company=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+            location=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+        )
+    )
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=220.0,
+            height_pt=80.0,
+        )
+    )
+
+    preview = workflow.preview()
+
+    assert preview.fields[0].text
+    assert "Alice Example" in preview.fields[0].text
+    assert "Board Secretary" in preview.fields[0].text
+    assert preview.fields[1].text == "Alice Example"
+    assert preview.fields[2].text == "alice@example.com"
+    assert preview.fields[3].text == "Board Secretary"
+    assert preview.fields[4].text == "FoliaSeal"
+    assert preview.fields[6].visible is False
+    assert preview.fields[7].text == "Wytheville, Virginia, US"
+
+
+def test_workflow_blocks_compact_rectangles_that_backend_will_reject(
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=35.84,
+            bottom_pt=428.48,
+            width_pt=261.63,
+            height_pt=20.99,
+        )
+    )
+
+    preview = workflow.preview()
+
+    assert preview.can_submit is False
+    assert any(
+        issue.code.startswith("visible_signature_layout") for issue in preview.issues
+    )
+    with pytest.raises(SigningDraftValidationError):
+        workflow.build_signing_request()
 
 
 def test_workflow_converts_view_selection_into_pdf_rectangle(tmp_path: Path) -> None:

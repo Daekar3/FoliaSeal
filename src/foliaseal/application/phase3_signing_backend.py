@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
@@ -13,9 +13,16 @@ from PIL import Image
 from pyhanko.pdf_utils.font.basic import SimpleFontEngineFactory
 from pyhanko.pdf_utils.images import PdfImage
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
-from pyhanko.pdf_utils.layout import AxisAlignment, SimpleBoxLayoutRule
+from pyhanko.pdf_utils.layout import (
+    AxisAlignment,
+    BoxConstraints,
+    InnerScaling,
+    Margins,
+    SimpleBoxLayoutRule,
+)
 from pyhanko.pdf_utils.reader import PdfFileReader
-from pyhanko.pdf_utils.text import TextBoxStyle
+from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
+from pyhanko.pdf_utils.writer import PdfFileWriter
 from pyhanko.sign import fields, validation
 from pyhanko.sign.signers import PdfSignatureMetadata, PdfSigner, SimpleSigner
 from pyhanko.stamp import TextStampStyle
@@ -27,6 +34,10 @@ from foliaseal.application.sign_pdf_use_case import (
     SigningBackendRequest,
     SignPdfUseCase,
 )
+from foliaseal.application.signing_draft_workflow import (
+    SigningDraftValidationIssue,
+    SigningDraftValidationSeverity,
+)
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
@@ -36,6 +47,8 @@ from foliaseal.domain.models import (
     SignatureFieldKey,
     SignatureFieldSource,
     SignatureLayoutTemplate,
+    SignatureRect,
+    SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningOutput,
     SigningRequest,
@@ -84,17 +97,28 @@ class PyHankoPdfSigner:
                 "Timestamping is not configured for the concrete signing backend yet."
             )
 
+        fit_issues = _visible_signature_fit_issues(
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            signature_rect=request.signature_rect,
+            signature_appearance=appearance,
+        )
+        if any(issue.severity == SigningDraftValidationSeverity.ERROR for issue in fit_issues):
+            raise ValueError("; ".join(issue.message for issue in fit_issues))
+
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         signing_time = _current_signing_time(appearance.timezone_display_mode)
         stamp_text = _build_stamp_text(
             appearance=appearance,
             signer=signer,
             signing_time=signing_time,
+            signature_rect=request.signature_rect,
         )
         stamp_style = _build_stamp_style(
             appearance,
             stamp_text=stamp_text,
             stamp_background=_stamp_background_for_path(appearance.image_stamp_path),
+            signature_rect=request.signature_rect,
         )
         metadata = PdfSignatureMetadata(
             field_name=_SIG_FIELD_NAME,
@@ -223,31 +247,272 @@ def _build_stamp_style(
     *,
     stamp_text: str,
     stamp_background: PdfImage | None,
+    signature_rect: SignatureRect,
 ) -> TextStampStyle:
     text_style = appearance.text_style
     box_style = appearance.box_style
-    font_factory = _font_factory_for_family(text_style.font_family)
     border_width = max(0, int(round(box_style.border_width_pt))) if box_style.show_border else 0
-    text_color = _hex_to_rgb(text_style.text_color_hex)
     border_color = _hex_to_rgb(box_style.border_color_hex)
     background = stamp_background or _solid_background_for_color(box_style.background_color_hex)
+    text_box_style = _build_text_box_style(text_style)
+    text_box_width, text_box_height = _measure_text_box_dimensions(
+        stamp_text,
+        text_box_style,
+    )
+    layout_reservation = _layout_reservation_for_template(
+        appearance.layout_template,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+    )
+    _ensure_layout_can_fit(layout_reservation)
+    background_layout = _background_layout_for_stamp(
+        appearance.layout_template,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+    )
     return TextStampStyle(
         border_width=border_width,
         border_color=border_color,
         background=background,
+        background_layout=background_layout,
         background_opacity=1.0,
-        text_box_style=TextBoxStyle(
-            font=font_factory,
-            font_size=max(1, int(round(text_style.font_size_pt))),
-            text_color=text_color,
-        ),
-        inner_content_layout=SimpleBoxLayoutRule(
-            AxisAlignment.ALIGN_MID,
-            AxisAlignment.ALIGN_MID,
-        ),
+        text_box_style=text_box_style,
+        inner_content_layout=layout_reservation.inner_content_layout,
         stamp_text=stamp_text,
         timestamp_format=appearance.datetime_format,
     )
+
+
+@dataclass(frozen=True)
+class _SignatureLayoutReservation:
+    """Explicit split of reserved stamp and text space inside the rectangle."""
+
+    layout_template: SignatureLayoutTemplate
+    container_width_pt: int
+    container_height_pt: int
+    text_box_width_pt: int
+    text_box_height_pt: int
+    reserved_primary_extent_pt: int
+    stamp_area_width_pt: int
+    stamp_area_height_pt: int
+    text_area_width_pt: int
+    text_area_height_pt: int
+    background_layout: SimpleBoxLayoutRule
+    inner_content_layout: SimpleBoxLayoutRule
+
+
+def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
+    font_factory = _font_factory_for_family(text_style.font_family)
+    return TextBoxStyle(
+        font=font_factory,
+        font_size=max(1, int(round(text_style.font_size_pt))),
+        text_color=_hex_to_rgb(text_style.text_color_hex),
+        box_layout_rule=SimpleBoxLayoutRule(
+            AxisAlignment.ALIGN_MIN,
+            AxisAlignment.ALIGN_MAX,
+            margins=Margins.uniform(0),
+            inner_content_scaling=InnerScaling.NO_SCALING,
+        ),
+    )
+
+
+def _layout_reservation_for_template(
+    layout_template: SignatureLayoutTemplate,
+    *,
+    signature_rect: SignatureRect,
+    text_box_width: int,
+    text_box_height: int,
+) -> _SignatureLayoutReservation:
+    """Compute the actual reserved-space split for the requested rectangle."""
+    box_width = max(1, int(round(signature_rect.width_pt)))
+    box_height = max(1, int(round(signature_rect.height_pt)))
+    gap = 6
+    edge_margin = 4
+
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        reserved_right = _reserved_space(box_width, text_box_width, gap)
+        background_width = max(box_width - edge_margin - reserved_right, 0)
+        text_left_margin = max(background_width + gap + edge_margin, edge_margin)
+        margins = Margins(
+            left=edge_margin,
+            right=reserved_right,
+            top=edge_margin,
+            bottom=edge_margin,
+        )
+        return _SignatureLayoutReservation(
+            layout_template=layout_template,
+            container_width_pt=box_width,
+            container_height_pt=box_height,
+            text_box_width_pt=text_box_width,
+            text_box_height_pt=text_box_height,
+            reserved_primary_extent_pt=reserved_right,
+            stamp_area_width_pt=background_width,
+            stamp_area_height_pt=max(box_height - edge_margin * 2, 0),
+            text_area_width_pt=max(box_width - text_left_margin - edge_margin, 0),
+            text_area_height_pt=max(box_height - edge_margin * 2, 0),
+            background_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MIN,
+                AxisAlignment.ALIGN_MAX,
+                margins=margins,
+                inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+            ),
+            inner_content_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MAX,
+                AxisAlignment.ALIGN_MAX,
+                margins=margins,
+                inner_content_scaling=InnerScaling.NO_SCALING,
+            ),
+        )
+
+    if layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
+        reserved_bottom = _reserved_space(box_height, text_box_height, gap)
+        margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=edge_margin,
+            bottom=reserved_bottom,
+        )
+        return _SignatureLayoutReservation(
+            layout_template=layout_template,
+            container_width_pt=box_width,
+            container_height_pt=box_height,
+            text_box_width_pt=text_box_width,
+            text_box_height_pt=text_box_height,
+            reserved_primary_extent_pt=reserved_bottom,
+            stamp_area_width_pt=max(box_width - edge_margin * 2, 0),
+            stamp_area_height_pt=max(box_height - edge_margin - reserved_bottom, 0),
+            text_area_width_pt=max(box_width - edge_margin * 2, 0),
+            text_area_height_pt=text_box_height,
+            background_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MIN,
+                AxisAlignment.ALIGN_MAX,
+                margins=margins,
+                inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+            ),
+            inner_content_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MIN,
+                AxisAlignment.ALIGN_MIN,
+                margins=margins,
+                inner_content_scaling=InnerScaling.NO_SCALING,
+            ),
+        )
+
+    reserved_right = _reserved_space(box_width, text_box_width, gap)
+    background_width = max(box_width - edge_margin - reserved_right, 0)
+    text_left_margin = max(background_width + gap + edge_margin, edge_margin)
+    return _SignatureLayoutReservation(
+        layout_template=layout_template,
+        container_width_pt=box_width,
+        container_height_pt=box_height,
+        text_box_width_pt=text_box_width,
+        text_box_height_pt=text_box_height,
+        reserved_primary_extent_pt=reserved_right,
+        stamp_area_width_pt=background_width,
+        stamp_area_height_pt=max(box_height - edge_margin * 2, 0),
+        text_area_width_pt=max(box_width - text_left_margin - edge_margin, 0),
+        text_area_height_pt=max(box_height - edge_margin * 2, 0),
+        background_layout=SimpleBoxLayoutRule(
+            AxisAlignment.ALIGN_MIN,
+            AxisAlignment.ALIGN_MAX,
+            margins=Margins(
+                left=edge_margin,
+                right=reserved_right,
+                top=edge_margin,
+                bottom=edge_margin,
+            ),
+            inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+        ),
+        inner_content_layout=SimpleBoxLayoutRule(
+            AxisAlignment.ALIGN_MAX,
+            AxisAlignment.ALIGN_MAX,
+            margins=Margins(
+                left=text_left_margin,
+                right=edge_margin,
+                top=edge_margin,
+                bottom=edge_margin,
+            ),
+            inner_content_scaling=InnerScaling.NO_SCALING,
+        ),
+    )
+
+
+def _background_layout_for_stamp(
+    layout_template: SignatureLayoutTemplate,
+    *,
+    stamp_background: PdfImage | None,
+    signature_rect: SignatureRect,
+    text_box_width: int,
+    text_box_height: int,
+) -> SimpleBoxLayoutRule:
+    reservation = _layout_reservation_for_template(
+        layout_template,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+    )
+    if stamp_background is None:
+        return reservation.background_layout
+    return replace(
+        reservation.background_layout,
+        inner_content_scaling=InnerScaling.SHRINK_TO_FIT,
+    )
+
+
+def _visible_signature_fit_issues(
+    *,
+    certificate_path: str,
+    passphrase: str,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+) -> tuple[SigningDraftValidationIssue, ...]:
+    """Return backend-side layout fit issues for the requested visible signature."""
+    try:
+        signer = _load_simple_signer(certificate_path, passphrase)
+        signing_time = _current_signing_time(signature_appearance.timezone_display_mode)
+        stamp_text = _build_stamp_text(
+            appearance=signature_appearance,
+            signer=signer,
+            signing_time=signing_time,
+            signature_rect=signature_rect,
+        )
+        stamp_background = _stamp_background_for_path(signature_appearance.image_stamp_path)
+        _build_stamp_style(
+            signature_appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+        )
+    except Exception as exc:
+        return (
+            SigningDraftValidationIssue(
+                code="visible_signature_layout_unavailable",
+                message=str(exc),
+                field_name="signature_appearance",
+                severity=SigningDraftValidationSeverity.ERROR,
+            ),
+        )
+
+    return ()
+
+
+def _ensure_layout_can_fit(layout_reservation: _SignatureLayoutReservation) -> None:
+    if layout_reservation.stamp_area_width_pt <= 0 or layout_reservation.stamp_area_height_pt <= 0:
+        raise ValueError(
+            "Visible signature rectangle is too small to reserve a usable stamp area "
+            f"for the {layout_reservation.layout_template.value} template."
+        )
+    if (
+        layout_reservation.text_box_width_pt > layout_reservation.text_area_width_pt
+        or layout_reservation.text_box_height_pt > layout_reservation.text_area_height_pt
+    ):
+        raise ValueError(
+            "Visible signature content does not fit inside the selected rectangle for the "
+            f"{layout_reservation.layout_template.value} template. "
+            "Enlarge the signature box or choose a more compact appearance."
+        )
 
 
 def _build_stamp_text(
@@ -255,11 +520,12 @@ def _build_stamp_text(
     appearance: SigningBackendAppearance,
     signer: SimpleSigner,
     signing_time: datetime,
+    signature_rect: SignatureRect | None = None,
 ) -> str:
-    lines: list[str] = []
+    fragments: list[str] = []
     prefix = appearance.signer_label_prefix.strip()
     if prefix:
-        lines.append(prefix)
+        fragments.append(prefix)
 
     for binding in appearance.field_bindings:
         field_key = binding.field_key
@@ -275,13 +541,59 @@ def _build_stamp_text(
         if not text:
             continue
         if appearance.show_field_names:
-            lines.append(f"{_field_label(field_key)}: {text}")
+            fragments.append(f"{_field_label(field_key)}: {text}")
         else:
-            lines.append(text)
+            fragments.append(text)
 
     if appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        return _escape_percent(" | ".join(lines))
-    return _escape_percent("\n".join(lines))
+        if signature_rect is None:
+            return _escape_percent(" | ".join(fragments))
+        return _escape_percent(
+            _wrap_visible_signature_fragments(
+                fragments,
+                text_style=appearance.text_style,
+                max_text_height_pt=max(1, int(round(signature_rect.height_pt)) - 8),
+            )
+        )
+    return _escape_percent("\n".join(fragments))
+
+
+def _wrap_visible_signature_fragments(
+    fragments: list[str],
+    *,
+    text_style: SignatureTextStyle,
+    max_text_height_pt: int,
+) -> str:
+    if not fragments:
+        return ""
+
+    text_box_style = _build_text_box_style(text_style)
+    best_candidate: tuple[int, int, str] | None = None
+    fragment_count = len(fragments)
+    for split_mask in range(1 << max(fragment_count - 1, 0)):
+        lines: list[list[str]] = [[]]
+        for index, fragment in enumerate(fragments):
+            lines[-1].append(fragment)
+            if index < fragment_count - 1 and split_mask & (1 << index):
+                lines.append([])
+
+        line_strings = [" | ".join(line) for line in lines if line]
+        if not line_strings:
+            continue
+        candidate = "\n".join(line_strings)
+        width_pt, height_pt = _measure_text_box_dimensions(candidate, text_box_style)
+        if height_pt > max_text_height_pt:
+            continue
+        candidate_score = (width_pt, height_pt, candidate)
+        if best_candidate is None or candidate_score[:2] < best_candidate[:2]:
+            best_candidate = candidate_score
+
+    if best_candidate is None:
+        raise ValueError(
+            "Visible signature content does not fit inside the selected rectangle at the "
+            "requested font size."
+        )
+    return best_candidate[2]
 
 
 def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
@@ -321,39 +633,113 @@ def _resolve_visible_field_text(
 
     subject = signer.signing_cert.subject.native
     if field_key == SignatureFieldKey.DISTINGUISHED_NAME:
-        return signer.signing_cert.subject.human_friendly
+        dn_parts = [
+            value
+            for value in (
+                _subject_value(subject, "common_name"),
+                _subject_value(subject, "email_address"),
+                (
+                    _subject_value(subject, "title")
+                    or _subject_value(subject, "organizational_unit_name")
+                ),
+                _subject_value(subject, "organization_name"),
+                _derived_location(subject),
+            )
+            if value
+        ]
+        return ", ".join(dn_parts)
     if field_key == SignatureFieldKey.COMMON_NAME:
-        return str(subject.get("common_name") or signer.subject_name)
+        return _subject_value(subject, "common_name") or signer.subject_name
     if field_key == SignatureFieldKey.EMAIL:
-        return str(subject.get("email_address") or signer.subject_name)
+        return _subject_value(subject, "email_address") or ""
     if field_key == SignatureFieldKey.TITLE:
         return str(
-            subject.get("organizational_unit_name")
-            or binding.display_label
-            or signer.subject_name
+            _subject_value(subject, "title")
+            or _subject_value(subject, "organizational_unit_name")
+            or ""
         )
     if field_key == SignatureFieldKey.COMPANY:
-        return str(
-            subject.get("organization_name")
-            or binding.display_label
-            or signer.subject_name
-        )
+        return _subject_value(subject, "organization_name") or ""
     if field_key == SignatureFieldKey.REASON:
-        return str(binding.display_label or signer.subject_name)
+        return ""
     if field_key == SignatureFieldKey.LOCATION:
-        location_parts = [
-            str(part)
-            for part in (
-                subject.get("locality_name"),
-                subject.get("state_or_province_name"),
-                subject.get("country_name"),
-            )
-            if part
-        ]
-        if location_parts:
-            return ", ".join(location_parts)
-        return str(binding.display_label or signer.subject_name)
+        return _derived_location(subject)
     return binding.display_label or _field_label(field_key)
+
+
+def _subject_value(subject: dict[str, object], key: str) -> str | None:
+    value = subject.get(key)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _derived_location(subject: dict[str, object]) -> str:
+    location_parts = [
+        part
+        for part in (
+            _subject_value(subject, "locality_name"),
+            _subject_value(subject, "state_or_province_name"),
+            _subject_value(subject, "country_name"),
+        )
+        if part
+    ]
+    return ", ".join(location_parts)
+
+
+def _content_layout_for_template(
+    layout_template: SignatureLayoutTemplate,
+    *,
+    signature_rect: SignatureRect,
+    stamp_background: PdfImage | None,
+    text_box_width: int,
+    text_box_height: int,
+) -> SimpleBoxLayoutRule:
+    return _layout_reservation_for_template(
+        layout_template,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+    ).inner_content_layout
+
+
+def _background_layout_for_template(
+    *,
+    layout_template: SignatureLayoutTemplate,
+    signature_rect: SignatureRect,
+    stamp_background: PdfImage | None,
+    text_box_width: int,
+    text_box_height: int,
+) -> SimpleBoxLayoutRule:
+    return _layout_reservation_for_template(
+        layout_template,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+    ).background_layout
+
+
+def _measure_text_box_dimensions(
+    stamp_text: str,
+    text_box_style: TextBoxStyle,
+) -> tuple[int, int]:
+    writer = PdfFileWriter()
+    text_box = TextBox(
+        text_box_style,
+        writer=writer,
+        resources=None,
+        box=BoxConstraints(),
+    )
+    text_box.content = stamp_text
+    text_box.render()
+    return int(round(text_box.box.width)), int(round(text_box.box.height))
+
+
+def _reserved_space(container_length: int, content_length: int, gap: int) -> int:
+    desired = content_length + gap + 4
+    upper_bound = max(container_length - 4, 0)
+    return max(0, min(desired, upper_bound))
 
 
 def _should_render_field(binding: SigningBackendFieldBinding) -> bool:

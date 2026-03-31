@@ -48,6 +48,8 @@ Not yet achieved:
 - a product-quality appearance preview and coherent signing flow
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance against representative signed output
+- a documented certificate compatibility matrix and manual QA pass across supported PKCS#12
+  variations
 
 Interpretation:
 
@@ -56,6 +58,40 @@ Interpretation:
 - harness success should be treated as implementation progress, not final acceptance
 - the executor seam now has a concrete cryptographic backend
 - the remaining backend gap is honest TSA/timestamp support rather than basic PDF signing
+- certificate support should be treated as PKCS#12-scoped for v1 until a broader identity model is
+  explicitly planned
+
+## Certificate Compatibility Profile
+
+Phase 3 and the current backend should be planned against the following certificate scope:
+
+- supported identity containers:
+  - `.p12`
+  - `.pfx`
+- supported key families for release:
+  - RSA
+  - ECDSA
+- expected container contents:
+  - one signing identity with private key
+  - one end-entity signing certificate
+  - optional embedded chain certificates
+
+Legacy/variation expectations:
+
+- legacy `.pfx` naming is in scope
+- older PKCS#12 encryption/MAC profiles are in scope only when they remain readable through the
+  selected Python/OpenSSL stack
+- malformed containers, unreadable legacy encodings, missing-key containers, and unsupported key
+  algorithms must fail explicitly with actionable diagnostics
+- multi-identity containers must not be handled by silent first-match selection; either reliable
+  alias selection is implemented or the flow fails safely with guidance
+
+Out of scope for current Phase 3 unless separately approved:
+
+- PEM + private-key pairs
+- PKCS#11 / smart-card tokens
+- OS-native certificate stores
+- hardware-backed providers that do not present as PKCS#12
 
 ## Scope Boundary
 
@@ -68,13 +104,17 @@ Phase 3 includes:
 - live preview
 - GUI integration with signing request creation
 
-Phase 3 does not need full preset lifecycle management yet.
+Historical note:
 
-That belongs primarily to Phase 4:
-
-- create/edit/duplicate/delete/import/export preset persistence UX
-  - default/last-used preset behavior
-  - corruption recovery flows
+- The original roadmap assumed broader preset lifecycle work would wait for a later phase.
+- In practice, Phase 3 already absorbed a substantial part of named-profile lifecycle work:
+  - save,
+  - select,
+  - persistent reload across relaunch,
+  - overwrite confirmation,
+  - delete with confirmation.
+- Remaining profile portability/completion work now belongs to the smaller post-Phase-3 roadmap
+  slices in `pdf_signing_app_feasibility.md`, not a monolithic old “Phase 4” bucket.
 
 It is acceptable in Phase 3 to support:
 
@@ -2275,6 +2315,589 @@ When opening a new chat or spawning a new agent, reference this file directly:
 Suggested instruction:
 
 "Please use `phase3_parallel_plan.md` as the Phase 3 coordination document. Follow the ownership boundaries and deliverables for the assigned workstream, and avoid unrelated refactors."
+
+## Follow-Up Visible Appearance Parity Wave
+
+This wave focuses on the current Phase 3 blocker after real cryptographic signing landed:
+
+- the final visible signature written into the PDF does not yet match the shell preview closely
+  enough for acceptance
+- derived field mapping needs to stay semantically correct between preview and backend output
+- harness artifacts need richer signing/output diagnostics so manual review can distinguish
+  cryptographic success from appearance-parity failure
+
+### Appearance Parity Target
+
+This wave should be considered complete when:
+
+- the final PDF appearance obeys the selected layout template closely enough to compare fairly with
+  the shell preview
+- stamp image placement and text placement in the output are no longer centered/squashed in ways
+  that contradict the preview
+- derived field mapping is semantically correct for DN/common name/email/title/company/location
+- harness capture includes enough post-sign diagnostics to support appearance-parity debugging
+- a focused review and manual pass can judge output fidelity instead of guessing from sparse logs
+
+### Brief AE: Backend Appearance Parity
+
+You are implementing the backend visible-appearance parity fixes for the Phase 3 signing path.
+
+Objectives:
+
+- make the final visible signature in the written PDF match the shell preview semantics more
+  closely
+- correct derived-field output behavior so the backend does not invent placeholder labels or
+  duplicate decomposed fields unnecessarily
+- improve text/image positioning so the visible signature is actually readable in the output PDF
+
+Primary files you own:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- relevant backend-oriented tests in `tests/unit/`
+
+Files you should avoid editing unless absolutely necessary:
+
+- broad shell UI layout
+- README / acceptance artifacts
+
+Requirements to satisfy:
+
+- derived-field mapping must be semantically correct
+  - DN should be treated as its own field
+  - decomposed fields should not silently duplicate DN content unless the request explicitly asks
+    for both
+  - title/location/reason should not fall back to nonsense placeholders in signed output
+- the output appearance should respect the selected layout template closely enough for manual
+  comparison against the preview
+- text should not be shrunk into unreadability when the rectangle has reasonable space
+- stamp image placement should no longer default to visually useless centered composition
+
+Expected deliverables:
+
+- backend appearance-composition improvements in the signing path
+- tests covering derived-field semantics and output-oriented appearance behavior
+- no regression in cryptographic signing or failure-code mapping
+
+Definition of done:
+
+- the backend writes a signed PDF whose visible appearance is materially closer to the preview
+- focused backend tests pass
+
+### Brief AF: Harness Diagnostics Enrichment
+
+You are enriching the Phase 3 harness artifacts so manual appearance-parity debugging has enough
+ evidence to be useful.
+
+Objectives:
+
+- add richer post-sign capture about the final output and current preview state
+- make it easier to diagnose whether a problem is preview semantics, backend output, or UX
+  communication
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_harness.py`
+- tiny shell touches only if needed to expose already-existing result data
+
+Requirements to satisfy:
+
+- capture signing result success/failure and message
+- capture whether the output file exists, its size, and embedded signature count
+- capture current preview text/state helpful for appearance-parity review
+- keep the harness output stable and readable
+
+Expected deliverables:
+
+- richer JSON capture and seeded acceptance artifact summary
+- regression tests for the new capture fields
+
+Definition of done:
+
+- a manual run yields enough artifact detail to reason about appearance mismatch without guessing
+
+### Brief AG: Visible Appearance Review
+
+You are doing a review-only pass on the appearance-parity wave.
+
+Review scope:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- affected tests under `tests/unit/`
+
+Tasks:
+
+- inspect for bugs in derived-field mapping semantics
+- inspect for preview/output contract drift
+- inspect for remaining layout-template mismatches that would keep the output visibly unusable
+- inspect for missing tests or missing diagnostics in the richer harness output
+
+Definition of done:
+
+- findings are concrete and scoped to backend appearance parity and harness diagnostics
+
+## Final Appearance Parity Follow-Up
+
+This wave addresses the remaining no-go findings from the visible appearance review:
+
+- the stamp is not yet maximized within the available rectangle while preserving the requested text size
+- `wrapped_block` does not yet have its own backend layout contract
+- harness artifacts still do not capture enough final-output appearance detail to reason confidently
+
+### Brief AH: Max-Fit Stamp and Template Parity
+
+You are fixing the backend visible-appearance layout so the written PDF output better matches the
+ preview contract and uses the available rectangle more intelligently.
+
+Objectives:
+
+- make stamp sizing responsive to the available rectangle and surrounding text needs
+- preserve the requested text size instead of shrinking text away unnecessarily
+- give `wrapped_block` its own explicit backend layout semantics instead of treating it as
+  `multi_line`
+- keep the cryptographic signing path and failure semantics intact
+
+Primary files you own:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+Requirements to satisfy:
+
+- the stamp should scale up as large as practical within the signature rectangle while still
+  leaving room for the selected text at the specified font size
+- `single_line`, `multi_line`, and `wrapped_block` must each have explicit backend layout behavior
+- add focused tests that lock in the new layout contract and prevent regression
+- do not weaken the real signing, PKCS#12 loading, or verification behavior
+
+Expected deliverables:
+
+- backend layout/scaling improvements for visible signatures
+- focused regression tests for stamp sizing and all three layout templates
+
+Definition of done:
+
+- the backend no longer relies on a fixed-size/no-scaling stamp path
+- `wrapped_block` is explicitly represented in code and tests
+
+### Brief AI: Output-Side Appearance Diagnostics
+
+You are enriching the harness/output diagnostics so preview-to-output mismatches are more concrete
+ after a real signing run.
+
+Objectives:
+
+- capture more facts about the final output appearance without guessing
+- help reviewers compare requested appearance, preview snapshot, and output-side facts
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_harness.py`
+- minimal test-side support changes only if clearly necessary
+
+Requirements to satisfy:
+
+- keep existing capture fields stable
+- add output-side appearance facts if supportable from current code paths or post-sign inspection
+- prefer structured capture over free-form text where possible
+- do not claim geometry or layout facts you cannot actually observe
+
+Expected deliverables:
+
+- richer harness capture for final-output appearance analysis
+- focused tests for the added capture fields
+
+Definition of done:
+
+- a post-sign artifact gives materially better evidence about output-side appearance than before
+
+### Brief AJ: Final Appearance Review
+
+You are doing a review-only pass on the final appearance-parity follow-up.
+
+Review scope:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- affected tests under `tests/unit/`
+
+Tasks:
+
+- inspect whether stamp sizing is now truly max-fit relative to remaining text space
+- inspect whether `wrapped_block` has distinct backend semantics and coverage
+- inspect whether the harness now captures enough output-side appearance evidence
+- inspect for regressions in signing, verification, and field-derivation behavior
+
+Definition of done:
+
+- findings clearly answer whether visible appearance parity is ready for another real manual run
+
+## Appearance Tightening Pass
+
+This pass addresses the remaining hold from the final appearance review:
+
+- stamp sizing is still only best-effort rather than an explicitly constrained max-fit policy
+- output-side diagnostics still do not expose enough reserved-space facts to judge parity cleanly
+
+### Brief AK: Deterministic Stamp Reservation
+
+You are tightening the backend visible-appearance logic so the stamp/text split is more
+ deterministic and inspectable than the current best-effort pyHanko composition.
+
+Objectives:
+
+- make the reserved text area and remaining stamp area explicit from the actual signature rectangle
+- strengthen the contract around how much space is reserved for text at the requested font size
+- improve the honesty of the max-fit policy, even if a mathematically perfect solver is not
+  practical with pyHanko
+
+Primary files you own:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+Requirements to satisfy:
+
+- compute and retain explicit reserved-space facts for text vs stamp
+- keep `single_line`, `multi_line`, and `wrapped_block` distinct
+- preserve cryptographic signing, PKCS#12 handling, and verification behavior
+- add focused tests that lock in the stronger reservation/sizing contract
+
+Expected deliverables:
+
+- tighter backend layout policy for stamp/text partitioning
+- focused tests for reservation behavior and template-specific sizing outcomes
+
+Definition of done:
+
+- the backend has a more explicit stamp/text area policy than simple stretch-to-fit after implicit
+  reservation
+
+### Brief AL: Reserved-Space Output Diagnostics
+
+You are enriching the harness/output artifacts with the backend-reserved appearance facts needed to
+ reason about final layout.
+
+Objectives:
+
+- capture the reserved text/stamp sizing facts if available from the backend
+- expose enough structured data to compare request, preview, and backend reservation decisions
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_harness.py`
+- minimal support changes only if clearly necessary
+
+Requirements to satisfy:
+
+- keep existing capture fields stable
+- add structured reservation/appearance facts only when they can be observed honestly
+- prefer additive JSON snapshots over prose
+
+Expected deliverables:
+
+- richer post-sign artifacts for appearance debugging
+- focused tests for the new capture fields
+
+Definition of done:
+
+- manual harness artifacts expose materially better evidence about backend reservation choices
+
+### Brief AM: Tightening Review
+
+You are doing a review-only pass on the appearance tightening pass.
+
+Review scope:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- affected tests under `tests/unit/`
+
+Tasks:
+
+- inspect whether stamp/text reservation is now explicit enough to support the max-fit claim more
+  honestly
+- inspect whether the new output-side diagnostics are sufficient to make the next manual run
+  materially more trustworthy
+- inspect for regressions in signing, verification, and field derivation
+
+Definition of done:
+
+- findings clearly state whether the next manual run is now worth doing
+
+## Corrective Wave: Harness, Zoom, and Fit
+
+This wave addresses the new regressions and blockers found during the latest real harness/manual
+ run:
+
+- harness capture serialization can crash when richer diagnostics are present
+- viewer zoom can shrink content without shrinking the apparent page bounds
+- final visible signature output can still produce unusable image/text fit
+
+### Brief AN: Harness and Viewer Regression Fixes
+
+You are fixing the non-signing regressions surfaced by the latest manual run.
+
+Objectives:
+
+- make harness capture serialization robust even with richer nested diagnostics
+- fix the viewer zoom/page-bound regression so page bounds track the rendered content correctly
+- add regression tests for both issues
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `src/foliaseal/presentation/qt/viewer_widget.py`
+- `tests/unit/test_phase3_harness.py`
+- `tests/unit/test_qt_viewer_widget.py`
+
+Requirements to satisfy:
+
+- `capture.to_json()` must not fail due to non-serializable nested objects
+- zoom in/out must keep page bounds visually in sync with rendered content
+- add tests that would have caught the current regression
+
+Expected deliverables:
+
+- robust harness serialization
+- viewer zoom regression fix
+- focused regression tests
+
+Definition of done:
+
+- the harness no longer crashes while writing artifacts
+- zoomed page bounds match the rendered page content closely enough in the widget
+
+### Brief AO: Visible Signature Fit Correction
+
+You are fixing the remaining visible-signature fit problems in the written PDF output.
+
+Objectives:
+
+- stop the stamp image from overwhelming the reserved rectangle
+- ensure text remains visible and placed inside the reserved text region
+- make fit/overflow behavior more defensive and explicit
+
+Primary files you own:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+Requirements to satisfy:
+
+- preserve image aspect ratio while fitting into the reserved stamp region
+- keep text readable and top-left aligned within its reserved region
+- tighten behavior for very small/awkward rectangles so output is not silently unusable
+- preserve signing, verification, PKCS#12 handling, and derived-field semantics
+
+Expected deliverables:
+
+- improved visible-signature fit policy
+- focused tests for image+text fit and awkward rectangles
+
+Definition of done:
+
+- a real signed PDF should no longer reduce text to effectively invisible output in normal use
+
+### Brief AP: Corrective Review
+
+You are doing a review-only pass on the corrective wave.
+
+Review scope:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `src/foliaseal/presentation/qt/viewer_widget.py`
+- `src/foliaseal/application/phase3_signing_backend.py`
+- affected tests under `tests/unit/`
+
+Tasks:
+
+- inspect whether the harness serialization path is now robust
+- inspect whether the zoom/page-bound regression is actually prevented
+- inspect whether visible-signature fit is materially safer and less likely to generate useless
+  output
+- inspect for regressions in signing, verification, and field derivation
+
+Definition of done:
+
+- findings clearly state whether another real harness/manual run is worth doing
+
+## Compact Rectangle Compliance Wave
+
+This wave corrects implementation drift against the already-approved visible appearance sizing
+ contract:
+
+- text size in points should be honored first
+- text space should be reserved first
+- the stamp should then maximize within the remaining permitted area
+- ordinary compact signature lines on common forms should not be rejected as if they were unusable
+
+The latest manual harness run showed that a realistic form-line rectangle was rejected even though
+ it should be supported under the existing contract.
+
+### Brief AQ: Compact Rectangle Backend Compliance
+
+You are correcting the backend fit policy so realistic compact rectangles succeed when they should
+ under the text-first sizing contract.
+
+Objectives:
+
+- relax over-conservative fit heuristics for ordinary compact rectangles
+- preserve the text-first contract: honor requested text size first, then maximize the stamp within
+  the remaining area
+- keep too-small rectangles failing honestly, but stop rejecting normal form-line cases
+
+Primary files you own:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+Requirements to satisfy:
+
+- add a realistic regression case close to the observed manual run:
+  - roughly `262 pt x 21 pt`
+  - small visible field set
+  - image stamp present
+  - `6 pt` text
+  - should succeed
+- keep truly tiny/absurd rectangles failing honestly
+- preserve cryptographic signing, verification, PKCS#12 handling, and derived-field behavior
+
+Expected deliverables:
+
+- backend fit-policy correction for realistic compact rectangles
+- regression tests for realistic compact success and truly-too-small failure
+
+Definition of done:
+
+- ordinary compact form-line rectangles no longer fail just because the policy is too aggressive
+
+### Brief AR: Shared Fit Validation Alignment
+
+You are aligning shell/harness validation with backend fit decisions so the UI does not say
+ `Ready to sign` for requests the backend will reject.
+
+Objectives:
+
+- make preview validation, submit readiness, and backend acceptance agree on fit viability
+- surface compact-rectangle failures honestly before the user presses sign
+
+Primary files you own:
+
+- `src/foliaseal/application/signing_draft_workflow.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `tests/unit/test_signing_draft_workflow.py`
+- `tests/unit/test_qt_signing_shell.py`
+
+Requirements to satisfy:
+
+- the shell must not report `Ready to sign` when the backend fit policy would reject the request
+- validation should use the same fit logic or a faithful shared predicate
+- preserve the rest of the existing preview and signing behavior
+
+Expected deliverables:
+
+- aligned fit-validation behavior across preview and sign
+- regression tests for the previous mismatch
+
+Definition of done:
+
+- shell readiness and backend acceptance agree for compact-rectangle fit decisions
+
+### Brief AS: Compact Rectangle Review
+
+You are doing a review-only pass on the compact rectangle compliance wave.
+
+Review scope:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/application/signing_draft_workflow.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- affected tests under `tests/unit/`
+
+Tasks:
+
+- inspect whether the backend now complies with the text-first sizing contract for realistic
+  compact rectangles
+- inspect whether the shell validation and backend fit policy are aligned
+- inspect for regressions in signing, verification, PKCS#12 handling, field derivation, and
+  preview behavior
+- explicitly decide whether another real manual harness run is worth doing
+
+Definition of done:
+
+- findings clearly state whether the realistic compact-rectangle case is ready for another manual
+  run
+
+## Next Requirement: Rectangle-Aware Preview Parity
+
+The next product requirement after the current backend appearance-parity fixes is to make the shell
+ preview geometry-aware so it reflects the actual placed signature rectangle rather than a generic
+ preview card.
+
+Why this matters:
+
+- users draw and resize a signature box with a specific width/height ratio
+- the final PDF appearance has to adapt to that real rectangle
+- a preview that does not reflect the same aspect ratio and layout constraints is only an
+  approximation and can mislead the user about readability, wrapping, and image/text balance
+
+Requirement statement:
+
+- once a signature rectangle exists, the visible signature preview must adapt to that rectangle's
+  effective aspect ratio and layout constraints
+- the preview and backend should follow the same layout policy for:
+  - margins
+  - image/text composition
+  - font sizing rules
+  - wrapping rules
+  - overflow/fallback behavior
+- the preview should make it obvious when a chosen rectangle is too small or awkward for the
+  selected content/layout instead of silently implying a cleaner result than the backend can produce
+
+Acceptance intent:
+
+- drawing or resizing the rectangle should materially change the preview shape and composition
+- preview/output parity should improve for wide, tall, and compact rectangles
+- the user should be able to trust the preview as a meaningful approximation of the final visible
+  signature
+
+## Visible Appearance Sizing Contract
+
+The visible signature layout should follow an explicit text-first sizing contract rather than a
+ generic “scale everything until it fits” rule.
+
+Contract:
+
+- text size is specified in typographic points and should be honored in the final visible signature
+  output
+- the backend should reserve space for the selected text at that font size before sizing the image
+  stamp
+- the image stamp should preserve aspect ratio and scale to the largest size that fits inside the
+  remaining permitted stamp region
+- the system should not silently shrink text into unreadable output just to make the signature fit
+- when an image stamp is present, the stamp may shrink aggressively before the system refuses the
+  layout, provided the preview makes the resulting balance clear to the user
+
+Overflow behavior:
+
+- if the chosen rectangle is too small to honor the selected text size and requested content/layout,
+  the app should surface that honestly through validation, warning, or another explicit degraded
+  policy
+- “microscopic but technically present” text is not acceptable output
+- a very small image stamp can still be acceptable if the text remains honest and the preview makes
+  that tradeoff obvious before signing
+
+Preview implication:
+
+- the preview should ultimately reflect this same text-first sizing rule so users can trust that
+  the stamp fills remaining space after the text has been laid out at the requested size
+- because the preview is the user’s contract, the system can allow more aggressive stamp shrinkage
+  than it otherwise might, as long as the preview clearly shows the real result the user is asking
+  for
 
 ## Reusable Review Agent Template
 

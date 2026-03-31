@@ -206,6 +206,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the PDF to open in the interactive signing harness.",
     )
     phase3_harness.add_argument(
+        "--certificate-path",
+        default="demo-cert.p12",
+        help="PKCS#12 certificate file used by the harness signing flow.",
+    )
+    phase3_harness.add_argument(
+        "--passphrase",
+        default="demo-passphrase",
+        help="Passphrase for the PKCS#12 certificate file used by the harness.",
+    )
+    phase3_harness.add_argument(
         "--summary-json-path",
         default=None,
         help="Optional file path where the harness capture JSON should be written.",
@@ -329,6 +339,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.command == "phase3-signing-harness":
         run_phase3_signing_harness(
             pdf_path=args.pdf_path,
+            certificate_path=args.certificate_path,
+            passphrase=args.passphrase,
             summary_json_path=args.summary_json_path,
             checklist_results_path=args.checklist_results_path,
             checklist_template_path=args.checklist_template_path,

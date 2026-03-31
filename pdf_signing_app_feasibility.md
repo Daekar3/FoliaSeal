@@ -87,6 +87,33 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - key usage is compatible with digital signatures where extension exists.
 - App supports alias selection if multiple identities are present.
 
+### FR-2A: Certificate compatibility profile
+- Release-gated identity container support for v1 is PKCS#12 only:
+  - `.p12`
+  - `.pfx`
+- The signing backend must support at least:
+  - RSA signing identities
+  - ECDSA signing identities
+  - end-entity signing certificate plus optional embedded chain certificates
+- The app should accept commonly encountered PKCS#12 containers that the selected backend stack
+  (`pyHanko` + `cryptography`/OpenSSL) can decode, including legacy `.pfx` naming and older
+  password-based encryption/MAC profiles that remain readable through that stack.
+- The app must fail with actionable diagnostics rather than guessing when a container is present
+  but not usable, including:
+  - wrong passphrase
+  - malformed or unreadable PKCS#12 structure
+  - missing private key
+  - missing signing certificate
+  - unsupported key algorithm or signature profile
+- If a PKCS#12 file exposes more than one candidate signing identity and reliable alias selection
+  is not available in the backend path, the app must fail safely with explicit guidance rather than
+  silently choosing one.
+- Explicitly out of scope for v1 unless separately approved:
+  - PEM + private-key pairs
+  - PKCS#11 / smart-card tokens
+  - OS-native certificate stores
+  - hardware-backed signing providers that do not present as PKCS#12
+
 ## FR-3: Signature placement and appearance
 - User can select target page index.
 - User can define signature rectangle by **click-and-drag with the mouse** directly on a rendered PDF page preview.
@@ -113,6 +140,30 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - manually overridden by user input,
   - hidden from visible appearance while still retained in signed cryptographic attributes where applicable.
 - The app must provide a real-time preview that updates as property fields are changed.
+- Once a signature rectangle has been placed, the preview must become rectangle-aware and adapt to
+  the effective width/height ratio of that real placement rather than showing only a generic sample
+  card.
+- Preview and final output should share the same layout policy as closely as practical, including:
+  - image/text composition,
+  - margins,
+  - font sizing behavior,
+  - wrapping rules,
+  - overflow handling.
+- If the chosen rectangle is too small or awkward for the selected content/layout, the UI should
+  make that limitation apparent instead of implying a cleaner final result than the backend can
+  render.
+- Visible-signature text sizing should be treated as a text-first contract:
+  - the selected font size is specified in points and should be honored in the final output,
+  - text space should be reserved before sizing the image stamp,
+  - the image stamp should preserve aspect ratio and scale to the largest size that fits in the
+    remaining permitted stamp region,
+  - the system must not silently shrink text into unreadable output merely to make the signature
+    fit.
+- When an image stamp is present, the backend may shrink the image stamp aggressively before
+  refusing the layout, as long as:
+  - the selected text size remains honored,
+  - the visible text remains honest and readable,
+  - and the preview clearly reflects the resulting stamp/text tradeoff before signing.
 - The app must validate required/optional property combinations and prevent invalid templates from being signed (with inline guidance).
 
 ### FR-3B: Adobe Acrobat / PDF-XChange Editor parity requirements
@@ -555,18 +606,35 @@ To reflect the expanded requirements (especially FR-3A/3B/3C, FR-9 through FR-17
 - Invalid property combinations are blocked with actionable inline guidance.
 - Preview output consistently matches final signed appearance within accepted tolerance.
 
-## Phase 4 (Week 7): Signature preset management and profile durability
-- Implement preset lifecycle (create/edit/duplicate/delete/import/export).
-- Persist preset data in human-readable config with schema version migrations.
-- Add default-preset + last-used behavior controls.
-- Implement corruption/failure recovery path with safe defaults.
+## Refactored Post-Phase-3 Roadmap
+
+Phase 3 turned out to contain several independent failure modes: shell UX, preview semantics,
+ preview/output parity, named-profile lifecycle, real cryptographic signing, and acceptance tooling.
+ The remaining roadmap is therefore broken into smaller slices by failure mode rather than broad
+ feature theme.
+
+## Phase 4A: Preview/output parity and rectangle-aware preview
+- Make the preview geometry-aware once a real signature rectangle exists.
+- Align preview layout policy with backend layout policy for margins, wrapping, text-first sizing,
+  and image placement.
+- Validate representative wide, tall, and compact rectangles against real signed output.
 
 **Exit criteria**
-- Presets load/apply in one action from signing flow.
-- Import/export compatibility tests pass across schema versions.
-- Corrupted preset file scenario degrades gracefully without blocking signing.
+- Preview materially reflects the chosen rectangle shape.
+- Preview/output differences are small enough to support informed user decisions.
+- Compact-rectangle behavior is validated against representative form-line cases.
 
-## Phase 5 (Week 8): Trust, certification constraints, and hardening
+## Phase 4B: Timestamping and standards hardening
+- Implement real TSA-backed timestamp integration.
+- Support timestamp-required signing flows with stable failure mapping.
+- Verify standards/compatibility reporting around timestamp presence and policy.
+
+**Exit criteria**
+- Timestamp-required flows succeed against a real TSA or fail with explicit stable errors.
+- Output reports distinguish ordinary signatures from timestamped signatures honestly.
+- Timestamp behavior is covered by deterministic tests and manual validation.
+
+## Phase 4C: Trust, certification constraints, and signing hardening
 - Implement trust profile loader (system store + optional extra CA bundle + revocation policy modes).
 - Detect and enforce certification restrictions (DocMDP/permissions) with user-facing diagnostics.
 - Expand logging/audit model to include operation type and revision strategy.
@@ -574,10 +642,24 @@ To reflect the expanded requirements (especially FR-3A/3B/3C, FR-9 through FR-17
 
 **Exit criteria**
 - Certification-restricted documents are blocked with explicit rationale.
-- TSA/trust failures map to stable failure codes and user-readable messages.
+- Trust and certification failures map to stable failure codes and user-readable messages.
 - No sensitive data appears in logs under negative-path testing.
 
-## Phase 6 (Week 9): Packaging and runtime validation (Mint 22.3)
+## Phase 5A: Preset portability and profile management completion
+- Extend the now-implemented named-profile lifecycle with the remaining portability features:
+  - duplicate,
+  - import,
+  - export,
+  - schema migration handling,
+  - corruption recovery.
+- Add default-preset + last-used behavior controls if still desired after Phase 3 validation.
+
+**Exit criteria**
+- Import/export compatibility tests pass across schema versions.
+- Corrupted profile scenarios degrade gracefully without blocking signing.
+- Remaining profile-management affordances are explicit and testable.
+
+## Phase 5B: Packaging and runtime validation (Mint 22.3)
 - Finalize PyInstaller one-dir spec including Qt plugins and render backend runtime assets.
 - Produce reproducible build script and checksum output.
 - Run clean-VM smoke tests for startup, render, sign, timestamp, and offline error handling.
@@ -587,7 +669,7 @@ To reflect the expanded requirements (especially FR-3A/3B/3C, FR-9 through FR-17
 - No missing plugin/runtime dependency errors.
 - Signing workflow completes end-to-end in packaged artifact.
 
-## Phase 7 (Week 10): Full-system QA, compatibility matrix, and release readiness
+## Phase 6: Full-system QA, compatibility matrix, and release readiness
 - Execute compatibility matrix across PDF versions (`1.4`–`2.0`), signed/unsigned inputs, and certification states.
 - Validate interoperability with Acrobat and Okular for signed output checks.
 - Measure and document release metrics: startup time, first render, idle memory, bundle size.

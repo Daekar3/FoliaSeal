@@ -380,7 +380,10 @@ class PdfViewerWidgetAdapter:
                     bindings.q_image.Format_RGBA8888,
                 )
                 self._pixmap = bindings.q_pixmap.fromImage(image.copy())
+                resize = getattr(self, "resize", None)
                 self.setMinimumSize(result.width_px, result.height_px)
+                if callable(resize):
+                    resize(result.width_px, result.height_px)
                 self.update()
 
             def _navigate(self, *, action: Callable[[], Any], summary: str) -> None:

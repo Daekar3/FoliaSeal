@@ -1539,7 +1539,10 @@ class SigningWorkspaceWidget:
             self._last_signing_result = result
             self.widget.last_signing_result = result  # type: ignore[attr-defined]
             if result.success:
-                self._set_sign_result_text(result.message, success=True)
+                self._set_sign_result_text(
+                    f"{result.message} Output: {request.output_pdf_path}",
+                    success=True,
+                )
                 if self._on_status_change is not None:
                     self._on_status_change("sign_success")
             else:
