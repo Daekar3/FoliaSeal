@@ -105,7 +105,7 @@ def build_phase3_checklist_results_markdown(
             f"{'yes' if capture.last_signature_has_visible_appearance else 'no'}"
         ),
         (
-        f"- Last sign request output path: `{capture.last_signature_output_path}`"
+            f"- Last sign request output path: `{capture.last_signature_output_path}`"
             if capture.last_signature_output_path is not None
             else "- Last sign request output path: not captured"
         ),
@@ -114,6 +114,12 @@ def build_phase3_checklist_results_markdown(
             f"{_snapshot_layout_template(capture.sign_request_snapshot)}"
             if capture.sign_request_snapshot is not None
             else "- Last request layout template: not captured"
+        ),
+        (
+            f"- Last request stamp position: "
+            f"{_snapshot_stamp_position(capture.sign_request_snapshot)}"
+            if capture.sign_request_snapshot is not None
+            else "- Last request stamp position: not captured"
         ),
         (
             f"- Last request show field names: "
@@ -132,6 +138,12 @@ def build_phase3_checklist_results_markdown(
             f"{_snapshot_layout_template(capture.backend_reservation_snapshot)}"
             if capture.backend_reservation_snapshot is not None
             else "- Backend reservation layout template: not captured"
+        ),
+        (
+            f"- Backend reservation stamp position: "
+            f"{_snapshot_stamp_position(capture.backend_reservation_snapshot)}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation stamp position: not captured"
         ),
         (
             f"- Backend reservation stamp text length: "
@@ -172,6 +184,12 @@ def build_phase3_checklist_results_markdown(
             f"- Preview layout template: {capture.preview_snapshot['layout_template']}"
             if capture.preview_snapshot
             else "- Preview layout template: not captured"
+        ),
+        (
+            f"- Preview stamp position: "
+            f"{_snapshot_preview_stamp_position(capture.preview_snapshot)}"
+            if capture.preview_snapshot
+            else "- Preview stamp position: not captured"
         ),
         (
             f"- Preview show field names: "
@@ -580,6 +598,7 @@ def _snapshot_preview(preview) -> dict[str, Any]:
         "title": preview.title,
         "signer_label_prefix": preview.signer_label_prefix,
         "layout_template": preview.layout_template.value if preview.layout_template else None,
+        "stamp_position": preview.stamp_position.value if preview.stamp_position else None,
         "timezone_display_mode": (
             preview.timezone_display_mode.value if preview.timezone_display_mode else None
         ),
@@ -617,6 +636,7 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
 
     snapshot = {
         "layout_template": request.signature_appearance.layout_template.value,
+        "stamp_position": request.signature_appearance.stamp_position.value,
         "signature_rect": _snapshot_signature_rect(request.signature_rect),
     }
     try:
@@ -699,6 +719,7 @@ def _snapshot_signing_appearance(appearance) -> dict[str, Any]:
     return {
         "signer_label_prefix": appearance.signer_label_prefix,
         "layout_template": appearance.layout_template.value,
+        "stamp_position": appearance.stamp_position.value,
         "timezone_display_mode": appearance.timezone_display_mode.value,
         "show_field_names": appearance.show_field_names,
         "datetime_format": appearance.datetime_format,
@@ -804,6 +825,19 @@ def _snapshot_layout_template(snapshot: dict[str, Any] | None) -> str | None:
     return layout_template if isinstance(layout_template, str) else None
 
 
+def _snapshot_stamp_position(snapshot: dict[str, Any] | None) -> str | None:
+    if snapshot is None:
+        return None
+    direct_position = snapshot.get("stamp_position")
+    if isinstance(direct_position, str):
+        return direct_position
+    appearance = _snapshot_sign_request_appearance(snapshot)
+    if appearance is None:
+        return None
+    stamp_position = appearance.get("stamp_position")
+    return stamp_position if isinstance(stamp_position, str) else None
+
+
 def _snapshot_show_field_names(snapshot: dict[str, Any] | None) -> bool:
     appearance = _snapshot_sign_request_appearance(snapshot)
     if appearance is None:
@@ -865,6 +899,13 @@ def _snapshot_preview_show_field_names(snapshot: dict[str, Any] | None) -> bool:
     if snapshot is None:
         return False
     return bool(snapshot.get("show_field_names"))
+
+
+def _snapshot_preview_stamp_position(snapshot: dict[str, Any] | None) -> str | None:
+    if snapshot is None:
+        return None
+    stamp_position = snapshot.get("stamp_position")
+    return stamp_position if isinstance(stamp_position, str) else None
 
 
 def _serialize_signature_metadata(value: Any) -> Any:

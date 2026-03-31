@@ -7,6 +7,7 @@ from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
     SigningDraftWorkflow,
 )
+from foliaseal.domain.models import SignatureStampPosition
 from tests.support.phase3_builders import (
     build_signature_appearance,
     build_signature_rect,
@@ -32,6 +33,7 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         build_signature_appearance(
             datetime_format="%Y-%m-%d %H:%M",
             image_stamp_path="/tmp/stamp.png",
+            stamp_position=SignatureStampPosition.LEFT,
             show_field_names=True,
         )
     )
@@ -78,9 +80,30 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         for line in snapshot.lines
     )
     assert any(
+        line.kind.value == "summary" and "Stamp position: left" in line.text
+        for line in snapshot.lines
+    )
+    assert any(
         line.kind.value == "status" and line.text == "Ready to sign"
         for line in snapshot.lines
     )
+
+
+def test_preview_renderer_omits_blank_title_line_when_prefix_is_empty(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="",
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2))
+
+    preview = workflow.preview()
+    snapshot = render_signing_preview(preview)
+
+    assert preview.title == ""
+    assert all(line.kind.value != "title" for line in snapshot.lines)
+    assert snapshot.lines[0].kind.value == "summary"
 
 
 def test_preview_renderer_defaults_to_value_only_field_text(tmp_path: Path) -> None:
@@ -185,3 +208,18 @@ def test_preview_parity_reports_metadata_drift(tmp_path: Path) -> None:
         "datetime_format_mismatch",
         "image_stamp_path_mismatch",
     }
+
+
+def test_preview_parity_reports_stamp_position_drift(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = build_signature_appearance()
+    workflow.set_signature_appearance(appearance)
+    workflow.set_signature_rect(build_signature_rect(page_index=2))
+
+    preview = workflow.preview()
+    drifted_preview = replace(preview, stamp_position=SignatureStampPosition.RIGHT)
+
+    report = compare_preview_to_request(drifted_preview, workflow.build_signing_request())
+
+    assert report.is_consistent is False
+    assert {issue.code for issue in report.issues} == {"stamp_position_mismatch"}

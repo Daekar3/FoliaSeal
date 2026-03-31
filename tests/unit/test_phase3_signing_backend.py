@@ -32,6 +32,7 @@ from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
     SignatureFieldSource,
     SignatureLayoutTemplate,
+    SignatureStampPosition,
     SignatureTextStyle,
 )
 from tests.support.phase3_builders import (
@@ -336,7 +337,10 @@ def test_phase3_certificate_loader_rejects_malformed_pkcs12(tmp_path: Path) -> N
 
 
 def test_build_stamp_style_uses_solid_background_when_no_image_stamp() -> None:
-    appearance = build_signature_appearance(image_stamp_path=None)
+    appearance = build_signature_appearance(
+        image_stamp_path=None,
+        stamp_position=SignatureStampPosition.TOP,
+    )
 
     style = _build_stamp_style(
         appearance,
@@ -348,14 +352,15 @@ def test_build_stamp_style_uses_solid_background_when_no_image_stamp() -> None:
     assert style.background is not None
     assert style.background_layout.inner_content_scaling == InnerScaling.STRETCH_TO_FIT
     assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
-    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MAX
-    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
+    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
 
 
 def test_layout_reservation_for_single_line_allocates_right_text_space() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
         signature_rect=build_signature_rect(page_index=0, width_pt=240.0, height_pt=72.0),
         text_box_width=110,
         text_box_height=18,
@@ -367,10 +372,10 @@ def test_layout_reservation_for_single_line_allocates_right_text_space() -> None
     assert reservation.stamp_area_height_pt < reservation.container_height_pt
     assert reservation.text_area_width_pt < reservation.container_width_pt
     assert reservation.text_area_height_pt < reservation.container_height_pt
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MIN
+    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MID
     assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MAX
-    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MAX
-    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
+    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
     assert reservation.background_layout.inner_content_scaling == InnerScaling.STRETCH_TO_FIT
     assert reservation.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
 
@@ -378,6 +383,7 @@ def test_layout_reservation_for_single_line_allocates_right_text_space() -> None
 def test_layout_reservation_for_multi_line_allocates_right_text_space() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
         signature_rect=build_signature_rect(page_index=0, width_pt=240.0, height_pt=72.0),
         text_box_width=110,
         text_box_height=18,
@@ -389,8 +395,8 @@ def test_layout_reservation_for_multi_line_allocates_right_text_space() -> None:
     assert reservation.stamp_area_height_pt == 64
     assert reservation.text_area_width_pt < reservation.container_width_pt
     assert reservation.text_area_height_pt == 64
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MAX
+    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MAX
+    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MIN
     assert reservation.background_layout.inner_content_scaling == InnerScaling.STRETCH_TO_FIT
     assert reservation.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
 
@@ -398,6 +404,7 @@ def test_layout_reservation_for_multi_line_allocates_right_text_space() -> None:
 def test_layout_reservation_for_wrapped_block_allocates_bottom_text_space() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.BOTTOM,
         signature_rect=build_signature_rect(page_index=0, width_pt=240.0, height_pt=72.0),
         text_box_width=110,
         text_box_height=18,
@@ -407,10 +414,10 @@ def test_layout_reservation_for_wrapped_block_allocates_bottom_text_space() -> N
     assert reservation.reserved_primary_extent_pt > 0
     assert reservation.stamp_area_width_pt == reservation.text_area_width_pt
     assert reservation.stamp_area_height_pt < reservation.container_height_pt
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MAX
-    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
+    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MID
+    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
+    assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MIN
+    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
 
 
 def test_build_stamp_style_uses_template_specific_layout_for_single_line(
@@ -430,12 +437,12 @@ def test_build_stamp_style_uses_template_specific_layout_for_single_line(
         signature_rect=build_signature_rect(page_index=0),
     )
 
-    assert style.background_layout.x_align == AxisAlignment.ALIGN_MIN
+    assert style.background_layout.x_align == AxisAlignment.ALIGN_MID
     assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
     assert style.background_layout.inner_content_scaling == InnerScaling.SHRINK_TO_FIT
     assert style.background_layout.margins.bottom >= style.inner_content_layout.margins.bottom
-    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MAX
-    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
+    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
     assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
 
@@ -448,6 +455,34 @@ def test_build_stamp_style_uses_template_specific_layout_for_multi_line(
     appearance = build_signature_appearance(
         image_stamp_path=str(stamp_path),
         layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+    )
+
+    style = _build_stamp_style(
+        appearance,
+        stamp_text="Visible signature",
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        signature_rect=build_signature_rect(page_index=0),
+    )
+
+    assert style.background_layout.x_align == AxisAlignment.ALIGN_MAX
+    assert style.background_layout.y_align == AxisAlignment.ALIGN_MID
+    assert style.background_layout.inner_content_scaling == InnerScaling.SHRINK_TO_FIT
+    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MIN
+    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
+    assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
+    assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
+
+
+def test_build_stamp_style_uses_template_specific_layout_for_left_position(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        image_stamp_path=str(stamp_path),
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
     )
 
     style = _build_stamp_style(
@@ -458,12 +493,11 @@ def test_build_stamp_style_uses_template_specific_layout_for_multi_line(
     )
 
     assert style.background_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert style.background_layout.y_align == AxisAlignment.ALIGN_MID
     assert style.background_layout.inner_content_scaling == InnerScaling.SHRINK_TO_FIT
     assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MAX
-    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
     assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
-    assert style.inner_content_layout.margins.left > style.inner_content_layout.margins.right
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
 
 
@@ -475,6 +509,7 @@ def test_build_stamp_style_uses_template_specific_layout_for_wrapped_block(
     appearance = build_signature_appearance(
         image_stamp_path=str(stamp_path),
         layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.BOTTOM,
     )
 
     style = _build_stamp_style(
@@ -484,11 +519,11 @@ def test_build_stamp_style_uses_template_specific_layout_for_wrapped_block(
         signature_rect=build_signature_rect(page_index=0),
     )
 
-    assert style.background_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert style.background_layout.x_align == AxisAlignment.ALIGN_MID
+    assert style.background_layout.y_align == AxisAlignment.ALIGN_MIN
     assert style.background_layout.inner_content_scaling == InnerScaling.SHRINK_TO_FIT
-    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
+    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
+    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
     assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
 

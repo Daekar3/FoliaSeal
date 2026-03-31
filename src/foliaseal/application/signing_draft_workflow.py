@@ -27,6 +27,7 @@ from foliaseal.domain.models import (
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
@@ -97,6 +98,7 @@ class SigningDraftPreview:
     signature_rect: SignatureRect | None
     signer_label_prefix: str | None
     layout_template: SignatureLayoutTemplate | None
+    stamp_position: SignatureStampPosition | None
     timezone_display_mode: SignatureTimezoneDisplayMode | None
     show_field_names: bool
     datetime_format: str | None
@@ -377,6 +379,7 @@ class SigningDraftWorkflow:
             signature_rect=self.signature_rect,
             signer_label_prefix=appearance.signer_label_prefix if appearance else None,
             layout_template=appearance.layout_template if appearance else None,
+            stamp_position=appearance.stamp_position if appearance else None,
             timezone_display_mode=appearance.timezone_display_mode if appearance else None,
             show_field_names=appearance.show_field_names if appearance else False,
             datetime_format=appearance.datetime_format if appearance else None,

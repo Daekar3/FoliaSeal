@@ -56,6 +56,15 @@ class SignatureLayoutTemplate(str, Enum):  # noqa: UP042
     WRAPPED_BLOCK = "wrapped_block"
 
 
+class SignatureStampPosition(str, Enum):  # noqa: UP042
+    """How the stamp image is positioned relative to the main signature text."""
+
+    TOP = "top"
+    BOTTOM = "bottom"
+    LEFT = "left"
+    RIGHT = "right"
+
+
 class SignatureTimezoneDisplayMode(str, Enum):  # noqa: UP042
     """How signing-time timestamps should be displayed."""
 
@@ -312,6 +321,7 @@ class SignatureAppearance:
 
     signer_label_prefix: str = "Digitally signed by"
     layout_template: SignatureLayoutTemplate = SignatureLayoutTemplate.SINGLE_LINE
+    stamp_position: SignatureStampPosition = SignatureStampPosition.TOP
     timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.UTC
     show_field_names: bool = False
     datetime_format: str = "%Y-%m-%d %H:%M:%S %Z"
@@ -345,6 +355,8 @@ class SignatureAppearance:
         )
         if not isinstance(self.layout_template, SignatureLayoutTemplate):
             raise ValueError("layout_template must be a SignatureLayoutTemplate value.")
+        if not isinstance(self.stamp_position, SignatureStampPosition):
+            raise ValueError("stamp_position must be a SignatureStampPosition value.")
         if not isinstance(self.timezone_display_mode, SignatureTimezoneDisplayMode):
             raise ValueError(
                 "timezone_display_mode must be a SignatureTimezoneDisplayMode value."

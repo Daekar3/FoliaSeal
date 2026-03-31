@@ -25,6 +25,7 @@ from foliaseal.domain.models import (
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
@@ -121,6 +122,7 @@ class AppearanceControls:
     summary_label: Any
     signer_label_prefix: Any
     layout_template: Any
+    stamp_position: Any
     timezone_display_mode: Any
     datetime_format: Any
     font_family: Any
@@ -172,6 +174,48 @@ def _compose_preview_column(bindings: QtSigningWidgetBindings, *widgets: Any) ->
     return container
 
 
+def _container_layout(container: Any) -> Any | None:
+    layout_attr = getattr(container, "layout", None)
+    if callable(layout_attr):
+        return layout_attr()
+    return layout_attr
+
+
+def _clear_layout(layout: Any) -> None:
+    take_at = getattr(layout, "takeAt", None)
+    count = getattr(layout, "count", None)
+    if callable(take_at) and callable(count):
+        while count():
+            item = take_at(0)
+            if item is None:
+                break
+            widget_getter = getattr(item, "widget", None)
+            if callable(widget_getter):
+                widget = widget_getter()
+                if widget is not None:
+                    parent_setter = getattr(widget, "setParent", None)
+                    if callable(parent_setter):
+                        parent_setter(None)
+        return
+
+    items = getattr(layout, "items", None)
+    if isinstance(items, list):
+        items.clear()
+
+
+def _set_container_widgets(container: Any, *widgets: Any) -> None:
+    layout = _container_layout(container)
+    if layout is None:
+        return
+    _clear_layout(layout)
+    for widget in widgets:
+        if isinstance(widget, tuple):
+            item, *args = widget
+            layout.addWidget(item, *args)
+            continue
+        layout.addWidget(widget)
+
+
 def _field_label(field_key: SignatureFieldKey) -> str:
     labels = {
         SignatureFieldKey.DISTINGUISHED_NAME: "Distinguished name",
@@ -189,11 +233,14 @@ def _field_label(field_key: SignatureFieldKey) -> str:
 def _enum_display_text(
     value: SignatureFieldSource
     | SignatureLayoutTemplate
+    | SignatureStampPosition
     | SignatureTimezoneDisplayMode
     | str,
 ) -> str:
     if isinstance(value, SignatureTimezoneDisplayMode):
         return "UTC" if value == SignatureTimezoneDisplayMode.UTC else "Local"
+    if isinstance(value, SignatureStampPosition):
+        return value.value.replace("_", " ").title()
     if isinstance(value, SignatureLayoutTemplate):
         return value.value.replace("_", " ").title()
     if isinstance(value, SignatureFieldSource):
@@ -202,7 +249,12 @@ def _enum_display_text(
 
 
 def _enum_combo_items(
-    enum_cls: type[SignatureFieldSource | SignatureLayoutTemplate | SignatureTimezoneDisplayMode],
+    enum_cls: type[
+        SignatureFieldSource
+        | SignatureLayoutTemplate
+        | SignatureStampPosition
+        | SignatureTimezoneDisplayMode
+    ],
 ) -> tuple[str, ...]:
     return tuple(_enum_display_text(member) for member in enum_cls)
 
@@ -342,6 +394,7 @@ def _format_appearance_summary(appearance: SignatureAppearance) -> str:
         [
             "Current appearance draft",
             f"Layout: {appearance.layout_template.value}",
+            f"Stamp position: {appearance.stamp_position.value}",
             f"Timezone: {appearance.timezone_display_mode.value}",
             f"Datetime format: {appearance.datetime_format}",
             f"Visible fields: {visible_fields_text}",
@@ -382,12 +435,26 @@ def _preview_detail_text(preview: SigningDraftPreview) -> str:
         return "No visible fields selected"
     if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
         if preview.signature_rect is not None and preview.text_style is not None:
+            max_text_width_pt = max(1, int(round(preview.signature_rect.width_pt)) - 8)
+            max_text_height_pt = max(1, int(round(preview.signature_rect.height_pt)) - 8)
+            if (
+                preview.image_stamp_path
+                and preview.stamp_position in {
+                    SignatureStampPosition.LEFT,
+                    SignatureStampPosition.RIGHT,
+                }
+            ):
+                reserved_stamp_width_pt = max(
+                    48,
+                    int(round(preview.signature_rect.width_pt * 0.35)),
+                )
+                max_text_width_pt = max(1, max_text_width_pt - reserved_stamp_width_pt - 6)
             try:
                 return _wrap_visible_signature_fragments(
                     visible_fields,
                     text_style=preview.text_style,
-                    max_text_width_pt=max(1, int(round(preview.signature_rect.width_pt)) - 8),
-                    max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
+                    max_text_width_pt=max_text_width_pt,
+                    max_text_height_pt=max_text_height_pt,
                 )
             except ValueError:
                 pass
@@ -545,7 +612,14 @@ class SignaturePropertiesPanel:
     def preview_text(self) -> str:
         preview = self._current_preview()
         title = _text(self._preview_controls.title_label)
-        if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        if (
+            preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and (preview.stamp_position or SignatureStampPosition.TOP)
+            in {
+                SignatureStampPosition.TOP,
+                SignatureStampPosition.BOTTOM,
+            }
+        ):
             detail = _text(self._preview_controls.detail_label)
         else:
             detail = _text(self._preview_controls.multi_detail_label)
@@ -893,6 +967,9 @@ class SignaturePropertiesPanel:
         layout_template = bindings.q_combo_box()
         layout_template.addItems(_enum_combo_items(SignatureLayoutTemplate))
 
+        stamp_position = bindings.q_combo_box()
+        stamp_position.addItems(_enum_combo_items(SignatureStampPosition))
+
         timezone_display_mode = bindings.q_combo_box()
         timezone_display_mode.addItems(_enum_combo_items(SignatureTimezoneDisplayMode))
 
@@ -947,6 +1024,7 @@ class SignaturePropertiesPanel:
             "Layout / Timezone",
             _compose_row(bindings, layout_template, timezone_display_mode),
         )
+        text_layout.addRow("Stamp Position", stamp_position)
         text_layout.addRow(
             "Datetime / Font",
             _compose_row(bindings, datetime_format, font_family),
@@ -969,6 +1047,7 @@ class SignaturePropertiesPanel:
         for control in (
             signer_label_prefix,
             layout_template,
+            stamp_position,
             timezone_display_mode,
             datetime_format,
             font_family,
@@ -992,6 +1071,7 @@ class SignaturePropertiesPanel:
                 "container": container,
                 "signer_label_prefix": signer_label_prefix,
                 "layout_template": layout_template,
+                "stamp_position": stamp_position,
                 "timezone_display_mode": timezone_display_mode,
                 "datetime_format": datetime_format,
                 "font_family": font_family,
@@ -1087,6 +1167,10 @@ class SignaturePropertiesPanel:
             _enum_display_text(appearance.layout_template),
         )
         _set_combo_text(
+            self._appearance_controls.stamp_position,
+            _enum_display_text(appearance.stamp_position),
+        )
+        _set_combo_text(
             self._appearance_controls.timezone_display_mode,
             _enum_display_text(appearance.timezone_display_mode),
         )
@@ -1180,6 +1264,10 @@ class SignaturePropertiesPanel:
                 _combo_text(self._appearance_controls.layout_template),
                 SignatureLayoutTemplate,
             ),
+            stamp_position=_selected_enum(
+                _combo_text(self._appearance_controls.stamp_position),
+                SignatureStampPosition,
+            ),
             timezone_display_mode=_selected_enum(
                 _combo_text(self._appearance_controls.timezone_display_mode),
                 SignatureTimezoneDisplayMode,
@@ -1255,12 +1343,16 @@ class SignaturePropertiesPanel:
 
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
         title_line = preview.signer_label_prefix or preview.title
+        stamp_position = preview.stamp_position or SignatureStampPosition.TOP
         stamp_pixmap = None
         if preview.image_stamp_path:
             stamp_pixmap = _load_stamp_pixmap(self._bindings, preview.image_stamp_path)
-        single_line_layout = preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        _set_widget_visible(self._preview_controls.single_body_container, single_line_layout)
-        _set_widget_visible(self._preview_controls.multi_body_container, not single_line_layout)
+        is_vertical = stamp_position in (
+            SignatureStampPosition.TOP,
+            SignatureStampPosition.BOTTOM,
+        )
+        _set_widget_visible(self._preview_controls.single_body_container, is_vertical)
+        _set_widget_visible(self._preview_controls.multi_body_container, not is_vertical)
 
         def _apply_stamp(label: Any, *, visible: bool) -> None:
             if visible and stamp_pixmap is not None and hasattr(label, "setPixmap"):
@@ -1290,8 +1382,39 @@ class SignaturePropertiesPanel:
             if hasattr(label, "setFixedSize"):
                 label.setFixedSize(96, 64)
 
-        _apply_stamp(self._preview_controls.stamp_label, visible=single_line_layout)
-        _apply_stamp(self._preview_controls.multi_stamp_label, visible=not single_line_layout)
+        if is_vertical:
+            _set_container_widgets(
+                self._preview_controls.single_body_container,
+                self._preview_controls.stamp_label,
+                self._preview_controls.detail_label,
+            )
+            if stamp_position == SignatureStampPosition.BOTTOM:
+                _set_container_widgets(
+                    self._preview_controls.single_body_container,
+                    self._preview_controls.detail_label,
+                    self._preview_controls.stamp_label,
+                )
+        else:
+            _set_container_widgets(
+                self._preview_controls.multi_body_container,
+                (self._preview_controls.multi_stamp_label, 0, self._bindings.qt.AlignCenter),
+                (self._preview_controls.multi_detail_label, 0, self._bindings.qt.AlignCenter),
+            )
+            if stamp_position == SignatureStampPosition.RIGHT:
+                _set_container_widgets(
+                    self._preview_controls.multi_body_container,
+                    (self._preview_controls.multi_detail_label, 0, self._bindings.qt.AlignCenter),
+                    (self._preview_controls.multi_stamp_label, 0, self._bindings.qt.AlignCenter),
+                )
+
+        _apply_stamp(
+            self._preview_controls.stamp_label,
+            visible=is_vertical and stamp_pixmap is not None,
+        )
+        _apply_stamp(
+            self._preview_controls.multi_stamp_label,
+            visible=not is_vertical and stamp_pixmap is not None,
+        )
         border_css, background_color = _preview_box_styles(preview)
         text_css = _preview_text_style(preview)
         if hasattr(self._preview_controls.card_container, "setStyleSheet"):
@@ -1315,10 +1438,12 @@ class SignaturePropertiesPanel:
             self._preview_controls.multi_detail_label.setStyleSheet(text_css)
         self._preview_controls.title_label.setText(title_line)
         _set_widget_visible(self._preview_controls.title_label, bool(title_line))
-        self._preview_controls.detail_label.setText(visible_detail if single_line_layout else "")
-        self._preview_controls.multi_detail_label.setText(
-            "" if single_line_layout else visible_detail
-        )
+        if is_vertical:
+            self._preview_controls.detail_label.setText(visible_detail)
+            self._preview_controls.multi_detail_label.setText("")
+        else:
+            self._preview_controls.detail_label.setText("")
+            self._preview_controls.multi_detail_label.setText(visible_detail)
         self._preview_controls.footer_label.setText("")
 
     def _current_preview(self) -> SigningDraftPreview:

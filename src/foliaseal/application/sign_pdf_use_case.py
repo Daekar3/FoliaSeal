@@ -24,6 +24,7 @@ from foliaseal.domain.models import (
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningOutput,
@@ -78,6 +79,7 @@ class SigningBackendAppearance:
 
     signer_label_prefix: str
     layout_template: SignatureLayoutTemplate
+    stamp_position: SignatureStampPosition
     timezone_display_mode: SignatureTimezoneDisplayMode
     show_field_names: bool
     datetime_format: str
@@ -95,6 +97,7 @@ class SigningBackendAppearance:
         return cls(
             signer_label_prefix=appearance.signer_label_prefix,
             layout_template=appearance.layout_template,
+            stamp_position=appearance.stamp_position,
             timezone_display_mode=appearance.timezone_display_mode,
             show_field_names=appearance.show_field_names,
             datetime_format=appearance.datetime_format,

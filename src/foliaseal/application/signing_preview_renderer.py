@@ -98,6 +98,7 @@ def _appearance_summary(preview: SigningDraftPreview) -> str:
     if (
         preview.signer_label_prefix is None
         or preview.layout_template is None
+        or preview.stamp_position is None
         or preview.timezone_display_mode is None
     ):
         return "Appearance: missing"
@@ -105,6 +106,7 @@ def _appearance_summary(preview: SigningDraftPreview) -> str:
         "Appearance: "
         f"{preview.signer_label_prefix} | "
         f"{preview.layout_template.value} | "
+        f"Stamp position: {preview.stamp_position.value} | "
         f"{preview.timezone_display_mode.value}"
     )
 
@@ -159,11 +161,18 @@ def _format_issue_line(issue: SigningDraftValidationIssue) -> str:
 
 def render_signing_preview(preview: SigningDraftPreview) -> SigningPreviewRenderSnapshot:
     """Render the normalized preview into deterministic text lines."""
-    lines: list[SigningPreviewLine] = [
-        SigningPreviewLine(SigningPreviewLineKind.TITLE, preview.title),
-        SigningPreviewLine(SigningPreviewLineKind.SUMMARY, _rect_summary(preview.signature_rect)),
-        SigningPreviewLine(SigningPreviewLineKind.SUMMARY, _appearance_summary(preview)),
-    ]
+    lines: list[SigningPreviewLine] = []
+    if preview.title.strip():
+        lines.append(SigningPreviewLine(SigningPreviewLineKind.TITLE, preview.title))
+    lines.extend(
+        [
+            SigningPreviewLine(
+                SigningPreviewLineKind.SUMMARY,
+                _rect_summary(preview.signature_rect),
+            ),
+            SigningPreviewLine(SigningPreviewLineKind.SUMMARY, _appearance_summary(preview)),
+        ]
+    )
 
     lines.extend(
         SigningPreviewLine(SigningPreviewLineKind.SUMMARY, summary)
@@ -249,6 +258,15 @@ def compare_preview_to_request(
                 code="layout_template_mismatch",
                 message="Preview layout template does not match the final request.",
                 field_name="layout_template",
+            )
+        )
+
+    if preview.stamp_position != request_appearance.stamp_position:
+        issues.append(
+            SigningPreviewParityIssue(
+                code="stamp_position_mismatch",
+                message="Preview stamp position does not match the final request.",
+                field_name="stamp_position",
             )
         )
 

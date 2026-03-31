@@ -15,6 +15,7 @@ from foliaseal.domain.models import (
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
@@ -175,6 +176,7 @@ def _serialize_appearance(value: SignatureAppearance) -> dict[str, Any]:
     return {
         "signer_label_prefix": value.signer_label_prefix,
         "layout_template": _serialize_enum(value.layout_template),
+        "stamp_position": _serialize_enum(value.stamp_position),
         "timezone_display_mode": _serialize_enum(value.timezone_display_mode),
         "show_field_names": value.show_field_names,
         "datetime_format": value.datetime_format,
@@ -211,6 +213,12 @@ def _deserialize_appearance(payload: dict[str, Any]) -> SignatureAppearance:
     return SignatureAppearance(
         signer_label_prefix=_require_str(payload, "signer_label_prefix").strip(),
         layout_template=_require_enum(payload, "layout_template", SignatureLayoutTemplate),  # type: ignore[arg-type]
+        stamp_position=_optional_enum(
+            payload,
+            "stamp_position",
+            SignatureStampPosition,
+        )
+        or SignatureStampPosition.TOP,
         timezone_display_mode=_require_enum(
             payload,
             "timezone_display_mode",
