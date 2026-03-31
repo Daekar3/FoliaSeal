@@ -473,7 +473,10 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     assert executor.calls == [request]
     assert widget._signing_workspace.last_signing_result is not None
     assert widget._signing_workspace.last_signing_result.success is True
-    assert widget.sign_result_label.text() == "Signing completed successfully."
+    assert (
+        widget.sign_result_label.text()
+        == f"Signing completed successfully. Output: {request.output_pdf_path}"
+    )
 
 
 def test_signing_shell_reports_sign_failure_when_executor_returns_failure(

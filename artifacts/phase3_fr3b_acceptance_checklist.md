@@ -297,7 +297,7 @@ Overall result:
 Summary notes:
 
 - Record the final judgment for FR-3B acceptance.
-- Include any constraints that should be carried into Phase 4 or future parity testing.
+- Include any constraints that should be carried into the smaller post-Phase-3 roadmap slices or future parity testing.
 - If the overlay gate failed, call that out explicitly as the reason Phase 3 remains blocked.
 - If TSA-backed timestamping or timestamp-required flows remain unsupported in the current build,
   call that out explicitly as the reason timestamp-oriented acceptance is not yet complete.

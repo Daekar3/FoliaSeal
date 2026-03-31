@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from pathlib import Path
 from typing import Self
+
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import NameOID
 
 from foliaseal.application.coordinate_transform import (
     PageBox,
@@ -162,6 +166,12 @@ class SigningDraftWorkflow:
     signature_appearance: SignatureAppearance | None = None
     signature_placement_defaults: SignaturePlacementDefaults | None = None
     placement_context: SignaturePlacementContext | None = None
+    _certificate_preview_values: dict[SignatureFieldKey, str] | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
+    _certificate_preview_available: bool = field(default=False, init=False, repr=False)
 
     @classmethod
     def from_signing_request(
@@ -344,6 +354,8 @@ class SigningDraftWorkflow:
                     field_name="signature_appearance",
                 )
             )
+        elif self.signature_rect is not None:
+            issues.extend(self._validate_visible_signature_fit())
 
         return tuple(issues)
 
@@ -401,6 +413,8 @@ class SigningDraftWorkflow:
         self,
         appearance: SignatureAppearance,
     ) -> tuple[SigningDraftPreviewField, ...]:
+        certificate_values = self._certificate_values_for_preview()
+        certificate_available = self._certificate_preview_available
         fields: list[SigningDraftPreviewField] = []
         for field_key, binding in appearance.iter_field_bindings():
             label = _field_label(field_key)
@@ -429,21 +443,96 @@ class SigningDraftWorkflow:
                 )
                 hint = "sign time"
             else:
-                text = binding.display_label or _derived_preview_text(field_key)
-                hint = "from certificate"
+                if certificate_available:
+                    text = certificate_values.get(field_key, "")
+                    hint = "from certificate" if text else None
+                else:
+                    text = binding.display_label or _derived_preview_text(field_key)
+                    hint = "from certificate"
 
             fields.append(
                 SigningDraftPreviewField(
                     field_key=field_key,
                     label=label,
                     text=text,
-                    visible=True,
+                    visible=bool(text),
                     source=binding.source,
                     hint=hint,
                 )
             )
 
         return tuple(fields)
+
+    def _certificate_values_for_preview(self) -> dict[SignatureFieldKey, str]:
+        if self._certificate_preview_values is not None:
+            return self._certificate_preview_values
+
+        try:
+            key, certificate, _extra = pkcs12.load_key_and_certificates(
+                Path(self.certificate_path).read_bytes(),
+                self.passphrase.encode("utf-8"),
+            )
+        except Exception:
+            self._certificate_preview_values = {}
+            self._certificate_preview_available = False
+            return self._certificate_preview_values
+
+        if key is None or certificate is None:
+            self._certificate_preview_values = {}
+            self._certificate_preview_available = False
+            return self._certificate_preview_values
+
+        subject = certificate.subject
+        def _first_attr(oid: NameOID) -> str | None:
+            attributes = subject.get_attributes_for_oid(oid)
+            if not attributes:
+                return None
+            value = attributes[0].value.strip()
+            return value or None
+
+        common_name = _first_attr(NameOID.COMMON_NAME)
+        email = _first_attr(NameOID.EMAIL_ADDRESS)
+        title = _first_attr(NameOID.TITLE) or _first_attr(NameOID.ORGANIZATIONAL_UNIT_NAME)
+        company = _first_attr(NameOID.ORGANIZATION_NAME)
+        location_parts = tuple(
+            value
+            for value in (
+                _first_attr(NameOID.LOCALITY_NAME),
+                _first_attr(NameOID.STATE_OR_PROVINCE_NAME),
+                _first_attr(NameOID.COUNTRY_NAME),
+            )
+            if value
+        )
+        distinguished_name_parts = tuple(
+            value
+            for value in (
+                common_name,
+                email,
+                title,
+                company,
+                *location_parts,
+            )
+            if value
+        )
+
+        values: dict[SignatureFieldKey, str] = {}
+        if distinguished_name_parts:
+            values[SignatureFieldKey.DISTINGUISHED_NAME] = ", ".join(distinguished_name_parts)
+
+        if common_name:
+            values[SignatureFieldKey.COMMON_NAME] = common_name
+        if email:
+            values[SignatureFieldKey.EMAIL] = email
+        if title:
+            values[SignatureFieldKey.TITLE] = title
+        if company:
+            values[SignatureFieldKey.COMPANY] = company
+        if location_parts:
+            values[SignatureFieldKey.LOCATION] = ", ".join(location_parts)
+
+        self._certificate_preview_values = values
+        self._certificate_preview_available = True
+        return values
 
     def _validate_signature_rect(self) -> tuple[SigningDraftValidationIssue, ...]:
         rect = self.signature_rect
@@ -494,3 +583,23 @@ class SigningDraftWorkflow:
         if self.placement_context is None:
             raise ValueError("A placement context is required before converting selections.")
         return self.placement_context
+
+    def _validate_visible_signature_fit(self) -> tuple[SigningDraftValidationIssue, ...]:
+        if self.signature_rect is None or self.signature_appearance is None:
+            return ()
+        if not Path(self.certificate_path).exists():
+            return ()
+
+        from foliaseal.application.phase3_signing_backend import (
+            _visible_signature_fit_issues,
+        )
+        from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+
+        return _visible_signature_fit_issues(
+            certificate_path=self.certificate_path,
+            passphrase=self.passphrase,
+            signature_rect=self.signature_rect,
+            signature_appearance=SigningBackendAppearance.from_signature_appearance(
+                self.signature_appearance
+            ),
+        )

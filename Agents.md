@@ -117,3 +117,30 @@ When practical and unlikely to cause problems, develop work plans such that they
 
 ### Agent Lifecycle
 If an agent is unlikely to be used again in such a fashion that their existing context is beneficial - if their feature is confirmed complete by a review and no bug fixing is expected, for instance - they will be closed down at the completion of their task to free up agent slots.
+
+### Agent Reporting Requirements
+Spawned agents must report back proactively instead of waiting to be polled.
+
+Required behaviors:
+- When the agent finishes, it must send a completion report immediately.
+- When the agent hits a blocker, ambiguity, or scope conflict, it must report that immediately instead of stalling silently.
+- If the agent realizes it has only produced analysis or a plan for an implementation brief, it must say so explicitly and not imply the task is complete.
+- If the agent cannot complete the requested work within a reasonable amount of progress, it must send a status update with what is done, what remains, and what decision or input is needed.
+
+Required completion report contents:
+- explicit statement that the task is done
+- changed files
+- concise summary of what changed
+- verification performed, including tests/lint and their results
+- remaining caveats or limitations
+
+Required blocker report contents:
+- explicit statement that the task is blocked or incomplete
+- exact blocker or uncertainty
+- files or interfaces involved
+- the narrowest recommended next step
+
+Coordinator expectations:
+- Do not treat silence as progress.
+- Do not accept plan-only responses for implementation briefs.
+- Interrupt and redirect agents that drift into planning, vague status notes, or incomplete handoffs.

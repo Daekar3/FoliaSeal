@@ -64,6 +64,18 @@ Not yet production-ready:
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
 
+Roadmap note:
+
+- The original Phase 3 scope turned out to bundle several independent failure modes.
+- The remaining roadmap is now split into smaller post-Phase-3 slices in
+  [pdf_signing_app_feasibility.md](/home/daekar/SignPDF/Scratch/pdf_signing_app_feasibility.md),
+  including:
+  - preview/output parity and rectangle-aware preview,
+  - TSA-backed timestamping,
+  - trust/certification hardening,
+  - remaining profile portability work,
+  - packaging and full release validation.
+
 ## Local development
 
 ```bash
@@ -117,9 +129,16 @@ Run it against a representative PDF:
 ```bash
 .venv/bin/python -m foliaseal phase3-signing-harness \
   --pdf-path "/path/to/representative.pdf" \
+  --certificate-path "/path/to/identity.p12" \
+  --passphrase "your-test-passphrase" \
   --summary-json-path artifacts/phase3_harness_capture.json \
   --checklist-results-path artifacts/phase3_fr3b_acceptance_results.md
 ```
+
+The harness defaults to `timestamp_required=False` today, so it is suitable for real signed-PDF
+testing even before TSA-backed timestamping support lands. The certificate CLI arguments are meant
+for local development/manual QA; avoid using a production identity in shell history if that is a
+concern in your environment.
 
 What it does:
 

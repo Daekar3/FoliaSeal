@@ -6,16 +6,26 @@ import importlib
 import json
 import re
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields, is_dataclass
+from enum import Enum
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from pyhanko.pdf_utils.reader import PdfFileReader
+
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
+from foliaseal.application.phase3_signing_backend import (
+    _build_stamp_style,
+    _build_stamp_text,
+    _current_signing_time,
+    _load_simple_signer,
+    _stamp_background_for_path,
+    build_phase3_signing_executor,
+)
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
-from foliaseal.domain.models import SigningRequest
+from foliaseal.domain.models import SigningRequest, SigningResult
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
@@ -36,7 +46,17 @@ class Phase3HarnessCapture:
     last_signature_page_number: int | None
     last_signature_has_visible_appearance: bool
     last_signature_output_path: str | None
+    last_signing_result_message: str | None
+    last_signing_result_success: bool | None
+    preview_snapshot: dict[str, Any]
+    sign_request_snapshot: dict[str, Any] | None
+    backend_reservation_snapshot: dict[str, Any] | None
+    output_file_exists: bool
+    output_file_size_bytes: int | None
+    output_signature_count: int | None
+    output_signature_snapshot: dict[str, Any] | None
     preview_available: bool
+    preview_text: str
     validation_text: str
     interaction_counts: dict[str, int]
     errors: tuple[str, ...]
@@ -44,7 +64,7 @@ class Phase3HarnessCapture:
     def to_json(self) -> str:
         """Return a stable JSON representation for later review."""
 
-        return json.dumps(asdict(self), indent=2, sort_keys=True)
+        return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
 
 
 def build_phase3_checklist_results_markdown(
@@ -84,9 +104,143 @@ def build_phase3_checklist_results_markdown(
             f"{'yes' if capture.last_signature_has_visible_appearance else 'no'}"
         ),
         (
-            f"- Last sign request output path: `{capture.last_signature_output_path}`"
+        f"- Last sign request output path: `{capture.last_signature_output_path}`"
             if capture.last_signature_output_path is not None
             else "- Last sign request output path: not captured"
+        ),
+        (
+            f"- Last request layout template: "
+            f"{_snapshot_layout_template(capture.sign_request_snapshot)}"
+            if capture.sign_request_snapshot is not None
+            else "- Last request layout template: not captured"
+        ),
+        (
+            f"- Last request show field names: "
+            f"{'yes' if _snapshot_show_field_names(capture.sign_request_snapshot) else 'no'}"
+            if capture.sign_request_snapshot is not None
+            else "- Last request show field names: not captured"
+        ),
+        (
+            f"- Last request field snapshot count: "
+            f"{_snapshot_request_field_count(capture.sign_request_snapshot)}"
+            if capture.sign_request_snapshot is not None
+            else "- Last request field snapshot count: not captured"
+        ),
+        (
+            f"- Backend reservation layout template: "
+            f"{_snapshot_layout_template(capture.backend_reservation_snapshot)}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation layout template: not captured"
+        ),
+        (
+            f"- Backend reservation stamp text length: "
+            f"{_snapshot_reservation_text_length(capture.backend_reservation_snapshot)}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation stamp text length: not captured"
+        ),
+        (
+            f"- Backend reservation stamp background: "
+            f"{_snapshot_reservation_stamp_background_text(capture.backend_reservation_snapshot)}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation stamp background: not captured"
+        ),
+        (
+            f"- Backend reservation background scaling: "
+            f"{_snapshot_layout_scaling(capture.backend_reservation_snapshot, 'background')}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation background scaling: not captured"
+        ),
+        (
+            f"- Backend reservation content scaling: "
+            f"{_snapshot_layout_scaling(capture.backend_reservation_snapshot, 'content')}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation content scaling: not captured"
+        ),
+        (
+            f"- Backend reservation content bottom margin: "
+            f"{_snapshot_reservation_margin_bottom(capture.backend_reservation_snapshot)}"
+            if capture.backend_reservation_snapshot is not None
+            else "- Backend reservation content bottom margin: not captured"
+        ),
+        (
+            f"- Preview layout template: {capture.preview_snapshot['layout_template']}"
+            if capture.preview_snapshot
+            else "- Preview layout template: not captured"
+        ),
+        (
+            f"- Preview show field names: "
+            f"{'yes' if _snapshot_preview_show_field_names(capture.preview_snapshot) else 'no'}"
+            if capture.preview_snapshot
+            else "- Preview show field names: not captured"
+        ),
+        (
+            f"- Preview field count: {len(capture.preview_snapshot['fields'])}"
+            if capture.preview_snapshot
+            else "- Preview field count: not captured"
+        ),
+        (
+            "- Last signing result: "
+            f"{'success' if capture.last_signing_result_success else 'failure'}"
+            if capture.last_signing_result_success is not None
+            else "- Last signing result: not captured"
+        ),
+        (
+            f"- Last signing message: `{capture.last_signing_result_message}`"
+            if capture.last_signing_result_message
+            else "- Last signing message: not captured"
+        ),
+        f"- Output file exists: {'yes' if capture.output_file_exists else 'no'}",
+        (
+            f"- Output file size: {capture.output_file_size_bytes} bytes"
+            if capture.output_file_size_bytes is not None
+            else "- Output file size: not captured"
+        ),
+        (
+            f"- Output embedded signature count: {capture.output_signature_count}"
+            if capture.output_signature_count is not None
+            else "- Output embedded signature count: not captured"
+        ),
+        (
+            f"- Output signature field name: {capture.output_signature_snapshot['field_name']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("field_name") is not None
+            else "- Output signature field name: not captured"
+        ),
+        (
+            f"- Output signature name: {capture.output_signature_snapshot['name']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("name") is not None
+            else "- Output signature name: not captured"
+        ),
+        (
+            f"- Output signature location: {capture.output_signature_snapshot['location']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("location") is not None
+            else "- Output signature location: not captured"
+        ),
+        (
+            f"- Output signature contact info: {capture.output_signature_snapshot['contact_info']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("contact_info") is not None
+            else "- Output signature contact info: not captured"
+        ),
+        (
+            f"- Output signature byte range: {capture.output_signature_snapshot['byte_range']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("byte_range") is not None
+            else "- Output signature byte range: not captured"
+        ),
+        (
+            f"- Output signature subfilter: {capture.output_signature_snapshot['subfilter']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("subfilter") is not None
+            else "- Output signature subfilter: not captured"
+        ),
+        (
+            f"- Output signature md algorithm: {capture.output_signature_snapshot['md_algorithm']}"
+            if capture.output_signature_snapshot
+            and capture.output_signature_snapshot.get("md_algorithm") is not None
+            else "- Output signature md algorithm: not captured"
         ),
         f"- Current validation text: `{capture.validation_text or 'n/a'}`",
         "",
@@ -105,6 +259,8 @@ def build_phase3_checklist_results_markdown(
 def run_phase3_signing_harness(
     *,
     pdf_path: str,
+    certificate_path: str = "demo-cert.p12",
+    passphrase: str = "demo-passphrase",
     summary_json_path: str | None = None,
     checklist_results_path: str = DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
     checklist_template_path: str = DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
@@ -130,8 +286,8 @@ def run_phase3_signing_harness(
     signing_workflow = SigningDraftWorkflow(
         input_pdf_path=str(source_path),
         output_pdf_path=str(source_path.with_name(source_path.stem + "-signed.pdf")),
-        certificate_path="demo-cert.p12",
-        passphrase="demo-passphrase",
+        certificate_path=certificate_path,
+        passphrase=passphrase,
         tsa_url="https://tsa.example.invalid",
         timestamp_required=False,
     )
@@ -213,12 +369,29 @@ def run_phase3_signing_harness(
     app.exec()
 
     preview_text = shell.properties_panel.preview_text()
+    preview = shell.properties_panel.refresh_preview()
     validation_text = shell.properties_panel.validation_text()
+    last_signing_result = getattr(shell, "last_signing_result", None)
+    backend_reservation_snapshot = (
+        _snapshot_backend_reservation(sign_requests[-1]) if sign_requests else None
+    )
     last_signature_page_index = (
         sign_requests[-1].signature_rect.page_index
         if sign_requests and sign_requests[-1].signature_rect is not None
         else None
     )
+    output_path = sign_requests[-1].output_pdf_path if sign_requests else None
+    output_exists = False
+    output_size_bytes = None
+    output_signature_count = None
+    output_signature_snapshot = None
+    if output_path is not None:
+        output_file = Path(output_path)
+        output_exists = output_file.exists()
+        if output_exists:
+            output_size_bytes = output_file.stat().st_size
+            output_signature_count = _count_embedded_signatures(output_file)
+            output_signature_snapshot = _snapshot_output_signature(output_file)
     capture = Phase3HarnessCapture(
         pdf_path=str(source_path),
         first_render_ms=viewer_workflow.timing_tracker.snapshot().first_render_ms,
@@ -231,10 +404,24 @@ def run_phase3_signing_harness(
         last_signature_has_visible_appearance=(
             sign_requests[-1].has_visible_signature_settings() if sign_requests else False
         ),
-        last_signature_output_path=(
-            sign_requests[-1].output_pdf_path if sign_requests else None
+        last_signature_output_path=output_path,
+        last_signing_result_message=(
+            last_signing_result.message if isinstance(last_signing_result, SigningResult) else None
         ),
+        last_signing_result_success=(
+            last_signing_result.success if isinstance(last_signing_result, SigningResult) else None
+        ),
+        preview_snapshot=_snapshot_preview(preview),
+        sign_request_snapshot=(
+            _snapshot_signing_request(sign_requests[-1]) if sign_requests else None
+        ),
+        backend_reservation_snapshot=backend_reservation_snapshot,
+        output_file_exists=output_exists,
+        output_file_size_bytes=output_size_bytes,
+        output_signature_count=output_signature_count,
+        output_signature_snapshot=output_signature_snapshot,
         preview_available=bool(preview_text.strip()),
+        preview_text=preview_text,
         validation_text=validation_text,
         interaction_counts=dict(sorted(interaction_counts.items())),
         errors=tuple(errors),
@@ -343,3 +530,330 @@ def _write_optional_text(*, target_path: str | None, content: str) -> None:
     path = Path(target_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def _count_embedded_signatures(output_file: Path) -> int | None:
+    try:
+        with output_file.open("rb") as handle:
+            reader = PdfFileReader(handle)
+            return len(list(reader.embedded_signatures))
+    except Exception:
+        return None
+
+
+def _snapshot_output_signature(output_file: Path) -> dict[str, Any] | None:
+    try:
+        with output_file.open("rb") as handle:
+            reader = PdfFileReader(handle)
+            embedded_signatures = list(reader.embedded_signatures)
+            if not embedded_signatures:
+                return None
+            signature = embedded_signatures[-1]
+            sig_object = signature.sig_object
+            return {
+                "field_name": signature.field_name,
+                "name": sig_object.get("/Name"),
+                "location": sig_object.get("/Location"),
+                "contact_info": sig_object.get("/ContactInfo"),
+                "byte_range": list(sig_object.get("/ByteRange", [])),
+                "subfilter": sig_object.get("/SubFilter"),
+                "md_algorithm": signature.md_algorithm,
+                "coverage": _serialize_signature_metadata(signature.coverage),
+                "docmdp_level": _serialize_signature_metadata(signature.docmdp_level),
+            }
+    except Exception:
+        return None
+
+
+def _snapshot_preview(preview) -> dict[str, Any]:
+    return {
+        "title": preview.title,
+        "signer_label_prefix": preview.signer_label_prefix,
+        "layout_template": preview.layout_template.value if preview.layout_template else None,
+        "timezone_display_mode": (
+            preview.timezone_display_mode.value if preview.timezone_display_mode else None
+        ),
+        "show_field_names": preview.show_field_names,
+        "datetime_format": preview.datetime_format,
+        "image_stamp_path": preview.image_stamp_path,
+        "signature_rect": _snapshot_signature_rect(preview.signature_rect),
+        "text_style": _snapshot_text_style(preview.text_style),
+        "box_style": _snapshot_box_style(preview.box_style),
+        "fields": [_snapshot_preview_field(field) for field in preview.fields],
+        "issues": [_snapshot_issue(issue) for issue in preview.issues],
+        "can_submit": preview.can_submit,
+    }
+
+
+def _snapshot_signing_request(request: SigningRequest) -> dict[str, Any]:
+    appearance = request.signature_appearance
+    return {
+        "input_pdf_path": request.input_pdf_path,
+        "output_pdf_path": request.output_pdf_path,
+        "certificate_path": request.certificate_path,
+        "certificate_alias": request.certificate_alias,
+        "timestamp_required": request.timestamp_required,
+        "tsa_url": request.tsa_url,
+        "signature_rect": _snapshot_signature_rect(request.signature_rect),
+        "signature_appearance": (
+            None if appearance is None else _snapshot_signing_appearance(appearance)
+        ),
+    }
+
+
+def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | None:
+    if request.signature_rect is None or request.signature_appearance is None:
+        return None
+
+    try:
+        appearance = request.signature_appearance
+        signer = _load_simple_signer(request.certificate_path, request.passphrase)
+        signing_time = _current_signing_time(appearance.timezone_display_mode)
+        stamp_text = _build_stamp_text(
+            appearance=appearance,
+            signer=signer,
+            signing_time=signing_time,
+            signature_rect=request.signature_rect,
+        )
+        stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
+        style = _build_stamp_style(
+            appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=request.signature_rect,
+        )
+    except Exception:
+        return None
+    return {
+        "layout_template": appearance.layout_template.value,
+        "signature_rect": _snapshot_signature_rect(request.signature_rect),
+        "stamp_text": stamp_text,
+        "stamp_text_length": len(stamp_text),
+        "stamp_text_line_count": len(stamp_text.splitlines()) if stamp_text else 0,
+        "stamp_background_present": stamp_background is not None,
+        "text_style": _snapshot_text_style(appearance.text_style),
+        "box_style": _snapshot_box_style(appearance.box_style),
+        "background_layout": _snapshot_layout_rule(style.background_layout),
+        "content_layout": _snapshot_layout_rule(style.inner_content_layout),
+    }
+
+
+def _snapshot_layout_rule(layout_rule) -> dict[str, Any] | None:
+    if layout_rule is None:
+        return None
+    return {
+        "x_align": layout_rule.x_align.name.lower(),
+        "y_align": layout_rule.y_align.name.lower(),
+        "inner_content_scaling": layout_rule.inner_content_scaling.name.lower(),
+        "margins": {
+            "left": layout_rule.margins.left,
+            "right": layout_rule.margins.right,
+            "top": layout_rule.margins.top,
+            "bottom": layout_rule.margins.bottom,
+        },
+    }
+
+
+def _snapshot_signing_appearance(appearance) -> dict[str, Any]:
+    return {
+        "signer_label_prefix": appearance.signer_label_prefix,
+        "layout_template": appearance.layout_template.value,
+        "timezone_display_mode": appearance.timezone_display_mode.value,
+        "show_field_names": appearance.show_field_names,
+        "datetime_format": appearance.datetime_format,
+        "field_order": [field_key.value for field_key in appearance.field_order],
+        "text_style": _snapshot_text_style(appearance.text_style),
+        "box_style": _snapshot_box_style(appearance.box_style),
+        "image_stamp_path": appearance.image_stamp_path,
+        "fields": [
+            _snapshot_field_binding(field_key, binding)
+            for field_key, binding in appearance.iter_field_bindings()
+        ],
+    }
+
+
+def _snapshot_field_binding(field_key, binding) -> dict[str, Any]:
+    return {
+        "field_key": field_key.value,
+        "label": field_key.value,
+        "source": binding.source.value,
+        "show_in_visible_appearance": binding.show_in_visible_appearance,
+        "override_text": binding.override_text,
+        "display_label": binding.display_label,
+    }
+
+
+def _snapshot_preview_field(field) -> dict[str, Any]:
+    return {
+        "field_key": field.field_key.value,
+        "label": field.label,
+        "text": field.text,
+        "visible": field.visible,
+        "source": field.source.value,
+        "hint": field.hint,
+    }
+
+
+def _snapshot_text_style(text_style) -> dict[str, Any] | None:
+    if text_style is None:
+        return None
+    return {
+        "font_family": text_style.font_family,
+        "font_size_pt": text_style.font_size_pt,
+        "bold": text_style.bold,
+        "italic": text_style.italic,
+        "text_color_hex": text_style.text_color_hex,
+    }
+
+
+def _snapshot_box_style(box_style) -> dict[str, Any] | None:
+    if box_style is None:
+        return None
+    return {
+        "show_border": box_style.show_border,
+        "border_color_hex": box_style.border_color_hex,
+        "border_width_pt": box_style.border_width_pt,
+        "background_color_hex": box_style.background_color_hex,
+    }
+
+
+def _snapshot_signature_rect(signature_rect) -> dict[str, Any] | None:
+    if signature_rect is None:
+        return None
+    return {
+        "page_index": signature_rect.page_index,
+        "page_number": signature_rect.page_index + 1,
+        "left_pt": signature_rect.left_pt,
+        "bottom_pt": signature_rect.bottom_pt,
+        "width_pt": signature_rect.width_pt,
+        "height_pt": signature_rect.height_pt,
+    }
+
+
+def _snapshot_issue(issue) -> dict[str, Any]:
+    return {
+        "code": issue.code,
+        "message": issue.message,
+        "field_name": issue.field_name,
+        "severity": issue.severity.value,
+    }
+
+
+def _snapshot_sign_request_appearance(
+    snapshot: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if snapshot is None:
+        return None
+    appearance = snapshot.get("signature_appearance")
+    if not isinstance(appearance, dict):
+        return None
+    return appearance
+
+
+def _snapshot_layout_template(snapshot: dict[str, Any] | None) -> str | None:
+    if snapshot is None:
+        return None
+    direct_template = snapshot.get("layout_template")
+    if isinstance(direct_template, str):
+        return direct_template
+    appearance = _snapshot_sign_request_appearance(snapshot)
+    if appearance is None:
+        return None
+    layout_template = appearance.get("layout_template")
+    return layout_template if isinstance(layout_template, str) else None
+
+
+def _snapshot_show_field_names(snapshot: dict[str, Any] | None) -> bool:
+    appearance = _snapshot_sign_request_appearance(snapshot)
+    if appearance is None:
+        return False
+    return bool(appearance.get("show_field_names"))
+
+
+def _snapshot_request_field_count(snapshot: dict[str, Any] | None) -> int:
+    appearance = _snapshot_sign_request_appearance(snapshot)
+    if appearance is None:
+        return 0
+    fields = appearance.get("fields")
+    if not isinstance(fields, list):
+        return 0
+    return len(fields)
+
+
+def _snapshot_reservation_text_length(snapshot: dict[str, Any] | None) -> int:
+    if snapshot is None:
+        return 0
+    stamp_text = snapshot.get("stamp_text")
+    return len(stamp_text) if isinstance(stamp_text, str) else 0
+
+
+def _snapshot_reservation_stamp_background(snapshot: dict[str, Any] | None) -> bool:
+    if snapshot is None:
+        return False
+    return bool(snapshot.get("stamp_background_present"))
+
+
+def _snapshot_reservation_stamp_background_text(snapshot: dict[str, Any] | None) -> str:
+    return "yes" if _snapshot_reservation_stamp_background(snapshot) else "no"
+
+
+def _snapshot_layout_scaling(snapshot: dict[str, Any] | None, key: str) -> str | None:
+    if snapshot is None:
+        return None
+    layout = snapshot.get(f"{key}_layout")
+    if not isinstance(layout, dict):
+        return None
+    scaling = layout.get("inner_content_scaling")
+    return scaling if isinstance(scaling, str) else None
+
+
+def _snapshot_reservation_margin_bottom(snapshot: dict[str, Any] | None) -> int | None:
+    if snapshot is None:
+        return None
+    layout = snapshot.get("content_layout")
+    if not isinstance(layout, dict):
+        return None
+    margins = layout.get("margins")
+    if not isinstance(margins, dict):
+        return None
+    bottom = margins.get("bottom")
+    return int(bottom) if isinstance(bottom, int) else None
+
+
+def _snapshot_preview_show_field_names(snapshot: dict[str, Any] | None) -> bool:
+    if snapshot is None:
+        return False
+    return bool(snapshot.get("show_field_names"))
+
+
+def _serialize_signature_metadata(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _serialize_signature_metadata(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_serialize_signature_metadata(item) for item in value]
+    return str(value)
+
+
+def _jsonable_capture(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, Path):
+        return str(value)
+    if is_dataclass(value):
+        return {
+            field.name: _jsonable_capture(getattr(value, field.name))
+            for field in fields(value)
+        }
+    if isinstance(value, dict):
+        return {str(key): _jsonable_capture(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable_capture(item) for item in value]
+    return str(value)

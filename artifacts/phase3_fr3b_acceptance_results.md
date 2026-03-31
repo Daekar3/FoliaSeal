@@ -11,12 +11,36 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 0
-- Sign requests captured: 0
-- Last signature page number: not captured
-- Last sign request had visible appearance: no
-- Last sign request output path: not captured
-- Current validation text: `Place a signature on the page to continue.`
+- Selection interactions captured: 1
+- Sign requests captured: 6
+- Last signature page number: 4
+- Last sign request had visible appearance: yes
+- Last sign request output path: `/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf`
+- Last request layout template: single_line
+- Last request show field names: no
+- Last request field snapshot count: 8
+- Backend reservation layout template: not captured
+- Backend reservation stamp text length: not captured
+- Backend reservation stamp background: not captured
+- Backend reservation background scaling: not captured
+- Backend reservation content scaling: not captured
+- Backend reservation content bottom margin: not captured
+- Preview layout template: single_line
+- Preview show field names: no
+- Preview field count: 8
+- Last signing result: failure
+- Last signing message: `Visible signature content does not fit inside the selected rectangle for the single_line template. Enlarge the signature box or choose a more compact appearance.`
+- Output file exists: no
+- Output file size: not captured
+- Output embedded signature count: not captured
+- Output signature field name: not captured
+- Output signature name: not captured
+- Output signature location: not captured
+- Output signature contact info: not captured
+- Output signature byte range: not captured
+- Output signature subfilter: not captured
+- Output signature md algorithm: not captured
+- Current validation text: `Ready to sign.`
 
 # Phase 3 FR-3B Acceptance Checklist and Task Worksheet
 
@@ -75,7 +99,7 @@ Overlay notes:
 - [ ] Open a representative PDF that includes at least one page suitable for signature placement.
 - [x] Confirm the signature properties flow is reachable from the main signing UI.
 - [x] Confirm the viewer preview renders before any signing action is attempted.
-- [x] Confirm the selected PDF can be used without unexpected dependency or backend errors.
+- [ ] Confirm the selected PDF can be used without unexpected dependency or backend errors.
 
 Notes:
 
@@ -144,10 +168,10 @@ Goal:
 
 Checks:
 
-- [ ] The user can choose the target page before placement.
-- [ ] The user can draw a signature rectangle on the preview.
+- [x] The user can choose the target page before placement.
+- [x] The user can draw a signature rectangle on the preview.
 - [ ] The rectangle preview appears while dragging.
-- [ ] The resulting placement lands on the expected page area.
+- [x] The resulting placement lands on the expected page area.
 - [ ] The placement respects zoom and pan state.
 - [ ] The overlay does not drift, snap, or jump during the placement interaction.
 
@@ -196,8 +220,8 @@ Goal:
 
 Checks:
 
-- [ ] The sign action is available from the properties flow.
-- [ ] The app shows the expected confirmation or summary before signing, if applicable.
+- [x] The sign action is available from the properties flow.
+- [x] The app shows the expected confirmation or summary before signing, if applicable.
 - [ ] The signing action completes successfully for a valid non-timestamp-required request using the current backend path.
 - [ ] The signed output is produced at the expected location.
 - [ ] The signed output can be opened and inspected after signing.
@@ -317,7 +341,7 @@ Overall result:
 Summary notes:
 
 - Record the final judgment for FR-3B acceptance.
-- Include any constraints that should be carried into Phase 4 or future parity testing.
+- Include any constraints that should be carried into the smaller post-Phase-3 roadmap slices or future parity testing.
 - If the overlay gate failed, call that out explicitly as the reason Phase 3 remains blocked.
 - If TSA-backed timestamping or timestamp-required flows remain unsupported in the current build,
   call that out explicitly as the reason timestamp-oriented acceptance is not yet complete.
