@@ -96,6 +96,15 @@ def _write_test_stamp_image(path: Path) -> None:
     image.save(path, format="PNG")
 
 
+def _signature_appearance_stream_text(pdf_path: Path) -> str:
+    with pdf_path.open("rb") as handle:
+        reader = PdfFileReader(handle)
+        embedded_signatures = list(reader.embedded_signatures)
+        assert embedded_signatures
+        appearance_stream = embedded_signatures[-1].sig_field["/AP"]["/N"].get_object()
+        return appearance_stream.data.decode("latin1", errors="replace")
+
+
 def test_phase3_signing_executor_produces_signed_pdf_and_validates(tmp_path: Path) -> None:
     input_pdf = tmp_path / "input.pdf"
     output_pdf = tmp_path / "output.pdf"
@@ -131,6 +140,12 @@ def test_phase3_signing_executor_produces_signed_pdf_and_validates(tmp_path: Pat
     assert result.signature_subfilter == "adbe.pkcs7.detached"
     assert result.timestamp_present is False
 
+    appearance_text = _signature_appearance_stream_text(output_pdf)
+    assert "Test User" in appearance_text
+    assert "Board Secretary" in appearance_text
+    assert "FoliaSeal" in appearance_text
+    assert "Visible signature" not in appearance_text
+
     with output_pdf.open("rb") as handle:
         reader = PdfFileReader(handle)
         embedded_signatures = list(reader.embedded_signatures)
@@ -150,6 +165,47 @@ def test_phase3_signing_executor_produces_signed_pdf_and_validates(tmp_path: Pat
     summary = verifier.verify(str(output_pdf))
     assert summary.signature_count == 1
     assert summary.timestamp_present is False
+
+
+def test_phase3_signing_executor_produces_visible_signature_without_image_stamp(
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    appearance = build_signature_appearance(
+        image_stamp_path=None,
+        show_field_names=True,
+        signer_label_prefix="",
+    )
+
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=620.0,
+            height_pt=180.0,
+        ),
+        signature_appearance=appearance,
+    )
+
+    result = build_phase3_signing_executor().execute(request)
+
+    assert result.success is True
+    assert result.failure_code is None
+    assert output_pdf.exists()
+    appearance_text = _signature_appearance_stream_text(output_pdf)
+    assert "Test User" in appearance_text
+    assert "Board Secretary" in appearance_text
+    assert "FoliaSeal" in appearance_text
+    assert appearance_text.strip()
 
 
 def test_phase3_signing_executor_signs_compact_single_line_rectangle(
@@ -538,12 +594,84 @@ def test_build_stamp_text_wraps_single_line_content_for_compact_rectangle(
         signing_time=_current_signing_time(appearance.timezone_display_mode),
         signature_rect=build_signature_rect(
             page_index=0,
-            width_pt=261.63,
+            width_pt=180.0,
             height_pt=20.99,
         ),
     )
 
     assert "\n" in stamp_text
+    assert "Inkslapped by" in stamp_text
+    assert "Test User" in stamp_text
+    assert "test@example.com" in stamp_text
+    assert "FoliaSeal" in stamp_text
+
+
+def test_build_stamp_text_keeps_single_line_content_single_when_roomy(
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    signer = _load_simple_signer(str(cert_path), "secret")
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Inkslapped by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            show_field_names=False,
+            image_stamp_path=None,
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            text_style=SignatureTextStyle(
+                font_family="Source Sans 3",
+                font_size_pt=6.0,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    stamp_text = _build_stamp_text(
+        appearance=appearance,
+        signer=signer,
+        signing_time=_current_signing_time(appearance.timezone_display_mode),
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=620.0,
+            height_pt=180.0,
+        ),
+    )
+
+    assert "\n" not in stamp_text
     assert "Inkslapped by" in stamp_text
     assert "Test User" in stamp_text
     assert "test@example.com" in stamp_text

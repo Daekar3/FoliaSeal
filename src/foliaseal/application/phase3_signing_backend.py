@@ -552,7 +552,9 @@ def _build_stamp_text(
             _wrap_visible_signature_fragments(
                 fragments,
                 text_style=appearance.text_style,
+                max_text_width_pt=max(1, int(round(signature_rect.width_pt)) - 8),
                 max_text_height_pt=max(1, int(round(signature_rect.height_pt)) - 8),
+                allow_width_overflow=False,
             )
         )
     return _escape_percent("\n".join(fragments))
@@ -562,13 +564,16 @@ def _wrap_visible_signature_fragments(
     fragments: list[str],
     *,
     text_style: SignatureTextStyle,
+    max_text_width_pt: int | None = None,
     max_text_height_pt: int,
+    allow_width_overflow: bool = True,
 ) -> str:
     if not fragments:
         return ""
 
     text_box_style = _build_text_box_style(text_style)
-    best_candidate: tuple[int, int, str] | None = None
+    best_candidate: tuple[int, int, int, str] | None = None
+    best_overflow_candidate: tuple[int, int, int, str] | None = None
     fragment_count = len(fragments)
     for split_mask in range(1 << max(fragment_count - 1, 0)):
         lines: list[list[str]] = [[]]
@@ -584,16 +589,22 @@ def _wrap_visible_signature_fragments(
         width_pt, height_pt = _measure_text_box_dimensions(candidate, text_box_style)
         if height_pt > max_text_height_pt:
             continue
-        candidate_score = (width_pt, height_pt, candidate)
-        if best_candidate is None or candidate_score[:2] < best_candidate[:2]:
-            best_candidate = candidate_score
+        candidate_score = (len(line_strings), -width_pt, height_pt, candidate)
+        if max_text_width_pt is None or width_pt <= max_text_width_pt:
+            if best_candidate is None or candidate_score[:3] < best_candidate[:3]:
+                best_candidate = candidate_score
+        elif allow_width_overflow:
+            if best_overflow_candidate is None or candidate_score[:3] < best_overflow_candidate[:3]:
+                best_overflow_candidate = candidate_score
 
     if best_candidate is None:
+        if allow_width_overflow and best_overflow_candidate is not None:
+            return best_overflow_candidate[3]
         raise ValueError(
             "Visible signature content does not fit inside the selected rectangle at the "
             "requested font size."
         )
-    return best_candidate[2]
+    return best_candidate[3]
 
 
 def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:

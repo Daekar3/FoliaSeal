@@ -57,7 +57,7 @@ def build_signature_field_binding(
 
 def build_signature_appearance(
     *,
-    signer_label_prefix: str = "Digitally signed by",
+    signer_label_prefix: str | None = "Digitally signed by",
     layout_template: SignatureLayoutTemplate = SignatureLayoutTemplate.MULTI_LINE,
     timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.UTC,
     show_field_names: bool = False,
@@ -87,7 +87,7 @@ def build_signature_appearance(
         SignatureFieldKey.LOCATION,
     )
     return SignatureAppearance(
-        signer_label_prefix=signer_label_prefix,
+        signer_label_prefix=signer_label_prefix or "",
         layout_template=layout_template,
         timezone_display_mode=timezone_display_mode,
         show_field_names=show_field_names,

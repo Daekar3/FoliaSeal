@@ -11,14 +11,14 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 1
-- Sign requests captured: 6
-- Last signature page number: 4
-- Last sign request had visible appearance: yes
-- Last sign request output path: `/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf`
-- Last request layout template: single_line
-- Last request show field names: no
-- Last request field snapshot count: 8
+- Selection interactions captured: 11
+- Sign requests captured: 0
+- Last signature page number: not captured
+- Last sign request had visible appearance: no
+- Last sign request output path: not captured
+- Last request layout template: not captured
+- Last request show field names: not captured
+- Last request field snapshot count: not captured
 - Backend reservation layout template: not captured
 - Backend reservation stamp text length: not captured
 - Backend reservation stamp background: not captured
@@ -28,8 +28,8 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 - Preview layout template: single_line
 - Preview show field names: no
 - Preview field count: 8
-- Last signing result: failure
-- Last signing message: `Visible signature content does not fit inside the selected rectangle for the single_line template. Enlarge the signature box or choose a more compact appearance.`
+- Last signing result: not captured
+- Last signing message: not captured
 - Output file exists: no
 - Output file size: not captured
 - Output embedded signature count: not captured
@@ -40,7 +40,7 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 - Output signature byte range: not captured
 - Output signature subfilter: not captured
 - Output signature md algorithm: not captured
-- Current validation text: `Ready to sign.`
+- Current validation text: `ERROR signature_appearance_invalid: signer_label_prefix must be a non-empty string.`
 
 # Phase 3 FR-3B Acceptance Checklist and Task Worksheet
 
@@ -67,8 +67,13 @@ Current status note:
   - confirming overwrite when a name already exists
   - selecting a saved profile from a dropdown
 - The concrete signing backend now produces a genuinely cryptographically signed PDF.
-- The current open workflow gaps are TSA-backed timestamping, timestamp-required flows, and the
-  final end-to-end acceptance pass against representative signed output.
+- Current blockers still include visible-signature fidelity and parity issues in addition to the
+  remaining timestamping work.
+- The main active Phase 3 risks are:
+  - preview/output parity for compact and awkward rectangles,
+  - visible-signature fit and readability,
+  - end-to-end manual acceptance against representative signed output,
+  - TSA-backed timestamping and timestamp-required flows.
 - Some worksheet items below are therefore not yet testable in the current build and should be
   marked as such rather than treated as failures.
 
@@ -99,7 +104,7 @@ Overlay notes:
 - [ ] Open a representative PDF that includes at least one page suitable for signature placement.
 - [x] Confirm the signature properties flow is reachable from the main signing UI.
 - [x] Confirm the viewer preview renders before any signing action is attempted.
-- [ ] Confirm the selected PDF can be used without unexpected dependency or backend errors.
+- [x] Confirm the selected PDF can be used without unexpected dependency or backend errors.
 
 Notes:
 
@@ -168,7 +173,7 @@ Goal:
 
 Checks:
 
-- [x] The user can choose the target page before placement.
+- [ ] The user can choose the target page before placement.
 - [x] The user can draw a signature rectangle on the preview.
 - [ ] The rectangle preview appears while dragging.
 - [x] The resulting placement lands on the expected page area.
@@ -193,7 +198,7 @@ Goal:
 
 Checks:
 
-- [ ] The placed rectangle can be resized or repositioned in the workflow.
+- [x] The placed rectangle can be resized or repositioned in the workflow.
 - [ ] Numeric x/y/width/height fine-tuning is available when expected.
 - [ ] Fine-tuned values are reflected in the preview.
 - [ ] Fine-tuned values remain valid after the user changes other appearance settings.
@@ -220,8 +225,8 @@ Goal:
 
 Checks:
 
-- [x] The sign action is available from the properties flow.
-- [x] The app shows the expected confirmation or summary before signing, if applicable.
+- [ ] The sign action is available from the properties flow.
+- [ ] The app shows the expected confirmation or summary before signing, if applicable.
 - [ ] The signing action completes successfully for a valid non-timestamp-required request using the current backend path.
 - [ ] The signed output is produced at the expected location.
 - [ ] The signed output can be opened and inspected after signing.

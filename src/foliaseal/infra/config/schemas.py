@@ -209,7 +209,7 @@ def _deserialize_field_order(payload: dict[str, Any]) -> tuple[SignatureFieldKey
 def _deserialize_appearance(payload: dict[str, Any]) -> SignatureAppearance:
     box_style_payload = _require_mapping(payload, "box_style")
     return SignatureAppearance(
-        signer_label_prefix=_require_non_empty_str(payload, "signer_label_prefix"),
+        signer_label_prefix=_require_str(payload, "signer_label_prefix").strip(),
         layout_template=_require_enum(payload, "layout_template", SignatureLayoutTemplate),  # type: ignore[arg-type]
         timezone_display_mode=_require_enum(
             payload,

@@ -23,8 +23,13 @@ Current status note:
   - confirming overwrite when a name already exists
   - selecting a saved profile from a dropdown
 - The concrete signing backend now produces a genuinely cryptographically signed PDF.
-- The current open workflow gaps are TSA-backed timestamping, timestamp-required flows, and the
-  final end-to-end acceptance pass against representative signed output.
+- Current blockers still include visible-signature fidelity and parity issues in addition to the
+  remaining timestamping work.
+- The main active Phase 3 risks are:
+  - preview/output parity for compact and awkward rectangles,
+  - visible-signature fit and readability,
+  - end-to-end manual acceptance against representative signed output,
+  - TSA-backed timestamping and timestamp-required flows.
 - Some worksheet items below are therefore not yet testable in the current build and should be
   marked as such rather than treated as failures.
 

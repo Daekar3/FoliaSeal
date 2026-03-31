@@ -1,26 +1,18 @@
 {
   "backend_reservation_snapshot": null,
-  "errors": [
-    "Visible signature rectangle is too small to reserve a usable stamp area for the single_line template.",
-    "Visible signature content does not fit inside the selected rectangle for the multi_line template. Enlarge the signature box or choose a more compact appearance.",
-    "Visible signature rectangle is too small to reserve a usable stamp area for the single_line template.",
-    "Visible signature content does not fit inside the selected rectangle for the multi_line template. Enlarge the signature box or choose a more compact appearance.",
-    "Visible signature content does not fit inside the selected rectangle for the multi_line template. Enlarge the signature box or choose a more compact appearance.",
-    "Visible signature content does not fit inside the selected rectangle for the single_line template. Enlarge the signature box or choose a more compact appearance."
-  ],
-  "first_render_ms": 9.724993957206607,
+  "errors": [],
+  "first_render_ms": 9.382790885865688,
   "interaction_counts": {
-    "selection_success": 1,
-    "sign_failure": 6,
-    "wheel_zoom_in": 11,
-    "wheel_zoom_out": 8
+    "selection_success": 11,
+    "wheel_zoom_in": 7,
+    "wheel_zoom_out": 3
   },
-  "last_signature_has_visible_appearance": true,
-  "last_signature_output_path": "/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf",
-  "last_signature_page_index": 3,
-  "last_signature_page_number": 4,
-  "last_signing_result_message": "Visible signature content does not fit inside the selected rectangle for the single_line template. Enlarge the signature box or choose a more compact appearance.",
-  "last_signing_result_success": false,
+  "last_signature_has_visible_appearance": false,
+  "last_signature_output_path": null,
+  "last_signature_page_index": null,
+  "last_signature_page_number": null,
+  "last_signing_result_message": null,
+  "last_signing_result_success": null,
   "output_file_exists": false,
   "output_file_size_bytes": null,
   "output_signature_count": null,
@@ -34,7 +26,7 @@
       "border_width_pt": 1.0,
       "show_border": true
     },
-    "can_submit": true,
+    "can_submit": false,
     "datetime_format": "%Y-%m-%d %H:%M:%S %Z",
     "fields": [
       {
@@ -63,11 +55,11 @@
       },
       {
         "field_key": "title",
-        "hint": null,
+        "hint": "from certificate",
         "label": "Title",
-        "source": "hidden",
-        "text": "",
-        "visible": false
+        "source": "derived",
+        "text": "Board Secretary",
+        "visible": true
       },
       {
         "field_key": "company",
@@ -82,7 +74,7 @@
         "hint": "sign time",
         "label": "Signing time",
         "source": "derived",
-        "text": "2026-03-31 03:06:46 UTC",
+        "text": "2026-03-31 03:39:47 UTC",
         "visible": true
       },
       {
@@ -95,151 +87,46 @@
       },
       {
         "field_key": "location",
-        "hint": null,
+        "hint": "from certificate",
         "label": "Location",
-        "source": "hidden",
-        "text": "",
-        "visible": false
+        "source": "derived",
+        "text": "Wytheville, Virginia, US",
+        "visible": true
       }
     ],
-    "image_stamp_path": "/mnt/Fast Storage/OneDrive, Adam/Documents/Adam's Signature.png",
-    "issues": [],
+    "image_stamp_path": null,
+    "issues": [
+      {
+        "code": "signature_appearance_invalid",
+        "field_name": "signature_appearance",
+        "message": "signer_label_prefix must be a non-empty string.",
+        "severity": "error"
+      }
+    ],
     "layout_template": "single_line",
     "show_field_names": false,
     "signature_rect": {
-      "bottom_pt": 428.48,
-      "height_pt": 20.99,
-      "left_pt": 35.84,
+      "bottom_pt": 428.68,
+      "height_pt": 42.008000000000095,
+      "left_pt": 36.04,
       "page_index": 3,
       "page_number": 4,
-      "width_pt": 261.63
+      "width_pt": 372.73880000000014
     },
     "signer_label_prefix": "Inkslapped by",
     "text_style": {
       "bold": false,
       "font_family": "Serif",
-      "font_size_pt": 6.0,
+      "font_size_pt": 9.0,
       "italic": true,
       "text_color_hex": "#000000"
     },
     "timezone_display_mode": "utc",
     "title": "Inkslapped by"
   },
-  "preview_text": "Inkslapped by\nAdam Smith | Secretary.LHI@Outlook.com | Lawson Heirs Inc. | 2026-03-31 03:05:52 UTC",
-  "selection_count": 1,
-  "sign_request_count": 6,
-  "sign_request_snapshot": {
-    "certificate_alias": null,
-    "certificate_path": "/mnt/Fast Storage/OneDrive, Adam/Applications/Encryption/Adam_Royall_Smith.pfx",
-    "input_pdf_path": "/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed).pdf",
-    "output_pdf_path": "/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf",
-    "signature_appearance": {
-      "box_style": {
-        "background_color_hex": "#FFFFFF",
-        "border_color_hex": "#000000",
-        "border_width_pt": 1.0,
-        "show_border": true
-      },
-      "datetime_format": "%Y-%m-%d %H:%M:%S %Z",
-      "field_order": [
-        "distinguished_name",
-        "common_name",
-        "email",
-        "title",
-        "company",
-        "signing_time",
-        "reason",
-        "location"
-      ],
-      "fields": [
-        {
-          "display_label": null,
-          "field_key": "distinguished_name",
-          "label": "distinguished_name",
-          "override_text": null,
-          "show_in_visible_appearance": false,
-          "source": "hidden"
-        },
-        {
-          "display_label": null,
-          "field_key": "common_name",
-          "label": "common_name",
-          "override_text": null,
-          "show_in_visible_appearance": true,
-          "source": "derived"
-        },
-        {
-          "display_label": null,
-          "field_key": "email",
-          "label": "email",
-          "override_text": null,
-          "show_in_visible_appearance": true,
-          "source": "derived"
-        },
-        {
-          "display_label": null,
-          "field_key": "title",
-          "label": "title",
-          "override_text": null,
-          "show_in_visible_appearance": false,
-          "source": "hidden"
-        },
-        {
-          "display_label": null,
-          "field_key": "company",
-          "label": "company",
-          "override_text": null,
-          "show_in_visible_appearance": true,
-          "source": "derived"
-        },
-        {
-          "display_label": null,
-          "field_key": "signing_time",
-          "label": "signing_time",
-          "override_text": null,
-          "show_in_visible_appearance": true,
-          "source": "derived"
-        },
-        {
-          "display_label": null,
-          "field_key": "reason",
-          "label": "reason",
-          "override_text": null,
-          "show_in_visible_appearance": true,
-          "source": "derived"
-        },
-        {
-          "display_label": null,
-          "field_key": "location",
-          "label": "location",
-          "override_text": null,
-          "show_in_visible_appearance": false,
-          "source": "hidden"
-        }
-      ],
-      "image_stamp_path": "/mnt/Fast Storage/OneDrive, Adam/Documents/Adam's Signature.png",
-      "layout_template": "single_line",
-      "show_field_names": false,
-      "signer_label_prefix": "Inkslapped by",
-      "text_style": {
-        "bold": false,
-        "font_family": "Serif",
-        "font_size_pt": 6.0,
-        "italic": true,
-        "text_color_hex": "#000000"
-      },
-      "timezone_display_mode": "utc"
-    },
-    "signature_rect": {
-      "bottom_pt": 428.48,
-      "height_pt": 20.99,
-      "left_pt": 35.84,
-      "page_index": 3,
-      "page_number": 4,
-      "width_pt": 261.63
-    },
-    "timestamp_required": false,
-    "tsa_url": "https://tsa.example.invalid"
-  },
-  "validation_text": "Ready to sign."
+  "preview_text": "Inkslapped by\nAdam Smith | Secretary.LHI@Outlook.com | Board Secretary | Lawson Heirs Inc. | 2026-03-31 03:38:14 UTC | Wytheville, Virginia, US",
+  "selection_count": 11,
+  "sign_request_count": 0,
+  "sign_request_snapshot": null,
+  "validation_text": "ERROR signature_appearance_invalid: signer_label_prefix must be a non-empty string."
 }

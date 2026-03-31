@@ -2832,6 +2832,199 @@ Definition of done:
 - findings clearly state whether the realistic compact-rectangle case is ready for another manual
   run
 
+## Corrective Wave: Blank Output, Optional Prefix, and Preview Parity
+
+This wave addresses the latest real-run blockers:
+
+- the signed PDF can succeed cryptographically while leaving the visible signature box blank
+- the signer label prefix is behaving as if it were required, even though it should be optional
+- compact `single_line` preview/output parity is still inconsistent
+- backend reservation diagnostics are still returning `null` in runs where they should be useful
+
+### Brief AT: Visible Signature Content Rendering Fix
+
+You are fixing the backend so successful signed PDFs do not produce an empty visible signature box.
+
+Objectives:
+
+- ensure visible signature content is actually rendered when the request includes visible fields
+- preserve cryptographic signing behavior
+- keep image/no-image cases working
+
+Primary files you own:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+Requirements to satisfy:
+
+- add a regression case for successful signing with visible fields and no image stamp
+- add a regression case for successful signing with visible fields and an image stamp
+- successful output must not leave the visible signature box blank
+- preserve current failure behavior for truly too-small rectangles
+
+Expected deliverables:
+
+- backend rendering fix for blank visible signature output
+- focused regression tests
+
+Definition of done:
+
+- a successful signing run no longer yields an empty visible signature box
+
+### Brief AU: Optional Prefix and Compact Preview Parity
+
+You are fixing the signing-shell/preview side so the signer label prefix is truly optional and
+ compact `single_line` preview behavior matches the backend more closely.
+
+Objectives:
+
+- allow empty signer label prefix with no reserved blank line/space
+- make compact `single_line` preview behavior reflect wrapped backend behavior more honestly
+- keep visible-field semantics intact
+
+Primary files you own:
+
+- `src/foliaseal/application/signing_draft_workflow.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `tests/unit/test_signing_draft_workflow.py`
+- `tests/unit/test_qt_signing_shell.py`
+
+Requirements to satisfy:
+
+- empty prefix must be allowed and should free space in preview/output behavior
+- preview must stop implying a flat one-line `single_line` result when the backend will wrap it
+- do not auto-drop user-selected visible fields
+
+Expected deliverables:
+
+- optional-prefix behavior aligned across preview and sign
+- improved compact `single_line` preview parity
+- focused regression tests
+
+Definition of done:
+
+- prefix can be omitted without leaving dead space, and compact preview behavior is more honest
+
+### Brief AV: Reservation Snapshot Reliability
+
+You are fixing the harness/backend diagnostics path so reservation snapshots are reliably available
+ when a signing request is otherwise valid.
+
+Objectives:
+
+- stop `backend_reservation_snapshot` from silently becoming `null` in useful runs
+- preserve diagnostic honesty
+
+Primary files you own:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_harness.py`
+
+Requirements to satisfy:
+
+- successful or near-successful signing runs should produce a useful reservation snapshot when the
+  backend can compute one
+- if a snapshot truly cannot be computed, that reason should be visible/debuggable rather than
+  silently swallowed
+
+Expected deliverables:
+
+- more reliable reservation diagnostics
+- focused regression tests
+
+Definition of done:
+
+- reservation snapshot data is no longer unexpectedly absent in normal debugging runs
+
+### Brief AW: Blank Output Review
+
+You are doing a review-only pass on this corrective wave.
+
+Review scope:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/application/signing_draft_workflow.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- affected tests under `tests/unit/`
+
+Tasks:
+
+- inspect whether successful signing now reliably renders visible content
+- inspect whether empty prefix behavior is truly optional and space-free
+- inspect whether compact `single_line` preview/output parity is materially improved
+- inspect whether reservation snapshots are now reliable enough for debugging
+- explicitly decide whether another real manual harness run is worth doing
+
+Definition of done:
+
+- findings clearly state whether the blank-output/prefix/parity blockers are resolved enough for
+  another manual run
+
+## Documentation Review Wave
+
+The roadmap and requirement docs should stay aligned with the implementation strategy so workers do
+ not follow stale or contradictory guidance.
+
+### Brief AX: Documentation Alignment Review
+
+You are reviewing the roadmap and requirement docs for stale scope boundaries, contradictory layout
+ guidance, or wording that could push implementers toward the wrong behavior.
+
+Review scope:
+
+- `README.md`
+- `Agents.md`
+- `pdf_signing_app_feasibility.md`
+- `phase3_parallel_plan.md`
+- `artifacts/phase3_fr3b_acceptance_checklist.md`
+- `artifacts/phase3_fr3b_acceptance_results.md`
+
+Tasks:
+
+- inspect for stale phase boundaries or phase names that no longer reflect the refactored roadmap
+- inspect for wording that contradicts the current visible-fields, text-first sizing, or no-trimming
+  contracts
+- inspect for any remaining ambiguity that could cause workers to implement the wrong behavior
+- inspect for mismatches between README guidance and the working plan
+
+Definition of done:
+
+- findings clearly state whether the docs could be confusing or misleading for future implementation
+
+## Documentation Review Wave
+
+The roadmap and requirement docs should stay aligned with the implementation strategy so workers do
+ not follow stale or contradictory guidance.
+
+### Brief AX: Documentation Alignment Review
+
+You are reviewing the roadmap and requirement docs for stale scope boundaries, contradictory layout
+ guidance, or wording that could push implementers toward the wrong behavior.
+
+Review scope:
+
+- `README.md`
+- `Agents.md`
+- `pdf_signing_app_feasibility.md`
+- `phase3_parallel_plan.md`
+- `artifacts/phase3_fr3b_acceptance_checklist.md`
+- `artifacts/phase3_fr3b_acceptance_results.md`
+
+Tasks:
+
+- inspect for stale phase boundaries or phase names that no longer reflect the refactored roadmap
+- inspect for wording that contradicts the current visible-fields, text-first sizing, or no-trimming
+  contracts
+- inspect for any remaining ambiguity that could cause workers to implement the wrong behavior
+- inspect for mismatches between README guidance and the working plan
+
+Definition of done:
+
+- findings clearly state whether the docs could be confusing or misleading for future implementation
+
 ## Next Requirement: Rectangle-Aware Preview Parity
 
 The next product requirement after the current backend appearance-parity fixes is to make the shell
