@@ -15,7 +15,12 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
-from foliaseal.application.phase3_signing_backend import _wrap_visible_signature_fragments
+from foliaseal.application.phase3_signing_backend import (
+    _build_text_box_style,
+    _layout_reservation_for_template,
+    _measure_text_box_dimensions,
+    _wrap_visible_signature_fragments,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -149,6 +154,7 @@ class PreviewControls:
     detail_label: Any
     single_body_container: Any
     multi_body_container: Any
+    multi_content_container: Any
     multi_stamp_label: Any
     multi_detail_label: Any
     footer_label: Any
@@ -189,13 +195,6 @@ def _clear_layout(layout: Any) -> None:
             item = take_at(0)
             if item is None:
                 break
-            widget_getter = getattr(item, "widget", None)
-            if callable(widget_getter):
-                widget = widget_getter()
-                if widget is not None:
-                    parent_setter = getattr(widget, "setParent", None)
-                    if callable(parent_setter):
-                        parent_setter(None)
         return
 
     items = getattr(layout, "items", None)
@@ -310,7 +309,13 @@ def _combo_items(combo: Any) -> tuple[str, ...]:
     return ()
 
 
-def _load_stamp_pixmap(bindings: QtSigningWidgetBindings, path: str) -> Any | None:
+def _load_stamp_pixmap(
+    bindings: QtSigningWidgetBindings,
+    path: str,
+    *,
+    max_width: int | None = None,
+    max_height: int | None = None,
+) -> Any | None:
     if not path:
         return None
     pixmap = bindings.q_pixmap(path)
@@ -322,11 +327,71 @@ def _load_stamp_pixmap(bindings: QtSigningWidgetBindings, path: str) -> Any | No
         keep_aspect = getattr(bindings.qt, "KeepAspectRatio", None)
         smooth = getattr(bindings.qt, "SmoothTransformation", None)
         if keep_aspect is not None and smooth is not None:
-            candidate = scaled(148, 92, keep_aspect, smooth)
+            candidate = scaled(
+                max_width or 148,
+                max_height or 92,
+                keep_aspect,
+                smooth,
+            )
             is_candidate_null = getattr(candidate, "isNull", None)
             if not callable(is_candidate_null) or not is_candidate_null():
                 return candidate
     return pixmap
+
+
+def _preview_stamp_max_size(
+    preview: SigningDraftPreview,
+    *,
+    title_line: str,
+    detail_text: str,
+    raw_pixmap: Any,
+) -> tuple[int, int]:
+    if (
+        preview.signature_rect is None
+        or preview.text_style is None
+        or preview.layout_template is None
+        or preview.stamp_position is None
+    ):
+        return (148, 92)
+
+    stamp_text_parts = [part for part in (title_line.strip(), detail_text.strip()) if part]
+    stamp_text = "\n".join(stamp_text_parts) or " "
+    text_box_style = _build_text_box_style(preview.text_style)
+    text_box_width, text_box_height = _measure_text_box_dimensions(stamp_text, text_box_style)
+    reservation = _layout_reservation_for_template(
+        preview.layout_template,
+        stamp_position=preview.stamp_position,
+        signature_rect=preview.signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+    )
+    area_width = max(1, reservation.stamp_area_width_pt)
+    area_height = max(1, reservation.stamp_area_height_pt)
+
+    pixmap_width = getattr(raw_pixmap, "width", None)
+    pixmap_height = getattr(raw_pixmap, "height", None)
+    if callable(pixmap_width):
+        pixmap_width = pixmap_width()
+    if callable(pixmap_height):
+        pixmap_height = pixmap_height()
+    if (
+        not isinstance(pixmap_width, int)
+        or not isinstance(pixmap_height, int)
+        or pixmap_height <= 0
+    ):
+        return (148, 92)
+
+    aspect_ratio = pixmap_width / pixmap_height
+    target_width = area_width
+    target_height = max(1, int(round(target_width / aspect_ratio)))
+    if target_height > area_height:
+        target_height = area_height
+        target_width = max(1, int(round(target_height * aspect_ratio)))
+
+    preview_scale = 0.5
+    scaled_width = max(1, int(round(target_width * preview_scale)))
+    scaled_height = max(1, int(round(target_height * preview_scale)))
+    return (min(scaled_width, 140), min(scaled_height, 80))
 
 
 def _set_checked(check_box: Any, value: bool) -> None:
@@ -460,13 +525,7 @@ def _preview_detail_text(preview: SigningDraftPreview) -> str:
                 pass
         if len(visible_fields) <= 1:
             return " | ".join(visible_fields)
-        line_count = 2 if len(visible_fields) <= 4 else 3
-        chunk_size = max(1, (len(visible_fields) + line_count - 1) // line_count)
-        wrapped_lines = [
-            " | ".join(visible_fields[index : index + chunk_size])
-            for index in range(0, len(visible_fields), chunk_size)
-        ]
-        return "\n".join(wrapped_lines)
+        return " | ".join(visible_fields)
     if preview.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
         lines = list(visible_fields[:2])
         if len(visible_fields) > 2:
@@ -756,6 +815,7 @@ class SignaturePropertiesPanel:
             detail_label=detail_label,
             single_body_container=single_body_container,
             multi_body_container=multi_body_container,
+            multi_content_container=multi_content_container,
             multi_stamp_label=multi_stamp_label,
             multi_detail_label=multi_detail_label,
             footer_label=footer_label,
@@ -1019,12 +1079,14 @@ class SignaturePropertiesPanel:
         background_color.setPlaceholderText("#FFFFFF")
         show_field_names = bindings.q_check_box("Show field names")
 
-        text_layout.addRow("Signer label prefix", signer_label_prefix)
+        text_layout.addRow(
+            "Signer label / Stamp Position",
+            _compose_row(bindings, signer_label_prefix, stamp_position),
+        )
         text_layout.addRow(
             "Layout / Timezone",
             _compose_row(bindings, layout_template, timezone_display_mode),
         )
-        text_layout.addRow("Stamp Position", stamp_position)
         text_layout.addRow(
             "Datetime / Font",
             _compose_row(bindings, datetime_format, font_family),
@@ -1344,13 +1406,28 @@ class SignaturePropertiesPanel:
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
         title_line = preview.signer_label_prefix or preview.title
         stamp_position = preview.stamp_position or SignatureStampPosition.TOP
-        stamp_pixmap = None
-        if preview.image_stamp_path:
-            stamp_pixmap = _load_stamp_pixmap(self._bindings, preview.image_stamp_path)
         is_vertical = stamp_position in (
             SignatureStampPosition.TOP,
             SignatureStampPosition.BOTTOM,
         )
+        visible_detail = _preview_detail_text(preview)
+        stamp_pixmap = None
+        if preview.image_stamp_path:
+            raw_pixmap = self._bindings.q_pixmap(preview.image_stamp_path)
+            raw_is_null = getattr(raw_pixmap, "isNull", None)
+            if not callable(raw_is_null) or not raw_is_null():
+                max_width, max_height = _preview_stamp_max_size(
+                    preview,
+                    title_line=title_line,
+                    detail_text=visible_detail,
+                    raw_pixmap=raw_pixmap,
+                )
+                stamp_pixmap = _load_stamp_pixmap(
+                    self._bindings,
+                    preview.image_stamp_path,
+                    max_width=max_width,
+                    max_height=max_height,
+                )
         _set_widget_visible(self._preview_controls.single_body_container, is_vertical)
         _set_widget_visible(self._preview_controls.multi_body_container, not is_vertical)
 
@@ -1398,12 +1475,16 @@ class SignaturePropertiesPanel:
             _set_container_widgets(
                 self._preview_controls.multi_body_container,
                 (self._preview_controls.multi_stamp_label, 0, self._bindings.qt.AlignCenter),
-                (self._preview_controls.multi_detail_label, 0, self._bindings.qt.AlignCenter),
+                (self._preview_controls.multi_content_container, 0, self._bindings.qt.AlignCenter),
             )
             if stamp_position == SignatureStampPosition.RIGHT:
                 _set_container_widgets(
                     self._preview_controls.multi_body_container,
-                    (self._preview_controls.multi_detail_label, 0, self._bindings.qt.AlignCenter),
+                    (
+                        self._preview_controls.multi_content_container,
+                        0,
+                        self._bindings.qt.AlignCenter,
+                    ),
                     (self._preview_controls.multi_stamp_label, 0, self._bindings.qt.AlignCenter),
                 )
 
@@ -1426,7 +1507,6 @@ class SignaturePropertiesPanel:
                 " padding: 6px;"
                 "}"
             )
-        visible_detail = _preview_detail_text(preview)
         if hasattr(self._preview_controls.title_label, "setStyleSheet"):
             self._preview_controls.title_label.setStyleSheet(
                 "font-weight: 700; "

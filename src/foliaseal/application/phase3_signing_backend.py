@@ -493,9 +493,38 @@ def _background_layout_for_stamp(
     )
     if stamp_background is None:
         return reservation.background_layout
-    return replace(
+    background_layout = replace(
         reservation.background_layout,
         inner_content_scaling=InnerScaling.SHRINK_TO_FIT,
+    )
+    image = getattr(stamp_background, "image", None)
+    if image is None or not hasattr(image, "size"):
+        return background_layout
+
+    image_width, image_height = image.size
+    if image_height <= 0:
+        return background_layout
+
+    area_width = max(1, reservation.stamp_area_width_pt)
+    area_height = max(1, reservation.stamp_area_height_pt)
+    aspect_ratio = image_width / image_height
+    target_width = area_width
+    target_height = max(1, int(round(target_width / aspect_ratio)))
+    if target_height > area_height:
+        target_height = area_height
+        target_width = max(1, int(round(target_height * aspect_ratio)))
+
+    extra_x = max(0, area_width - target_width) // 2
+    extra_y = max(0, area_height - target_height) // 2
+    margins = background_layout.margins
+    return replace(
+        background_layout,
+        margins=Margins(
+            left=margins.left + extra_x,
+            right=margins.right + extra_x,
+            top=margins.top + extra_y,
+            bottom=margins.bottom + extra_y,
+        ),
     )
 
 
@@ -555,10 +584,8 @@ def _build_stamp_text(
     signing_time: datetime,
     signature_rect: SignatureRect | None = None,
 ) -> str:
-    fragments: list[str] = []
+    body_fragments: list[str] = []
     prefix = appearance.signer_label_prefix.strip()
-    if prefix:
-        fragments.append(prefix)
 
     for binding in appearance.field_bindings:
         field_key = binding.field_key
@@ -574,23 +601,26 @@ def _build_stamp_text(
         if not text:
             continue
         if appearance.show_field_names:
-            fragments.append(f"{_field_label(field_key)}: {text}")
+            body_fragments.append(f"{_field_label(field_key)}: {text}")
         else:
-            fragments.append(text)
+            body_fragments.append(text)
 
     if appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        if signature_rect is None:
-            return _escape_percent(" | ".join(fragments))
-        return _escape_percent(
-            _wrap_visible_signature_fragments(
-                fragments,
+        body_text = " | ".join(body_fragments)
+        if signature_rect is not None and body_fragments:
+            body_text = _wrap_visible_signature_fragments(
+                body_fragments,
                 text_style=appearance.text_style,
                 max_text_width_pt=max(1, int(round(signature_rect.width_pt)) - 8),
                 max_text_height_pt=max(1, int(round(signature_rect.height_pt)) - 8),
                 allow_width_overflow=False,
             )
-        )
-    return _escape_percent("\n".join(fragments))
+        if prefix and body_text:
+            return _escape_percent(f"{prefix}\n{body_text}")
+        return _escape_percent(prefix or body_text)
+    if prefix and body_fragments:
+        return _escape_percent("\n".join([prefix, *body_fragments]))
+    return _escape_percent(prefix or "\n".join(body_fragments))
 
 
 def _wrap_visible_signature_fragments(

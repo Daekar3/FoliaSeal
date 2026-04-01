@@ -11,36 +11,40 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 
 - First render recorded: yes
 - Preview available: yes
-- Selection interactions captured: 11
-- Sign requests captured: 0
-- Last signature page number: not captured
-- Last sign request had visible appearance: no
-- Last sign request output path: not captured
-- Last request layout template: not captured
-- Last request show field names: not captured
-- Last request field snapshot count: not captured
-- Backend reservation layout template: not captured
-- Backend reservation stamp text length: not captured
-- Backend reservation stamp background: not captured
-- Backend reservation background scaling: not captured
-- Backend reservation content scaling: not captured
-- Backend reservation content bottom margin: not captured
+- Selection interactions captured: 1
+- Sign requests captured: 3
+- Last signature page number: 4
+- Last sign request had visible appearance: yes
+- Last sign request output path: `/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf`
+- Last request layout template: single_line
+- Last request stamp position: left
+- Last request show field names: no
+- Last request field snapshot count: 8
+- Backend reservation layout template: single_line
+- Backend reservation stamp position: left
+- Backend reservation stamp text length: 0
+- Backend reservation stamp background: no
+- Backend reservation background scaling: None
+- Backend reservation content scaling: None
+- Backend reservation content bottom margin: None
+- Backend reservation error: `'SignatureAppearance' object has no attribute 'field_bindings'`
 - Preview layout template: single_line
+- Preview stamp position: left
 - Preview show field names: no
 - Preview field count: 8
-- Last signing result: not captured
-- Last signing message: not captured
-- Output file exists: no
-- Output file size: not captured
-- Output embedded signature count: not captured
-- Output signature field name: not captured
-- Output signature name: not captured
-- Output signature location: not captured
-- Output signature contact info: not captured
-- Output signature byte range: not captured
-- Output signature subfilter: not captured
-- Output signature md algorithm: not captured
-- Current validation text: `ERROR signature_appearance_invalid: signer_label_prefix must be a non-empty string.`
+- Last signing result: success
+- Last signing message: `Signing completed successfully.`
+- Output file exists: yes
+- Output file size: 210245 bytes
+- Output embedded signature count: 1
+- Output signature field name: Signature1
+- Output signature name: Adam Smith <Secretary.LHI@Outlook.com>
+- Output signature location: Wytheville, Virginia, US
+- Output signature contact info: Secretary.LHI@Outlook.com
+- Output signature byte range: [0, 201141, 209459, 786]
+- Output signature subfilter: /adbe.pkcs7.detached
+- Output signature md algorithm: sha256
+- Current validation text: `Ready to sign.`
 
 # Phase 3 FR-3B Acceptance Checklist and Task Worksheet
 
@@ -173,7 +177,7 @@ Goal:
 
 Checks:
 
-- [ ] The user can choose the target page before placement.
+- [x] The user can choose the target page before placement.
 - [x] The user can draw a signature rectangle on the preview.
 - [ ] The rectangle preview appears while dragging.
 - [x] The resulting placement lands on the expected page area.
@@ -198,7 +202,7 @@ Goal:
 
 Checks:
 
-- [x] The placed rectangle can be resized or repositioned in the workflow.
+- [ ] The placed rectangle can be resized or repositioned in the workflow.
 - [ ] Numeric x/y/width/height fine-tuning is available when expected.
 - [ ] Fine-tuned values are reflected in the preview.
 - [ ] Fine-tuned values remain valid after the user changes other appearance settings.
@@ -225,8 +229,8 @@ Goal:
 
 Checks:
 
-- [ ] The sign action is available from the properties flow.
-- [ ] The app shows the expected confirmation or summary before signing, if applicable.
+- [x] The sign action is available from the properties flow.
+- [x] The app shows the expected confirmation or summary before signing, if applicable.
 - [ ] The signing action completes successfully for a valid non-timestamp-required request using the current backend path.
 - [ ] The signed output is produced at the expected location.
 - [ ] The signed output can be opened and inspected after signing.
