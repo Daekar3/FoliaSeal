@@ -22,14 +22,21 @@ runs without enough evidence to diagnose the real failure mode.
 ## Progress
 
 - [x] (2026-03-31 23:58Z) Captured the latest harness findings and created this ExecPlan.
+- [x] (2026-03-31 23:59Z) Identified that the current harness diagnostics path is broken by a
+  `field_bindings` attribute mismatch.
+- [x] (2026-03-31 23:59Z) Fixed the harness diagnostics path so it converts the request appearance
+  into the backend appearance type before summarizing it.
+- [x] (2026-03-31 23:59Z) Added actual-output inspection helpers that capture the signed PDF’s
+  annotation rectangle, appearance stream facts, and image XObject summaries.
 - [ ] Inspect the current shell preview sizing path to stop the side panel from widening itself.
-- [ ] Add output-analysis tooling that records actual visible-appearance facts from the signed PDF.
 - [ ] Correct the preview contract so it never stretches the preview container to “fit” oversized
   text; it must instead show overflow honestly inside a fixed-size preview card.
 - [ ] Correct the backend single-line stamp-image sizing for `Top` and `Bottom` so the image is
   constrained by the true remaining rectangle space.
-- [ ] Run focused verification, then perform a narrow harness rerun on `single_line` `Top`,
-  `Bottom`, and `Left`.
+- [x] (2026-03-31 23:59Z) Ran focused verification on the harness slice that exercises the new
+  capture fields.
+- [ ] Run the narrow harness rerun on `single_line` `Top`, `Bottom`, and `Left` when the shell
+  preview and backend fit work are stable enough to interpret together.
 
 ## Surprises & Discoveries
 
@@ -46,6 +53,16 @@ runs without enough evidence to diagnose the real failure mode.
   PDF appearance is being constrained by different geometry than the preview assumes.
   Evidence: `single_line/left` produced a smaller and better-placed stamp than `single_line/top`
   and `single_line/bottom`, while the preview still looked odd and far from the text.
+
+- Observation: the current backend diagnostics path is still wired to the wrong appearance object
+  shape.
+  Evidence: the harness captured `backend_reservation_error` as
+  `'SignatureAppearance' object has no attribute 'field_bindings'` after the latest run.
+
+- Observation: the signed PDF appearance stream itself is good enough to analyze without adding a
+  new parsing library.
+  Evidence: the harness can inspect the `/AP` `/N` stream, decode visible text fragments, and list
+  image XObject summaries from the existing pyHanko reader stack.
 
 ## Decision Log
 
@@ -67,11 +84,22 @@ runs without enough evidence to diagnose the real failure mode.
   create more confusion than progress.
   Date/Author: 2026-03-31 / Codex
 
+- Decision: prioritize actual-output analysis tooling before more backend heuristics.
+  Rationale: the current harness shows we need facts from the signed PDF itself, not only request
+  snapshots and preview text, to understand why the image sizing diverges.
+  Date/Author: 2026-03-31 / Codex
+
+- Decision: keep the output-analysis snapshot focused on primitive facts rather than PDF objects.
+  Rationale: the harness capture needs to remain JSON-safe, reviewable, and easy to diff in future
+  acceptance runs.
+  Date/Author: 2026-03-31 / Codex
+
 ## Outcomes & Retrospective
 
-Pending. The target outcome is a system where the preview stays fixed and honest, the final PDF no
-longer grossly overscales the stamp for ordinary rectangles, and the harness artifacts provide
-actual evidence about the signed output instead of only surface-level symptoms.
+The harness/output-analysis slice is now providing the key evidence the wave needed: request-side
+layout, backend reservation data, and actual signed-PDF visible-appearance facts are all captured in
+one place. The remaining work in the broader wave is still the preview sizing contract and the
+backend image-fit behavior for `Top` and `Bottom`.
 
 ## Context and Orientation
 
@@ -86,28 +114,28 @@ The main files involved are:
 
 The Qt shell renders a live preview card. The backend uses pyHanko to build the actual visible
 signature that gets embedded in the signed PDF. Right now those two paths are both trying to be
-helpful, but they still disagree in important cases. The preview is still stretching or wrapping in
-ways that do not match the signed output, and the backend diagnostics in the harness are not
-reliably reporting the same object shape as the signer uses.
+helpful, but they still disagree in important cases. The preview panel can widen itself to
+accommodate content, the harness diagnostics path is still asking the wrong object for reservation
+data, and the actual PDF can overscale the stamp image in ways the preview does not explain.
 
 “Actual output analysis” in this repository should mean code that inspects the produced signed PDF
-and extracts useful, machine-readable facts about the visible appearance. That can include the raw
-appearance stream, widget annotation rectangle, image XObject dimensions if accessible, and the text
-fragments visible in the appearance content stream. The goal is not pixel-perfect rendering inside
-tests; the goal is enough objective evidence to explain why the output looks wrong.
+and extracts useful, machine-readable facts about the visible appearance. That can include the
+appearance stream, widget annotation rectangle, image XObject dimensions if accessible, and the
+text fragments visible in the appearance content stream. The goal is not pixel-perfect rendering
+inside tests; the goal is enough objective evidence to explain why the output looks wrong.
 
 ## Plan of Work
 
 Start with the shell preview contract. In `src/foliaseal/presentation/qt/signing_shell.py`, stop
 the preview card and the surrounding properties panel from widening to accommodate overflowing
-content. The preview should stay constrained to the selected rectangle’s aspect ratio, scaled to the
-panel, and should allow text or image content to overflow or clip inside that fixed card if needed.
-This is the user-visible signal that the chosen font size or fields do not fit.
+content. The preview should keep a fixed size derived from the selected rectangle’s aspect ratio and
+should not expand just because the text is too large. Instead, oversized text should visibly
+overflow or clip inside the fixed preview card so the user can see that the chosen size does not fit.
 
 Then repair the harness-side reservation diagnostics in
 `src/foliaseal/presentation/qt/phase3_harness.py` so they use the backend-facing appearance object,
 not the domain-side object that lacks `field_bindings`. Without this, every later harness run loses
-the exact diagnostics we need.
+the exact diagnostics we need and the JSON artifact cannot explain the output failure.
 
 Next, add actual-output inspection helpers. These should live in
 `src/foliaseal/application/phase3_signing_backend.py` or a closely related helper module and should
@@ -202,3 +230,8 @@ Any spawned agent in this wave must:
 - create and maintain its own ExecPlan in `.agent/`
 - explicitly state changed files, verification, and caveats when reporting back
 - avoid plan-only responses when given an implementation brief
+
+Update note: revised on 2026-03-31 after the next harness run showed the preview still widening,
+the backend reservation snapshot still failing on `field_bindings`, and the final PDF still
+overscaling the stamp for `single_line/top` and `single_line/bottom`. The new version explicitly
+calls for actual-output inspection tooling so the next corrective pass has better evidence.

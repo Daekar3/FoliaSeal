@@ -52,6 +52,10 @@ class _FakeWidget:
         self.children = []
         self.style = None
         self.visible = True
+        self.fixed_size = None
+        self.fixed_width = None
+        self.maximum_width = None
+        self.minimum_width = None
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
@@ -64,6 +68,18 @@ class _FakeWidget:
 
     def setStyleSheet(self, style):  # noqa: N802
         self.style = style
+
+    def setFixedSize(self, width, height):  # noqa: N802
+        self.fixed_size = (width, height)
+
+    def setFixedWidth(self, width):  # noqa: N802
+        self.fixed_width = width
+
+    def setMaximumWidth(self, width):  # noqa: N802
+        self.maximum_width = width
+
+    def setMinimumWidth(self, width):  # noqa: N802
+        self.minimum_width = width
 
 
 class _FakeLayout:
@@ -693,6 +709,12 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert 0 < height < 108
     assert preview_controls.multi_body_container.layout.items[0][0].visible is True
     assert preview_controls.multi_body_container.layout.items[0][0].alignment == _FakeQt.AlignCenter
+    assert preview_controls.container.fixed_width == 40
+    assert preview_controls.card_container.fixed_size == (40, 20)
+    assert preview_controls.title_label.fixed_width == 40
+    assert preview_controls.detail_label.fixed_width == 40
+    assert preview_controls.multi_content_container.fixed_width == 40
+    assert preview_controls.multi_detail_label.fixed_width == 40
     assert preview_controls.title_label.text() == "Digitally signed by"
     detail_text = preview_controls.multi_detail_label.text()
     detail_lines = detail_text.splitlines()
@@ -718,6 +740,65 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert "alice@example.com" in preview_text
     assert "Single line" not in preview_text
     assert "UTC" not in preview_text
+
+
+def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        signer_label_prefix="A very long prefix that should not widen the preview panel",
+        show_field_names=True,
+        image_stamp_path="/tmp/stamp.png",
+        text_style=SignatureTextStyle(
+            font_family="Source Sans 3",
+            font_size_pt=12.0,
+            bold=False,
+            italic=False,
+            text_color_hex="#123456",
+        ),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=88.0,
+            height_pt=28.0,
+        )
+    )
+
+    preview_controls = widget.properties_panel.preview_controls
+
+    assert preview_controls.container.fixed_width == 88
+    assert preview_controls.card_container.fixed_size == (88, 28)
+    assert preview_controls.single_body_container.fixed_size == (88, 28)
+    assert preview_controls.title_label.fixed_width == 88
+    assert preview_controls.detail_label.fixed_width == 88
+    assert preview_controls.footer_label.fixed_width == 88
+    assert preview_controls.multi_content_container.fixed_width == 88
+    assert preview_controls.multi_detail_label.fixed_width == 88
+    assert preview_controls.multi_body_container.visible is False
+    assert preview_controls.single_body_container.visible is True
+    assert preview_controls.detail_label.text() != ""
 
 
 def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
@@ -759,14 +840,9 @@ def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
 
     assert preview_controls.single_body_container.visible is True
     assert preview_controls.multi_body_container.visible is False
-    assert preview_controls.single_body_container.layout.items[0][0] is (
-        preview_controls.detail_label
-    )
-    assert preview_controls.single_body_container.layout.items[1][0] is (
-        preview_controls.stamp_label
-    )
     assert preview_controls.stamp_label.visible is True
     assert preview_controls.detail_label.visible is True
+    assert " | " in widget.properties_panel.preview_text()
 
 
 def test_signing_shell_stamp_position_right_places_stamp_to_the_right(

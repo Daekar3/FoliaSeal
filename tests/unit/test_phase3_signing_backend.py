@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -104,6 +105,16 @@ def _signature_appearance_stream_text(pdf_path: Path) -> str:
         assert embedded_signatures
         appearance_stream = embedded_signatures[-1].sig_field["/AP"]["/N"].get_object()
         return appearance_stream.data.decode("latin1", errors="replace")
+
+
+def _signature_background_scale(pdf_path: Path) -> tuple[float, float]:
+    stream_text = _signature_appearance_stream_text(pdf_path)
+    match = re.search(
+        r"/BackgroundGS gs\s+([-\d.]+)\s+0\s+0\s+([-\d.]+)\s+[-\d.]+\s+[-\d.]+\s+cm",
+        stream_text,
+    )
+    assert match is not None, stream_text
+    return float(match.group(1)), float(match.group(2))
 
 
 def test_phase3_signing_executor_produces_signed_pdf_and_validates(tmp_path: Path) -> None:
@@ -287,6 +298,97 @@ def test_phase3_signing_executor_signs_compact_single_line_rectangle(
     assert result.failure_code is None
     assert output_pdf.exists()
     assert output_pdf.read_bytes() != input_pdf.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
+)
+def test_phase3_signing_executor_keeps_compact_vertical_stamp_visible(
+    tmp_path: Path,
+    stamp_position: SignatureStampPosition,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / f"output-{stamp_position.value}.pdf"
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        signer_label_prefix="Inkslapped by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        show_field_names=False,
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=4.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+    )
+
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name=output_pdf.name,
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=261.63,
+            height_pt=22.12,
+        ),
+        signature_appearance=appearance,
+    )
+
+    result = build_phase3_signing_executor().execute(request)
+
+    assert result.success is True
+    assert output_pdf.exists()
+
+    scale_x, scale_y = _signature_background_scale(output_pdf)
+    assert scale_x > 0.02
+    assert scale_y > 0.02
+
+    appearance_text = _signature_appearance_stream_text(output_pdf)
+    assert "Inkslapped by" in appearance_text
+    assert "Test User" in appearance_text
 
 
 def test_phase3_signing_executor_maps_wrong_password_to_stable_failure(
