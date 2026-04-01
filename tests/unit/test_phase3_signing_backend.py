@@ -641,7 +641,7 @@ def test_build_stamp_text_wraps_single_line_content_for_compact_rectangle(
     assert "FoliaSeal" in stamp_text
 
 
-def test_build_stamp_text_keeps_single_line_content_single_when_roomy(
+def test_build_stamp_text_keeps_single_line_body_single_when_roomy(
     tmp_path: Path,
 ) -> None:
     cert_path = tmp_path / "cert.p12"
@@ -706,8 +706,81 @@ def test_build_stamp_text_keeps_single_line_content_single_when_roomy(
         ),
     )
 
+    lines = stamp_text.splitlines()
+
+    assert lines[0] == "Inkslapped by"
+    assert len(lines) == 2
+    assert "Test User" in lines[1]
+    assert "test@example.com" in lines[1]
+    assert "FoliaSeal" in lines[1]
+
+
+def test_build_stamp_text_without_prefix_keeps_roomy_single_line_on_one_line(
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    signer = _load_simple_signer(str(cert_path), "secret")
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            show_field_names=False,
+            image_stamp_path=None,
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.DERIVED,
+                show_in_visible_appearance=True,
+            ),
+            text_style=SignatureTextStyle(
+                font_family="Source Sans 3",
+                font_size_pt=6.0,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    stamp_text = _build_stamp_text(
+        appearance=appearance,
+        signer=signer,
+        signing_time=_current_signing_time(appearance.timezone_display_mode),
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=620.0,
+            height_pt=180.0,
+        ),
+    )
+
     assert "\n" not in stamp_text
-    assert "Inkslapped by" in stamp_text
     assert "Test User" in stamp_text
     assert "test@example.com" in stamp_text
     assert "FoliaSeal" in stamp_text

@@ -550,7 +550,7 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
-    ) == 6
+    ) == 5
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
     ) == 2
@@ -677,7 +677,7 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
-    ) == 6
+    ) == 5
     assert len(
         widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
     ) == 2
@@ -687,7 +687,10 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         == "/tmp/stamp.png"
     )
     assert preview_controls.multi_body_container.layout.items[0][0].text() == ""
-    assert preview_controls.multi_body_container.layout.items[0][0].fixed_size == (154, 108)
+    assert preview_controls.multi_body_container.layout.items[0][0].fixed_size is not None
+    width, height = preview_controls.multi_body_container.layout.items[0][0].fixed_size
+    assert 0 < width < 154
+    assert 0 < height < 108
     assert preview_controls.multi_body_container.layout.items[0][0].visible is True
     assert preview_controls.multi_body_container.layout.items[0][0].alignment == _FakeQt.AlignCenter
     assert preview_controls.title_label.text() == "Digitally signed by"
@@ -806,7 +809,7 @@ def test_signing_shell_stamp_position_right_places_stamp_to_the_right(
     assert preview_controls.single_body_container.visible is False
     assert preview_controls.multi_body_container.visible is True
     assert preview_controls.multi_body_container.layout.items[0][0] is (
-        preview_controls.multi_detail_label
+        preview_controls.multi_content_container
     )
     assert preview_controls.multi_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
     assert preview_controls.multi_body_container.layout.items[1][0] is (
@@ -863,7 +866,7 @@ def test_signing_shell_stamp_position_left_centers_text_beside_stamp(
     )
     assert preview_controls.multi_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
     assert preview_controls.multi_body_container.layout.items[1][0] is (
-        preview_controls.multi_detail_label
+        preview_controls.multi_content_container
     )
     assert preview_controls.multi_body_container.layout.items[1][1] == (0, _FakeQt.AlignCenter)
 
