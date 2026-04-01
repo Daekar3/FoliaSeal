@@ -212,7 +212,17 @@ def _set_container_widgets(container: Any, *widgets: Any) -> None:
             item, *args = widget
             layout.addWidget(item, *args)
             continue
-        layout.addWidget(widget)
+            layout.addWidget(widget)
+
+
+def _set_widget_width_limit(widget: Any, width: int) -> None:
+    fixed_width = getattr(widget, "setFixedWidth", None)
+    if callable(fixed_width):
+        fixed_width(width)
+        return
+    max_width = getattr(widget, "setMaximumWidth", None)
+    if callable(max_width):
+        max_width(width)
 
 
 def _field_label(field_key: SignatureFieldKey) -> str:
@@ -337,6 +347,14 @@ def _load_stamp_pixmap(
             if not callable(is_candidate_null) or not is_candidate_null():
                 return candidate
     return pixmap
+
+
+def _preview_body_size(preview: SigningDraftPreview) -> tuple[int, int]:
+    if preview.signature_rect is None:
+        return (240, 96)
+    width = max(1, int(round(preview.signature_rect.width_pt)))
+    height = max(1, int(round(preview.signature_rect.height_pt)))
+    return (width, height)
 
 
 def _preview_stamp_max_size(
@@ -1410,6 +1428,7 @@ class SignaturePropertiesPanel:
             SignatureStampPosition.TOP,
             SignatureStampPosition.BOTTOM,
         )
+        body_width, body_height = _preview_body_size(preview)
         visible_detail = _preview_detail_text(preview)
         stamp_pixmap = None
         if preview.image_stamp_path:
@@ -1428,6 +1447,25 @@ class SignaturePropertiesPanel:
                     max_width=max_width,
                     max_height=max_height,
                 )
+        for widget in (
+            self._preview_controls.card_container,
+            self._preview_controls.single_body_container,
+            self._preview_controls.multi_body_container,
+        ):
+            if hasattr(widget, "setFixedSize"):
+                widget.setFixedSize(body_width, body_height)
+            elif hasattr(widget, "setFixedWidth"):
+                widget.setFixedWidth(body_width)
+        for widget in (
+            self._preview_controls.container,
+            self._preview_controls.card_container,
+            self._preview_controls.title_label,
+            self._preview_controls.detail_label,
+            self._preview_controls.footer_label,
+            self._preview_controls.multi_content_container,
+            self._preview_controls.multi_detail_label,
+        ):
+            _set_widget_width_limit(widget, body_width)
         _set_widget_visible(self._preview_controls.single_body_container, is_vertical)
         _set_widget_visible(self._preview_controls.multi_body_container, not is_vertical)
 

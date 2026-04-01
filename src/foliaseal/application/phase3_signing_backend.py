@@ -334,6 +334,22 @@ def _layout_reservation_for_template(
     """Compute the actual reserved-space split for the requested rectangle."""
     box_width = max(1, int(round(signature_rect.width_pt)))
     box_height = max(1, int(round(signature_rect.height_pt)))
+
+    def _compact_vertical_spacing() -> tuple[int, int]:
+        """Use smaller vertical spacing on compact rectangles.
+
+        Top/bottom single-line signatures tend to be short and need more
+        of the rectangle height left available for the image stamp.
+        The older fixed 4 pt margins plus 6 pt separator left too little
+        room on ordinary form-line rectangles, so we relax them a bit for
+        compact layouts while keeping the original breathing room on taller
+        signatures.
+        """
+
+        if box_height <= 40:
+            return 2, 1
+        return 4, 6
+
     gap = 6
     edge_margin = 4
     available_width = max(box_width - edge_margin * 2, 0)
@@ -405,10 +421,16 @@ def _layout_reservation_for_template(
             ),
         )
 
-    text_area_width = available_width
     text_area_height = min(text_box_height, available_height)
     remaining_height = max(available_height - text_area_height, 0)
+    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        edge_margin, gap = _compact_vertical_spacing()
+        available_width = max(box_width - edge_margin * 2, 0)
+        available_height = max(box_height - edge_margin * 2, 0)
+        text_area_height = min(text_box_height, available_height)
+        remaining_height = max(available_height - text_area_height, 0)
     separator_height = min(gap, remaining_height)
+    text_area_width = available_width
     stamp_area_width = available_width
     stamp_area_height = max(remaining_height - separator_height, 0)
     reserved_primary_extent = stamp_area_height

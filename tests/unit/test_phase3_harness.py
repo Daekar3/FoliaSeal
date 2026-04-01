@@ -1,19 +1,125 @@
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import NameOID
+from PIL import Image
+from pyhanko.pdf_utils import generic
+from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
+
+from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureLayoutTemplate,
     SignatureRect,
+    SignatureStampPosition,
     SigningRequest,
 )
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
     _snapshot_backend_reservation,
+    _snapshot_visible_signature_appearance,
     build_phase3_checklist_results_markdown,
 )
+from tests.support.phase3_builders import (
+    build_signature_appearance,
+    build_signature_rect,
+    build_signing_request,
+)
+
+
+def _write_test_pdf(path: Path) -> None:
+    writer = PdfFileWriter()
+    empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
+    writer.insert_page(PageObject(contents=empty_stream, media_box=(0, 0, 612, 792)))
+    with path.open("wb") as handle:
+        writer.write(handle)
+
+
+def _write_test_pkcs12(
+    path: Path,
+    *,
+    passphrase: str,
+    common_name: str = "Test User",
+) -> x509.Certificate:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "FoliaSeal"),
+            x509.NameAttribute(NameOID.TITLE, "Board Secretary"),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "QA"),
+            x509.NameAttribute(NameOID.EMAIL_ADDRESS, "test@example.com"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "Wytheville"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Virginia"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    pfx = pkcs12.serialize_key_and_certificates(
+        name=common_name.encode("utf-8"),
+        key=key,
+        cert=cert,
+        cas=None,
+        encryption_algorithm=serialization.BestAvailableEncryption(passphrase.encode("utf-8")),
+    )
+    path.write_bytes(pfx)
+    return cert
+
+
+def _write_test_stamp_image(path: Path) -> None:
+    image = Image.new("RGB", (96, 48), color=(215, 235, 255))
+    image.save(path, format="PNG")
+
+
+def _write_signed_test_pdf(
+    tmp_path: Path,
+    *,
+    signature_appearance: SignatureAppearance | None = None,
+    signature_rect: SignatureRect | None = None,
+) -> Path:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    _write_test_stamp_image(stamp_path)
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=signature_rect
+        or build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        signature_appearance=signature_appearance
+        or build_signature_appearance(
+            image_stamp_path=str(stamp_path),
+            show_field_names=True,
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+        ),
+    )
+    build_phase3_signing_executor().execute(request)
+    return output_pdf
 
 
 def test_phase3_checklist_results_markdown_auto_checks_supported_items(
@@ -208,6 +314,29 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
             "coverage": "known",
             "docmdp_level": None,
         },
+        output_visible_appearance_snapshot={
+            "field_name": "Signature1",
+            "annotation_rect": [24.0, 18.0, 644.0, 198.0],
+            "appearance_bbox": [0.0, 180.0, 620.0, 0.0],
+            "appearance_stream_length": 650,
+            "appearance_text_fragments": [
+                "Digitally signed by",
+                "Alice Example",
+            ],
+            "appearance_text_snippet": "Digitally signed by ...",
+            "appearance_text_operator_count": 3,
+            "appearance_xobjects": [
+                {
+                    "name": "/Img4f98d153-5c97-4ad4-89f4-d08f26ccc303",
+                    "subtype": "/Image",
+                    "width": 96,
+                    "height": 48,
+                    "bbox": None,
+                }
+            ],
+            "appearance_image_xobject_count": 1,
+            "appearance_has_visible_text": True,
+        },
         preview_available=True,
         preview_text="Digitally signed by\nAlice Example",
         validation_text="Ready to sign.",
@@ -230,6 +359,21 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     assert "- Output signature byte range: [0, 123, 456, 789]" in markdown
     assert "- Output signature subfilter: /adbe.pkcs7.detached" in markdown
     assert "- Output signature md algorithm: sha256" in markdown
+    assert "- Output visible appearance field name: Signature1" in markdown
+    assert "- Output visible appearance annotation rect: [24.0, 18.0, 644.0, 198.0]" in markdown
+    assert "- Output visible appearance bbox: [0.0, 180.0, 620.0, 0.0]" in markdown
+    assert "- Output visible appearance stream length: 650 bytes" in markdown
+    assert (
+        "- Output visible appearance text fragments: "
+        "['Digitally signed by', 'Alice Example']"
+        in markdown
+    )
+    assert (
+        "- Output visible appearance image XObjects: "
+        "[/Img4f98d153-5c97-4ad4-89f4-d08f26ccc303:/Image 96x48]"
+        in markdown
+    )
+    assert "- Output visible appearance error: none" in markdown
     assert "- Backend reservation layout template: single_line" in markdown
     assert "- Backend reservation stamp position: top" in markdown
     assert "- Backend reservation stamp text length: 33" in markdown
@@ -297,6 +441,7 @@ def test_phase3_checklist_results_markdown_leaves_manual_items_unchecked(
         output_file_size_bytes=None,
         output_signature_count=None,
         output_signature_snapshot=None,
+        output_visible_appearance_snapshot=None,
         preview_available=False,
         preview_text="",
         validation_text="",
@@ -338,6 +483,7 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
             output_file_size_bytes=None,
             output_signature_count=None,
             output_signature_snapshot=None,
+            output_visible_appearance_snapshot=None,
             preview_available=False,
             preview_text="",
             validation_text="",
@@ -395,3 +541,58 @@ def test_backend_reservation_snapshot_retains_error_details_for_bad_request() ->
     assert snapshot["layout_template"] == "single_line"
     assert snapshot["signature_rect"]["page_number"] == 1
     assert "missing-cert.p12" in snapshot["error"]
+
+
+def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    _write_test_stamp_image(stamp_path)
+
+    appearance = build_signature_appearance(
+        image_stamp_path=str(stamp_path),
+        show_field_names=True,
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+    )
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        signature_appearance=appearance,
+    )
+
+    snapshot = _snapshot_backend_reservation(request)
+
+    assert snapshot is not None
+    assert snapshot["layout_template"] == "single_line"
+    assert snapshot["stamp_position"] == "top"
+    assert snapshot["signature_rect"]["page_number"] == 1
+    assert "error" not in snapshot
+    assert snapshot["stamp_text_length"] > 0
+    assert snapshot["background_layout"]["inner_content_scaling"] == "shrink_to_fit"
+
+
+def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
+    tmp_path: Path,
+) -> None:
+    output_pdf = _write_signed_test_pdf(tmp_path)
+
+    snapshot = _snapshot_visible_signature_appearance(output_pdf)
+
+    assert snapshot is not None
+    assert snapshot["field_name"] == "Signature1"
+    assert snapshot["annotation_rect"] == [24.0, 18.0, 644.0, 198.0]
+    assert snapshot["appearance_stream_length"] > 0
+    assert snapshot["appearance_has_visible_text"] is True
+    fragments = snapshot["appearance_text_fragments"]
+    assert any("Digitally signed by" in fragment for fragment in fragments)
+    assert any("Test User" in fragment for fragment in fragments)
+    assert snapshot["appearance_image_xobject_count"] >= 1
+    assert snapshot["appearance_xobjects"]

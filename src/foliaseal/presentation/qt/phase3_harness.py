@@ -23,6 +23,7 @@ from foliaseal.application.phase3_signing_backend import (
     _stamp_background_for_path,
     build_phase3_signing_executor,
 )
+from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest, SigningResult
@@ -56,6 +57,7 @@ class Phase3HarnessCapture:
     output_file_size_bytes: int | None
     output_signature_count: int | None
     output_signature_snapshot: dict[str, Any] | None
+    output_visible_appearance_snapshot: dict[str, Any] | None
     preview_available: bool
     preview_text: str
     validation_text: str
@@ -77,6 +79,7 @@ def build_phase3_checklist_results_markdown(
 
     template = Path(checklist_template_path).read_text(encoding="utf-8")
     auto_checked_items = _derive_phase3_auto_checked_items(capture)
+    visible_appearance_snapshot = capture.output_visible_appearance_snapshot
     checkbox_pattern = re.compile(r"^(\s*-\s*)\[(?: |x|X)\](\s+)(.+)$")
 
     rendered_lines = [
@@ -266,6 +269,48 @@ def build_phase3_checklist_results_markdown(
             and capture.output_signature_snapshot.get("md_algorithm") is not None
             else "- Output signature md algorithm: not captured"
         ),
+        (
+            f"- Output visible appearance field name: "
+            f"{_snapshot_visible_appearance_field_name(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance field name: not captured"
+        ),
+        (
+            f"- Output visible appearance annotation rect: "
+            f"{_snapshot_visible_appearance_annotation_rect(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance annotation rect: not captured"
+        ),
+        (
+            f"- Output visible appearance bbox: "
+            f"{_snapshot_visible_appearance_bbox(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance bbox: not captured"
+        ),
+        (
+            f"- Output visible appearance stream length: "
+            f"{_snapshot_visible_appearance_stream_length(visible_appearance_snapshot)} bytes"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance stream length: not captured"
+        ),
+        (
+            f"- Output visible appearance text fragments: "
+            f"{_snapshot_visible_appearance_text_fragments(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance text fragments: not captured"
+        ),
+        (
+            f"- Output visible appearance image XObjects: "
+            f"{_snapshot_visible_appearance_image_xobjects(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance image XObjects: not captured"
+        ),
+        (
+            f"- Output visible appearance error: "
+            f"{_snapshot_visible_appearance_error(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance error: not captured"
+        ),
         f"- Current validation text: `{capture.validation_text or 'n/a'}`",
         "",
     ]
@@ -412,6 +457,7 @@ def run_phase3_signing_harness(
     output_size_bytes = None
     output_signature_count = None
     output_signature_snapshot = None
+    output_visible_appearance_snapshot = None
     if output_path is not None:
         output_file = Path(output_path)
         output_exists = output_file.exists()
@@ -419,6 +465,7 @@ def run_phase3_signing_harness(
             output_size_bytes = output_file.stat().st_size
             output_signature_count = _count_embedded_signatures(output_file)
             output_signature_snapshot = _snapshot_output_signature(output_file)
+            output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(output_file)
     capture = Phase3HarnessCapture(
         pdf_path=str(source_path),
         first_render_ms=viewer_workflow.timing_tracker.snapshot().first_render_ms,
@@ -448,6 +495,7 @@ def run_phase3_signing_harness(
         output_file_size_bytes=output_size_bytes,
         output_signature_count=output_signature_count,
         output_signature_snapshot=output_signature_snapshot,
+        output_visible_appearance_snapshot=output_visible_appearance_snapshot,
         preview_available=bool(preview_text.strip()),
         preview_text=preview_text,
         validation_text=validation_text,
@@ -593,6 +641,58 @@ def _snapshot_output_signature(output_file: Path) -> dict[str, Any] | None:
         return None
 
 
+def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] | None:
+    try:
+        with output_file.open("rb") as handle:
+            reader = PdfFileReader(handle)
+            embedded_signatures = list(reader.embedded_signatures)
+            if not embedded_signatures:
+                return None
+
+            signature = embedded_signatures[-1]
+            sig_field = signature.sig_field
+            rect = _snapshot_pdf_rect(sig_field.get("/Rect"))
+            appearance_dict = sig_field.get("/AP")
+            if appearance_dict is None:
+                return {
+                    "field_name": signature.field_name,
+                    "annotation_rect": rect,
+                    "error": "Missing /AP entry on the signature field.",
+                }
+
+            normal_appearance = appearance_dict.get("/N")
+            if normal_appearance is None:
+                return {
+                    "field_name": signature.field_name,
+                    "annotation_rect": rect,
+                    "error": "Missing normal appearance stream for the signature field.",
+                }
+
+            appearance_stream = normal_appearance.get_object()
+            appearance_data = appearance_stream.data
+            appearance_text = appearance_data.decode("latin1", errors="replace")
+            xobject_summaries = _snapshot_appearance_xobjects(
+                appearance_stream.get("/Resources")
+            )
+            text_fragments = _extract_pdf_text_fragments(appearance_text)
+            return {
+                "field_name": signature.field_name,
+                "annotation_rect": rect,
+                "appearance_bbox": _snapshot_pdf_rect(appearance_stream.get("/BBox")),
+                "appearance_stream_length": len(appearance_data),
+                "appearance_text_fragments": text_fragments,
+                "appearance_text_snippet": appearance_text[:240],
+                "appearance_text_operator_count": _count_pdf_text_operators(appearance_text),
+                "appearance_xobjects": xobject_summaries,
+                "appearance_image_xobject_count": sum(
+                    1 for item in xobject_summaries if item.get("subtype") == "/Image"
+                ),
+                "appearance_has_visible_text": bool(text_fragments),
+            }
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 def _snapshot_preview(preview) -> dict[str, Any]:
     return {
         "title": preview.title,
@@ -634,13 +734,15 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
     if request.signature_rect is None or request.signature_appearance is None:
         return None
 
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        request.signature_appearance
+    )
     snapshot = {
-        "layout_template": request.signature_appearance.layout_template.value,
-        "stamp_position": request.signature_appearance.stamp_position.value,
+        "layout_template": appearance.layout_template.value,
+        "stamp_position": appearance.stamp_position.value,
         "signature_rect": _snapshot_signature_rect(request.signature_rect),
     }
     try:
-        appearance = request.signature_appearance
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         signing_time = _current_signing_time(appearance.timezone_display_mode)
         stamp_text = _build_stamp_text(
@@ -678,7 +780,9 @@ def _backend_reservation_error(request: SigningRequest) -> str | None:
     if request.signature_rect is None or request.signature_appearance is None:
         return None
     try:
-        appearance = request.signature_appearance
+        appearance = SigningBackendAppearance.from_signature_appearance(
+            request.signature_appearance
+        )
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         signing_time = _current_signing_time(appearance.timezone_display_mode)
         stamp_text = _build_stamp_text(
@@ -906,6 +1010,194 @@ def _snapshot_preview_stamp_position(snapshot: dict[str, Any] | None) -> str | N
         return None
     stamp_position = snapshot.get("stamp_position")
     return stamp_position if isinstance(stamp_position, str) else None
+
+
+def _snapshot_visible_appearance_field_name(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    value = snapshot.get("field_name")
+    return str(value) if value is not None else "not captured"
+
+
+def _snapshot_visible_appearance_annotation_rect(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    value = snapshot.get("annotation_rect")
+    return str(value) if value is not None else "not captured"
+
+
+def _snapshot_visible_appearance_bbox(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    value = snapshot.get("appearance_bbox")
+    return str(value) if value is not None else "not captured"
+
+
+def _snapshot_visible_appearance_stream_length(snapshot: dict[str, Any] | None) -> int:
+    if snapshot is None:
+        return 0
+    value = snapshot.get("appearance_stream_length")
+    return int(value) if isinstance(value, int) else 0
+
+
+def _snapshot_visible_appearance_text_fragments(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    fragments = snapshot.get("appearance_text_fragments")
+    if not isinstance(fragments, list):
+        return "not captured"
+    if not fragments:
+        return "[]"
+    preview = ", ".join(repr(fragment) for fragment in fragments[:6])
+    if len(fragments) > 6:
+        return f"[{preview}, ...]"
+    return f"[{preview}]"
+
+
+def _snapshot_visible_appearance_image_xobjects(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    xobjects = snapshot.get("appearance_xobjects")
+    if not isinstance(xobjects, list):
+        return "not captured"
+    if not xobjects:
+        return "[]"
+    entries: list[str] = []
+    for item in xobjects[:6]:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        subtype = item.get("subtype")
+        width = item.get("width")
+        height = item.get("height")
+        size = f" {width}x{height}" if width is not None and height is not None else ""
+        entries.append(f"{name}:{subtype}{size}")
+    if len(xobjects) > 6:
+        return f"[{', '.join(entries)}, ...]"
+    return f"[{', '.join(entries)}]"
+
+
+def _snapshot_visible_appearance_error(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    value = snapshot.get("error")
+    return str(value) if value is not None else "none"
+
+
+def _snapshot_appearance_xobjects(resources) -> list[dict[str, Any]]:
+    if resources is None:
+        return []
+    xobjects = resources.get("/XObject")
+    if xobjects is None:
+        return []
+    summaries: list[dict[str, Any]] = []
+    for name, ref in xobjects.items():
+        try:
+            obj = ref.get_object()
+        except Exception:
+            obj = ref
+        summaries.append(
+            {
+                "name": str(name),
+                "subtype": _snapshot_pdf_name(obj.get("/Subtype")),
+                "width": _snapshot_pdf_numeric(obj.get("/Width")),
+                "height": _snapshot_pdf_numeric(obj.get("/Height")),
+                "bbox": _snapshot_pdf_rect(obj.get("/BBox")),
+            }
+        )
+    return summaries
+
+
+def _count_pdf_text_operators(appearance_text: str) -> int:
+    return len(re.findall(r"\)\s*T[Jj]\b", appearance_text))
+
+
+def _extract_pdf_text_fragments(appearance_text: str) -> list[str]:
+    fragments: list[str] = []
+    for match in re.finditer(r"\((?:\\.|[^()])*\)", appearance_text):
+        fragment = _decode_pdf_literal_string(match.group(0))
+        if fragment:
+            fragments.append(fragment)
+    return fragments
+
+
+def _decode_pdf_literal_string(literal: str) -> str:
+    if not literal.startswith("(") or not literal.endswith(")"):
+        return literal
+
+    body = literal[1:-1]
+    out: list[str] = []
+    index = 0
+    while index < len(body):
+        char = body[index]
+        if char != "\\":
+            out.append(char)
+            index += 1
+            continue
+
+        index += 1
+        if index >= len(body):
+            break
+        escape = body[index]
+        if escape in "nrtbf()\\":
+            out.append(
+                {
+                    "n": "\n",
+                    "r": "\r",
+                    "t": "\t",
+                    "b": "\b",
+                    "f": "\f",
+                    "(": "(",
+                    ")": ")",
+                    "\\": "\\",
+                }[escape]
+            )
+            index += 1
+            continue
+        if escape in "\r\n":
+            if escape == "\r" and index + 1 < len(body) and body[index + 1] == "\n":
+                index += 2
+            else:
+                index += 1
+            continue
+        if escape in "01234567":
+            digits = [escape]
+            index += 1
+            while index < len(body) and len(digits) < 3 and body[index] in "01234567":
+                digits.append(body[index])
+                index += 1
+            out.append(chr(int("".join(digits), 8)))
+            continue
+        out.append(escape)
+        index += 1
+    return "".join(out)
+
+
+def _snapshot_pdf_rect(value) -> list[float] | None:
+    if value is None:
+        return None
+    try:
+        return [float(component) for component in value]
+    except Exception:
+        return None
+
+
+def _snapshot_pdf_name(value) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _snapshot_pdf_numeric(value) -> float | int | None:
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except Exception:
+        return None
+    if numeric.is_integer():
+        return int(numeric)
+    return numeric
 
 
 def _serialize_signature_metadata(value: Any) -> Any:
