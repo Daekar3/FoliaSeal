@@ -11,6 +11,7 @@ from PIL import Image
 from pyhanko.pdf_utils import generic
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
+from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -24,6 +25,7 @@ from foliaseal.domain.models import (
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
     _snapshot_backend_reservation,
+    _snapshot_current_draft_request,
     _snapshot_visible_signature_appearance,
     build_phase3_checklist_results_markdown,
 )
@@ -350,6 +352,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     )
 
     assert "Phase 3 FR-3B Acceptance Results" in markdown
+    assert "- Request snapshot origin: submitted request" in markdown
     assert "- Last signature page number: 1" in markdown
     assert "- Output embedded signature count: 1" in markdown
     assert "- Output signature field name: Signature1" in markdown
@@ -363,6 +366,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     assert "- Output visible appearance annotation rect: [24.0, 18.0, 644.0, 198.0]" in markdown
     assert "- Output visible appearance bbox: [0.0, 180.0, 620.0, 0.0]" in markdown
     assert "- Output visible appearance stream length: 650 bytes" in markdown
+    assert "- Output visible appearance has visible text: yes" in markdown
     assert (
         "- Output visible appearance text fragments: "
         "['Digitally signed by', 'Alice Example']"
@@ -543,6 +547,33 @@ def test_backend_reservation_snapshot_retains_error_details_for_bad_request() ->
     assert "missing-cert.p12" in snapshot["error"]
 
 
+def test_snapshot_current_draft_request_uses_workflow_state(tmp_path: Path) -> None:
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=1, width_pt=320.0, height_pt=64.0),
+        signature_appearance=build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+        ),
+    )
+
+    draft_request = _snapshot_current_draft_request(
+        SigningDraftWorkflow.from_signing_request(request)
+    )
+
+    assert draft_request is not None
+    assert draft_request.input_pdf_path == request.input_pdf_path
+    assert draft_request.output_pdf_path == request.output_pdf_path
+    assert draft_request.certificate_path == request.certificate_path
+    assert draft_request.signature_rect == request.signature_rect
+    assert draft_request.signature_appearance == request.signature_appearance
+
+
 def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: Path) -> None:
     input_pdf = tmp_path / "input.pdf"
     cert_path = tmp_path / "cert.p12"
@@ -591,8 +622,14 @@ def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
     assert snapshot["annotation_rect"] == [24.0, 18.0, 644.0, 198.0]
     assert snapshot["appearance_stream_length"] > 0
     assert snapshot["appearance_has_visible_text"] is True
+    assert snapshot["visible_text_present"] is True
     fragments = snapshot["appearance_text_fragments"]
+    assert snapshot["text_fragments"] == fragments
     assert any("Digitally signed by" in fragment for fragment in fragments)
     assert any("Test User" in fragment for fragment in fragments)
     assert snapshot["appearance_image_xobject_count"] >= 1
     assert snapshot["appearance_xobjects"]
+    assert snapshot["image_xobjects"] == snapshot["appearance_xobjects"]
+    assert snapshot["annotation_rect_size"] == {"width": 620.0, "height": 180.0}
+    assert snapshot["text_fragment_count"] == len(fragments)
+    assert snapshot["image_xobject_count"] == snapshot["appearance_image_xobject_count"]

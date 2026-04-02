@@ -212,7 +212,7 @@ def _set_container_widgets(container: Any, *widgets: Any) -> None:
             item, *args = widget
             layout.addWidget(item, *args)
             continue
-            layout.addWidget(widget)
+        layout.addWidget(widget)
 
 
 def _set_widget_width_limit(widget: Any, width: int) -> None:
@@ -349,12 +349,129 @@ def _load_stamp_pixmap(
     return pixmap
 
 
-def _preview_body_size(preview: SigningDraftPreview) -> tuple[int, int]:
+_PREVIEW_MAX_WIDTH_PX = 520
+_PREVIEW_MAX_HEIGHT_PX = 180
+_PREVIEW_DEFAULT_WIDTH_PX = 320
+_PREVIEW_DEFAULT_HEIGHT_PX = 120
+_PREVIEW_HORIZONTAL_PADDING_PX = 24
+_PREVIEW_GROUP_OVERHEAD_PX = 28
+
+
+def _widget_width(widget: Any) -> int | None:
+    width_getter = getattr(widget, "width", None)
+    if callable(width_getter):
+        try:
+            value = width_getter()
+        except TypeError:
+            value = None
+        if isinstance(value, int) and value > 0:
+            return value
+    for attr in ("fixed_width", "maximum_width", "minimum_width"):
+        value = getattr(widget, attr, None)
+        if isinstance(value, int) and value > 0:
+            return value
+    return None
+
+
+def _widget_parent(widget: Any) -> Any | None:
+    parent_getter = getattr(widget, "parentWidget", None)
+    if callable(parent_getter):
+        try:
+            parent = parent_getter()
+        except TypeError:
+            parent = None
+        if parent is not None:
+            return parent
+    return getattr(widget, "parent", None)
+
+
+def _ancestor_width(widget: Any) -> int | None:
+    current = _widget_parent(widget)
+    widths: list[int] = []
+    while current is not None:
+        width = _widget_width(current)
+        if isinstance(width, int) and width > 0:
+            widths.append(width)
+        current = _widget_parent(current)
+    if not widths:
+        return None
+    return min(widths)
+
+
+def _preview_available_width(preview: SigningDraftPreview, container: Any | None = None) -> int:
+    container_width = _ancestor_width(container) if container is not None else None
+    if isinstance(container_width, int) and container_width > 0:
+        return max(
+            _PREVIEW_DEFAULT_WIDTH_PX,
+            container_width
+            - _PREVIEW_HORIZONTAL_PADDING_PX
+            - _PREVIEW_GROUP_OVERHEAD_PX,
+        )
     if preview.signature_rect is None:
-        return (240, 96)
-    width = max(1, int(round(preview.signature_rect.width_pt)))
-    height = max(1, int(round(preview.signature_rect.height_pt)))
+        return _PREVIEW_DEFAULT_WIDTH_PX
+    return _PREVIEW_MAX_WIDTH_PX
+
+
+def _preview_body_size(
+    preview: SigningDraftPreview,
+    *,
+    available_width_px: int | None = None,
+) -> tuple[int, int]:
+    if preview.signature_rect is None:
+        return (_PREVIEW_DEFAULT_WIDTH_PX, _PREVIEW_DEFAULT_HEIGHT_PX)
+
+    width_pt = max(1.0, preview.signature_rect.width_pt)
+    height_pt = max(1.0, preview.signature_rect.height_pt)
+    max_width_px = available_width_px or _PREVIEW_MAX_WIDTH_PX
+    scale = min(max_width_px / width_pt, _PREVIEW_MAX_HEIGHT_PX / height_pt)
+    width = max(1, int(round(width_pt * scale)))
+    height = max(1, int(round(height_pt * scale)))
     return (width, height)
+
+
+def _preview_display_scale(
+    preview: SigningDraftPreview,
+    *,
+    available_width_px: int | None = None,
+) -> float:
+    if preview.signature_rect is None:
+        return 1.0
+    body_width, _body_height = _preview_body_size(
+        preview,
+        available_width_px=available_width_px,
+    )
+    width_pt = max(1.0, preview.signature_rect.width_pt)
+    return body_width / width_pt
+
+
+def _preview_text_width_limit(
+    preview: SigningDraftPreview,
+    *,
+    available_width_px: int | None = None,
+) -> int:
+    body_width, _body_height = _preview_body_size(
+        preview,
+        available_width_px=available_width_px,
+    )
+    if preview.signature_rect is None:
+        return body_width
+
+    text_width_pt = max(1, int(round(preview.signature_rect.width_pt)) - 8)
+    if (
+        preview.image_stamp_path
+        and preview.stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        reserved_stamp_width_pt = max(48, int(round(preview.signature_rect.width_pt * 0.35)))
+        text_width_pt = max(1, text_width_pt - reserved_stamp_width_pt - 6)
+    return max(
+        1,
+        int(
+            round(
+                text_width_pt
+                * _preview_display_scale(preview, available_width_px=available_width_px)
+            )
+        ),
+    )
 
 
 def _preview_stamp_max_size(
@@ -363,6 +480,7 @@ def _preview_stamp_max_size(
     title_line: str,
     detail_text: str,
     raw_pixmap: Any,
+    available_width_px: int | None = None,
 ) -> tuple[int, int]:
     if (
         preview.signature_rect is None
@@ -406,7 +524,10 @@ def _preview_stamp_max_size(
         target_height = area_height
         target_width = max(1, int(round(target_height * aspect_ratio)))
 
-    preview_scale = 0.5
+    preview_scale = _preview_display_scale(
+        preview,
+        available_width_px=available_width_px,
+    )
     scaled_width = max(1, int(round(target_width * preview_scale)))
     scaled_height = max(1, int(round(target_height * preview_scale)))
     return (min(scaled_width, 140), min(scaled_height, 80))
@@ -603,6 +724,13 @@ def _set_widget_visible(widget: Any, visible: bool) -> None:
         setter(visible)
 
 
+def _panel_available_width(widget: Any) -> int:
+    panel_width = _ancestor_width(widget) or _widget_width(widget)
+    if isinstance(panel_width, int) and panel_width > 0:
+        return max(1, panel_width - 16)
+    return _PREVIEW_MAX_WIDTH_PX
+
+
 class SignaturePropertiesPanel:
     """Signature editing controls and preview/validation summary."""
 
@@ -647,6 +775,8 @@ class SignaturePropertiesPanel:
         self._preview_controls = self._build_preview_controls()
         self.preview_controls = self._preview_controls
         self._validation_label = bindings.q_label("")
+        if hasattr(self._validation_label, "setWordWrap"):
+            self._validation_label.setWordWrap(True)
 
         self._layout.addWidget(self._profile_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
@@ -707,6 +837,10 @@ class SignaturePropertiesPanel:
     def refresh_preview(self) -> SigningDraftPreview:
         preview = self._current_preview()
         self._update_preview_controls(preview)
+        _set_widget_width_limit(
+            self._validation_label,
+            _panel_available_width(self.widget),
+        )
         self._validation_label.setText(self._format_validation_text(preview))
         return preview
 
@@ -1428,7 +1562,22 @@ class SignaturePropertiesPanel:
             SignatureStampPosition.TOP,
             SignatureStampPosition.BOTTOM,
         )
-        body_width, body_height = _preview_body_size(preview)
+        available_width_px = _preview_available_width(
+            preview,
+            container=self._preview_controls.container,
+        )
+        body_width, body_height = _preview_body_size(
+            preview,
+            available_width_px=available_width_px,
+        )
+        detail_width = (
+            body_width
+            if is_vertical
+            else _preview_text_width_limit(
+                preview,
+                available_width_px=available_width_px,
+            )
+        )
         visible_detail = _preview_detail_text(preview)
         stamp_pixmap = None
         if preview.image_stamp_path:
@@ -1440,6 +1589,7 @@ class SignaturePropertiesPanel:
                     title_line=title_line,
                     detail_text=visible_detail,
                     raw_pixmap=raw_pixmap,
+                    available_width_px=available_width_px,
                 )
                 stamp_pixmap = _load_stamp_pixmap(
                     self._bindings,
@@ -1447,25 +1597,23 @@ class SignaturePropertiesPanel:
                     max_width=max_width,
                     max_height=max_height,
                 )
+        if hasattr(self._preview_controls.card_container, "setFixedWidth"):
+            self._preview_controls.card_container.setFixedWidth(body_width)
+        if hasattr(self._preview_controls.single_body_container, "setFixedSize"):
+            self._preview_controls.single_body_container.setFixedSize(body_width, body_height)
+        if hasattr(self._preview_controls.multi_body_container, "setFixedSize"):
+            self._preview_controls.multi_body_container.setFixedSize(body_width, body_height)
         for widget in (
-            self._preview_controls.card_container,
-            self._preview_controls.single_body_container,
-            self._preview_controls.multi_body_container,
-        ):
-            if hasattr(widget, "setFixedSize"):
-                widget.setFixedSize(body_width, body_height)
-            elif hasattr(widget, "setFixedWidth"):
-                widget.setFixedWidth(body_width)
-        for widget in (
-            self._preview_controls.container,
-            self._preview_controls.card_container,
             self._preview_controls.title_label,
             self._preview_controls.detail_label,
             self._preview_controls.footer_label,
+        ):
+            _set_widget_width_limit(widget, body_width)
+        for widget in (
             self._preview_controls.multi_content_container,
             self._preview_controls.multi_detail_label,
         ):
-            _set_widget_width_limit(widget, body_width)
+            _set_widget_width_limit(widget, detail_width)
         _set_widget_visible(self._preview_controls.single_body_container, is_vertical)
         _set_widget_visible(self._preview_controls.multi_body_container, not is_vertical)
 

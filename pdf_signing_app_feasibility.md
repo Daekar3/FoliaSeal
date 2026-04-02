@@ -179,6 +179,35 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - place and resize signature,
   - re-use saved preset for subsequent signing.
 
+### FR-3D: Visual instrumentation and acceptance evidence
+- The signing workflow and its engineering harness must support richer evidence capture for
+  user-visible preview/output debugging and acceptance.
+- Instrumentation should be layered at the application level, not the display-server level, in this
+  order:
+  - structured UI-state capture,
+  - preview artifact capture,
+  - final signed-output visible-appearance capture,
+  - optional scripted interaction replay.
+- Structured UI-state capture should include, at minimum:
+  - preview-card bounds,
+  - inner body bounds,
+  - text/stamp widget bounds,
+  - scrollbar visibility,
+  - active layout template and stamp position,
+  - validation state,
+  - effective placed-rectangle geometry.
+- Preview artifact capture should preserve what the user actually saw in the signing UI at review or
+  signing time, ideally as an image artifact or equivalent directly inspectable record.
+- Final signed-output capture should preserve a rendered crop of the signed annotation region in
+  addition to PDF-object metadata such as appearance-stream text fragments, image XObjects, and
+  annotation geometry.
+- If visual comparison is automated, it should be done using application/rendered artifacts rather
+  than X11/Wayland/compositor protocol tracing.
+- Display-server-specific tracing is out of current scope unless a later debugging need proves that
+  application-level instrumentation is insufficient.
+- Manual harness runs remain part of acceptance, but stronger instrumentation should reduce their
+  frequency, make them narrower, and make their findings easier to interpret.
+
 ### FR-3C: Signature presets (reusable appearance profiles)
 - User must be able to create, name, edit, duplicate, delete, import, and export **signature presets**.
 - A preset must persist all appearance/property settings needed to avoid reconfiguration on each signing action, including:
@@ -624,6 +653,26 @@ Phase 3 turned out to contain several independent failure modes: shell UX, previ
 - Align preview layout policy with backend layout policy for margins, wrapping, text-first sizing,
   and image placement.
 - Validate representative wide, tall, and compact rectangles against real signed output.
+
+### Instrumentation upgrade inside Phase 4A
+This slice should include a dedicated instrumentation upgrade so preview/output parity work can be
+evaluated with stronger evidence than free-form human observation alone.
+
+Planned subphases:
+1. App-state instrumentation
+   - capture preview-card geometry, inner body geometry, stamp/text bounds, scrollbar state, active
+     layout settings, and validation state at key interaction points.
+2. Visual artifact capture
+   - capture the live preview card as a reviewable artifact;
+   - capture a rendered crop of the final signed annotation region from the output PDF.
+3. Deterministic replay support
+   - support scripted interaction sequences for common signing scenarios so reruns are repeatable.
+4. Visual comparison support
+   - add optional preview-vs-output comparison artifacts, including simple image diffs or structured
+     summary comparisons where practical.
+
+The target is not pixel-perfect proof across every renderer. The target is materially better
+evidence about what a human actually saw in the app and what the final signed PDF actually showed.
 
 **Exit criteria**
 - Preview materially reflects the chosen rectangle shape.

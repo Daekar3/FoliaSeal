@@ -33,10 +33,22 @@ runs without enough evidence to diagnose the real failure mode.
   text; it must instead show overflow honestly inside a fixed-size preview card.
 - [ ] Correct the backend single-line stamp-image sizing for `Top` and `Bottom` so the image is
   constrained by the true remaining rectangle space.
+- [x] (2026-04-01 00:00Z) Launched the next corrective wave with three explicit ownership slices:
+  shell preview sizing, harness/output diagnostics, and backend fit correction.
 - [x] (2026-03-31 23:59Z) Ran focused verification on the harness slice that exercises the new
   capture fields.
+- [x] (2026-04-01 00:15Z) Integrated the first three-worker corrective wave and verified the
+  merged shell, harness, and backend slices together (`64 passed`, `ruff` clean).
+- [ ] Fix the preview card so it scales to the available panel width instead of staying at a small
+  fixed viewport that can render text effectively invisible.
+- [ ] Fix the preview card/body sizing contract so the card is not fixed to the inner body height
+  and does not clip title/detail content into an apparently empty preview.
+- [ ] Improve `single_line` horizontal (`Left`/`Right`) stamp sizing so the backend uses the real
+  wrapped text footprint more effectively and does not leave excessive unused space beside the text.
 - [ ] Run the narrow harness rerun on `single_line` `Top`, `Bottom`, and `Left` when the shell
   preview and backend fit work are stable enough to interpret together.
+- [x] (2026-04-01 00:40Z) Recorded the proposed next instrumentation upgrade wave so the current
+  preview/output work has a clear follow-on path once the remaining Phase 3 parity issues settle.
 
 ## Surprises & Discoveries
 
@@ -63,6 +75,24 @@ runs without enough evidence to diagnose the real failure mode.
   new parsing library.
   Evidence: the harness can inspect the `/AP` `/N` stream, decode visible text fragments, and list
   image XObject summaries from the existing pyHanko reader stack.
+
+- Observation: the recent preview fix stopped raw-point sizing, but the preview is still too small
+  because it is capped to a tiny static viewport and the whole card is being fixed to the body area.
+  Evidence: the latest manual run showed the preview taking only roughly one-third to one-half of
+  the available width, and in some `single_line` cases the border remained visible while the text
+  appeared absent until the font was reduced.
+
+- Observation: the backend output for vertical `single_line` is now in much better shape than the
+  preview, while horizontal `Left`/`Right` still leaves too much unused space beside the text.
+  Evidence: the user reported that `single_line/top` and `single_line/bottom` now look good in the
+  signed PDF, but `single_line/left` and `single_line/right` still produce a stamp that is smaller
+  than necessary despite plenty of unused horizontal space.
+
+- Observation: richer PDF-object instrumentation still does not fully answer “what did the human
+  actually see?”
+  Evidence: even after adding reservation snapshots and appearance-stream facts, the remaining
+  disagreements are still about preview usability, clipping, and visual balance rather than missing
+  PDF metadata.
 
 ## Decision Log
 
@@ -94,12 +124,34 @@ runs without enough evidence to diagnose the real failure mode.
   acceptance runs.
   Date/Author: 2026-03-31 / Codex
 
+- Decision: split the new corrective wave into three disjoint workers rather than one broad agent.
+  Rationale: the preview scaling, harness diagnostics, and backend stamp-fit changes are related
+  but can be implemented and verified independently; splitting them reduces overlap risk and keeps
+  each worker's ExecPlan focused.
+  Date/Author: 2026-04-01 / Codex
+
+- Decision: treat the next pass as a narrower follow-up wave rather than reopening the whole
+  harness/output-analysis effort.
+  Rationale: the latest manual evidence shows the remaining problems are now concentrated in shell
+  preview card sizing/clipping and horizontal `Left`/`Right` stamp fit, while the harness and
+  vertical `Top`/`Bottom` output are materially improved.
+  Date/Author: 2026-04-01 / Codex
+
+- Decision: the next instrumentation upgrade should target application-level visual artifacts and
+  structured UI-state capture rather than display-server protocol tracing.
+  Rationale: app-level snapshots, rendered preview/output crops, and deterministic replay are much
+  more portable and actionable for this project than low-level X11/Wayland tracing.
+  Date/Author: 2026-04-01 / Codex
+
 ## Outcomes & Retrospective
 
 The harness/output-analysis slice is now providing the key evidence the wave needed: request-side
 layout, backend reservation data, and actual signed-PDF visible-appearance facts are all captured in
-one place. The remaining work in the broader wave is still the preview sizing contract and the
-backend image-fit behavior for `Top` and `Bottom`.
+one place. The first backend follow-up also brought `single_line` `Top` and `Bottom` much closer to
+acceptable output. The remaining work is now narrower: make the preview card scale and clip
+honestly inside the available panel width, and improve horizontal `Left`/`Right` stamp fit so the
+stamp uses the reserved area more effectively. A future instrumentation upgrade should build on this
+foundation with preview snapshots, rendered output crops, and deterministic replay support.
 
 ## Context and Orientation
 
@@ -126,67 +178,51 @@ inside tests; the goal is enough objective evidence to explain why the output lo
 
 ## Plan of Work
 
-Start with the shell preview contract. In `src/foliaseal/presentation/qt/signing_shell.py`, stop
-the preview card and the surrounding properties panel from widening to accommodate overflowing
-content. The preview should keep a fixed size derived from the selected rectangle’s aspect ratio and
-should not expand just because the text is too large. Instead, oversized text should visibly
-overflow or clip inside the fixed preview card so the user can see that the chosen size does not fit.
+Start with the shell preview contract again, but now target the remaining specific failure. In
+`src/foliaseal/presentation/qt/signing_shell.py`, the preview should scale to the available panel
+width while preserving the selected rectangle’s aspect ratio. The preview card itself should not be
+fixed to the inner body height; only the body region should be constrained. The goal is a preview
+that stays stable, uses the available horizontal space, and clips/overflows honestly instead of
+collapsing into an empty-looking miniature card.
 
-Then repair the harness-side reservation diagnostics in
-`src/foliaseal/presentation/qt/phase3_harness.py` so they use the backend-facing appearance object,
-not the domain-side object that lacks `field_bindings`. Without this, every later harness run loses
-the exact diagnostics we need and the JSON artifact cannot explain the output failure.
-
-Next, add actual-output inspection helpers. These should live in
-`src/foliaseal/application/phase3_signing_backend.py` or a closely related helper module and should
-be callable from the harness. The helpers should extract at least:
-
-- the widget annotation rectangle
-- the visible-appearance stream bytes or decoded text operators where feasible
-- the text fragments visible in the appearance stream
-- the presence and dimensions of any embedded image XObject used by the visible signature
-
-These facts should be serialized into `Phase3HarnessCapture` so the JSON artifact can explain what
-the final PDF actually contains.
-
-Only after that tooling is in place should the backend image-fit logic be tightened again for
-`single_line` `Top` and `Bottom`. The goal is to constrain the stamp image by the true remaining
-stamp area instead of whatever pyHanko happens to do after a generic shrink-to-fit rule. The likely
-path is to compute a stricter bounding region from measured text dimensions and the image aspect
-ratio, then pass pyHanko a background layout with margins that reflect that target region.
+Then tighten the backend’s horizontal `single_line` fit logic in
+`src/foliaseal/application/phase3_signing_backend.py`. The current `Left`/`Right` path measures a
+text box and reserves width conservatively, which leaves too much unused space and makes the stamp
+smaller than necessary. The next pass should use the real wrapped body footprint more effectively so
+the stamp can grow when the text occupies less width than the current reservation assumes.
 
 ## Concrete Steps
 
 From `/home/daekar/SignPDF/Scratch`:
 
-1. Inspect and patch the shell preview sizing behavior in
+1. Inspect and patch the shell preview card/body sizing behavior in
    `src/foliaseal/presentation/qt/signing_shell.py`.
-2. Repair harness reservation diagnostics in
-   `src/foliaseal/presentation/qt/phase3_harness.py`.
-3. Add actual-output inspection helpers and harness serialization for them.
-4. Tighten backend `single_line` image-fit logic using the new evidence from the output-analysis
-   helpers.
+2. Tighten backend `single_line` horizontal image-fit logic in
+   `src/foliaseal/application/phase3_signing_backend.py`.
 5. Run focused tests:
 
-       ./.venv/bin/python -m pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_signing_backend.py
-       ./.venv/bin/ruff check src/foliaseal/presentation/qt/signing_shell.py src/foliaseal/presentation/qt/phase3_harness.py src/foliaseal/application/phase3_signing_backend.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_signing_backend.py
+       ./.venv/bin/python -m pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py
+       ./.venv/bin/ruff check src/foliaseal/presentation/qt/signing_shell.py src/foliaseal/application/phase3_signing_backend.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py
 
 6. Perform a narrow harness rerun covering:
    - `single_line / Top`
    - `single_line / Bottom`
    - `single_line / Left`
+   - `single_line / Right`
 
 ## Validation and Acceptance
 
 Acceptance for this wave means all of the following are true:
 
 - the properties panel no longer widens just because preview text is too large
-- the preview card remains fixed to the selected rectangle’s aspect ratio and shows overflow or
-  clipping honestly
-- `backend_reservation_snapshot` no longer fails with the `field_bindings` attribute error
-- the harness JSON contains meaningful output-side appearance facts from the actual signed PDF
-- `single_line / Top` and `single_line / Bottom` no longer show a grossly oversized stamp in the
-  final PDF for an ordinary rectangle
+- the preview card uses the available panel width while preserving the selected rectangle’s aspect
+  ratio
+- the preview card does not clip title/detail content into an apparently empty card when the backend
+  still considers the layout signable
+- `single_line / Top` and `single_line / Bottom` continue to produce the improved final PDF output
+  observed in the latest manual run
+- `single_line / Left` and `single_line / Right` use the horizontal stamp area more effectively and
+  stop leaving obvious unused space beside the text
 - focused tests pass and lint is clean
 
 The user-visible proof is another harness run where the preview stays fixed, the side panel stays
@@ -202,19 +238,14 @@ already much better than today’s state.
 ## Artifacts and Notes
 
 - Latest harness findings from 2026-03-31:
-  - side panel widens when preview text is too large
-  - preview stamp shrinks too far for `single_line/top` and `single_line/bottom`
-  - final PDF stamp remains much too large for `single_line/top` and `single_line/bottom`
-  - `single_line/left` is stable, but preview and final output still disagree materially
-  - `backend_reservation_error` currently reports:
-
-        'SignatureAppearance' object has no attribute 'field_bindings'
-
-- Latest capture highlights:
-  - `layout_template: single_line`
-  - `stamp_position: left`
-  - `font_size_pt: 4.5`
-  - `preview_text` still wrapped to multiple lines
+  - side panel still widened as soon as the rectangle was drawn in the latest manual run
+  - preview card still used only about one-third to one-half of the available horizontal space
+  - preview could show only the border with no visible text even when validation later allowed
+    signing after field/font adjustments
+  - final PDF output for `single_line/top` and `single_line/bottom` looked good after the recent
+    backend changes
+  - final PDF output for `single_line/left` and `single_line/right` still left too much unused
+    horizontal space beside the text because the stamp was smaller than necessary
 
 ## Interfaces and Dependencies
 
