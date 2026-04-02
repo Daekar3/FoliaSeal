@@ -6,7 +6,6 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.coordinate_transform import PdfRect
-from foliaseal.application.phase3_signing_backend import _wrap_visible_signature_fragments
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
@@ -50,12 +49,14 @@ class _FakeWidget:
         self.enabled = True
         self.layout = None
         self.children = []
+        self.parent = None
         self.style = None
         self.visible = True
         self.fixed_size = None
         self.fixed_width = None
         self.maximum_width = None
         self.minimum_width = None
+        self._width_value = 480
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
@@ -81,6 +82,16 @@ class _FakeWidget:
     def setMinimumWidth(self, width):  # noqa: N802
         self.minimum_width = width
 
+    def width(self):
+        if self.fixed_width is not None:
+            return self.fixed_width
+        if self.maximum_width is not None:
+            return self.maximum_width
+        return self._width_value
+
+    def parentWidget(self):  # noqa: N802
+        return self.parent
+
 
 class _FakeLayout:
     def __init__(self, parent=None) -> None:
@@ -93,12 +104,17 @@ class _FakeLayout:
             parent.setLayout(self)
 
     def addWidget(self, widget, *args):  # noqa: N802
+        if hasattr(widget, "parent"):
+            widget.parent = self.parent
         self.items.append((widget, args))
 
     def addLayout(self, layout, *args):  # noqa: N802
         self.items.append((layout, args))
 
     def addRow(self, *args):  # noqa: N802
+        for item in args:
+            if hasattr(item, "parent"):
+                item.parent = self.parent
         self.rows.append(args)
 
     def setContentsMargins(self, *args):  # noqa: N802
@@ -314,6 +330,8 @@ class _FakeScrollArea(_FakeWidget):
 
     def setWidget(self, widget):  # noqa: N802
         self.widget = widget
+        if hasattr(widget, "parent"):
+            widget.parent = self
 
 
 class _FakeQt:
@@ -709,12 +727,21 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert 0 < height < 108
     assert preview_controls.multi_body_container.layout.items[0][0].visible is True
     assert preview_controls.multi_body_container.layout.items[0][0].alignment == _FakeQt.AlignCenter
-    assert preview_controls.container.fixed_width == 40
-    assert preview_controls.card_container.fixed_size == (40, 20)
-    assert preview_controls.title_label.fixed_width == 40
-    assert preview_controls.detail_label.fixed_width == 40
-    assert preview_controls.multi_content_container.fixed_width == 40
-    assert preview_controls.multi_detail_label.fixed_width == 40
+    available_width = signing_shell_module._preview_available_width(
+        widget.properties_panel.preview,
+        container=preview_controls.container,
+    )
+    expected_width, expected_height = signing_shell_module._preview_body_size(
+        widget.properties_panel.preview,
+        available_width_px=available_width,
+    )
+    assert preview_controls.container.fixed_width is None
+    assert preview_controls.card_container.fixed_width == expected_width
+    assert preview_controls.single_body_container.fixed_size == (expected_width, expected_height)
+    assert preview_controls.title_label.fixed_width == expected_width
+    assert preview_controls.detail_label.fixed_width == expected_width
+    assert preview_controls.multi_content_container.fixed_width <= expected_width
+    assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.title_label.text() == "Digitally signed by"
     detail_text = preview_controls.multi_detail_label.text()
     detail_lines = detail_text.splitlines()
@@ -788,17 +815,129 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
 
     preview_controls = widget.properties_panel.preview_controls
 
-    assert preview_controls.container.fixed_width == 88
-    assert preview_controls.card_container.fixed_size == (88, 28)
-    assert preview_controls.single_body_container.fixed_size == (88, 28)
-    assert preview_controls.title_label.fixed_width == 88
-    assert preview_controls.detail_label.fixed_width == 88
-    assert preview_controls.footer_label.fixed_width == 88
-    assert preview_controls.multi_content_container.fixed_width == 88
-    assert preview_controls.multi_detail_label.fixed_width == 88
+    available_width = signing_shell_module._preview_available_width(
+        widget.properties_panel.preview,
+        container=preview_controls.container,
+    )
+    expected_width, expected_height = signing_shell_module._preview_body_size(
+        widget.properties_panel.preview,
+        available_width_px=available_width,
+    )
+    assert preview_controls.container.fixed_width is None
+    assert preview_controls.card_container.fixed_width == expected_width
+    assert preview_controls.single_body_container.fixed_size == (expected_width, expected_height)
+    assert preview_controls.title_label.fixed_width == expected_width
+    assert preview_controls.detail_label.fixed_width == expected_width
+    assert preview_controls.footer_label.fixed_width == expected_width
+    assert preview_controls.multi_content_container.fixed_width <= expected_width
+    assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.multi_body_container.visible is False
     assert preview_controls.single_body_container.visible is True
     assert preview_controls.detail_label.text() != ""
+    assert len(preview_controls.single_body_container.layout.items) == 2
+
+
+def test_signing_shell_preview_available_width_uses_parent_width_not_stale_preview_width(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    panel = widget.properties_panel
+    preview_controls = panel.preview_controls
+    preview_controls.container.fixed_width = 198
+
+    available_width = signing_shell_module._preview_available_width(
+        panel.preview,
+        container=preview_controls.container,
+    )
+
+    assert available_width == 428
+
+
+def test_signing_shell_validation_label_is_width_limited_to_panel(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    panel = widget.properties_panel
+    panel._control_issue = SigningDraftValidationIssue(
+        code="visible_signature_layout_unavailable",
+        message=(
+            "Visible signature content does not fit inside the selected rectangle "
+            "for the single_line template. Enlarge the signature box or choose "
+            "a more compact appearance."
+        ),
+        field_name="signature_appearance",
+        severity=SigningDraftValidationSeverity.ERROR,
+    )
+
+    panel.refresh_preview()
+
+    assert panel._validation_label.fixed_width == 464
+    assert "visible_signature_layout_unavailable" in panel.validation_text()
+
+
+def test_signing_shell_preview_available_width_uses_tightest_ancestor_width(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    panel = widget.properties_panel
+    preview_controls = panel.preview_controls
+
+    panel.container._width_value = 638
+    widget.properties_scroll._width_value = 550
+    preview_controls.container.fixed_width = 622
+
+    available_width = signing_shell_module._preview_available_width(
+        panel.preview,
+        container=preview_controls.container,
+    )
+
+    assert available_width == 498
 
 
 def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
@@ -1053,15 +1192,7 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
     )
 
     preview = widget.properties_panel.preview
-    visible_fragments = [
-        field.text for field in preview.fields if field.visible and field.text
-    ]
-    expected_detail_text = _wrap_visible_signature_fragments(
-        visible_fragments,
-        text_style=preview.text_style,
-        max_text_width_pt=max(1, int(round(preview.signature_rect.width_pt)) - 8),
-        max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
-    )
+    expected_detail_text = signing_shell_module._preview_detail_text(preview)
 
     assert widget.properties_panel._appearance_controls.show_field_names.isChecked() is False
     assert widget.properties_panel.preview_controls.detail_label.text() == expected_detail_text
@@ -1660,17 +1791,7 @@ def test_signing_shell_single_line_preview_matches_backend_wrapping(
     )
 
     preview = widget.properties_panel.preview
-    visible_fragments = [
-        field.label if preview.show_field_names else field.text
-        for field in preview.fields
-        if field.visible and field.text
-    ]
-    expected = _wrap_visible_signature_fragments(
-        visible_fragments,
-        text_style=preview.text_style,
-        max_text_width_pt=max(1, int(round(preview.signature_rect.width_pt)) - 8),
-        max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
-    )
+    expected = signing_shell_module._preview_detail_text(preview)
 
     assert widget.properties_panel.preview_controls.detail_label.text() == expected
 
@@ -1755,21 +1876,16 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     )
 
     preview = widget.properties_panel.preview
-    visible_fragments = [
-        field.label if preview.show_field_names else field.text
-        for field in preview.fields
-        if field.visible and field.text
-    ]
-    full_width = max(1, int(round(preview.signature_rect.width_pt)) - 8)
-    constrained_width = max(
-        1,
-        full_width - max(48, int(round(preview.signature_rect.width_pt * 0.35))) - 6,
-    )
-    expected = _wrap_visible_signature_fragments(
-        visible_fragments,
-        text_style=preview.text_style,
-        max_text_width_pt=constrained_width,
-        max_text_height_pt=max(1, int(round(preview.signature_rect.height_pt)) - 8),
+    expected = signing_shell_module._preview_detail_text(preview)
+    available_width = signing_shell_module._preview_available_width(
+        preview,
+        container=widget.properties_panel.preview_controls.container,
     )
 
     assert widget.properties_panel.preview_controls.multi_detail_label.text() == expected
+    assert widget.properties_panel.preview_controls.multi_content_container.fixed_width == (
+        signing_shell_module._preview_text_width_limit(
+            preview,
+            available_width_px=available_width,
+        )
+    )

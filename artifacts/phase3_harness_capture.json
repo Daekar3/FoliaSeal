@@ -1,24 +1,62 @@
 {
-  "backend_reservation_error": "'SignatureAppearance' object has no attribute 'field_bindings'",
+  "backend_reservation_error": null,
   "backend_reservation_snapshot": {
-    "error": "'SignatureAppearance' object has no attribute 'field_bindings'",
+    "background_layout": {
+      "inner_content_scaling": "shrink_to_fit",
+      "margins": {
+        "bottom": 17,
+        "left": 2,
+        "right": 240,
+        "top": 2
+      },
+      "x_align": "align_min",
+      "y_align": "align_max"
+    },
+    "box_style": {
+      "background_color_hex": "#FFFFFF",
+      "border_color_hex": "#000000",
+      "border_width_pt": 1.0,
+      "show_border": true
+    },
+    "content_layout": {
+      "inner_content_scaling": "no_scaling",
+      "margins": {
+        "bottom": 2,
+        "left": 2,
+        "right": 2,
+        "top": 7
+      },
+      "x_align": "align_mid",
+      "y_align": "align_min"
+    },
     "layout_template": "single_line",
     "signature_rect": {
-      "bottom_pt": 428.68,
-      "height_pt": 22.12,
-      "left_pt": 35.23,
+      "bottom_pt": 428.48,
+      "height_pt": 23.04,
+      "left_pt": 36.35,
       "page_index": 3,
       "page_number": 4,
-      "width_pt": 259.28
+      "width_pt": 259.07
     },
-    "stamp_position": "left"
+    "stamp_background_present": true,
+    "stamp_position": "top",
+    "stamp_text": "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary\nLawson Heirs Inc. | 2026-04-02 01:43 | Wytheville, Virginia, US",
+    "stamp_text_length": 120,
+    "stamp_text_line_count": 2,
+    "text_style": {
+      "bold": false,
+      "font_family": "Serif",
+      "font_size_pt": 7.0,
+      "italic": true,
+      "text_color_hex": "#000000"
+    }
   },
   "errors": [],
-  "first_render_ms": 9.596985997632146,
+  "first_render_ms": 9.363424964249134,
   "interaction_counts": {
     "selection_success": 1,
-    "sign_success": 3,
-    "wheel_zoom_in": 4
+    "sign_success": 1,
+    "wheel_zoom_in": 3
   },
   "last_signature_has_visible_appearance": true,
   "last_signature_output_path": "/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf",
@@ -26,25 +64,11 @@
   "last_signature_page_number": 4,
   "last_signing_result_message": "Signing completed successfully.",
   "last_signing_result_success": true,
-  "output_file_exists": true,
-  "output_file_size_bytes": 210245,
-  "output_signature_count": 1,
-  "output_signature_snapshot": {
-    "byte_range": [
-      0,
-      201141,
-      209459,
-      786
-    ],
-    "contact_info": "Secretary.LHI@Outlook.com",
-    "coverage": null,
-    "docmdp_level": null,
-    "field_name": "Signature1",
-    "location": "Wytheville, Virginia, US",
-    "md_algorithm": "sha256",
-    "name": "Adam Smith <Secretary.LHI@Outlook.com>",
-    "subfilter": "/adbe.pkcs7.detached"
-  },
+  "output_file_exists": false,
+  "output_file_size_bytes": null,
+  "output_signature_count": null,
+  "output_signature_snapshot": null,
+  "output_visible_appearance_snapshot": null,
   "pdf_path": "/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed).pdf",
   "preview_available": true,
   "preview_snapshot": {
@@ -55,7 +79,7 @@
       "show_border": true
     },
     "can_submit": true,
-    "datetime_format": "%Y-%m-%d %H:%M:%S %Z",
+    "datetime_format": "%Y-%m-%d %H:%M",
     "fields": [
       {
         "field_key": "distinguished_name",
@@ -102,7 +126,7 @@
         "hint": "sign time",
         "label": "Signing time",
         "source": "derived",
-        "text": "2026-03-31 23:52:28 UTC",
+        "text": "2026-04-02 01:43",
         "visible": true
       },
       {
@@ -122,33 +146,33 @@
         "visible": true
       }
     ],
-    "image_stamp_path": "/mnt/Fast Storage/OneDrive, Adam/Documents/Adam's Signature.png",
+    "image_stamp_path": "/mnt/Fast Storage/OneDrive, Adam/Documents/Adam's Signature.gif",
     "issues": [],
     "layout_template": "single_line",
     "show_field_names": false,
     "signature_rect": {
-      "bottom_pt": 428.68,
-      "height_pt": 22.12,
-      "left_pt": 35.23,
+      "bottom_pt": 428.48,
+      "height_pt": 23.04,
+      "left_pt": 36.35,
       "page_index": 3,
       "page_number": 4,
-      "width_pt": 259.28
+      "width_pt": 259.07
     },
-    "signer_label_prefix": "Inkslapped by",
-    "stamp_position": "left",
+    "signer_label_prefix": "",
+    "stamp_position": "top",
     "text_style": {
       "bold": false,
       "font_family": "Serif",
-      "font_size_pt": 4.5,
+      "font_size_pt": 7.0,
       "italic": true,
       "text_color_hex": "#000000"
     },
     "timezone_display_mode": "utc",
-    "title": "Inkslapped by"
+    "title": ""
   },
-  "preview_text": "Inkslapped by\nAdam Smith | Secretary.LHI@Outlook.com | Board Secretary | Lawson Heirs Inc.\n2026-03-31 23:51:03 UTC | Wytheville, Virginia, US",
+  "preview_text": "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary\nLawson Heirs Inc. | 2026-04-02 01:40 | Wytheville, Virginia, US",
   "selection_count": 1,
-  "sign_request_count": 3,
+  "sign_request_count": 1,
   "sign_request_snapshot": {
     "certificate_alias": null,
     "certificate_path": "/mnt/Fast Storage/OneDrive, Adam/Applications/Encryption/Adam_Royall_Smith.pfx",
@@ -161,7 +185,7 @@
         "border_width_pt": 1.0,
         "show_border": true
       },
-      "datetime_format": "%Y-%m-%d %H:%M:%S %Z",
+      "datetime_format": "%Y-%m-%d %H:%M",
       "field_order": [
         "distinguished_name",
         "common_name",
@@ -238,27 +262,27 @@
           "source": "derived"
         }
       ],
-      "image_stamp_path": "/mnt/Fast Storage/OneDrive, Adam/Documents/Adam's Signature.png",
+      "image_stamp_path": "/mnt/Fast Storage/OneDrive, Adam/Documents/Adam's Signature.gif",
       "layout_template": "single_line",
       "show_field_names": false,
-      "signer_label_prefix": "Inkslapped by",
-      "stamp_position": "left",
+      "signer_label_prefix": "",
+      "stamp_position": "top",
       "text_style": {
         "bold": false,
         "font_family": "Serif",
-        "font_size_pt": 4.5,
+        "font_size_pt": 7.0,
         "italic": true,
         "text_color_hex": "#000000"
       },
       "timezone_display_mode": "utc"
     },
     "signature_rect": {
-      "bottom_pt": 428.68,
-      "height_pt": 22.12,
-      "left_pt": 35.23,
+      "bottom_pt": 428.48,
+      "height_pt": 23.04,
+      "left_pt": 36.35,
       "page_index": 3,
       "page_number": 4,
-      "width_pt": 259.28
+      "width_pt": 259.07
     },
     "timestamp_required": false,
     "tsa_url": "https://tsa.example.invalid"

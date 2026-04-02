@@ -12,38 +12,47 @@ notes in this file so Phase 3 acceptance can be reviewed from one artifact.
 - First render recorded: yes
 - Preview available: yes
 - Selection interactions captured: 1
-- Sign requests captured: 3
+- Sign requests captured: 1
+- Request snapshot origin: submitted request
 - Last signature page number: 4
 - Last sign request had visible appearance: yes
 - Last sign request output path: `/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf`
 - Last request layout template: single_line
-- Last request stamp position: left
+- Last request stamp position: top
 - Last request show field names: no
 - Last request field snapshot count: 8
 - Backend reservation layout template: single_line
-- Backend reservation stamp position: left
-- Backend reservation stamp text length: 0
-- Backend reservation stamp background: no
-- Backend reservation background scaling: None
-- Backend reservation content scaling: None
-- Backend reservation content bottom margin: None
-- Backend reservation error: `'SignatureAppearance' object has no attribute 'field_bindings'`
+- Backend reservation stamp position: top
+- Backend reservation stamp text length: 120
+- Backend reservation stamp background: yes
+- Backend reservation background scaling: shrink_to_fit
+- Backend reservation content scaling: no_scaling
+- Backend reservation content bottom margin: 2
+- Backend reservation error: none
 - Preview layout template: single_line
-- Preview stamp position: left
+- Preview stamp position: top
 - Preview show field names: no
 - Preview field count: 8
 - Last signing result: success
 - Last signing message: `Signing completed successfully.`
-- Output file exists: yes
-- Output file size: 210245 bytes
-- Output embedded signature count: 1
-- Output signature field name: Signature1
-- Output signature name: Adam Smith <Secretary.LHI@Outlook.com>
-- Output signature location: Wytheville, Virginia, US
-- Output signature contact info: Secretary.LHI@Outlook.com
-- Output signature byte range: [0, 201141, 209459, 786]
-- Output signature subfilter: /adbe.pkcs7.detached
-- Output signature md algorithm: sha256
+- Output file exists: no
+- Output file size: not captured
+- Output embedded signature count: not captured
+- Output signature field name: not captured
+- Output signature name: not captured
+- Output signature location: not captured
+- Output signature contact info: not captured
+- Output signature byte range: not captured
+- Output signature subfilter: not captured
+- Output signature md algorithm: not captured
+- Output visible appearance field name: not captured
+- Output visible appearance annotation rect: not captured
+- Output visible appearance bbox: not captured
+- Output visible appearance stream length: not captured
+- Output visible appearance has visible text: not captured
+- Output visible appearance text fragments: not captured
+- Output visible appearance image XObjects: not captured
+- Output visible appearance error: not captured
 - Current validation text: `Ready to sign.`
 
 # Phase 3 FR-3B Acceptance Checklist and Task Worksheet

@@ -98,6 +98,7 @@ def build_phase3_checklist_results_markdown(
         f"- Preview available: {'yes' if capture.preview_available else 'no'}",
         f"- Selection interactions captured: {capture.selection_count}",
         f"- Sign requests captured: {capture.sign_request_count}",
+        f"- Request snapshot origin: {_snapshot_request_origin(capture)}",
         (
             f"- Last signature page number: {capture.last_signature_page_number}"
             if capture.last_signature_page_number is not None
@@ -294,6 +295,12 @@ def build_phase3_checklist_results_markdown(
             else "- Output visible appearance stream length: not captured"
         ),
         (
+            f"- Output visible appearance has visible text: "
+            f"{_snapshot_visible_appearance_has_text(visible_appearance_snapshot)}"
+            if visible_appearance_snapshot is not None
+            else "- Output visible appearance has visible text: not captured"
+        ),
+        (
             f"- Output visible appearance text fragments: "
             f"{_snapshot_visible_appearance_text_fragments(visible_appearance_snapshot)}"
             if visible_appearance_snapshot is not None
@@ -441,11 +448,16 @@ def run_phase3_signing_harness(
     preview = shell.properties_panel.refresh_preview()
     validation_text = shell.properties_panel.validation_text()
     last_signing_result = getattr(shell, "last_signing_result", None)
+    capture_request = (
+        sign_requests[-1]
+        if sign_requests
+        else _snapshot_current_draft_request(shell.properties_panel._workflow)
+    )
     backend_reservation_snapshot = (
-        _snapshot_backend_reservation(sign_requests[-1]) if sign_requests else None
+        _snapshot_backend_reservation(capture_request) if capture_request is not None else None
     )
     backend_reservation_error = (
-        _backend_reservation_error(sign_requests[-1]) if sign_requests else None
+        _backend_reservation_error(capture_request) if capture_request is not None else None
     )
     last_signature_page_index = (
         sign_requests[-1].signature_rect.page_index
@@ -486,9 +498,7 @@ def run_phase3_signing_harness(
             last_signing_result.success if isinstance(last_signing_result, SigningResult) else None
         ),
         preview_snapshot=_snapshot_preview(preview),
-        sign_request_snapshot=(
-            _snapshot_signing_request(sign_requests[-1]) if sign_requests else None
-        ),
+        sign_request_snapshot=_snapshot_signing_request(capture_request),
         backend_reservation_snapshot=backend_reservation_snapshot,
         backend_reservation_error=backend_reservation_error,
         output_file_exists=output_exists,
@@ -675,19 +685,29 @@ def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] 
                 appearance_stream.get("/Resources")
             )
             text_fragments = _extract_pdf_text_fragments(appearance_text)
+            visible_text_present = bool(text_fragments)
+            image_xobject_count = sum(
+                1 for item in xobject_summaries if item.get("subtype") == "/Image"
+            )
+            appearance_bbox = _snapshot_pdf_rect(appearance_stream.get("/BBox"))
             return {
                 "field_name": signature.field_name,
                 "annotation_rect": rect,
-                "appearance_bbox": _snapshot_pdf_rect(appearance_stream.get("/BBox")),
+                "appearance_bbox": appearance_bbox,
                 "appearance_stream_length": len(appearance_data),
                 "appearance_text_fragments": text_fragments,
                 "appearance_text_snippet": appearance_text[:240],
                 "appearance_text_operator_count": _count_pdf_text_operators(appearance_text),
                 "appearance_xobjects": xobject_summaries,
-                "appearance_image_xobject_count": sum(
-                    1 for item in xobject_summaries if item.get("subtype") == "/Image"
-                ),
-                "appearance_has_visible_text": bool(text_fragments),
+                "appearance_image_xobject_count": image_xobject_count,
+                "appearance_has_visible_text": visible_text_present,
+                "visible_text_present": visible_text_present,
+                "text_fragments": text_fragments,
+                "image_xobjects": xobject_summaries,
+                "annotation_rect_size": _snapshot_rect_size(rect),
+                "appearance_bbox_size": _snapshot_rect_size(appearance_bbox),
+                "text_fragment_count": len(text_fragments),
+                "image_xobject_count": image_xobject_count,
             }
     except Exception as exc:
         return {"error": str(exc)}
@@ -714,7 +734,9 @@ def _snapshot_preview(preview) -> dict[str, Any]:
     }
 
 
-def _snapshot_signing_request(request: SigningRequest) -> dict[str, Any]:
+def _snapshot_signing_request(request: SigningRequest | None) -> dict[str, Any] | None:
+    if request is None:
+        return None
     appearance = request.signature_appearance
     return {
         "input_pdf_path": request.input_pdf_path,
@@ -728,6 +750,24 @@ def _snapshot_signing_request(request: SigningRequest) -> dict[str, Any]:
             None if appearance is None else _snapshot_signing_appearance(appearance)
         ),
     }
+
+
+def _snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:
+    signature_rect = workflow.current_signature_rect
+    signature_appearance = workflow.current_signature_appearance
+    if signature_rect is None or signature_appearance is None:
+        return None
+    return SigningRequest(
+        input_pdf_path=workflow.input_pdf_path,
+        output_pdf_path=workflow.output_pdf_path,
+        certificate_path=workflow.certificate_path,
+        passphrase=workflow.passphrase,
+        tsa_url=workflow.tsa_url,
+        timestamp_required=workflow.timestamp_required,
+        certificate_alias=workflow.certificate_alias,
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+    )
 
 
 def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | None:
@@ -916,6 +956,14 @@ def _snapshot_sign_request_appearance(
     return appearance
 
 
+def _snapshot_request_origin(capture: Phase3HarnessCapture) -> str:
+    if capture.sign_request_snapshot is None:
+        return "not captured"
+    if capture.sign_request_count > 0:
+        return "submitted request"
+    return "current draft"
+
+
 def _snapshot_layout_template(snapshot: dict[str, Any] | None) -> str | None:
     if snapshot is None:
         return None
@@ -1040,10 +1088,19 @@ def _snapshot_visible_appearance_stream_length(snapshot: dict[str, Any] | None) 
     return int(value) if isinstance(value, int) else 0
 
 
+def _snapshot_visible_appearance_has_text(snapshot: dict[str, Any] | None) -> str:
+    if snapshot is None:
+        return "not captured"
+    value = snapshot.get("visible_text_present", snapshot.get("appearance_has_visible_text"))
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return "not captured"
+
+
 def _snapshot_visible_appearance_text_fragments(snapshot: dict[str, Any] | None) -> str:
     if snapshot is None:
         return "not captured"
-    fragments = snapshot.get("appearance_text_fragments")
+    fragments = snapshot.get("text_fragments", snapshot.get("appearance_text_fragments"))
     if not isinstance(fragments, list):
         return "not captured"
     if not fragments:
@@ -1057,7 +1114,7 @@ def _snapshot_visible_appearance_text_fragments(snapshot: dict[str, Any] | None)
 def _snapshot_visible_appearance_image_xobjects(snapshot: dict[str, Any] | None) -> str:
     if snapshot is None:
         return "not captured"
-    xobjects = snapshot.get("appearance_xobjects")
+    xobjects = snapshot.get("image_xobjects", snapshot.get("appearance_xobjects"))
     if not isinstance(xobjects, list):
         return "not captured"
     if not xobjects:
@@ -1180,6 +1237,16 @@ def _snapshot_pdf_rect(value) -> list[float] | None:
         return [float(component) for component in value]
     except Exception:
         return None
+
+
+def _snapshot_rect_size(rect: list[float] | None) -> dict[str, float] | None:
+    if rect is None or len(rect) != 4:
+        return None
+    left, bottom, right, top = rect
+    return {
+        "width": float(right - left),
+        "height": float(top - bottom),
+    }
 
 
 def _snapshot_pdf_name(value) -> str | None:

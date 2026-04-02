@@ -61,6 +61,36 @@ Interpretation:
 - certificate support should be treated as PKCS#12-scoped for v1 until a broader identity model is
   explicitly planned
 
+## Proposed Next Instrumentation Wave
+
+The current harness and JSON capture are now useful, but the latest manual runs show that we still
+need stronger evidence about the actual human experience of preview vs final output. The next
+instrumentation upgrade should therefore stay above the display-server layer and focus on
+application-visible artifacts.
+
+Proposed instrumentation phases:
+
+1. UI-state capture
+- record preview-card geometry, inner body geometry, stamp/text widget bounds, scrollbar state,
+  active layout metadata, and validation state at key interaction moments
+
+2. Visual artifact capture
+- capture the live preview card as an artifact
+- capture a rendered crop of the signed annotation region from the final output PDF
+
+3. Scripted interaction replay
+- support deterministic replay of common signing scenarios so manual reruns become narrower and more
+  reproducible
+
+4. Visual comparison support
+- add optional preview-vs-output comparison artifacts, including simple image diffs or structured
+  comparison summaries where practical
+
+Scope boundary for this wave:
+- prefer app-level instrumentation and rendered artifacts
+- do not introduce X11/Wayland/compositor tracing unless later evidence proves app-level capture is
+  insufficient
+
 ## Certificate Compatibility Profile
 
 Phase 3 and the current backend should be planned against the following certificate scope:
