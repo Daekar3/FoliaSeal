@@ -678,6 +678,7 @@ def _build_stamp_text(
         body_text = " | ".join(body_fragments)
         if signature_rect is not None and body_fragments:
             max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - 8)
+            max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - 8)
             width_overflow_tolerance = 1.0
             if (
                 appearance.stamp_position
@@ -685,6 +686,9 @@ def _build_stamp_text(
                 and signature_rect.height_pt <= 24
             ):
                 width_overflow_tolerance = _single_line_vertical_width_overflow_tolerance()
+                max_text_height_pt = _single_line_vertical_text_wrap_height_limit(
+                    signature_rect
+                )
             if (
                 appearance.image_stamp_path is not None
                 and appearance.stamp_position
@@ -697,7 +701,7 @@ def _build_stamp_text(
                 body_fragments,
                 text_style=appearance.text_style,
                 max_text_width_pt=max_text_width_pt,
-                max_text_height_pt=max(1, int(round(signature_rect.height_pt)) - 8),
+                max_text_height_pt=max_text_height_pt,
                 width_overflow_tolerance=width_overflow_tolerance,
             )
             if _should_prefer_compact_single_line_body(
@@ -825,6 +829,17 @@ def _single_line_vertical_width_overflow_tolerance() -> float:
     """
 
     return 1.25
+
+
+def _single_line_vertical_text_wrap_height_limit(signature_rect: SignatureRect) -> int:
+    """Match early wrap height limits to the compact vertical reservation budget.
+
+    Compact top/bottom single-line layouts already relax vertical margins in the
+    final reservation logic, but the early wrap step was still using the older
+    `height - 8` rule. That could reject layouts the final fit gate would accept.
+    """
+
+    return max(1, int(round(signature_rect.height_pt)) - 4)
 
 
 def _effective_horizontal_text_reservation_width(

@@ -35,6 +35,7 @@ from foliaseal.domain.models import (
     SignatureLayoutTemplate,
     SignatureStampPosition,
     SignatureTextStyle,
+    SignatureTimezoneDisplayMode,
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
@@ -1384,6 +1385,78 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_fou
             page_index=0,
             left_pt=35.0,
             bottom_pt=429.0,
+            width_pt=260.0,
+            height_pt=22.0,
+        ),
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+    )
+
+    assert issues == ()
+
+
+def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_five_fields_at_eight_point_five(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.gif"
+    _write_test_pkcs12(cert_path, passphrase="secret", common_name="Adam Smith")
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        signer_label_prefix="",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+    )
+
+    issues = _visible_signature_fit_issues(
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=34.0,
+            bottom_pt=430.0,
             width_pt=260.0,
             height_pt=22.0,
         ),

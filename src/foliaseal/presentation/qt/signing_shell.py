@@ -355,6 +355,7 @@ _PREVIEW_DEFAULT_WIDTH_PX = 320
 _PREVIEW_DEFAULT_HEIGHT_PX = 120
 _PREVIEW_HORIZONTAL_PADDING_PX = 24
 _PREVIEW_GROUP_OVERHEAD_PX = 28
+_PREVIEW_CARD_CONTENT_INSET_PX = 4
 
 
 def _widget_width(widget: Any) -> int | None:
@@ -418,7 +419,21 @@ def _preview_body_size(
     available_width_px: int | None = None,
 ) -> tuple[int, int]:
     if preview.signature_rect is None:
-        return (_PREVIEW_DEFAULT_WIDTH_PX, _PREVIEW_DEFAULT_HEIGHT_PX)
+        max_width_px = min(
+            available_width_px or _PREVIEW_MAX_WIDTH_PX,
+            int(
+                round(
+                    _PREVIEW_MAX_HEIGHT_PX
+                    * (_PREVIEW_DEFAULT_WIDTH_PX / _PREVIEW_DEFAULT_HEIGHT_PX)
+                )
+            ),
+        )
+        width = max(_PREVIEW_DEFAULT_WIDTH_PX, max_width_px)
+        height = max(
+            1,
+            int(round(width * (_PREVIEW_DEFAULT_HEIGHT_PX / _PREVIEW_DEFAULT_WIDTH_PX))),
+        )
+        return (width, min(height, _PREVIEW_MAX_HEIGHT_PX))
 
     width_pt = max(1.0, preview.signature_rect.width_pt)
     height_pt = max(1.0, preview.signature_rect.height_pt)
@@ -894,13 +909,13 @@ class SignaturePropertiesPanel:
                 "QGroupBox {"
                 " border: 1px solid #d8d8d8;"
                 " border-radius: 6px;"
-                " padding: 5px;"
+                " padding: 2px;"
                 " background: #ffffff;"
                 "}"
             )
         card_layout = bindings.q_vbox_layout(card_container)
-        card_layout.setContentsMargins(6, 6, 6, 6)
-        card_layout.setSpacing(4)
+        card_layout.setContentsMargins(2, 2, 2, 2)
+        card_layout.setSpacing(2)
 
         title_label = bindings.q_label("")
         stamp_label = bindings.q_label("")
@@ -908,8 +923,8 @@ class SignaturePropertiesPanel:
         footer_label = bindings.q_label("")
         multi_stamp_label = bindings.q_label("")
         multi_detail_label = bindings.q_label("")
-        single_body_container = _compose_preview_column(bindings, stamp_label, detail_label)
-        multi_content_container = _compose_preview_column(bindings, multi_detail_label)
+        single_body_container = _compose_preview_column(bindings)
+        multi_content_container = _compose_preview_column(bindings)
         multi_body_container = bindings.q_widget()
         multi_body_layout = bindings.q_hbox_layout(multi_body_container)
         multi_body_layout.setContentsMargins(0, 0, 0, 0)
@@ -935,13 +950,13 @@ class SignaturePropertiesPanel:
 
         if hasattr(stamp_label, "setStyleSheet"):
             stamp_label.setStyleSheet(
-                "font-weight: 600; color: #1f2937; border: 1px dashed #94a3b8;"
-                " padding: 4px; background: #f8fafc;"
+                "font-weight: 600; color: #1f2937; border: none;"
+                " padding: 0px; background: transparent;"
             )
         if hasattr(multi_stamp_label, "setStyleSheet"):
             multi_stamp_label.setStyleSheet(
-                "font-weight: 600; color: #1f2937; border: 1px dashed #94a3b8;"
-                " padding: 4px; background: #f8fafc;"
+                "font-weight: 600; color: #1f2937; border: none;"
+                " padding: 0px; background: transparent;"
             )
         if hasattr(title_label, "setStyleSheet"):
             title_label.setStyleSheet(
@@ -954,7 +969,6 @@ class SignaturePropertiesPanel:
         if hasattr(footer_label, "setStyleSheet"):
             footer_label.setStyleSheet("color: #374151;")
 
-        card_layout.addWidget(title_label)
         card_layout.addWidget(single_body_container)
         card_layout.addWidget(multi_body_container)
         layout.addWidget(card_container)
@@ -1566,10 +1580,12 @@ class SignaturePropertiesPanel:
             preview,
             container=self._preview_controls.container,
         )
-        body_width, body_height = _preview_body_size(
+        card_width, card_height = _preview_body_size(
             preview,
             available_width_px=available_width_px,
         )
+        body_width = card_width
+        body_height = card_height
         detail_width = (
             body_width
             if is_vertical
@@ -1597,18 +1613,28 @@ class SignaturePropertiesPanel:
                     max_width=max_width,
                     max_height=max_height,
                 )
-        if hasattr(self._preview_controls.card_container, "setFixedWidth"):
-            self._preview_controls.card_container.setFixedWidth(body_width)
+        if hasattr(self._preview_controls.card_container, "setFixedSize"):
+            self._preview_controls.card_container.setFixedSize(card_width, card_height)
+        elif hasattr(self._preview_controls.card_container, "setFixedWidth"):
+            self._preview_controls.card_container.setFixedWidth(card_width)
+        inner_body_width = max(1, body_width - _PREVIEW_CARD_CONTENT_INSET_PX)
+        inner_body_height = max(1, body_height - _PREVIEW_CARD_CONTENT_INSET_PX)
         if hasattr(self._preview_controls.single_body_container, "setFixedSize"):
-            self._preview_controls.single_body_container.setFixedSize(body_width, body_height)
+            self._preview_controls.single_body_container.setFixedSize(
+                inner_body_width,
+                inner_body_height,
+            )
         if hasattr(self._preview_controls.multi_body_container, "setFixedSize"):
-            self._preview_controls.multi_body_container.setFixedSize(body_width, body_height)
+            self._preview_controls.multi_body_container.setFixedSize(
+                inner_body_width,
+                inner_body_height,
+            )
         for widget in (
             self._preview_controls.title_label,
             self._preview_controls.detail_label,
             self._preview_controls.footer_label,
         ):
-            _set_widget_width_limit(widget, body_width)
+            _set_widget_width_limit(widget, card_width)
         for widget in (
             self._preview_controls.multi_content_container,
             self._preview_controls.multi_detail_label,
@@ -1631,7 +1657,7 @@ class SignaturePropertiesPanel:
                     if callable(size_height):
                         size_height = size_height()
                     if isinstance(size_width, int) and isinstance(size_height, int):
-                        label.setFixedSize(size_width + 16, size_height + 16)
+                        label.setFixedSize(size_width + 4, size_height + 4)
                 return
             clear = getattr(label, "clear", None)
             if callable(clear):
@@ -1645,19 +1671,39 @@ class SignaturePropertiesPanel:
             if hasattr(label, "setFixedSize"):
                 label.setFixedSize(96, 64)
 
+        align_left = getattr(self._bindings.qt, "AlignLeft", None)
+        align_center = getattr(self._bindings.qt, "AlignCenter", None)
+        if is_vertical and align_left is not None:
+            if hasattr(self._preview_controls.stamp_label, "setAlignment"):
+                self._preview_controls.stamp_label.setAlignment(align_left)
+        elif (
+            align_center is not None
+            and hasattr(self._preview_controls.stamp_label, "setAlignment")
+        ):
+            self._preview_controls.stamp_label.setAlignment(align_center)
+
         if is_vertical:
+            stamp_widget: Any = self._preview_controls.stamp_label
+            detail_widget: Any = self._preview_controls.detail_label
+            if align_left is not None:
+                stamp_widget = (self._preview_controls.stamp_label, 0, align_left)
+                detail_widget = (self._preview_controls.detail_label, 0, align_left)
+            single_widgets: list[Any] = [stamp_widget, detail_widget]
+            if stamp_position == SignatureStampPosition.BOTTOM:
+                single_widgets = [detail_widget, stamp_widget]
             _set_container_widgets(
                 self._preview_controls.single_body_container,
-                self._preview_controls.stamp_label,
-                self._preview_controls.detail_label,
+                *single_widgets,
             )
-            if stamp_position == SignatureStampPosition.BOTTOM:
-                _set_container_widgets(
-                    self._preview_controls.single_body_container,
-                    self._preview_controls.detail_label,
-                    self._preview_controls.stamp_label,
-                )
         else:
+            multi_content_widgets: list[Any] = []
+            if title_line:
+                multi_content_widgets.append(self._preview_controls.title_label)
+            multi_content_widgets.append(self._preview_controls.multi_detail_label)
+            _set_container_widgets(
+                self._preview_controls.multi_content_container,
+                *multi_content_widgets,
+            )
             _set_container_widgets(
                 self._preview_controls.multi_body_container,
                 (self._preview_controls.multi_stamp_label, 0, self._bindings.qt.AlignCenter),
@@ -1702,12 +1748,17 @@ class SignaturePropertiesPanel:
             self._preview_controls.detail_label.setStyleSheet(text_css)
         if hasattr(self._preview_controls.multi_detail_label, "setStyleSheet"):
             self._preview_controls.multi_detail_label.setStyleSheet(text_css)
-        self._preview_controls.title_label.setText(title_line)
-        _set_widget_visible(self._preview_controls.title_label, bool(title_line))
         if is_vertical:
-            self._preview_controls.detail_label.setText(visible_detail)
+            combined_vertical_text = "\n".join(
+                part for part in (title_line, visible_detail) if part
+            )
+            self._preview_controls.title_label.setText("")
+            _set_widget_visible(self._preview_controls.title_label, False)
+            self._preview_controls.detail_label.setText(combined_vertical_text)
             self._preview_controls.multi_detail_label.setText("")
         else:
+            self._preview_controls.title_label.setText(title_line)
+            _set_widget_visible(self._preview_controls.title_label, bool(title_line))
             self._preview_controls.detail_label.setText("")
             self._preview_controls.multi_detail_label.setText(visible_detail)
         self._preview_controls.footer_label.setText("")
@@ -1977,8 +2028,14 @@ class SigningWorkspaceWidget:
         return self._last_signing_result
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
-        page_index = self._viewer_workflow.session.current_page
+        snapshot = getattr(self._viewer_workflow, "snapshot", None)
+        page_index = (
+            snapshot.page_index
+            if snapshot is not None
+            else self._viewer_workflow.session.current_page
+        )
         normalized_rect = pdf_rect.normalized()
+        self._sync_placement_context_from_viewer()
         try:
             signature_rect = SignatureRect(
                 page_index=page_index,
@@ -1992,7 +2049,6 @@ class SigningWorkspaceWidget:
             return
         self.properties_panel.set_signature_rect(signature_rect)
         self._sync_signature_overlay()
-        self._sync_placement_context_from_viewer()
         self._refresh_sign_button_state()
 
     def _handle_viewer_error(self, message: str) -> None:
