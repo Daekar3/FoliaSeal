@@ -13,6 +13,13 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
+from foliaseal.application.qa_evidence_contract import (
+    ENGINEERING_RUN,
+    GATE_CANDIDATE,
+    NON_GATING,
+    PHASE3_EVIDENCE_CONTRACT_VERSION,
+    evaluate_phase3_evidence_contract,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldBinding,
@@ -124,6 +131,23 @@ def _write_signed_test_pdf(
     return output_pdf
 
 
+def _capture_metadata_defaults(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "summary_json_path": "artifacts/phase3_harness_capture.json",
+        "summary_json_written": True,
+        "checklist_results_path": "artifacts/phase3_fr3b_acceptance_results.md",
+        "checklist_results_written": True,
+        "evidence_contract_version": PHASE3_EVIDENCE_CONTRACT_VERSION,
+        "acceptance_tier": GATE_CANDIDATE,
+        "gate_verdict": GATE_CANDIDATE,
+        "evidence_validation_passed": True,
+        "evidence_validation_errors": (),
+        "evidence_validation_warnings": (),
+    }
+    payload.update(overrides)
+    return payload
+
+
 def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     tmp_path: Path,
 ) -> None:
@@ -149,6 +173,7 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     )
     capture = Phase3HarnessCapture(
         pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
         first_render_ms=52.4,
         selection_count=1,
         sign_request_count=1,
@@ -352,6 +377,10 @@ def test_phase3_checklist_results_markdown_auto_checks_supported_items(
     )
 
     assert "Phase 3 FR-3B Acceptance Results" in markdown
+    assert "- Acceptance tier: `gate_candidate`" in markdown
+    assert "- Automated gate verdict: `gate_candidate`" in markdown
+    assert "- Evidence contract version: `phase3_evidence_v1`" in markdown
+    assert "- Evidence validation passed: yes" in markdown
     assert "- Request snapshot origin: submitted request" in markdown
     assert "- Last signature page number: 1" in markdown
     assert "- Output embedded signature count: 1" in markdown
@@ -414,6 +443,11 @@ def test_phase3_checklist_results_markdown_leaves_manual_items_unchecked(
     )
     capture = Phase3HarnessCapture(
         pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(
+            acceptance_tier=ENGINEERING_RUN,
+            gate_verdict=NON_GATING,
+            evidence_validation_warnings=("debug-only run",),
+        ),
         first_render_ms=None,
         selection_count=0,
         sign_request_count=0,
@@ -459,6 +493,103 @@ def test_phase3_checklist_results_markdown_leaves_manual_items_unchecked(
     )
 
     assert "- [ ] The placed rectangle can be resized or repositioned in the workflow." in markdown
+    assert "- Automated gate verdict: `non_gating`" in markdown
+    assert "- Evidence validation warnings: ['debug-only run']" in markdown
+
+
+def test_evidence_contract_rejects_success_without_output_file() -> None:
+    evaluation = evaluate_phase3_evidence_contract(
+        {
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 1,
+            "last_signing_result_success": True,
+            "last_signature_has_visible_appearance": True,
+            "output_file_exists": False,
+            "output_signature_count": None,
+            "output_visible_appearance_snapshot": None,
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+            },
+            "sign_request_snapshot": {
+                "signature_appearance": {
+                    "layout_template": "single_line",
+                    "stamp_position": "top",
+                    "show_field_names": False,
+                    "datetime_format": "%Y-%m-%d",
+                    "signer_label_prefix": "",
+                    "timezone_display_mode": "utc",
+                    "image_stamp_path": None,
+                }
+            },
+            "backend_reservation_snapshot": {"layout_template": "single_line"},
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is False
+    assert evaluation.acceptance_tier == ENGINEERING_RUN
+    assert evaluation.gate_verdict == NON_GATING
+    assert any("output_file_exists is false" in item for item in evaluation.errors)
+    assert any("output_signature_count is missing" in item for item in evaluation.errors)
+    assert any(
+        "output_visible_appearance_snapshot is missing" in item
+        for item in evaluation.errors
+    )
+
+
+def test_evidence_contract_accepts_consistent_success_state() -> None:
+    evaluation = evaluate_phase3_evidence_contract(
+        {
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 1,
+            "last_signing_result_success": True,
+            "last_signature_has_visible_appearance": True,
+            "output_file_exists": True,
+            "output_signature_count": 1,
+            "output_visible_appearance_snapshot": {"field_name": "Signature1"},
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+            },
+            "sign_request_snapshot": {
+                "signature_appearance": {
+                    "layout_template": "single_line",
+                    "stamp_position": "top",
+                    "show_field_names": False,
+                    "datetime_format": "%Y-%m-%d",
+                    "signer_label_prefix": "",
+                    "timezone_display_mode": "utc",
+                    "image_stamp_path": None,
+                }
+            },
+            "backend_reservation_snapshot": {"layout_template": "single_line"},
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is True
+    assert evaluation.acceptance_tier == GATE_CANDIDATE
+    assert evaluation.gate_verdict == GATE_CANDIDATE
+    assert evaluation.errors == ()
 
 
 def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
@@ -470,6 +601,10 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
     with opaque_path.open("rb") as opaque_handle:
         capture = Phase3HarnessCapture(
             pdf_path="/tmp/sample.pdf",
+            **_capture_metadata_defaults(
+                acceptance_tier=ENGINEERING_RUN,
+                gate_verdict=NON_GATING,
+            ),
             first_render_ms=None,
             selection_count=0,
             sign_request_count=0,

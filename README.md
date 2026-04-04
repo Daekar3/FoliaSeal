@@ -61,7 +61,9 @@ Current capabilities:
 
 Not yet production-ready:
 
-- visible-signature preview/output parity for all realistic rectangle shapes
+- visible-signature preview/output parity for every realistic rectangle/layout case
+- horizontal `single_line` packing still needs work for `stamp_position=left/right`
+- transparent GIF stamp handling in final signed PDF output is not trustworthy yet; PNG remains the safer image-stamp format
 - final end-to-end visible-signature fidelity validation against representative signed PDFs
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
@@ -80,6 +82,11 @@ Roadmap note:
 - The current visible-signature contract is text-first: honor the selected text size in points,
   reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
   fail honestly only when the chosen rectangle cannot support that result.
+- The current Phase 3 finish line is narrower than it was earlier in the project:
+  - `single_line` `Top` and `Bottom` are materially healthier in both preview and output,
+  - the evidence-contract/gate machinery now exists,
+  - the remaining engineering focus is mainly on the last preview/output parity gaps, horizontal
+    packing efficiency, image-format edge cases, and TSA/timestamp support.
 
 ## Local development
 
@@ -127,6 +134,8 @@ Current acceptance note:
 
 - The harness helps collect a consistent record, but it does not prove final Phase 3 readiness on its own.
 - Use it as a manual-review aid for placement, appearance behavior, named-profile workflows, and signing-flow validation.
+- Harness terminal success is non-gating unless the run also produces the required evidence artifacts.
+- The harness JSON is now validated against a machine evidence contract; contradictory captures should be treated as failed gate evidence even if the GUI appeared to finish normally.
 - For the current acceptance focus and unresolved items, rely on the Phase 3 checklist and results artifacts rather than treating this README as the project status log.
 
 Run it against a representative PDF:
@@ -149,8 +158,23 @@ What it does:
 
 - launches the current Qt signing shell on the chosen PDF
 - records a structured capture of preview availability, selection count, sign-request count, and any surfaced errors
+- classifies the run as `engineering_run` or `gate_candidate` and records the automated gate verdict
+- validates the capture for internal evidence consistency before writing the artifacts
 - writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
 - automatically checks the acceptance items that can be observed directly from the harness
+
+Validate an existing harness capture without relaunching the GUI:
+
+```bash
+.venv/bin/python -m foliaseal phase3-signing-harness-validate \
+  --summary-json-path artifacts/phase3_harness_capture.json
+```
+
+Gate interpretation:
+
+- `engineering_run`: useful for debugging and iteration, but not gate evidence
+- `gate_candidate`: required artifacts are present and the capture is internally consistent enough for review
+- `release_gate_passed`: must be recorded explicitly in the FR-3B worksheet after manual review; automation does not grant this verdict by itself
 
 What still remains manual:
 
@@ -165,4 +189,5 @@ See also:
 
 - [phase3_fr3b_acceptance_checklist.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_checklist.md)
 - [phase3_fr3b_acceptance_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
+- [phase3_handoff_2026-04-03.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_handoff_2026-04-03.md)
 - [phase3_parallel_plan.md](/home/daekar/SignPDF/Scratch/phase3_parallel_plan.md)

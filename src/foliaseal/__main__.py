@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from foliaseal.application.phase2_evidence import (
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
     parse_checklist_markdown,
+)
+from foliaseal.application.qa_evidence_contract import (
+    evaluate_phase3_evidence_contract,
 )
 from foliaseal.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
@@ -234,6 +238,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Template checklist used to seed the run-specific Phase 3 results file.",
     )
 
+    phase3_validate = subparsers.add_parser(
+        "phase3-signing-harness-validate",
+        help="Validate an existing Phase 3 harness capture JSON without launching the GUI.",
+    )
+    phase3_validate.add_argument(
+        "--summary-json-path",
+        required=True,
+        help="Path to an existing Phase 3 harness capture JSON file.",
+    )
+
     return parser
 
 
@@ -319,6 +333,23 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         output_path.write_text(report + "\n", encoding="utf-8")
 
 
+def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
+    capture_path = Path(args.summary_json_path)
+    payload = json.loads(capture_path.read_text(encoding="utf-8"))
+    evaluation = evaluate_phase3_evidence_contract(payload)
+    print("Phase 3 evidence contract")
+    print(f"- acceptance tier: {evaluation.acceptance_tier}")
+    print(f"- gate verdict: {evaluation.gate_verdict}")
+    print(f"- validation passed: {'yes' if evaluation.passed else 'no'}")
+    print(f"- contract version: {evaluation.contract_version}")
+    if evaluation.errors:
+        print(f"- errors: {list(evaluation.errors)}")
+    if evaluation.warnings:
+        print(f"- warnings: {list(evaluation.warnings)}")
+    if not evaluation.passed:
+        raise ValueError("Phase 3 harness capture failed evidence contract validation.")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Run command-line helpers for local development workflows."""
     parser = _build_parser()
@@ -345,6 +376,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             checklist_results_path=args.checklist_results_path,
             checklist_template_path=args.checklist_template_path,
         )
+        return
+    if args.command == "phase3-signing-harness-validate":
+        _run_phase3_harness_validate(args)
         return
 
     print("FoliaSeal phase 0 skeleton ready")

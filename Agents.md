@@ -277,3 +277,22 @@ Coordinator expectations:
 - Do not treat silence as progress.
 - Do not accept plan-only responses for implementation briefs.
 - Interrupt and redirect agents that drift into planning, vague status notes, or incomplete handoffs.
+
+## Change Slicing Policy
+
+- Default rule: one commit or PR should contain one primary change class only.
+- Allowed change classes:
+  - behavior change: code and tests for one behavior objective
+  - evidence refresh: generated QA artifacts or acceptance-result updates caused by an already-landed behavior change
+  - documentation/status update: roadmap, acceptance wording, process docs, retrospective notes
+- Mixed slices are exceptions and must be justified explicitly in the brief, ExecPlan, or handoff.
+- Discouraged mixing includes:
+  - backend or shell behavior changes plus refreshed acceptance artifacts in the same commit
+  - implementation changes plus broad roadmap/process rewrites in the same commit
+  - process/policy changes plus unrelated product behavior changes
+- A narrow documentation update in the same PR is allowed only when it documents the exact user-visible behavior changed by that PR.
+- Generated acceptance artifacts should either land in a dedicated follow-up commit or be called out explicitly as an evidence refresh for the immediately preceding behavior change.
+- Agent briefs and local implementation plans should always state:
+  - the primary objective,
+  - the allowed artifact updates,
+  - the forbidden slice mixing for that unit of work.

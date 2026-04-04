@@ -40,12 +40,20 @@ Validated so far:
 - persistent named profile storage and delete-current-profile behavior are implemented
 - the shell can drive an executor-backed sign/apply-output path and surface success/failure
 - the concrete backend now produces a genuinely cryptographically signed PDF through `pyHanko`
+- the preview panel width/aspect-ratio behavior is materially more stable than earlier in the
+  remediation wave
+- compact `single_line` `Top`/`Bottom` preview and output behavior are much closer to the intended
+  text-first contract
+- Phase 3 harness artifacts now include a machine-validated evidence contract and explicit
+  `engineering_run` / `gate_candidate` classification
 
 Not yet achieved:
 
 - a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
-- a real end-user concept of "appearance" in the GUI
-- a product-quality appearance preview and coherent signing flow
+- a fully acceptance-ready appearance workflow and product-quality preview/signing flow
+- complete preview/output parity for all realistic rectangle/layout combinations
+- efficient horizontal `single_line` packing for `stamp_position=left/right`
+- trustworthy transparent-GIF stamp handling in final signed output
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance against representative signed output
 - a documented certificate compatibility matrix and manual QA pass across supported PKCS#12
@@ -60,6 +68,12 @@ Interpretation:
 - the remaining backend gap is honest TSA/timestamp support rather than basic PDF signing
 - certificate support should be treated as PKCS#12-scoped for v1 until a broader identity model is
   explicitly planned
+- the acceptance/governance gap is now much smaller because the harness can distinguish debugging
+  runs from gate candidates automatically
+- the remaining Phase 3 finish work is now concentrated in a few stubborn visible-signature fidelity
+  gaps rather than broad missing infrastructure
+- `artifacts/phase3_handoff_2026-04-03.md` should be treated as the tactical jump-in note for the
+  next finishing wave, while this file remains the broader coordination document
 
 ## Proposed Next Instrumentation Wave
 
@@ -559,6 +573,12 @@ Future Phase 3 reviews should clearly separate:
 
 - implementation validation
 - true feature acceptance
+
+Current execution rule:
+
+- no Phase 3 completion claim is valid without a release-gating FR-3B run
+- harness terminal success by itself counts only as engineering evidence unless the generated
+  artifacts are machine-validated and the FR-3B worksheet records an explicit human gate verdict
 
 ## Remaining Phase 3 Build Plan
 

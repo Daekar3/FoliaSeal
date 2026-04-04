@@ -64,6 +64,22 @@ Each milestone must be independently verifiable and incrementally implement the 
 * If you change course mid-implementation, document why in the `Decision Log` and reflect the implications in `Progress`. Plans are guides for the next contributor as much as checklists for you.
 * At completion of a major task or the full plan, write an `Outcomes & Retrospective` entry summarizing what was achieved, what remains, and lessons learned.
 
+## Change-slice requirements for ExecPlans
+
+ExecPlans must state the intended change slice clearly enough that a later contributor can keep commits and reviews narrow. For any non-trivial task, the plan must identify:
+
+- the primary objective of the slice,
+- which generated artifacts are allowed to change as part of that slice,
+- and which classes of unrelated changes are forbidden from being mixed in.
+
+Use the repository change classes when relevant:
+
+- behavior change,
+- evidence refresh,
+- documentation/status update.
+
+Default to one primary change class per commit or PR. If a mixed slice is unavoidable, record the exception explicitly in the `Decision Log` and explain why the simpler split was not practical.
+
 # Prototyping milestones and parallel implementations
 
 It is acceptable—-and often encouraged—-to include explicit prototyping milestones when they de-risk a larger change. Examples: adding a low-level operator to a dependency to validate feasibility, or exploring two composition orders while measuring optimizer effects. Keep prototypes additive and testable. Clearly label the scope as “prototyping”; describe how to run and observe results; and state the criteria for promoting or discarding the prototype.
