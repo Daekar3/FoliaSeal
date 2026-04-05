@@ -33,17 +33,21 @@ from foliaseal.domain.models import (
 )
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
+    _analyze_stamp_source_image,
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
     _load_preview_matrix_manifest,
     _preview_edge_distances,
     _preview_matrix_error_result,
+    _project_content_bounds_to_preview,
     _snapshot_backend_reservation,
     _snapshot_current_draft_request,
     _snapshot_preview,
     _snapshot_visible_signature_appearance,
+    _stamp_edge_diagnostics,
     _widget_is_visible,
+    _write_stamp_debug_overlay,
     build_phase3_checklist_results_markdown,
 )
 from tests.support.phase3_builders import (
@@ -105,6 +109,18 @@ def _write_test_pkcs12(
 def _write_test_stamp_image(path: Path) -> None:
     image = Image.new("RGB", (96, 48), color=(215, 235, 255))
     image.save(path, format="PNG")
+
+
+def _write_transparent_test_stamp_image(path: Path) -> None:
+    image = Image.new("RGBA", (100, 50), color=(0, 0, 0, 0))
+    for x in range(12, 84):
+        for y in range(8, 38):
+            image.putpixel((x, y), (32, 48, 96, 255))
+    image.save(path, format="PNG")
+
+
+def _write_fully_transparent_stamp_image(path: Path) -> None:
+    Image.new("RGBA", (40, 20), color=(0, 0, 0, 0)).save(path, format="PNG")
 
 
 def _write_signed_test_pdf(
@@ -675,6 +691,81 @@ def test_snapshot_preview_includes_render_capture_payload() -> None:
     assert snapshot["render_capture"] == {"preview_image_path": "artifacts/preview.png"}
 
 
+def test_analyze_stamp_source_image_reports_alpha_bounds(tmp_path: Path) -> None:
+    image_path = tmp_path / "transparent_stamp.png"
+    image = Image.new("RGBA", (20, 10), color=(0, 0, 0, 0))
+    for x in range(4, 16):
+        for y in range(2, 8):
+            image.putpixel((x, y), (10, 40, 90, 255))
+    image.save(image_path, format="PNG")
+
+    analysis = _analyze_stamp_source_image(str(image_path))
+
+    assert analysis["stamp_source_image_size_px"] == {"width": 20, "height": 10}
+    assert analysis["stamp_source_content_bounds_px"] == {
+        "x": 4,
+        "y": 2,
+        "width": 12,
+        "height": 6,
+    }
+    assert analysis["stamp_source_content_error"] is None
+
+
+def test_project_content_bounds_to_preview_scales_source_bounds() -> None:
+    projected = _project_content_bounds_to_preview(
+        source_image_size={"width": 20, "height": 10},
+        source_content_bounds={"x": 4, "y": 2, "width": 12, "height": 6},
+        pixmap_bounds={"x": 10, "y": 5, "width": 100, "height": 50},
+    )
+
+    assert projected == {"x": 30, "y": 15, "width": 60, "height": 30}
+
+
+def test_stamp_edge_diagnostics_flags_touching_and_near_edge() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 0, "y": 0, "width": 100, "height": 40},
+        stamp_pixmap_bounds={"x": 0, "y": 5, "width": 80, "height": 20},
+        stamp_content_bounds={"x": 1, "y": 6, "width": 70, "height": 18},
+    )
+
+    assert diagnostics["stamp_pixmap_touches_band_edge"] is True
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is True
+    assert diagnostics["stamp_content_warning_threshold_px"] == 2
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 1
+
+
+def test_write_stamp_debug_overlay_writes_debug_crop(tmp_path: Path) -> None:
+    preview_image_path = tmp_path / "preview.png"
+    output_path = tmp_path / "stamp_debug.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_image_path)
+
+    error = _write_stamp_debug_overlay(
+        preview_image_path=str(preview_image_path),
+        output_path=str(output_path),
+        stamp_band_bounds={"x": 10, "y": 8, "width": 70, "height": 24},
+        stamp_pixmap_bounds={"x": 14, "y": 10, "width": 52, "height": 18},
+        stamp_content_bounds={"x": 18, "y": 12, "width": 40, "height": 12},
+        crop_padding=6,
+    )
+
+    assert error is None
+    assert output_path.exists()
+
+
 def test_preview_edge_distances_report_top_and_bottom_clearance() -> None:
     preview = type(
         "_Preview",
@@ -699,6 +790,90 @@ def test_preview_edge_distances_report_top_and_bottom_clearance() -> None:
     assert distances["stamp_bottom_to_border_px"] == 14
     assert distances["content_top_to_border_px"] == 6
     assert distances["content_bottom_to_border_px"] == 14
+
+
+def test_analyze_stamp_source_image_reports_alpha_content_bounds(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "transparent_stamp.png"
+    _write_transparent_test_stamp_image(stamp_path)
+
+    analysis = _analyze_stamp_source_image(str(stamp_path))
+
+    assert analysis["stamp_source_image_size_px"] == {"width": 100, "height": 50}
+    assert analysis["stamp_source_content_bounds_px"] == {
+        "x": 12,
+        "y": 8,
+        "width": 72,
+        "height": 30,
+    }
+    assert analysis["stamp_source_content_error"] is None
+
+
+def test_analyze_stamp_source_image_reports_empty_alpha_as_error(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "empty_stamp.png"
+    _write_fully_transparent_stamp_image(stamp_path)
+
+    analysis = _analyze_stamp_source_image(str(stamp_path))
+
+    assert analysis["stamp_source_image_size_px"] == {"width": 40, "height": 20}
+    assert analysis["stamp_source_content_bounds_px"] is None
+    assert analysis["stamp_source_content_error"] == (
+        "Stamp source image contains no non-transparent pixels."
+    )
+
+
+def test_project_content_bounds_to_preview_scales_into_pixmap_bounds() -> None:
+    projected = _project_content_bounds_to_preview(
+        source_image_size={"width": 100, "height": 50},
+        source_content_bounds={"x": 10, "y": 5, "width": 60, "height": 20},
+        pixmap_bounds={"x": 40, "y": 12, "width": 80, "height": 40},
+    )
+
+    assert projected == {"x": 48, "y": 16, "width": 48, "height": 16}
+
+
+def test_stamp_edge_diagnostics_flags_touching_and_warning_distance() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 10, "y": 10, "width": 60, "height": 20},
+        stamp_pixmap_bounds={"x": 10, "y": 12, "width": 58, "height": 18},
+        stamp_content_bounds={"x": 11, "y": 12, "width": 56, "height": 17},
+    )
+
+    assert diagnostics["stamp_pixmap_touches_band_edge"] is True
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_warning_threshold_px"] == 2
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 1
+    assert diagnostics["stamp_content_within_warning_distance"] is True
+
+
+def test_write_stamp_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
+    preview_path = tmp_path / "preview.png"
+    output_path = tmp_path / "stamp_debug.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
+
+    error = _write_stamp_debug_overlay(
+        preview_image_path=str(preview_path),
+        output_path=str(output_path),
+        stamp_band_bounds={"x": 10, "y": 12, "width": 50, "height": 18},
+        stamp_pixmap_bounds={"x": 14, "y": 14, "width": 32, "height": 12},
+        stamp_content_bounds={"x": 18, "y": 16, "width": 20, "height": 8},
+        crop_padding=6,
+    )
+
+    assert error is None
+    assert output_path.exists() is True
 
 
 def test_widget_is_visible_supports_real_and_fake_widget_shapes() -> None:

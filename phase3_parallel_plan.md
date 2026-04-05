@@ -111,6 +111,8 @@ Current harness instrumentation note:
   metrics when `--artifacts-dir` is supplied
 - `phase3-signing-preview-matrix` can apply a JSON scenario manifest and write per-scenario preview
   captures plus a summary JSON for batch fidelity sweeps
+- the matrix now also writes a stamp-focused debug crop for stamped scenarios, with overlay boxes
+  for the reserved stamp band, rendered pixmap, and projected non-transparent content bounds
 - `artifacts/phase3_preview_matrix_template.json` is the hand-editable starting point for those
   sweeps
 - `artifacts/preview_sweep_assets/` now contains a repository-local PDF/certificate/stamp suite plus
@@ -119,6 +121,9 @@ Current harness instrumentation note:
   easier to interpret and avoids conflating field-volume problems with geometry problems
 - the checked-in single-line matrix now includes explicit text-size variation scenarios so preview
   regressions can be exercised across more than one `font_size_pt`
+- the summary JSON now records alpha-aware stamp-content bounds plus explicit “touches edge” and
+  “within warning distance” diagnostics so agents can distinguish “tiny but intact” from actual
+  clipping risk
 
 ## Certificate Compatibility Profile
 

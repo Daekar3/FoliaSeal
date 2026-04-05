@@ -179,10 +179,14 @@ For repeatable preview sweeps across many settings permutations, run the preview
 What the preview matrix writes:
 
 - one preview PNG per scenario
+- one stamp-focused debug PNG per stamped scenario, with overlay rectangles for the reserved band,
+  rendered pixmap, and projected non-transparent stamp content bounds
 - one summary JSON at `artifacts/phase3_preview_matrix/summary.json`
 - per-scenario preview geometry, rendered widget bounds, and top/bottom border-distance metrics
 - per-scenario preview settings, including any manifest overrides for `visible_fields`,
   `text_style.font_size_pt`, border width, and stamp image choice
+- per-scenario stamp diagnostics, including alpha-aware source-image content bounds and explicit
+  clipping/proximity flags for stamp content versus the reserved stamp band
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
 

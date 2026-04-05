@@ -8,10 +8,12 @@ import re
 from collections import Counter
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
+from math import ceil
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from PIL import Image, ImageDraw
 from pyhanko.pdf_utils.reader import PdfFileReader
 
 from foliaseal.application import SigningDraftWorkflow
@@ -1223,6 +1225,26 @@ def _capture_preview_render(
     detail_bounds = _widget_rect_snapshot(active_detail)
     stamp_bounds = _widget_rect_snapshot(active_stamp)
     card_bounds = _widget_rect_snapshot(card_container)
+    stamp_band_bounds = _translate_child_bounds(body_bounds, stamp_bounds)
+    stamp_alignment = _label_alignment_snapshot(active_stamp)
+    stamp_pixmap_size = _label_pixmap_size_snapshot(active_stamp)
+    stamp_pixmap_bounds = _project_pixmap_bounds_within_label(
+        label_bounds=stamp_band_bounds,
+        pixmap_size=stamp_pixmap_size,
+        alignment=stamp_alignment,
+    )
+    stamp_source_analysis = _analyze_stamp_source_image(preview.image_stamp_path)
+    stamp_content_bounds = _project_content_bounds_to_preview(
+        source_image_size=stamp_source_analysis.get("stamp_source_image_size_px"),
+        source_content_bounds=stamp_source_analysis.get("stamp_source_content_bounds_px"),
+        pixmap_bounds=stamp_pixmap_bounds,
+    )
+    stamp_diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds=stamp_band_bounds,
+        stamp_pixmap_bounds=stamp_pixmap_bounds,
+        stamp_content_bounds=stamp_content_bounds,
+    )
     band_distances = _preview_edge_distances(
         preview=preview,
         card_bounds=card_bounds,
@@ -1230,6 +1252,23 @@ def _capture_preview_render(
         detail_bounds=detail_bounds,
         stamp_bounds=stamp_bounds,
     )
+    stamp_debug_image_path = None
+    stamp_debug_image_error = None
+    if (
+        image_path is not None
+        and image_error is None
+        and stamp_band_bounds is not None
+        and stamp_pixmap_bounds is not None
+    ):
+        stamp_debug_image_path = str(target_dir / f"{artifact_basename}_stamp_debug.png")
+        stamp_debug_image_error = _write_stamp_debug_overlay(
+            preview_image_path=image_path,
+            output_path=stamp_debug_image_path,
+            stamp_band_bounds=stamp_band_bounds,
+            stamp_pixmap_bounds=stamp_pixmap_bounds,
+            stamp_content_bounds=stamp_content_bounds,
+            crop_padding=max(6, _preview_padding_for_capture(preview)),
+        )
     return {
         "preview_image_path": image_path,
         "preview_image_error": image_error,
@@ -1241,10 +1280,18 @@ def _capture_preview_render(
         "multi_detail_bounds_px": _widget_rect_snapshot(multi_detail),
         "multi_stamp_bounds_px": _widget_rect_snapshot(multi_stamp),
         "detail_text_size_hint_px": _size_hint_snapshot(detail_label),
-        "stamp_pixmap_size_px": _label_pixmap_size_snapshot(active_stamp),
+        "stamp_pixmap_size_px": stamp_pixmap_size,
         "layout_spacing_px": _layout_spacing(active_body),
         "preview_padding_px": _preview_padding_for_capture(preview),
         "edge_distances_px": band_distances,
+        "stamp_debug_image_path": stamp_debug_image_path,
+        "stamp_debug_image_error": stamp_debug_image_error,
+        "stamp_band_bounds_px": stamp_band_bounds,
+        "stamp_alignment": stamp_alignment,
+        "stamp_rendered_pixmap_bounds_px": stamp_pixmap_bounds,
+        "stamp_rendered_content_bounds_px": stamp_content_bounds,
+        **stamp_source_analysis,
+        **stamp_diagnostics,
     }
 
 
@@ -1280,6 +1327,48 @@ def _write_widget_capture_png(widget: Any, output_path: str) -> str | None:
     return None
 
 
+def _write_stamp_debug_overlay(
+    *,
+    preview_image_path: str,
+    output_path: str,
+    stamp_band_bounds: dict[str, int],
+    stamp_pixmap_bounds: dict[str, int],
+    stamp_content_bounds: dict[str, int] | None,
+    crop_padding: int,
+) -> str | None:
+    try:
+        preview_image = Image.open(preview_image_path).convert("RGBA")
+    except OSError as exc:
+        return f"Failed to open preview image for stamp debug overlay: {exc}"
+
+    image_width, image_height = preview_image.size
+    crop_left = max(0, stamp_band_bounds["x"] - crop_padding)
+    crop_top = max(0, stamp_band_bounds["y"] - crop_padding)
+    crop_right = min(
+        image_width,
+        stamp_band_bounds["x"] + stamp_band_bounds["width"] + crop_padding,
+    )
+    crop_bottom = min(
+        image_height,
+        stamp_band_bounds["y"] + stamp_band_bounds["height"] + crop_padding,
+    )
+    cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
+    draw = ImageDraw.Draw(cropped)
+    for bounds, color in (
+        (_offset_rect(stamp_band_bounds, dx=-crop_left, dy=-crop_top), (255, 165, 0, 255)),
+        (_offset_rect(stamp_pixmap_bounds, dx=-crop_left, dy=-crop_top), (0, 120, 255, 255)),
+    ):
+        _draw_overlay_rect(draw, bounds, color)
+    if stamp_content_bounds is not None:
+        _draw_overlay_rect(
+            draw,
+            _offset_rect(stamp_content_bounds, dx=-crop_left, dy=-crop_top),
+            (0, 200, 120, 255),
+        )
+    cropped.save(output_path)
+    return None
+
+
 def _widget_is_visible(widget: Any) -> bool:
     visible = getattr(widget, "isVisible", None)
     if callable(visible):
@@ -1288,6 +1377,27 @@ def _widget_is_visible(widget: Any) -> bool:
     if isinstance(visible, bool):
         return visible
     return True
+
+
+def _draw_overlay_rect(
+    draw: ImageDraw.ImageDraw,
+    bounds: dict[str, int],
+    color: tuple[int, ...],
+) -> None:
+    left = bounds["x"]
+    top = bounds["y"]
+    right = left + max(0, bounds["width"] - 1)
+    bottom = top + max(0, bounds["height"] - 1)
+    draw.rectangle((left, top, right, bottom), outline=color, width=2)
+
+
+def _offset_rect(bounds: dict[str, int], *, dx: int, dy: int) -> dict[str, int]:
+    return {
+        "x": bounds["x"] + dx,
+        "y": bounds["y"] + dy,
+        "width": bounds["width"],
+        "height": bounds["height"],
+    }
 
 
 def _widget_rect_snapshot(widget: Any) -> dict[str, int] | None:
@@ -1355,6 +1465,196 @@ def _label_pixmap_size_snapshot(label: Any) -> dict[str, int] | None:
     if callable(width) and callable(height):
         return {"width": int(width()), "height": int(height())}
     return None
+
+
+def _label_alignment_snapshot(label: Any) -> int | None:
+    alignment = getattr(label, "alignment", None)
+    if callable(alignment):
+        value = alignment()
+        if isinstance(value, int):
+            return value
+    if isinstance(alignment, int):
+        return alignment
+    return None
+
+
+def _translate_child_bounds(
+    parent_bounds: dict[str, int] | None,
+    child_bounds: dict[str, int] | None,
+) -> dict[str, int] | None:
+    if parent_bounds is None or child_bounds is None:
+        return None
+    return {
+        "x": parent_bounds["x"] + child_bounds["x"],
+        "y": parent_bounds["y"] + child_bounds["y"],
+        "width": child_bounds["width"],
+        "height": child_bounds["height"],
+    }
+
+
+def _project_pixmap_bounds_within_label(
+    *,
+    label_bounds: dict[str, int] | None,
+    pixmap_size: dict[str, int] | None,
+    alignment: int | None,
+) -> dict[str, int] | None:
+    if label_bounds is None or pixmap_size is None:
+        return None
+    width = min(label_bounds["width"], pixmap_size["width"])
+    height = min(label_bounds["height"], pixmap_size["height"])
+    horizontal_space = max(0, label_bounds["width"] - width)
+    vertical_space = max(0, label_bounds["height"] - height)
+    x_offset = horizontal_space // 2
+    y_offset = vertical_space // 2
+    if alignment is not None:
+        try:
+            qt_core = importlib.import_module("PySide6.QtCore")
+        except ImportError:
+            qt_core = None
+        qt = getattr(qt_core, "Qt", None) if qt_core is not None else None
+        if qt is not None:
+            align_left = int(getattr(qt, "AlignLeft", 0))
+            align_right = int(getattr(qt, "AlignRight", 0))
+            align_top = int(getattr(qt, "AlignTop", 0))
+            align_bottom = int(getattr(qt, "AlignBottom", 0))
+            if alignment & align_left:
+                x_offset = 0
+            elif alignment & align_right:
+                x_offset = horizontal_space
+            if alignment & align_top:
+                y_offset = 0
+            elif alignment & align_bottom:
+                y_offset = vertical_space
+    return {
+        "x": label_bounds["x"] + x_offset,
+        "y": label_bounds["y"] + y_offset,
+        "width": width,
+        "height": height,
+    }
+
+
+def _analyze_stamp_source_image(image_path: str | None) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "stamp_source_image_size_px": None,
+        "stamp_source_content_bounds_px": None,
+        "stamp_source_content_error": None,
+    }
+    if not image_path:
+        return result
+    try:
+        with Image.open(image_path) as image:
+            width, height = image.size
+            result["stamp_source_image_size_px"] = {"width": width, "height": height}
+            alpha_bounds = image.convert("RGBA").getchannel("A").getbbox()
+            if alpha_bounds is None:
+                result["stamp_source_content_error"] = (
+                    "Stamp source image contains no non-transparent pixels."
+                )
+                return result
+            left, top, right, bottom = alpha_bounds
+            result["stamp_source_content_bounds_px"] = {
+                "x": int(left),
+                "y": int(top),
+                "width": int(right - left),
+                "height": int(bottom - top),
+            }
+    except OSError as exc:
+        result["stamp_source_content_error"] = f"Failed to open stamp source image: {exc}"
+    return result
+
+
+def _project_content_bounds_to_preview(
+    *,
+    source_image_size: dict[str, int] | None,
+    source_content_bounds: dict[str, int] | None,
+    pixmap_bounds: dict[str, int] | None,
+) -> dict[str, int] | None:
+    if source_image_size is None or source_content_bounds is None or pixmap_bounds is None:
+        return None
+    source_width = max(1, source_image_size["width"])
+    source_height = max(1, source_image_size["height"])
+    content_left = int(round(source_content_bounds["x"] * pixmap_bounds["width"] / source_width))
+    content_top = int(round(source_content_bounds["y"] * pixmap_bounds["height"] / source_height))
+    content_width = max(
+        1,
+        int(round(source_content_bounds["width"] * pixmap_bounds["width"] / source_width)),
+    )
+    content_height = max(
+        1,
+        int(round(source_content_bounds["height"] * pixmap_bounds["height"] / source_height)),
+    )
+    content_width = min(content_width, pixmap_bounds["width"] - content_left)
+    content_height = min(content_height, pixmap_bounds["height"] - content_top)
+    return {
+        "x": pixmap_bounds["x"] + content_left,
+        "y": pixmap_bounds["y"] + content_top,
+        "width": max(1, content_width),
+        "height": max(1, content_height),
+    }
+
+
+def _rect_edge_distances(
+    *,
+    outer_bounds: dict[str, int] | None,
+    inner_bounds: dict[str, int] | None,
+) -> dict[str, int] | None:
+    if outer_bounds is None or inner_bounds is None:
+        return None
+    outer_right = outer_bounds["x"] + outer_bounds["width"]
+    outer_bottom = outer_bounds["y"] + outer_bounds["height"]
+    inner_right = inner_bounds["x"] + inner_bounds["width"]
+    inner_bottom = inner_bounds["y"] + inner_bounds["height"]
+    return {
+        "left": inner_bounds["x"] - outer_bounds["x"],
+        "top": inner_bounds["y"] - outer_bounds["y"],
+        "right": outer_right - inner_right,
+        "bottom": outer_bottom - inner_bottom,
+    }
+
+
+def _stamp_edge_diagnostics(
+    *,
+    preview: Any,
+    stamp_band_bounds: dict[str, int] | None,
+    stamp_pixmap_bounds: dict[str, int] | None,
+    stamp_content_bounds: dict[str, int] | None,
+) -> dict[str, Any]:
+    warning_threshold = 2
+    if preview.box_style is not None and preview.box_style.show_border:
+        warning_threshold = max(2, int(ceil(preview.box_style.border_width_pt / 2.0)))
+
+    pixmap_distances = _rect_edge_distances(
+        outer_bounds=stamp_band_bounds,
+        inner_bounds=stamp_pixmap_bounds,
+    )
+    content_distances = _rect_edge_distances(
+        outer_bounds=stamp_band_bounds,
+        inner_bounds=stamp_content_bounds,
+    )
+
+    def _min_distance(distances: dict[str, int] | None) -> int | None:
+        if distances is None:
+            return None
+        return min(distances.values())
+
+    pixmap_min_distance = _min_distance(pixmap_distances)
+    content_min_distance = _min_distance(content_distances)
+    return {
+        "stamp_pixmap_edge_distances_px": pixmap_distances,
+        "stamp_content_edge_distances_px": content_distances,
+        "stamp_pixmap_touches_band_edge": (
+            None if pixmap_min_distance is None else pixmap_min_distance <= 0
+        ),
+        "stamp_content_touches_band_edge": (
+            None if content_min_distance is None else content_min_distance <= 0
+        ),
+        "stamp_content_warning_threshold_px": warning_threshold,
+        "stamp_pixmap_min_edge_distance_px": pixmap_min_distance,
+        "stamp_content_min_edge_distance_px": content_min_distance,
+        "stamp_content_within_warning_distance": (
+            None if content_min_distance is None else content_min_distance <= warning_threshold
+        ),
+    }
 
 
 def _layout_spacing(widget: Any) -> int | None:
