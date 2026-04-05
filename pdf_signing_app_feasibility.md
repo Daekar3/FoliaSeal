@@ -149,6 +149,9 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - font sizing behavior,
   - wrapping rules,
   - overflow handling.
+- The rules that determine visible-signature text/layout inputs should live in one shared
+  application/backend-owned path. Preview rendering and pre-submit fit validation should consume
+  that shared output rather than maintaining separate formatting logic.
 - If the chosen rectangle is too small or awkward for the selected content/layout, the UI should
   make that limitation apparent instead of implying a cleaner final result than the backend can
   render.
@@ -610,6 +613,11 @@ Failure codes to expose in UI and logs:
 
 ## Delivery milestones (historical development phase plan)
 
+Historical note: the milestone breakdown below is retained as planning history. Current status and
+near-term engineering focus should be taken from `README.md`, `phase3_parallel_plan.md`, and the
+latest living ExecPlans rather than assuming every unresolved bullet below is still an active
+present-tense blocker.
+
 To reflect the expanded requirements (especially FR-3A/3B/3C, FR-9 through FR-17), the implementation plan should be sequenced as a **phase-gated program** rather than a simple linear MVP.
 
 Historical note:
@@ -657,7 +665,8 @@ Historical note:
 ## Phase 3 (Week 5–6): Signature UX parity + properties system
 - Implement Acrobat/PDF-XChange-style flow: select appearance template → place/resize signature → edit properties → confirm sign.
 - Build full signature properties panel (FR-3A): field toggles, source rules (derived/override/hidden), text layout templates, font/color/background/border controls, datetime format/timezone settings.
-- Add real-time appearance preview with inline validation.
+- Add real-time appearance preview with thin, factual pre-submit validation backed by the same
+  layout/fit rules used for actual signing.
 - Conduct side-by-side task-based parity testing for representative workflows.
 
 **Exit criteria**
@@ -673,20 +682,27 @@ Phase 3 turned out to contain several independent failure modes: shell UX, previ
  feature theme.
 
 ## Phase 4A: Preview/output parity and rectangle-aware preview
+
+Status note: substantial portions of this slice have already landed in the Phase 3 codebase,
+including rectangle-aware preview, app-level preview/output instrumentation, and unattended preview
+matrix sweeps. The remaining work in this slice is now narrower finishing work rather than a
+greenfield instrumentation effort.
+
 - Make the preview geometry-aware once a real signature rectangle exists.
 - Align preview layout policy with backend layout policy for margins, wrapping, text-first sizing,
   and image placement.
 - Validate representative wide, tall, and compact rectangles against real signed output.
 - Prioritize the remaining narrow blockers exposed by late Phase 3 manual runs:
-  - horizontal `single_line` `Left` / `Right` packing still underuses available width,
   - some image-format edge cases such as transparent GIF stamps are still not trustworthy in final
     PDF output,
   - final preview/output acceptance still needs representative signed-output comparison runs after
-    the current parity fixes settle.
+    the current parity fixes settle,
+  - recent architecture simplification and no-wrap cleanup still need manual confirmation against
+    real signing assets and representative PDFs.
 
 ### Instrumentation upgrade inside Phase 4A
-This slice should include a dedicated instrumentation upgrade so preview/output parity work can be
-evaluated with stronger evidence than free-form human observation alone.
+Most of this upgrade has now been implemented. The remaining expectation is to keep the current
+artifact set healthy and extend it only where real debugging gaps remain.
 
 Planned subphases:
 1. App-state instrumentation

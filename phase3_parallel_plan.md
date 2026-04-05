@@ -42,8 +42,10 @@ Validated so far:
 - the concrete backend now produces a genuinely cryptographically signed PDF through `pyHanko`
 - the preview panel width/aspect-ratio behavior is materially more stable than earlier in the
   remediation wave
-- compact `single_line` `Top`/`Bottom` preview and output behavior are much closer to the intended
-  text-first contract
+- the checked-in unattended `single_line` preview matrix is currently green across the repository
+  fixture set
+- the `single_line` layout path has been simplified so preview composition and pre-submit fit
+  validation now share the same backend-owned text/layout input rules
 - Phase 3 harness artifacts now include a machine-validated evidence contract and explicit
   `engineering_run` / `gate_candidate` classification
 
@@ -52,7 +54,7 @@ Not yet achieved:
 - a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
 - a fully acceptance-ready appearance workflow and product-quality preview/signing flow
 - complete preview/output parity for all realistic rectangle/layout combinations
-- efficient horizontal `single_line` packing for `stamp_position=left/right`
+- manual harness revalidation of the simplified `single_line` path with real user assets
 - trustworthy transparent-GIF stamp handling in final signed output
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance against representative signed output
@@ -71,11 +73,15 @@ Interpretation:
 - the acceptance/governance gap is now much smaller because the harness can distinguish debugging
   runs from gate candidates automatically
 - the remaining Phase 3 finish work is now concentrated in a few stubborn visible-signature fidelity
-  gaps rather than broad missing infrastructure
+  gaps and acceptance confirmations rather than broad missing infrastructure
 - `artifacts/phase3_handoff_2026-04-03.md` should be treated as the tactical jump-in note for the
   next finishing wave, while this file remains the broader coordination document
 
 ## Proposed Next Instrumentation Wave
+
+Status note: most of the originally proposed instrumentation wave has now landed. Keep this section
+as historical context plus a checklist for any remaining evidence gaps; do not treat it as a
+statement that preview-card capture, matrix sweeps, or stamp-content diagnostics are still absent.
 
 The current harness and JSON capture are now useful, but the latest manual runs show that we still
 need stronger evidence about the actual human experience of preview vs final output. The next
@@ -198,6 +204,13 @@ It is acceptable in Phase 3 to support:
    - Keep one backend-owned visible-signature fit gate.
    - Keep preview visual rather than interpretive.
    - Keep validation UI factual rather than duplicating preview semantics.
+
+Historical-plan note:
+
+- The remainder of this file includes both current coordination guidance and older implementation
+  wave records.
+- When a later section conflicts with the current-status summary above or a newer living ExecPlan,
+  prefer the newer source rather than assuming every older remediation note is still active.
 
 ## Recommended Parallel Workstreams
 

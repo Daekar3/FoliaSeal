@@ -36,9 +36,9 @@ Current capabilities:
   - Saved profiles now persist across relaunches in the user-visible `Signature Profiles`
     storage area.
   - The shell supports delete-current-profile with explicit confirmation.
-- `render_signing_preview()` should turn the normalized draft state into a preview representation.
-  - It should be treated as the single source of truth for preview formatting.
-  - The Qt shell should reuse it rather than rebuilding preview semantics in widget code.
+- `render_signing_preview()` should turn the normalized draft state into a deterministic text
+  snapshot for logs, tests, and lower-level parity checks.
+  - It should not become a second live-preview formatter alongside the Qt widget path.
 - `compare_preview_to_request()` should be a narrow consistency check between the preview model and the final signing request.
   - It should be used to catch drift between the visible draft and the request payload.
   - It should not become a second preview renderer or a substitute for validation.
@@ -62,12 +62,15 @@ Current capabilities:
   - keep exactly one authoritative backend-owned visible-signature fit gate
   - keep preview visual
   - keep validation text thin and factual
+  - keep the rules that determine visible-signature text/layout inputs in one shared path whose
+    output then feeds both preview rendering and pre-submit fit validation
   - prefer deleting duplicate interpretation layers over adding new synchronization logic
 
 Not yet production-ready:
 
 - visible-signature preview/output parity for every realistic rectangle/layout case
-- horizontal `single_line` packing still needs work for `stamp_position=left/right`
+- final manual harness revalidation of the recently simplified `single_line` path with real user
+  assets and representative PDFs
 - transparent GIF stamp handling in final signed PDF output is not trustworthy yet; PNG remains the safer image-stamp format
 - final end-to-end visible-signature fidelity validation against representative signed PDFs
 - TSA-backed timestamping and timestamp-required signing flows
@@ -88,10 +91,11 @@ Roadmap note:
   reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
   fail honestly only when the chosen rectangle cannot support that result.
 - The current Phase 3 finish line is narrower than it was earlier in the project:
-  - `single_line` `Top` and `Bottom` are materially healthier in both preview and output,
+  - the unattended `single_line` preview matrix is now clean across the checked-in permutation set,
+  - `single_line` `Top`, `Bottom`, `Left`, and `Right` share a simpler backend-owned layout path,
   - the evidence-contract/gate machinery now exists,
   - the remaining engineering focus is mainly on the last preview/output parity gaps, horizontal
-    packing efficiency, image-format edge cases, and TSA/timestamp support.
+    signed-output confirmation with real assets, image-format edge cases, and TSA/timestamp support.
 
 ## Local development
 
@@ -203,6 +207,12 @@ also demonstrates two practical sweep controls that matter for layout triage:
 - `visible_fields` to constrain which derived fields participate in a compact preview scenario
 - explicit text-size variation scenarios so preview regressions can be checked at more than one
   `font_size_pt`
+
+Status note:
+
+- the checked-in unattended `single_line` matrix is currently green in automation
+- use it as a regression net, not as a substitute for the pending manual harness confirmation with
+  real signing assets
 
 Validate an existing harness capture without relaunching the GUI:
 
