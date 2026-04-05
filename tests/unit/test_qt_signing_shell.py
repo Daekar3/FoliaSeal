@@ -395,6 +395,8 @@ class _FakeQt:
     AlignLeft = 1
     AlignRight = 2
     AlignCenter = 4
+    AlignTop = 8
+    AlignBottom = 16
     KeepAspectRatio = 1
     SmoothTransformation = 2
 
@@ -1153,6 +1155,10 @@ def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
     assert preview_controls.single_body_container.visible is True
     assert preview_controls.multi_body_container.visible is False
     assert preview_controls.stamp_label.visible is True
+    assert preview_controls.stamp_label.alignment == (
+        _FakeQt.AlignLeft | _FakeQt.AlignTop
+    )
+    assert preview_controls.stamp_label.pixmap().height < preview_controls.stamp_label.fixed_size[1]
     assert preview_controls.detail_label.visible is True
     assert " | " in widget.properties_panel.preview_text()
 
@@ -1333,6 +1339,63 @@ def test_signing_shell_preview_respects_small_font_sizes(
 
     assert "font-size: 6.5pt;" in widget.properties_panel.preview_controls.title_label.style
     assert "font-size: 6.5pt;" in widget.properties_panel.preview_controls.detail_label.style
+
+
+def test_signing_shell_preview_updates_style_when_font_size_changes(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(
+        build_signature_appearance(
+            text_style=SignatureTextStyle(
+                font_family="Source Sans 3",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#123456",
+            ),
+        )
+    )
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+    initial_style = widget.properties_panel.preview_controls.detail_label.style
+
+    widget.properties_panel.set_signature_appearance(
+        build_signature_appearance(
+            text_style=SignatureTextStyle(
+                font_family="Source Sans 3",
+                font_size_pt=8.0,
+                bold=False,
+                italic=False,
+                text_color_hex="#123456",
+            ),
+        )
+    )
+
+    assert "font-size: 8.5pt;" in initial_style
+    assert "font-size: 8.0pt;" in widget.properties_panel.preview_controls.detail_label.style
 
 
 def test_signing_shell_single_line_preview_disables_word_wrap_even_without_rect(
@@ -2092,6 +2155,14 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
             detail_text=expected,
             available_width_px=available_width,
         )
+    )
+    assert widget.properties_panel.preview_controls.multi_content_container.fixed_size == (
+        widget.properties_panel.preview_controls.multi_content_container.fixed_width,
+        widget.properties_panel.preview_controls.multi_body_container.fixed_size[1],
+    )
+    assert widget.properties_panel.preview_controls.multi_detail_label.fixed_size == (
+        widget.properties_panel.preview_controls.multi_content_container.fixed_width,
+        widget.properties_panel.preview_controls.multi_body_container.fixed_size[1],
     )
 
 

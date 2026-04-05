@@ -168,11 +168,17 @@ What it does:
 
 - launches the current Qt signing shell on the chosen PDF
 - records a structured capture of preview availability, selection count, sign-request count, and any surfaced errors
+- lets you click `Capture State` during the same GUI run so one summary JSON can preserve several manually chosen configuration states before you close the harness
 - can capture the live preview card as a PNG plus widget geometry and border-to-content distance metrics when `--artifacts-dir` is supplied
 - classifies the run as `engineering_run` or `gate_candidate` and records the automated gate verdict
 - validates the capture for internal evidence consistency before writing the artifacts
 - writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
 - automatically checks the acceptance items that can be observed directly from the harness
+
+The summary JSON keeps the existing top-level final-state fields and now also includes a
+`captured_states` history array. Each manual capture entry stores the current preview snapshot,
+preview text, validation text, request snapshot, and backend reservation snapshot so several
+configurations can be reviewed from one run.
 
 For repeatable preview sweeps across many settings permutations, run the preview matrix command with a JSON manifest:
 

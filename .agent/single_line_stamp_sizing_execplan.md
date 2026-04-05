@@ -36,6 +36,9 @@ The observable result is a more honest and more efficient image fit. In `single_
 - Observation: Horizontal stamp visibility improves once the reservation can preserve image-driven minimum width, even before any preview-only rendering adjustments.
   Evidence: After the backend reservation update, the same real `single_line/right` probe moved from `stamp_area_width_pt = 0` to `stamp_area_width_pt = 56` while keeping `text_area_height_pt = 15`.
 
+- Observation: A real Qt probe against the user’s GIF showed that the stamp can legitimately scale to the full band height, so the remaining “too small” feeling was still coming from a conservative vertical inset, not from Qt failing to scale the image.
+  Evidence: `QPixmap.scaled(..., Qt.KeepAspectRatio, ...)` on the real GIF produced `113x27` for a `691x27` band, which confirmed the band itself was large enough to support a visibly larger stamp.
+
 ## Decision Log
 
 - Decision: Fix stamp sizing through one shared reservation and fit model instead of adding another preview-only exception.
@@ -219,3 +222,4 @@ The preview may call a thin adapter over that helper, but it must not create a s
 
 Revision note (2026-04-05): Created this ExecPlan after tracing the current stamp-sizing bug to oversized internal gutters in short vertical bands and zero-width horizontal stamp reservation.
 Revision note (2026-04-05): Updated this ExecPlan after implementation to record the final helper design, test results, and before/after reservation evidence.
+Revision note (2026-04-05): Updated this ExecPlan after a manual-harness follow-up to record the final vertical inset tuning informed by a real Qt GIF scaling probe.

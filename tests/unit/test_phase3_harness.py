@@ -37,6 +37,8 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
+    _capture_interactive_state,
+    _interactive_capture_label,
     _load_preview_matrix_manifest,
     _preview_edge_distances,
     _preview_matrix_error_result,
@@ -659,6 +661,159 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
         payload = json.loads(capture.to_json())
 
     assert payload["preview_snapshot"]["opaque"].startswith("<_io.BufferedReader")
+
+
+def test_phase3_harness_capture_to_json_serializes_captured_states() -> None:
+    capture = Phase3HarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
+        first_render_ms=12.5,
+        selection_count=1,
+        sign_request_count=0,
+        last_signature_page_index=None,
+        last_signature_page_number=None,
+        last_signature_has_visible_appearance=False,
+        last_signature_output_path=None,
+        last_signing_result_message=None,
+        last_signing_result_success=None,
+        preview_snapshot={"title": "Current"},
+        sign_request_snapshot=None,
+        backend_reservation_snapshot=None,
+        backend_reservation_error=None,
+        output_file_exists=False,
+        output_file_size_bytes=None,
+        output_signature_count=None,
+        output_signature_snapshot=None,
+        output_visible_appearance_snapshot=None,
+        preview_available=True,
+        preview_text="Current",
+        validation_text="Ready to sign.",
+        interaction_counts={},
+        errors=(),
+        captured_states=(
+            {
+                "capture_index": 1,
+                "capture_kind": "manual",
+                "capture_label": "manual_01_single_line_top",
+                "preview_snapshot": {"title": "Manual"},
+                "preview_text": "Manual",
+                "validation_text": "Ready to sign.",
+                "sign_request_snapshot": None,
+                "backend_reservation_snapshot": None,
+                "backend_reservation_error": None,
+            },
+            {
+                "capture_index": 2,
+                "capture_kind": "final",
+                "capture_label": "final_02_single_line_top",
+                "preview_snapshot": {"title": "Final"},
+                "preview_text": "Final",
+                "validation_text": "Ready to sign.",
+                "sign_request_snapshot": None,
+                "backend_reservation_snapshot": None,
+                "backend_reservation_error": None,
+            },
+        ),
+    )
+
+    payload = json.loads(capture.to_json())
+
+    assert len(payload["captured_states"]) == 2
+    assert payload["captured_states"][0]["capture_kind"] == "manual"
+    assert payload["captured_states"][1]["capture_kind"] == "final"
+
+
+def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.BOTTOM,
+        },
+    )()
+
+    label = _interactive_capture_label(
+        preview=preview,
+        capture_index=3,
+        capture_kind="manual",
+    )
+
+    assert label == "manual_03_single_line_bottom"
+
+
+def test_capture_interactive_state_collects_preview_and_backend_snapshots(monkeypatch) -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "title": "Inkslapped by",
+            "signer_label_prefix": "Inkslapped by",
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "timezone_display_mode": SignatureTimezoneDisplayMode.LOCAL,
+            "show_field_names": False,
+            "datetime_format": "%Y-%m-%d %H:%M",
+            "image_stamp_path": None,
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=30.0),
+            "text_style": None,
+            "box_style": None,
+            "fields": (),
+            "issues": (),
+            "can_submit": True,
+        },
+    )()
+
+    class _FakePanel:
+        def refresh_preview(self):
+            return preview
+
+        def preview_text(self) -> str:
+            return "Preview text"
+
+        def validation_text(self) -> str:
+            return "Ready to sign."
+
+    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
+
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._capture_preview_render",
+        lambda **_kwargs: {"preview_image_path": "artifacts/preview.png"},
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._snapshot_backend_reservation",
+        lambda request: {"layout_template": request.signature_appearance.layout_template.value},
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._backend_reservation_error",
+        lambda _request: None,
+    )
+
+    request = build_signing_request(
+        Path("/tmp"),
+        signature_appearance=build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+        ),
+    )
+    state = _capture_interactive_state(
+        shell=shell,
+        request=request,
+        artifacts_dir="artifacts/debug",
+        artifact_basename="interactive_state_01",
+        capture_index=1,
+        capture_kind="manual",
+    )
+
+    assert state["capture_index"] == 1
+    assert state["capture_kind"] == "manual"
+    assert state["capture_label"] == "manual_01_single_line_top"
+    assert state["preview_text"] == "Preview text"
+    assert state["validation_text"] == "Ready to sign."
+    assert state["preview_snapshot"]["render_capture"] == {
+        "preview_image_path": "artifacts/preview.png"
+    }
+    assert state["backend_reservation_snapshot"] == {"layout_template": "single_line"}
 
 
 def test_snapshot_preview_includes_render_capture_payload() -> None:

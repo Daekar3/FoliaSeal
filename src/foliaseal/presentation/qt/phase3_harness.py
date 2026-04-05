@@ -91,6 +91,7 @@ class Phase3HarnessCapture:
     evidence_validation_warnings: tuple[str, ...]
     interaction_counts: dict[str, int]
     errors: tuple[str, ...]
+    captured_states: tuple[dict[str, Any], ...] = ()
 
     def to_json(self) -> str:
         """Return a stable JSON representation for later review."""
@@ -479,6 +480,8 @@ def run_phase3_signing_harness(
         if callable(focus_setter):
             focus_setter()
 
+    captured_states: list[dict[str, Any]] = []
+
     def on_sign_request(request: SigningRequest) -> None:
         sign_requests.append(request)
 
@@ -513,14 +516,61 @@ def run_phase3_signing_harness(
         ("Prev Page", lambda: navigate("go_to_previous_page")),
         ("Next Page", lambda: navigate("go_to_next_page")),
         ("Reset Zoom", lambda: navigate("reset_zoom_view")),
-        ("Confirm/Sign", shell.submit_sign_request),
     ]
     for label, callback in controls:
         button = bindings.q_push_button(label)
         button.clicked.connect(callback)
         toolbar.addWidget(button)
 
+    capture_count_label = bindings.q_label("Captured states: 0")
+
+    def capture_current_state(
+        *,
+        capture_kind: str,
+        request: SigningRequest | None = None,
+    ) -> dict[str, Any]:
+        current_request = request
+        if current_request is None:
+            current_request = _snapshot_current_draft_request(shell.properties_panel._workflow)
+        capture_index = (
+            len(captured_states) + 1
+            if capture_kind == "manual"
+            else len(captured_states)
+        )
+        artifact_basename = None
+        if artifacts_dir is not None:
+            artifact_basename = (
+                f"interactive_state_{capture_index:02d}"
+                if capture_kind == "manual"
+                else "interactive_final"
+            )
+        return _capture_interactive_state(
+            shell=shell,
+            request=current_request,
+            artifacts_dir=artifacts_dir,
+            artifact_basename=artifact_basename,
+            capture_index=(capture_index if capture_kind == "manual" else len(captured_states) + 1),
+            capture_kind=capture_kind,
+        )
+
+    def update_capture_count_label() -> None:
+        capture_count_label.setText(f"Captured states: {len(captured_states)}")
+
+    def on_capture_state() -> None:
+        captured_states.append(capture_current_state(capture_kind="manual"))
+        update_capture_count_label()
+        refocus_shell()
+
+    capture_button = bindings.q_push_button("Capture State")
+    capture_button.clicked.connect(on_capture_state)
+    toolbar.addWidget(capture_button)
+
+    confirm_button = bindings.q_push_button("Confirm/Sign")
+    confirm_button.clicked.connect(shell.submit_sign_request)
+    toolbar.addWidget(confirm_button)
+
     toolbar.addStretch(1)
+    toolbar.addWidget(capture_count_label)
 
     start = perf_counter()
     shell.refresh_viewer()
@@ -530,28 +580,17 @@ def run_phase3_signing_harness(
     refocus_shell()
     app.exec()
 
-    preview_text = shell.properties_panel.preview_text()
-    preview = shell.properties_panel.refresh_preview()
-    app.processEvents()
-    validation_text = shell.properties_panel.validation_text()
-    last_signing_result = getattr(shell, "last_signing_result", None)
-    preview_render_capture = _capture_preview_render(
-        shell=shell,
-        preview=preview,
-        artifacts_dir=artifacts_dir,
-        artifact_basename="interactive_preview",
-    )
     capture_request = (
         sign_requests[-1]
         if sign_requests
         else _snapshot_current_draft_request(shell.properties_panel._workflow)
     )
-    backend_reservation_snapshot = (
-        _snapshot_backend_reservation(capture_request) if capture_request is not None else None
-    )
-    backend_reservation_error = (
-        _backend_reservation_error(capture_request) if capture_request is not None else None
-    )
+    final_state = capture_current_state(capture_kind="final", request=capture_request)
+    preview_text = final_state["preview_text"]
+    validation_text = final_state["validation_text"]
+    last_signing_result = getattr(shell, "last_signing_result", None)
+    backend_reservation_snapshot = final_state["backend_reservation_snapshot"]
+    backend_reservation_error = final_state["backend_reservation_error"]
     last_signature_page_index = (
         sign_requests[-1].signature_rect.page_index
         if sign_requests and sign_requests[-1].signature_rect is not None
@@ -595,8 +634,8 @@ def run_phase3_signing_harness(
         "last_signing_result_success": (
             last_signing_result.success if isinstance(last_signing_result, SigningResult) else None
         ),
-        "preview_snapshot": _snapshot_preview(preview, render_capture=preview_render_capture),
-        "sign_request_snapshot": _snapshot_signing_request(capture_request),
+        "preview_snapshot": final_state["preview_snapshot"],
+        "sign_request_snapshot": final_state["sign_request_snapshot"],
         "backend_reservation_snapshot": backend_reservation_snapshot,
         "backend_reservation_error": backend_reservation_error,
         "output_file_exists": output_exists,
@@ -609,6 +648,7 @@ def run_phase3_signing_harness(
         "validation_text": validation_text,
         "interaction_counts": dict(sorted(interaction_counts.items())),
         "errors": tuple(errors),
+        "captured_states": tuple(captured_states + [final_state]),
     }
     contract = evaluate_phase3_evidence_contract(capture_payload)
     capture = Phase3HarnessCapture(
@@ -646,6 +686,7 @@ def run_phase3_signing_harness(
         evidence_validation_warnings=contract.warnings,
         interaction_counts=capture_payload["interaction_counts"],
         errors=capture_payload["errors"],
+        captured_states=capture_payload["captured_states"],
     )
     _write_optional_text(target_path=summary_json_path, content=capture.to_json() + "\n")
     checklist_results = build_phase3_checklist_results_markdown(
@@ -663,11 +704,59 @@ def run_phase3_signing_harness(
         print(f"- acceptance tier: {capture.acceptance_tier}")
         print(f"- gate verdict: {capture.gate_verdict}")
         print(f"- validation: {capture.validation_text}")
+        print(f"- captured states: {len(capture.captured_states)}")
         print()
     print(f"Checklist results file: {checklist_results_path}")
     print("Review the pre-checked items, complete the remaining manual-only checks, and")
     print("use the generated file as the acceptance worksheet for Phase 3.")
     return capture
+
+
+def _capture_interactive_state(
+    *,
+    shell: Any,
+    request: SigningRequest | None,
+    artifacts_dir: str | None,
+    artifact_basename: str | None,
+    capture_index: int,
+    capture_kind: str,
+) -> dict[str, Any]:
+    preview = shell.properties_panel.refresh_preview()
+    app = _widget_application(shell)
+    if app is not None and hasattr(app, "processEvents"):
+        app.processEvents()
+    preview_text = shell.properties_panel.preview_text()
+    validation_text = shell.properties_panel.validation_text()
+    render_capture = _capture_preview_render(
+        shell=shell,
+        preview=preview,
+        artifacts_dir=artifacts_dir,
+        artifact_basename=artifact_basename,
+    )
+    capture_label = _interactive_capture_label(
+        preview=preview,
+        capture_index=capture_index,
+        capture_kind=capture_kind,
+    )
+    return {
+        "capture_index": capture_index,
+        "capture_kind": capture_kind,
+        "capture_label": capture_label,
+        "preview_snapshot": _snapshot_preview(preview, render_capture=render_capture),
+        "preview_text": preview_text,
+        "validation_text": validation_text,
+        "sign_request_snapshot": _snapshot_signing_request(request),
+        "backend_reservation_snapshot": (
+            _snapshot_backend_reservation(request) if request is not None else None
+        ),
+        "backend_reservation_error": _backend_reservation_error(request) if request else None,
+    }
+
+
+def _interactive_capture_label(*, preview, capture_index: int, capture_kind: str) -> str:
+    layout_name = preview.layout_template.value if preview.layout_template else "unknown_layout"
+    stamp_name = preview.stamp_position.value if preview.stamp_position else "unknown_stamp"
+    return f"{capture_kind}_{capture_index:02d}_{layout_name}_{stamp_name}"
 
 
 def run_phase3_preview_matrix(

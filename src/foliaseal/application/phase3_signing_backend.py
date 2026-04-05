@@ -270,6 +270,7 @@ def _build_stamp_style(
         text_box_height=text_box_height,
         box_style=appearance.box_style,
         has_visible_stamp_image=stamp_background is not None,
+        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
     )
     _ensure_layout_can_fit(layout_reservation)
     background_layout = _background_layout_for_stamp(
@@ -326,7 +327,7 @@ def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
     font_factory = _font_factory_for_family(text_style.font_family)
     return TextBoxStyle(
         font=font_factory,
-        font_size=max(1, int(round(text_style.font_size_pt))),
+        font_size=max(1, int(text_style.font_size_pt + 0.5)),
         text_color=_hex_to_rgb(text_style.text_color_hex),
         box_layout_rule=SimpleBoxLayoutRule(
             AxisAlignment.ALIGN_MIN,
@@ -440,13 +441,24 @@ def _single_line_stamp_content_inset(
         SignatureStampPosition.TOP,
         SignatureStampPosition.BOTTOM,
     }:
-        return max(1, min(2, int(round(shortest_edge * 0.08))))
+        return max(0, min(2, int(shortest_edge * 0.08)))
     if stamp_position in {
         SignatureStampPosition.LEFT,
         SignatureStampPosition.RIGHT,
     }:
-        return max(1, min(2, int(round(shortest_edge * 0.04))))
+        return max(0, min(1, int(round(shortest_edge * 0.03))))
     return 0
+
+
+def _single_line_vertical_stamp_border_gap(
+    *,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    """Reserve a small border-facing gap for vertical single-line stamp images."""
+
+    if box_style is None or not box_style.show_border:
+        return 0
+    return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
 
 
 def _stamp_image_aspect_ratio(stamp_background: PdfImage | None) -> float | None:
@@ -769,6 +781,13 @@ def _background_layout_for_stamp(
         )
     fit_width = max(1, area_width - content_inset * 2)
     fit_height = max(1, area_height - content_inset * 2)
+    border_gap = 0
+    if (
+        layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+    ):
+        border_gap = _single_line_vertical_stamp_border_gap(box_style=box_style)
+        fit_height = max(1, fit_height - border_gap)
     aspect_ratio = image_width / image_height
     target_width = fit_width
     target_height = max(1, int(round(target_width / aspect_ratio)))
@@ -780,21 +799,30 @@ def _background_layout_for_stamp(
         layout_template == SignatureLayoutTemplate.SINGLE_LINE
         and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
     ):
+        remaining_y = max(0, area_height - target_height)
+        centered_extra_y = max(0, remaining_y - border_gap) // 2
         extra_x_left = 0
         extra_x_right = max(0, area_width - target_width)
+        if stamp_position == SignatureStampPosition.TOP:
+            extra_y_top = min(border_gap, remaining_y) + centered_extra_y
+            extra_y_bottom = centered_extra_y
+        else:
+            extra_y_top = centered_extra_y
+            extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
     else:
         centered_extra_x = max(0, area_width - target_width) // 2
         extra_x_left = centered_extra_x
         extra_x_right = centered_extra_x
-    extra_y = max(0, area_height - target_height) // 2
+        extra_y_top = max(0, area_height - target_height) // 2
+        extra_y_bottom = extra_y_top
     margins = background_layout.margins
     return replace(
         background_layout,
         margins=Margins(
             left=margins.left + extra_x_left,
             right=margins.right + extra_x_right,
-            top=margins.top + extra_y,
-            bottom=margins.bottom + extra_y,
+            top=margins.top + extra_y_top,
+            bottom=margins.bottom + extra_y_bottom,
         ),
     )
 
@@ -930,8 +958,8 @@ def _single_line_width_overflow_tolerance(
     """
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        return 1.65
-    return 1.5
+        return 1.9
+    return 1.7
 
 
 def _single_line_text_fits_reservation(

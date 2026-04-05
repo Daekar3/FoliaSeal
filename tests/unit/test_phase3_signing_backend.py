@@ -27,6 +27,7 @@ from foliaseal.application.phase3_signing_backend import (
     _layout_reservation_for_template,
     _load_simple_signer,
     _single_line_stamp_content_inset,
+    _single_line_vertical_stamp_border_gap,
     _stamp_background_for_path,
     _visible_signature_fit_issues,
     build_phase3_signing_executor,
@@ -232,7 +233,7 @@ def test_single_line_stamp_content_inset_is_orientation_aware() -> None:
             box_width=260,
             box_height=24,
         )
-        == 2
+        == 1
     )
     assert (
         _single_line_stamp_content_inset(
@@ -248,7 +249,7 @@ def test_single_line_stamp_content_inset_is_orientation_aware() -> None:
             box_width=210,
             box_height=42,
         )
-        == 2
+        == 1
     )
 
 
@@ -261,8 +262,34 @@ def test_single_line_stamp_content_inset_scales_to_reserved_band() -> None:
             reserved_width=257,
             reserved_height=8,
         )
+        == 0
+    )
+
+
+def test_single_line_vertical_stamp_border_gap_tracks_border_visibility() -> None:
+    assert (
+        _single_line_vertical_stamp_border_gap(
+            box_style=SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            )
+        )
         == 1
     )
+    assert (
+        _single_line_vertical_stamp_border_gap(
+            box_style=SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=3.5,
+                background_color_hex="#FFFFFF",
+            )
+        )
+        == 2
+    )
+    assert _single_line_vertical_stamp_border_gap(box_style=None) == 0
 
 
 def test_single_line_horizontal_text_reservation_width_rounds_up() -> None:
@@ -272,8 +299,40 @@ def test_single_line_horizontal_text_reservation_width_rounds_up() -> None:
             stamp_position=SignatureStampPosition.RIGHT,
             text_box_width=115,
         )
-        == 70
+        == 61
     )
+
+
+def test_single_line_horizontal_text_reservation_width_matches_live_preview_contract() -> None:
+    assert (
+        _effective_horizontal_text_reservation_width(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.RIGHT,
+            text_box_width=380,
+        )
+        == 200
+    )
+
+
+def test_build_text_box_style_uses_half_up_rounding_for_font_size() -> None:
+    style = _build_stamp_style(
+        SigningBackendAppearance.from_signature_appearance(
+            build_signature_appearance(
+                text_style=SignatureTextStyle(
+                    font_family="Serif",
+                    font_size_pt=8.5,
+                    bold=False,
+                    italic=True,
+                    text_color_hex="#000000",
+                )
+            )
+        ),
+        stamp_text="Test",
+        stamp_background=None,
+        signature_rect=build_signature_rect(page_index=0),
+    )
+
+    assert style.text_box_style.font_size == 9
 
 
 def test_layout_reservation_for_horizontal_single_line_preserves_stamp_width_for_image() -> None:
@@ -328,8 +387,8 @@ def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
     assert layout.margins.left <= 3
     assert layout.margins.right > 3
     assert layout.margins.right > layout.margins.left
-    assert layout.margins.top >= 4
-    assert layout.margins.bottom >= 13
+    assert layout.margins.top >= 3
+    assert layout.margins.bottom >= 12
 
 
 def test_phase3_signing_executor_signs_compact_single_line_rectangle(
@@ -685,6 +744,42 @@ def test_layout_reservation_for_single_line_bottom_centers_content_within_reserv
 
     assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MID
     assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
+
+
+def test_background_layout_for_single_line_bottom_preserves_border_facing_gap(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=24.0)
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=8,
+        box_style=box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=2.0,
+    )
+
+    layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=8,
+        box_style=box_style,
+    )
+
+    assert layout.margins.bottom > reservation.background_layout.margins.bottom
 
 
 @pytest.mark.parametrize(
@@ -1543,20 +1638,24 @@ def test_build_stamp_text_accepts_compact_vertical_single_line_with_modest_width
             show_in_visible_appearance=False,
         ),
         common_name=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Adam Smith",
         ),
         email=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Secretary.LHI@Outlook.com",
         ),
         title=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Board Secretary",
         ),
         company=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Lawson Heirs Inc.",
         ),
         signing_time=build_signature_field_binding(
             source=SignatureFieldSource.HIDDEN,
@@ -1596,7 +1695,10 @@ def test_build_stamp_text_accepts_compact_vertical_single_line_with_modest_width
     )
 
     assert "Inkslapped by" in stamp_text
-    assert "Adam Smith | test@example.com | Board Secretary | FoliaSeal" in stamp_text
+    assert (
+        "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary | Lawson Heirs Inc."
+        in stamp_text
+    )
 
 
 def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_four_fields_at_nine_point(  # noqa: E501
@@ -1617,20 +1719,24 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_fou
             show_in_visible_appearance=False,
         ),
         common_name=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Adam Smith",
         ),
         email=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Secretary.LHI@Outlook.com",
         ),
         title=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Board Secretary",
         ),
         company=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Lawson Heirs Inc.",
         ),
         signing_time=build_signature_field_binding(
             source=SignatureFieldSource.HIDDEN,
@@ -1689,20 +1795,24 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_fiv
             show_in_visible_appearance=False,
         ),
         common_name=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Adam Smith",
         ),
         email=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Secretary.LHI@Outlook.com",
         ),
         title=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Board Secretary",
         ),
         company=build_signature_field_binding(
-            source=SignatureFieldSource.DERIVED,
+            source=SignatureFieldSource.OVERRIDE,
             show_in_visible_appearance=True,
+            override_text="Lawson Heirs Inc.",
         ),
         signing_time=build_signature_field_binding(
             source=SignatureFieldSource.DERIVED,
@@ -1739,6 +1849,164 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_fiv
     )
 
     assert issues == ()
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
+)
+def test_visible_signature_fit_issues_accept_real_world_vertical_single_line_text(
+    tmp_path: Path,
+    stamp_position: SignatureStampPosition,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.gif"
+    _write_test_pkcs12(cert_path, passphrase="secret", common_name="Adam Smith")
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        signer_label_prefix="",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Adam Smith",
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Secretary.LHI@Outlook.com",
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Board Secretary",
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Lawson Heirs Inc.",
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+    )
+
+    issues = _visible_signature_fit_issues(
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=260.0,
+            height_pt=24.0,
+        ),
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+    )
+
+    assert issues == ()
+
+
+def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_real_signature_gif(
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_pkcs12(cert_path, passphrase="secret", common_name="Adam Smith")
+    Image.new("RGB", (1400, 334), color=(215, 235, 255)).save(stamp_path, format="PNG")
+    appearance = build_signature_appearance(
+        signer_label_prefix="",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Adam Smith",
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Secretary.LHI@Outlook.com",
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Board Secretary",
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            show_in_visible_appearance=True,
+            override_text="Lawson Heirs Inc.",
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.DERIVED,
+            show_in_visible_appearance=True,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.0,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+    )
+
+    issues = _visible_signature_fit_issues(
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=260.0,
+            height_pt=24.0,
+        ),
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+    )
+
+    assert issues
+    assert issues[0].code == "visible_signature_layout_unavailable"
 
 
 def test_visible_signature_fit_issues_reject_compact_vertical_rectangle_when_combined_text_is_too_tall(  # noqa: E501

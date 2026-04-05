@@ -115,6 +115,8 @@ Current harness instrumentation note:
 
 - `phase3-signing-harness` can now write preview-card PNGs and preview widget geometry/border-distance
   metrics when `--artifacts-dir` is supplied
+- the interactive harness now has a `Capture State` action so one manual GUI session can preserve
+  several chosen preview/validation/backend snapshots in the same summary JSON
 - `phase3-signing-preview-matrix` can apply a JSON scenario manifest and write per-scenario preview
   captures plus a summary JSON for batch fidelity sweeps
 - the matrix now also writes a stamp-focused debug crop for stamped scenarios, with overlay boxes

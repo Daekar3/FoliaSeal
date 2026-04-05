@@ -21,6 +21,7 @@ from foliaseal.application.phase3_signing_backend import (
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
     _single_line_stamp_content_inset,
+    _single_line_vertical_stamp_border_gap,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -1137,9 +1138,9 @@ class SignaturePropertiesPanel:
                 "font-weight: 700; font-size: 11pt; color: #111827; margin-bottom: 2px;"
             )
         if hasattr(detail_label, "setStyleSheet"):
-            detail_label.setStyleSheet("font-size: 9pt; color: #111827;")
+            detail_label.setStyleSheet("color: #111827;")
         if hasattr(multi_detail_label, "setStyleSheet"):
-            multi_detail_label.setStyleSheet("font-size: 9pt; color: #111827;")
+            multi_detail_label.setStyleSheet("color: #111827;")
         if hasattr(footer_label, "setStyleSheet"):
             footer_label.setStyleSheet("color: #374151;")
 
@@ -1863,6 +1864,26 @@ class SignaturePropertiesPanel:
         else:
             self._preview_controls.detail_label.setText("")
             self._preview_controls.multi_detail_label.setText(visible_detail)
+            if hasattr(self._preview_controls.multi_content_container, "setFixedSize"):
+                self._preview_controls.multi_content_container.setFixedSize(
+                    detail_width,
+                    inner_body_height,
+                )
+            else:
+                _set_widget_width_limit(
+                    self._preview_controls.multi_content_container,
+                    detail_width,
+                )
+            if hasattr(self._preview_controls.multi_detail_label, "setFixedSize"):
+                self._preview_controls.multi_detail_label.setFixedSize(
+                    detail_width,
+                    inner_body_height,
+                )
+            else:
+                _set_widget_width_limit(
+                    self._preview_controls.multi_detail_label,
+                    detail_width,
+                )
         self._preview_controls.footer_label.setText("")
         _set_widget_visible(self._preview_controls.single_body_container, is_vertical)
         _set_widget_visible(self._preview_controls.multi_body_container, not is_vertical)
@@ -1906,11 +1927,22 @@ class SignaturePropertiesPanel:
                     0,
                     int(round(content_inset * preview_scale)),
                 )
+                border_gap_px = max(
+                    0,
+                    int(
+                        round(
+                            _single_line_vertical_stamp_border_gap(
+                                box_style=preview.box_style
+                            )
+                            * preview_scale
+                        )
+                    ),
+                )
                 stamp_pixmap = _load_stamp_pixmap(
                     self._bindings,
                     preview.image_stamp_path,
                     max_width=max(1, inner_body_width - inset_px * 2),
-                    max_height=max(1, stamp_height - inset_px * 2),
+                    max_height=max(1, stamp_height - inset_px * 2 - border_gap_px),
                 )
             else:
                 max_width, max_height = _preview_stamp_max_size(
@@ -1969,9 +2001,16 @@ class SignaturePropertiesPanel:
 
         align_left = _qt_alignment_flag(self._bindings.qt, "AlignLeft")
         align_center = _qt_alignment_flag(self._bindings.qt, "AlignCenter")
+        align_top = _qt_alignment_flag(self._bindings.qt, "AlignTop")
+        align_bottom = _qt_alignment_flag(self._bindings.qt, "AlignBottom")
         if is_vertical and align_left is not None:
+            stamp_alignment = align_left
+            if stamp_position == SignatureStampPosition.TOP and align_bottom is not None:
+                stamp_alignment = align_left | align_bottom
+            elif stamp_position == SignatureStampPosition.BOTTOM and align_top is not None:
+                stamp_alignment = align_left | align_top
             if hasattr(self._preview_controls.stamp_label, "setAlignment"):
-                self._preview_controls.stamp_label.setAlignment(align_left)
+                self._preview_controls.stamp_label.setAlignment(stamp_alignment)
             if hasattr(self._preview_controls.detail_label, "setAlignment"):
                 self._preview_controls.detail_label.setAlignment(align_left)
         elif (
