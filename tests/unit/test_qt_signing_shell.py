@@ -827,17 +827,20 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         1,
         expected_height - int(round(expected_padding * 2)),
     )
+    expected_title_height = preview_controls.title_label.sizeHint().height()
+    expected_card_spacing = preview_controls.card_container.layout.spacing
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
     assert preview_controls.single_body_container.fixed_size == (
         expected_inner_width,
-        expected_inner_height,
+        expected_inner_height - expected_title_height - expected_card_spacing,
     )
     assert preview_controls.title_label.fixed_width == expected_width
     assert preview_controls.detail_label.fixed_width == expected_width
     assert preview_controls.multi_content_container.fixed_width <= expected_width
     assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.title_label.text() == "Digitally signed by"
+    assert preview_controls.title_label.visible is True
     detail_text = preview_controls.multi_detail_label.text()
     detail_lines = detail_text.splitlines()
     assert detail_lines[0] == "Distinguished name: Distinguished name"
@@ -849,12 +852,10 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert detail_lines[6] == "Reason: Approved"
     assert len(detail_lines) == 7
     assert preview_controls.footer_label.text() == ""
-    assert len(preview_controls.card_container.layout.items) == 2
-    assert (
-        preview_controls.multi_content_container.layout.items[0][0]
-        is preview_controls.title_label
-    )
-    assert preview_controls.multi_content_container.layout.items[1][0] is (
+    assert len(preview_controls.card_container.layout.items) == 3
+    assert preview_controls.card_container.layout.items[0][0] is preview_controls.title_label
+    assert len(preview_controls.multi_content_container.layout.items) == 1
+    assert preview_controls.multi_content_container.layout.items[0][0] is (
         preview_controls.multi_detail_label
     )
     assert (
@@ -936,11 +937,13 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
         1,
         expected_height - int(round(expected_padding * 2)),
     )
+    expected_title_height = preview_controls.title_label.sizeHint().height()
+    expected_card_spacing = preview_controls.card_container.layout.spacing
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
     assert preview_controls.single_body_container.fixed_size == (
         expected_inner_width,
-        expected_inner_height,
+        expected_inner_height - expected_title_height - expected_card_spacing,
     )
     assert preview_controls.title_label.fixed_width == expected_width
     assert preview_controls.detail_label.fixed_width == expected_width
@@ -949,10 +952,11 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.multi_body_container.visible is False
     assert preview_controls.single_body_container.visible is True
-    assert preview_controls.title_label.visible is False
-    assert "A very long prefix" in preview_controls.detail_label.text()
+    assert preview_controls.title_label.visible is True
+    assert preview_controls.title_label.text().startswith("A very long prefix")
+    assert "A very long prefix" not in preview_controls.detail_label.text()
     assert len(preview_controls.single_body_container.layout.items) == 2
-    assert preview_controls.single_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
+    assert preview_controls.single_body_container.layout.items[0][1] == (0, _FakeQt.AlignLeft)
 
 
 def test_signing_shell_preview_available_width_uses_parent_width_not_stale_preview_width(
@@ -1349,12 +1353,10 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
 
     preview = widget.properties_panel.preview
     expected_detail_text = signing_shell_module._preview_detail_text(preview)
-    expected_vertical_text = "\n".join(
-        part for part in (preview.title, expected_detail_text) if part
-    )
-
     assert widget.properties_panel._appearance_controls.show_field_names.isChecked() is False
-    assert widget.properties_panel.preview_controls.detail_label.text() == expected_vertical_text
+    assert widget.properties_panel.preview_controls.title_label.text() == (preview.title or "")
+    assert widget.properties_panel.preview_controls.title_label.visible is True
+    assert widget.properties_panel.preview_controls.detail_label.text() == expected_detail_text
 
 
 def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
@@ -1951,9 +1953,9 @@ def test_signing_shell_single_line_preview_matches_backend_wrapping(
 
     preview = widget.properties_panel.preview
     expected = signing_shell_module._preview_detail_text(preview)
-    expected_vertical_text = "\n".join(part for part in (preview.title, expected) if part)
-
-    assert widget.properties_panel.preview_controls.detail_label.text() == expected_vertical_text
+    assert widget.properties_panel.preview_controls.title_label.text() == (preview.title or "")
+    assert widget.properties_panel.preview_controls.title_label.visible is True
+    assert widget.properties_panel.preview_controls.detail_label.text() == expected
 
 
 def test_signing_shell_single_line_horizontal_preview_text_uses_active_detail_label(
@@ -2268,4 +2270,11 @@ def test_signing_shell_preview_uses_border_aware_padding_for_thick_borders(
         )
     )
 
-    assert "padding: 6.0px;" in widget.properties_panel.preview_controls.card_container.style
+    expected_padding = signing_shell_module._preview_card_padding_px(
+        widget.properties_panel.preview
+    )
+
+    assert (
+        f"padding: {expected_padding:.1f}px;"
+        in widget.properties_panel.preview_controls.card_container.style
+    )

@@ -333,8 +333,9 @@ def _base_layout_spacing(
     box_height: int,
 ) -> tuple[int, int]:
     if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
-        if box_height <= 40:
-            return 2, 1
+        edge_margin = max(2, min(4, int(round(box_height * 0.08))))
+        gap = max(1, min(6, int(round(box_height * 0.14)) - 2))
+        return edge_margin, gap
     return 4, 6
 
 
@@ -362,19 +363,13 @@ def _single_line_vertical_outer_margin(
     box_height: int,
     box_style: SignatureBoxStyle | None,
 ) -> int:
-    """Use symmetric outer insets for compact vertical single-line content."""
+    """Use the same border-aware outer inset for all vertical single-line content."""
 
-    base_edge_margin, _gap = _base_layout_spacing(
+    return _effective_layout_edge_margin(
         stamp_position=SignatureStampPosition.TOP,
         box_height=box_height,
+        box_style=box_style,
     )
-    compact_bonus = 1 if box_height >= 24 else 0
-    if box_style is None or not box_style.show_border:
-        return base_edge_margin + compact_bonus
-    safe_inset = _border_safe_inset(box_style)
-    if safe_inset <= 0:
-        return base_edge_margin
-    return max(base_edge_margin + compact_bonus, safe_inset + compact_bonus)
 
 
 def _single_line_stamp_content_inset(
@@ -385,10 +380,17 @@ def _single_line_stamp_content_inset(
 ) -> int:
     """Reserve a small internal gutter so fitted stamp content is not flush to the band edge."""
 
-    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
-        return 1 if box_height <= 34 else 0
-    if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        return 1 if box_height <= 26 else 0
+    shortest_edge = max(1, min(box_width, box_height))
+    if stamp_position in {
+        SignatureStampPosition.TOP,
+        SignatureStampPosition.BOTTOM,
+    }:
+        return max(2, min(3, int(round(shortest_edge * 0.08))))
+    if stamp_position in {
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.RIGHT,
+    }:
+        return max(1, min(2, int(round(shortest_edge * 0.04))))
     return 0
 
 
@@ -626,9 +628,16 @@ def _background_layout_for_stamp(
         target_height = fit_height
         target_width = max(1, int(round(target_height * aspect_ratio)))
 
-    centered_extra_x = max(0, area_width - target_width) // 2
-    extra_x_left = centered_extra_x
-    extra_x_right = centered_extra_x
+    if (
+        layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+    ):
+        extra_x_left = 0
+        extra_x_right = max(0, area_width - target_width)
+    else:
+        centered_extra_x = max(0, area_width - target_width) // 2
+        extra_x_left = centered_extra_x
+        extra_x_right = centered_extra_x
     extra_y = max(0, area_height - target_height) // 2
     margins = background_layout.margins
     return replace(
@@ -683,25 +692,13 @@ def _ensure_layout_can_fit(layout_reservation: _SignatureLayoutReservation) -> N
     max_text_width = layout_reservation.text_area_width_pt
     if (
         layout_reservation.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and layout_reservation.stamp_position
-        in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-        and layout_reservation.container_height_pt <= 24
     ):
         max_text_width = int(
             round(
                 layout_reservation.text_area_width_pt
-                * _single_line_vertical_width_overflow_tolerance()
-            )
-        )
-    if (
-        layout_reservation.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and layout_reservation.stamp_position
-        in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        max_text_width = int(
-            round(
-                layout_reservation.text_area_width_pt
-                * _single_line_horizontal_width_overflow_tolerance()
+                * _single_line_width_overflow_tolerance(
+                    stamp_position=layout_reservation.stamp_position
+                )
             )
         )
     if (
@@ -746,38 +743,14 @@ def _build_stamp_text(
     if appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
         body_text = " | ".join(body_fragments)
         if signature_rect is not None and body_fragments:
-            max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - 8)
-            max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - 8)
-            width_overflow_tolerance = 1.0
-            edge_margin = _effective_layout_edge_margin(
-                stamp_position=appearance.stamp_position,
-                box_height=max(1, int(round(signature_rect.height_pt))),
-                box_style=appearance.box_style,
+            (
+                max_text_width_pt,
+                max_text_height_pt,
+                width_overflow_tolerance,
+            ) = _single_line_text_wrap_limits(
+                appearance=appearance,
+                signature_rect=signature_rect,
             )
-            max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - edge_margin * 2)
-            max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - edge_margin * 2)
-            if (
-                appearance.stamp_position
-                in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-                and signature_rect.height_pt <= 24
-            ):
-                width_overflow_tolerance = _single_line_vertical_width_overflow_tolerance()
-                max_text_height_pt = max(
-                    1,
-                    int(round(signature_rect.height_pt)) - edge_margin * 2,
-                )
-            if (
-                appearance.image_stamp_path is not None
-                and appearance.stamp_position
-                in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-            ):
-                available_width_pt = max(
-                    1,
-                    int(round(signature_rect.width_pt)) - edge_margin * 2,
-                )
-                reserved_stamp_width_pt = max(48, int(round(available_width_pt * 0.35)))
-                max_text_width_pt = max(1, max_text_width_pt - reserved_stamp_width_pt - 6)
-                width_overflow_tolerance = 1.25
             body_text = _wrap_visible_signature_fragments(
                 body_fragments,
                 text_style=appearance.text_style,
@@ -785,19 +758,6 @@ def _build_stamp_text(
                 max_text_height_pt=max_text_height_pt,
                 width_overflow_tolerance=width_overflow_tolerance,
             )
-            if _should_prefer_compact_single_line_body(
-                appearance=appearance,
-                signature_rect=signature_rect,
-                prefix=prefix,
-                body_text=body_text,
-            ):
-                body_text = _wrap_visible_signature_fragments(
-                    body_fragments,
-                    text_style=appearance.text_style,
-                    max_text_width_pt=max(1, int(round(signature_rect.width_pt)) - 8),
-                    max_text_height_pt=max(1, int(round(signature_rect.height_pt)) - 4),
-                    width_overflow_tolerance=1.25,
-                )
         if prefix and body_text:
             return _escape_percent(f"{prefix}\n{body_text}")
         return _escape_percent(prefix or body_text)
@@ -862,65 +822,86 @@ def _wrap_visible_signature_fragments(
     return best_candidate[3]
 
 
-def _should_prefer_compact_single_line_body(
+def _single_line_width_overflow_tolerance(
+    *,
+    stamp_position: SignatureStampPosition,
+) -> float:
+    """Allow modest horizontal text overflow to free more room for the stamp.
+
+    Left/right single-line layouts need more flexibility because text and stamp
+    share the same width. Top/bottom layouts still benefit from a smaller bounded
+    tolerance so fit decisions do not change at arbitrary box-height cutoffs.
+    """
+
+    if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
+        return 1.3
+    return 1.25
+
+
+def _single_line_text_wrap_limits(
     *,
     appearance: SigningBackendAppearance,
     signature_rect: SignatureRect,
-    prefix: str,
-    body_text: str,
-) -> bool:
-    if appearance.image_stamp_path is None:
-        return False
-    if appearance.stamp_position not in {
+) -> tuple[int, int, float]:
+    box_height = max(1, int(round(signature_rect.height_pt)))
+    edge_margin = _effective_layout_edge_margin(
+        stamp_position=appearance.stamp_position,
+        box_height=box_height,
+        box_style=appearance.box_style,
+    )
+    max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - edge_margin * 2)
+    max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - edge_margin * 2)
+    if appearance.stamp_position in {
         SignatureStampPosition.TOP,
         SignatureStampPosition.BOTTOM,
     }:
-        return False
-    if signature_rect.height_pt > 24:
-        return False
-    if not prefix or "\n" not in body_text:
-        return False
+        outer_margin = _single_line_vertical_outer_margin(
+            box_height=box_height,
+            box_style=appearance.box_style,
+        )
+        max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - outer_margin * 2)
+    width_overflow_tolerance = _single_line_width_overflow_tolerance(
+        stamp_position=appearance.stamp_position
+    )
+    if (
+        appearance.image_stamp_path is not None
+        and appearance.stamp_position
+        in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        _edge_margin, gap = _base_layout_spacing(
+            stamp_position=appearance.stamp_position,
+            box_height=box_height,
+        )
+        available_width_pt = max(
+            1,
+            int(round(signature_rect.width_pt)) - edge_margin * 2,
+        )
+        reserved_stamp_width_pt = max(1, int(round(available_width_pt * 0.28)))
+        max_text_width_pt = max(1, max_text_width_pt - reserved_stamp_width_pt - gap)
+    return max_text_width_pt, max_text_height_pt, width_overflow_tolerance
 
+
+def _single_line_text_fits_reservation(
+    *,
+    appearance: SigningBackendAppearance,
+    signature_rect: SignatureRect,
+    text: str,
+) -> bool:
     text_box_style = _build_text_box_style(appearance.text_style)
-    combined_text = f"{prefix}\n{body_text}"
-    _, measured_height = _measure_text_box_dimensions(combined_text, text_box_style)
-    return measured_height > max(1, int(round(signature_rect.height_pt)) - 4)
-
-
-def _single_line_horizontal_width_overflow_tolerance() -> float:
-    """Allow modest horizontal text overflow to free more room for the stamp.
-
-    Horizontal single-line layouts already pick wrapped body text using a bounded
-    overflow tolerance when a stamp is present. Reusing the same tolerance when
-    reserving text width keeps the stamp/text split honest and avoids starving the
-    stamp area based on a conservative measured text box.
-    """
-
-    return 1.25
-
-
-def _single_line_vertical_width_overflow_tolerance() -> float:
-    """Allow modest horizontal overflow on compact vertical single-line layouts.
-
-    The final fit gate already permits a small amount of width overflow for
-    top/bottom single-line layouts on compact rectangles. Reusing the same
-    tolerance when choosing the wrapped body text prevents early rejection in
-    `_build_stamp_text()` for layouts that the final reservation logic would
-    still accept honestly.
-    """
-
-    return 1.25
-
-
-def _single_line_vertical_text_wrap_height_limit(signature_rect: SignatureRect) -> int:
-    """Match early wrap height limits to the compact vertical reservation budget.
-
-    Compact top/bottom single-line layouts already relax vertical margins in the
-    final reservation logic, but the early wrap step was still using the older
-    `height - 8` rule. That could reject layouts the final fit gate would accept.
-    """
-
-    return max(1, int(round(signature_rect.height_pt)) - 4)
+    text_box_width, text_box_height = _measure_text_box_dimensions(text, text_box_style)
+    reservation = _layout_reservation_for_template(
+        appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+        box_style=appearance.box_style,
+    )
+    try:
+        _ensure_layout_can_fit(reservation)
+    except ValueError:
+        return False
+    return True
 
 
 def _effective_horizontal_text_reservation_width(
@@ -932,7 +913,14 @@ def _effective_horizontal_text_reservation_width(
         return text_box_width
     return max(
         1,
-        int(round(text_box_width / _single_line_horizontal_width_overflow_tolerance())),
+        int(
+            ceil(
+                text_box_width
+                / _single_line_width_overflow_tolerance(
+                    stamp_position=SignatureStampPosition.RIGHT
+                )
+            )
+        ),
     )
 
 

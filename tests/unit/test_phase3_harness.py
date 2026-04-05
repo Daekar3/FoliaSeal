@@ -858,6 +858,38 @@ def test_stamp_edge_diagnostics_flags_touching_and_warning_distance() -> None:
     assert diagnostics["stamp_content_within_warning_distance"] is True
 
 
+def test_stamp_edge_diagnostics_ignores_left_anchor_for_top_and_bottom() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "stamp_position": SignatureStampPosition.TOP,
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 10, "y": 10, "width": 60, "height": 20},
+        stamp_pixmap_bounds={"x": 10, "y": 12, "width": 30, "height": 16},
+        stamp_content_bounds={"x": 10, "y": 13, "width": 20, "height": 14},
+    )
+
+    assert diagnostics["stamp_content_edge_distances_px"] == {
+        "top": 3,
+        "right": 40,
+        "bottom": 3,
+        "left": 0,
+    }
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 3
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
 def test_write_stamp_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
     preview_path = tmp_path / "preview.png"
     output_path = tmp_path / "stamp_debug.png"

@@ -23,6 +23,7 @@ from foliaseal.application.phase3_signing_backend import (
     _build_stamp_style,
     _build_stamp_text,
     _current_signing_time,
+    _effective_horizontal_text_reservation_width,
     _layout_reservation_for_template,
     _load_simple_signer,
     _single_line_stamp_content_inset,
@@ -224,14 +225,14 @@ def test_phase3_signing_executor_produces_visible_signature_without_image_stamp(
     assert appearance_text.strip()
 
 
-def test_single_line_stamp_content_inset_targets_compact_cases() -> None:
+def test_single_line_stamp_content_inset_is_orientation_aware() -> None:
     assert (
         _single_line_stamp_content_inset(
             stamp_position=SignatureStampPosition.TOP,
             box_width=260,
             box_height=24,
         )
-        == 1
+        == 2
     )
     assert (
         _single_line_stamp_content_inset(
@@ -247,11 +248,21 @@ def test_single_line_stamp_content_inset_targets_compact_cases() -> None:
             box_width=210,
             box_height=42,
         )
-        == 0
+        == 2
     )
 
 
-def test_background_layout_for_stamp_centers_compact_vertical_single_line_image(
+def test_single_line_horizontal_text_reservation_width_rounds_up() -> None:
+    assert (
+        _effective_horizontal_text_reservation_width(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            text_box_width=115,
+        )
+        == 89
+    )
+
+
+def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
     tmp_path: Path,
 ) -> None:
     stamp_path = tmp_path / "tall_stamp.png"
@@ -273,11 +284,11 @@ def test_background_layout_for_stamp_centers_compact_vertical_single_line_image(
         ),
     )
 
-    assert layout.margins.left > 3
+    assert layout.margins.left <= 3
     assert layout.margins.right > 3
-    assert abs(layout.margins.left - layout.margins.right) <= 1
-    assert layout.margins.top > 4
-    assert layout.margins.bottom > 13
+    assert layout.margins.right > layout.margins.left
+    assert layout.margins.top >= 4
+    assert layout.margins.bottom >= 13
 
 
 def test_phase3_signing_executor_signs_compact_single_line_rectangle(
@@ -615,7 +626,8 @@ def test_layout_reservation_for_wrapped_block_allocates_bottom_text_space() -> N
     assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
 
 
-def test_layout_reservation_for_single_line_bottom_centers_content_within_reserved_regions() -> None:
+def test_layout_reservation_for_single_line_bottom_centers_content_within_reserved_regions(
+) -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.BOTTOM,
@@ -634,7 +646,10 @@ def test_layout_reservation_for_single_line_bottom_centers_content_within_reserv
     assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
 
 
-@pytest.mark.parametrize("stamp_position", [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM])
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
+)
 def test_layout_reservation_for_compact_vertical_single_line_uses_symmetric_outer_clearance(
     stamp_position: SignatureStampPosition,
 ) -> None:
@@ -657,12 +672,21 @@ def test_layout_reservation_for_compact_vertical_single_line_uses_symmetric_oute
     )
 
     if stamp_position == SignatureStampPosition.TOP:
-        assert reservation.background_layout.margins.top == reservation.inner_content_layout.margins.bottom
+        assert (
+            reservation.background_layout.margins.top
+            == reservation.inner_content_layout.margins.bottom
+        )
     else:
-        assert reservation.inner_content_layout.margins.top == reservation.background_layout.margins.bottom
+        assert (
+            reservation.inner_content_layout.margins.top
+            == reservation.background_layout.margins.bottom
+        )
 
 
-@pytest.mark.parametrize("stamp_position", [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM])
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
+)
 def test_layout_reservation_for_compact_vertical_single_line_increases_outer_clearance_with_border(
     stamp_position: SignatureStampPosition,
 ) -> None:
@@ -702,13 +726,19 @@ def test_layout_reservation_for_compact_vertical_single_line_increases_outer_cle
     )
 
     if stamp_position == SignatureStampPosition.TOP:
-        assert thick_reservation.background_layout.margins.top > thin_reservation.background_layout.margins.top
+        assert (
+            thick_reservation.background_layout.margins.top
+            > thin_reservation.background_layout.margins.top
+        )
         assert (
             thick_reservation.inner_content_layout.margins.bottom
             > thin_reservation.inner_content_layout.margins.bottom
         )
     else:
-        assert thick_reservation.inner_content_layout.margins.top > thin_reservation.inner_content_layout.margins.top
+        assert (
+            thick_reservation.inner_content_layout.margins.top
+            > thin_reservation.inner_content_layout.margins.top
+        )
         assert (
             thick_reservation.background_layout.margins.bottom
             > thin_reservation.background_layout.margins.bottom
@@ -1054,7 +1084,7 @@ def test_build_stamp_text_prefers_fewer_body_lines_for_compact_vertical_single_l
     assert "Wytheville, Virginia, US" in stamp_text
 
 
-def test_build_stamp_text_wraps_horizontal_single_line_more_aggressively_when_stamp_is_present(
+def test_build_stamp_text_wraps_horizontal_single_line_when_stamp_is_present(
     tmp_path: Path,
 ) -> None:
     cert_path = tmp_path / "cert.p12"
@@ -1136,6 +1166,7 @@ def test_build_stamp_text_wraps_horizontal_single_line_more_aggressively_when_st
     assert with_stamp.count("\n") >= without_stamp.count("\n")
     assert "Adam Smith" in with_stamp
     assert "Wytheville, Virginia, US" in with_stamp
+
 
 
 @pytest.mark.parametrize(

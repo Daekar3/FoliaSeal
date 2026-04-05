@@ -1681,6 +1681,11 @@ def _relevant_stamp_edge_distances(
 ) -> dict[str, int] | None:
     if edge_distances is None:
         return None
+    if stamp_position in {
+        SignatureStampPosition.TOP,
+        SignatureStampPosition.BOTTOM,
+    }:
+        return {key: value for key, value in edge_distances.items() if key != "left"}
     if stamp_position == SignatureStampPosition.LEFT:
         return {key: value for key, value in edge_distances.items() if key != "left"}
     if stamp_position == SignatureStampPosition.RIGHT:
