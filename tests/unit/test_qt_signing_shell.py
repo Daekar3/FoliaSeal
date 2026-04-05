@@ -952,7 +952,7 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     assert preview_controls.title_label.visible is False
     assert "A very long prefix" in preview_controls.detail_label.text()
     assert len(preview_controls.single_body_container.layout.items) == 2
-    assert preview_controls.single_body_container.layout.items[0][1] == (0, _FakeQt.AlignLeft)
+    assert preview_controls.single_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
 
 
 def test_signing_shell_preview_available_width_uses_parent_width_not_stale_preview_width(
@@ -2053,7 +2053,7 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     )
 
 
-def test_signing_shell_single_line_horizontal_preview_aligns_stamp_to_side(
+def test_signing_shell_single_line_horizontal_preview_centers_stamp_within_side_band(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2068,9 +2068,9 @@ def test_signing_shell_single_line_horizontal_preview_aligns_stamp_to_side(
         lambda self: _fake_bindings(),
     )
 
-    for stamp_position, expected_alignment in (
-        (SignatureStampPosition.LEFT, _FakeQt.AlignLeft),
-        (SignatureStampPosition.RIGHT, _FakeQt.AlignRight),
+    for stamp_position in (
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.RIGHT,
     ):
         appearance = build_signature_appearance(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
@@ -2096,7 +2096,7 @@ def test_signing_shell_single_line_horizontal_preview_aligns_stamp_to_side(
             widget.properties_panel.preview_controls.multi_body_container.layout.items[
                 0 if stamp_position == SignatureStampPosition.LEFT else 1
             ][0].alignment
-            == expected_alignment
+            == _FakeQt.AlignCenter
         )
 
 

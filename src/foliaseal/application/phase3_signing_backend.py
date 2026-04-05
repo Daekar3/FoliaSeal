@@ -45,6 +45,7 @@ from foliaseal.domain.errors import (
     TsaUnavailableError,
 )
 from foliaseal.domain.models import (
+    SignatureBoxStyle,
     SignatureFieldKey,
     SignatureFieldSource,
     SignatureLayoutTemplate,
@@ -376,6 +377,21 @@ def _single_line_vertical_outer_margin(
     return max(base_edge_margin + compact_bonus, safe_inset + compact_bonus)
 
 
+def _single_line_stamp_content_inset(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_width: int,
+    box_height: int,
+) -> int:
+    """Reserve a small internal gutter so fitted stamp content is not flush to the band edge."""
+
+    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        return 1 if box_height <= 34 else 0
+    if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
+        return 1 if box_height <= 26 else 0
+    return 0
+
+
 def _layout_reservation_for_template(
     layout_template: SignatureLayoutTemplate,
     *,
@@ -500,7 +516,7 @@ def _layout_reservation_for_template(
             bottom=vertical_bottom_margin,
         )
         background_alignment = (
-            AxisAlignment.ALIGN_MIN
+            AxisAlignment.ALIGN_MID
             if layout_template == SignatureLayoutTemplate.SINGLE_LINE
             else AxisAlignment.ALIGN_MID
         )
@@ -521,7 +537,7 @@ def _layout_reservation_for_template(
             bottom=stamp_area_height + separator_height + vertical_bottom_margin,
         )
         background_alignment = (
-            AxisAlignment.ALIGN_MIN
+            AxisAlignment.ALIGN_MID
             if layout_template == SignatureLayoutTemplate.SINGLE_LINE
             else AxisAlignment.ALIGN_MID
         )
@@ -594,23 +610,25 @@ def _background_layout_for_stamp(
 
     area_width = max(1, reservation.stamp_area_width_pt)
     area_height = max(1, reservation.stamp_area_height_pt)
+    content_inset = 0
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        content_inset = _single_line_stamp_content_inset(
+            stamp_position=stamp_position,
+            box_width=max(1, int(round(signature_rect.width_pt))),
+            box_height=max(1, int(round(signature_rect.height_pt))),
+        )
+    fit_width = max(1, area_width - content_inset * 2)
+    fit_height = max(1, area_height - content_inset * 2)
     aspect_ratio = image_width / image_height
-    target_width = area_width
+    target_width = fit_width
     target_height = max(1, int(round(target_width / aspect_ratio)))
-    if target_height > area_height:
-        target_height = area_height
+    if target_height > fit_height:
+        target_height = fit_height
         target_width = max(1, int(round(target_height * aspect_ratio)))
 
-    if (
-        layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-    ):
-        extra_x_left = 0
-        extra_x_right = max(0, area_width - target_width)
-    else:
-        centered_extra_x = max(0, area_width - target_width) // 2
-        extra_x_left = centered_extra_x
-        extra_x_right = centered_extra_x
+    centered_extra_x = max(0, area_width - target_width) // 2
+    extra_x_left = centered_extra_x
+    extra_x_right = centered_extra_x
     extra_y = max(0, area_height - target_height) // 2
     margins = background_layout.margins
     return replace(

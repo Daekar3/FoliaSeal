@@ -1478,6 +1478,24 @@ def _label_alignment_snapshot(label: Any) -> int | None:
     return None
 
 
+def _qt_alignment_flag(name: str) -> int:
+    try:
+        qt_core = importlib.import_module("PySide6.QtCore")
+    except ImportError:
+        return 0
+    qt = getattr(qt_core, "Qt", None)
+    if qt is None:
+        return 0
+    direct = getattr(qt, name, None)
+    if direct is not None:
+        return int(direct)
+    alignment_flag = getattr(qt, "AlignmentFlag", None)
+    if alignment_flag is None:
+        return 0
+    value = getattr(alignment_flag, name, None)
+    return int(value) if value is not None else 0
+
+
 def _translate_child_bounds(
     parent_bounds: dict[str, int] | None,
     child_bounds: dict[str, int] | None,
@@ -1507,24 +1525,18 @@ def _project_pixmap_bounds_within_label(
     x_offset = horizontal_space // 2
     y_offset = vertical_space // 2
     if alignment is not None:
-        try:
-            qt_core = importlib.import_module("PySide6.QtCore")
-        except ImportError:
-            qt_core = None
-        qt = getattr(qt_core, "Qt", None) if qt_core is not None else None
-        if qt is not None:
-            align_left = int(getattr(qt, "AlignLeft", 0))
-            align_right = int(getattr(qt, "AlignRight", 0))
-            align_top = int(getattr(qt, "AlignTop", 0))
-            align_bottom = int(getattr(qt, "AlignBottom", 0))
-            if alignment & align_left:
-                x_offset = 0
-            elif alignment & align_right:
-                x_offset = horizontal_space
-            if alignment & align_top:
-                y_offset = 0
-            elif alignment & align_bottom:
-                y_offset = vertical_space
+        align_left = _qt_alignment_flag("AlignLeft")
+        align_right = _qt_alignment_flag("AlignRight")
+        align_top = _qt_alignment_flag("AlignTop")
+        align_bottom = _qt_alignment_flag("AlignBottom")
+        if alignment & align_left:
+            x_offset = 0
+        elif alignment & align_right:
+            x_offset = horizontal_space
+        if alignment & align_top:
+            y_offset = 0
+        elif alignment & align_bottom:
+            y_offset = vertical_space
     return {
         "x": label_bounds["x"] + x_offset,
         "y": label_bounds["y"] + y_offset,
@@ -1632,13 +1644,18 @@ def _stamp_edge_diagnostics(
         inner_bounds=stamp_content_bounds,
     )
 
+    relevant_content_distances = _relevant_stamp_edge_distances(
+        stamp_position=getattr(preview, "stamp_position", None),
+        edge_distances=content_distances,
+    )
+
     def _min_distance(distances: dict[str, int] | None) -> int | None:
         if distances is None:
             return None
         return min(distances.values())
 
     pixmap_min_distance = _min_distance(pixmap_distances)
-    content_min_distance = _min_distance(content_distances)
+    content_min_distance = _min_distance(relevant_content_distances)
     return {
         "stamp_pixmap_edge_distances_px": pixmap_distances,
         "stamp_content_edge_distances_px": content_distances,
@@ -1655,6 +1672,20 @@ def _stamp_edge_diagnostics(
             None if content_min_distance is None else content_min_distance <= warning_threshold
         ),
     }
+
+
+def _relevant_stamp_edge_distances(
+    *,
+    stamp_position: SignatureStampPosition | None,
+    edge_distances: dict[str, int] | None,
+) -> dict[str, int] | None:
+    if edge_distances is None:
+        return None
+    if stamp_position == SignatureStampPosition.LEFT:
+        return {key: value for key, value in edge_distances.items() if key != "left"}
+    if stamp_position == SignatureStampPosition.RIGHT:
+        return {key: value for key, value in edge_distances.items() if key != "right"}
+    return dict(edge_distances)
 
 
 def _layout_spacing(widget: Any) -> int | None:

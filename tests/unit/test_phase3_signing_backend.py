@@ -19,11 +19,13 @@ from pyhanko_certvalidator import ValidationContext
 from foliaseal.application.phase3_signing_backend import (
     PyHankoCertificateLoader,
     PyHankoSignatureVerifier,
+    _background_layout_for_stamp,
     _build_stamp_style,
     _build_stamp_text,
     _current_signing_time,
     _layout_reservation_for_template,
     _load_simple_signer,
+    _single_line_stamp_content_inset,
     _stamp_background_for_path,
     _visible_signature_fit_issues,
     build_phase3_signing_executor,
@@ -220,6 +222,62 @@ def test_phase3_signing_executor_produces_visible_signature_without_image_stamp(
     assert "Board Secretary" in appearance_text
     assert "FoliaSeal" in appearance_text
     assert appearance_text.strip()
+
+
+def test_single_line_stamp_content_inset_targets_compact_cases() -> None:
+    assert (
+        _single_line_stamp_content_inset(
+            stamp_position=SignatureStampPosition.TOP,
+            box_width=260,
+            box_height=24,
+        )
+        == 1
+    )
+    assert (
+        _single_line_stamp_content_inset(
+            stamp_position=SignatureStampPosition.LEFT,
+            box_width=300,
+            box_height=26,
+        )
+        == 1
+    )
+    assert (
+        _single_line_stamp_content_inset(
+            stamp_position=SignatureStampPosition.RIGHT,
+            box_width=210,
+            box_height=42,
+        )
+        == 0
+    )
+
+
+def test_background_layout_for_stamp_centers_compact_vertical_single_line_image(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "tall_stamp.png"
+    Image.new("RGBA", (40, 120), color=(32, 48, 96, 255)).save(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+
+    layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        stamp_background=stamp_background,
+        signature_rect=build_signature_rect(page_index=0, width_pt=260.0, height_pt=24.0),
+        text_box_width=176,
+        text_box_height=8,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=3.5,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    assert layout.margins.left > 3
+    assert layout.margins.right > 3
+    assert abs(layout.margins.left - layout.margins.right) <= 1
+    assert layout.margins.top > 4
+    assert layout.margins.bottom > 13
 
 
 def test_phase3_signing_executor_signs_compact_single_line_rectangle(
@@ -477,7 +535,7 @@ def test_layout_reservation_for_single_line_allocates_right_text_space() -> None
     assert reservation.stamp_area_height_pt < reservation.container_height_pt
     assert reservation.text_area_width_pt < reservation.container_width_pt
     assert reservation.text_area_height_pt < reservation.container_height_pt
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MIN
+    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MID
     assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MAX
     assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
     assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
@@ -718,7 +776,7 @@ def test_build_stamp_style_uses_template_specific_layout_for_single_line(
         signature_rect=build_signature_rect(page_index=0),
     )
 
-    assert style.background_layout.x_align == AxisAlignment.ALIGN_MIN
+    assert style.background_layout.x_align == AxisAlignment.ALIGN_MID
     assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
     assert style.background_layout.inner_content_scaling == InnerScaling.SHRINK_TO_FIT
     assert style.background_layout.margins.bottom >= style.inner_content_layout.margins.bottom

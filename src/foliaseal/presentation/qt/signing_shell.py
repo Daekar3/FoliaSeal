@@ -20,6 +20,7 @@ from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
+    _single_line_stamp_content_inset,
     _single_line_vertical_outer_margin,
     _wrap_visible_signature_fragments,
 )
@@ -536,6 +537,15 @@ def _preview_stamp_max_size(
     )
     area_width = max(1, reservation.stamp_area_width_pt)
     area_height = max(1, reservation.stamp_area_height_pt)
+    content_inset = 0
+    if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        content_inset = _single_line_stamp_content_inset(
+            stamp_position=preview.stamp_position,
+            box_width=max(1, int(round(preview.signature_rect.width_pt))),
+            box_height=max(1, int(round(preview.signature_rect.height_pt))),
+        )
+    area_width = max(1, area_width - content_inset * 2)
+    area_height = max(1, area_height - content_inset * 2)
 
     pixmap_width = getattr(raw_pixmap, "width", None)
     pixmap_height = getattr(raw_pixmap, "height", None)
@@ -615,6 +625,16 @@ def _size_hint_height(widget: Any) -> int | None:
     return None
 
 
+def _qt_alignment_flag(qt_namespace: Any, name: str) -> Any | None:
+    direct = getattr(qt_namespace, name, None)
+    if direct is not None:
+        return direct
+    alignment_flag = getattr(qt_namespace, "AlignmentFlag", None)
+    if alignment_flag is None:
+        return None
+    return getattr(alignment_flag, name, None)
+
+
 def _reset_widget_size_constraints(widget: Any) -> None:
     """Clear prior fixed-size constraints before recomputing preview geometry."""
 
@@ -672,6 +692,21 @@ def _fit_vertical_preview_band_geometry(
         )
     fitted_stamp_height = max(0, remaining_height - fitted_separator_height)
     return (fitted_text_height, fitted_stamp_height, fitted_separator_height)
+
+
+def _single_line_vertical_separator_cap(
+    preview: SigningDraftPreview,
+    *,
+    preview_padding_px: float,
+) -> int:
+    if preview.signature_rect is None:
+        return max(2, int(round(preview_padding_px)))
+    box_height = max(1, int(round(preview.signature_rect.height_pt)))
+    if box_height <= 24:
+        return 1
+    if box_height <= 28:
+        return 2
+    return max(2, int(round(preview_padding_px)))
 
 
 def _set_checked(check_box: Any, value: bool) -> None:
@@ -1850,7 +1885,10 @@ class SignaturePropertiesPanel:
                 text_height, stamp_height, separator_height = vertical_band_geometry
                 capped_separator_height = min(
                     separator_height,
-                    max(2, int(round(preview_padding_px))),
+                    _single_line_vertical_separator_cap(
+                        preview,
+                        preview_padding_px=preview_padding_px,
+                    ),
                 )
                 vertical_band_geometry = (
                     text_height,
@@ -1861,7 +1899,10 @@ class SignaturePropertiesPanel:
                 text_height, stamp_height, separator_height = vertical_band_geometry
                 capped_separator_height = min(
                     separator_height,
-                    max(2, int(round(preview_padding_px))),
+                    _single_line_vertical_separator_cap(
+                        preview,
+                        preview_padding_px=preview_padding_px,
+                    ),
                 )
                 vertical_band_geometry = (
                     text_height,
@@ -1873,11 +1914,28 @@ class SignaturePropertiesPanel:
         if raw_stamp_pixmap is not None:
             if is_vertical and vertical_band_geometry is not None:
                 _text_height, stamp_height, _separator_height = vertical_band_geometry
+                content_inset = _single_line_stamp_content_inset(
+                    stamp_position=preview.stamp_position,
+                    box_width=max(1, int(round(preview.signature_rect.width_pt))),
+                    box_height=max(1, int(round(preview.signature_rect.height_pt))),
+                )
+                inset_px = max(
+                    0,
+                    int(
+                        round(
+                            content_inset
+                            * _preview_display_scale(
+                                preview,
+                                available_width_px=available_width_px,
+                            )
+                        )
+                    ),
+                )
                 stamp_pixmap = _load_stamp_pixmap(
                     self._bindings,
                     preview.image_stamp_path,
-                    max_width=inner_body_width,
-                    max_height=max(1, stamp_height),
+                    max_width=max(1, inner_body_width - inset_px * 2),
+                    max_height=max(1, stamp_height - inset_px * 2),
                 )
             else:
                 max_width, max_height = _preview_stamp_max_size(
@@ -1933,11 +1991,14 @@ class SignaturePropertiesPanel:
                 else:
                     label.setFixedSize(96, 64)
 
-        align_left = getattr(self._bindings.qt, "AlignLeft", None)
-        align_center = getattr(self._bindings.qt, "AlignCenter", None)
+        align_left = _qt_alignment_flag(self._bindings.qt, "AlignLeft")
+        align_center = _qt_alignment_flag(self._bindings.qt, "AlignCenter")
         if is_vertical and align_left is not None:
             if hasattr(self._preview_controls.stamp_label, "setAlignment"):
-                self._preview_controls.stamp_label.setAlignment(align_left)
+                if align_center is not None:
+                    self._preview_controls.stamp_label.setAlignment(align_center)
+                else:
+                    self._preview_controls.stamp_label.setAlignment(align_left)
             if hasattr(self._preview_controls.detail_label, "setAlignment"):
                 self._preview_controls.detail_label.setAlignment(align_left)
         elif (
@@ -1960,7 +2021,8 @@ class SignaturePropertiesPanel:
             stamp_widget: Any = self._preview_controls.stamp_label
             detail_widget: Any = self._preview_controls.detail_label
             if align_left is not None:
-                stamp_widget = (self._preview_controls.stamp_label, 0, align_left)
+                stamp_alignment = align_center if align_center is not None else align_left
+                stamp_widget = (self._preview_controls.stamp_label, 0, stamp_alignment)
                 detail_widget = (self._preview_controls.detail_label, 0, align_left)
             single_widgets: list[Any] = [stamp_widget, detail_widget]
             if stamp_position == SignatureStampPosition.BOTTOM:
@@ -1970,14 +2032,11 @@ class SignaturePropertiesPanel:
                 *single_widgets,
             )
         else:
-            stamp_alignment = self._bindings.qt.AlignCenter
-            if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-                if stamp_position == SignatureStampPosition.LEFT and align_left is not None:
-                    stamp_alignment = align_left
-                elif stamp_position == SignatureStampPosition.RIGHT:
-                    align_right = getattr(self._bindings.qt, "AlignRight", None)
-                    if align_right is not None:
-                        stamp_alignment = align_right
+            stamp_alignment = (
+                align_center
+                if align_center is not None
+                else _qt_alignment_flag(self._bindings.qt, "AlignLeft")
+            )
             if hasattr(self._preview_controls.multi_stamp_label, "setAlignment"):
                 self._preview_controls.multi_stamp_label.setAlignment(stamp_alignment)
             multi_content_widgets: list[Any] = []
@@ -1991,7 +2050,11 @@ class SignaturePropertiesPanel:
             _set_container_widgets(
                 self._preview_controls.multi_body_container,
                 (self._preview_controls.multi_stamp_label, 0, stamp_alignment),
-                (self._preview_controls.multi_content_container, 0, self._bindings.qt.AlignCenter),
+                (
+                    self._preview_controls.multi_content_container,
+                    0,
+                    stamp_alignment,
+                ),
             )
             if stamp_position == SignatureStampPosition.RIGHT:
                 _set_container_widgets(
@@ -1999,7 +2062,7 @@ class SignaturePropertiesPanel:
                     (
                         self._preview_controls.multi_content_container,
                         0,
-                        self._bindings.qt.AlignCenter,
+                        stamp_alignment,
                     ),
                     (self._preview_controls.multi_stamp_label, 0, stamp_alignment),
                 )
