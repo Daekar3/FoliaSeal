@@ -20,6 +20,7 @@ from foliaseal.application.phase3_signing_backend import (
     _build_text_box_style,
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
+    _single_line_stamp_content_inset,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -481,6 +482,7 @@ def _preview_text_width_limit(
     title_line: str | None = None,
     detail_text: str | None = None,
     available_width_px: int | None = None,
+    stamp_aspect_ratio: float | None = None,
 ) -> int:
     body_width, _body_height = _preview_body_size(
         preview,
@@ -506,6 +508,7 @@ def _preview_text_width_limit(
         text_box_height=text_box_height,
         box_style=preview.box_style,
         has_visible_stamp_image=preview.image_stamp_path is not None,
+        stamp_aspect_ratio=stamp_aspect_ratio,
     )
     text_width_pt = max(1, reservation.text_area_width_pt)
     return max(
@@ -539,18 +542,26 @@ def _preview_card_padding_pt(preview: SigningDraftPreview) -> float:
 def _preview_stamp_content_gutter_pt(preview: SigningDraftPreview) -> float:
     if preview.signature_rect is None:
         return 0.0
-    shortest_edge_pt = max(
-        1.0,
-        min(preview.signature_rect.width_pt, preview.signature_rect.height_pt),
-    )
-    if preview.stamp_position in {
-        SignatureStampPosition.TOP,
-        SignatureStampPosition.BOTTOM,
-    }:
-        geometry_gutter = max(1.25, min(2.5, shortest_edge_pt * 0.08))
-    else:
-        geometry_gutter = max(0.5, min(1.5, shortest_edge_pt * 0.04))
-    return max(geometry_gutter, _preview_border_safe_inset_pt(preview.box_style) * 0.25)
+    return 0.0
+
+
+def _raw_pixmap_aspect_ratio(raw_pixmap: Any | None) -> float | None:
+    if raw_pixmap is None:
+        return None
+    pixmap_width = getattr(raw_pixmap, "width", None)
+    pixmap_height = getattr(raw_pixmap, "height", None)
+    if callable(pixmap_width):
+        pixmap_width = pixmap_width()
+    if callable(pixmap_height):
+        pixmap_height = pixmap_height()
+    if (
+        not isinstance(pixmap_width, int)
+        or not isinstance(pixmap_height, int)
+        or pixmap_width <= 0
+        or pixmap_height <= 0
+    ):
+        return None
+    return pixmap_width / pixmap_height
 
 
 def _preview_stamp_max_size(
@@ -560,6 +571,7 @@ def _preview_stamp_max_size(
     detail_text: str,
     raw_pixmap: Any,
     available_width_px: int | None = None,
+    stamp_aspect_ratio: float | None = None,
 ) -> tuple[int, int]:
     if (
         preview.signature_rect is None
@@ -581,12 +593,19 @@ def _preview_stamp_max_size(
         text_box_height=text_box_height,
         box_style=preview.box_style,
         has_visible_stamp_image=preview.image_stamp_path is not None,
+        stamp_aspect_ratio=stamp_aspect_ratio,
     )
     area_width = max(1, reservation.stamp_area_width_pt)
     area_height = max(1, reservation.stamp_area_height_pt)
     content_inset = 0
     if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        content_inset = int(round(_preview_stamp_content_gutter_pt(preview)))
+        content_inset = _single_line_stamp_content_inset(
+            stamp_position=preview.stamp_position,
+            box_width=max(1, int(round(preview.signature_rect.width_pt))),
+            box_height=max(1, int(round(preview.signature_rect.height_pt))),
+            reserved_width=area_width,
+            reserved_height=area_height,
+        )
     area_width = max(1, area_width - content_inset * 2)
     area_height = max(1, area_height - content_inset * 2)
 
@@ -616,7 +635,7 @@ def _preview_stamp_max_size(
     )
     scaled_width = max(1, int(round(target_width * preview_scale)))
     scaled_height = max(1, int(round(target_height * preview_scale)))
-    return (min(scaled_width, 140), min(scaled_height, 80))
+    return (scaled_width, scaled_height)
 
 
 def _preview_vertical_band_geometry(
@@ -626,6 +645,7 @@ def _preview_vertical_band_geometry(
     detail_text: str,
     inner_body_height_px: int,
     available_width_px: int | None = None,
+    stamp_aspect_ratio: float | None = None,
 ) -> tuple[int, int, int] | None:
     if (
         preview.signature_rect is None
@@ -647,6 +667,7 @@ def _preview_vertical_band_geometry(
         text_box_height=text_box_height,
         box_style=preview.box_style,
         has_visible_stamp_image=preview.image_stamp_path is not None,
+        stamp_aspect_ratio=stamp_aspect_ratio,
     )
     preview_scale = _preview_display_scale(
         preview,
@@ -1748,6 +1769,13 @@ class SignaturePropertiesPanel:
         body_width = card_width
         body_height = card_height
         visible_detail = _preview_detail_text(preview)
+        raw_stamp_pixmap = None
+        if preview.image_stamp_path:
+            raw_pixmap = self._bindings.q_pixmap(preview.image_stamp_path)
+            raw_is_null = getattr(raw_pixmap, "isNull", None)
+            if not callable(raw_is_null) or not raw_is_null():
+                raw_stamp_pixmap = raw_pixmap
+        stamp_aspect_ratio = _raw_pixmap_aspect_ratio(raw_stamp_pixmap)
         detail_width = (
             body_width
             if is_vertical
@@ -1756,14 +1784,9 @@ class SignaturePropertiesPanel:
                 title_line=title_line,
                 detail_text=visible_detail,
                 available_width_px=available_width_px,
+                stamp_aspect_ratio=stamp_aspect_ratio,
             )
         )
-        raw_stamp_pixmap = None
-        if preview.image_stamp_path:
-            raw_pixmap = self._bindings.q_pixmap(preview.image_stamp_path)
-            raw_is_null = getattr(raw_pixmap, "isNull", None)
-            if not callable(raw_is_null) or not raw_is_null():
-                raw_stamp_pixmap = raw_pixmap
         if hasattr(self._preview_controls.card_container, "setFixedSize"):
             self._preview_controls.card_container.setFixedSize(card_width, card_height)
         elif hasattr(self._preview_controls.card_container, "setFixedWidth"):
@@ -1803,6 +1826,15 @@ class SignaturePropertiesPanel:
             self._preview_controls.multi_detail_label.setStyleSheet(text_css)
         self._preview_controls.title_label.setText(title_line)
         _set_widget_visible(self._preview_controls.title_label, bool(title_line))
+        single_line_preview = preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        for label in (
+            self._preview_controls.title_label,
+            self._preview_controls.detail_label,
+            self._preview_controls.multi_detail_label,
+        ):
+            set_word_wrap = getattr(label, "setWordWrap", None)
+            if callable(set_word_wrap):
+                set_word_wrap(not single_line_preview)
         title_hint_height = (
             _size_hint_height(self._preview_controls.title_label) if title_line else 0
         ) or 0
@@ -1840,6 +1872,7 @@ class SignaturePropertiesPanel:
             detail_text=visible_detail,
             inner_body_height_px=inner_body_height,
             available_width_px=available_width_px,
+            stamp_aspect_ratio=stamp_aspect_ratio,
         )
         if is_vertical and vertical_band_geometry is not None:
             text_height, stamp_height, separator_height = vertical_band_geometry
@@ -1858,18 +1891,20 @@ class SignaturePropertiesPanel:
         if raw_stamp_pixmap is not None:
             if is_vertical and vertical_band_geometry is not None:
                 _text_height, stamp_height, _separator_height = vertical_band_geometry
-                content_inset = _preview_stamp_content_gutter_pt(preview)
+                preview_scale = _preview_display_scale(
+                    preview,
+                    available_width_px=available_width_px,
+                )
+                content_inset = _single_line_stamp_content_inset(
+                    stamp_position=preview.stamp_position,
+                    box_width=max(1, int(round(preview.signature_rect.width_pt))),
+                    box_height=max(1, int(round(preview.signature_rect.height_pt))),
+                    reserved_width=max(1, int(round(inner_body_width / preview_scale))),
+                    reserved_height=max(1, int(round(stamp_height / preview_scale))),
+                )
                 inset_px = max(
                     0,
-                    int(
-                        round(
-                            content_inset
-                            * _preview_display_scale(
-                                preview,
-                                available_width_px=available_width_px,
-                            )
-                        )
-                    ),
+                    int(round(content_inset * preview_scale)),
                 )
                 stamp_pixmap = _load_stamp_pixmap(
                     self._bindings,
@@ -1884,6 +1919,7 @@ class SignaturePropertiesPanel:
                     detail_text=visible_detail,
                     raw_pixmap=raw_stamp_pixmap,
                     available_width_px=available_width_px,
+                    stamp_aspect_ratio=stamp_aspect_ratio,
                 )
                 stamp_pixmap = _load_stamp_pixmap(
                     self._bindings,

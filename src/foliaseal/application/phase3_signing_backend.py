@@ -422,21 +422,67 @@ def _single_line_stamp_content_inset(
     stamp_position: SignatureStampPosition,
     box_width: int,
     box_height: int,
+    reserved_width: int | None = None,
+    reserved_height: int | None = None,
 ) -> int:
     """Reserve a small internal gutter so fitted stamp content is not flush to the band edge."""
 
-    shortest_edge = max(1, min(box_width, box_height))
+    effective_width = (
+        reserved_width
+        if isinstance(reserved_width, int) and reserved_width > 0
+        else box_width
+    )
+    effective_height = (
+        reserved_height if isinstance(reserved_height, int) and reserved_height > 0 else box_height
+    )
+    shortest_edge = max(1, min(effective_width, effective_height))
     if stamp_position in {
         SignatureStampPosition.TOP,
         SignatureStampPosition.BOTTOM,
     }:
-        return max(2, min(3, int(round(shortest_edge * 0.08))))
+        return max(1, min(2, int(round(shortest_edge * 0.08))))
     if stamp_position in {
         SignatureStampPosition.LEFT,
         SignatureStampPosition.RIGHT,
     }:
         return max(1, min(2, int(round(shortest_edge * 0.04))))
     return 0
+
+
+def _stamp_image_aspect_ratio(stamp_background: PdfImage | None) -> float | None:
+    if stamp_background is None:
+        return None
+    image = getattr(stamp_background, "image", None)
+    if image is None or not hasattr(image, "size"):
+        return None
+    image_width, image_height = image.size
+    if image_width <= 0 or image_height <= 0:
+        return None
+    return image_width / image_height
+
+
+def _single_line_horizontal_minimum_stamp_width(
+    *,
+    available_height: int,
+    box_width: int,
+    box_height: int,
+    stamp_aspect_ratio: float | None,
+) -> int:
+    if available_height <= 0:
+        return 0
+    content_inset = _single_line_stamp_content_inset(
+        stamp_position=SignatureStampPosition.RIGHT,
+        box_width=box_width,
+        box_height=box_height,
+        reserved_width=box_width,
+        reserved_height=available_height,
+    )
+    fit_height = max(1, available_height - content_inset * 2)
+    if stamp_aspect_ratio is None:
+        content_width = max(6, int(round(fit_height * 1.5)))
+    else:
+        content_width = max(1, int(round(fit_height * min(stamp_aspect_ratio, 6.0))))
+    return max(1, content_width + content_inset * 2)
 
 
 def _layout_reservation_for_template(
@@ -448,6 +494,7 @@ def _layout_reservation_for_template(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
     has_visible_stamp_image: bool = True,
+    stamp_aspect_ratio: float | None = None,
 ) -> _SignatureLayoutReservation:
     """Compute the actual reserved-space split for the requested rectangle."""
     box_width = max(1, int(round(signature_rect.width_pt)))
@@ -503,15 +550,24 @@ def _layout_reservation_for_template(
         )
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
+        minimum_stamp_width = 0
+        if layout_template == SignatureLayoutTemplate.SINGLE_LINE and has_visible_stamp_image:
+            minimum_stamp_width = _single_line_horizontal_minimum_stamp_width(
+                available_height=available_height,
+                box_width=box_width,
+                box_height=box_height,
+                stamp_aspect_ratio=stamp_aspect_ratio,
+            )
         text_area_width = min(
             _effective_horizontal_text_reservation_width(
                 layout_template=layout_template,
+                stamp_position=stamp_position,
                 text_box_width=text_box_width,
             ),
-            available_width,
+            max(available_width - minimum_stamp_width, 0),
         )
         remaining_width = max(available_width - text_area_width, 0)
-        separator_width = min(gap, remaining_width)
+        separator_width = min(gap, max(remaining_width - minimum_stamp_width, 0))
         stamp_area_width = max(remaining_width - separator_width, 0)
         reserved_primary_extent = stamp_area_width
         stamp_area_height = available_height
@@ -684,6 +740,7 @@ def _background_layout_for_stamp(
         text_box_height=text_box_height,
         box_style=box_style,
         has_visible_stamp_image=stamp_background is not None,
+        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
     )
     if stamp_background is None:
         return reservation.background_layout
@@ -707,6 +764,8 @@ def _background_layout_for_stamp(
             stamp_position=stamp_position,
             box_width=max(1, int(round(signature_rect.width_pt))),
             box_height=max(1, int(round(signature_rect.height_pt))),
+            reserved_width=area_width,
+            reserved_height=area_height,
         )
     fit_width = max(1, area_width - content_inset * 2)
     fit_height = max(1, area_height - content_inset * 2)
@@ -871,8 +930,8 @@ def _single_line_width_overflow_tolerance(
     """
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        return 1.3
-    return 1.25
+        return 1.65
+    return 1.5
 
 
 def _single_line_text_fits_reservation(
@@ -891,6 +950,11 @@ def _single_line_text_fits_reservation(
         text_box_height=text_box_height,
         box_style=appearance.box_style,
         has_visible_stamp_image=appearance.image_stamp_path is not None,
+        stamp_aspect_ratio=_stamp_image_aspect_ratio(
+            _stamp_background_for_path(appearance.image_stamp_path)
+            if appearance.image_stamp_path is not None
+            else None
+        ),
     )
     try:
         _ensure_layout_can_fit(reservation)
@@ -902,6 +966,7 @@ def _single_line_text_fits_reservation(
 def _effective_horizontal_text_reservation_width(
     *,
     layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
     text_box_width: int,
 ) -> int:
     if layout_template != SignatureLayoutTemplate.SINGLE_LINE:
@@ -912,7 +977,7 @@ def _effective_horizontal_text_reservation_width(
             ceil(
                 text_box_width
                 / _single_line_width_overflow_tolerance(
-                    stamp_position=SignatureStampPosition.RIGHT
+                    stamp_position=stamp_position
                 )
             )
         ),
@@ -1029,6 +1094,7 @@ def _content_layout_for_template(
         text_box_height=text_box_height,
         box_style=box_style,
         has_visible_stamp_image=stamp_background is not None,
+        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
     ).inner_content_layout
 
 
@@ -1050,6 +1116,7 @@ def _background_layout_for_template(
         text_box_height=text_box_height,
         box_style=box_style,
         has_visible_stamp_image=stamp_background is not None,
+        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
     ).background_layout
 
 

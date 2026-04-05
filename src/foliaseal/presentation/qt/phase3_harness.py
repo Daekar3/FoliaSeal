@@ -653,9 +653,17 @@ def run_phase3_signing_harness(
         checklist_template_path=checklist_template_path,
     )
     _write_optional_text(target_path=checklist_results_path, content=checklist_results)
-    print("Phase 3 harness capture")
-    print(capture.to_json())
-    print()
+    if summary_json_path is None:
+        print("Phase 3 harness capture")
+        print(capture.to_json())
+        print()
+    else:
+        print("Phase 3 harness capture written")
+        print(f"- summary json: {summary_json_path}")
+        print(f"- acceptance tier: {capture.acceptance_tier}")
+        print(f"- gate verdict: {capture.gate_verdict}")
+        print(f"- validation: {capture.validation_text}")
+        print()
     print(f"Checklist results file: {checklist_results_path}")
     print("Review the pre-checked items, complete the remaining manual-only checks, and")
     print("use the generated file as the acceptance worksheet for Phase 3.")

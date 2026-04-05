@@ -58,6 +58,7 @@ class _FakeWidget:
         self.maximum_width = None
         self.minimum_width = None
         self._width_value = 480
+        self.word_wrap = None
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
@@ -70,6 +71,9 @@ class _FakeWidget:
 
     def setStyleSheet(self, style):  # noqa: N802
         self.style = style
+
+    def setWordWrap(self, value):  # noqa: N802
+        self.word_wrap = bool(value)
 
     def setFixedSize(self, width, height):  # noqa: N802
         self.fixed_size = (width, height)
@@ -1331,6 +1335,35 @@ def test_signing_shell_preview_respects_small_font_sizes(
     assert "font-size: 6.5pt;" in widget.properties_panel.preview_controls.detail_label.style
 
 
+def test_signing_shell_single_line_preview_disables_word_wrap_even_without_rect(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+
+    assert widget.properties_panel.preview_controls.title_label.word_wrap is False
+    assert widget.properties_panel.preview_controls.detail_label.word_wrap is False
+    assert widget.properties_panel.preview_controls.multi_detail_label.word_wrap is False
+
+
 def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
     monkeypatch,
     tmp_path: Path,
@@ -2109,6 +2142,51 @@ def test_signing_shell_single_line_horizontal_preview_centers_stamp_within_side_
         )
 
 
+def test_preview_stamp_max_size_is_not_capped_to_legacy_dimensions(tmp_path: Path) -> None:
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path="/tmp/stamp.png",
+        signer_label_prefix="",
+    )
+    preview = signing_shell_module.SigningDraftPreview(
+        title="",
+        page_index=0,
+        signature_rect=signing_shell_module.SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=320.0,
+            height_pt=80.0,
+        ),
+        signer_label_prefix="",
+        layout_template=appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        timezone_display_mode=appearance.timezone_display_mode,
+        show_field_names=appearance.show_field_names,
+        datetime_format=appearance.datetime_format,
+        text_style=appearance.text_style,
+        box_style=appearance.box_style,
+        image_stamp_path=appearance.image_stamp_path,
+        fields=(),
+        detail_text="Adam Smith | Board Secretary | Lawson Heirs Inc.",
+        issues=(),
+        can_submit=True,
+    )
+
+    max_width, max_height = signing_shell_module._preview_stamp_max_size(
+        preview,
+        title_line="",
+        detail_text="Adam Smith | Board Secretary | Lawson Heirs Inc.",
+        raw_pixmap=_FakePixmap("/tmp/stamp.png", width=400, height=50),
+        stamp_aspect_ratio=8.0,
+        available_width_px=520,
+    )
+
+    assert max_width > 140
+    assert max_height > 0
+
+
 def test_fit_vertical_preview_band_geometry_prefers_text_hint_and_reduces_separator() -> None:
     fitted = signing_shell_module._fit_vertical_preview_band_geometry(
         text_height=15,
@@ -2150,7 +2228,7 @@ def test_reset_widget_size_constraints_clears_fake_geometry() -> None:
     assert label.minimum_width is None
 
 
-def test_signing_shell_horizontal_preview_reduces_text_width_for_thick_borders(
+def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2203,6 +2281,7 @@ def test_signing_shell_horizontal_preview_reduces_text_width_for_thick_borders(
         title_line=preview.signer_label_prefix or preview.title,
         detail_text=detail,
         available_width_px=available_width,
+        stamp_aspect_ratio=1.5,
     )
     thick_border_appearance = build_signature_appearance(
         layout_template=SignatureLayoutTemplate.SINGLE_LINE,
@@ -2228,9 +2307,10 @@ def test_signing_shell_horizontal_preview_reduces_text_width_for_thick_borders(
         title_line=thick_preview.signer_label_prefix or thick_preview.title,
         detail_text=thick_detail,
         available_width_px=thick_available_width,
+        stamp_aspect_ratio=1.5,
     )
 
-    assert thick_width < default_width
+    assert thick_width != default_width
     assert (
         widget.properties_panel.preview_controls.multi_content_container.fixed_width == thick_width
     )

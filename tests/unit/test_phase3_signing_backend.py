@@ -252,14 +252,55 @@ def test_single_line_stamp_content_inset_is_orientation_aware() -> None:
     )
 
 
+def test_single_line_stamp_content_inset_scales_to_reserved_band() -> None:
+    assert (
+        _single_line_stamp_content_inset(
+            stamp_position=SignatureStampPosition.TOP,
+            box_width=260,
+            box_height=23,
+            reserved_width=257,
+            reserved_height=8,
+        )
+        == 1
+    )
+
+
 def test_single_line_horizontal_text_reservation_width_rounds_up() -> None:
     assert (
         _effective_horizontal_text_reservation_width(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.RIGHT,
             text_box_width=115,
         )
-        == 89
+        == 70
     )
+
+
+def test_layout_reservation_for_horizontal_single_line_preserves_stamp_width_for_image() -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=34.3,
+            bottom_pt=428.99,
+            width_pt=260.61,
+            height_pt=23.04,
+        ),
+        text_box_width=475,
+        text_box_height=10,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.0,
+    )
+
+    assert reservation.stamp_area_width_pt > 0
+    assert reservation.text_area_width_pt < reservation.container_width_pt
 
 
 def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
