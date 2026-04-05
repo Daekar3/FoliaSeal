@@ -269,6 +269,7 @@ def _build_stamp_style(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=appearance.box_style,
+        has_visible_stamp_image=stamp_background is not None,
     )
     _ensure_layout_can_fit(layout_reservation)
     background_layout = _background_layout_for_stamp(
@@ -312,6 +313,15 @@ class _SignatureLayoutReservation:
     inner_content_layout: SimpleBoxLayoutRule
 
 
+@dataclass(frozen=True)
+class VisibleSignatureTextLayout:
+    """Composed visible-signature text shared by preview and backend fit checks."""
+
+    title_text: str
+    detail_text: str
+    stamp_text: str
+
+
 def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
     font_factory = _font_factory_for_family(text_style.font_family)
     return TextBoxStyle(
@@ -324,6 +334,41 @@ def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
             margins=Margins.uniform(0),
             inner_content_scaling=InnerScaling.NO_SCALING,
         ),
+    )
+
+
+def _compose_visible_signature_text_layout(
+    *,
+    signer_label_prefix: str,
+    layout_template: SignatureLayoutTemplate,
+    body_fragments: list[str],
+) -> VisibleSignatureTextLayout:
+    title_text = signer_label_prefix.strip()
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        detail_text = " | ".join(body_fragments)
+    elif layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
+        if not body_fragments:
+            detail_text = ""
+        elif len(body_fragments) <= 2:
+            detail_text = "\n".join(body_fragments)
+        else:
+            detail_text = "\n".join(
+                [
+                    body_fragments[0],
+                    body_fragments[1],
+                    " ".join(body_fragments[2:]),
+                ]
+            )
+    else:
+        detail_text = "\n".join(body_fragments)
+    if title_text and detail_text:
+        stamp_text = f"{title_text}\n{detail_text}"
+    else:
+        stamp_text = title_text or detail_text
+    return VisibleSignatureTextLayout(
+        title_text=title_text,
+        detail_text=detail_text,
+        stamp_text=_escape_percent(stamp_text),
     )
 
 
@@ -402,6 +447,7 @@ def _layout_reservation_for_template(
     text_box_width: int,
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
+    has_visible_stamp_image: bool = True,
 ) -> _SignatureLayoutReservation:
     """Compute the actual reserved-space split for the requested rectangle."""
     box_width = max(1, int(round(signature_rect.width_pt)))
@@ -413,6 +459,48 @@ def _layout_reservation_for_template(
     edge_margin = max(edge_margin, _border_safe_inset(box_style))
     available_width = max(box_width - edge_margin * 2, 0)
     available_height = max(box_height - edge_margin * 2, 0)
+
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE and not has_visible_stamp_image:
+        vertical_margin = edge_margin
+        if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+            vertical_margin = _single_line_vertical_outer_margin(
+                box_height=box_height,
+                box_style=box_style,
+            )
+            available_height = max(box_height - vertical_margin * 2, 0)
+        full_margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=vertical_margin,
+            bottom=vertical_margin,
+        )
+        return _SignatureLayoutReservation(
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            container_width_pt=box_width,
+            container_height_pt=box_height,
+            text_box_width_pt=text_box_width,
+            text_box_height_pt=text_box_height,
+            reserved_primary_extent_pt=0,
+            stamp_area_width_pt=0,
+            stamp_area_height_pt=0,
+            text_area_width_pt=available_width,
+            text_area_height_pt=available_height,
+            background_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MID,
+                AxisAlignment.ALIGN_MID,
+                margins=full_margins,
+                inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+            ),
+            inner_content_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MIN
+                if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.LEFT}
+                else AxisAlignment.ALIGN_MID,
+                AxisAlignment.ALIGN_MID,
+                margins=full_margins,
+                inner_content_scaling=InnerScaling.NO_SCALING,
+            ),
+        )
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
         text_area_width = min(
@@ -595,6 +683,7 @@ def _background_layout_for_stamp(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=box_style,
+        has_visible_stamp_image=stamp_background is not None,
     )
     if stamp_background is None:
         return reservation.background_layout
@@ -669,6 +758,31 @@ def _visible_signature_fit_issues(
             signature_rect=signature_rect,
         )
         stamp_background = _stamp_background_for_path(signature_appearance.image_stamp_path)
+        return _visible_signature_fit_issues_for_stamp_text(
+            signature_rect=signature_rect,
+            signature_appearance=signature_appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+        )
+    except Exception as exc:
+        return (
+            SigningDraftValidationIssue(
+                code="visible_signature_layout_unavailable",
+                message=str(exc),
+                field_name="signature_appearance",
+                severity=SigningDraftValidationSeverity.ERROR,
+            ),
+        )
+
+
+def _visible_signature_fit_issues_for_stamp_text(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+    stamp_background: PdfImage | None,
+) -> tuple[SigningDraftValidationIssue, ...]:
+    try:
         _build_stamp_style(
             signature_appearance,
             stamp_text=stamp_text,
@@ -684,7 +798,6 @@ def _visible_signature_fit_issues(
                 severity=SigningDraftValidationSeverity.ERROR,
             ),
         )
-
     return ()
 
 
@@ -739,87 +852,11 @@ def _build_stamp_text(
             body_fragments.append(f"{_field_label(field_key)}: {text}")
         else:
             body_fragments.append(text)
-
-    if appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        body_text = " | ".join(body_fragments)
-        if signature_rect is not None and body_fragments:
-            (
-                max_text_width_pt,
-                max_text_height_pt,
-                width_overflow_tolerance,
-            ) = _single_line_text_wrap_limits(
-                appearance=appearance,
-                signature_rect=signature_rect,
-            )
-            body_text = _wrap_visible_signature_fragments(
-                body_fragments,
-                text_style=appearance.text_style,
-                max_text_width_pt=max_text_width_pt,
-                max_text_height_pt=max_text_height_pt,
-                width_overflow_tolerance=width_overflow_tolerance,
-            )
-        if prefix and body_text:
-            return _escape_percent(f"{prefix}\n{body_text}")
-        return _escape_percent(prefix or body_text)
-    if prefix and body_fragments:
-        return _escape_percent("\n".join([prefix, *body_fragments]))
-    return _escape_percent(prefix or "\n".join(body_fragments))
-
-
-def _wrap_visible_signature_fragments(
-    fragments: list[str],
-    *,
-    text_style: SignatureTextStyle,
-    max_text_width_pt: int | None = None,
-    max_text_height_pt: int,
-    width_overflow_tolerance: float = 1.0,
-) -> str:
-    if not fragments:
-        return ""
-
-    text_box_style = _build_text_box_style(text_style)
-    best_candidate: tuple[int, int, int, str] | None = None
-    best_overflow_candidate: tuple[int, int, int, str] | None = None
-    fragment_count = len(fragments)
-    for split_mask in range(1 << max(fragment_count - 1, 0)):
-        lines: list[list[str]] = [[]]
-        for index, fragment in enumerate(fragments):
-            lines[-1].append(fragment)
-            if index < fragment_count - 1 and split_mask & (1 << index):
-                lines.append([])
-
-        line_strings = [" | ".join(line) for line in lines if line]
-        if not line_strings:
-            continue
-        candidate = "\n".join(line_strings)
-        width_pt, height_pt = _measure_text_box_dimensions(candidate, text_box_style)
-        if height_pt > max_text_height_pt:
-            continue
-        candidate_score = (len(line_strings), -width_pt, height_pt, candidate)
-        if max_text_width_pt is None or width_pt <= max_text_width_pt:
-            if best_candidate is None or candidate_score[:3] < best_candidate[:3]:
-                best_candidate = candidate_score
-        elif (
-            max_text_width_pt is not None
-            and width_pt <= int(round(max_text_width_pt * width_overflow_tolerance))
-        ):
-            if best_overflow_candidate is None or candidate_score[:3] < best_overflow_candidate[:3]:
-                best_overflow_candidate = candidate_score
-
-    if best_candidate is None:
-        if best_overflow_candidate is not None:
-            return best_overflow_candidate[3]
-        raise ValueError(
-            "Visible signature content does not fit inside the selected rectangle at the "
-            "requested font size."
-        )
-    if (
-        width_overflow_tolerance > 1.0
-        and best_overflow_candidate is not None
-        and best_overflow_candidate[0] < best_candidate[0]
-    ):
-        return best_overflow_candidate[3]
-    return best_candidate[3]
+    return _compose_visible_signature_text_layout(
+        signer_label_prefix=prefix,
+        layout_template=appearance.layout_template,
+        body_fragments=body_fragments,
+    ).stamp_text
 
 
 def _single_line_width_overflow_tolerance(
@@ -838,49 +875,6 @@ def _single_line_width_overflow_tolerance(
     return 1.25
 
 
-def _single_line_text_wrap_limits(
-    *,
-    appearance: SigningBackendAppearance,
-    signature_rect: SignatureRect,
-) -> tuple[int, int, float]:
-    box_height = max(1, int(round(signature_rect.height_pt)))
-    edge_margin = _effective_layout_edge_margin(
-        stamp_position=appearance.stamp_position,
-        box_height=box_height,
-        box_style=appearance.box_style,
-    )
-    max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - edge_margin * 2)
-    max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - edge_margin * 2)
-    if appearance.stamp_position in {
-        SignatureStampPosition.TOP,
-        SignatureStampPosition.BOTTOM,
-    }:
-        outer_margin = _single_line_vertical_outer_margin(
-            box_height=box_height,
-            box_style=appearance.box_style,
-        )
-        max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - outer_margin * 2)
-    width_overflow_tolerance = _single_line_width_overflow_tolerance(
-        stamp_position=appearance.stamp_position
-    )
-    if (
-        appearance.image_stamp_path is not None
-        and appearance.stamp_position
-        in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        _edge_margin, gap = _base_layout_spacing(
-            stamp_position=appearance.stamp_position,
-            box_height=box_height,
-        )
-        available_width_pt = max(
-            1,
-            int(round(signature_rect.width_pt)) - edge_margin * 2,
-        )
-        reserved_stamp_width_pt = max(1, int(round(available_width_pt * 0.28)))
-        max_text_width_pt = max(1, max_text_width_pt - reserved_stamp_width_pt - gap)
-    return max_text_width_pt, max_text_height_pt, width_overflow_tolerance
-
-
 def _single_line_text_fits_reservation(
     *,
     appearance: SigningBackendAppearance,
@@ -896,6 +890,7 @@ def _single_line_text_fits_reservation(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=appearance.box_style,
+        has_visible_stamp_image=appearance.image_stamp_path is not None,
     )
     try:
         _ensure_layout_can_fit(reservation)
@@ -1033,6 +1028,7 @@ def _content_layout_for_template(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=box_style,
+        has_visible_stamp_image=stamp_background is not None,
     ).inner_content_layout
 
 
@@ -1053,6 +1049,7 @@ def _background_layout_for_template(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=box_style,
+        has_visible_stamp_image=stamp_background is not None,
     ).background_layout
 
 

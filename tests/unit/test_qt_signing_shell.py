@@ -1011,6 +1011,15 @@ def test_signing_shell_validation_label_is_width_limited_to_panel(
     )
 
     panel = widget.properties_panel
+    panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
     panel._control_issue = SigningDraftValidationIssue(
         code="visible_signature_layout_unavailable",
         message=(
@@ -1025,7 +1034,7 @@ def test_signing_shell_validation_label_is_width_limited_to_panel(
     panel.refresh_preview()
 
     assert panel._validation_label.fixed_width == 464
-    assert "visible_signature_layout_unavailable" in panel.validation_text()
+    assert panel.validation_text().startswith("Will fail to sign:")
 
 
 def test_signing_shell_preview_available_width_uses_tightest_ancestor_width(
@@ -1875,9 +1884,7 @@ def test_signing_shell_warning_only_issue_keeps_readiness_enabled(
     assert widget.properties_panel.preview.can_submit is True
     assert widget.properties_panel.is_ready_to_sign() is True
     assert widget._signing_workspace._sign_button._enabled is True
-    validation_text = widget.properties_panel.validation_text()
-    assert validation_text.startswith("Ready to sign.")
-    assert "WARNING preview_warning: Preview is stale but still usable." in validation_text
+    assert widget.properties_panel.validation_text() == "Ready to sign."
 
 
 def test_signing_shell_allows_blank_signer_label_prefix_and_frees_title_line(

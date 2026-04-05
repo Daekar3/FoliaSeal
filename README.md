@@ -58,6 +58,11 @@ Current capabilities:
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
   - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
+- Architectural simplification rule:
+  - keep exactly one authoritative backend-owned visible-signature fit gate
+  - keep preview visual
+  - keep validation text thin and factual
+  - prefer deleting duplicate interpretation layers over adding new synchronization logic
 
 Not yet production-ready:
 

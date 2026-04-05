@@ -144,7 +144,7 @@ def _write_signed_test_pdf(
         passphrase="secret",
         timestamp_required=False,
         signature_rect=signature_rect
-        or build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        or build_signature_rect(page_index=0, width_pt=1000.0, height_pt=180.0),
         signature_appearance=signature_appearance
         or build_signature_appearance(
             image_stamp_path=str(stamp_path),
@@ -1209,7 +1209,7 @@ def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: P
         certificate_name="cert.p12",
         passphrase="secret",
         timestamp_required=False,
-        signature_rect=build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        signature_rect=build_signature_rect(page_index=0, width_pt=1000.0, height_pt=180.0),
         signature_appearance=appearance,
     )
 
@@ -1233,7 +1233,7 @@ def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
 
     assert snapshot is not None
     assert snapshot["field_name"] == "Signature1"
-    assert snapshot["annotation_rect"] == [24.0, 18.0, 644.0, 198.0]
+    assert snapshot["annotation_rect"] == [24.0, 18.0, 1024.0, 198.0]
     assert snapshot["appearance_stream_length"] > 0
     assert snapshot["appearance_has_visible_text"] is True
     assert snapshot["visible_text_present"] is True
@@ -1244,6 +1244,6 @@ def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
     assert snapshot["appearance_image_xobject_count"] >= 1
     assert snapshot["appearance_xobjects"]
     assert snapshot["image_xobjects"] == snapshot["appearance_xobjects"]
-    assert snapshot["annotation_rect_size"] == {"width": 620.0, "height": 180.0}
+    assert snapshot["annotation_rect_size"] == {"width": 1000.0, "height": 180.0}
     assert snapshot["text_fragment_count"] == len(fragments)
     assert snapshot["image_xobject_count"] == snapshot["appearance_image_xobject_count"]

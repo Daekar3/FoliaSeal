@@ -184,6 +184,9 @@ The following are deferred and must not be proposed/implemented without explicit
 - Do not add abstraction layers unless there are at least two real, current use cases.
 - Do not refactor for speculative future needs.
 - Every non-trivial PR must include a brief note: “Why this is the simplest viable approach.”
+- Architectural decisions must be biased toward the ruthless elimination of complexity.
+- When choosing between synchronizing multiple interpretation layers or deleting one of them, prefer deletion unless the extra layer protects a real current requirement that cannot be met otherwise.
+- Avoid parallel semantic models for the same user-visible behavior. Prefer one authoritative owner and thin adapters around it.
 
 ---
 

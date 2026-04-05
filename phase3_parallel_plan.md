@@ -194,6 +194,10 @@ It is acceptable in Phase 3 to support:
 4. Expand the domain model before building the full UI.
 5. Keep final signing integration incremental by extending the existing `SignPdfUseCase`, not replacing it.
 6. Minimize merge conflicts by assigning disjoint write ownership.
+7. Bias architectural decisions toward ruthless elimination of complexity.
+   - Keep one backend-owned visible-signature fit gate.
+   - Keep preview visual rather than interpretive.
+   - Keep validation UI factual rather than duplicating preview semantics.
 
 ## Recommended Parallel Workstreams
 

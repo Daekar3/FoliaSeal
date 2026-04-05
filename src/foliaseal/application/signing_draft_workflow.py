@@ -106,6 +106,7 @@ class SigningDraftPreview:
     box_style: SignatureBoxStyle | None
     image_stamp_path: str | None
     fields: tuple[SigningDraftPreviewField, ...]
+    detail_text: str
     issues: tuple[SigningDraftValidationIssue, ...]
     can_submit: bool
 
@@ -373,6 +374,9 @@ class SigningDraftWorkflow:
         appearance = self.signature_appearance
         issues = self.validation_issues()
         fields = self._build_preview_fields(appearance) if appearance is not None else ()
+        detail_text = ""
+        if appearance is not None:
+            detail_text = self._build_preview_detail_text(appearance, fields)
         return SigningDraftPreview(
             title=appearance.signer_label_prefix if appearance else "Signature draft",
             page_index=self.signature_rect.page_index if self.signature_rect else None,
@@ -387,6 +391,7 @@ class SigningDraftWorkflow:
             box_style=appearance.box_style if appearance else None,
             image_stamp_path=appearance.image_stamp_path if appearance else None,
             fields=fields,
+            detail_text=detail_text,
             issues=issues,
             can_submit=self.can_build_request(),
         )
@@ -465,6 +470,37 @@ class SigningDraftWorkflow:
             )
 
         return tuple(fields)
+
+    def _build_preview_detail_text(
+        self,
+        appearance: SignatureAppearance,
+        fields: tuple[SigningDraftPreviewField, ...],
+    ) -> str:
+        from foliaseal.application.phase3_signing_backend import (
+            _compose_visible_signature_text_layout,
+        )
+
+        visible_fragments = self._visible_preview_fragments(appearance, fields)
+        return _compose_visible_signature_text_layout(
+            signer_label_prefix=appearance.signer_label_prefix,
+            layout_template=appearance.layout_template,
+            body_fragments=visible_fragments,
+        ).detail_text
+
+    def _visible_preview_fragments(
+        self,
+        appearance: SignatureAppearance,
+        fields: tuple[SigningDraftPreviewField, ...],
+    ) -> list[str]:
+        fragments: list[str] = []
+        for preview_field in fields:
+            if not preview_field.visible or not preview_field.text:
+                continue
+            if appearance.show_field_names:
+                fragments.append(f"{preview_field.label}: {preview_field.text}")
+            else:
+                fragments.append(preview_field.text)
+        return fragments
 
     def _certificate_values_for_preview(self) -> dict[SignatureFieldKey, str]:
         if self._certificate_preview_values is not None:
@@ -594,15 +630,39 @@ class SigningDraftWorkflow:
             return ()
 
         from foliaseal.application.phase3_signing_backend import (
-            _visible_signature_fit_issues,
+            _compose_visible_signature_text_layout,
+            _stamp_background_for_path,
+            _visible_signature_fit_issues_for_stamp_text,
         )
         from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 
-        return _visible_signature_fit_issues(
-            certificate_path=self.certificate_path,
-            passphrase=self.passphrase,
+        fields = self._build_preview_fields(self.signature_appearance)
+        visible_fragments = self._visible_preview_fragments(
+            self.signature_appearance,
+            fields,
+        )
+        stamp_text = _compose_visible_signature_text_layout(
+            signer_label_prefix=self.signature_appearance.signer_label_prefix,
+            layout_template=self.signature_appearance.layout_template,
+            body_fragments=visible_fragments,
+        ).stamp_text
+        try:
+            stamp_background = _stamp_background_for_path(
+                self.signature_appearance.image_stamp_path
+            )
+        except ValueError as exc:
+            return (
+                _issue(
+                    "visible_signature_layout_unavailable",
+                    str(exc),
+                    field_name="signature_appearance",
+                ),
+            )
+        return _visible_signature_fit_issues_for_stamp_text(
             signature_rect=self.signature_rect,
             signature_appearance=SigningBackendAppearance.from_signature_appearance(
                 self.signature_appearance
             ),
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
         )

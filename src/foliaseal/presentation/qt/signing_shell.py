@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from math import ceil
 from typing import Any, Protocol
 
@@ -20,8 +20,6 @@ from foliaseal.application.phase3_signing_backend import (
     _build_text_box_style,
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
-    _single_line_text_wrap_limits,
-    _wrap_visible_signature_fragments,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -160,14 +158,6 @@ class PreviewControls:
     multi_stamp_label: Any
     multi_detail_label: Any
     footer_label: Any
-
-
-@dataclass(frozen=True)
-class _PreviewWrapAppearance:
-    stamp_position: SignatureStampPosition
-    box_style: SignatureBoxStyle | None
-    image_stamp_path: str | None
-
 
 def _compose_row(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
     container = bindings.q_widget()
@@ -515,6 +505,7 @@ def _preview_text_width_limit(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=preview.box_style,
+        has_visible_stamp_image=preview.image_stamp_path is not None,
     )
     text_width_pt = max(1, reservation.text_area_width_pt)
     return max(
@@ -589,6 +580,7 @@ def _preview_stamp_max_size(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=preview.box_style,
+        has_visible_stamp_image=preview.image_stamp_path is not None,
     )
     area_width = max(1, reservation.stamp_area_width_pt)
     area_height = max(1, reservation.stamp_area_height_pt)
@@ -654,6 +646,7 @@ def _preview_vertical_band_geometry(
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=preview.box_style,
+        has_visible_stamp_image=preview.image_stamp_path is not None,
     )
     preview_scale = _preview_display_scale(
         preview,
@@ -839,50 +832,7 @@ def _hex_to_css_color(value: str, *, fallback: str) -> str:
 
 
 def _preview_detail_text(preview: SigningDraftPreview) -> str:
-    visible_fields = []
-    for field in preview.fields:
-        if not field.visible or not field.text:
-            continue
-        if preview.show_field_names:
-            visible_fields.append(f"{field.label}: {field.text}")
-        else:
-            visible_fields.append(field.text)
-    if not visible_fields:
-        return "No visible fields selected"
-    if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        if preview.signature_rect is not None and preview.text_style is not None:
-            try:
-                wrap_appearance = _PreviewWrapAppearance(
-                    stamp_position=preview.stamp_position or SignatureStampPosition.TOP,
-                    box_style=preview.box_style,
-                    image_stamp_path=preview.image_stamp_path,
-                )
-                (
-                    max_text_width_pt,
-                    max_text_height_pt,
-                    width_overflow_tolerance,
-                ) = _single_line_text_wrap_limits(
-                    appearance=wrap_appearance,
-                    signature_rect=preview.signature_rect,
-                )
-                return _wrap_visible_signature_fragments(
-                    visible_fields,
-                    text_style=preview.text_style,
-                    max_text_width_pt=max_text_width_pt,
-                    max_text_height_pt=max_text_height_pt,
-                    width_overflow_tolerance=width_overflow_tolerance,
-                )
-            except ValueError:
-                pass
-        if len(visible_fields) <= 1:
-            return " | ".join(visible_fields)
-        return " | ".join(visible_fields)
-    if preview.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
-        lines = list(visible_fields[:2])
-        if len(visible_fields) > 2:
-            lines.append(" ".join(visible_fields[2:]))
-        return "\n".join(lines)
-    return "\n".join(visible_fields)
+    return preview.detail_text or "No visible fields selected"
 
 
 def _preview_box_styles(preview: SigningDraftPreview) -> tuple[str, str]:
@@ -1020,10 +970,10 @@ class SignaturePropertiesPanel:
 
     @property
     def preview(self) -> SigningDraftPreview:
-        return self._current_preview()
+        return self._workflow.preview()
 
     def is_ready_to_sign(self) -> bool:
-        preview = self._current_preview()
+        preview = self._workflow.preview()
         if not preview.can_submit:
             return False
         if self._control_issue is None:
@@ -1035,7 +985,7 @@ class SignaturePropertiesPanel:
         return text
 
     def preview_text(self) -> str:
-        preview = self._current_preview()
+        preview = self._workflow.preview()
         title = _text(self._preview_controls.title_label)
         if (
             preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
@@ -1053,7 +1003,7 @@ class SignaturePropertiesPanel:
         return "\n".join([title, detail]).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
-        preview = self._current_preview()
+        preview = self._workflow.preview()
         self._update_preview_controls(preview)
         _set_widget_width_limit(
             self._validation_label,
@@ -2060,44 +2010,34 @@ class SignaturePropertiesPanel:
             visible=not is_vertical and stamp_pixmap is not None,
         )
 
-    def _current_preview(self) -> SigningDraftPreview:
-        preview = self._workflow.preview()
+    def _validation_issues(
+        self,
+        preview: SigningDraftPreview,
+    ) -> tuple[SigningDraftValidationIssue, ...]:
         if self._control_issue is None:
-            return preview
-        combined_issues = preview.issues + (self._control_issue,)
-        can_submit = preview.can_submit
-        if self._control_issue.severity == SigningDraftValidationSeverity.ERROR:
-            can_submit = False
-        return replace(
-            preview,
-            issues=combined_issues,
-            can_submit=can_submit,
-        )
+            return preview.issues
+        return preview.issues + (self._control_issue,)
 
     def _format_validation_text(self, preview: SigningDraftPreview) -> str:
+        issues = self._validation_issues(preview)
         blocking_issues = [
             issue
-            for issue in preview.issues
+            for issue in issues
             if issue.severity == SigningDraftValidationSeverity.ERROR
-        ]
-        warning_issues = [
-            issue
-            for issue in preview.issues
-            if issue.severity == SigningDraftValidationSeverity.WARNING
         ]
         if (
             len(blocking_issues) == 1
-            and not warning_issues
+            and self._control_issue is None
             and blocking_issues[0].code == "signature_rect_missing"
         ):
             return "Place a signature on the page to continue."
         if not blocking_issues:
-            lines = ["Ready to sign."]
-            lines.extend(
-                f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
-                for issue in warning_issues
-            )
-            return "\n".join(lines)
+            return "Ready to sign."
+        if (
+            len(blocking_issues) == 1
+            and blocking_issues[0].code == "visible_signature_layout_unavailable"
+        ):
+            return f"Will fail to sign: {blocking_issues[0].message}"
         return "\n".join(
             f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
             for issue in blocking_issues
