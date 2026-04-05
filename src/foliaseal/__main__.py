@@ -31,6 +31,7 @@ from foliaseal.presentation.qt.phase2_harness import (
 from foliaseal.presentation.qt.phase3_harness import (
     DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
     DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
+    run_phase3_preview_matrix,
     run_phase3_signing_harness,
 )
 
@@ -237,6 +238,44 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
         help="Template checklist used to seed the run-specific Phase 3 results file.",
     )
+    phase3_harness.add_argument(
+        "--artifacts-dir",
+        default=None,
+        help=(
+            "Optional directory where preview capture artifacts such as preview-card PNGs "
+            "should be written."
+        ),
+    )
+
+    phase3_matrix = subparsers.add_parser(
+        "phase3-signing-preview-matrix",
+        help="Run a repeatable Phase 3 preview scenario sweep and capture per-scenario artifacts.",
+    )
+    phase3_matrix.add_argument(
+        "--pdf-path",
+        required=True,
+        help="Path to the PDF to open in the preview matrix runner.",
+    )
+    phase3_matrix.add_argument(
+        "--certificate-path",
+        required=True,
+        help="PKCS#12 certificate file used to derive preview field values.",
+    )
+    phase3_matrix.add_argument(
+        "--passphrase",
+        required=True,
+        help="Passphrase for the PKCS#12 certificate file used by the preview matrix.",
+    )
+    phase3_matrix.add_argument(
+        "--scenario-manifest-path",
+        required=True,
+        help="JSON manifest describing the preview scenarios to execute.",
+    )
+    phase3_matrix.add_argument(
+        "--artifacts-dir",
+        required=True,
+        help="Directory where per-scenario preview PNGs and the summary JSON should be written.",
+    )
 
     phase3_validate = subparsers.add_parser(
         "phase3-signing-harness-validate",
@@ -375,7 +414,22 @@ def main(argv: Sequence[str] | None = None) -> None:
             summary_json_path=args.summary_json_path,
             checklist_results_path=args.checklist_results_path,
             checklist_template_path=args.checklist_template_path,
+            artifacts_dir=args.artifacts_dir,
         )
+        return
+
+    if args.command == "phase3-signing-preview-matrix":
+        summary = run_phase3_preview_matrix(
+            pdf_path=args.pdf_path,
+            certificate_path=args.certificate_path,
+            passphrase=args.passphrase,
+            scenario_manifest_path=args.scenario_manifest_path,
+            artifacts_dir=args.artifacts_dir,
+        )
+        print("Phase 3 preview matrix")
+        print(f"- scenarios executed: {summary['scenario_count']}")
+        print(f"- artifacts directory: {summary['artifacts_dir']}")
+        print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
         return
     if args.command == "phase3-signing-harness-validate":
         _run_phase3_harness_validate(args)

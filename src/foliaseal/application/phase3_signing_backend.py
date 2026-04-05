@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from io import BytesIO
+from math import ceil
 from pathlib import Path
 
 from asn1crypto import pkcs12
@@ -266,6 +267,7 @@ def _build_stamp_style(
         signature_rect=signature_rect,
         text_box_width=text_box_width,
         text_box_height=text_box_height,
+        box_style=appearance.box_style,
     )
     _ensure_layout_can_fit(layout_reservation)
     background_layout = _background_layout_for_stamp(
@@ -275,6 +277,7 @@ def _build_stamp_style(
         signature_rect=signature_rect,
         text_box_width=text_box_width,
         text_box_height=text_box_height,
+        box_style=appearance.box_style,
     )
     return TextStampStyle(
         border_width=border_width,
@@ -323,6 +326,56 @@ def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
     )
 
 
+def _base_layout_spacing(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_height: int,
+) -> tuple[int, int]:
+    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        if box_height <= 40:
+            return 2, 1
+    return 4, 6
+
+
+def _border_safe_inset(box_style: SignatureBoxStyle | None) -> int:
+    if box_style is None or not box_style.show_border:
+        return 0
+    return max(0, int(ceil(box_style.border_width_pt / 2.0)) + 1)
+
+
+def _effective_layout_edge_margin(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_height: int,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    base_edge_margin, _gap = _base_layout_spacing(
+        stamp_position=stamp_position,
+        box_height=box_height,
+    )
+    return max(base_edge_margin, _border_safe_inset(box_style))
+
+
+def _single_line_vertical_outer_margin(
+    *,
+    box_height: int,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    """Use symmetric outer insets for compact vertical single-line content."""
+
+    base_edge_margin, _gap = _base_layout_spacing(
+        stamp_position=SignatureStampPosition.TOP,
+        box_height=box_height,
+    )
+    compact_bonus = 1 if box_height >= 24 else 0
+    if box_style is None or not box_style.show_border:
+        return base_edge_margin + compact_bonus
+    safe_inset = _border_safe_inset(box_style)
+    if safe_inset <= 0:
+        return base_edge_margin
+    return max(base_edge_margin + compact_bonus, safe_inset + compact_bonus)
+
+
 def _layout_reservation_for_template(
     layout_template: SignatureLayoutTemplate,
     *,
@@ -330,28 +383,16 @@ def _layout_reservation_for_template(
     signature_rect: SignatureRect,
     text_box_width: int,
     text_box_height: int,
+    box_style: SignatureBoxStyle | None = None,
 ) -> _SignatureLayoutReservation:
     """Compute the actual reserved-space split for the requested rectangle."""
     box_width = max(1, int(round(signature_rect.width_pt)))
     box_height = max(1, int(round(signature_rect.height_pt)))
-
-    def _compact_vertical_spacing() -> tuple[int, int]:
-        """Use smaller vertical spacing on compact rectangles.
-
-        Top/bottom single-line signatures tend to be short and need more
-        of the rectangle height left available for the image stamp.
-        The older fixed 4 pt margins plus 6 pt separator left too little
-        room on ordinary form-line rectangles, so we relax them a bit for
-        compact layouts while keeping the original breathing room on taller
-        signatures.
-        """
-
-        if box_height <= 40:
-            return 2, 1
-        return 4, 6
-
-    gap = 6
-    edge_margin = 4
+    edge_margin, gap = _base_layout_spacing(
+        stamp_position=stamp_position,
+        box_height=box_height,
+    )
+    edge_margin = max(edge_margin, _border_safe_inset(box_style))
     available_width = max(box_width - edge_margin * 2, 0)
     available_height = max(box_height - edge_margin * 2, 0)
 
@@ -427,14 +468,18 @@ def _layout_reservation_for_template(
             ),
         )
 
+    vertical_top_margin = edge_margin
+    vertical_bottom_margin = edge_margin
+    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        vertical_top_margin = _single_line_vertical_outer_margin(
+            box_height=box_height,
+            box_style=box_style,
+        )
+        vertical_bottom_margin = vertical_top_margin
+        available_width = max(box_width - edge_margin * 2, 0)
+        available_height = max(box_height - vertical_top_margin - vertical_bottom_margin, 0)
     text_area_height = min(text_box_height, available_height)
     remaining_height = max(available_height - text_area_height, 0)
-    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
-        edge_margin, gap = _compact_vertical_spacing()
-        available_width = max(box_width - edge_margin * 2, 0)
-        available_height = max(box_height - edge_margin * 2, 0)
-        text_area_height = min(text_box_height, available_height)
-        remaining_height = max(available_height - text_area_height, 0)
     separator_height = min(gap, remaining_height)
     text_area_width = available_width
     stamp_area_width = available_width
@@ -445,14 +490,14 @@ def _layout_reservation_for_template(
         background_margins = Margins(
             left=edge_margin,
             right=edge_margin,
-            top=edge_margin,
-            bottom=text_area_height + separator_height + edge_margin,
+            top=vertical_top_margin,
+            bottom=text_area_height + separator_height + vertical_bottom_margin,
         )
         text_margins = Margins(
             left=edge_margin,
             right=edge_margin,
-            top=stamp_area_height + separator_height + edge_margin,
-            bottom=edge_margin,
+            top=stamp_area_height + separator_height + vertical_top_margin,
+            bottom=vertical_bottom_margin,
         )
         background_alignment = (
             AxisAlignment.ALIGN_MIN
@@ -466,14 +511,14 @@ def _layout_reservation_for_template(
         background_margins = Margins(
             left=edge_margin,
             right=edge_margin,
-            top=text_area_height + separator_height + edge_margin,
-            bottom=edge_margin,
+            top=text_area_height + separator_height + vertical_top_margin,
+            bottom=vertical_bottom_margin,
         )
         text_margins = Margins(
             left=edge_margin,
             right=edge_margin,
-            top=edge_margin,
-            bottom=stamp_area_height + separator_height + edge_margin,
+            top=vertical_top_margin,
+            bottom=stamp_area_height + separator_height + vertical_bottom_margin,
         )
         background_alignment = (
             AxisAlignment.ALIGN_MIN
@@ -481,8 +526,12 @@ def _layout_reservation_for_template(
             else AxisAlignment.ALIGN_MID
         )
         text_alignment = AxisAlignment.ALIGN_MID
-        background_y_alignment = AxisAlignment.ALIGN_MIN
-        text_y_alignment = AxisAlignment.ALIGN_MAX
+        if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+            background_y_alignment = AxisAlignment.ALIGN_MID
+            text_y_alignment = AxisAlignment.ALIGN_MID
+        else:
+            background_y_alignment = AxisAlignment.ALIGN_MIN
+            text_y_alignment = AxisAlignment.ALIGN_MAX
 
     return _SignatureLayoutReservation(
         layout_template=layout_template,
@@ -519,6 +568,7 @@ def _background_layout_for_stamp(
     signature_rect: SignatureRect,
     text_box_width: int,
     text_box_height: int,
+    box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
     reservation = _layout_reservation_for_template(
         layout_template,
@@ -526,6 +576,7 @@ def _background_layout_for_stamp(
         signature_rect=signature_rect,
         text_box_width=text_box_width,
         text_box_height=text_box_height,
+        box_style=box_style,
     )
     if stamp_background is None:
         return reservation.background_layout
@@ -680,21 +731,33 @@ def _build_stamp_text(
             max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - 8)
             max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - 8)
             width_overflow_tolerance = 1.0
+            edge_margin = _effective_layout_edge_margin(
+                stamp_position=appearance.stamp_position,
+                box_height=max(1, int(round(signature_rect.height_pt))),
+                box_style=appearance.box_style,
+            )
+            max_text_width_pt = max(1, int(round(signature_rect.width_pt)) - edge_margin * 2)
+            max_text_height_pt = max(1, int(round(signature_rect.height_pt)) - edge_margin * 2)
             if (
                 appearance.stamp_position
                 in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
                 and signature_rect.height_pt <= 24
             ):
                 width_overflow_tolerance = _single_line_vertical_width_overflow_tolerance()
-                max_text_height_pt = _single_line_vertical_text_wrap_height_limit(
-                    signature_rect
+                max_text_height_pt = max(
+                    1,
+                    int(round(signature_rect.height_pt)) - edge_margin * 2,
                 )
             if (
                 appearance.image_stamp_path is not None
                 and appearance.stamp_position
                 in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
             ):
-                reserved_stamp_width_pt = max(48, int(round(signature_rect.width_pt * 0.35)))
+                available_width_pt = max(
+                    1,
+                    int(round(signature_rect.width_pt)) - edge_margin * 2,
+                )
+                reserved_stamp_width_pt = max(48, int(round(available_width_pt * 0.35)))
                 max_text_width_pt = max(1, max_text_width_pt - reserved_stamp_width_pt - 6)
                 width_overflow_tolerance = 1.25
             body_text = _wrap_visible_signature_fragments(
@@ -955,6 +1018,7 @@ def _content_layout_for_template(
     stamp_background: PdfImage | None,
     text_box_width: int,
     text_box_height: int,
+    box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
     return _layout_reservation_for_template(
         layout_template,
@@ -962,6 +1026,7 @@ def _content_layout_for_template(
         signature_rect=signature_rect,
         text_box_width=text_box_width,
         text_box_height=text_box_height,
+        box_style=box_style,
     ).inner_content_layout
 
 
@@ -973,6 +1038,7 @@ def _background_layout_for_template(
     stamp_background: PdfImage | None,
     text_box_width: int,
     text_box_height: int,
+    box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
     return _layout_reservation_for_template(
         layout_template,
@@ -980,6 +1046,7 @@ def _background_layout_for_template(
         signature_rect=signature_rect,
         text_box_width=text_box_width,
         text_box_height=text_box_height,
+        box_style=box_style,
     ).background_layout
 
 

@@ -10,6 +10,7 @@ from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
 from foliaseal.domain.models import (
+    SignatureBoxStyle,
     SignatureFieldKey,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
@@ -814,13 +815,16 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         widget.properties_panel.preview,
         available_width_px=available_width,
     )
+    expected_padding = signing_shell_module._preview_card_padding_px(
+        widget.properties_panel.preview
+    )
     expected_inner_width = max(
         1,
-        expected_width - signing_shell_module._PREVIEW_CARD_CONTENT_INSET_PX,
+        expected_width - int(round(expected_padding * 2)),
     )
     expected_inner_height = max(
         1,
-        expected_height - signing_shell_module._PREVIEW_CARD_CONTENT_INSET_PX,
+        expected_height - int(round(expected_padding * 2)),
     )
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
@@ -920,13 +924,16 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
         widget.properties_panel.preview,
         available_width_px=available_width,
     )
+    expected_padding = signing_shell_module._preview_card_padding_px(
+        widget.properties_panel.preview
+    )
     expected_inner_width = max(
         1,
-        expected_width - signing_shell_module._PREVIEW_CARD_CONTENT_INSET_PX,
+        expected_width - int(round(expected_padding * 2)),
     )
     expected_inner_height = max(
         1,
-        expected_height - signing_shell_module._PREVIEW_CARD_CONTENT_INSET_PX,
+        expected_height - int(round(expected_padding * 2)),
     )
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
@@ -2038,6 +2045,164 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     assert widget.properties_panel.preview_controls.multi_content_container.fixed_width == (
         signing_shell_module._preview_text_width_limit(
             preview,
+            title_line=preview.signer_label_prefix or preview.title,
+            detail_text=expected,
             available_width_px=available_width,
         )
     )
+
+
+def test_fit_vertical_preview_band_geometry_prefers_text_hint_and_reduces_separator() -> None:
+    fitted = signing_shell_module._fit_vertical_preview_band_geometry(
+        text_height=15,
+        stamp_height=13,
+        separator_height=10,
+        inner_body_height_px=38,
+        detail_hint_height_px=30,
+        stamp_visible=True,
+    )
+
+    assert fitted == (30, 8, 0)
+
+
+def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() -> None:
+    fitted = signing_shell_module._fit_vertical_preview_band_geometry(
+        text_height=18,
+        stamp_height=16,
+        separator_height=6,
+        inner_body_height_px=56,
+        detail_hint_height_px=16,
+        stamp_visible=True,
+    )
+
+    assert fitted == (18, 32, 6)
+
+
+def test_signing_shell_horizontal_preview_reduces_text_width_for_thick_borders(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path="/tmp/stamp.png",
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=7.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=36.0,
+        )
+    )
+
+    preview = widget.properties_panel.preview
+    detail = widget.properties_panel.preview_controls.multi_detail_label.text()
+    available_width = signing_shell_module._preview_available_width(
+        preview,
+        container=widget.properties_panel.preview_controls.container,
+    )
+
+    default_width = signing_shell_module._preview_text_width_limit(
+        preview,
+        title_line=preview.signer_label_prefix or preview.title,
+        detail_text=detail,
+        available_width_px=available_width,
+    )
+    thick_border_appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path="/tmp/stamp.png",
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=10.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    widget.properties_panel.set_signature_appearance(thick_border_appearance)
+
+    thick_preview = widget.properties_panel.preview
+    thick_detail = widget.properties_panel.preview_controls.multi_detail_label.text()
+    thick_available_width = signing_shell_module._preview_available_width(
+        thick_preview,
+        container=widget.properties_panel.preview_controls.container,
+    )
+    thick_width = signing_shell_module._preview_text_width_limit(
+        thick_preview,
+        title_line=thick_preview.signer_label_prefix or thick_preview.title,
+        detail_text=thick_detail,
+        available_width_px=thick_available_width,
+    )
+
+    assert thick_width < default_width
+    assert (
+        widget.properties_panel.preview_controls.multi_content_container.fixed_width == thick_width
+    )
+
+
+def test_signing_shell_preview_uses_border_aware_padding_for_thick_borders(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        image_stamp_path="/tmp/stamp.png",
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=7.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=28.0,
+        )
+    )
+
+    assert "padding: 6.0px;" in widget.properties_panel.preview_controls.card_container.style

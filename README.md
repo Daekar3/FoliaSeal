@@ -146,7 +146,8 @@ Run it against a representative PDF:
   --certificate-path "/path/to/identity.p12" \
   --passphrase "your-test-passphrase" \
   --summary-json-path artifacts/phase3_harness_capture.json \
-  --checklist-results-path artifacts/phase3_fr3b_acceptance_results.md
+  --checklist-results-path artifacts/phase3_fr3b_acceptance_results.md \
+  --artifacts-dir artifacts/phase3_preview_debug
 ```
 
 The harness defaults to `timestamp_required=False` today, so it is suitable for real signed-PDF
@@ -158,10 +159,34 @@ What it does:
 
 - launches the current Qt signing shell on the chosen PDF
 - records a structured capture of preview availability, selection count, sign-request count, and any surfaced errors
+- can capture the live preview card as a PNG plus widget geometry and border-to-content distance metrics when `--artifacts-dir` is supplied
 - classifies the run as `engineering_run` or `gate_candidate` and records the automated gate verdict
 - validates the capture for internal evidence consistency before writing the artifacts
 - writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
 - automatically checks the acceptance items that can be observed directly from the harness
+
+For repeatable preview sweeps across many settings permutations, run the preview matrix command with a JSON manifest:
+
+```bash
+.venv/bin/python -m foliaseal phase3-signing-preview-matrix \
+  --pdf-path "/path/to/representative.pdf" \
+  --certificate-path "/path/to/identity.p12" \
+  --passphrase "your-test-passphrase" \
+  --scenario-manifest-path artifacts/phase3_preview_matrix_template.json \
+  --artifacts-dir artifacts/phase3_preview_matrix
+```
+
+What the preview matrix writes:
+
+- one preview PNG per scenario
+- one summary JSON at `artifacts/phase3_preview_matrix/summary.json`
+- per-scenario preview geometry, rendered widget bounds, and top/bottom border-distance metrics
+
+Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
+
+The repo now also includes a reusable local sweep fixture set under `artifacts/preview_sweep_assets/`,
+including `sweep_fixture.pdf`, `test_identity.p12`, three transparent stamp images, and
+`single_line_matrix.json` for unattended `single_line` preview sweeps.
 
 Validate an existing harness capture without relaunching the GUI:
 
@@ -191,3 +216,4 @@ See also:
 - [phase3_fr3b_acceptance_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
 - [phase3_handoff_2026-04-03.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_handoff_2026-04-03.md)
 - [phase3_parallel_plan.md](/home/daekar/SignPDF/Scratch/phase3_parallel_plan.md)
+- [phase3_preview_matrix_template.json](/home/daekar/SignPDF/Scratch/artifacts/phase3_preview_matrix_template.json)

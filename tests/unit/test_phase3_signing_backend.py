@@ -31,6 +31,7 @@ from foliaseal.application.phase3_signing_backend import (
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
+    SignatureBoxStyle,
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureStampPosition,
@@ -554,6 +555,150 @@ def test_layout_reservation_for_wrapped_block_allocates_bottom_text_space() -> N
     assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
     assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MIN
     assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+
+
+def test_layout_reservation_for_single_line_bottom_centers_content_within_reserved_regions() -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        signature_rect=build_signature_rect(page_index=0, width_pt=260.0, height_pt=25.0),
+        text_box_width=180,
+        text_box_height=16,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=3.5,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MID
+    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
+
+
+@pytest.mark.parametrize("stamp_position", [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM])
+def test_layout_reservation_for_compact_vertical_single_line_uses_symmetric_outer_clearance(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=262.0,
+            height_pt=25.0,
+        ),
+        text_box_width=180,
+        text_box_height=16,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    if stamp_position == SignatureStampPosition.TOP:
+        assert reservation.background_layout.margins.top == reservation.inner_content_layout.margins.bottom
+    else:
+        assert reservation.inner_content_layout.margins.top == reservation.background_layout.margins.bottom
+
+
+@pytest.mark.parametrize("stamp_position", [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM])
+def test_layout_reservation_for_compact_vertical_single_line_increases_outer_clearance_with_border(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    thin_reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=262.0,
+            height_pt=25.0,
+        ),
+        text_box_width=180,
+        text_box_height=16,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    thick_reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=262.0,
+            height_pt=25.0,
+        ),
+        text_box_width=180,
+        text_box_height=16,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=3.5,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    if stamp_position == SignatureStampPosition.TOP:
+        assert thick_reservation.background_layout.margins.top > thin_reservation.background_layout.margins.top
+        assert (
+            thick_reservation.inner_content_layout.margins.bottom
+            > thin_reservation.inner_content_layout.margins.bottom
+        )
+    else:
+        assert thick_reservation.inner_content_layout.margins.top > thin_reservation.inner_content_layout.margins.top
+        assert (
+            thick_reservation.background_layout.margins.bottom
+            > thin_reservation.background_layout.margins.bottom
+        )
+
+
+@pytest.mark.parametrize(
+    "stamp_position, width_pt, height_pt",
+    [
+        (SignatureStampPosition.TOP, 260.0, 22.0),
+        (SignatureStampPosition.BOTTOM, 260.0, 22.0),
+        (SignatureStampPosition.LEFT, 260.0, 40.0),
+        (SignatureStampPosition.RIGHT, 260.0, 40.0),
+    ],
+)
+def test_layout_reservation_uses_border_aware_outer_insets(
+    stamp_position: SignatureStampPosition,
+    width_pt: float,
+    height_pt: float,
+) -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=width_pt,
+            height_pt=height_pt,
+        ),
+        text_box_width=120,
+        text_box_height=18,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=7.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    expected_edge_margin = 5
+
+    assert reservation.background_layout.margins.top >= expected_edge_margin
+    assert reservation.background_layout.margins.bottom >= expected_edge_margin
+    assert reservation.background_layout.margins.left >= expected_edge_margin
+    assert reservation.background_layout.margins.right >= expected_edge_margin
+    assert reservation.inner_content_layout.margins.top >= expected_edge_margin
+    assert reservation.inner_content_layout.margins.bottom >= expected_edge_margin
+    assert reservation.inner_content_layout.margins.left >= expected_edge_margin
+    assert reservation.inner_content_layout.margins.right >= expected_edge_margin
 
 
 def test_build_stamp_style_uses_template_specific_layout_for_single_line(

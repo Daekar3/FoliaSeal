@@ -27,13 +27,21 @@ from foliaseal.domain.models import (
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
+    SignatureTimezoneDisplayMode,
     SigningRequest,
 )
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
+    _apply_appearance_overrides,
+    _apply_preview_matrix_scenario,
+    _load_preview_matrix_manifest,
+    _preview_edge_distances,
+    _preview_matrix_error_result,
     _snapshot_backend_reservation,
     _snapshot_current_draft_request,
+    _snapshot_preview,
     _snapshot_visible_signature_appearance,
+    _widget_is_visible,
     build_phase3_checklist_results_markdown,
 )
 from tests.support.phase3_builders import (
@@ -633,6 +641,243 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
         payload = json.loads(capture.to_json())
 
     assert payload["preview_snapshot"]["opaque"].startswith("<_io.BufferedReader")
+
+
+def test_snapshot_preview_includes_render_capture_payload() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "title": "",
+            "signer_label_prefix": "",
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "timezone_display_mode": SignatureTimezoneDisplayMode.UTC,
+            "show_field_names": False,
+            "datetime_format": "%Y-%m-%d",
+            "image_stamp_path": None,
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=30.0),
+            "text_style": None,
+            "box_style": None,
+            "fields": (),
+            "issues": (),
+            "can_submit": True,
+        },
+    )()
+
+    snapshot = _snapshot_preview(
+        preview,
+        render_capture={"preview_image_path": "artifacts/preview.png"},
+    )
+
+    assert snapshot["render_capture"] == {"preview_image_path": "artifacts/preview.png"}
+
+
+def test_preview_edge_distances_report_top_and_bottom_clearance() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=28.0),
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.BOTTOM,
+            "box_style": None,
+        },
+    )()
+
+    distances = _preview_edge_distances(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 200, "height": 80},
+        body_bounds={"x": 6, "y": 6, "width": 188, "height": 68},
+        detail_bounds={"x": 0, "y": 0, "width": 188, "height": 28},
+        stamp_bounds={"x": 0, "y": 40, "width": 188, "height": 20},
+    )
+
+    assert distances["text_top_to_border_px"] == 6
+    assert distances["stamp_bottom_to_border_px"] == 14
+    assert distances["content_top_to_border_px"] == 6
+    assert distances["content_bottom_to_border_px"] == 14
+
+
+def test_widget_is_visible_supports_real_and_fake_widget_shapes() -> None:
+    fake_widget = type("_FakeWidget", (), {"visible": False})()
+    qt_like_widget = type(
+        "_QtLikeWidget",
+        (),
+        {"isVisible": lambda self: True},
+    )()
+
+    assert _widget_is_visible(fake_widget) is False
+    assert _widget_is_visible(qt_like_widget) is True
+    assert _widget_is_visible(object()) is True
+
+
+def test_preview_matrix_error_result_records_scenario_name_and_error_type() -> None:
+    result = _preview_matrix_error_result(
+        scenario={"name": "Broken Scenario", "profile_name": "Saved Profile"},
+        error=ValueError("bad border width"),
+    )
+
+    assert result == {
+        "name": "Broken Scenario",
+        "profile_name": "Saved Profile",
+        "error": "bad border width",
+        "error_type": "ValueError",
+    }
+
+
+def test_apply_preview_matrix_scenario_syncs_viewer_to_signature_rect_page() -> None:
+    class _FakeProfileStore:
+        def load_catalog(self):
+            return type(
+                "_Catalog",
+                (),
+                {"profile_named": lambda self, name: (_ for _ in ()).throw(KeyError(name))},
+            )()
+
+    class _FakePanel:
+        def __init__(self) -> None:
+            self.appearance = None
+            self.rect = None
+            self._workflow = type(
+                "_Workflow",
+                (),
+                {"current_signature_appearance": build_signature_appearance()},
+            )()
+
+        def set_signature_appearance(self, appearance) -> None:
+            self.appearance = appearance
+
+        def set_signature_rect(self, signature_rect) -> None:
+            self.rect = signature_rect
+
+    class _FakeViewerWorkflow:
+        def __init__(self) -> None:
+            self.jumps: list[int] = []
+
+        def jump_to_page(self, page_index: int) -> None:
+            self.jumps.append(page_index)
+
+    class _FakeViewerWidget:
+        def __init__(self) -> None:
+            self.refresh_calls: list[bool] = []
+
+        def refresh(self, *, navigation: bool) -> None:
+            self.refresh_calls.append(navigation)
+
+    shell = type(
+        "_Shell",
+        (),
+        {
+            "properties_panel": _FakePanel(),
+            "_viewer_workflow": _FakeViewerWorkflow(),
+            "_viewer_widget": _FakeViewerWidget(),
+            "refresh_viewer": lambda self: None,
+        },
+    )()
+
+    _apply_preview_matrix_scenario(
+        shell=shell,
+        scenario={
+            "name": "Page Four",
+            "signature_rect": {
+                "page_index": 3,
+                "left_pt": 24,
+                "bottom_pt": 18,
+                "width_pt": 120,
+                "height_pt": 36,
+            },
+            "appearance_overrides": {
+                "layout_template": "single_line",
+                "stamp_position": "top",
+            },
+        },
+        profile_store=_FakeProfileStore(),
+    )
+
+    assert shell.properties_panel.rect is not None
+    assert shell.properties_panel.rect.page_index == 3
+    assert shell._viewer_workflow.jumps == [3]
+    assert shell._viewer_widget.refresh_calls == [True]
+
+
+def test_load_preview_matrix_manifest_accepts_object_or_array(tmp_path: Path) -> None:
+    object_manifest = tmp_path / "object.json"
+    array_manifest = tmp_path / "array.json"
+    object_manifest.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "name": "Compact Top",
+                        "signature_rect": {
+                            "page_index": 0,
+                            "left_pt": 1,
+                            "bottom_pt": 2,
+                            "width_pt": 3,
+                            "height_pt": 4,
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    array_manifest.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "Compact Bottom",
+                    "signature_rect": {
+                        "page_index": 0,
+                        "left_pt": 1,
+                        "bottom_pt": 2,
+                        "width_pt": 3,
+                        "height_pt": 4,
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        _load_preview_matrix_manifest(str(object_manifest))["scenarios"][0]["name"]
+        == "Compact Top"
+    )
+    assert (
+        _load_preview_matrix_manifest(str(array_manifest))["scenarios"][0]["name"]
+        == "Compact Bottom"
+    )
+
+
+def test_apply_appearance_overrides_updates_common_preview_controls() -> None:
+    appearance = build_signature_appearance()
+
+    updated = _apply_appearance_overrides(
+        appearance,
+        {
+            "layout_template": "single_line",
+            "stamp_position": "bottom",
+            "image_stamp_path": "/tmp/stamp.png",
+            "box_style": {
+                "border_width_pt": 3.5,
+                "background_color_hex": "#EEEEEE",
+            },
+            "text_style": {
+                "font_size_pt": 8.5,
+                "italic": True,
+            },
+        },
+    )
+
+    assert updated.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+    assert updated.stamp_position == SignatureStampPosition.BOTTOM
+    assert updated.image_stamp_path == "/tmp/stamp.png"
+    assert updated.box_style.border_width_pt == 3.5
+    assert updated.box_style.background_color_hex == "#EEEEEE"
+    assert updated.text_style.font_size_pt == 8.5
+    assert updated.text_style.italic is True
 
 
 def test_backend_reservation_snapshot_retains_error_details_for_bad_request() -> None:

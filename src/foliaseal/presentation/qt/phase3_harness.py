@@ -6,7 +6,7 @@ import importlib
 import json
 import re
 from collections import Counter
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
 from time import perf_counter
@@ -19,7 +19,9 @@ from foliaseal.application.phase3_signing_backend import (
     _build_stamp_style,
     _build_stamp_text,
     _current_signing_time,
+    _effective_layout_edge_margin,
     _load_simple_signer,
+    _single_line_vertical_outer_margin,
     _stamp_background_for_path,
     build_phase3_signing_executor,
 )
@@ -27,7 +29,17 @@ from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
-from foliaseal.domain.models import SigningRequest, SigningResult
+from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignatureBoxStyle,
+    SignatureLayoutTemplate,
+    SignatureRect,
+    SignatureStampPosition,
+    SignatureTextStyle,
+    SignatureTimezoneDisplayMode,
+    SigningRequest,
+    SigningResult,
+)
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
@@ -91,6 +103,12 @@ def build_phase3_checklist_results_markdown(
     template = Path(checklist_template_path).read_text(encoding="utf-8")
     auto_checked_items = _derive_phase3_auto_checked_items(capture)
     visible_appearance_snapshot = capture.output_visible_appearance_snapshot
+    preview_content_top_distance = _snapshot_preview_edge_distance(
+        capture.preview_snapshot, "content_top_to_border_px"
+    )
+    preview_content_bottom_distance = _snapshot_preview_edge_distance(
+        capture.preview_snapshot, "content_bottom_to_border_px"
+    )
     checkbox_pattern = re.compile(r"^(\s*-\s*)\[(?: |x|X)\](\s+)(.+)$")
 
     rendered_lines = [
@@ -249,6 +267,26 @@ def build_phase3_checklist_results_markdown(
             else "- Preview field count: not captured"
         ),
         (
+            f"- Preview capture image: "
+            f"`{_snapshot_preview_capture_image(capture.preview_snapshot)}`"
+            if _snapshot_preview_capture_image(capture.preview_snapshot) is not None
+            else "- Preview capture image: not captured"
+        ),
+        (
+            f"- Preview content top distance: "
+            f"{preview_content_top_distance}"
+            " px"
+            if preview_content_top_distance is not None
+            else "- Preview content top distance: not captured"
+        ),
+        (
+            f"- Preview content bottom distance: "
+            f"{preview_content_bottom_distance}"
+            " px"
+            if preview_content_bottom_distance is not None
+            else "- Preview content bottom distance: not captured"
+        ),
+        (
             "- Last signing result: "
             f"{'success' if capture.last_signing_result_success else 'failure'}"
             if capture.last_signing_result_success is not None
@@ -382,6 +420,7 @@ def run_phase3_signing_harness(
     summary_json_path: str | None = None,
     checklist_results_path: str = DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
     checklist_template_path: str = DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
+    artifacts_dir: str | None = None,
 ) -> Phase3HarnessCapture:
     """Launch an interactive Qt signing-shell harness for Phase 3 acceptance."""
 
@@ -488,8 +527,15 @@ def run_phase3_signing_harness(
 
     preview_text = shell.properties_panel.preview_text()
     preview = shell.properties_panel.refresh_preview()
+    app.processEvents()
     validation_text = shell.properties_panel.validation_text()
     last_signing_result = getattr(shell, "last_signing_result", None)
+    preview_render_capture = _capture_preview_render(
+        shell=shell,
+        preview=preview,
+        artifacts_dir=artifacts_dir,
+        artifact_basename="interactive_preview",
+    )
     capture_request = (
         sign_requests[-1]
         if sign_requests
@@ -544,7 +590,7 @@ def run_phase3_signing_harness(
         "last_signing_result_success": (
             last_signing_result.success if isinstance(last_signing_result, SigningResult) else None
         ),
-        "preview_snapshot": _snapshot_preview(preview),
+        "preview_snapshot": _snapshot_preview(preview, render_capture=preview_render_capture),
         "sign_request_snapshot": _snapshot_signing_request(capture_request),
         "backend_reservation_snapshot": backend_reservation_snapshot,
         "backend_reservation_error": backend_reservation_error,
@@ -609,6 +655,93 @@ def run_phase3_signing_harness(
     print("Review the pre-checked items, complete the remaining manual-only checks, and")
     print("use the generated file as the acceptance worksheet for Phase 3.")
     return capture
+
+
+def run_phase3_preview_matrix(
+    *,
+    pdf_path: str,
+    certificate_path: str,
+    passphrase: str,
+    scenario_manifest_path: str,
+    artifacts_dir: str,
+) -> dict[str, Any]:
+    """Run a repeatable preview-only scenario sweep and capture rendered artifacts."""
+
+    bindings = _load_qt_harness_bindings()
+    source_path = Path(pdf_path)
+    if not source_path.exists():
+        raise FileNotFoundError(f"PDF does not exist: {pdf_path}")
+
+    manifest = _load_preview_matrix_manifest(scenario_manifest_path)
+    scenarios = manifest["scenarios"]
+    artifact_root = Path(artifacts_dir)
+    artifact_root.mkdir(parents=True, exist_ok=True)
+
+    page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
+    backend = QtPdfRenderBackend()
+    diagnostic = backend.diagnostics()
+    if not diagnostic.available:
+        raise RuntimeError(diagnostic.message)
+
+    viewer_workflow = ViewerWorkflow(
+        document_path=str(source_path),
+        render_backend=backend,
+        session=ViewerSession(page_count=page_count),
+    )
+    signing_workflow = SigningDraftWorkflow(
+        input_pdf_path=str(source_path),
+        output_pdf_path=str(source_path.with_name(source_path.stem + "-signed.pdf")),
+        certificate_path=certificate_path,
+        passphrase=passphrase,
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+    )
+    profile_store = SignaturePresetCatalogStore.default()
+
+    app = bindings.q_application.instance() or bindings.q_application([])
+    window = bindings.q_main_window()
+    window.setWindowTitle(f"FoliaSeal Phase 3 Preview Matrix - {source_path.name}")
+    window.resize(1440, 980)
+    shell = build_qt_signing_shell(
+        viewer_workflow=viewer_workflow,
+        signing_workflow=signing_workflow,
+        preset_catalog_store=profile_store,
+    )
+    window.setCentralWidget(shell)
+    window.show()
+    shell.refresh_viewer()
+    app.processEvents()
+
+    results: list[dict[str, Any]] = []
+    for scenario in scenarios:
+        try:
+            result = _execute_preview_matrix_scenario(
+                shell=shell,
+                scenario=scenario,
+                profile_store=profile_store,
+                artifacts_dir=artifact_root,
+            )
+        except Exception as exc:
+            result = _preview_matrix_error_result(scenario=scenario, error=exc)
+        results.append(result)
+        app.processEvents()
+
+    close = getattr(window, "close", None)
+    if callable(close):
+        close()
+
+    summary = {
+        "pdf_path": str(source_path),
+        "scenario_manifest_path": scenario_manifest_path,
+        "artifacts_dir": str(artifact_root),
+        "scenario_count": len(results),
+        "successful_scenario_count": sum(1 for item in results if "error" not in item),
+        "error_scenario_count": sum(1 for item in results if "error" in item),
+        "results": results,
+    }
+    summary_path = artifact_root / "summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return summary
 
 
 @dataclass(frozen=True)
@@ -797,7 +930,7 @@ def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] 
         return {"error": str(exc)}
 
 
-def _snapshot_preview(preview) -> dict[str, Any]:
+def _snapshot_preview(preview, *, render_capture: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "title": preview.title,
         "signer_label_prefix": preview.signer_label_prefix,
@@ -815,7 +948,472 @@ def _snapshot_preview(preview) -> dict[str, Any]:
         "fields": [_snapshot_preview_field(field) for field in preview.fields],
         "issues": [_snapshot_issue(issue) for issue in preview.issues],
         "can_submit": preview.can_submit,
+        "render_capture": render_capture,
     }
+
+
+def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
+    manifest_path = Path(path)
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Scenario manifest does not exist: {path}")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        scenarios = payload
+    elif isinstance(payload, dict):
+        scenarios = payload.get("scenarios")
+    else:
+        raise ValueError("Scenario manifest must be a JSON object or array.")
+    if not isinstance(scenarios, list) or not scenarios:
+        raise ValueError("Scenario manifest must define a non-empty 'scenarios' array.")
+    validated: list[dict[str, Any]] = []
+    for index, scenario in enumerate(scenarios):
+        if not isinstance(scenario, dict):
+            raise ValueError(f"Scenario at index {index} must be a JSON object.")
+        name = scenario.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Scenario at index {index} must define a non-empty 'name'.")
+        validated.append(scenario)
+    return {"scenarios": validated}
+
+
+def _execute_preview_matrix_scenario(
+    *,
+    shell: Any,
+    scenario: dict[str, Any],
+    profile_store: SignaturePresetCatalogStore,
+    artifacts_dir: Path,
+) -> dict[str, Any]:
+    _apply_preview_matrix_scenario(
+        shell=shell,
+        scenario=scenario,
+        profile_store=profile_store,
+    )
+    preview = shell.properties_panel.refresh_preview()
+    preview_text = shell.properties_panel.preview_text()
+    validation_text = shell.properties_panel.validation_text()
+    request = _snapshot_current_draft_request(shell.properties_panel._workflow)
+    artifact_basename = _scenario_slug(str(scenario["name"]))
+    render_capture = _capture_preview_render(
+        shell=shell,
+        preview=preview,
+        artifacts_dir=str(artifacts_dir),
+        artifact_basename=artifact_basename,
+    )
+    return {
+        "name": scenario["name"],
+        "profile_name": scenario.get("profile_name"),
+        "preview_snapshot": _snapshot_preview(preview, render_capture=render_capture),
+        "preview_text": preview_text,
+        "validation_text": validation_text,
+        "sign_request_snapshot": _snapshot_signing_request(request),
+        "backend_reservation_snapshot": (
+            _snapshot_backend_reservation(request) if request is not None else None
+        ),
+    }
+
+
+def _preview_matrix_error_result(*, scenario: dict[str, Any], error: Exception) -> dict[str, Any]:
+    return {
+        "name": scenario["name"],
+        "profile_name": scenario.get("profile_name"),
+        "error": str(error),
+        "error_type": error.__class__.__name__,
+    }
+
+
+def _apply_preview_matrix_scenario(
+    *,
+    shell: Any,
+    scenario: dict[str, Any],
+    profile_store: SignaturePresetCatalogStore,
+) -> None:
+    catalog = profile_store.load_catalog()
+    profile_name = scenario.get("profile_name")
+    if profile_name is not None:
+        if not isinstance(profile_name, str) or not profile_name.strip():
+            raise ValueError("Scenario 'profile_name' must be a non-empty string.")
+        preset = catalog.profile_named(profile_name)
+        base_appearance = preset.appearance
+    else:
+        base_appearance = (
+            shell.properties_panel._workflow.current_signature_appearance or SignatureAppearance()
+        )
+    appearance = _apply_appearance_overrides(
+        base_appearance,
+        scenario.get("appearance_overrides"),
+    )
+    shell.properties_panel.set_signature_appearance(appearance)
+    signature_rect_payload = scenario.get("signature_rect")
+    if signature_rect_payload is not None:
+        signature_rect = _signature_rect_from_payload(signature_rect_payload)
+        shell.properties_panel.set_signature_rect(signature_rect)
+        viewer_workflow = getattr(shell, "_viewer_workflow", None)
+        viewer_widget = getattr(shell, "_viewer_widget", None)
+        if viewer_workflow is not None and hasattr(viewer_workflow, "jump_to_page"):
+            viewer_workflow.jump_to_page(signature_rect.page_index)
+        refresh = getattr(viewer_widget, "refresh", None)
+        if callable(refresh):
+            refresh(navigation=True)
+        sync_placement = getattr(shell, "_sync_placement_context_from_viewer", None)
+        if callable(sync_placement):
+            sync_placement()
+        sync_overlay = getattr(shell, "_sync_signature_overlay", None)
+        if callable(sync_overlay):
+            sync_overlay()
+        refresh_sign_button = getattr(shell, "_refresh_sign_button_state", None)
+        if callable(refresh_sign_button):
+            refresh_sign_button()
+    shell.refresh_viewer()
+    app = _widget_application(shell)
+    if app is not None and hasattr(app, "processEvents"):
+        app.processEvents()
+
+
+def _signature_rect_from_payload(payload: object) -> SignatureRect:
+    if not isinstance(payload, dict):
+        raise ValueError("Scenario 'signature_rect' must be an object.")
+    return SignatureRect(
+        page_index=int(payload["page_index"]),
+        left_pt=float(payload["left_pt"]),
+        bottom_pt=float(payload["bottom_pt"]),
+        width_pt=float(payload["width_pt"]),
+        height_pt=float(payload["height_pt"]),
+    )
+
+
+def _apply_appearance_overrides(
+    appearance: SignatureAppearance,
+    overrides: object,
+) -> SignatureAppearance:
+    if overrides is None:
+        return appearance
+    if not isinstance(overrides, dict):
+        raise ValueError("Scenario 'appearance_overrides' must be an object.")
+
+    updated = appearance
+    direct_updates: dict[str, Any] = {}
+    enum_mappings = {
+        "layout_template": SignatureLayoutTemplate,
+        "stamp_position": SignatureStampPosition,
+        "timezone_display_mode": SignatureTimezoneDisplayMode,
+    }
+    for key in (
+        "signer_label_prefix",
+        "show_field_names",
+        "datetime_format",
+        "image_stamp_path",
+    ):
+        if key in overrides:
+            direct_updates[key] = overrides[key]
+    for key, enum_cls in enum_mappings.items():
+        if key in overrides:
+            direct_updates[key] = enum_cls(str(overrides[key]))
+    if direct_updates:
+        updated = replace(updated, **direct_updates)
+    if "text_style" in overrides:
+        updated = replace(
+            updated,
+            text_style=_apply_text_style_overrides(updated.text_style, overrides["text_style"]),
+        )
+    if "box_style" in overrides:
+        updated = replace(
+            updated,
+            box_style=_apply_box_style_overrides(updated.box_style, overrides["box_style"]),
+        )
+    return updated
+
+
+def _apply_text_style_overrides(style: SignatureTextStyle, overrides: object) -> SignatureTextStyle:
+    if not isinstance(overrides, dict):
+        raise ValueError("Scenario 'text_style' overrides must be an object.")
+    allowed: dict[str, Any] = {}
+    for key in ("font_family", "font_size_pt", "bold", "italic", "text_color_hex"):
+        if key in overrides:
+            allowed[key] = overrides[key]
+    return replace(style, **allowed)
+
+
+def _apply_box_style_overrides(style: SignatureBoxStyle, overrides: object) -> SignatureBoxStyle:
+    if not isinstance(overrides, dict):
+        raise ValueError("Scenario 'box_style' overrides must be an object.")
+    allowed: dict[str, Any] = {}
+    for key in ("show_border", "border_color_hex", "border_width_pt", "background_color_hex"):
+        if key in overrides:
+            allowed[key] = overrides[key]
+    return replace(style, **allowed)
+
+
+def _capture_preview_render(
+    *,
+    shell: Any,
+    preview: Any,
+    artifacts_dir: str | None,
+    artifact_basename: str,
+) -> dict[str, Any]:
+    controls = shell.properties_panel.preview_controls
+    card_container = controls.card_container
+    single_body = controls.single_body_container
+    multi_body = controls.multi_body_container
+    detail_label = controls.detail_label
+    stamp_label = controls.stamp_label
+    multi_detail = controls.multi_detail_label
+    multi_stamp = controls.multi_stamp_label
+    image_path = None
+    image_error = None
+    if artifacts_dir is not None:
+        target_dir = Path(artifacts_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        image_path = str(target_dir / f"{artifact_basename}.png")
+        image_error = _write_widget_capture_png(card_container, image_path)
+
+    use_single_body = _widget_is_visible(single_body)
+    active_body = single_body if use_single_body else multi_body
+    active_detail = detail_label if use_single_body else multi_detail
+    active_stamp = stamp_label if use_single_body else multi_stamp
+
+    body_bounds = _widget_rect_snapshot(active_body)
+    detail_bounds = _widget_rect_snapshot(active_detail)
+    stamp_bounds = _widget_rect_snapshot(active_stamp)
+    card_bounds = _widget_rect_snapshot(card_container)
+    band_distances = _preview_edge_distances(
+        preview=preview,
+        card_bounds=card_bounds,
+        body_bounds=body_bounds,
+        detail_bounds=detail_bounds,
+        stamp_bounds=stamp_bounds,
+    )
+    return {
+        "preview_image_path": image_path,
+        "preview_image_error": image_error,
+        "card_bounds_px": card_bounds,
+        "single_body_bounds_px": _widget_rect_snapshot(single_body),
+        "multi_body_bounds_px": _widget_rect_snapshot(multi_body),
+        "detail_label_bounds_px": _widget_rect_snapshot(detail_label),
+        "stamp_label_bounds_px": _widget_rect_snapshot(stamp_label),
+        "multi_detail_bounds_px": _widget_rect_snapshot(multi_detail),
+        "multi_stamp_bounds_px": _widget_rect_snapshot(multi_stamp),
+        "detail_text_size_hint_px": _size_hint_snapshot(detail_label),
+        "stamp_pixmap_size_px": _label_pixmap_size_snapshot(active_stamp),
+        "layout_spacing_px": _layout_spacing(active_body),
+        "preview_padding_px": _preview_padding_for_capture(preview),
+        "edge_distances_px": band_distances,
+    }
+
+
+def _preview_padding_for_capture(preview: Any) -> int:
+    if (
+        preview.signature_rect is not None
+        and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and preview.stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+    ):
+        return _single_line_vertical_outer_margin(
+            box_height=max(1, int(round(preview.signature_rect.height_pt))),
+            box_style=preview.box_style,
+        )
+    if preview.signature_rect is None or preview.stamp_position is None:
+        return 6
+    return _effective_layout_edge_margin(
+        stamp_position=preview.stamp_position,
+        box_height=max(1, int(round(preview.signature_rect.height_pt))),
+        box_style=preview.box_style,
+    )
+
+
+def _write_widget_capture_png(widget: Any, output_path: str) -> str | None:
+    grab = getattr(widget, "grab", None)
+    if not callable(grab):
+        return "Widget capture is unavailable because the Qt widget does not expose grab()."
+    pixmap = grab()
+    save = getattr(pixmap, "save", None)
+    if not callable(save):
+        return "Widget capture is unavailable because the grabbed pixmap does not expose save()."
+    if not save(output_path):
+        return f"Failed to save preview image to '{output_path}'."
+    return None
+
+
+def _widget_is_visible(widget: Any) -> bool:
+    visible = getattr(widget, "isVisible", None)
+    if callable(visible):
+        return bool(visible())
+    visible = getattr(widget, "visible", None)
+    if isinstance(visible, bool):
+        return visible
+    return True
+
+
+def _widget_rect_snapshot(widget: Any) -> dict[str, int] | None:
+    geometry = getattr(widget, "geometry", None)
+    if callable(geometry):
+        rect = geometry()
+        x = getattr(rect, "x", None)
+        y = getattr(rect, "y", None)
+        width = getattr(rect, "width", None)
+        height = getattr(rect, "height", None)
+        if all(callable(item) for item in (x, y, width, height)):
+            return {
+                "x": int(x()),
+                "y": int(y()),
+                "width": int(width()),
+                "height": int(height()),
+            }
+    size = getattr(widget, "fixed_size", None)
+    if isinstance(size, tuple) and len(size) == 2:
+        return {"x": 0, "y": 0, "width": int(size[0]), "height": int(size[1])}
+    width = _widget_width(widget)
+    height = None
+    size_hint = getattr(widget, "sizeHint", None)
+    if callable(size_hint):
+        hint = size_hint()
+        hint_height = getattr(hint, "height", None)
+        if callable(hint_height):
+            height = int(hint_height())
+    if width is not None and height is not None:
+        return {"x": 0, "y": 0, "width": int(width), "height": int(height)}
+    return None
+
+
+def _widget_width(widget: Any) -> int | None:
+    width = getattr(widget, "width", None)
+    if callable(width):
+        value = width()
+        if isinstance(value, int):
+            return value
+    fixed_width = getattr(widget, "fixed_width", None)
+    if isinstance(fixed_width, int):
+        return fixed_width
+    return None
+
+
+def _size_hint_snapshot(widget: Any) -> dict[str, int] | None:
+    size_hint = getattr(widget, "sizeHint", None)
+    if not callable(size_hint):
+        return None
+    hint = size_hint()
+    width = getattr(hint, "width", None)
+    height = getattr(hint, "height", None)
+    if callable(width) and callable(height):
+        return {"width": int(width()), "height": int(height())}
+    return None
+
+
+def _label_pixmap_size_snapshot(label: Any) -> dict[str, int] | None:
+    pixmap = getattr(label, "pixmap", None)
+    pixmap = pixmap() if callable(pixmap) else None
+    if pixmap is None:
+        return None
+    width = getattr(pixmap, "width", None)
+    height = getattr(pixmap, "height", None)
+    if callable(width) and callable(height):
+        return {"width": int(width()), "height": int(height())}
+    return None
+
+
+def _layout_spacing(widget: Any) -> int | None:
+    layout = getattr(widget, "layout", None)
+    layout = layout() if callable(layout) else layout
+    if layout is None:
+        return None
+    spacing = getattr(layout, "spacing", None)
+    if callable(spacing):
+        return int(spacing())
+    if isinstance(spacing, int):
+        return spacing
+    return getattr(layout, "spacing", None)
+
+
+def _preview_edge_distances(
+    *,
+    preview: Any,
+    card_bounds: dict[str, int] | None,
+    body_bounds: dict[str, int] | None,
+    detail_bounds: dict[str, int] | None,
+    stamp_bounds: dict[str, int] | None,
+) -> dict[str, Any]:
+    padding = _preview_padding_for_capture(preview)
+    result = {
+        "preview_padding_px": padding,
+        "text_top_to_border_px": None,
+        "text_bottom_to_border_px": None,
+        "stamp_top_to_border_px": None,
+        "stamp_bottom_to_border_px": None,
+        "content_top_to_border_px": None,
+        "content_bottom_to_border_px": None,
+    }
+    if card_bounds is None or body_bounds is None:
+        return result
+    body_top = body_bounds["y"]
+    card_height = card_bounds["height"]
+    if detail_bounds is not None:
+        detail_top = body_top + detail_bounds["y"]
+        detail_bottom = detail_top + detail_bounds["height"]
+        result["text_top_to_border_px"] = detail_top
+        result["text_bottom_to_border_px"] = max(0, card_height - detail_bottom)
+    if stamp_bounds is not None:
+        stamp_top = body_top + stamp_bounds["y"]
+        stamp_bottom = stamp_top + stamp_bounds["height"]
+        result["stamp_top_to_border_px"] = stamp_top
+        result["stamp_bottom_to_border_px"] = max(0, card_height - stamp_bottom)
+    content_tops = [
+        value
+        for value in (
+            result["text_top_to_border_px"],
+            result["stamp_top_to_border_px"],
+        )
+        if value is not None
+    ]
+    content_bottoms = [
+        value
+        for value in (
+            result["text_bottom_to_border_px"],
+            result["stamp_bottom_to_border_px"],
+        )
+        if value is not None
+    ]
+    if content_tops:
+        result["content_top_to_border_px"] = min(content_tops)
+    if content_bottoms:
+        result["content_bottom_to_border_px"] = min(content_bottoms)
+    return result
+
+
+def _widget_application(widget: Any) -> Any | None:
+    app_getter = getattr(type(widget), "window", None)
+    _ = app_getter  # keep linter quiet for fake widgets that lack QApplication access.
+    app_module = importlib.import_module("PySide6.QtWidgets")
+    q_application = getattr(app_module, "QApplication", None)
+    if q_application is None:
+        return None
+    instance = getattr(q_application, "instance", None)
+    return instance() if callable(instance) else None
+
+
+def _scenario_slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return slug or "scenario"
+
+
+def _snapshot_preview_capture_image(snapshot: dict[str, Any] | None) -> str | None:
+    if snapshot is None:
+        return None
+    render_capture = snapshot.get("render_capture")
+    if not isinstance(render_capture, dict):
+        return None
+    image_path = render_capture.get("preview_image_path")
+    return str(image_path) if image_path is not None else None
+
+
+def _snapshot_preview_edge_distance(snapshot: dict[str, Any] | None, key: str) -> int | None:
+    if snapshot is None:
+        return None
+    render_capture = snapshot.get("render_capture")
+    if not isinstance(render_capture, dict):
+        return None
+    distances = render_capture.get("edge_distances_px")
+    if not isinstance(distances, dict):
+        return None
+    value = distances.get(key)
+    return value if isinstance(value, int) else None
 
 
 def _snapshot_signing_request(request: SigningRequest | None) -> dict[str, Any] | None:

@@ -105,6 +105,17 @@ Scope boundary for this wave:
 - do not introduce X11/Wayland/compositor tracing unless later evidence proves app-level capture is
   insufficient
 
+Current harness instrumentation note:
+
+- `phase3-signing-harness` can now write preview-card PNGs and preview widget geometry/border-distance
+  metrics when `--artifacts-dir` is supplied
+- `phase3-signing-preview-matrix` can apply a JSON scenario manifest and write per-scenario preview
+  captures plus a summary JSON for batch fidelity sweeps
+- `artifacts/phase3_preview_matrix_template.json` is the hand-editable starting point for those
+  sweeps
+- `artifacts/preview_sweep_assets/` now contains a repository-local PDF/certificate/stamp suite plus
+  `single_line_matrix.json` for unattended single-line preview regression sweeps
+
 ## Certificate Compatibility Profile
 
 Phase 3 and the current backend should be planned against the following certificate scope:
