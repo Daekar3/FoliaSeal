@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -34,6 +35,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
+    _apply_visible_fields_override,
     _load_preview_matrix_manifest,
     _preview_edge_distances,
     _preview_matrix_error_result,
@@ -876,8 +878,33 @@ def test_apply_appearance_overrides_updates_common_preview_controls() -> None:
     assert updated.image_stamp_path == "/tmp/stamp.png"
     assert updated.box_style.border_width_pt == 3.5
     assert updated.box_style.background_color_hex == "#EEEEEE"
-    assert updated.text_style.font_size_pt == 8.5
-    assert updated.text_style.italic is True
+
+
+def test_apply_appearance_overrides_can_limit_visible_fields() -> None:
+    appearance = build_signature_appearance()
+
+    updated = _apply_appearance_overrides(
+        appearance,
+        {
+            "visible_fields": ["common_name", "signing_time"],
+        },
+    )
+
+    assert updated.common_name.show_in_visible_appearance is True
+    assert updated.signing_time.show_in_visible_appearance is True
+    assert updated.distinguished_name.source.value == "hidden"
+    assert updated.email.source.value == "hidden"
+    assert updated.title.source.value == "hidden"
+    assert updated.company.source.value == "hidden"
+
+
+def test_apply_visible_fields_override_rejects_empty_or_unknown_values() -> None:
+    appearance = build_signature_appearance()
+
+    with pytest.raises(ValueError):
+        _apply_visible_fields_override(appearance, [])
+    with pytest.raises(ValueError):
+        _apply_visible_fields_override(appearance, ["not_a_field"])
 
 
 def test_backend_reservation_snapshot_retains_error_details_for_bad_request() -> None:

@@ -181,12 +181,19 @@ What the preview matrix writes:
 - one preview PNG per scenario
 - one summary JSON at `artifacts/phase3_preview_matrix/summary.json`
 - per-scenario preview geometry, rendered widget bounds, and top/bottom border-distance metrics
+- per-scenario preview settings, including any manifest overrides for `visible_fields`,
+  `text_style.font_size_pt`, border width, and stamp image choice
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
 
 The repo now also includes a reusable local sweep fixture set under `artifacts/preview_sweep_assets/`,
 including `sweep_fixture.pdf`, `test_identity.p12`, three transparent stamp images, and
-`single_line_matrix.json` for unattended `single_line` preview sweeps.
+`single_line_matrix.json` for unattended `single_line` preview sweeps. That checked-in manifest now
+also demonstrates two practical sweep controls that matter for layout triage:
+
+- `visible_fields` to constrain which derived fields participate in a compact preview scenario
+- explicit text-size variation scenarios so preview regressions can be checked at more than one
+  `font_size_pt`
 
 Validate an existing harness capture without relaunching the GUI:
 

@@ -17,6 +17,8 @@ The user-visible proof is straightforward. A single batch command should generat
 - [x] (2026-04-04 23:45Z) Ran the preview matrix offscreen, inspected the generated PNGs and geometry metrics, and identified two real problems: the harness capture path did not handle real Qt widget visibility correctly, and compact vertical single-line preview bands could clip text because the preview used reservation proportions without respecting Qt label size hints.
 - [x] (2026-04-05 00:09Z) Implemented the required harness/preview fixes, added regression coverage, and reran the matrix plus focused tests successfully.
 - [x] (2026-04-05 00:12Z) Updated this ExecPlan with the sweep findings, local asset locations, and the final verification outcome.
+- [x] (2026-04-05 01:20Z) Expanded the manifest and harness overrides so sweep scenarios can pin `visible_fields` and vary text size explicitly, then reran the matrix to make the captures easier to interpret.
+- [x] (2026-04-05 01:47Z) Fixed the remaining preview-side single-line issues surfaced by the refreshed sweep review: stale widget size constraints were bleeding between scenarios, compact vertical previews were letting text overtake the reserved stamp band, and separator slack was not being returned to the stamp band.
 
 ## Surprises & Discoveries
 
@@ -32,6 +34,12 @@ The user-visible proof is straightforward. A single batch command should generat
 - Observation: several deliberately broad scenarios are invalid by design once the content becomes too verbose, and the new matrix now makes that obvious.
   Evidence: the final summary in `artifacts/preview_sweep_runs/single_line_matrix/summary.json` cleanly separates valid `Ready to sign.` scenarios from the intentionally overfull cases that emit `visible_signature_layout_unavailable`.
 
+- Observation: compact single-line sweeps are much easier to judge when the manifest constrains the visible field set explicitly.
+  Evidence: after adding `visible_fields` support to matrix overrides and updating the checked-in sweep to focus most compact cases on `common_name` plus `signing_time`, the left/right tight scenarios became readable enough to distinguish geometry bugs from content-density noise.
+
+- Observation: part of the stubborn bottom/compact preview drift was stateful rather than purely geometric.
+  Evidence: preview labels were carrying fixed-size constraints from prior scenarios, which meant later matrix captures could inherit stale height assumptions and overgrow the text band before the current scenario had even been measured.
+
 ## Decision Log
 
 - Decision: prefer repository-local generated assets over personal user files for the automated sweep when the environment supports it.
@@ -42,11 +50,19 @@ The user-visible proof is straightforward. A single batch command should generat
   Rationale: the goal of this pass is to judge preview layout quality, not to spend most of the matrix on stale page-selection errors or pathological field verbosity.
   Date/Author: 2026-04-05 / Codex
 
+- Decision: teach the matrix manifest to override `visible_fields` and include explicit text-size variants instead of inferring those permutations from whatever happens to be in the active appearance.
+  Rationale: that keeps scenario intent obvious and makes future unattended sweeps useful for both field-density and font-size regression checks.
+  Date/Author: 2026-04-05 / Codex
+
+- Decision: for compact vertical `single_line` preview, treat the backend reservation split as authoritative and only add a tiny Qt safety slack rather than expanding the text band all the way to the live label hint.
+  Rationale: the matrix showed that honoring the full live hint made bottom-mode previews consume the stamp band and produce misleadingly tiny or invisible stamps even when the backend still considered the scenario valid.
+  Date/Author: 2026-04-05 / Codex
+
 ## Outcomes & Retrospective
 
-The unattended sweep is now genuinely useful. It can be run entirely from repository-local assets, it produces preview PNGs that are easy to inspect without a human operator, and it already paid for itself by catching two issues the earlier unit coverage missed: a real-Qt visibility bug in the harness capture path and compact vertical preview clipping caused by sizing the preview bands purely from backend reservation proportions.
+The unattended sweep is now genuinely useful. It can be run entirely from repository-local assets, it produces preview PNGs that are easy to inspect without a human operator, and it already paid for itself by catching multiple issues the earlier unit coverage missed: a real-Qt visibility bug in the harness capture path, compact vertical preview clipping caused by sizing the preview bands purely from backend reservation proportions, stale widget geometry leaking between matrix scenarios, and compact separator slack being wasted as dead air instead of preserving stamp size.
 
-After the fixes, the valid `single_line` scenarios in the matrix look materially better. Compact `top` and `bottom` previews no longer clip into the border the way they did before, and valid `left`/`right` scenarios now render visible stamp imagery at practical sizes. The remaining flagged cases in the matrix are the intentionally overfull scenarios that the draft workflow correctly marks as `visible_signature_layout_unavailable`, which is acceptable and useful evidence rather than a new bug.
+After the latest fixes, the valid `single_line` scenarios in the checked-in matrix look materially better. Compact `bottom` previews now keep the stamp visible in cases where it was previously reduced to a barely perceptible sliver, compact `top`/`bottom` cases share a more faithful stamp/text split, and `left`/`right` sweeps are easier to judge because the manifest now constrains the visible field set explicitly and includes text-size variants. The remaining edge cases are now narrower: mostly product-judgment questions about how close to the border a compact valid scenario should be allowed to look, rather than obvious preview bugs or hidden scenario ambiguity.
 
 ## Context and Orientation
 
@@ -115,3 +131,5 @@ Do not add new runtime dependencies. Prefer existing `Pillow`, `PySide6`, and th
 Revision note: created on 2026-04-04 to drive the first unattended, repository-local sweep of Phase 3 single-line preview configurations using the new harness instrumentation.
 
 Revision note (2026-04-05, completion): the sweep now ships with local PDF/stamp/certificate fixtures under `artifacts/preview_sweep_assets/`, a reusable matrix manifest, real-Qt-safe harness capture logic, compact vertical preview band fitting that respects Qt size hints, and regression tests covering both the harness and preview fixes.
+
+Revision note (2026-04-05, follow-up): the matrix manifest now supports explicit `visible_fields` control and checked-in text-size variants, while the preview layout now clears stale widget-size constraints between scenarios and returns reclaimed separator slack to the compact vertical stamp band.

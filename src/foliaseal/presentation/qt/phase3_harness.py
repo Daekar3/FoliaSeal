@@ -32,6 +32,9 @@ from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
+    SignatureFieldBinding,
+    SignatureFieldKey,
+    SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -1120,6 +1123,8 @@ def _apply_appearance_overrides(
             updated,
             box_style=_apply_box_style_overrides(updated.box_style, overrides["box_style"]),
         )
+    if "visible_fields" in overrides:
+        updated = _apply_visible_fields_override(updated, overrides["visible_fields"])
     return updated
 
 
@@ -1141,6 +1146,49 @@ def _apply_box_style_overrides(style: SignatureBoxStyle, overrides: object) -> S
         if key in overrides:
             allowed[key] = overrides[key]
     return replace(style, **allowed)
+
+
+def _apply_visible_fields_override(
+    appearance: SignatureAppearance,
+    visible_fields: object,
+) -> SignatureAppearance:
+    if not isinstance(visible_fields, list) or not visible_fields:
+        raise ValueError("Scenario 'visible_fields' must be a non-empty array.")
+
+    visible_keys = {
+        _signature_field_key_from_manifest_value(value)
+        for value in visible_fields
+    }
+    updates: dict[str, Any] = {}
+    for field_key in appearance.field_order:
+        binding = appearance.binding_for(field_key)
+        if field_key in visible_keys:
+            source = binding.source
+            if source == SignatureFieldSource.HIDDEN:
+                source = SignatureFieldSource.DERIVED
+            updates[field_key.value] = SignatureFieldBinding(
+                source=source,
+                show_in_visible_appearance=True,
+                override_text=(
+                    binding.override_text
+                    if source == SignatureFieldSource.OVERRIDE
+                    else None
+                ),
+                display_label=binding.display_label,
+            )
+            continue
+        updates[field_key.value] = SignatureFieldBinding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+            display_label=binding.display_label,
+        )
+    return replace(appearance, **updates)
+
+
+def _signature_field_key_from_manifest_value(value: object) -> SignatureFieldKey:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Scenario field names must be non-empty strings.")
+    return SignatureFieldKey(value)
 
 
 def _capture_preview_render(

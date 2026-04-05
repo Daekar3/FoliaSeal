@@ -115,6 +115,10 @@ Current harness instrumentation note:
   sweeps
 - `artifacts/preview_sweep_assets/` now contains a repository-local PDF/certificate/stamp suite plus
   `single_line_matrix.json` for unattended single-line preview regression sweeps
+- matrix scenarios can now override `visible_fields` explicitly, which makes compact-layout sweeps
+  easier to interpret and avoids conflating field-volume problems with geometry problems
+- the checked-in single-line matrix now includes explicit text-size variation scenarios so preview
+  regressions can be exercised across more than one `font_size_pt`
 
 ## Certificate Compatibility Profile
 

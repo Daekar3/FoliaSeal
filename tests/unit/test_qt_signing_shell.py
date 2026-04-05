@@ -389,6 +389,7 @@ class _FakeScrollArea(_FakeWidget):
 
 class _FakeQt:
     AlignLeft = 1
+    AlignRight = 2
     AlignCenter = 4
     KeepAspectRatio = 1
     SmoothTransformation = 2
@@ -2052,6 +2053,53 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     )
 
 
+def test_signing_shell_single_line_horizontal_preview_aligns_stamp_to_side(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    for stamp_position, expected_alignment in (
+        (SignatureStampPosition.LEFT, _FakeQt.AlignLeft),
+        (SignatureStampPosition.RIGHT, _FakeQt.AlignRight),
+    ):
+        appearance = build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=stamp_position,
+            image_stamp_path="/tmp/stamp.png",
+        )
+        widget = build_qt_signing_shell(
+            viewer_workflow=_viewer_workflow(),
+            signing_workflow=_workflow(tmp_path),
+        )
+        widget.properties_panel.set_signature_appearance(appearance)
+        widget.properties_panel.set_signature_rect(
+            widget._signing_workspace._draft_workflow.update_signature_rect(
+                page_index=0,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=36.0,
+            )
+        )
+
+        assert (
+            widget.properties_panel.preview_controls.multi_body_container.layout.items[
+                0 if stamp_position == SignatureStampPosition.LEFT else 1
+            ][0].alignment
+            == expected_alignment
+        )
+
+
 def test_fit_vertical_preview_band_geometry_prefers_text_hint_and_reduces_separator() -> None:
     fitted = signing_shell_module._fit_vertical_preview_band_geometry(
         text_height=15,
@@ -2062,7 +2110,7 @@ def test_fit_vertical_preview_band_geometry_prefers_text_hint_and_reduces_separa
         stamp_visible=True,
     )
 
-    assert fitted == (30, 8, 0)
+    assert fitted == (17, 21, 0)
 
 
 def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() -> None:
@@ -2076,6 +2124,21 @@ def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() ->
     )
 
     assert fitted == (18, 32, 6)
+
+
+def test_reset_widget_size_constraints_clears_fake_geometry() -> None:
+    label = _FakeLabel("Preview")
+    label.fixed_size = (140, 32)
+    label.fixed_width = 140
+    label.maximum_width = 140
+    label.minimum_width = 80
+
+    signing_shell_module._reset_widget_size_constraints(label)
+
+    assert label.fixed_size is None
+    assert label.fixed_width is None
+    assert label.maximum_width is None
+    assert label.minimum_width is None
 
 
 def test_signing_shell_horizontal_preview_reduces_text_width_for_thick_borders(
