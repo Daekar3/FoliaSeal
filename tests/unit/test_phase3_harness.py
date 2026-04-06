@@ -1045,6 +1045,36 @@ def test_stamp_edge_diagnostics_ignores_left_anchor_for_top_and_bottom() -> None
     assert diagnostics["stamp_content_within_warning_distance"] is False
 
 
+def test_stamp_edge_diagnostics_uses_tighter_threshold_for_multi_line_and_wrapped_block() -> None:
+    for layout_template in (
+        SignatureLayoutTemplate.MULTI_LINE,
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+    ):
+        preview = type(
+            "_Preview",
+            (),
+            {
+                "layout_template": layout_template,
+                "box_style": type(
+                    "_BoxStyle",
+                    (),
+                    {"show_border": True, "border_width_pt": 3.5},
+                )(),
+            },
+        )()
+
+        diagnostics = _stamp_edge_diagnostics(
+            preview=preview,
+            stamp_band_bounds={"x": 10, "y": 10, "width": 40, "height": 40},
+            stamp_pixmap_bounds={"x": 14, "y": 14, "width": 24, "height": 24},
+            stamp_content_bounds={"x": 12, "y": 12, "width": 26, "height": 26},
+        )
+
+        assert diagnostics["stamp_content_warning_threshold_px"] == 1
+        assert diagnostics["stamp_content_min_edge_distance_px"] == 2
+        assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
 def test_write_stamp_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
     preview_path = tmp_path / "preview.png"
     output_path = tmp_path / "stamp_debug.png"

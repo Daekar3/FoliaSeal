@@ -43,6 +43,8 @@ Validated so far:
 - the preview panel width/aspect-ratio behavior is materially more stable than earlier in the
   remediation wave
 - the checked-in unattended `single_line` preview matrix is currently green across the repository
+- the checked-in unattended `multi_line` preview matrix is currently green across the repository
+- the checked-in unattended `wrapped_block` preview matrix is currently green across the repository
   fixture set
 - the `single_line` layout path has been simplified so preview composition and pre-submit fit
   validation now share the same backend-owned text/layout input rules

@@ -1729,8 +1729,19 @@ def _stamp_edge_diagnostics(
     stamp_content_bounds: dict[str, int] | None,
 ) -> dict[str, Any]:
     warning_threshold = 2
+    layout_template = getattr(preview, "layout_template", None)
+    if layout_template in {
+        SignatureLayoutTemplate.MULTI_LINE,
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+    }:
+        warning_threshold = 1
     if preview.box_style is not None and preview.box_style.show_border:
         warning_threshold = max(2, int(ceil(preview.box_style.border_width_pt / 2.0)))
+        if layout_template in {
+            SignatureLayoutTemplate.MULTI_LINE,
+            SignatureLayoutTemplate.WRAPPED_BLOCK,
+        }:
+            warning_threshold = min(warning_threshold, 1)
 
     pixmap_distances = _rect_edge_distances(
         outer_bounds=stamp_band_bounds,

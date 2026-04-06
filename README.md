@@ -207,8 +207,14 @@ Use the interactive harness when you want to manipulate the GUI manually. Use th
 
 The repo now also includes a reusable local sweep fixture set under `artifacts/preview_sweep_assets/`,
 including `sweep_fixture.pdf`, `test_identity.p12`, three transparent stamp images, and
-`single_line_matrix.json` for unattended `single_line` preview sweeps. That checked-in manifest now
-also demonstrates two practical sweep controls that matter for layout triage:
+`single_line_matrix.json` for unattended `single_line` preview sweeps. The fixture set now also
+includes dedicated full-matrix manifests for all three current layout families:
+
+- `single_line_full_matrix.json`
+- `multi_line_full_matrix.json`
+- `wrapped_block_full_matrix.json`
+
+Those checked-in manifests demonstrate two practical sweep controls that matter for layout triage:
 
 - `visible_fields` to constrain which derived fields participate in a compact preview scenario
 - explicit text-size variation scenarios so preview regressions can be checked at more than one
@@ -217,6 +223,8 @@ also demonstrates two practical sweep controls that matter for layout triage:
 Status note:
 
 - the checked-in unattended `single_line` matrix is currently green in automation
+- the checked-in unattended `multi_line` matrix is currently green in automation
+- the checked-in unattended `wrapped_block` matrix is currently green in automation
 - use it as a regression net, not as a substitute for the pending manual harness confirmation with
   real signing assets
 
