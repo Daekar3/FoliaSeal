@@ -1753,6 +1753,7 @@ def _stamp_edge_diagnostics(
     )
 
     relevant_content_distances = _relevant_stamp_edge_distances(
+        layout_template=getattr(preview, "layout_template", None),
         stamp_position=getattr(preview, "stamp_position", None),
         edge_distances=content_distances,
     )
@@ -1784,11 +1785,24 @@ def _stamp_edge_diagnostics(
 
 def _relevant_stamp_edge_distances(
     *,
+    layout_template: SignatureLayoutTemplate | None,
     stamp_position: SignatureStampPosition | None,
     edge_distances: dict[str, int] | None,
 ) -> dict[str, int] | None:
     if edge_distances is None:
         return None
+    if layout_template in {
+        SignatureLayoutTemplate.MULTI_LINE,
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+    }:
+        if stamp_position == SignatureStampPosition.TOP:
+            return {"top": edge_distances["top"]}
+        if stamp_position == SignatureStampPosition.BOTTOM:
+            return {"bottom": edge_distances["bottom"]}
+        if stamp_position == SignatureStampPosition.LEFT:
+            return {"left": edge_distances["left"]}
+        if stamp_position == SignatureStampPosition.RIGHT:
+            return {"right": edge_distances["right"]}
     if stamp_position in {
         SignatureStampPosition.TOP,
         SignatureStampPosition.BOTTOM,

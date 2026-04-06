@@ -28,6 +28,7 @@ from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
 from tests.support.phase3_builders import (
     build_signature_appearance,
+    build_signature_field_binding,
     build_signature_preset,
     build_signature_preset_catalog,
 )
@@ -811,7 +812,7 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert preview_controls.multi_body_container.layout.items[0][0].fixed_size is not None
     width, height = preview_controls.multi_body_container.layout.items[0][0].fixed_size
     assert 0 < width < 154
-    assert 0 < height < 108
+    assert 0 < height <= 108
     assert preview_controls.multi_body_container.layout.items[0][0].visible is True
     assert preview_controls.multi_body_container.layout.items[0][0].alignment == _FakeQt.AlignCenter
     available_width = signing_shell_module._preview_available_width(
@@ -2163,6 +2164,175 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     assert widget.properties_panel.preview_controls.multi_detail_label.fixed_size == (
         widget.properties_panel.preview_controls.multi_content_container.fixed_width,
         widget.properties_panel.preview_controls.multi_body_container.fixed_size[1],
+    )
+
+
+def test_signing_shell_multi_line_vertical_preview_uses_reserved_band_heights(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        image_stamp_path="/tmp/stamp.png",
+        signer_label_prefix="Signed by",
+        email=build_signature_field_binding(show_in_visible_appearance=False),
+        title=build_signature_field_binding(show_in_visible_appearance=False),
+        company=build_signature_field_binding(show_in_visible_appearance=False),
+        reason=build_signature_field_binding(show_in_visible_appearance=False),
+        location=build_signature_field_binding(
+            source=signing_shell_module.SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=35.84,
+            bottom_pt=428.48,
+            width_pt=260.48,
+            height_pt=23.68,
+        )
+    )
+
+    preview = widget.properties_panel.preview
+    detail = signing_shell_module._preview_detail_text(preview)
+    available_width = signing_shell_module._preview_available_width(
+        preview,
+        container=widget.properties_panel.preview_controls.container,
+    )
+    raw_geometry = signing_shell_module._preview_vertical_band_geometry(
+        preview,
+        title_line=preview.signer_label_prefix or preview.title,
+        detail_text=detail,
+        inner_body_height_px=widget.properties_panel.preview_controls.single_body_container.fixed_size[
+            1
+        ],
+        available_width_px=available_width,
+        stamp_aspect_ratio=signing_shell_module._raw_pixmap_aspect_ratio(
+            _FakePixmap("/tmp/stamp.png")
+        ),
+    )
+    assert raw_geometry is not None
+    expected_text_height, expected_stamp_height, _ = (
+        signing_shell_module._fit_vertical_preview_band_geometry(
+            text_height=raw_geometry[0],
+            stamp_height=raw_geometry[1],
+            separator_height=raw_geometry[2],
+            inner_body_height_px=widget.properties_panel.preview_controls.single_body_container.fixed_size[
+                1
+            ],
+            detail_hint_height_px=(
+                widget.properties_panel.preview_controls.detail_label.sizeHint().height()
+                or raw_geometry[0]
+            ),
+            stamp_visible=True,
+        )
+    )
+
+    assert widget.properties_panel.preview_controls.detail_label.fixed_size == (
+        widget.properties_panel.preview_controls.single_body_container.fixed_size[0],
+        expected_text_height,
+    )
+    assert widget.properties_panel.preview_controls.stamp_label.fixed_size == (
+        widget.properties_panel.preview_controls.single_body_container.fixed_size[0],
+        expected_stamp_height,
+    )
+
+
+def test_signing_shell_multi_line_horizontal_preview_uses_reserved_text_height(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path="/tmp/stamp.png",
+        signer_label_prefix="",
+        title=build_signature_field_binding(show_in_visible_appearance=False),
+        reason=build_signature_field_binding(show_in_visible_appearance=False),
+        location=build_signature_field_binding(
+            source=signing_shell_module.SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=35.84,
+            bottom_pt=429.12,
+            width_pt=202.24,
+            height_pt=23.04,
+        )
+    )
+
+    preview = widget.properties_panel.preview
+    detail = signing_shell_module._preview_detail_text(preview)
+    available_width = signing_shell_module._preview_available_width(
+        preview,
+        container=widget.properties_panel.preview_controls.container,
+    )
+    reservation = signing_shell_module._preview_layout_reservation(
+        preview,
+        detail_text=detail,
+        stamp_aspect_ratio=signing_shell_module._raw_pixmap_aspect_ratio(
+            _FakePixmap("/tmp/stamp.png")
+        ),
+    )
+    scale = signing_shell_module._preview_display_scale(
+        preview,
+        available_width_px=available_width,
+    )
+    expected_text_width = max(1, int(round(reservation.text_area_width_pt * scale)))
+    expected_text_height = max(1, int(round(reservation.text_area_height_pt * scale)))
+    expected_stamp_width = max(1, int(round(reservation.stamp_area_width_pt * scale)))
+    expected_stamp_height = max(1, int(round(reservation.stamp_area_height_pt * scale)))
+
+    assert widget.properties_panel.preview_controls.multi_content_container.fixed_size == (
+        expected_text_width,
+        expected_text_height,
+    )
+    assert widget.properties_panel.preview_controls.multi_detail_label.fixed_size == (
+        expected_text_width,
+        expected_text_height,
+    )
+    assert widget.properties_panel.preview_controls.multi_stamp_label.fixed_size == (
+        expected_stamp_width,
+        expected_stamp_height,
     )
 
 

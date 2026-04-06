@@ -17,7 +17,11 @@ The user-visible outcome is straightforward. Running the preview matrix commands
 - [x] (2026-04-05 22:55Z) Generated checked-in full-matrix manifests for `multi_line` and `wrapped_block` under `artifacts/preview_sweep_assets/`, with 288 deterministic scenarios per layout family.
 - [x] (2026-04-05 23:03Z) Ran unattended preview matrices for both layout families and captured their summaries under `artifacts/preview_sweep_runs/`.
 - [x] (2026-04-05 23:11Z) Analyzed the baseline summaries, identified one non-blocking `multi_line` warning cluster from the content-proximity threshold, made the threshold layout-aware in `phase3_harness.py`, and reran both matrices to a clean state.
-- [ ] Update user-facing documentation and focused/full verification results so the new sweep assets and final behavior are covered and reproducible.
+- [x] (2026-04-05 23:18Z) Updated user-facing documentation and verification results so the new sweep assets and final behavior are covered and reproducible.
+- [x] (2026-04-05 23:34Z) Reviewed the latest interactive manual-harness capture and corrected one mistaken interpretation: `multi_line` `left/right` are not failing from width strictness, but from genuine text-height overflow in very short horizontal rectangles.
+- [x] (2026-04-05 23:41Z) Narrowed non-`single_line` stamp-edge diagnostics so they evaluate only the border-facing edge of the reserved stamp band, which removed a misleading `multi_line top` warning from the manual-harness capture without changing signability.
+- [x] (2026-04-05 23:58Z) Investigated the next manual harness report and found a real preview/backend mismatch: `multi_line` preview was not sizing text and stamp widgets to the same reservation bands used by backend fit validation.
+- [x] (2026-04-06 00:05Z) Updated `signing_shell.py` so `multi_line` vertical and horizontal preview widgets use reservation-derived band sizes, then added focused Qt regressions for the vertical and horizontal cases.
 
 ## Surprises & Discoveries
 
@@ -29,6 +33,15 @@ The user-visible outcome is straightforward. Running the preview matrix commands
 
 - Observation: the only first-pass `multi_line` issue was a non-blocking warning cluster on tall top/bottom stamps, and every warning reported exactly `2px` of alpha-aware content clearance.
   Evidence: the initial `multi_line` summary showed 36 warnings, all from top/bottom tall-stamp cases, with `stamp_content_min_edge_distance_px = 2` and no `can_submit` failures.
+
+- Observation: the later manual-harness `multi_line left/right` failures were initially misread as width-gate pessimism, but the captured states show the opposite: width fits exactly while text height exceeds the reserved band by 1.8x to 3.8x.
+  Evidence: reconstructing the saved states from `artifacts/phase3_harness_capture.json` against `_layout_reservation_for_template(...)` produced cases such as `text_box 62x25` with `text_area 62x14` and `text_box 112x54` with `text_area 112x14`.
+
+- Observation: the remaining `multi_line top` stamp-edge warning in the manual-harness capture was a diagnostic artifact, not a real border-crowding defect.
+  Evidence: the saved top state had `stamp_content_edge_distances_px = {top: 6, left: 1, right: 5, bottom: 0}`. The `0px` distance was on the text-facing band edge, not the border-facing edge, and the scenario was signable with no visible complaint from the user.
+
+- Observation: later manual harness captures exposed a separate preview honesty bug for `multi_line`: the preview was still giving text and stamp labels more live widget space than the backend reservation actually allowed.
+  Evidence: a saved `multi_line top` state was marked signable while the preview showed the bottom text row cut off by the border, and a saved `multi_line left` state looked visually roomy while the backend correctly rejected it. The common cause was that the Qt preview body used soft width hints but not reservation-derived fixed heights for non-`single_line` bands.
 
 ## Decision Log
 
@@ -48,6 +61,18 @@ The user-visible outcome is straightforward. Running the preview matrix commands
   Rationale: the clustered scenarios were signable, not touching the band edge, and all reported the same centered `2px` content clearance. Preserving the stricter `2px` warning threshold for `single_line` while using a `1px` threshold for the more spacious non-`single_line` layouts keeps the alert useful without flagging benign centered fits.
   Date/Author: 2026-04-05 / Codex
 
+- Decision: do not loosen the backend fit gate for horizontal `multi_line` based on the latest manual harness run.
+  Rationale: the saved `left/right` states are genuinely over-height for their reserved text bands, so allowing them to sign would create preview/output dishonesty rather than simplification. The correct action is to preserve the backend rejection and make the harness evidence clearer.
+  Date/Author: 2026-04-05 / Codex
+
+- Decision: for `multi_line` and `wrapped_block`, evaluate stamp-edge warnings against the border-facing edge only.
+  Rationale: those layouts intentionally reserve separate text and stamp bands, so touching the text-facing band edge is not the same problem as crowding the outer border. The manual `multi_line top` state demonstrated that the old rule was producing false-positive warnings.
+  Date/Author: 2026-04-05 / Codex
+
+- Decision: keep backend fit validation unchanged for `multi_line`, and instead make the Qt preview honor the backend reservation bands more strictly.
+  Rationale: the newest manual harness report showed green-but-clipped `multi_line top/bottom` previews and blocked-but-roomy `multi_line left` previews. That is a preview contract bug, not proof that the backend is too strict.
+  Date/Author: 2026-04-06 / Codex
+
 ## Outcomes & Retrospective
 
 This plan achieved its purpose. The repository now has checked-in unattended full matrices for both `multi_line` and `wrapped_block`, and both are green under the current harness diagnostics:
@@ -56,6 +81,13 @@ This plan achieved its purpose. The repository now has checked-in unattended ful
 - `artifacts/preview_sweep_runs/wrapped_block_full_matrix/summary.json`: 288 scenarios, 0 invalid, 0 warnings, 0 edge-touch cases.
 
 The only code change needed in this slice was in the harness diagnostics, not the layout engine itself. That is a good outcome: the first broad `multi_line` and `wrapped_block` coverage did not immediately uncover backend/preview contract defects, only an over-eager proximity warning threshold for one harmless `multi_line` cluster.
+
+After the later manual harness review, that conclusion still holds. The follow-up trace showed one more harness-diagnostic mismatch, but it did not justify loosening backend fit validation. The corrected understanding is:
+
+- `multi_line top/bottom` are healthy under the current layout contract; the harness needed to ignore text-facing stamp-band edges for non-`single_line` warnings.
+- `multi_line left/right` remain blocked in very short rectangles for a real reason: the stacked text lines do not fit vertically inside the reserved text band, even when width fits cleanly.
+
+The additional preview correction in `signing_shell.py` tightened that contract further. The live Qt preview now sizes non-`single_line` text and stamp widgets from the same reservation bands that drive backend validation, which should remove the class of “green but visibly clipped” and “blocked but visually roomy” contradictions from the manual harness.
 
 ## Context and Orientation
 

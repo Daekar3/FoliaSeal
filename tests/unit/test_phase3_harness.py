@@ -1075,6 +1075,39 @@ def test_stamp_edge_diagnostics_uses_tighter_threshold_for_multi_line_and_wrappe
         assert diagnostics["stamp_content_within_warning_distance"] is False
 
 
+def test_stamp_edge_diagnostics_ignores_text_facing_edge_for_multi_line_top() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "layout_template": SignatureLayoutTemplate.MULTI_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 1.0},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 7, "y": 24, "width": 234, "height": 59},
+        stamp_pixmap_bounds={"x": 7, "y": 28, "width": 230, "height": 55},
+        stamp_content_bounds={"x": 8, "y": 30, "width": 228, "height": 53},
+    )
+
+    assert diagnostics["stamp_content_edge_distances_px"] == {
+        "left": 1,
+        "top": 6,
+        "right": 5,
+        "bottom": 0,
+    }
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 6
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
 def test_write_stamp_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
     preview_path = tmp_path / "preview.png"
     output_path = tmp_path / "stamp_debug.png"

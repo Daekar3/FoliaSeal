@@ -679,6 +679,39 @@ def test_layout_reservation_for_multi_line_allocates_right_text_space() -> None:
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
 )
+def test_layout_reservation_for_horizontal_multi_line_can_fail_from_height_not_width(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=stamp_position,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=34.3,
+            bottom_pt=428.99,
+            width_pt=260.61,
+            height_pt=22.12,
+        ),
+        text_box_width=62,
+        text_box_height=25,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.0,
+    )
+
+    assert reservation.text_box_width_pt == reservation.text_area_width_pt
+    assert reservation.text_box_height_pt > reservation.text_area_height_pt
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
+)
 def test_layout_reservation_for_horizontal_single_line_frees_more_stamp_space(
     stamp_position: SignatureStampPosition,
 ) -> None:

@@ -498,19 +498,13 @@ def _preview_text_width_limit(
         return body_width
 
     _unused_title = title_line
-    stamp_text = (detail_text or "").strip() or " "
-    text_box_style = _build_text_box_style(preview.text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(stamp_text, text_box_style)
-    reservation = _layout_reservation_for_template(
-        preview.layout_template,
-        stamp_position=preview.stamp_position,
-        signature_rect=preview.signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=preview.box_style,
-        has_visible_stamp_image=preview.image_stamp_path is not None,
+    reservation = _preview_layout_reservation(
+        preview,
+        detail_text=detail_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
+    if reservation is None:
+        return body_width
     text_width_pt = max(1, reservation.text_area_width_pt)
     return max(
         1,
@@ -583,19 +577,13 @@ def _preview_stamp_max_size(
         return (148, 92)
 
     _unused_title = title_line
-    stamp_text = detail_text.strip() or " "
-    text_box_style = _build_text_box_style(preview.text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(stamp_text, text_box_style)
-    reservation = _layout_reservation_for_template(
-        preview.layout_template,
-        stamp_position=preview.stamp_position,
-        signature_rect=preview.signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=preview.box_style,
-        has_visible_stamp_image=preview.image_stamp_path is not None,
+    reservation = _preview_layout_reservation(
+        preview,
+        detail_text=detail_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
+    if reservation is None:
+        return (148, 92)
     area_width = max(1, reservation.stamp_area_width_pt)
     area_height = max(1, reservation.stamp_area_height_pt)
     content_inset = 0
@@ -651,16 +639,46 @@ def _preview_vertical_band_geometry(
     if (
         preview.signature_rect is None
         or preview.text_style is None
-        or preview.layout_template != SignatureLayoutTemplate.SINGLE_LINE
         or preview.stamp_position not in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
     ):
         return None
 
     _unused_title = title_line
+    reservation = _preview_layout_reservation(
+        preview,
+        detail_text=detail_text,
+        stamp_aspect_ratio=stamp_aspect_ratio,
+    )
+    if reservation is None:
+        return None
+    preview_scale = _preview_display_scale(
+        preview,
+        available_width_px=available_width_px,
+    )
+    text_height = max(1, int(round(reservation.text_area_height_pt * preview_scale)))
+    stamp_height = max(1, int(round(reservation.stamp_area_height_pt * preview_scale)))
+    separator_height = max(0, inner_body_height_px - text_height - stamp_height)
+    return (text_height, stamp_height, separator_height)
+
+
+def _preview_layout_reservation(
+    preview: SigningDraftPreview,
+    *,
+    detail_text: str,
+    stamp_aspect_ratio: float | None = None,
+):
+    if (
+        preview.signature_rect is None
+        or preview.text_style is None
+        or preview.layout_template is None
+        or preview.stamp_position is None
+    ):
+        return None
+
     stamp_text = detail_text.strip() or " "
     text_box_style = _build_text_box_style(preview.text_style)
     text_box_width, text_box_height = _measure_text_box_dimensions(stamp_text, text_box_style)
-    reservation = _layout_reservation_for_template(
+    return _layout_reservation_for_template(
         preview.layout_template,
         stamp_position=preview.stamp_position,
         signature_rect=preview.signature_rect,
@@ -670,14 +688,6 @@ def _preview_vertical_band_geometry(
         has_visible_stamp_image=preview.image_stamp_path is not None,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
-    preview_scale = _preview_display_scale(
-        preview,
-        available_width_px=available_width_px,
-    )
-    text_height = max(1, int(round(reservation.text_area_height_pt * preview_scale)))
-    stamp_height = max(1, int(round(reservation.stamp_area_height_pt * preview_scale)))
-    separator_height = max(0, inner_body_height_px - text_height - stamp_height)
-    return (text_height, stamp_height, separator_height)
 
 
 def _size_hint_height(widget: Any) -> int | None:
@@ -1777,6 +1787,15 @@ class SignaturePropertiesPanel:
             if not callable(raw_is_null) or not raw_is_null():
                 raw_stamp_pixmap = raw_pixmap
         stamp_aspect_ratio = _raw_pixmap_aspect_ratio(raw_stamp_pixmap)
+        preview_scale = _preview_display_scale(
+            preview,
+            available_width_px=available_width_px,
+        )
+        preview_reservation = _preview_layout_reservation(
+            preview,
+            detail_text=visible_detail,
+            stamp_aspect_ratio=stamp_aspect_ratio,
+        )
         detail_width = (
             body_width
             if is_vertical
@@ -1794,6 +1813,22 @@ class SignaturePropertiesPanel:
             self._preview_controls.card_container.setFixedWidth(card_width)
         preview_padding_px = _preview_card_padding_px(preview)
         inner_body_width = max(1, body_width - int(round(preview_padding_px * 2)))
+        reserved_text_height_px = None
+        reserved_stamp_width_px = None
+        reserved_stamp_height_px = None
+        if preview_reservation is not None:
+            reserved_text_height_px = max(
+                1,
+                int(round(preview_reservation.text_area_height_pt * preview_scale)),
+            )
+            reserved_stamp_width_px = max(
+                1,
+                int(round(preview_reservation.stamp_area_width_pt * preview_scale)),
+            )
+            reserved_stamp_height_px = max(
+                1,
+                int(round(preview_reservation.stamp_area_height_pt * preview_scale)),
+            )
         for widget in (
             self._preview_controls.title_label,
             self._preview_controls.detail_label,
@@ -1864,10 +1899,18 @@ class SignaturePropertiesPanel:
         else:
             self._preview_controls.detail_label.setText("")
             self._preview_controls.multi_detail_label.setText(visible_detail)
+            content_height = (
+                reserved_text_height_px
+                if (
+                    preview.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+                    and reserved_text_height_px is not None
+                )
+                else inner_body_height
+            )
             if hasattr(self._preview_controls.multi_content_container, "setFixedSize"):
                 self._preview_controls.multi_content_container.setFixedSize(
                     detail_width,
-                    inner_body_height,
+                    content_height,
                 )
             else:
                 _set_widget_width_limit(
@@ -1877,7 +1920,7 @@ class SignaturePropertiesPanel:
             if hasattr(self._preview_controls.multi_detail_label, "setFixedSize"):
                 self._preview_controls.multi_detail_label.setFixedSize(
                     detail_width,
-                    inner_body_height,
+                    content_height,
                 )
             else:
                 _set_widget_width_limit(
@@ -1907,15 +1950,10 @@ class SignaturePropertiesPanel:
                 ),
                 stamp_visible=raw_stamp_pixmap is not None,
             )
-
         stamp_pixmap = None
         if raw_stamp_pixmap is not None:
             if is_vertical and vertical_band_geometry is not None:
                 _text_height, stamp_height, _separator_height = vertical_band_geometry
-                preview_scale = _preview_display_scale(
-                    preview,
-                    available_width_px=available_width_px,
-                )
                 content_inset = _single_line_stamp_content_inset(
                     stamp_position=preview.stamp_position,
                     box_width=max(1, int(round(preview.signature_rect.width_pt))),
@@ -1973,6 +2011,20 @@ class SignaturePropertiesPanel:
                 ):
                     _text_height, stamp_height, _separator_height = vertical_band_geometry
                     label.setFixedSize(inner_body_width, stamp_height)
+                elif (
+                    is_vertical
+                    and reserved_stamp_height_px is not None
+                    and hasattr(label, "setFixedSize")
+                ):
+                    label.setFixedSize(inner_body_width, reserved_stamp_height_px)
+                elif (
+                    not is_vertical
+                    and preview.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+                    and reserved_stamp_width_px is not None
+                    and reserved_stamp_height_px is not None
+                    and hasattr(label, "setFixedSize")
+                ):
+                    label.setFixedSize(reserved_stamp_width_px, reserved_stamp_height_px)
                 elif hasattr(label, "setFixedSize"):
                     size_width = getattr(stamp_pixmap, "width", None)
                     size_height = getattr(stamp_pixmap, "height", None)
@@ -1996,6 +2048,15 @@ class SignaturePropertiesPanel:
                 if is_vertical and vertical_band_geometry is not None:
                     _text_height, stamp_height, _separator_height = vertical_band_geometry
                     label.setFixedSize(inner_body_width, stamp_height)
+                elif is_vertical and reserved_stamp_height_px is not None:
+                    label.setFixedSize(inner_body_width, reserved_stamp_height_px)
+                elif (
+                    not is_vertical
+                    and preview.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+                    and reserved_stamp_width_px is not None
+                    and reserved_stamp_height_px is not None
+                ):
+                    label.setFixedSize(reserved_stamp_width_px, reserved_stamp_height_px)
                 else:
                     label.setFixedSize(96, 64)
 
@@ -2030,6 +2091,14 @@ class SignaturePropertiesPanel:
                 layout = _container_layout(self._preview_controls.single_body_container)
                 if layout is not None and hasattr(layout, "setSpacing"):
                     layout.setSpacing(separator_height)
+            elif (
+                reserved_text_height_px is not None
+                and hasattr(self._preview_controls.detail_label, "setFixedSize")
+            ):
+                self._preview_controls.detail_label.setFixedSize(
+                    inner_body_width,
+                    reserved_text_height_px,
+                )
             stamp_widget: Any = self._preview_controls.stamp_label
             detail_widget: Any = self._preview_controls.detail_label
             if align_left is not None:
