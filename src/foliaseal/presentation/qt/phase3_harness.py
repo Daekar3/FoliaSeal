@@ -10,6 +10,7 @@ from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from math import ceil
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from time import perf_counter
 from typing import Any
 
@@ -1346,8 +1347,14 @@ def _capture_preview_render(
     detail_bounds = _widget_rect_snapshot(active_detail)
     stamp_bounds = _widget_rect_snapshot(active_stamp)
     card_bounds = _widget_rect_snapshot(card_container)
-    text_widget_bounds = _translate_child_bounds(body_bounds, detail_bounds)
-    stamp_band_bounds = _translate_child_bounds(body_bounds, stamp_bounds)
+    image_card_bounds = (
+        None
+        if card_bounds is None
+        else {"x": 0, "y": 0, "width": card_bounds["width"], "height": card_bounds["height"]}
+    )
+    body_bounds = _widget_rect_snapshot_relative_to(card_container, active_body) or body_bounds
+    text_widget_bounds = _widget_rect_snapshot_relative_to(card_container, active_detail)
+    stamp_band_bounds = _widget_rect_snapshot_relative_to(card_container, active_stamp)
     stamp_alignment = _label_alignment_snapshot(active_stamp)
     stamp_pixmap_size = _label_pixmap_size_snapshot(active_stamp)
     stamp_pixmap_bounds = _project_pixmap_bounds_within_label(
@@ -1369,16 +1376,25 @@ def _capture_preview_render(
     )
     text_rendered_content_bounds = None
     text_content_error = None
+    text_reference_content_bounds = None
+    text_reference_error = None
     if image_path is not None and image_error is None and text_widget_bounds is not None:
         text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
             preview_image_path=image_path,
             text_widget_bounds=text_widget_bounds,
+            text_color_rgba=_preview_text_color_rgba(preview),
+        )
+    if text_widget_bounds is not None:
+        text_reference_content_bounds, text_reference_error = _reference_text_content_bounds(
+            source_label=active_detail,
+            text_color_rgba=_preview_text_color_rgba(preview),
         )
     text_diagnostics = _text_edge_diagnostics(
         preview=preview,
-        card_bounds=card_bounds,
+        card_bounds=image_card_bounds,
         text_widget_bounds=text_widget_bounds,
         text_content_bounds=text_rendered_content_bounds,
+        reference_text_content_bounds=text_reference_content_bounds,
         stamp_band_bounds=stamp_band_bounds,
         stamp_content_bounds=stamp_content_bounds,
     )
@@ -1438,6 +1454,8 @@ def _capture_preview_render(
         "text_debug_image_error": text_debug_image_error,
         "text_rendered_content_bounds_px": text_rendered_content_bounds,
         "text_content_detection_error": text_content_error,
+        "text_reference_content_bounds_px": text_reference_content_bounds,
+        "text_reference_detection_error": text_reference_error,
         "stamp_debug_image_path": stamp_debug_image_path,
         "stamp_debug_image_error": stamp_debug_image_error,
         "stamp_band_bounds_px": stamp_band_bounds,
@@ -1717,6 +1735,27 @@ def _translate_child_bounds(
     }
 
 
+def _widget_rect_snapshot_relative_to(root_widget: Any, widget: Any) -> dict[str, int] | None:
+    bounds = _widget_rect_snapshot(widget)
+    if root_widget is None or widget is None or bounds is None:
+        return bounds
+    map_to = getattr(widget, "mapTo", None)
+    if not callable(map_to):
+        return bounds
+    qt_core = importlib.import_module("PySide6.QtCore")
+    point = map_to(root_widget, getattr(qt_core, "QPoint")(0, 0))
+    x_getter = getattr(point, "x", None)
+    y_getter = getattr(point, "y", None)
+    if not callable(x_getter) or not callable(y_getter):
+        return bounds
+    return {
+        "x": int(x_getter()),
+        "y": int(y_getter()),
+        "width": bounds["width"],
+        "height": bounds["height"],
+    }
+
+
 def _project_pixmap_bounds_within_label(
     *,
     label_bounds: dict[str, int] | None,
@@ -1816,6 +1855,7 @@ def _detect_text_content_bounds_in_preview(
     *,
     preview_image_path: str,
     text_widget_bounds: dict[str, int],
+    text_color_rgba: tuple[int, int, int, int] | None,
 ) -> tuple[dict[str, int] | None, str | None]:
     try:
         preview_image = Image.open(preview_image_path).convert("RGBA")
@@ -1840,7 +1880,11 @@ def _detect_text_content_bounds_in_preview(
     for y in range(crop_height):
         for x in range(crop_width):
             pixel = cropped.getpixel((x, y))
-            if not _is_text_candidate_pixel(pixel, background_rgba=background, threshold=16):
+            if not _is_text_candidate_pixel(
+                pixel,
+                text_color_rgba=text_color_rgba,
+                background_rgba=background,
+            ):
                 continue
             min_x = min(min_x, x)
             min_y = min(min_y, y)
@@ -1857,6 +1901,68 @@ def _detect_text_content_bounds_in_preview(
         },
         None,
     )
+
+
+def _reference_text_content_bounds(
+    *,
+    source_label: Any,
+    text_color_rgba: tuple[int, int, int, int] | None,
+) -> tuple[dict[str, int] | None, str | None]:
+    widgets = importlib.import_module("PySide6.QtWidgets")
+    qt_core = importlib.import_module("PySide6.QtCore")
+    reference_label = getattr(widgets, "QLabel")()
+    try:
+        reference_label.setAttribute(
+            getattr(qt_core.Qt.WidgetAttribute, "WA_DontShowOnScreen"),
+            True,
+        )
+        reference_label.setText(source_label.text())
+        reference_label.setFont(source_label.font())
+        reference_label.setAlignment(source_label.alignment())
+        reference_label.setWordWrap(source_label.wordWrap())
+        reference_label.setTextFormat(source_label.textFormat())
+        reference_label.setIndent(source_label.indent())
+        reference_label.setMargin(source_label.margin())
+        reference_label.setContentsMargins(source_label.contentsMargins())
+        reference_label.setStyleSheet(source_label.styleSheet())
+        reference_label.ensurePolished()
+
+        if source_label.wordWrap():
+            reference_width = max(1, source_label.width())
+            reference_label.setFixedWidth(reference_width)
+            reference_height = max(
+                source_label.height(),
+                reference_label.sizeHint().height(),
+                source_label.sizeHint().height(),
+            )
+            reference_label.resize(reference_width, max(1, reference_height))
+        else:
+            reference_label.adjustSize()
+            hint = reference_label.sizeHint()
+            reference_width = max(source_label.width(), hint.width())
+            reference_height = max(source_label.height(), hint.height())
+            reference_label.resize(max(1, reference_width), max(1, reference_height))
+
+        with NamedTemporaryFile(suffix=".png", delete=False) as handle:
+            capture_path = handle.name
+        try:
+            capture_error = _write_widget_capture_png(reference_label, capture_path)
+            if capture_error is not None:
+                return None, capture_error
+            return _detect_text_content_bounds_in_preview(
+                preview_image_path=capture_path,
+                text_widget_bounds={
+                    "x": 0,
+                    "y": 0,
+                    "width": reference_label.width(),
+                    "height": reference_label.height(),
+                },
+                text_color_rgba=text_color_rgba,
+            )
+        finally:
+            Path(capture_path).unlink(missing_ok=True)
+    finally:
+        reference_label.deleteLater()
 
 
 def _estimate_crop_background_rgba(image: Image.Image) -> tuple[int, int, int, int]:
@@ -1880,17 +1986,40 @@ def _estimate_crop_background_rgba(image: Image.Image) -> tuple[int, int, int, i
     )
 
 
+def _preview_text_color_rgba(preview: Any) -> tuple[int, int, int, int] | None:
+    text_style = getattr(preview, "text_style", None)
+    if text_style is None:
+        return None
+    color_hex = getattr(text_style, "text_color_hex", None)
+    if not isinstance(color_hex, str):
+        return None
+    normalized = color_hex.strip().lstrip("#")
+    if len(normalized) != 6:
+        return None
+    try:
+        return (
+            int(normalized[0:2], 16),
+            int(normalized[2:4], 16),
+            int(normalized[4:6], 16),
+            255,
+        )
+    except ValueError:
+        return None
+
+
 def _is_text_candidate_pixel(
     pixel: tuple[int, int, int, int],
     *,
+    text_color_rgba: tuple[int, int, int, int] | None,
     background_rgba: tuple[int, int, int, int],
-    threshold: int,
 ) -> bool:
     if pixel[3] <= 0:
         return False
+    if text_color_rgba is not None:
+        text_distance = sum(abs(pixel[index] - text_color_rgba[index]) for index in range(3))
+        return text_distance <= 110
     color_distance = sum(abs(pixel[index] - background_rgba[index]) for index in range(3))
-    alpha_distance = abs(pixel[3] - background_rgba[3])
-    return color_distance + alpha_distance > threshold
+    return color_distance > 80
 
 
 def _rect_edge_distances(
@@ -1980,6 +2109,7 @@ def _text_edge_diagnostics(
     card_bounds: dict[str, int] | None,
     text_widget_bounds: dict[str, int] | None,
     text_content_bounds: dict[str, int] | None,
+    reference_text_content_bounds: dict[str, int] | None,
     stamp_band_bounds: dict[str, int] | None,
     stamp_content_bounds: dict[str, int] | None,
 ) -> dict[str, Any]:
@@ -1996,15 +2126,43 @@ def _text_edge_diagnostics(
     )
     border_facing_distance = None if widget_distances is None else widget_distances.get(border_edge)
     stamp_facing_distance = None if widget_distances is None else widget_distances.get(stamp_edge)
-    stamp_band_overlap = _rectangles_intersect(text_content_bounds, stamp_band_bounds)
-    stamp_content_overlap = _rectangles_intersect(text_content_bounds, stamp_content_bounds)
+    raster_tolerance_px = 2
+    stamp_band_overlap = _rectangles_overlap_exceeds_tolerance(
+        text_content_bounds,
+        stamp_band_bounds,
+        tolerance_px=raster_tolerance_px,
+    )
+    stamp_content_overlap = _rectangles_overlap_exceeds_tolerance(
+        text_content_bounds,
+        stamp_content_bounds,
+        tolerance_px=raster_tolerance_px,
+    )
     widget_min_distance = None if widget_distances is None else min(widget_distances.values())
     border_min_distance = None if border_distances is None else min(border_distances.values())
+    reference_width_loss = None
+    reference_height_loss = None
+    if text_content_bounds is not None and reference_text_content_bounds is not None:
+        reference_width_loss = max(
+            0,
+            reference_text_content_bounds["width"] - text_content_bounds["width"],
+        )
+        reference_height_loss = max(
+            0,
+            reference_text_content_bounds["height"] - text_content_bounds["height"],
+        )
+    clipped_from_reference = None
+    if reference_width_loss is not None and reference_height_loss is not None:
+        clipped_from_reference = (
+            reference_width_loss > raster_tolerance_px
+            or reference_height_loss > raster_tolerance_px
+        )
     return {
         "text_content_edge_distances_px": widget_distances,
         "text_content_border_edge_distances_px": border_distances,
         "text_content_min_edge_distance_px": widget_min_distance,
         "text_content_min_border_distance_px": border_min_distance,
+        "text_content_reference_width_loss_px": reference_width_loss,
+        "text_content_reference_height_loss_px": reference_height_loss,
         "text_content_border_facing_distance_px": border_facing_distance,
         "text_content_stamp_facing_distance_px": stamp_facing_distance,
         "text_content_touches_widget_edge": (
@@ -2020,9 +2178,14 @@ def _text_edge_diagnostics(
         "text_content_overlaps_stamp_content": stamp_content_overlap,
         "text_content_clipped_in_preview": (
             None
-            if widget_min_distance is None
+            if (
+                clipped_from_reference is None
+                and widget_min_distance is None
+                and stamp_band_overlap is None
+                and stamp_content_overlap is None
+            )
             else (
-                widget_min_distance <= 0
+                clipped_from_reference is True
                 or stamp_band_overlap is True
                 or stamp_content_overlap is True
             )
@@ -2059,6 +2222,25 @@ def _rectangles_intersect(
         or first_bottom <= second["y"]
         or second_bottom <= first["y"]
     )
+
+
+def _rectangles_overlap_exceeds_tolerance(
+    first: dict[str, int] | None,
+    second: dict[str, int] | None,
+    *,
+    tolerance_px: int,
+) -> bool | None:
+    if first is None or second is None:
+        return None
+    if not _rectangles_intersect(first, second):
+        return False
+    overlap_left = max(first["x"], second["x"])
+    overlap_top = max(first["y"], second["y"])
+    overlap_right = min(first["x"] + first["width"], second["x"] + second["width"])
+    overlap_bottom = min(first["y"] + first["height"], second["y"] + second["height"])
+    overlap_width = max(0, overlap_right - overlap_left)
+    overlap_height = max(0, overlap_bottom - overlap_top)
+    return overlap_width > tolerance_px and overlap_height > tolerance_px
 
 
 def _relevant_stamp_edge_distances(

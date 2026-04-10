@@ -891,18 +891,27 @@ def _preview_card_padding_px(preview: SigningDraftPreview) -> float:
 def _preview_text_style(preview: SigningDraftPreview) -> str:
     if preview.text_style is None:
         return "color: #1f1f1f;"
-    family = preview.text_style.font_family
+    family = _preview_font_stack(preview.text_style.font_family)
     size = preview.text_style.font_size_pt
     weight = "700" if preview.text_style.bold else "500"
     style = "italic" if preview.text_style.italic else "normal"
     color = _hex_to_css_color(preview.text_style.text_color_hex, fallback="#1f1f1f")
     return (
-        f"font-family: '{family}'; "
+        f"font-family: {family}; "
         f"font-size: {size:.1f}pt; "
         f"font-weight: {weight}; "
         f"font-style: {style}; "
         f"color: {color};"
     )
+
+
+def _preview_font_stack(font_family: str) -> str:
+    normalized = font_family.strip().lower()
+    if "courier" in normalized or "mono" in normalized or "code" in normalized:
+        return "'Courier New', 'Courier', monospace"
+    if "times" in normalized or "serif" in normalized:
+        return "'Times New Roman', 'Times', serif"
+    return "'Helvetica', 'Arial', sans-serif"
 
 
 def _build_preview_issue(
@@ -1797,15 +1806,25 @@ class SignaturePropertiesPanel:
             detail_text=visible_detail,
             stamp_aspect_ratio=stamp_aspect_ratio,
         )
+        reserved_text_width_px = None
+        if preview_reservation is not None:
+            reserved_text_width_px = max(
+                1,
+                int(round(preview_reservation.text_area_width_pt * preview_scale)),
+            )
         detail_width = (
             body_width
             if is_vertical
-            else _preview_text_width_limit(
-                preview,
-                title_line=title_line,
-                detail_text=visible_detail,
-                available_width_px=available_width_px,
-                stamp_aspect_ratio=stamp_aspect_ratio,
+            else (
+                reserved_text_width_px
+                if reserved_text_width_px is not None
+                else _preview_text_width_limit(
+                    preview,
+                    title_line=title_line,
+                    detail_text=visible_detail,
+                    available_width_px=available_width_px,
+                    stamp_aspect_ratio=stamp_aspect_ratio,
+                )
             )
         )
         if hasattr(self._preview_controls.card_container, "setFixedSize"):

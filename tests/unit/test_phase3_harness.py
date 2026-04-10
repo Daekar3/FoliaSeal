@@ -936,6 +936,7 @@ def test_detect_text_content_bounds_in_preview_finds_rendered_pixels(tmp_path: P
     bounds, error = _detect_text_content_bounds_in_preview(
         preview_image_path=str(preview_path),
         text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
+        text_color_rgba=(0, 0, 0, 255),
     )
 
     assert error is None
@@ -954,6 +955,7 @@ def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
         card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
         text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 30},
         text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
+        reference_text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
         stamp_band_bounds={"x": 10, "y": 40, "width": 80, "height": 20},
         stamp_content_bounds={"x": 15, "y": 42, "width": 40, "height": 12},
     )
@@ -961,6 +963,28 @@ def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
     assert diagnostics["text_content_stamp_facing_distance_px"] == 0
     assert diagnostics["text_content_touches_stamp_facing_edge"] is True
     assert diagnostics["text_content_overlaps_stamp_band"] is False
+    assert diagnostics["text_content_clipped_in_preview"] is False
+
+
+def test_text_edge_diagnostics_flags_reference_content_loss_as_clipping() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.BOTTOM},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 30},
+        text_content_bounds={"x": 12, "y": 12, "width": 56, "height": 24},
+        reference_text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
+        stamp_band_bounds={"x": 10, "y": 40, "width": 80, "height": 20},
+        stamp_content_bounds={"x": 15, "y": 42, "width": 40, "height": 12},
+    )
+
+    assert diagnostics["text_content_reference_width_loss_px"] == 4
+    assert diagnostics["text_content_reference_height_loss_px"] == 4
     assert diagnostics["text_content_clipped_in_preview"] is True
 
 
