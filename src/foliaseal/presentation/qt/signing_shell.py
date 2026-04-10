@@ -371,6 +371,7 @@ _PREVIEW_MAX_WIDTH_PX = 520
 _PREVIEW_MAX_HEIGHT_PX = 180
 _PREVIEW_DEFAULT_WIDTH_PX = 320
 _PREVIEW_DEFAULT_HEIGHT_PX = 120
+_PREVIEW_SCREEN_PX_PER_PT = 96.0 / 72.0
 _PREVIEW_HORIZONTAL_PADDING_PX = 24
 _PREVIEW_GROUP_OVERHEAD_PX = 28
 _PREVIEW_CARD_CONTENT_INSET_PX = 4
@@ -456,7 +457,14 @@ def _preview_body_size(
     width_pt = max(1.0, preview.signature_rect.width_pt)
     height_pt = max(1.0, preview.signature_rect.height_pt)
     max_width_px = available_width_px or _PREVIEW_MAX_WIDTH_PX
-    scale = min(max_width_px / width_pt, _PREVIEW_MAX_HEIGHT_PX / height_pt)
+    # Keep the preview card tied to a physical PDF-to-screen scale instead of
+    # stretching it to fill the pane. Otherwise narrow rectangles look much
+    # roomier than the same text can ever be in the signed PDF.
+    scale = min(
+        _PREVIEW_SCREEN_PX_PER_PT,
+        max_width_px / width_pt,
+        _PREVIEW_MAX_HEIGHT_PX / height_pt,
+    )
     width = max(1, int(round(width_pt * scale)))
     height = max(1, int(round(height_pt * scale)))
     return (width, height)
@@ -743,29 +751,22 @@ def _fit_vertical_preview_band_geometry(
     if inner_body_height_px <= 0:
         return (0, 0, 0)
 
+    _unused_detail_hint_height_px = detail_hint_height_px
     minimum_stamp_height = 0
     if stamp_visible:
         minimum_stamp_height = min(inner_body_height_px, 6)
 
+    # Keep preview text constrained to the backend-reserved band height instead
+    # of letting Qt size hints silently borrow extra room. Preview honesty should
+    # come from shared reservation geometry, not from layout-engine growth.
     max_text_height = max(0, inner_body_height_px - minimum_stamp_height)
-    maximum_text_growth = 2 if stamp_visible else 4
-    fitted_text_height = max(
-        text_height,
-        min(detail_hint_height_px, text_height + maximum_text_growth),
-    )
-    if max_text_height > 0:
-        fitted_text_height = min(fitted_text_height, max_text_height)
-    else:
-        fitted_text_height = inner_body_height_px
+    fitted_text_height = min(text_height, max_text_height)
 
     remaining_height = max(0, inner_body_height_px - fitted_text_height)
-    if detail_hint_height_px > text_height:
-        fitted_separator_height = 0
-    else:
-        fitted_separator_height = min(
-            separator_height,
-            max(0, remaining_height - minimum_stamp_height),
-        )
+    fitted_separator_height = min(
+        separator_height,
+        max(0, remaining_height - minimum_stamp_height),
+    )
     fitted_stamp_height = max(0, remaining_height - fitted_separator_height)
     return (fitted_text_height, fitted_stamp_height, fitted_separator_height)
 

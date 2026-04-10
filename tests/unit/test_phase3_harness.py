@@ -38,9 +38,11 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
     _capture_interactive_state,
+    _detect_text_content_bounds_in_preview,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
     _preview_edge_distances,
+    _preview_matrix_diagnostic_summary,
     _preview_matrix_error_result,
     _project_content_bounds_to_preview,
     _snapshot_backend_reservation,
@@ -48,8 +50,10 @@ from foliaseal.presentation.qt.phase3_harness import (
     _snapshot_preview,
     _snapshot_visible_signature_appearance,
     _stamp_edge_diagnostics,
+    _text_edge_diagnostics,
     _widget_is_visible,
     _write_stamp_debug_overlay,
+    _write_text_debug_overlay,
     build_phase3_checklist_results_markdown,
 )
 from tests.support.phase3_builders import (
@@ -921,6 +925,63 @@ def test_write_stamp_debug_overlay_writes_debug_crop(tmp_path: Path) -> None:
     assert output_path.exists()
 
 
+def test_detect_text_content_bounds_in_preview_finds_rendered_pixels(tmp_path: Path) -> None:
+    preview_path = tmp_path / "preview.png"
+    image = Image.new("RGBA", (80, 40), color=(255, 255, 255, 255))
+    for x in range(18, 46):
+        for y in range(12, 21):
+            image.putpixel((x, y), (0, 0, 0, 255))
+    image.save(preview_path, format="PNG")
+
+    bounds, error = _detect_text_content_bounds_in_preview(
+        preview_image_path=str(preview_path),
+        text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
+    )
+
+    assert error is None
+    assert bounds == {"x": 18, "y": 12, "width": 28, "height": 9}
+
+
+def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.BOTTOM},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 30},
+        text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
+        stamp_band_bounds={"x": 10, "y": 40, "width": 80, "height": 20},
+        stamp_content_bounds={"x": 15, "y": 42, "width": 40, "height": 12},
+    )
+
+    assert diagnostics["text_content_stamp_facing_distance_px"] == 0
+    assert diagnostics["text_content_touches_stamp_facing_edge"] is True
+    assert diagnostics["text_content_overlaps_stamp_band"] is False
+    assert diagnostics["text_content_clipped_in_preview"] is True
+
+
+def test_write_text_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
+    preview_path = tmp_path / "preview.png"
+    output_path = tmp_path / "text_debug.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
+
+    error = _write_text_debug_overlay(
+        preview_image_path=str(preview_path),
+        output_path=str(output_path),
+        text_widget_bounds={"x": 10, "y": 12, "width": 50, "height": 18},
+        text_content_bounds={"x": 14, "y": 16, "width": 30, "height": 8},
+        stamp_band_bounds={"x": 10, "y": 34, "width": 50, "height": 12},
+        crop_padding=6,
+    )
+
+    assert error is None
+    assert output_path.exists() is True
+
+
 def test_preview_edge_distances_report_top_and_bottom_clearance() -> None:
     preview = type(
         "_Preview",
@@ -1150,6 +1211,37 @@ def test_preview_matrix_error_result_records_scenario_name_and_error_type() -> N
         "profile_name": "Saved Profile",
         "error": "bad border width",
         "error_type": "ValueError",
+    }
+
+
+def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
+    summary = _preview_matrix_diagnostic_summary(
+        [
+            {
+                "preview_snapshot": {
+                    "render_capture": {
+                        "text_content_clipped_in_preview": True,
+                        "text_content_overlaps_stamp_band": False,
+                        "text_content_overlaps_stamp_content": False,
+                    }
+                }
+            },
+            {
+                "preview_snapshot": {
+                    "render_capture": {
+                        "text_content_clipped_in_preview": False,
+                        "text_content_overlaps_stamp_band": True,
+                        "text_content_overlaps_stamp_content": False,
+                    }
+                }
+            },
+            {"error": "boom"},
+        ]
+    )
+
+    assert summary == {
+        "text_clipping_risk_scenario_count": 1,
+        "text_stamp_overlap_risk_scenario_count": 1,
     }
 
 

@@ -839,6 +839,7 @@ def run_phase3_preview_matrix(
         "scenario_count": len(results),
         "successful_scenario_count": sum(1 for item in results if "error" not in item),
         "error_scenario_count": sum(1 for item in results if "error" in item),
+        **_preview_matrix_diagnostic_summary(results),
         "results": results,
     }
     summary_path = artifact_root / "summary.json"
@@ -1123,6 +1124,29 @@ def _preview_matrix_error_result(*, scenario: dict[str, Any], error: Exception) 
     }
 
 
+def _preview_matrix_diagnostic_summary(results: list[dict[str, Any]]) -> dict[str, int]:
+    text_clip_count = 0
+    text_overlap_count = 0
+    for result in results:
+        preview_snapshot = result.get("preview_snapshot")
+        if not isinstance(preview_snapshot, dict):
+            continue
+        render_capture = preview_snapshot.get("render_capture")
+        if not isinstance(render_capture, dict):
+            continue
+        if render_capture.get("text_content_clipped_in_preview") is True:
+            text_clip_count += 1
+        if (
+            render_capture.get("text_content_overlaps_stamp_band") is True
+            or render_capture.get("text_content_overlaps_stamp_content") is True
+        ):
+            text_overlap_count += 1
+    return {
+        "text_clipping_risk_scenario_count": text_clip_count,
+        "text_stamp_overlap_risk_scenario_count": text_overlap_count,
+    }
+
+
 def _apply_preview_matrix_scenario(
     *,
     shell: Any,
@@ -1322,6 +1346,7 @@ def _capture_preview_render(
     detail_bounds = _widget_rect_snapshot(active_detail)
     stamp_bounds = _widget_rect_snapshot(active_stamp)
     card_bounds = _widget_rect_snapshot(card_container)
+    text_widget_bounds = _translate_child_bounds(body_bounds, detail_bounds)
     stamp_band_bounds = _translate_child_bounds(body_bounds, stamp_bounds)
     stamp_alignment = _label_alignment_snapshot(active_stamp)
     stamp_pixmap_size = _label_pixmap_size_snapshot(active_stamp)
@@ -1342,6 +1367,21 @@ def _capture_preview_render(
         stamp_pixmap_bounds=stamp_pixmap_bounds,
         stamp_content_bounds=stamp_content_bounds,
     )
+    text_rendered_content_bounds = None
+    text_content_error = None
+    if image_path is not None and image_error is None and text_widget_bounds is not None:
+        text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
+            preview_image_path=image_path,
+            text_widget_bounds=text_widget_bounds,
+        )
+    text_diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds=card_bounds,
+        text_widget_bounds=text_widget_bounds,
+        text_content_bounds=text_rendered_content_bounds,
+        stamp_band_bounds=stamp_band_bounds,
+        stamp_content_bounds=stamp_content_bounds,
+    )
     band_distances = _preview_edge_distances(
         preview=preview,
         card_bounds=card_bounds,
@@ -1351,6 +1391,8 @@ def _capture_preview_render(
     )
     stamp_debug_image_path = None
     stamp_debug_image_error = None
+    text_debug_image_path = None
+    text_debug_image_error = None
     if (
         image_path is not None
         and image_error is None
@@ -1366,10 +1408,21 @@ def _capture_preview_render(
             stamp_content_bounds=stamp_content_bounds,
             crop_padding=max(6, _preview_padding_for_capture(preview)),
         )
+    if image_path is not None and image_error is None and text_widget_bounds is not None:
+        text_debug_image_path = str(target_dir / f"{artifact_basename}_text_debug.png")
+        text_debug_image_error = _write_text_debug_overlay(
+            preview_image_path=image_path,
+            output_path=text_debug_image_path,
+            text_widget_bounds=text_widget_bounds,
+            text_content_bounds=text_rendered_content_bounds,
+            stamp_band_bounds=stamp_band_bounds,
+            crop_padding=max(6, _preview_padding_for_capture(preview)),
+        )
     return {
         "preview_image_path": image_path,
         "preview_image_error": image_error,
         "card_bounds_px": card_bounds,
+        "text_widget_bounds_px": text_widget_bounds,
         "single_body_bounds_px": _widget_rect_snapshot(single_body),
         "multi_body_bounds_px": _widget_rect_snapshot(multi_body),
         "detail_label_bounds_px": _widget_rect_snapshot(detail_label),
@@ -1381,6 +1434,10 @@ def _capture_preview_render(
         "layout_spacing_px": _layout_spacing(active_body),
         "preview_padding_px": _preview_padding_for_capture(preview),
         "edge_distances_px": band_distances,
+        "text_debug_image_path": text_debug_image_path,
+        "text_debug_image_error": text_debug_image_error,
+        "text_rendered_content_bounds_px": text_rendered_content_bounds,
+        "text_content_detection_error": text_content_error,
         "stamp_debug_image_path": stamp_debug_image_path,
         "stamp_debug_image_error": stamp_debug_image_error,
         "stamp_band_bounds_px": stamp_band_bounds,
@@ -1388,6 +1445,7 @@ def _capture_preview_render(
         "stamp_rendered_pixmap_bounds_px": stamp_pixmap_bounds,
         "stamp_rendered_content_bounds_px": stamp_content_bounds,
         **stamp_source_analysis,
+        **text_diagnostics,
         **stamp_diagnostics,
     }
 
@@ -1461,6 +1519,58 @@ def _write_stamp_debug_overlay(
             draw,
             _offset_rect(stamp_content_bounds, dx=-crop_left, dy=-crop_top),
             (0, 200, 120, 255),
+        )
+    cropped.save(output_path)
+    return None
+
+
+def _write_text_debug_overlay(
+    *,
+    preview_image_path: str,
+    output_path: str,
+    text_widget_bounds: dict[str, int],
+    text_content_bounds: dict[str, int] | None,
+    stamp_band_bounds: dict[str, int] | None,
+    crop_padding: int,
+) -> str | None:
+    try:
+        preview_image = Image.open(preview_image_path).convert("RGBA")
+    except OSError as exc:
+        return f"Failed to open preview image for text debug overlay: {exc}"
+
+    highlight_bounds = [text_widget_bounds]
+    if text_content_bounds is not None:
+        highlight_bounds.append(text_content_bounds)
+    if stamp_band_bounds is not None:
+        highlight_bounds.append(stamp_band_bounds)
+    crop_left = max(0, min(bounds["x"] for bounds in highlight_bounds) - crop_padding)
+    crop_top = max(0, min(bounds["y"] for bounds in highlight_bounds) - crop_padding)
+    crop_right = min(
+        preview_image.size[0],
+        max(bounds["x"] + bounds["width"] for bounds in highlight_bounds) + crop_padding,
+    )
+    crop_bottom = min(
+        preview_image.size[1],
+        max(bounds["y"] + bounds["height"] for bounds in highlight_bounds) + crop_padding,
+    )
+    cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
+    draw = ImageDraw.Draw(cropped)
+    _draw_overlay_rect(
+        draw,
+        _offset_rect(text_widget_bounds, dx=-crop_left, dy=-crop_top),
+        (128, 0, 255, 255),
+    )
+    if text_content_bounds is not None:
+        _draw_overlay_rect(
+            draw,
+            _offset_rect(text_content_bounds, dx=-crop_left, dy=-crop_top),
+            (0, 180, 80, 255),
+        )
+    if stamp_band_bounds is not None:
+        _draw_overlay_rect(
+            draw,
+            _offset_rect(stamp_band_bounds, dx=-crop_left, dy=-crop_top),
+            (255, 165, 0, 255),
         )
     cropped.save(output_path)
     return None
@@ -1702,6 +1812,87 @@ def _project_content_bounds_to_preview(
     }
 
 
+def _detect_text_content_bounds_in_preview(
+    *,
+    preview_image_path: str,
+    text_widget_bounds: dict[str, int],
+) -> tuple[dict[str, int] | None, str | None]:
+    try:
+        preview_image = Image.open(preview_image_path).convert("RGBA")
+    except OSError as exc:
+        return None, f"Failed to open preview image for text analysis: {exc}"
+
+    image_width, image_height = preview_image.size
+    crop_left = max(0, text_widget_bounds["x"])
+    crop_top = max(0, text_widget_bounds["y"])
+    crop_right = min(image_width, crop_left + max(0, text_widget_bounds["width"]))
+    crop_bottom = min(image_height, crop_top + max(0, text_widget_bounds["height"]))
+    if crop_right <= crop_left or crop_bottom <= crop_top:
+        return None, "Text widget bounds do not intersect the captured preview image."
+
+    cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
+    crop_width, crop_height = cropped.size
+    background = _estimate_crop_background_rgba(cropped)
+    min_x = crop_width
+    min_y = crop_height
+    max_x = -1
+    max_y = -1
+    for y in range(crop_height):
+        for x in range(crop_width):
+            pixel = cropped.getpixel((x, y))
+            if not _is_text_candidate_pixel(pixel, background_rgba=background, threshold=16):
+                continue
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+    if max_x < min_x or max_y < min_y:
+        return None, "No rendered text pixels detected in the preview text widget."
+    return (
+        {
+            "x": crop_left + min_x,
+            "y": crop_top + min_y,
+            "width": (max_x - min_x) + 1,
+            "height": (max_y - min_y) + 1,
+        },
+        None,
+    )
+
+
+def _estimate_crop_background_rgba(image: Image.Image) -> tuple[int, int, int, int]:
+    width, height = image.size
+    if width <= 0 or height <= 0:
+        return (255, 255, 255, 255)
+    sample_points = {
+        (0, 0),
+        (width - 1, 0),
+        (0, height - 1),
+        (width - 1, height - 1),
+        (width // 2, 0),
+        (width // 2, height - 1),
+        (0, height // 2),
+        (width - 1, height // 2),
+    }
+    samples = [image.getpixel(point) for point in sample_points]
+    return tuple(
+        int(round(sum(component[index] for component in samples) / len(samples)))
+        for index in range(4)
+    )
+
+
+def _is_text_candidate_pixel(
+    pixel: tuple[int, int, int, int],
+    *,
+    background_rgba: tuple[int, int, int, int],
+    threshold: int,
+) -> bool:
+    if pixel[3] <= 0:
+        return False
+    color_distance = sum(abs(pixel[index] - background_rgba[index]) for index in range(3))
+    alpha_distance = abs(pixel[3] - background_rgba[3])
+    return color_distance + alpha_distance > threshold
+
+
 def _rect_edge_distances(
     *,
     outer_bounds: dict[str, int] | None,
@@ -1781,6 +1972,93 @@ def _stamp_edge_diagnostics(
             None if content_min_distance is None else content_min_distance <= warning_threshold
         ),
     }
+
+
+def _text_edge_diagnostics(
+    *,
+    preview: Any,
+    card_bounds: dict[str, int] | None,
+    text_widget_bounds: dict[str, int] | None,
+    text_content_bounds: dict[str, int] | None,
+    stamp_band_bounds: dict[str, int] | None,
+    stamp_content_bounds: dict[str, int] | None,
+) -> dict[str, Any]:
+    widget_distances = _rect_edge_distances(
+        outer_bounds=text_widget_bounds,
+        inner_bounds=text_content_bounds,
+    )
+    border_distances = _rect_edge_distances(
+        outer_bounds=card_bounds,
+        inner_bounds=text_content_bounds,
+    )
+    border_edge, stamp_edge = _text_widget_edge_roles(
+        stamp_position=getattr(preview, "stamp_position", None),
+    )
+    border_facing_distance = None if widget_distances is None else widget_distances.get(border_edge)
+    stamp_facing_distance = None if widget_distances is None else widget_distances.get(stamp_edge)
+    stamp_band_overlap = _rectangles_intersect(text_content_bounds, stamp_band_bounds)
+    stamp_content_overlap = _rectangles_intersect(text_content_bounds, stamp_content_bounds)
+    widget_min_distance = None if widget_distances is None else min(widget_distances.values())
+    border_min_distance = None if border_distances is None else min(border_distances.values())
+    return {
+        "text_content_edge_distances_px": widget_distances,
+        "text_content_border_edge_distances_px": border_distances,
+        "text_content_min_edge_distance_px": widget_min_distance,
+        "text_content_min_border_distance_px": border_min_distance,
+        "text_content_border_facing_distance_px": border_facing_distance,
+        "text_content_stamp_facing_distance_px": stamp_facing_distance,
+        "text_content_touches_widget_edge": (
+            None if widget_min_distance is None else widget_min_distance <= 0
+        ),
+        "text_content_touches_border_facing_edge": (
+            None if border_facing_distance is None else border_facing_distance <= 0
+        ),
+        "text_content_touches_stamp_facing_edge": (
+            None if stamp_facing_distance is None else stamp_facing_distance <= 0
+        ),
+        "text_content_overlaps_stamp_band": stamp_band_overlap,
+        "text_content_overlaps_stamp_content": stamp_content_overlap,
+        "text_content_clipped_in_preview": (
+            None
+            if widget_min_distance is None
+            else (
+                widget_min_distance <= 0
+                or stamp_band_overlap is True
+                or stamp_content_overlap is True
+            )
+        ),
+    }
+
+
+def _text_widget_edge_roles(
+    *,
+    stamp_position: SignatureStampPosition | None,
+) -> tuple[str, str]:
+    if stamp_position == SignatureStampPosition.TOP:
+        return ("bottom", "top")
+    if stamp_position == SignatureStampPosition.BOTTOM:
+        return ("top", "bottom")
+    if stamp_position == SignatureStampPosition.LEFT:
+        return ("right", "left")
+    return ("left", "right")
+
+
+def _rectangles_intersect(
+    first: dict[str, int] | None,
+    second: dict[str, int] | None,
+) -> bool | None:
+    if first is None or second is None:
+        return None
+    first_right = first["x"] + first["width"]
+    first_bottom = first["y"] + first["height"]
+    second_right = second["x"] + second["width"]
+    second_bottom = second["y"] + second["height"]
+    return not (
+        first_right <= second["x"]
+        or second_right <= first["x"]
+        or first_bottom <= second["y"]
+        or second_bottom <= first["y"]
+    )
 
 
 def _relevant_stamp_edge_distances(

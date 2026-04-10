@@ -22,6 +22,11 @@ The user-visible outcome is straightforward. Running the preview matrix commands
 - [x] (2026-04-05 23:41Z) Narrowed non-`single_line` stamp-edge diagnostics so they evaluate only the border-facing edge of the reserved stamp band, which removed a misleading `multi_line top` warning from the manual-harness capture without changing signability.
 - [x] (2026-04-05 23:58Z) Investigated the next manual harness report and found a real preview/backend mismatch: `multi_line` preview was not sizing text and stamp widgets to the same reservation bands used by backend fit validation.
 - [x] (2026-04-06 00:05Z) Updated `signing_shell.py` so `multi_line` vertical and horizontal preview widgets use reservation-derived band sizes, then added focused Qt regressions for the vertical and horizontal cases.
+- [x] (2026-04-06 18:29Z) Reviewed a newer six-state manual harness run and identified two narrower follow-ups: one real backend false negative from `1pt` of width rounding in `multi_line bottom`, and one real backend false positive where a `multi_line` image stamp could be approved even when its reserved stamp band collapsed to zero height.
+- [x] (2026-04-06 18:36Z) Added a `1pt` non-`single_line` width tolerance in `_ensure_layout_can_fit(...)`, rejected zero-size image-stamp bands for non-`single_line` layouts, added focused backend regressions, reran the `multi_line` matrix, and kept it green.
+- [x] (2026-04-06 19:04Z) Reviewed the latest nine-state manual harness run and found the remaining “looks okay but validation fails” cluster was concentrated in narrow `multi_line` top/bottom boxes where the preview was still drawing text at nominal screen points while the backend was validating PDF-space geometry. Updated `signing_shell.py` so non-`single_line` preview text scales with the preview card’s PDF-space scale, then added a focused Qt regression for that honesty rule.
+- [x] (2026-04-09 21:38Z) Revisited a newer six-state manual harness run and traced the remaining false `multi_line top` failures to backend font-size rounding: the preview was rendering the selected `8.5pt`, but backend fit checks were still measuring the same text as `9pt`. Updated backend text measurement to preserve half-point font sizes using rational values and added regressions for the real-world narrow-box case.
+- [x] (2026-04-09 09:42Z) Revisited the non-`single_line` preview text scaling after manual comparison against `single_line` and removed it. The preview now treats the selected point size as layout-invariant again, and the focused Qt test now locks that invariant across `single_line`, `multi_line`, and `wrapped_block`.
 
 ## Surprises & Discoveries
 
@@ -42,6 +47,17 @@ The user-visible outcome is straightforward. Running the preview matrix commands
 
 - Observation: later manual harness captures exposed a separate preview honesty bug for `multi_line`: the preview was still giving text and stamp labels more live widget space than the backend reservation actually allowed.
   Evidence: a saved `multi_line top` state was marked signable while the preview showed the bottom text row cut off by the border, and a saved `multi_line left` state looked visually roomy while the backend correctly rejected it. The common cause was that the Qt preview body used soft width hints but not reservation-derived fixed heights for non-`single_line` bands.
+
+- Observation: the later six-state manual run refined that picture further. Most “looks like it should fit” failures were still traceable to old preview dishonesty, but two cases exposed real backend edge conditions:
+  1. one `multi_line bottom` case failed even though the measured text width only exceeded the reserved width by `1pt`;
+  2. one narrower `multi_line bottom` case was allowed even though the reserved image-stamp band height was `0pt`.
+  Evidence: reconstructing the saved states from `artifacts/phase3_harness_capture.json` produced `text_box 76x27 / text_area 75x27 / stamp_area 75x37` for the false-negative case and `text_box 76x27 / text_area 76x27 / stamp_area 76x0` for the false-positive case.
+
+- Observation: the latest nine-state manual run showed one more preview/backend seam in narrow `multi_line` top/bottom rectangles. The backend was still validating against actual PDF-space geometry, but the preview was drawing text at nominal screen-point size, which made these narrow vertical cases look roomier on screen than the real PDF layout contract allowed.
+  Evidence: states 4, 5, 7, 8, and 9 all failed with `visible_signature_layout_unavailable` even though they looked acceptable in the live preview. The common shape was `multi_line top/bottom` at roughly `80–98pt` width with `8.5pt` Serif italic text. The preview card geometry was already scaled from PDF points into preview pixels, but the preview text size was not scaled to match.
+
+- Observation: after restoring layout-invariant preview text sizing, the remaining narrow `multi_line top` false failures were explained by a different seam: backend measurement was rounding `8.5pt` up to `9pt`, while the Qt preview rendered the actual selected `8.5pt`.
+  Evidence: the same five-line `multi_line top` text measured `112x45` at `9pt` but `106x42` at exact `8.5pt`, which is enough to flip the `~117pt` and `~114pt` width captures from failure to success while leaving the narrower `~98pt` case blocked.
 
 ## Decision Log
 
@@ -73,6 +89,22 @@ The user-visible outcome is straightforward. Running the preview matrix commands
   Rationale: the newest manual harness report showed green-but-clipped `multi_line top/bottom` previews and blocked-but-roomy `multi_line left` previews. That is a preview contract bug, not proof that the backend is too strict.
   Date/Author: 2026-04-06 / Codex
 
+- Decision: allow a `1pt` width tolerance for non-`single_line` layouts, but keep height checks strict and reject zero-size image-stamp bands for those layouts.
+  Rationale: the manual capture showed one legitimate width-rounding false negative for `multi_line bottom`, while the zero-height stamp-band case is objectively nonconforming and must fail. This keeps the backend honest without reopening the earlier false-permissive `left/right` cases, which were height failures rather than width failures. The `1pt` allowance is explicitly a rounding-seam correction, not a new layout threshold or compactness mode. It exists because text measurement and reservation math currently meet at integer boundaries. The zero-size stamp-band guard is likewise semantic rather than arbitrary: it applies only to templates that reserve separate text and image bands (`multi_line` and `wrapped_block`), and does not apply to `single_line`, whose compact composition model intentionally allows much tighter image placement.
+  Date/Author: 2026-04-06 / Codex
+
+- Decision: fix the remaining narrow `multi_line` top/bottom false-negative cluster by making the preview text scale with the preview card’s PDF-space geometry instead of loosening backend validation further.
+  Rationale: those states were not another backend threshold bug; they were a preview honesty problem. The card itself was already scaled from PDF points into preview pixels, but the text stayed at nominal screen-point size, which made narrow vertical `multi_line` cases look more permissive than the actual PDF layout contract. Scaling non-`single_line` preview text by the same PDF-to-preview factor keeps the preview aligned with the backend without inventing another validation tolerance.
+  Date/Author: 2026-04-06 / Codex
+
+- Decision: reverse the layout-specific preview text scaling and keep typography semantics invariant across layouts.
+  Rationale: using different text-size rules for `single_line` versus `multi_line`/`wrapped_block` is more counter-intuitive than the narrow-cluster honesty problem it was trying to solve. The user expectation is that `8.5pt` means the same thing regardless of layout mode; layout selection should only change arrangement and available space. Preview honesty must come from reservation geometry and clipping, not from silently changing text-size semantics by layout.
+  Date/Author: 2026-04-09 / Codex
+
+- Decision: preserve the user's selected half-point font sizes in backend measurement instead of rounding them up to the nearest integer point.
+  Rationale: once preview typography semantics were made layout-invariant again, the remaining false `multi_line top` failures were no longer a preview problem. They came from backend measurement inflating `8.5pt` to `9pt`. Using rational half-point sizes removes that seam directly and is simpler than adding more validation tolerance.
+  Date/Author: 2026-04-09 / Codex
+
 ## Outcomes & Retrospective
 
 This plan achieved its purpose. The repository now has checked-in unattended full matrices for both `multi_line` and `wrapped_block`, and both are green under the current harness diagnostics:
@@ -88,6 +120,10 @@ After the later manual harness review, that conclusion still holds. The follow-u
 - `multi_line left/right` remain blocked in very short rectangles for a real reason: the stacked text lines do not fit vertically inside the reserved text band, even when width fits cleanly.
 
 The additional preview correction in `signing_shell.py` tightened that contract further. The live Qt preview now sizes non-`single_line` text and stamp widgets from the same reservation bands that drive backend validation, which should remove the class of “green but visibly clipped” and “blocked but visually roomy” contradictions from the manual harness.
+
+The latest backend follow-up kept that direction intact. After adding the narrow `1pt` width tolerance and the zero-size stamp-band rejection, the unattended `multi_line` matrix remained clean:
+
+- `artifacts/preview_sweep_runs/multi_line_full_matrix/summary.json`: 288 scenarios, 0 invalid, 0 warnings, 0 edge-touch cases.
 
 ## Context and Orientation
 

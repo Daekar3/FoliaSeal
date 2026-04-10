@@ -45,6 +45,9 @@ Validated so far:
 - the checked-in unattended `single_line` preview matrix is currently green across the repository
 - the checked-in unattended `multi_line` preview matrix is currently green across the repository
 - the checked-in unattended `wrapped_block` preview matrix is currently green across the repository
+- preview typography semantics are now intended to be layout-invariant: the selected point size
+  should mean the same thing in `single_line`, `multi_line`, and `wrapped_block`, with layout mode
+  affecting reservation geometry and fit behavior rather than silently rescaling text
   fixture set
 - the `single_line` layout path has been simplified so preview composition and pre-submit fit
   validation now share the same backend-owned text/layout input rules

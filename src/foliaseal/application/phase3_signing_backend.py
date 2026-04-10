@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from fractions import Fraction
 from io import BytesIO
 from math import ceil
 from pathlib import Path
@@ -272,7 +273,10 @@ def _build_stamp_style(
         has_visible_stamp_image=stamp_background is not None,
         stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
     )
-    _ensure_layout_can_fit(layout_reservation)
+    _ensure_layout_can_fit(
+        layout_reservation,
+        has_visible_stamp_image=stamp_background is not None,
+    )
     background_layout = _background_layout_for_stamp(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
@@ -325,9 +329,13 @@ class VisibleSignatureTextLayout:
 
 def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
     font_factory = _font_factory_for_family(text_style.font_family)
+    # Preserve the user's selected half-point font sizes in backend measurement.
+    # Rounding 8.5pt up to 9pt creates avoidable preview/backend drift in narrow
+    # layouts because the Qt preview renders the actual selected size.
+    font_size = max(Fraction(1, 1), Fraction(int(round(text_style.font_size_pt * 2)), 2))
     return TextBoxStyle(
         font=font_factory,
-        font_size=max(1, int(text_style.font_size_pt + 0.5)),
+        font_size=font_size,
         text_color=_hex_to_rgb(text_style.text_color_hex),
         box_layout_rule=SimpleBoxLayoutRule(
             AxisAlignment.ALIGN_MIN,
@@ -888,7 +896,26 @@ def _visible_signature_fit_issues_for_stamp_text(
     return ()
 
 
-def _ensure_layout_can_fit(layout_reservation: _SignatureLayoutReservation) -> None:
+def _ensure_layout_can_fit(
+    layout_reservation: _SignatureLayoutReservation,
+    *,
+    has_visible_stamp_image: bool = False,
+) -> None:
+    """Validate fit after reservation with explicit handling for measurement seams.
+
+    The small non-single-line width allowance below is not a layout mode or a
+    user-facing threshold. It exists only to absorb 1pt disagreements created by
+    mixed integer rounding across text measurement and reservation math. Height
+    remains strict because it reflects a real visual constraint in the stacked
+    layouts.
+
+    The zero-size stamp-band rejection also applies only to non-single-line
+    layouts. Those templates reserve separate text and stamp regions, so a
+    0pt-wide or 0pt-high image band means the image has no real reserved space
+    and the layout should fail. Single-line intentionally supports much tighter
+    compact image placement, so applying the same guard there would reject valid
+    compact cases that still render acceptably.
+    """
     max_text_width = layout_reservation.text_area_width_pt
     if (
         layout_reservation.layout_template == SignatureLayoutTemplate.SINGLE_LINE
@@ -900,6 +927,22 @@ def _ensure_layout_can_fit(layout_reservation: _SignatureLayoutReservation) -> N
                     stamp_position=layout_reservation.stamp_position
                 )
             )
+        )
+    else:
+        # This is a rounding-seam correction, not a separate compactness policy.
+        max_text_width += 1
+    if (
+        has_visible_stamp_image
+        and layout_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        and (
+        layout_reservation.stamp_area_width_pt <= 0
+        or layout_reservation.stamp_area_height_pt <= 0
+        )
+    ):
+        raise ValueError(
+            "Visible signature content does not fit inside the selected rectangle for the "
+            f"{layout_reservation.layout_template.value} template. "
+            "Enlarge the signature box or choose a more compact appearance."
         )
     if (
         layout_reservation.text_box_width_pt > max_text_width
@@ -985,7 +1028,10 @@ def _single_line_text_fits_reservation(
         ),
     )
     try:
-        _ensure_layout_can_fit(reservation)
+        _ensure_layout_can_fit(
+            reservation,
+            has_visible_stamp_image=appearance.image_stamp_path is not None,
+        )
     except ValueError:
         return False
     return True
@@ -1161,7 +1207,12 @@ def _measure_text_box_dimensions(
     )
     text_box.content = stamp_text
     text_box.render()
-    return int(round(text_box.box.width)), int(round(text_box.box.height))
+    measured_width = int(round(text_box.box.width))
+    measured_height = int(round(text_box.box.height))
+    line_count = max(1, stamp_text.count("\n") + 1)
+    nominal_line_height = float(text_box_style.font_size)
+    minimum_height = int(ceil(line_count * nominal_line_height))
+    return measured_width, max(measured_height, minimum_height)
 
 
 def _reserved_space(container_length: int, content_length: int, gap: int) -> int:

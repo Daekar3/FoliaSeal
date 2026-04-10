@@ -1,5 +1,6 @@
 import re
 from datetime import UTC, datetime, timedelta
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -22,14 +23,17 @@ from foliaseal.application.phase3_signing_backend import (
     _background_layout_for_stamp,
     _build_stamp_style,
     _build_stamp_text,
+    _build_text_box_style,
     _current_signing_time,
     _effective_horizontal_text_reservation_width,
     _layout_reservation_for_template,
     _load_simple_signer,
+    _measure_text_box_dimensions,
     _single_line_stamp_content_inset,
     _single_line_vertical_stamp_border_gap,
     _stamp_background_for_path,
     _visible_signature_fit_issues,
+    _visible_signature_fit_issues_for_stamp_text,
     build_phase3_signing_executor,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
@@ -314,7 +318,7 @@ def test_single_line_horizontal_text_reservation_width_matches_live_preview_cont
     )
 
 
-def test_build_text_box_style_uses_half_up_rounding_for_font_size() -> None:
+def test_build_text_box_style_preserves_half_point_font_size_in_stamp_style() -> None:
     style = _build_stamp_style(
         SigningBackendAppearance.from_signature_appearance(
             build_signature_appearance(
@@ -332,7 +336,7 @@ def test_build_text_box_style_uses_half_up_rounding_for_font_size() -> None:
         signature_rect=build_signature_rect(page_index=0),
     )
 
-    assert style.text_box_style.font_size == 9
+    assert style.text_box_style.font_size == Fraction(17, 2)
 
 
 def test_layout_reservation_for_horizontal_single_line_preserves_stamp_width_for_image() -> None:
@@ -757,6 +761,257 @@ def test_layout_reservation_for_wrapped_block_allocates_bottom_text_space() -> N
     assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
     assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MIN
     assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+
+
+def test_multi_line_bottom_allows_one_point_width_rounding_overflow(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        signer_label_prefix="",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Adam Smith",
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Lawson Heirs Inc.",
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="2026-04-06 18:11",
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    signature_rect = build_signature_rect(
+        page_index=0,
+        left_pt=37.376,
+        bottom_pt=420.8,
+        width_pt=83.456,
+        height_pt=78.336,
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=signature_rect,
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+        stamp_text="Adam Smith\nLawson Heirs Inc.\n2026-04-06 18:11",
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert issues == ()
+
+
+def test_multi_line_bottom_rejects_zero_height_stamp_band(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        signer_label_prefix="",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Adam Smith",
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Lawson Heirs Inc.",
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="2026-04-06 18:11",
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    signature_rect = build_signature_rect(
+        page_index=0,
+        left_pt=37.376,
+        bottom_pt=420.8,
+        width_pt=81.92,
+        height_pt=32.768,
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=signature_rect,
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+        stamp_text="Adam Smith\nLawson Heirs Inc.\n2026-04-06 18:11",
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert len(issues) == 1
+    assert "does not fit" in issues[0].message
+
+
+def test_build_text_box_style_preserves_half_point_font_size() -> None:
+    style = _build_text_box_style(
+        SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        )
+    )
+
+    assert style.font_size == Fraction(17, 2)
+
+
+def test_measure_text_box_dimensions_reserves_nominal_height_per_line() -> None:
+    style = _build_text_box_style(
+        SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        )
+    )
+
+    width, height = _measure_text_box_dimensions("Line 1\nLine 2\nLine 3", style)
+
+    assert width > 0
+    assert height == 26
+
+
+def test_multi_line_top_accepts_real_world_half_point_width_case(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        signer_label_prefix="",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Adam Smith",
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Secretary.LHI@Outlook.com",
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Board Secretary",
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Lawson Heirs Inc.",
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="2026-04-09 21:17",
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    signature_rect = build_signature_rect(
+        page_index=0,
+        left_pt=187.904,
+        bottom_pt=396.736,
+        width_pt=117.248,
+        height_pt=90.112,
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=signature_rect,
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+        stamp_text=(
+            "Adam Smith\nSecretary.LHI@Outlook.com\nBoard Secretary\n"
+            "Lawson Heirs Inc.\n2026-04-09 21:17"
+        ),
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert issues == ()
 
 
 def test_layout_reservation_for_single_line_bottom_centers_content_within_reserved_regions(

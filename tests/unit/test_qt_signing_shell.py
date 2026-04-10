@@ -16,6 +16,7 @@ from foliaseal.domain.models import (
     SignaturePlacementDefaults,
     SignatureStampPosition,
     SignatureTextStyle,
+    SignatureTimezoneDisplayMode,
     SigningResult,
 )
 from foliaseal.infra.config.profile_storage import (
@@ -1315,6 +1316,7 @@ def test_signing_shell_preview_respects_small_font_sizes(
     )
 
     appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
         text_style=SignatureTextStyle(
             font_family="Source Sans 3",
             font_size_pt=6.5,
@@ -1363,6 +1365,7 @@ def test_signing_shell_preview_updates_style_when_font_size_changes(
     )
     widget.properties_panel.set_signature_appearance(
         build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             text_style=SignatureTextStyle(
                 font_family="Source Sans 3",
                 font_size_pt=8.5,
@@ -1385,6 +1388,7 @@ def test_signing_shell_preview_updates_style_when_font_size_changes(
 
     widget.properties_panel.set_signature_appearance(
         build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             text_style=SignatureTextStyle(
                 font_family="Source Sans 3",
                 font_size_pt=8.0,
@@ -1397,6 +1401,56 @@ def test_signing_shell_preview_updates_style_when_font_size_changes(
 
     assert "font-size: 8.5pt;" in initial_style
     assert "font-size: 8.0pt;" in widget.properties_panel.preview_controls.detail_label.style
+
+
+def test_signing_shell_preview_keeps_text_size_invariant_across_layout_modes(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    rect = widget._signing_workspace._draft_workflow.update_signature_rect(
+        page_index=0,
+        left_pt=24.0,
+        bottom_pt=18.0,
+        width_pt=96.0,
+        height_pt=88.0,
+    )
+    for layout_template in (
+        SignatureLayoutTemplate.SINGLE_LINE,
+        SignatureLayoutTemplate.MULTI_LINE,
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+    ):
+        widget.properties_panel.set_signature_appearance(
+            build_signature_appearance(
+                layout_template=layout_template,
+                text_style=SignatureTextStyle(
+                    font_family="Serif",
+                    font_size_pt=8.5,
+                    bold=False,
+                    italic=True,
+                    text_color_hex="#123456",
+                ),
+            )
+        )
+        widget.properties_panel.set_signature_rect(rect)
+        detail_style = widget.properties_panel.preview_controls.detail_label.style
+        multi_detail_style = widget.properties_panel.preview_controls.multi_detail_label.style
+
+        assert "font-size: 8.5pt;" in detail_style or "font-size: 8.5pt;" in multi_detail_style
 
 
 def test_signing_shell_single_line_preview_disables_word_wrap_even_without_rect(
@@ -2428,7 +2482,53 @@ def test_preview_stamp_max_size_is_not_capped_to_legacy_dimensions(tmp_path: Pat
     assert max_height > 0
 
 
-def test_fit_vertical_preview_band_geometry_prefers_text_hint_and_reduces_separator() -> None:
+def test_preview_body_size_caps_card_to_physical_pdf_scale() -> None:
+    preview = signing_shell_module.SigningDraftPreview(
+        title="",
+        page_index=0,
+        signature_rect=signing_shell_module.SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=96.0,
+            height_pt=80.0,
+        ),
+        signer_label_prefix="",
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=None,
+        fields=(),
+        detail_text="Adam Smith\nSecretary.LHI@Outlook.com",
+        issues=(),
+        can_submit=True,
+    )
+
+    width, height = signing_shell_module._preview_body_size(
+        preview,
+        available_width_px=520,
+    )
+
+    assert width == 128
+    assert height == 107
+
+
+def test_fit_vertical_preview_band_geometry_preserves_reserved_text_height() -> None:
     fitted = signing_shell_module._fit_vertical_preview_band_geometry(
         text_height=15,
         stamp_height=13,
@@ -2438,7 +2538,7 @@ def test_fit_vertical_preview_band_geometry_prefers_text_hint_and_reduces_separa
         stamp_visible=True,
     )
 
-    assert fitted == (17, 21, 0)
+    assert fitted == (15, 13, 10)
 
 
 def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() -> None:

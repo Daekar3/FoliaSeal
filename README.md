@@ -225,6 +225,9 @@ Status note:
 - the checked-in unattended `single_line` matrix is currently green in automation
 - the checked-in unattended `multi_line` matrix is currently green in automation
 - the checked-in unattended `wrapped_block` matrix is currently green in automation
+- preview typography semantics are layout-invariant: the selected point size means the same thing in
+  `single_line`, `multi_line`, and `wrapped_block`; layout mode may change reservation geometry,
+  wrapping, and fit outcomes, but it must not silently change the meaning of the chosen text size
 - use it as a regression net, not as a substitute for the pending manual harness confirmation with
   real signing assets
 
