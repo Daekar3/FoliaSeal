@@ -993,15 +993,16 @@ def _single_line_width_overflow_tolerance(
     *,
     stamp_position: SignatureStampPosition,
 ) -> float:
-    """Allow modest horizontal text overflow to free more room for the stamp.
+    """Allow bounded text-width de-jitter where it matches user expectations.
 
-    Left/right single-line layouts need more flexibility because text and stamp
-    share the same width. Top/bottom layouts still benefit from a smaller bounded
-    tolerance so fit decisions do not change at arbitrary box-height cutoffs.
+    Horizontal single-line layouts are now strict because a signable clipped line
+    is a user-visible failure, not an acceptable trade-off. Top/bottom layouts
+    keep a small bounded tolerance so point/integer conversion seams do not make
+    compact vertical cases flap between pass and fail.
     """
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        return 1.9
+        return 1.0
     return 1.7
 
 

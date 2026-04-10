@@ -296,25 +296,26 @@ def test_single_line_vertical_stamp_border_gap_tracks_border_visibility() -> Non
     assert _single_line_vertical_stamp_border_gap(box_style=None) == 0
 
 
-def test_single_line_horizontal_text_reservation_width_rounds_up() -> None:
+def test_single_line_horizontal_text_reservation_width_is_strict_for_left_right() -> None:
     assert (
         _effective_horizontal_text_reservation_width(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.RIGHT,
             text_box_width=115,
         )
-        == 61
+        == 115
     )
 
 
-def test_single_line_horizontal_text_reservation_width_matches_live_preview_contract() -> None:
+def test_single_line_horizontal_text_reservation_width_matches_strict_preview_contract(
+) -> None:
     assert (
         _effective_horizontal_text_reservation_width(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.RIGHT,
             text_box_width=380,
         )
-        == 200
+        == 380
     )
 
 
@@ -739,8 +740,8 @@ def test_layout_reservation_for_horizontal_single_line_frees_more_stamp_space(
     old_remaining_width = max(available_width - min(text_box_width, available_width), 0)
     old_stamp_area_width = max(old_remaining_width - min(6, old_remaining_width), 0)
 
-    assert reservation.text_area_width_pt < text_box_width
-    assert reservation.stamp_area_width_pt > old_stamp_area_width
+    assert reservation.text_area_width_pt == text_box_width
+    assert reservation.stamp_area_width_pt == old_stamp_area_width
     assert reservation.text_box_width_pt == text_box_width
 
 
@@ -1597,7 +1598,7 @@ def test_build_stamp_text_wraps_horizontal_single_line_when_stamp_is_present(
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
 )
-def test_visible_signature_fit_issues_accept_compact_horizontal_rectangle_with_realistic_text(
+def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_realistic_text(
     tmp_path: Path,
     stamp_position: SignatureStampPosition,
 ) -> None:
@@ -1667,7 +1668,8 @@ def test_visible_signature_fit_issues_accept_compact_horizontal_rectangle_with_r
         signature_appearance=appearance,
     )
 
-    assert issues == ()
+    assert issues
+    assert issues[0].code == "visible_signature_layout_unavailable"
 
 
 def test_build_stamp_text_keeps_single_line_body_single_when_roomy(

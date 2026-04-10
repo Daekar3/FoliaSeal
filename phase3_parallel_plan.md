@@ -45,6 +45,17 @@ Validated so far:
 - the checked-in unattended `single_line` preview matrix is currently green across the repository
 - the checked-in unattended `multi_line` preview matrix is currently green across the repository
 - the checked-in unattended `wrapped_block` preview matrix is currently green across the repository
+- preview-matrix summaries now separate signable risk counts from rejected risk counts for both
+  text and stamp diagnostics, so intentionally blocked bad layouts do not read like unresolved
+  green-path regressions
+- stamp warnings now represent border-facing near-border crowding only; text-facing stamp/text
+  conflicts are tracked by the text overlap/clipping diagnostics instead
+- the current green-path findings are now easy to read:
+  - `single_line`: no signable text clipping and no signable stamp warnings remain
+  - `multi_line`: no signable text issues; a four-scenario `bottom / tall-stamp / 10pt / label-on`
+    stamp-warning tail remains
+  - `wrapped_block`: no signable text issues; an eighteen-scenario
+    `left/right / 10pt / dense` stamp-warning tail remains
 - preview typography semantics are now intended to be layout-invariant: the selected point size
   should mean the same thing in `single_line`, `multi_line`, and `wrapped_block`, with layout mode
   affecting reservation geometry and fit behavior rather than silently rescaling text

@@ -8,7 +8,6 @@ import re
 from collections import Counter
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
-from math import ceil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import perf_counter
@@ -1128,6 +1127,16 @@ def _preview_matrix_error_result(*, scenario: dict[str, Any], error: Exception) 
 def _preview_matrix_diagnostic_summary(results: list[dict[str, Any]]) -> dict[str, int]:
     text_clip_count = 0
     text_overlap_count = 0
+    stamp_warning_count = 0
+    stamp_edge_touch_count = 0
+    signable_text_clip_count = 0
+    rejected_text_clip_count = 0
+    signable_text_overlap_count = 0
+    rejected_text_overlap_count = 0
+    signable_stamp_warning_count = 0
+    rejected_stamp_warning_count = 0
+    signable_stamp_edge_touch_count = 0
+    rejected_stamp_edge_touch_count = 0
     for result in results:
         preview_snapshot = result.get("preview_snapshot")
         if not isinstance(preview_snapshot, dict):
@@ -1135,16 +1144,47 @@ def _preview_matrix_diagnostic_summary(results: list[dict[str, Any]]) -> dict[st
         render_capture = preview_snapshot.get("render_capture")
         if not isinstance(render_capture, dict):
             continue
+        can_submit = preview_snapshot.get("can_submit") is True
         if render_capture.get("text_content_clipped_in_preview") is True:
             text_clip_count += 1
+            if can_submit:
+                signable_text_clip_count += 1
+            else:
+                rejected_text_clip_count += 1
         if (
             render_capture.get("text_content_overlaps_stamp_band") is True
             or render_capture.get("text_content_overlaps_stamp_content") is True
         ):
             text_overlap_count += 1
+            if can_submit:
+                signable_text_overlap_count += 1
+            else:
+                rejected_text_overlap_count += 1
+        if render_capture.get("stamp_content_within_warning_distance") is True:
+            stamp_warning_count += 1
+            if can_submit:
+                signable_stamp_warning_count += 1
+            else:
+                rejected_stamp_warning_count += 1
+        if render_capture.get("stamp_content_touches_band_edge") is True:
+            stamp_edge_touch_count += 1
+            if can_submit:
+                signable_stamp_edge_touch_count += 1
+            else:
+                rejected_stamp_edge_touch_count += 1
     return {
         "text_clipping_risk_scenario_count": text_clip_count,
+        "signable_text_clipping_risk_scenario_count": signable_text_clip_count,
+        "rejected_text_clipping_risk_scenario_count": rejected_text_clip_count,
         "text_stamp_overlap_risk_scenario_count": text_overlap_count,
+        "signable_text_stamp_overlap_risk_scenario_count": signable_text_overlap_count,
+        "rejected_text_stamp_overlap_risk_scenario_count": rejected_text_overlap_count,
+        "stamp_warning_scenario_count": stamp_warning_count,
+        "signable_stamp_warning_scenario_count": signable_stamp_warning_count,
+        "rejected_stamp_warning_scenario_count": rejected_stamp_warning_count,
+        "stamp_edge_touch_scenario_count": stamp_edge_touch_count,
+        "signable_stamp_edge_touch_scenario_count": signable_stamp_edge_touch_count,
+        "rejected_stamp_edge_touch_scenario_count": rejected_stamp_edge_touch_count,
     }
 
 
@@ -2015,11 +2055,19 @@ def _is_text_candidate_pixel(
 ) -> bool:
     if pixel[3] <= 0:
         return False
+    pixel_luma = _rgba_luma(pixel)
+    background_luma = _rgba_luma(background_rgba)
     if text_color_rgba is not None:
         text_distance = sum(abs(pixel[index] - text_color_rgba[index]) for index in range(3))
-        return text_distance <= 110
+        if text_distance <= 150:
+            return True
+        return (background_luma - pixel_luma) >= 28
     color_distance = sum(abs(pixel[index] - background_rgba[index]) for index in range(3))
-    return color_distance > 80
+    return color_distance > 80 or (background_luma - pixel_luma) >= 28
+
+
+def _rgba_luma(pixel: tuple[int, int, int, int]) -> int:
+    return int(round((pixel[0] * 299 + pixel[1] * 587 + pixel[2] * 114) / 1000))
 
 
 def _rect_edge_distances(
@@ -2048,20 +2096,10 @@ def _stamp_edge_diagnostics(
     stamp_pixmap_bounds: dict[str, int] | None,
     stamp_content_bounds: dict[str, int] | None,
 ) -> dict[str, Any]:
-    warning_threshold = 2
-    layout_template = getattr(preview, "layout_template", None)
-    if layout_template in {
-        SignatureLayoutTemplate.MULTI_LINE,
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-    }:
-        warning_threshold = 1
-    if preview.box_style is not None and preview.box_style.show_border:
-        warning_threshold = max(2, int(ceil(preview.box_style.border_width_pt / 2.0)))
-        if layout_template in {
-            SignatureLayoutTemplate.MULTI_LINE,
-            SignatureLayoutTemplate.WRAPPED_BLOCK,
-        }:
-            warning_threshold = min(warning_threshold, 1)
+    # Rendered stamp content bounds already include anti-aliased edge pixels, so a
+    # 1px buffer is enough to represent "near the border" without reintroducing
+    # border-width-driven warning lore.
+    warning_threshold = 1
 
     pixmap_distances = _rect_edge_distances(
         outer_bounds=stamp_band_bounds,
@@ -2126,7 +2164,7 @@ def _text_edge_diagnostics(
     )
     border_facing_distance = None if widget_distances is None else widget_distances.get(border_edge)
     stamp_facing_distance = None if widget_distances is None else widget_distances.get(stamp_edge)
-    raster_tolerance_px = 2
+    raster_tolerance_px = 3
     stamp_band_overlap = _rectangles_overlap_exceeds_tolerance(
         text_content_bounds,
         stamp_band_bounds,
@@ -2251,27 +2289,17 @@ def _relevant_stamp_edge_distances(
 ) -> dict[str, int] | None:
     if edge_distances is None:
         return None
-    if layout_template in {
-        SignatureLayoutTemplate.MULTI_LINE,
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-    }:
-        if stamp_position == SignatureStampPosition.TOP:
-            return {"top": edge_distances["top"]}
-        if stamp_position == SignatureStampPosition.BOTTOM:
-            return {"bottom": edge_distances["bottom"]}
-        if stamp_position == SignatureStampPosition.LEFT:
-            return {"left": edge_distances["left"]}
-        if stamp_position == SignatureStampPosition.RIGHT:
-            return {"right": edge_distances["right"]}
-    if stamp_position in {
-        SignatureStampPosition.TOP,
-        SignatureStampPosition.BOTTOM,
-    }:
-        return {key: value for key, value in edge_distances.items() if key != "left"}
+    # Stamp warnings are about crowding against the signature border. Text-facing
+    # crowding is covered by the text overlap/clipping diagnostics instead of
+    # inferring it indirectly from stamp-band geometry.
+    if stamp_position == SignatureStampPosition.TOP:
+        return {"top": edge_distances["top"]}
+    if stamp_position == SignatureStampPosition.BOTTOM:
+        return {"bottom": edge_distances["bottom"]}
     if stamp_position == SignatureStampPosition.LEFT:
-        return {key: value for key, value in edge_distances.items() if key != "left"}
+        return {"left": edge_distances["left"]}
     if stamp_position == SignatureStampPosition.RIGHT:
-        return {key: value for key, value in edge_distances.items() if key != "right"}
+        return {"right": edge_distances["right"]}
     return dict(edge_distances)
 
 

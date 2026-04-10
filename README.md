@@ -202,8 +202,45 @@ What the preview matrix writes:
   `text_style.font_size_pt`, border width, and stamp image choice
 - per-scenario stamp diagnostics, including alpha-aware source-image content bounds and explicit
   clipping/proximity flags for stamp content versus the reserved stamp band
+- summary-level text diagnostics broken out into:
+  - total clipping-risk scenarios
+  - signable clipping-risk scenarios
+  - rejected clipping-risk scenarios
+  - total text/stamp-overlap scenarios
+  - signable text/stamp-overlap scenarios
+  - rejected text/stamp-overlap scenarios
+- summary-level stamp diagnostics broken out into:
+  - total stamp-warning scenarios
+  - signable stamp-warning scenarios
+  - rejected stamp-warning scenarios
+  - total stamp-edge-touch scenarios
+  - signable stamp-edge-touch scenarios
+  - rejected stamp-edge-touch scenarios
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
+
+Current interpretation of the checked-in full-matrix summaries:
+
+- treat `signable_*` counts as the true green-path regression signal
+- treat `rejected_*` counts as negative-test coverage for cases the validator is already blocking
+- stamp warnings now mean border-facing near-border crowding only; text-facing stamp/text
+  conflicts are tracked by the text overlap/clipping diagnostics instead of being inferred
+  indirectly from stamp-band geometry
+- as of the latest checked-in text-instrumented summaries:
+  - `single_line`: `0` signable text clipping risks, `42` rejected text clipping risks,
+    `0` signable stamp warnings, `0` signable stamp edge-touch cases
+  - `multi_line`: `0` signable text risks, `4` signable stamp warnings,
+    `0` signable stamp edge-touch cases
+  - `wrapped_block`: `0` signable text risks, `18` signable stamp warnings,
+    `0` signable stamp edge-touch cases
+
+In other words, the remaining text issues are currently confined to intentionally rejected
+`single_line` cases. The remaining stamp-side green-path signal is now small and specific:
+
+- `multi_line`: four `bottom / tall-stamp / 10pt / label-on` scenarios with 1px border-facing
+  stamp clearance
+- `wrapped_block`: eighteen `left/right / 10pt / dense` scenarios with 1px border-facing
+  stamp clearance
 
 The repo now also includes a reusable local sweep fixture set under `artifacts/preview_sweep_assets/`,
 including `sweep_fixture.pdf`, `test_identity.p12`, three transparent stamp images, and

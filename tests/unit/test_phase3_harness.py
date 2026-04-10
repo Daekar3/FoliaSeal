@@ -903,7 +903,7 @@ def test_stamp_edge_diagnostics_flags_touching_and_near_edge() -> None:
     assert diagnostics["stamp_pixmap_touches_band_edge"] is True
     assert diagnostics["stamp_content_touches_band_edge"] is False
     assert diagnostics["stamp_content_within_warning_distance"] is True
-    assert diagnostics["stamp_content_warning_threshold_px"] == 2
+    assert diagnostics["stamp_content_warning_threshold_px"] == 1
     assert diagnostics["stamp_content_min_edge_distance_px"] == 1
 
 
@@ -941,6 +941,33 @@ def test_detect_text_content_bounds_in_preview_finds_rendered_pixels(tmp_path: P
 
     assert error is None
     assert bounds == {"x": 18, "y": 12, "width": 28, "height": 9}
+
+
+def test_detect_text_content_bounds_in_preview_captures_antialiased_text_edges(
+    tmp_path: Path,
+) -> None:
+    preview_path = tmp_path / "preview_antialias.png"
+    image = Image.new("RGBA", (80, 40), color=(255, 255, 255, 255))
+    # Dark core
+    for x in range(22, 40):
+        for y in range(12, 18):
+            image.putpixel((x, y), (0, 0, 0, 255))
+    # Gray anti-aliased fringe that should still count as text.
+    for x in range(20, 42):
+        image.putpixel((x, 11), (120, 120, 120, 255))
+        image.putpixel((x, 18), (120, 120, 120, 255))
+    image.putpixel((21, 12), (120, 120, 120, 255))
+    image.putpixel((40, 17), (120, 120, 120, 255))
+    image.save(preview_path, format="PNG")
+
+    bounds, error = _detect_text_content_bounds_in_preview(
+        preview_image_path=str(preview_path),
+        text_widget_bounds={"x": 10, "y": 8, "width": 40, "height": 20},
+        text_color_rgba=(0, 0, 0, 255),
+    )
+
+    assert error is None
+    assert bounds == {"x": 20, "y": 11, "width": 22, "height": 8}
 
 
 def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
@@ -1093,7 +1120,7 @@ def test_stamp_edge_diagnostics_flags_touching_and_warning_distance() -> None:
 
     assert diagnostics["stamp_pixmap_touches_band_edge"] is True
     assert diagnostics["stamp_content_touches_band_edge"] is False
-    assert diagnostics["stamp_content_warning_threshold_px"] == 2
+    assert diagnostics["stamp_content_warning_threshold_px"] == 1
     assert diagnostics["stamp_content_min_edge_distance_px"] == 1
     assert diagnostics["stamp_content_within_warning_distance"] is True
 
@@ -1130,8 +1157,9 @@ def test_stamp_edge_diagnostics_ignores_left_anchor_for_top_and_bottom() -> None
     assert diagnostics["stamp_content_within_warning_distance"] is False
 
 
-def test_stamp_edge_diagnostics_uses_tighter_threshold_for_multi_line_and_wrapped_block() -> None:
+def test_stamp_edge_diagnostics_uses_uniform_near_border_threshold() -> None:
     for layout_template in (
+        SignatureLayoutTemplate.SINGLE_LINE,
         SignatureLayoutTemplate.MULTI_LINE,
         SignatureLayoutTemplate.WRAPPED_BLOCK,
     ):
@@ -1140,6 +1168,7 @@ def test_stamp_edge_diagnostics_uses_tighter_threshold_for_multi_line_and_wrappe
             (),
             {
                 "layout_template": layout_template,
+                "stamp_position": SignatureStampPosition.RIGHT,
                 "box_style": type(
                     "_BoxStyle",
                     (),
@@ -1156,7 +1185,7 @@ def test_stamp_edge_diagnostics_uses_tighter_threshold_for_multi_line_and_wrappe
         )
 
         assert diagnostics["stamp_content_warning_threshold_px"] == 1
-        assert diagnostics["stamp_content_min_edge_distance_px"] == 2
+        assert diagnostics["stamp_content_min_edge_distance_px"] == 12
         assert diagnostics["stamp_content_within_warning_distance"] is False
 
 
@@ -1189,6 +1218,39 @@ def test_stamp_edge_diagnostics_ignores_text_facing_edge_for_multi_line_top() ->
         "bottom": 0,
     }
     assert diagnostics["stamp_content_min_edge_distance_px"] == 6
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
+def test_stamp_edge_diagnostics_ignores_text_facing_edge_for_single_line_top() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 9, "y": 9, "width": 341, "height": 11},
+        stamp_pixmap_bounds={"x": 10, "y": 12, "width": 8, "height": 8},
+        stamp_content_bounds={"x": 10, "y": 13, "width": 7, "height": 7},
+    )
+
+    assert diagnostics["stamp_content_edge_distances_px"] == {
+        "bottom": 0,
+        "left": 1,
+        "right": 333,
+        "top": 4,
+    }
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 4
     assert diagnostics["stamp_content_touches_band_edge"] is False
     assert diagnostics["stamp_content_within_warning_distance"] is False
 
@@ -1243,19 +1305,25 @@ def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
         [
             {
                 "preview_snapshot": {
+                    "can_submit": True,
                     "render_capture": {
                         "text_content_clipped_in_preview": True,
                         "text_content_overlaps_stamp_band": False,
                         "text_content_overlaps_stamp_content": False,
+                        "stamp_content_within_warning_distance": True,
+                        "stamp_content_touches_band_edge": False,
                     }
                 }
             },
             {
                 "preview_snapshot": {
+                    "can_submit": False,
                     "render_capture": {
                         "text_content_clipped_in_preview": False,
                         "text_content_overlaps_stamp_band": True,
                         "text_content_overlaps_stamp_content": False,
+                        "stamp_content_within_warning_distance": False,
+                        "stamp_content_touches_band_edge": True,
                     }
                 }
             },
@@ -1265,7 +1333,17 @@ def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
 
     assert summary == {
         "text_clipping_risk_scenario_count": 1,
+        "signable_text_clipping_risk_scenario_count": 1,
+        "rejected_text_clipping_risk_scenario_count": 0,
         "text_stamp_overlap_risk_scenario_count": 1,
+        "signable_text_stamp_overlap_risk_scenario_count": 0,
+        "rejected_text_stamp_overlap_risk_scenario_count": 1,
+        "stamp_warning_scenario_count": 1,
+        "signable_stamp_warning_scenario_count": 1,
+        "rejected_stamp_warning_scenario_count": 0,
+        "stamp_edge_touch_scenario_count": 1,
+        "signable_stamp_edge_touch_scenario_count": 0,
+        "rejected_stamp_edge_touch_scenario_count": 1,
     }
 
 
