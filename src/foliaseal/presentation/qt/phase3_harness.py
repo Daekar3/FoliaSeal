@@ -2374,7 +2374,10 @@ def _preview_edge_distances(
 def _widget_application(widget: Any) -> Any | None:
     app_getter = getattr(type(widget), "window", None)
     _ = app_getter  # keep linter quiet for fake widgets that lack QApplication access.
-    app_module = importlib.import_module("PySide6.QtWidgets")
+    try:
+        app_module = importlib.import_module("PySide6.QtWidgets")
+    except ModuleNotFoundError:
+        return None
     q_application = getattr(app_module, "QApplication", None)
     if q_application is None:
         return None

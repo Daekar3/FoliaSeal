@@ -1,3 +1,4 @@
+import importlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -51,6 +52,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _snapshot_visible_signature_appearance,
     _stamp_edge_diagnostics,
     _text_edge_diagnostics,
+    _widget_application,
     _widget_is_visible,
     _write_stamp_debug_overlay,
     _write_text_debug_overlay,
@@ -1420,6 +1422,21 @@ def test_apply_preview_matrix_scenario_syncs_viewer_to_signature_rect_page() -> 
     assert shell.properties_panel.rect.page_index == 3
     assert shell._viewer_workflow.jumps == [3]
     assert shell._viewer_widget.refresh_calls == [True]
+
+
+def test_widget_application_returns_none_when_pyside_is_unavailable(
+    monkeypatch,
+) -> None:
+    real_import_module = importlib.import_module
+
+    def _fake_import_module(name: str, package: str | None = None):
+        if name == "PySide6.QtWidgets":
+            raise ModuleNotFoundError(name)
+        return real_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", _fake_import_module)
+
+    assert _widget_application(object()) is None
 
 
 def test_load_preview_matrix_manifest_accepts_object_or_array(tmp_path: Path) -> None:
