@@ -176,3 +176,6 @@ Interpretation:
 - an attempted explicit backend line-leading fix was intentionally not kept,
   because it also broke compact `single_line` cases that had already been
   accepted manually
+- an attempted preview-side rich-text line-height compression was also not kept,
+  because it did not change the stress matrix outcomes and would have added
+  complexity without buying signal

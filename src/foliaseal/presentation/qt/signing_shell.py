@@ -1064,13 +1064,7 @@ class SignaturePropertiesPanel:
 
     def preview_text(self) -> str:
         preview = self._workflow.preview()
-        if (preview.stamp_position or SignatureStampPosition.TOP) in {
-            SignatureStampPosition.TOP,
-            SignatureStampPosition.BOTTOM,
-        }:
-            return _text(self._preview_controls.detail_label).strip()
-        else:
-            return _text(self._preview_controls.multi_detail_label).strip()
+        return _preview_stamp_text(preview).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
         preview = self._workflow.preview()
@@ -1935,8 +1929,6 @@ class SignaturePropertiesPanel:
             self._preview_controls.detail_label.setText(stamp_text)
             self._preview_controls.multi_detail_label.setText("")
         else:
-            self._preview_controls.detail_label.setText("")
-            self._preview_controls.multi_detail_label.setText(stamp_text)
             content_height = (
                 reserved_text_height_px
                 if (
@@ -1945,6 +1937,8 @@ class SignaturePropertiesPanel:
                 )
                 else inner_body_height
             )
+            self._preview_controls.detail_label.setText("")
+            self._preview_controls.multi_detail_label.setText(stamp_text)
             if hasattr(self._preview_controls.multi_content_container, "setFixedSize"):
                 self._preview_controls.multi_content_container.setFixedSize(
                     detail_width,
