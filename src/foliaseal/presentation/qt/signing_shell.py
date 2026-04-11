@@ -490,6 +490,7 @@ def _preview_text_width_limit(
     *,
     title_line: str | None = None,
     detail_text: str | None = None,
+    stamp_text: str | None = None,
     available_width_px: int | None = None,
     stamp_aspect_ratio: float | None = None,
 ) -> int:
@@ -505,10 +506,16 @@ def _preview_text_width_limit(
     ):
         return body_width
 
-    _unused_title = title_line
+    if stamp_text is None:
+        if title_line and detail_text:
+            stamp_text = f"{title_line}\n{detail_text}"
+        elif title_line:
+            stamp_text = title_line
+        elif detail_text:
+            stamp_text = detail_text
     reservation = _preview_layout_reservation(
         preview,
-        detail_text=detail_text,
+        stamp_text=stamp_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
     if reservation is None:
@@ -570,8 +577,9 @@ def _raw_pixmap_aspect_ratio(raw_pixmap: Any | None) -> float | None:
 def _preview_stamp_max_size(
     preview: SigningDraftPreview,
     *,
-    title_line: str,
-    detail_text: str,
+    title_line: str | None = None,
+    detail_text: str | None = None,
+    stamp_text: str | None = None,
     raw_pixmap: Any,
     available_width_px: int | None = None,
     stamp_aspect_ratio: float | None = None,
@@ -584,10 +592,16 @@ def _preview_stamp_max_size(
     ):
         return (148, 92)
 
-    _unused_title = title_line
+    if stamp_text is None:
+        if title_line and detail_text:
+            stamp_text = f"{title_line}\n{detail_text}"
+        elif title_line:
+            stamp_text = title_line
+        elif detail_text:
+            stamp_text = detail_text
     reservation = _preview_layout_reservation(
         preview,
-        detail_text=detail_text,
+        stamp_text=stamp_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
     if reservation is None:
@@ -638,8 +652,9 @@ def _preview_stamp_max_size(
 def _preview_vertical_band_geometry(
     preview: SigningDraftPreview,
     *,
-    title_line: str,
-    detail_text: str,
+    title_line: str | None = None,
+    detail_text: str | None = None,
+    stamp_text: str | None = None,
     inner_body_height_px: int,
     available_width_px: int | None = None,
     stamp_aspect_ratio: float | None = None,
@@ -651,10 +666,16 @@ def _preview_vertical_band_geometry(
     ):
         return None
 
-    _unused_title = title_line
+    if stamp_text is None:
+        if title_line and detail_text:
+            stamp_text = f"{title_line}\n{detail_text}"
+        elif title_line:
+            stamp_text = title_line
+        elif detail_text:
+            stamp_text = detail_text
     reservation = _preview_layout_reservation(
         preview,
-        detail_text=detail_text,
+        stamp_text=stamp_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
     if reservation is None:
@@ -672,7 +693,8 @@ def _preview_vertical_band_geometry(
 def _preview_layout_reservation(
     preview: SigningDraftPreview,
     *,
-    detail_text: str,
+    detail_text: str | None = None,
+    stamp_text: str | None = None,
     stamp_aspect_ratio: float | None = None,
 ):
     if (
@@ -683,7 +705,9 @@ def _preview_layout_reservation(
     ):
         return None
 
-    stamp_text = detail_text.strip() or " "
+    if stamp_text is None and detail_text is not None:
+        stamp_text = detail_text
+    stamp_text = (stamp_text or _preview_stamp_text(preview)).strip() or " "
     text_box_style = _build_text_box_style(preview.text_style)
     text_box_width, text_box_height = _measure_text_box_dimensions(stamp_text, text_box_style)
     return _layout_reservation_for_template(
@@ -868,6 +892,18 @@ def _preview_detail_text(preview: SigningDraftPreview) -> str:
     return preview.detail_text or "No visible fields selected"
 
 
+def _preview_stamp_text(preview: SigningDraftPreview) -> str:
+    title_text = (preview.signer_label_prefix or preview.title or "").strip()
+    detail_text = (preview.detail_text or "").strip()
+    if title_text and detail_text:
+        return f"{title_text}\n{detail_text}"
+    if title_text:
+        return title_text
+    if detail_text:
+        return detail_text
+    return "No visible fields selected"
+
+
 def _preview_box_styles(preview: SigningDraftPreview) -> tuple[str, str]:
     if preview.box_style is None:
         return "", ""
@@ -1028,21 +1064,13 @@ class SignaturePropertiesPanel:
 
     def preview_text(self) -> str:
         preview = self._workflow.preview()
-        title = _text(self._preview_controls.title_label)
-        if (
-            preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-            and (preview.stamp_position or SignatureStampPosition.TOP)
-            in {
-                SignatureStampPosition.TOP,
-                SignatureStampPosition.BOTTOM,
-            }
-        ):
-            detail = _text(self._preview_controls.detail_label)
+        if (preview.stamp_position or SignatureStampPosition.TOP) in {
+            SignatureStampPosition.TOP,
+            SignatureStampPosition.BOTTOM,
+        }:
+            return _text(self._preview_controls.detail_label).strip()
         else:
-            detail = _text(self._preview_controls.multi_detail_label)
-        if not title:
-            return detail.strip()
-        return "\n".join([title, detail]).strip()
+            return _text(self._preview_controls.multi_detail_label).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
         preview = self._workflow.preview()
@@ -1766,7 +1794,7 @@ class SignaturePropertiesPanel:
         )
 
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
-        title_line = preview.signer_label_prefix or preview.title
+        stamp_text = _preview_stamp_text(preview)
         stamp_position = preview.stamp_position or SignatureStampPosition.TOP
         is_vertical = stamp_position in (
             SignatureStampPosition.TOP,
@@ -1789,7 +1817,6 @@ class SignaturePropertiesPanel:
         )
         body_width = card_width
         body_height = card_height
-        visible_detail = _preview_detail_text(preview)
         raw_stamp_pixmap = None
         if preview.image_stamp_path:
             raw_pixmap = self._bindings.q_pixmap(preview.image_stamp_path)
@@ -1803,7 +1830,7 @@ class SignaturePropertiesPanel:
         )
         preview_reservation = _preview_layout_reservation(
             preview,
-            detail_text=visible_detail,
+            stamp_text=stamp_text,
             stamp_aspect_ratio=stamp_aspect_ratio,
         )
         reserved_text_width_px = None
@@ -1820,8 +1847,7 @@ class SignaturePropertiesPanel:
                 if reserved_text_width_px is not None
                 else _preview_text_width_limit(
                     preview,
-                    title_line=title_line,
-                    detail_text=visible_detail,
+                    stamp_text=stamp_text,
                     available_width_px=available_width_px,
                     stamp_aspect_ratio=stamp_aspect_ratio,
                 )
@@ -1880,9 +1906,6 @@ class SignaturePropertiesPanel:
             self._preview_controls.detail_label.setStyleSheet(text_css)
         if hasattr(self._preview_controls.multi_detail_label, "setStyleSheet"):
             self._preview_controls.multi_detail_label.setStyleSheet(text_css)
-        self._preview_controls.title_label.setText(title_line)
-        _set_widget_visible(self._preview_controls.title_label, bool(title_line))
-        single_line_preview = preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
         for label in (
             self._preview_controls.title_label,
             self._preview_controls.detail_label,
@@ -1890,18 +1913,13 @@ class SignaturePropertiesPanel:
         ):
             set_word_wrap = getattr(label, "setWordWrap", None)
             if callable(set_word_wrap):
-                set_word_wrap(not single_line_preview)
-        title_hint_height = (
-            _size_hint_height(self._preview_controls.title_label) if title_line else 0
-        ) or 0
-        card_layout = _container_layout(self._preview_controls.card_container)
-        title_gap = _layout_spacing(card_layout) if title_line else 0
+                set_word_wrap(False)
+        self._preview_controls.title_label.setText("")
+        _set_widget_visible(self._preview_controls.title_label, False)
         inner_body_height = max(
             1,
             body_height
             - int(round(preview_padding_px * 2))
-            - title_hint_height
-            - title_gap,
         )
         if hasattr(self._preview_controls.single_body_container, "setFixedSize"):
             self._preview_controls.single_body_container.setFixedSize(
@@ -1914,11 +1932,11 @@ class SignaturePropertiesPanel:
                 inner_body_height,
             )
         if is_vertical:
-            self._preview_controls.detail_label.setText(visible_detail)
+            self._preview_controls.detail_label.setText(stamp_text)
             self._preview_controls.multi_detail_label.setText("")
         else:
             self._preview_controls.detail_label.setText("")
-            self._preview_controls.multi_detail_label.setText(visible_detail)
+            self._preview_controls.multi_detail_label.setText(stamp_text)
             content_height = (
                 reserved_text_height_px
                 if (
@@ -1952,8 +1970,7 @@ class SignaturePropertiesPanel:
         _set_widget_visible(self._preview_controls.multi_body_container, not is_vertical)
         vertical_band_geometry = _preview_vertical_band_geometry(
             preview,
-            title_line=title_line,
-            detail_text=visible_detail,
+            stamp_text=stamp_text,
             inner_body_height_px=inner_body_height,
             available_width_px=available_width_px,
             stamp_aspect_ratio=stamp_aspect_ratio,
@@ -2005,8 +2022,7 @@ class SignaturePropertiesPanel:
             else:
                 max_width, max_height = _preview_stamp_max_size(
                     preview,
-                    title_line=title_line,
-                    detail_text=visible_detail,
+                    stamp_text=stamp_text,
                     raw_pixmap=raw_stamp_pixmap,
                     available_width_px=available_width_px,
                     stamp_aspect_ratio=stamp_aspect_ratio,

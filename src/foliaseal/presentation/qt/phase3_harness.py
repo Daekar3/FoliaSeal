@@ -1942,10 +1942,7 @@ def _detect_text_content_bounds_in_preview(
     cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
     crop_width, crop_height = cropped.size
     background = _estimate_crop_background_rgba(cropped)
-    min_x = crop_width
-    min_y = crop_height
-    max_x = -1
-    max_y = -1
+    candidate_pixels: set[tuple[int, int]] = set()
     for y in range(crop_height):
         for x in range(crop_width):
             pixel = cropped.getpixel((x, y))
@@ -1955,10 +1952,21 @@ def _detect_text_content_bounds_in_preview(
                 background_rgba=background,
             ):
                 continue
-            min_x = min(min_x, x)
-            min_y = min(min_y, y)
-            max_x = max(max_x, x)
-            max_y = max(max_y, y)
+            candidate_pixels.add((x, y))
+    candidate_pixels = _filter_border_like_candidate_components(
+        candidate_pixels,
+        crop_width=crop_width,
+        crop_height=crop_height,
+    )
+    min_x = crop_width
+    min_y = crop_height
+    max_x = -1
+    max_y = -1
+    for x, y in candidate_pixels:
+        min_x = min(min_x, x)
+        min_y = min(min_y, y)
+        max_x = max(max_x, x)
+        max_y = max(max_y, y)
     if max_x < min_x or max_y < min_y:
         return None, "No rendered text pixels detected in the preview text widget."
     return (
@@ -1970,6 +1978,68 @@ def _detect_text_content_bounds_in_preview(
         },
         None,
     )
+
+
+def _filter_border_like_candidate_components(
+    candidate_pixels: set[tuple[int, int]],
+    *,
+    crop_width: int,
+    crop_height: int,
+) -> set[tuple[int, int]]:
+    if not candidate_pixels:
+        return candidate_pixels
+
+    remaining = set(candidate_pixels)
+    filtered: set[tuple[int, int]] = set()
+    while remaining:
+        start = remaining.pop()
+        stack = [start]
+        component = {start}
+        while stack:
+            x, y = stack.pop()
+            for neighbor in (
+                (x - 1, y),
+                (x + 1, y),
+                (x, y - 1),
+                (x, y + 1),
+            ):
+                if neighbor not in remaining:
+                    continue
+                remaining.remove(neighbor)
+                component.add(neighbor)
+                stack.append(neighbor)
+        if _component_looks_like_border_stroke(
+            component,
+            crop_width=crop_width,
+            crop_height=crop_height,
+        ):
+            continue
+        filtered.update(component)
+    return filtered
+
+
+def _component_looks_like_border_stroke(
+    component: set[tuple[int, int]],
+    *,
+    crop_width: int,
+    crop_height: int,
+) -> bool:
+    min_x = min(x for x, _y in component)
+    max_x = max(x for x, _y in component)
+    min_y = min(y for _x, y in component)
+    max_y = max(y for _x, y in component)
+    width = (max_x - min_x) + 1
+    height = (max_y - min_y) + 1
+    touches_left = min_x <= 0
+    touches_right = max_x >= crop_width - 1
+    touches_top = min_y <= 0
+    touches_bottom = max_y >= crop_height - 1
+
+    spans_full_width = width >= max(1, crop_width - 2)
+    spans_full_height = height >= max(1, crop_height - 2)
+    thin_horizontal = height <= 2 and spans_full_width and (touches_top or touches_bottom)
+    thin_vertical = width <= 2 and spans_full_height and (touches_left or touches_right)
+    return thin_horizontal or thin_vertical
 
 
 def _reference_text_content_bounds(

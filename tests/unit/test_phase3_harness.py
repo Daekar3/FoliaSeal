@@ -1174,6 +1174,28 @@ def test_detect_text_content_bounds_in_preview_captures_antialiased_text_edges(
     assert bounds == {"x": 20, "y": 11, "width": 22, "height": 8}
 
 
+def test_detect_text_content_bounds_in_preview_ignores_border_strokes(
+    tmp_path: Path,
+) -> None:
+    preview_path = tmp_path / "preview_border.png"
+    image = Image.new("RGBA", (80, 40), color=(255, 255, 255, 255))
+    for x in range(10, 60):
+        image.putpixel((x, 27), (0, 0, 0, 255))
+    for x in range(22, 38):
+        for y in range(14, 19):
+            image.putpixel((x, y), (0, 0, 0, 255))
+    image.save(preview_path, format="PNG")
+
+    bounds, error = _detect_text_content_bounds_in_preview(
+        preview_image_path=str(preview_path),
+        text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
+        text_color_rgba=(0, 0, 0, 255),
+    )
+
+    assert error is None
+    assert bounds == {"x": 22, "y": 14, "width": 16, "height": 5}
+
+
 def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
     preview = type(
         "_Preview",

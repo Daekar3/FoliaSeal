@@ -835,30 +835,29 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
         1,
         expected_height - int(round(expected_padding * 2)),
     )
-    expected_title_height = preview_controls.title_label.sizeHint().height()
-    expected_card_spacing = preview_controls.card_container.layout.spacing
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
     assert preview_controls.single_body_container.fixed_size == (
         expected_inner_width,
-        expected_inner_height - expected_title_height - expected_card_spacing,
+        expected_inner_height,
     )
     assert preview_controls.title_label.fixed_width == expected_width
     assert preview_controls.detail_label.fixed_width == expected_width
     assert preview_controls.multi_content_container.fixed_width <= expected_width
     assert preview_controls.multi_detail_label.fixed_width <= expected_width
-    assert preview_controls.title_label.text() == "Digitally signed by"
-    assert preview_controls.title_label.visible is True
+    assert preview_controls.title_label.text() == ""
+    assert preview_controls.title_label.visible is False
     detail_text = preview_controls.multi_detail_label.text()
     detail_lines = detail_text.splitlines()
-    assert detail_lines[0] == "Distinguished name: Distinguished name"
-    assert detail_lines[1] == "Common name: Common name"
-    assert detail_lines[2] == "Email: alice@example.com"
-    assert detail_lines[3] == "Title: Director"
-    assert detail_lines[4] == "Company: FoliaSeal"
-    assert detail_lines[5].startswith("Signing time:")
-    assert detail_lines[6] == "Reason: Approved"
-    assert len(detail_lines) == 7
+    assert detail_lines[0] == "Digitally signed by"
+    assert detail_lines[1] == "Distinguished name: Distinguished name"
+    assert detail_lines[2] == "Common name: Common name"
+    assert detail_lines[3] == "Email: alice@example.com"
+    assert detail_lines[4] == "Title: Director"
+    assert detail_lines[5] == "Company: FoliaSeal"
+    assert detail_lines[6].startswith("Signing time:")
+    assert detail_lines[7] == "Reason: Approved"
+    assert len(detail_lines) == 8
     assert preview_controls.footer_label.text() == ""
     assert len(preview_controls.card_container.layout.items) == 3
     assert preview_controls.card_container.layout.items[0][0] is preview_controls.title_label
@@ -945,13 +944,11 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
         1,
         expected_height - int(round(expected_padding * 2)),
     )
-    expected_title_height = preview_controls.title_label.sizeHint().height()
-    expected_card_spacing = preview_controls.card_container.layout.spacing
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
     assert preview_controls.single_body_container.fixed_size == (
         expected_inner_width,
-        expected_inner_height - expected_title_height - expected_card_spacing,
+        expected_inner_height,
     )
     assert preview_controls.title_label.fixed_width == expected_width
     assert preview_controls.detail_label.fixed_width == expected_width
@@ -960,9 +957,9 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.multi_body_container.visible is False
     assert preview_controls.single_body_container.visible is True
-    assert preview_controls.title_label.visible is True
-    assert preview_controls.title_label.text().startswith("A very long prefix")
-    assert "A very long prefix" not in preview_controls.detail_label.text()
+    assert preview_controls.title_label.visible is False
+    assert preview_controls.title_label.text() == ""
+    assert preview_controls.detail_label.text().startswith("A very long prefix")
     assert len(preview_controls.single_body_container.layout.items) == 2
     assert preview_controls.single_body_container.layout.items[0][1] == (0, _FakeQt.AlignLeft)
 
@@ -1512,11 +1509,11 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
     )
 
     preview = widget.properties_panel.preview
-    expected_detail_text = signing_shell_module._preview_detail_text(preview)
+    expected_stamp_text = signing_shell_module._preview_stamp_text(preview)
     assert widget.properties_panel._appearance_controls.show_field_names.isChecked() is False
-    assert widget.properties_panel.preview_controls.title_label.text() == (preview.title or "")
-    assert widget.properties_panel.preview_controls.title_label.visible is True
-    assert widget.properties_panel.preview_controls.detail_label.text() == expected_detail_text
+    assert widget.properties_panel.preview_controls.title_label.text() == ""
+    assert widget.properties_panel.preview_controls.title_label.visible is False
+    assert widget.properties_panel.preview_controls.detail_label.text() == expected_stamp_text
 
 
 def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
@@ -1623,14 +1620,15 @@ def test_signing_shell_wrapped_block_preview_groups_tail_fields(
 
     detail_lines = widget.properties_panel.preview_controls.multi_detail_label.text().splitlines()
 
-    assert len(detail_lines) == 3
-    assert detail_lines[0].startswith("Distinguished name:")
-    assert detail_lines[1].startswith("Common name:")
-    assert "Email: alice@example.com" in detail_lines[2]
-    assert "Title: Director" in detail_lines[2]
-    assert "Company: FoliaSeal" in detail_lines[2]
-    assert "Signing time:" in detail_lines[2]
-    assert "Reason: Approved" in detail_lines[2]
+    assert len(detail_lines) == 4
+    assert detail_lines[0] == "Digitally signed by"
+    assert detail_lines[1].startswith("Distinguished name:")
+    assert detail_lines[2].startswith("Common name:")
+    assert "Email: alice@example.com" in detail_lines[3]
+    assert "Title: Director" in detail_lines[3]
+    assert "Company: FoliaSeal" in detail_lines[3]
+    assert "Signing time:" in detail_lines[3]
+    assert "Reason: Approved" in detail_lines[3]
 
 
 def test_signing_shell_wrapped_block_preview_uses_value_only_text_by_default(
@@ -1670,17 +1668,59 @@ def test_signing_shell_wrapped_block_preview_uses_value_only_text_by_default(
 
     detail_lines = widget.properties_panel.preview_controls.multi_detail_label.text().splitlines()
 
-    assert len(detail_lines) == 3
-    assert detail_lines[0] == "Distinguished name"
-    assert detail_lines[1] == "Common name"
-    assert "alice@example.com" in detail_lines[2]
-    assert "Director" in detail_lines[2]
-    assert "FoliaSeal" in detail_lines[2]
-    assert "Approved" in detail_lines[2]
-    assert "Email:" not in detail_lines[2]
-    assert "Title:" not in detail_lines[2]
-    assert "Company:" not in detail_lines[2]
-    assert "Reason:" not in detail_lines[2]
+    assert len(detail_lines) == 4
+    assert detail_lines[0] == "Digitally signed by"
+    assert detail_lines[1] == "Distinguished name"
+    assert detail_lines[2] == "Common name"
+    assert "alice@example.com" in detail_lines[3]
+    assert "Director" in detail_lines[3]
+    assert "FoliaSeal" in detail_lines[3]
+    assert "Approved" in detail_lines[3]
+    assert "Email:" not in detail_lines[3]
+    assert "Title:" not in detail_lines[3]
+    assert "Company:" not in detail_lines[3]
+    assert "Reason:" not in detail_lines[3]
+
+
+def test_signing_shell_preview_text_uses_active_vertical_label_for_wrapped_block(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.TOP,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=54.0,
+        )
+    )
+
+    detail = widget.properties_panel.preview_controls.detail_label.text()
+
+    assert widget.properties_panel.preview_controls.single_body_container.visible is True
+    assert detail
+    assert widget.properties_panel.preview_text() == detail.strip()
 
 
 def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
@@ -2110,9 +2150,9 @@ def test_signing_shell_single_line_preview_matches_backend_wrapping(
     )
 
     preview = widget.properties_panel.preview
-    expected = signing_shell_module._preview_detail_text(preview)
-    assert widget.properties_panel.preview_controls.title_label.text() == (preview.title or "")
-    assert widget.properties_panel.preview_controls.title_label.visible is True
+    expected = signing_shell_module._preview_stamp_text(preview)
+    assert widget.properties_panel.preview_controls.title_label.text() == ""
+    assert widget.properties_panel.preview_controls.title_label.visible is False
     assert widget.properties_panel.preview_controls.detail_label.text() == expected
 
 
@@ -2196,7 +2236,7 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     )
 
     preview = widget.properties_panel.preview
-    expected = signing_shell_module._preview_detail_text(preview)
+    expected = signing_shell_module._preview_stamp_text(preview)
     available_width = signing_shell_module._preview_available_width(
         preview,
         container=widget.properties_panel.preview_controls.container,
@@ -2206,8 +2246,7 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     assert widget.properties_panel.preview_controls.multi_content_container.fixed_width == (
         signing_shell_module._preview_text_width_limit(
             preview,
-            title_line=preview.signer_label_prefix or preview.title,
-            detail_text=expected,
+            stamp_text=expected,
             available_width_px=available_width,
         )
     )
@@ -2267,15 +2306,14 @@ def test_signing_shell_multi_line_vertical_preview_uses_reserved_band_heights(
     )
 
     preview = widget.properties_panel.preview
-    detail = signing_shell_module._preview_detail_text(preview)
+    detail = signing_shell_module._preview_stamp_text(preview)
     available_width = signing_shell_module._preview_available_width(
         preview,
         container=widget.properties_panel.preview_controls.container,
     )
     raw_geometry = signing_shell_module._preview_vertical_band_geometry(
         preview,
-        title_line=preview.signer_label_prefix or preview.title,
-        detail_text=detail,
+        stamp_text=detail,
         inner_body_height_px=widget.properties_panel.preview_controls.single_body_container.fixed_size[
             1
         ],
@@ -2355,14 +2393,14 @@ def test_signing_shell_multi_line_horizontal_preview_uses_reserved_text_height(
     )
 
     preview = widget.properties_panel.preview
-    detail = signing_shell_module._preview_detail_text(preview)
+    detail = signing_shell_module._preview_stamp_text(preview)
     available_width = signing_shell_module._preview_available_width(
         preview,
         container=widget.properties_panel.preview_controls.container,
     )
     reservation = signing_shell_module._preview_layout_reservation(
         preview,
-        detail_text=detail,
+        stamp_text=detail,
         stamp_aspect_ratio=signing_shell_module._raw_pixmap_aspect_ratio(
             _FakePixmap("/tmp/stamp.png")
         ),
@@ -2471,8 +2509,7 @@ def test_preview_stamp_max_size_is_not_capped_to_legacy_dimensions(tmp_path: Pat
 
     max_width, max_height = signing_shell_module._preview_stamp_max_size(
         preview,
-        title_line="",
-        detail_text="Adam Smith | Board Secretary | Lawson Heirs Inc.",
+        stamp_text="Adam Smith | Board Secretary | Lawson Heirs Inc.",
         raw_pixmap=_FakePixmap("/tmp/stamp.png", width=400, height=50),
         stamp_aspect_ratio=8.0,
         available_width_px=520,
@@ -2619,8 +2656,7 @@ def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
 
     default_width = signing_shell_module._preview_text_width_limit(
         preview,
-        title_line=preview.signer_label_prefix or preview.title,
-        detail_text=detail,
+        stamp_text=detail,
         available_width_px=available_width,
         stamp_aspect_ratio=1.5,
     )
@@ -2645,8 +2681,7 @@ def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
     )
     thick_width = signing_shell_module._preview_text_width_limit(
         thick_preview,
-        title_line=thick_preview.signer_label_prefix or thick_preview.title,
-        detail_text=thick_detail,
+        stamp_text=thick_detail,
         available_width_px=thick_available_width,
         stamp_aspect_ratio=1.5,
     )
