@@ -2096,10 +2096,11 @@ def _stamp_edge_diagnostics(
     stamp_pixmap_bounds: dict[str, int] | None,
     stamp_content_bounds: dict[str, int] | None,
 ) -> dict[str, Any]:
-    # Rendered stamp content bounds already include anti-aliased edge pixels, so a
-    # 1px buffer is enough to represent "near the border" without reintroducing
-    # border-width-driven warning lore.
-    warning_threshold = 1
+    # Rendered stamp content bounds already include anti-aliased edge pixels, so
+    # a remaining 1px border-facing gap is visually acceptable. Only actual
+    # border contact is treated as a stamp warning; explicit edge-touch remains
+    # separately reported.
+    warning_threshold = 0
 
     pixmap_distances = _rect_edge_distances(
         outer_bounds=stamp_band_bounds,

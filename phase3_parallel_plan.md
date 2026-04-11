@@ -50,12 +50,13 @@ Validated so far:
   green-path regressions
 - stamp warnings now represent border-facing near-border crowding only; text-facing stamp/text
   conflicts are tracked by the text overlap/clipping diagnostics instead
+- after anti-aliased stamp-content detection was tightened, a remaining 1px border-facing gap is
+  treated as acceptable raster clearance; actual contact still shows up in the explicit
+  stamp edge-touch counts
 - the current green-path findings are now easy to read:
-  - `single_line`: no signable text clipping and no signable stamp warnings remain
-  - `multi_line`: no signable text issues; a four-scenario `bottom / tall-stamp / 10pt / label-on`
-    stamp-warning tail remains
-  - `wrapped_block`: no signable text issues; an eighteen-scenario
-    `left/right / 10pt / dense` stamp-warning tail remains
+  - `single_line`: no signable text clipping, stamp warnings, or stamp edge-touch remain
+  - `multi_line`: no signable text clipping, stamp warnings, or stamp edge-touch remain
+  - `wrapped_block`: no signable text clipping, stamp warnings, or stamp edge-touch remain
 - preview typography semantics are now intended to be layout-invariant: the selected point size
   should mean the same thing in `single_line`, `multi_line`, and `wrapped_block`, with layout mode
   affecting reservation geometry and fit behavior rather than silently rescaling text

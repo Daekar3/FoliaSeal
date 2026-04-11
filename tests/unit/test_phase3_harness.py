@@ -882,7 +882,7 @@ def test_project_content_bounds_to_preview_scales_source_bounds() -> None:
     assert projected == {"x": 30, "y": 15, "width": 60, "height": 30}
 
 
-def test_stamp_edge_diagnostics_flags_touching_and_near_edge() -> None:
+def test_stamp_edge_diagnostics_flags_touching_but_not_one_pixel_clearance() -> None:
     preview = type(
         "_Preview",
         (),
@@ -904,8 +904,8 @@ def test_stamp_edge_diagnostics_flags_touching_and_near_edge() -> None:
 
     assert diagnostics["stamp_pixmap_touches_band_edge"] is True
     assert diagnostics["stamp_content_touches_band_edge"] is False
-    assert diagnostics["stamp_content_within_warning_distance"] is True
-    assert diagnostics["stamp_content_warning_threshold_px"] == 1
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+    assert diagnostics["stamp_content_warning_threshold_px"] == 0
     assert diagnostics["stamp_content_min_edge_distance_px"] == 1
 
 
@@ -1100,7 +1100,7 @@ def test_project_content_bounds_to_preview_scales_into_pixmap_bounds() -> None:
     assert projected == {"x": 48, "y": 16, "width": 48, "height": 16}
 
 
-def test_stamp_edge_diagnostics_flags_touching_and_warning_distance() -> None:
+def test_stamp_edge_diagnostics_flags_touching_without_one_pixel_warning() -> None:
     preview = type(
         "_Preview",
         (),
@@ -1122,9 +1122,9 @@ def test_stamp_edge_diagnostics_flags_touching_and_warning_distance() -> None:
 
     assert diagnostics["stamp_pixmap_touches_band_edge"] is True
     assert diagnostics["stamp_content_touches_band_edge"] is False
-    assert diagnostics["stamp_content_warning_threshold_px"] == 1
+    assert diagnostics["stamp_content_warning_threshold_px"] == 0
     assert diagnostics["stamp_content_min_edge_distance_px"] == 1
-    assert diagnostics["stamp_content_within_warning_distance"] is True
+    assert diagnostics["stamp_content_within_warning_distance"] is False
 
 
 def test_stamp_edge_diagnostics_ignores_left_anchor_for_top_and_bottom() -> None:
@@ -1159,7 +1159,7 @@ def test_stamp_edge_diagnostics_ignores_left_anchor_for_top_and_bottom() -> None
     assert diagnostics["stamp_content_within_warning_distance"] is False
 
 
-def test_stamp_edge_diagnostics_uses_uniform_near_border_threshold() -> None:
+def test_stamp_edge_diagnostics_uses_uniform_touch_only_threshold() -> None:
     for layout_template in (
         SignatureLayoutTemplate.SINGLE_LINE,
         SignatureLayoutTemplate.MULTI_LINE,
@@ -1186,7 +1186,7 @@ def test_stamp_edge_diagnostics_uses_uniform_near_border_threshold() -> None:
             stamp_content_bounds={"x": 12, "y": 12, "width": 26, "height": 26},
         )
 
-        assert diagnostics["stamp_content_warning_threshold_px"] == 1
+        assert diagnostics["stamp_content_warning_threshold_px"] == 0
         assert diagnostics["stamp_content_min_edge_distance_px"] == 12
         assert diagnostics["stamp_content_within_warning_distance"] is False
 

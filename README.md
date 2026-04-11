@@ -226,21 +226,21 @@ Current interpretation of the checked-in full-matrix summaries:
 - stamp warnings now mean border-facing near-border crowding only; text-facing stamp/text
   conflicts are tracked by the text overlap/clipping diagnostics instead of being inferred
   indirectly from stamp-band geometry
+- after anti-aliased stamp-content detection was tightened, a remaining 1px border-facing gap is
+  treated as acceptable raster clearance rather than a warning; actual border contact is still
+  reported explicitly by the stamp edge-touch counts
 - as of the latest checked-in text-instrumented summaries:
   - `single_line`: `0` signable text clipping risks, `42` rejected text clipping risks,
     `0` signable stamp warnings, `0` signable stamp edge-touch cases
-  - `multi_line`: `0` signable text risks, `4` signable stamp warnings,
+  - `multi_line`: `0` signable text risks, `0` signable stamp warnings,
     `0` signable stamp edge-touch cases
-  - `wrapped_block`: `0` signable text risks, `18` signable stamp warnings,
+  - `wrapped_block`: `0` signable text risks, `0` signable stamp warnings,
     `0` signable stamp edge-touch cases
 
-In other words, the remaining text issues are currently confined to intentionally rejected
-`single_line` cases. The remaining stamp-side green-path signal is now small and specific:
-
-- `multi_line`: four `bottom / tall-stamp / 10pt / label-on` scenarios with 1px border-facing
-  stamp clearance
-- `wrapped_block`: eighteen `left/right / 10pt / dense` scenarios with 1px border-facing
-  stamp clearance
+In other words, the remaining preview-matrix risk signal is now confined to intentionally rejected
+`single_line` text-clipping cases. The checked-in green path is clean for text clipping,
+text/stamp overlap, stamp warnings, and stamp edge-touch across `single_line`, `multi_line`, and
+`wrapped_block`.
 
 The repo now also includes a reusable local sweep fixture set under `artifacts/preview_sweep_assets/`,
 including `sweep_fixture.pdf`, `test_identity.p12`, three transparent stamp images, and

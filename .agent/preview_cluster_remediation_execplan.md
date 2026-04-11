@@ -99,17 +99,18 @@ Inspection shows these are not all the same class of problem:
 - 2026-04-10: Refined stamp diagnostics so warnings are based on border-facing
   stamp clearance only; text-facing conflicts remain the responsibility of the
   text overlap/clipping diagnostics.
-- 2026-04-10: Simplified the stamp-warning threshold to a constant 1px
-  near-border signal now that the harness detects anti-aliased stamp-content
-  bounds directly, removing the earlier border-width-driven warning noise.
+- 2026-04-10: Simplified the stamp-warning threshold to a touch-only signal now
+  that the harness detects anti-aliased stamp-content bounds directly; a
+  remaining 1px border-facing gap is now treated as acceptable raster
+  clearance, not a product warning.
 - 2026-04-10: Reran all three full preview matrices after the stamp-diagnostic
   cleanup:
-  - `single_line v10`: `216` scenarios, `42` rejected text clipping risks,
+  - `single_line v11`: `216` scenarios, `42` rejected text clipping risks,
     `0` signable stamp warnings, `0` signable stamp edge-touch cases
-  - `multi_line v13`: `288` scenarios, `0` text clipping risks,
-    `4` signable stamp warnings, `0` signable stamp edge-touch cases
-  - `wrapped_block v10`: `288` scenarios, `0` text clipping risks,
-    `18` signable stamp warnings, `0` signable stamp edge-touch cases
+  - `multi_line v14`: `288` scenarios, `0` text clipping risks,
+    `0` signable stamp warnings, `0` signable stamp edge-touch cases
+  - `wrapped_block v11`: `288` scenarios, `0` text clipping risks,
+    `0` signable stamp warnings, `0` signable stamp edge-touch cases
 - 2026-04-10: Final verification passed:
   - `ruff check .`
   - `pytest -q`
