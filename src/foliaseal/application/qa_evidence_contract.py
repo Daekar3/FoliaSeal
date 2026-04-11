@@ -47,6 +47,7 @@ def evaluate_phase3_evidence_contract(
     signature_appearance = _mapping(sign_request_snapshot.get("signature_appearance"))
     backend_reservation_snapshot = _mapping(capture.get("backend_reservation_snapshot"))
     visible_appearance_snapshot = _mapping(capture.get("output_visible_appearance_snapshot"))
+    captured_states = capture.get("captured_states")
 
     sign_request_count = _int(capture.get("sign_request_count"))
     sign_attempted = sign_request_count > 0
@@ -144,6 +145,22 @@ def evaluate_phase3_evidence_contract(
             "this as evidence."
         )
 
+    if capture.get("summary_json_path"):
+        _validate_preview_render_artifacts(
+            errors=errors,
+            render_capture=_mapping(preview_snapshot.get("render_capture")),
+            context="current preview snapshot",
+        )
+        if isinstance(captured_states, (list, tuple)):
+            for index, state in enumerate(captured_states, start=1):
+                state_mapping = _mapping(state)
+                state_preview = _mapping(state_mapping.get("preview_snapshot"))
+                _validate_preview_render_artifacts(
+                    errors=errors,
+                    render_capture=_mapping(state_preview.get("render_capture")),
+                    context=f"captured_states[{index}]",
+                )
+
     if sign_attempted and not validation_text:
         warnings.append(
             "A signing attempt was captured without validation_text; the run is "
@@ -187,3 +204,27 @@ def _int(value: Any) -> int:
     if isinstance(value, int):
         return value
     return 0
+
+
+def _validate_preview_render_artifacts(
+    *,
+    errors: list[str],
+    render_capture: dict[str, Any],
+    context: str,
+) -> None:
+    if not render_capture:
+        errors.append(f"{context} is missing render_capture diagnostics.")
+        return
+    if render_capture.get("preview_image_error") is not None:
+        errors.append(f"{context} reported preview_image_error in a saved harness capture.")
+    if not render_capture.get("preview_image_path"):
+        errors.append(f"{context} is missing preview_image_path.")
+    for key in (
+        "text_rendered_content_bounds_px",
+        "text_debug_image_path",
+        "stamp_debug_image_path",
+        "text_content_clipped_in_preview",
+        "stamp_content_within_warning_distance",
+    ):
+        if key not in render_capture:
+            errors.append(f"{context} is missing `{key}` render diagnostics.")

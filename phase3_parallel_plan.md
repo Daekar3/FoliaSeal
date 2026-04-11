@@ -42,9 +42,8 @@ Validated so far:
 - the concrete backend now produces a genuinely cryptographically signed PDF through `pyHanko`
 - the preview panel width/aspect-ratio behavior is materially more stable than earlier in the
   remediation wave
-- the checked-in unattended `single_line` preview matrix is currently green across the repository
-- the checked-in unattended `multi_line` preview matrix is currently green across the repository
-- the checked-in unattended `wrapped_block` preview matrix is currently green across the repository
+- the checked-in baseline `single_line`, `multi_line`, and `wrapped_block` preview matrices are
+  currently structurally green across the repository
 - preview-matrix summaries now separate signable risk counts from rejected risk counts for both
   text and stamp diagnostics, so intentionally blocked bad layouts do not read like unresolved
   green-path regressions
@@ -53,14 +52,22 @@ Validated so far:
 - after anti-aliased stamp-content detection was tightened, a remaining 1px border-facing gap is
   treated as acceptable raster clearance; actual contact still shows up in the explicit
   stamp edge-touch counts
-- the current green-path findings are now easy to read:
+- the current baseline green-path findings are now easy to read:
   - `single_line`: no signable text clipping, stamp warnings, or stamp edge-touch remain
   - `multi_line`: no signable text clipping, stamp warnings, or stamp edge-touch remain
   - `wrapped_block`: no signable text clipping, stamp warnings, or stamp edge-touch remain
+- the new checked-in stress matrices now exercise anonymized real-world content pressure instead of
+  only the short generic fixture strings, and they immediately exposed remaining green-path text-fit
+  regressions:
+  - stress `single_line`: `150` signable text-clipping risks
+  - stress `multi_line`: `18` signable text-clipping risks
+  - stress `wrapped_block`: `15` signable text-clipping risks
+- harness evidence is now stricter: saved manual captures with `summary_json_path` are expected to
+  preserve preview render artifacts and diagnostics; missing preview image paths are treated as an
+  evidence-contract defect rather than a benign omission
 - preview typography semantics are now intended to be layout-invariant: the selected point size
   should mean the same thing in `single_line`, `multi_line`, and `wrapped_block`, with layout mode
   affecting reservation geometry and fit behavior rather than silently rescaling text
-  fixture set
 - the `single_line` layout path has been simplified so preview composition and pre-submit fit
   validation now share the same backend-owned text/layout input rules
 - Phase 3 harness artifacts now include a machine-validated evidence contract and explicit
@@ -71,6 +78,8 @@ Not yet achieved:
 - a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
 - a fully acceptance-ready appearance workflow and product-quality preview/signing flow
 - complete preview/output parity for all realistic rectangle/layout combinations
+- remediation of the new stress-matrix green-path regressions across `single_line`, `multi_line`,
+  and `wrapped_block`
 - manual harness revalidation of the simplified `single_line` path with real user assets
 - trustworthy transparent-GIF stamp handling in final signed output
 - TSA-backed timestamping and timestamp-required signing flows

@@ -28,6 +28,9 @@ from foliaseal.application.phase3_signing_backend import (
     build_phase3_signing_executor,
 )
 from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
+from foliaseal.application.qa_preview_stress_fixtures import (
+    apply_preview_stress_fixture_profile,
+)
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -434,6 +437,10 @@ def run_phase3_signing_harness(
     source_path = Path(pdf_path)
     if not source_path.exists():
         raise FileNotFoundError(f"PDF does not exist: {pdf_path}")
+    artifacts_dir = _default_harness_artifacts_dir(
+        summary_json_path=summary_json_path,
+        artifacts_dir=artifacts_dir,
+    )
 
     page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
     backend = QtPdfRenderBackend()
@@ -710,6 +717,19 @@ def run_phase3_signing_harness(
     print("Review the pre-checked items, complete the remaining manual-only checks, and")
     print("use the generated file as the acceptance worksheet for Phase 3.")
     return capture
+
+
+def _default_harness_artifacts_dir(
+    *,
+    summary_json_path: str | None,
+    artifacts_dir: str | None,
+) -> str | None:
+    if artifacts_dir is not None:
+        return artifacts_dir
+    if summary_json_path is None:
+        return None
+    summary_path = Path(summary_json_path)
+    return str(summary_path.with_name(f"{summary_path.stem}_artifacts"))
 
 
 def _capture_interactive_state(
@@ -1264,6 +1284,15 @@ def _apply_appearance_overrides(
         "stamp_position": SignatureStampPosition,
         "timezone_display_mode": SignatureTimezoneDisplayMode,
     }
+    fixture_profile = overrides.get("fixture_profile")
+    if fixture_profile is not None:
+        if not isinstance(fixture_profile, str) or not fixture_profile.strip():
+            raise ValueError("Scenario 'fixture_profile' must be a non-empty string.")
+        updated = apply_preview_stress_fixture_profile(
+            appearance=updated,
+            profile_name=fixture_profile,
+        )
+
     for key in (
         "signer_label_prefix",
         "show_field_names",
@@ -2178,6 +2207,8 @@ def _text_edge_diagnostics(
     )
     widget_min_distance = None if widget_distances is None else min(widget_distances.values())
     border_min_distance = None if border_distances is None else min(border_distances.values())
+    touches_widget_edge = None if widget_min_distance is None else widget_min_distance <= 0
+    touches_border_edge = None if border_min_distance is None else border_min_distance <= 0
     reference_width_loss = None
     reference_height_loss = None
     if text_content_bounds is not None and reference_text_content_bounds is not None:
@@ -2195,6 +2226,11 @@ def _text_edge_diagnostics(
             reference_width_loss > raster_tolerance_px
             or reference_height_loss > raster_tolerance_px
         )
+    clipped_with_edge_contact = None
+    if clipped_from_reference is not None:
+        clipped_with_edge_contact = clipped_from_reference and (
+            touches_widget_edge is True or touches_border_edge is True
+        )
     return {
         "text_content_edge_distances_px": widget_distances,
         "text_content_border_edge_distances_px": border_distances,
@@ -2204,9 +2240,7 @@ def _text_edge_diagnostics(
         "text_content_reference_height_loss_px": reference_height_loss,
         "text_content_border_facing_distance_px": border_facing_distance,
         "text_content_stamp_facing_distance_px": stamp_facing_distance,
-        "text_content_touches_widget_edge": (
-            None if widget_min_distance is None else widget_min_distance <= 0
-        ),
+        "text_content_touches_widget_edge": touches_widget_edge,
         "text_content_touches_border_facing_edge": (
             None if border_facing_distance is None else border_facing_distance <= 0
         ),
@@ -2224,7 +2258,7 @@ def _text_edge_diagnostics(
                 and stamp_content_overlap is None
             )
             else (
-                clipped_from_reference is True
+                clipped_with_edge_contact is True
                 or stamp_band_overlap is True
                 or stamp_content_overlap is True
             )

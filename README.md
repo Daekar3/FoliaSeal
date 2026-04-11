@@ -219,7 +219,7 @@ What the preview matrix writes:
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
 
-Current interpretation of the checked-in full-matrix summaries:
+Current interpretation of the checked-in preview-matrix summaries:
 
 - treat `signable_*` counts as the true green-path regression signal
 - treat `rejected_*` counts as negative-test coverage for cases the validator is already blocking
@@ -229,44 +229,62 @@ Current interpretation of the checked-in full-matrix summaries:
 - after anti-aliased stamp-content detection was tightened, a remaining 1px border-facing gap is
   treated as acceptable raster clearance rather than a warning; actual border contact is still
   reported explicitly by the stamp edge-touch counts
-- as of the latest checked-in text-instrumented summaries:
-  - `single_line`: `0` signable text clipping risks, `42` rejected text clipping risks,
+- the baseline matrices are broad structural sweeps; they are useful for regression safety, but
+  they do not by themselves prove realistic content-density coverage
+- the stress matrices are the realistic-content companion sweeps; they use anonymized long-field
+  fixture data shaped to reproduce the pressure of real signing identities without baking user
+  strings into the repository
+- as of the latest rechecks:
+  - baseline `single_line`: `0` signable text clipping risks, `42` rejected text clipping risks,
     `0` signable stamp warnings, `0` signable stamp edge-touch cases
-  - `multi_line`: `0` signable text risks, `0` signable stamp warnings,
+  - baseline `multi_line`: `0` signable text risks, `0` signable stamp warnings,
     `0` signable stamp edge-touch cases
-  - `wrapped_block`: `0` signable text risks, `0` signable stamp warnings,
+  - baseline `wrapped_block`: `0` signable text risks, `0` signable stamp warnings,
     `0` signable stamp edge-touch cases
+  - stress `single_line`: `150` signable text clipping risks, `680` rejected text clipping risks
+  - stress `multi_line`: `18` signable text clipping risks, `264` rejected text clipping risks
+  - stress `wrapped_block`: `15` signable text clipping risks, `423` rejected text clipping risks
 
-In other words, the remaining preview-matrix risk signal is now confined to intentionally rejected
-`single_line` text-clipping cases. The checked-in green path is clean for text clipping,
-text/stamp overlap, stamp warnings, and stamp edge-touch across `single_line`, `multi_line`, and
-`wrapped_block`.
+In other words, the baseline green path is still structurally clean, but the new stress corpus
+immediately exposed remaining green-path text-fit problems under realistic content pressure. That
+is an expected and useful result of the stronger methodology, not a reason to ignore the stress
+suite.
 
-The repo now also includes a reusable local sweep fixture set under `artifacts/preview_sweep_assets/`,
-including `sweep_fixture.pdf`, `test_identity.p12`, three transparent stamp images, and
-`single_line_matrix.json` for unattended `single_line` preview sweeps. The fixture set now also
-includes dedicated full-matrix manifests for all three current layout families:
+The repo now also includes a reusable local sweep fixture set under
+`artifacts/preview_sweep_assets/`, including `sweep_fixture.pdf`, `test_identity.p12`, three
+transparent stamp images, and `single_line_matrix.json` for unattended `single_line` preview
+sweeps. The fixture set now includes both baseline and stress full-matrix manifests for all three
+current layout families:
 
 - `single_line_full_matrix.json`
 - `multi_line_full_matrix.json`
 - `wrapped_block_full_matrix.json`
+- `single_line_full_matrix_stress.json`
+- `multi_line_full_matrix_stress.json`
+- `wrapped_block_full_matrix_stress.json`
 
-Those checked-in manifests demonstrate two practical sweep controls that matter for layout triage:
+Those checked-in manifests demonstrate three practical sweep controls that matter for layout triage:
 
 - `visible_fields` to constrain which derived fields participate in a compact preview scenario
 - explicit text-size variation scenarios so preview regressions can be checked at more than one
   `font_size_pt`
+- `fixture_profile` to swap between the short generic test corpus and the anonymized
+  long-field stress corpus
 
 Status note:
 
-- the checked-in unattended `single_line` matrix is currently green in automation
-- the checked-in unattended `multi_line` matrix is currently green in automation
-- the checked-in unattended `wrapped_block` matrix is currently green in automation
+- the checked-in baseline `single_line`, `multi_line`, and `wrapped_block` matrices are currently
+  green in automation
+- the checked-in stress matrices are intentionally not green yet; they are currently exposing
+  remaining green-path clipping regressions under realistic content pressure
 - preview typography semantics are layout-invariant: the selected point size means the same thing in
   `single_line`, `multi_line`, and `wrapped_block`; layout mode may change reservation geometry,
   wrapping, and fit outcomes, but it must not silently change the meaning of the chosen text size
-- use it as a regression net, not as a substitute for the pending manual harness confirmation with
-  real signing assets
+- harness captures written with `--summary-json-path` must now also preserve preview render
+  artifacts; missing preview image paths in saved captures are treated as an evidence-contract
+  defect rather than an optional convenience
+- use both baseline and stress matrices as the regression net, not as a substitute for the pending
+  manual harness confirmation with real signing assets
 
 Validate an existing harness capture without relaunching the GUI:
 

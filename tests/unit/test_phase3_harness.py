@@ -22,6 +22,9 @@ from foliaseal.application.qa_evidence_contract import (
     PHASE3_EVIDENCE_CONTRACT_VERSION,
     evaluate_phase3_evidence_contract,
 )
+from foliaseal.application.qa_preview_stress_fixtures import (
+    STRESS_VISIBLE_APPEARANCE_PROFILE,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldBinding,
@@ -39,6 +42,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
     _capture_interactive_state,
+    _default_harness_artifacts_dir,
     _detect_text_content_bounds_in_preview,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
@@ -584,6 +588,7 @@ def test_evidence_contract_rejects_success_without_output_file() -> None:
 def test_evidence_contract_accepts_consistent_success_state() -> None:
     evaluation = evaluate_phase3_evidence_contract(
         {
+            "summary_json_path": "artifacts/phase3_harness_capture.json",
             "summary_json_written": True,
             "checklist_results_written": True,
             "sign_request_count": 1,
@@ -601,6 +606,19 @@ def test_evidence_contract_accepts_consistent_success_state() -> None:
                 "signer_label_prefix": "",
                 "timezone_display_mode": "utc",
                 "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": "artifacts/phase3_harness_capture_artifacts/current.png",
+                    "preview_image_error": None,
+                    "text_debug_image_path": (
+                        "artifacts/phase3_harness_capture_artifacts/current_text_debug.png"
+                    ),
+                    "stamp_debug_image_path": (
+                        "artifacts/phase3_harness_capture_artifacts/current_stamp_debug.png"
+                    ),
+                    "text_rendered_content_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "text_content_clipped_in_preview": False,
+                    "stamp_content_within_warning_distance": False,
+                },
             },
             "sign_request_snapshot": {
                 "signature_appearance": {
@@ -617,6 +635,32 @@ def test_evidence_contract_accepts_consistent_success_state() -> None:
             "backend_reservation_error": None,
             "validation_text": "Ready to sign.",
             "preview_available": True,
+            "captured_states": [
+                {
+                    "preview_snapshot": {
+                        "render_capture": {
+                            "preview_image_path": (
+                                "artifacts/phase3_harness_capture_artifacts/manual.png"
+                            ),
+                            "preview_image_error": None,
+                            "text_debug_image_path": (
+                                "artifacts/phase3_harness_capture_artifacts/manual_text_debug.png"
+                            ),
+                            "stamp_debug_image_path": (
+                                "artifacts/phase3_harness_capture_artifacts/manual_stamp_debug.png"
+                            ),
+                            "text_rendered_content_bounds_px": {
+                                "x": 1,
+                                "y": 2,
+                                "width": 3,
+                                "height": 4,
+                            },
+                            "text_content_clipped_in_preview": False,
+                            "stamp_content_within_warning_distance": False,
+                        }
+                    }
+                }
+            ],
         }
     )
 
@@ -624,6 +668,61 @@ def test_evidence_contract_accepts_consistent_success_state() -> None:
     assert evaluation.acceptance_tier == GATE_CANDIDATE
     assert evaluation.gate_verdict == GATE_CANDIDATE
     assert evaluation.errors == ()
+
+
+def test_evidence_contract_rejects_saved_capture_without_preview_artifacts() -> None:
+    evaluation = evaluate_phase3_evidence_contract(
+        {
+            "summary_json_path": "artifacts/phase3_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 0,
+            "last_signing_result_success": False,
+            "last_signature_has_visible_appearance": False,
+            "output_file_exists": False,
+            "output_signature_count": None,
+            "output_visible_appearance_snapshot": None,
+            "preview_snapshot": {
+                "can_submit": False,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": None,
+                    "preview_image_error": None,
+                },
+            },
+            "sign_request_snapshot": None,
+            "backend_reservation_snapshot": None,
+            "backend_reservation_error": None,
+            "validation_text": "Will fail to sign.",
+            "preview_available": True,
+            "captured_states": [
+                {
+                    "preview_snapshot": {
+                        "render_capture": {
+                            "preview_image_path": None,
+                            "preview_image_error": None,
+                        }
+                    }
+                }
+            ],
+        }
+    )
+
+    assert evaluation.passed is False
+    assert any(
+        "current preview snapshot is missing preview_image_path" in item
+        for item in evaluation.errors
+    )
+    assert any(
+        "captured_states[1] is missing preview_image_path" in item
+        for item in evaluation.errors
+    )
 
 
 def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
@@ -729,6 +828,26 @@ def test_phase3_harness_capture_to_json_serializes_captured_states() -> None:
     assert payload["captured_states"][1]["capture_kind"] == "final"
 
 
+def test_default_harness_artifacts_dir_prefers_explicit_override() -> None:
+    assert (
+        _default_harness_artifacts_dir(
+            summary_json_path="artifacts/phase3_harness_capture.json",
+            artifacts_dir="artifacts/manual_override",
+        )
+        == "artifacts/manual_override"
+    )
+
+
+def test_default_harness_artifacts_dir_derives_from_summary_json_path() -> None:
+    assert (
+        _default_harness_artifacts_dir(
+            summary_json_path="artifacts/phase3_harness_capture.json",
+            artifacts_dir=None,
+        )
+        == "artifacts/phase3_harness_capture_artifacts"
+    )
+
+
 def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
     preview = type(
         "_Preview",
@@ -820,6 +939,89 @@ def test_capture_interactive_state_collects_preview_and_backend_snapshots(monkey
         "preview_image_path": "artifacts/preview.png"
     }
     assert state["backend_reservation_snapshot"] == {"layout_template": "single_line"}
+
+
+def test_capture_interactive_state_preserves_render_artifacts_when_preview_capture_succeeds(
+    monkeypatch,
+) -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "title": "Digitally signed by",
+            "signer_label_prefix": "Digitally signed by",
+            "layout_template": SignatureLayoutTemplate.MULTI_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "timezone_display_mode": SignatureTimezoneDisplayMode.UTC,
+            "show_field_names": False,
+            "datetime_format": "%Y-%m-%d %H:%M",
+            "image_stamp_path": None,
+            "signature_rect": build_signature_rect(page_index=0, width_pt=260.0, height_pt=46.0),
+            "text_style": None,
+            "box_style": None,
+            "fields": (),
+            "issues": (),
+            "can_submit": True,
+        },
+    )()
+
+    class _FakePanel:
+        def refresh_preview(self):
+            return preview
+
+        def preview_text(self) -> str:
+            return "Preview text"
+
+        def validation_text(self) -> str:
+            return "Ready to sign."
+
+    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
+
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._capture_preview_render",
+        lambda **_kwargs: {
+            "preview_image_path": "artifacts/debug/state.png",
+            "text_debug_image_path": "artifacts/debug/state_text_debug.png",
+            "stamp_debug_image_path": "artifacts/debug/state_stamp_debug.png",
+            "text_rendered_content_bounds_px": {"x": 10, "y": 12, "width": 80, "height": 18},
+            "stamp_rendered_content_bounds_px": {"x": 20, "y": 4, "width": 60, "height": 10},
+        },
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._snapshot_backend_reservation",
+        lambda request: {"layout_template": request.signature_appearance.layout_template.value},
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._backend_reservation_error",
+        lambda _request: None,
+    )
+
+    request = build_signing_request(
+        Path("/tmp"),
+        signature_appearance=build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+        ),
+    )
+    state = _capture_interactive_state(
+        shell=shell,
+        request=request,
+        artifacts_dir="artifacts/debug",
+        artifact_basename="interactive_state_02",
+        capture_index=2,
+        capture_kind="manual",
+    )
+
+    render_capture = state["preview_snapshot"]["render_capture"]
+    assert render_capture["preview_image_path"] == "artifacts/debug/state.png"
+    assert render_capture["text_debug_image_path"] == "artifacts/debug/state_text_debug.png"
+    assert render_capture["stamp_debug_image_path"] == "artifacts/debug/state_stamp_debug.png"
+    assert render_capture["text_rendered_content_bounds_px"] == {
+        "x": 10,
+        "y": 12,
+        "width": 80,
+        "height": 18,
+    }
 
 
 def test_snapshot_preview_includes_render_capture_payload() -> None:
@@ -1006,7 +1208,7 @@ def test_text_edge_diagnostics_flags_reference_content_loss_as_clipping() -> Non
         preview=preview,
         card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
         text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 30},
-        text_content_bounds={"x": 12, "y": 12, "width": 56, "height": 24},
+        text_content_bounds={"x": 10, "y": 10, "width": 56, "height": 24},
         reference_text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
         stamp_band_bounds={"x": 10, "y": 40, "width": 80, "height": 20},
         stamp_content_bounds={"x": 15, "y": 42, "width": 40, "height": 12},
@@ -1015,6 +1217,28 @@ def test_text_edge_diagnostics_flags_reference_content_loss_as_clipping() -> Non
     assert diagnostics["text_content_reference_width_loss_px"] == 4
     assert diagnostics["text_content_reference_height_loss_px"] == 4
     assert diagnostics["text_content_clipped_in_preview"] is True
+
+
+def test_text_edge_diagnostics_ignores_reference_loss_without_edge_contact() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.TOP},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 200, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 140, "height": 40},
+        text_content_bounds={"x": 14, "y": 18, "width": 120, "height": 18},
+        reference_text_content_bounds={"x": 0, "y": 0, "width": 120, "height": 24},
+        stamp_band_bounds={"x": 10, "y": 52, "width": 140, "height": 14},
+        stamp_content_bounds={"x": 15, "y": 54, "width": 70, "height": 8},
+    )
+
+    assert diagnostics["text_content_reference_height_loss_px"] == 6
+    assert diagnostics["text_content_touches_widget_edge"] is False
+    assert diagnostics["text_content_clipped_in_preview"] is False
 
 
 def test_write_text_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
@@ -1489,6 +1713,99 @@ def test_load_preview_matrix_manifest_accepts_object_or_array(tmp_path: Path) ->
     )
 
 
+def test_stress_preview_manifests_exist_and_parse() -> None:
+    for name in (
+        "single_line_full_matrix_stress.json",
+        "multi_line_full_matrix_stress.json",
+        "wrapped_block_full_matrix_stress.json",
+    ):
+        manifest = _load_preview_matrix_manifest(str(Path("artifacts/preview_sweep_assets") / name))
+        assert manifest["scenarios"]
+
+
+def test_stress_preview_manifests_reference_stress_fixture_profile() -> None:
+    for name in (
+        "single_line_full_matrix_stress.json",
+        "multi_line_full_matrix_stress.json",
+        "wrapped_block_full_matrix_stress.json",
+    ):
+        payload = json.loads((Path("artifacts/preview_sweep_assets") / name).read_text())
+        assert payload["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+        assert all(
+            scenario["appearance_overrides"]["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+            for scenario in payload["scenarios"]
+        )
+
+
+def test_single_line_stress_manifest_includes_required_dense_field_sets() -> None:
+    payload = json.loads(
+        Path("artifacts/preview_sweep_assets/single_line_full_matrix_stress.json").read_text()
+    )
+    field_sets = {
+        tuple(scenario["appearance_overrides"]["visible_fields"])
+        for scenario in payload["scenarios"]
+    }
+    assert ("common_name", "signing_time") in field_sets
+    assert ("common_name", "company", "signing_time") in field_sets
+    assert (
+        "common_name",
+        "email",
+        "title",
+        "company",
+        "signing_time",
+    ) in field_sets
+
+
+def test_stress_preview_manifests_preserve_expected_family_variants() -> None:
+    expectations = {
+        "multi_line_full_matrix_stress.json": {
+            "field_sets": {
+                ("common_name", "email", "signing_time"),
+                ("common_name", "title", "company", "signing_time"),
+                (
+                    "common_name",
+                    "email",
+                    "title",
+                    "company",
+                    "signing_time",
+                    "location",
+                    "reason",
+                ),
+            },
+            "label_tokens": {"_label_", "_nolabel_"},
+        },
+        "wrapped_block_full_matrix_stress.json": {
+            "field_sets": {
+                ("common_name", "email", "signing_time"),
+                ("common_name", "title", "company", "signing_time", "location"),
+                (
+                    "common_name",
+                    "email",
+                    "title",
+                    "company",
+                    "signing_time",
+                    "location",
+                    "reason",
+                ),
+            },
+            "label_tokens": {"_label_", "_nolabel_"},
+            "name_tokens": {"_named", "_plain"},
+        },
+    }
+    for manifest_name, expectation in expectations.items():
+        payload = json.loads((Path("artifacts/preview_sweep_assets") / manifest_name).read_text())
+        names = [scenario["name"] for scenario in payload["scenarios"]]
+        field_sets = {
+            tuple(scenario["appearance_overrides"]["visible_fields"])
+            for scenario in payload["scenarios"]
+        }
+        assert expectation["field_sets"].issubset(field_sets)
+        for token in expectation["label_tokens"]:
+            assert any(token in name for name in names)
+        for token in expectation.get("name_tokens", set()):
+            assert any(token in name for name in names)
+
+
 def test_apply_appearance_overrides_updates_common_preview_controls() -> None:
     appearance = build_signature_appearance()
 
@@ -1514,6 +1831,17 @@ def test_apply_appearance_overrides_updates_common_preview_controls() -> None:
     assert updated.image_stamp_path == "/tmp/stamp.png"
     assert updated.box_style.border_width_pt == 3.5
     assert updated.box_style.background_color_hex == "#EEEEEE"
+
+
+def test_apply_appearance_overrides_can_apply_stress_fixture_profile() -> None:
+    updated = _apply_appearance_overrides(
+        build_signature_appearance(),
+        {"fixture_profile": STRESS_VISIBLE_APPEARANCE_PROFILE},
+    )
+
+    assert updated.common_name.override_text == "Morgan Ellery"
+    assert updated.email.override_text == "records.operations@northwindledger.org"
+    assert updated.company.override_text == "Northwind Ledger Holdings"
 
 
 def test_apply_appearance_overrides_can_limit_visible_fields() -> None:
