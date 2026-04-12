@@ -185,6 +185,10 @@ This profile should be treated as a release-gating contract and reflected in QA 
 ### FR-3D: Visual instrumentation and acceptance evidence
 - The signing workflow and its engineering harness must support richer evidence capture for
   user-visible preview/output debugging and acceptance.
+- Preview validation and signed-output acceptance are separate checks:
+  - preview matrices exercise geometry, content density, and fit behavior before signing,
+  - signed-output acceptance verifies the actual signed PDF, its cryptographic validity, and the
+    rendered visible appearance after signing.
 - Phase 3 acceptance must use a tiered gate model:
   - **engineering run**: useful for debugging and iteration, but not sufficient for a milestone or release claim
   - **gate candidate**: a harness run with the required evidence artifacts present and machine-validated for internal consistency
@@ -210,6 +214,8 @@ This profile should be treated as a release-gating contract and reflected in QA 
 - Final signed-output capture should preserve a rendered crop of the signed annotation region in
   addition to PDF-object metadata such as appearance-stream text fragments, image XObjects, and
   annotation geometry.
+- Signed-output acceptance should compare the signed crop against the reviewed preview using
+  explicit geometry and raster tolerances rather than raw image equality.
 - If visual comparison is automated, it should be done using application/rendered artifacts rather
   than X11/Wayland/compositor protocol tracing.
 - Display-server-specific tracing is out of current scope unless a later debugging need proves that
@@ -229,6 +235,7 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - successful signing cannot coexist with a missing output file,
   - successful signing cannot omit the embedded signature count,
   - successful visible-signature signing cannot omit the visible-appearance snapshot,
+  - successful signed-output acceptance cannot omit the signed render/comparison evidence,
   - synchronized preview/request appearance fields must agree on core values such as layout
     template, stamp position, field-name visibility, signer-label prefix, datetime format, and
     image stamp path.
@@ -685,8 +692,9 @@ Phase 3 turned out to contain several independent failure modes: shell UX, previ
 
 Status note: substantial portions of this slice have already landed in the Phase 3 codebase,
 including rectangle-aware preview, app-level preview/output instrumentation, and unattended preview
-matrix sweeps. The remaining work in this slice is now narrower finishing work rather than a
-greenfield instrumentation effort.
+matrix sweeps. The remaining work is now split between tightening preview fidelity on the stress
+matrices and finishing the separate signed-output acceptance layer rather than a greenfield
+instrumentation effort.
 
 - Make the preview geometry-aware once a real signature rectangle exists.
 - Align preview layout policy with backend layout policy for margins, wrapping, text-first sizing,
@@ -719,6 +727,8 @@ Planned subphases:
 
 The target is not pixel-perfect proof across every renderer. The target is materially better
 evidence about what a human actually saw in the app and what the final signed PDF actually showed.
+Preview matrices are the broad regression net; signed-output acceptance is the end-to-end proof
+layer.
 
 **Exit criteria**
 - Preview materially reflects the chosen rectangle shape.

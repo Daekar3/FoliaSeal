@@ -47,6 +47,13 @@ def evaluate_phase3_evidence_contract(
     signature_appearance = _mapping(sign_request_snapshot.get("signature_appearance"))
     backend_reservation_snapshot = _mapping(capture.get("backend_reservation_snapshot"))
     visible_appearance_snapshot = _mapping(capture.get("output_visible_appearance_snapshot"))
+    output_verification_snapshot = _mapping(capture.get("output_verification_snapshot"))
+    signed_output_render_snapshot = _mapping(capture.get("signed_output_render_snapshot"))
+    signed_output_preview_comparison = _mapping(capture.get("signed_output_preview_comparison"))
+    signed_output_render_snapshot = _mapping(capture.get("signed_output_render_snapshot"))
+    signed_output_preview_comparison = _mapping(
+        capture.get("signed_output_preview_comparison")
+    )
     captured_states = capture.get("captured_states")
     transition_diagnostics = capture.get("captured_state_transition_diagnostics")
 
@@ -83,6 +90,63 @@ def evaluate_phase3_evidence_contract(
             "Signing succeeded with a visible signature request but "
             "output_visible_appearance_snapshot is missing."
         )
+
+    if signing_succeeded and not output_verification_snapshot:
+        errors.append(
+            "Signing succeeded but output_verification_snapshot is missing."
+        )
+
+    if signing_succeeded and output_verification_snapshot:
+        if output_verification_snapshot.get("cryptographic_validation_passed") is not True:
+            errors.append(
+                "Signing succeeded but output_verification_snapshot reports failed "
+                "cryptographic validation."
+            )
+
+    if signing_succeeded and visible_signature_requested and not signed_output_render_snapshot:
+        errors.append(
+            "Signing succeeded with a visible signature request but "
+            "signed_output_render_snapshot is missing."
+        )
+
+    if signing_succeeded and visible_signature_requested and not signed_output_preview_comparison:
+        errors.append(
+            "Signing succeeded with a visible signature request but "
+            "signed_output_preview_comparison is missing."
+        )
+
+    if signing_succeeded and visible_signature_requested and signed_output_preview_comparison:
+        if signed_output_preview_comparison.get("preview_vs_signed_output_passed") is not True:
+            errors.append(
+                "Signing succeeded but signed_output_preview_comparison reports "
+                "preview/output mismatch."
+            )
+    if signing_succeeded:
+        if not signed_output_render_snapshot:
+            errors.append(
+                "Signing succeeded but signed_output_render_snapshot is missing; "
+                "successful runs must preserve signed-output render evidence."
+            )
+        if not signed_output_preview_comparison:
+            errors.append(
+                "Signing succeeded but signed_output_preview_comparison is missing; "
+                "successful runs must compare the signed appearance to the preview."
+            )
+        if signed_output_preview_comparison:
+            if signed_output_preview_comparison.get("preview_vs_signed_output_passed") is not True:
+                errors.append(
+                    "Signing succeeded but the signed-output comparison did not pass."
+                )
+            if signed_output_preview_comparison.get("signature_crop_path") is None:
+                errors.append(
+                    "Signing succeeded but signed_output_preview_comparison is missing "
+                    "signature_crop_path."
+                )
+            if signed_output_preview_comparison.get("comparison_path") is None:
+                errors.append(
+                    "Signing succeeded but signed_output_preview_comparison is missing "
+                    "comparison_path."
+                )
 
     if preview_can_submit and not sign_attempted:
         warnings.append(
@@ -181,6 +245,13 @@ def evaluate_phase3_evidence_contract(
                         "not be producing a meaningful visual response."
                     )
 
+    if signing_succeeded and visible_signature_requested:
+        _validate_signed_output_artifacts(
+            errors=errors,
+            render_snapshot=signed_output_render_snapshot,
+            comparison_snapshot=signed_output_preview_comparison,
+        )
+
     if sign_attempted and not validation_text:
         warnings.append(
             "A signing attempt was captured without validation_text; the run is "
@@ -195,9 +266,18 @@ def evaluate_phase3_evidence_contract(
         and bool(validation_text)
         and (not signing_succeeded or output_file_exists)
         and (not signing_succeeded or capture.get("output_signature_count") is not None)
+        and (not signing_succeeded or bool(output_verification_snapshot))
         and (
             not (signing_succeeded and visible_signature_requested)
             or bool(visible_appearance_snapshot)
+        )
+        and (
+            not (signing_succeeded and visible_signature_requested)
+            or bool(signed_output_render_snapshot)
+        )
+        and (
+            not (signing_succeeded and visible_signature_requested)
+            or bool(signed_output_preview_comparison)
         )
     )
 
@@ -271,3 +351,27 @@ def _validate_signable_render_consistency(
             f"{context} is signable even though render diagnostics report "
             "a user-visible fit failure."
         )
+
+
+def _validate_signed_output_artifacts(
+    *,
+    errors: list[str],
+    render_snapshot: dict[str, Any],
+    comparison_snapshot: dict[str, Any],
+) -> None:
+    if not render_snapshot:
+        errors.append("Signed-output render snapshot is missing.")
+        return
+    if render_snapshot.get("page_render_error") is not None:
+        errors.append("Signed-output render reported page_render_error.")
+    if render_snapshot.get("signature_crop_error") is not None:
+        errors.append("Signed-output render reported signature_crop_error.")
+    if not render_snapshot.get("page_render_path"):
+        errors.append("Signed-output render is missing page_render_path.")
+    if not render_snapshot.get("signature_crop_path"):
+        errors.append("Signed-output render is missing signature_crop_path.")
+    if comparison_snapshot:
+        if comparison_snapshot.get("preview_vs_signed_output_error") is not None:
+            errors.append("Signed-output comparison reported an explicit comparison error.")
+        if not comparison_snapshot.get("comparison_path"):
+            errors.append("Signed-output comparison is missing comparison_path.")

@@ -68,11 +68,9 @@ Current capabilities:
 
 Not yet production-ready:
 
-- visible-signature preview/output parity for every realistic rectangle/layout case
-- final manual harness revalidation of the recently simplified `single_line` path with real user
-  assets and representative PDFs
+- preview/output parity still needs signed-output acceptance coverage for representative real PDFs
+- the stress matrices still expose remaining text-fit regressions under dense, realistic content
 - transparent GIF stamp handling in final signed PDF output is not trustworthy yet; PNG remains the safer image-stamp format
-- final end-to-end visible-signature fidelity validation against representative signed PDFs
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
 
@@ -90,12 +88,16 @@ Roadmap note:
 - The current visible-signature contract is text-first: honor the selected text size in points,
   reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
   fail honestly only when the chosen rectangle cannot support that result.
-- The current Phase 3 finish line is narrower than it was earlier in the project:
-  - the unattended `single_line` preview matrix is now clean across the checked-in permutation set,
-  - `single_line` `Top`, `Bottom`, `Left`, and `Right` share a simpler backend-owned layout path,
-  - the evidence-contract/gate machinery now exists,
-  - the remaining engineering focus is mainly on the last preview/output parity gaps, horizontal
-    signed-output confirmation with real assets, image-format edge cases, and TSA/timestamp support.
+- The current Phase 3 finish line is now split into two distinct validation tracks:
+  - preview matrices cover layout geometry and content-density regression safety,
+  - signed-output acceptance covers cryptographic validity and preview/output parity on the actual
+    signed PDF.
+- The baseline preview matrices are currently structurally green, but the stress matrices still
+  expose the remaining text-fit regressions under realistic content pressure.
+- The evidence-contract/gate machinery now exists, but it is an engineering validation layer rather
+  than a substitute for signed-output acceptance.
+- The remaining engineering focus is on closing the stress-matrix green-path gaps, broadening the
+  signed-output acceptance checks, and finishing TSA/timestamp support.
 
 ## Local development
 
@@ -142,10 +144,17 @@ To make Phase 3 acceptance easier, there is also an interactive signing-shell ha
 Current acceptance note:
 
 - The harness helps collect a consistent record, but it does not prove final Phase 3 readiness on its own.
-- Use it as a manual-review aid for placement, appearance behavior, named-profile workflows, and signing-flow validation.
+- Use it as a manual-review aid for placement, appearance behavior, named-profile workflows, signed-output evidence, and signing-flow validation.
 - Harness terminal success is non-gating unless the run also produces the required evidence artifacts.
 - The harness JSON is now validated against a machine evidence contract; contradictory captures should be treated as failed gate evidence even if the GUI appeared to finish normally.
 - For the current acceptance focus and unresolved items, rely on the Phase 3 checklist and results artifacts rather than treating this README as the project status log.
+
+Signed-output acceptance:
+
+- Preview matrices are for geometry and content-density sweeps.
+- Signed-output acceptance is the end-to-end check that the actual signed PDF is cryptographically valid and that its rendered visible appearance matches the reviewed preview within acceptable tolerance.
+- The signed-output evidence captured by the harness should be reviewed separately from preview-matrix status.
+- A broad representative signed-output matrix is the next acceptance layer after the preview matrices are stable.
 
 Run it against a representative PDF:
 
@@ -170,6 +179,7 @@ What it does:
 - records a structured capture of preview availability, selection count, sign-request count, and any surfaced errors
 - lets you click `Capture State` during the same GUI run so one summary JSON can preserve several manually chosen configuration states before you close the harness
 - can capture the live preview card as a PNG plus widget geometry and border-to-content distance metrics when `--artifacts-dir` is supplied
+- can capture signed-output render evidence when a signing run succeeds, including a rendered crop of the signed annotation region and preview-vs-output comparison metadata
 - classifies the run as `engineering_run` or `gate_candidate` and records the automated gate verdict
 - validates the capture for internal evidence consistency before writing the artifacts
 - writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
@@ -216,6 +226,33 @@ What the preview matrix writes:
   - total stamp-edge-touch scenarios
   - signable stamp-edge-touch scenarios
   - rejected stamp-edge-touch scenarios
+
+What signed-output acceptance should add on top:
+
+- the signed PDF page render containing the final visible appearance
+- a crop of the signed annotation region
+- a preview-vs-signed-output comparison image or summary
+- cryptographic status details needed to prove the output is not only visually plausible but also actually signed correctly
+- explicit evidence that the signed annotation rect landed where requested and that preview/output parity stayed within tolerance
+
+Representative signed acceptance matrix:
+
+```bash
+.venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
+  --pdf-path "/absolute/path/to/document.pdf" \
+  --certificate-path "/absolute/path/to/signer.p12" \
+  --passphrase "secret" \
+  --scenario-manifest-path artifacts/preview_sweep_assets/signed_acceptance_matrix.json \
+  --artifacts-dir artifacts/signed_acceptance_matrix_run
+```
+
+What it writes:
+
+- a signed PDF per scenario
+- the signed page render and signed annotation crop
+- preview-vs-signed-output side-by-side comparisons
+- cryptographic verification details for the embedded signature
+- a summary JSON with per-scenario signing/parity verdicts
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
 

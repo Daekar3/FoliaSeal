@@ -32,6 +32,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
     DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
     run_phase3_preview_matrix,
+    run_phase3_signed_acceptance_matrix,
     run_phase3_signing_harness,
 )
 
@@ -277,6 +278,39 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Directory where per-scenario preview PNGs and the summary JSON should be written.",
     )
 
+    phase3_signed_matrix = subparsers.add_parser(
+        "phase3-signing-acceptance-matrix",
+        help="Run a representative signed-output acceptance sweep and capture artifacts.",
+    )
+    phase3_signed_matrix.add_argument(
+        "--pdf-path",
+        required=True,
+        help="Path to the PDF to open and sign in the signed acceptance matrix runner.",
+    )
+    phase3_signed_matrix.add_argument(
+        "--certificate-path",
+        required=True,
+        help="PKCS#12 certificate file used to sign acceptance matrix scenarios.",
+    )
+    phase3_signed_matrix.add_argument(
+        "--passphrase",
+        required=True,
+        help="Passphrase for the PKCS#12 certificate file used by the signed matrix.",
+    )
+    phase3_signed_matrix.add_argument(
+        "--scenario-manifest-path",
+        required=True,
+        help="JSON manifest describing the signed acceptance scenarios to execute.",
+    )
+    phase3_signed_matrix.add_argument(
+        "--artifacts-dir",
+        required=True,
+        help=(
+            "Directory where per-scenario signed-output artifacts and the summary "
+            "JSON should be written."
+        ),
+    )
+
     phase3_validate = subparsers.add_parser(
         "phase3-signing-harness-validate",
         help="Validate an existing Phase 3 harness capture JSON without launching the GUI.",
@@ -428,6 +462,20 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         print("Phase 3 preview matrix")
         print(f"- scenarios executed: {summary['scenario_count']}")
+        print(f"- artifacts directory: {summary['artifacts_dir']}")
+        print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
+        return
+    if args.command == "phase3-signing-acceptance-matrix":
+        summary = run_phase3_signed_acceptance_matrix(
+            pdf_path=args.pdf_path,
+            certificate_path=args.certificate_path,
+            passphrase=args.passphrase,
+            scenario_manifest_path=args.scenario_manifest_path,
+            artifacts_dir=args.artifacts_dir,
+        )
+        print("Phase 3 signed acceptance matrix")
+        print(f"- scenarios executed: {summary['scenario_count']}")
+        print(f"- successful signings: {summary['successful_signing_run_count']}")
         print(f"- artifacts directory: {summary['artifacts_dir']}")
         print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
         return

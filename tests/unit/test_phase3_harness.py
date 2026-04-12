@@ -51,9 +51,12 @@ from foliaseal.presentation.qt.phase3_harness import (
     _preview_matrix_diagnostic_summary,
     _preview_matrix_error_result,
     _project_content_bounds_to_preview,
+    _signed_matrix_diagnostic_summary,
     _snapshot_backend_reservation,
     _snapshot_current_draft_request,
+    _snapshot_output_verification,
     _snapshot_preview,
+    _snapshot_signed_output_render,
     _snapshot_visible_signature_appearance,
     _stamp_edge_diagnostics,
     _text_edge_diagnostics,
@@ -598,7 +601,24 @@ def test_evidence_contract_accepts_consistent_success_state() -> None:
             "last_signature_has_visible_appearance": True,
             "output_file_exists": True,
             "output_signature_count": 1,
+            "output_verification_snapshot": {
+                "cryptographic_validation_passed": True,
+                "signature_count": 1,
+                "error": None,
+            },
             "output_visible_appearance_snapshot": {"field_name": "Signature1"},
+            "signed_output_render_snapshot": {
+                "page_render_path": "artifacts/final_signed_output_page.png",
+                "signature_crop_path": "artifacts/final_signed_output_crop.png",
+                "page_render_error": None,
+                "signature_crop_error": None,
+            },
+            "signed_output_preview_comparison": {
+                "signature_crop_path": "artifacts/final_signed_output_crop.png",
+                "comparison_path": "artifacts/final_signed_output_compare.png",
+                "preview_vs_signed_output_passed": True,
+                "preview_vs_signed_output_error": None,
+            },
             "preview_snapshot": {
                 "can_submit": True,
                 "layout_template": "single_line",
@@ -776,6 +796,55 @@ def test_evidence_contract_rejects_signable_render_clipping() -> None:
     )
 
 
+def test_evidence_contract_requires_signed_output_evidence_for_success() -> None:
+    evaluation = evaluate_phase3_evidence_contract(
+        {
+            "summary_json_path": "artifacts/phase3_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 1,
+            "last_signing_result_success": True,
+            "last_signature_has_visible_appearance": True,
+            "output_file_exists": True,
+            "output_signature_count": 1,
+            "output_visible_appearance_snapshot": {"field_name": "Signature1"},
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": "artifacts/current.png",
+                    "preview_image_error": None,
+                    "text_debug_image_path": "artifacts/current_text_debug.png",
+                    "stamp_debug_image_path": "artifacts/current_stamp_debug.png",
+                    "text_rendered_content_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "text_content_clipped_in_preview": False,
+                    "text_content_overlaps_stamp_band": False,
+                    "text_content_overlaps_stamp_content": False,
+                    "stamp_content_touches_band_edge": False,
+                    "stamp_content_within_warning_distance": False,
+                },
+            },
+            "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
+            "backend_reservation_snapshot": {"layout_template": "single_line"},
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is False
+    assert any("output_verification_snapshot is missing" in item for item in evaluation.errors)
+    assert any(
+        "signed_output_preview_comparison is missing" in item for item in evaluation.errors
+    )
+
+
 def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
     tmp_path: Path,
 ) -> None:
@@ -877,6 +946,138 @@ def test_phase3_harness_capture_to_json_serializes_captured_states() -> None:
     assert len(payload["captured_states"]) == 2
     assert payload["captured_states"][0]["capture_kind"] == "manual"
     assert payload["captured_states"][1]["capture_kind"] == "final"
+
+
+def test_snapshot_output_verification_reports_cryptographic_details(tmp_path: Path) -> None:
+    output_pdf = _write_signed_test_pdf(tmp_path)
+
+    snapshot = _snapshot_output_verification(output_pdf)
+
+    assert snapshot is not None
+    assert snapshot["cryptographic_validation_passed"] is True
+    assert snapshot["signature_count"] == 1
+    assert snapshot["byte_range_present"] is True
+    assert snapshot["subfilter"] is not None
+    assert snapshot["signer_subject"]
+
+
+def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_path: Path) -> None:
+    preview_path = tmp_path / "preview.png"
+    Image.new("RGBA", (120, 48), color=(255, 255, 255, 255)).save(preview_path)
+    output_pdf = tmp_path / "signed.pdf"
+    output_pdf.write_bytes(b"%PDF-1.7\n")
+
+    class _FakeBackend:
+        def diagnostics(self):
+            return type("_Diag", (), {"available": True, "message": "ok"})()
+
+        def render_page(self, request):
+            image = Image.new("RGBA", (300, 400), color=(255, 255, 255, 255))
+            return type(
+                "_Render",
+                (),
+                {
+                    "width_px": image.width,
+                    "height_px": image.height,
+                    "rgba_bytes": image.tobytes(),
+                },
+            )()
+
+        def get_page_geometry(self, document_path: str, page_index: int):
+            return type(
+                "_Geom",
+                (),
+                {"crop_box": (0.0, 0.0, 300.0, 400.0), "rotation": 0},
+            )()
+
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness.QtPdfRenderBackend",
+        _FakeBackend,
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._detect_text_content_bounds_in_preview",
+        lambda **kwargs: ({"x": 14, "y": 12, "width": 64, "height": 18}, None),
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._normalized_image_crop_change_ratio",
+        lambda **kwargs: 0.1,
+    )
+
+    snapshot = _snapshot_signed_output_render(
+        output_pdf_path=str(output_pdf),
+        page_index=0,
+        preview_snapshot={
+            "image_stamp_path": "/tmp/stamp.png",
+            "signature_rect": {
+                "left_pt": 10.0,
+                "bottom_pt": 20.0,
+                "width_pt": 120.0,
+                "height_pt": 48.0,
+            },
+            "text_style": {"text_color_hex": "#000000"},
+            "render_capture": {
+                "preview_image_path": str(preview_path),
+                "card_bounds_px": {"x": 0, "y": 0, "width": 120, "height": 48},
+                "text_rendered_content_bounds_px": {"x": 14, "y": 12, "width": 64, "height": 18},
+            },
+            "box_style": {
+                "show_border": True,
+                "border_color_hex": "#000000",
+                "border_width_pt": 1.0,
+                "background_color_hex": "#FFFFFF",
+            },
+            "layout_template": "single_line",
+            "stamp_position": "top",
+        },
+        preview_text="Morgan Ellery | Northwind Ledger Holdings | 2026-04-11 09:00",
+        output_visible_appearance_snapshot={
+            "annotation_rect": [10.0, 20.0, 130.0, 68.0],
+            "image_xobject_count": 1,
+            "appearance_has_visible_text": True,
+            "text_fragments": [
+                "Morgan Ellery",
+                "Northwind Ledger Holdings",
+                "2026-04-11 09:00",
+            ],
+        },
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_case",
+    )
+
+    assert snapshot is not None
+    assert snapshot["signature_crop_path"] is not None
+    assert snapshot["comparison_path"] is not None
+    assert snapshot["annotation_rect_matches_request"] is True
+    assert snapshot["output_image_presence_matches_preview"] is True
+    assert snapshot["output_text_bounds_match_preview"] is True
+
+
+def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
+    summary = _signed_matrix_diagnostic_summary(
+        [
+            {
+                "signing_result": {"success": True},
+                "output_verification_snapshot": {"cryptographic_validation_passed": False},
+                "signed_output_preview_comparison": {
+                    "preview_vs_signed_output_passed": False,
+                    "annotation_rect_matches_request": False,
+                },
+            },
+            {
+                "signing_result": {"success": True},
+                "output_verification_snapshot": {"cryptographic_validation_passed": True},
+                "signed_output_preview_comparison": {
+                    "preview_vs_signed_output_passed": True,
+                    "annotation_rect_matches_request": True,
+                },
+            },
+        ]
+    )
+
+    assert summary["successful_signing_run_count"] == 2
+    assert summary["cryptographic_validation_failure_count"] == 1
+    assert summary["preview_output_comparison_failure_count"] == 1
+    assert summary["annotation_rect_mismatch_count"] == 1
 
 
 def test_default_harness_artifacts_dir_prefers_explicit_override() -> None:
@@ -2042,6 +2243,16 @@ def test_stress_preview_manifests_exist_and_parse() -> None:
     ):
         manifest = _load_preview_matrix_manifest(str(Path("artifacts/preview_sweep_assets") / name))
         assert manifest["scenarios"]
+
+
+def test_signed_acceptance_manifest_exists_and_parses() -> None:
+    manifest = _load_preview_matrix_manifest(
+        str(Path("artifacts/preview_sweep_assets/signed_acceptance_matrix.json"))
+    )
+
+    assert len(manifest["scenarios"]) >= 6
+    assert any("single_line" in scenario["name"] for scenario in manifest["scenarios"])
+    assert any("wrapped_block" in scenario["name"] for scenario in manifest["scenarios"])
 
 
 def test_stress_preview_manifests_reference_stress_fixture_profile() -> None:

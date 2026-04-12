@@ -44,6 +44,8 @@ Validated so far:
   remediation wave
 - the checked-in baseline `single_line`, `multi_line`, and `wrapped_block` preview matrices are
   currently structurally green across the repository
+- the checked-in stress matrices are now the active content-density regression frontier and still
+  expose remaining green-path clipping cases under realistic long-form inputs
 - preview-matrix summaries now separate signable risk counts from rejected risk counts for both
   text and stamp diagnostics, so intentionally blocked bad layouts do not read like unresolved
   green-path regressions
@@ -52,16 +54,13 @@ Validated so far:
 - after anti-aliased stamp-content detection was tightened, a remaining 1px border-facing gap is
   treated as acceptable raster clearance; actual contact still shows up in the explicit
   stamp edge-touch counts
-- the current baseline green-path findings are now easy to read:
-  - `single_line`: no signable text clipping, stamp warnings, or stamp edge-touch remain
-  - `multi_line`: no signable text clipping, stamp warnings, or stamp edge-touch remain
-  - `wrapped_block`: no signable text clipping, stamp warnings, or stamp edge-touch remain
-- the new checked-in stress matrices now exercise anonymized real-world content pressure instead of
-  only the short generic fixture strings, and they immediately exposed remaining green-path text-fit
-  regressions:
-  - stress `single_line`: `150` signable text-clipping risks
-  - stress `multi_line`: `18` signable text-clipping risks
-  - stress `wrapped_block`: `15` signable text-clipping risks
+- the baseline preview matrices are structurally green, but the stress matrices are intentionally
+  not green yet and should be treated as the current preview-fidelity work queue rather than as
+  product-ready acceptance proof
+- preview validation and signed-output acceptance are separate concerns:
+  - preview matrices prove layout geometry and content-density behavior,
+  - signed-output evidence is the end-to-end proof layer that must verify the actual signed PDF
+    against the reviewed preview
 - harness evidence is now stricter: saved manual captures with `summary_json_path` are expected to
   preserve preview render artifacts and diagnostics; missing preview image paths are treated as an
   evidence-contract defect rather than a benign omission
@@ -100,6 +99,8 @@ Interpretation:
   runs from gate candidates automatically
 - the remaining Phase 3 finish work is now concentrated in a few stubborn visible-signature fidelity
   gaps and acceptance confirmations rather than broad missing infrastructure
+- the next acceptance wave should be framed as signed-output validation rather than another
+  preview-matrix sweep; the preview work is now a prerequisite, not the final proof
 - `artifacts/phase3_handoff_2026-04-03.md` should be treated as the tactical jump-in note for the
   next finishing wave, while this file remains the broader coordination document
 
@@ -141,10 +142,19 @@ Current harness instrumentation note:
 
 - `phase3-signing-harness` can now write preview-card PNGs and preview widget geometry/border-distance
   metrics when `--artifacts-dir` is supplied
+- successful signing runs should also capture signed-output render evidence and preview/output
+  comparison data so acceptance review can inspect the actual signed PDF rather than only the
+  preview
 - the interactive harness now has a `Capture State` action so one manual GUI session can preserve
   several chosen preview/validation/backend snapshots in the same summary JSON
 - `phase3-signing-preview-matrix` can apply a JSON scenario manifest and write per-scenario preview
   captures plus a summary JSON for batch fidelity sweeps
+- `phase3-signing-acceptance-matrix` now exists for representative end-to-end signing runs and
+  writes:
+  - signed outputs per scenario
+  - cryptographic verification snapshots
+  - rendered signed-annotation crops
+  - preview-vs-signed-output parity evidence
 - the matrix now also writes a stamp-focused debug crop for stamped scenarios, with overlay boxes
   for the reserved stamp band, rendered pixmap, and projected non-transparent content bounds
 - `artifacts/phase3_preview_matrix_template.json` is the hand-editable starting point for those
