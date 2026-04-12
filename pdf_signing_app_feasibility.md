@@ -189,6 +189,11 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - preview matrices exercise geometry, content density, and fit behavior before signing,
   - signed-output acceptance verifies the actual signed PDF, its cryptographic validity, and the
     rendered visible appearance after signing.
+- Preview fixtures and signing fixtures should be treated as different QA assets:
+  - preview/layout sweeps may use lightweight repository-local fixture PDFs that are suitable for
+    geometry work only,
+  - end-to-end signed acceptance must use a clean signing fixture PDF that is known to be compatible
+    with the signing stack and acceptance harness.
 - Phase 3 acceptance must use a tiered gate model:
   - **engineering run**: useful for debugging and iteration, but not sufficient for a milestone or release claim
   - **gate candidate**: a harness run with the required evidence artifacts present and machine-validated for internal consistency
@@ -216,6 +221,9 @@ This profile should be treated as a release-gating contract and reflected in QA 
   annotation geometry.
 - Signed-output acceptance should compare the signed crop against the reviewed preview using
   explicit geometry and raster tolerances rather than raw image equality.
+- The signed acceptance matrix should define explicit positive-path and negative-path expectations so
+  the batch summary can report whether the observed outcomes matched the intended acceptance set,
+  not just how many scenarios happened to sign.
 - If visual comparison is automated, it should be done using application/rendered artifacts rather
   than X11/Wayland/compositor protocol tracing.
 - Display-server-specific tracing is out of current scope unless a later debugging need proves that

@@ -239,8 +239,8 @@ Representative signed acceptance matrix:
 
 ```bash
 .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
-  --pdf-path "/absolute/path/to/document.pdf" \
-  --certificate-path "/absolute/path/to/signer.p12" \
+  --pdf-path artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf \
+  --certificate-path artifacts/generated_acceptance_assets/signed_acceptance_identity.p12 \
   --passphrase "secret" \
   --scenario-manifest-path artifacts/preview_sweep_assets/signed_acceptance_matrix.json \
   --artifacts-dir artifacts/signed_acceptance_matrix_run
@@ -253,6 +253,21 @@ What it writes:
 - preview-vs-signed-output side-by-side comparisons
 - cryptographic verification details for the embedded signature
 - a summary JSON with per-scenario signing/parity verdicts
+
+How to interpret it:
+
+- `artifacts/preview_sweep_assets/sweep_fixture.pdf` is a preview-only asset and should not be used
+  as the canonical signing-acceptance target
+- `artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf` is the clean signing fixture
+  for repeatable end-to-end acceptance runs
+- the signed acceptance manifest now carries explicit positive-path and negative-path expectations
+- the summary JSON now reports:
+  - expected success scenario count
+  - expected intentional rejection count
+  - matched expected successes
+  - matched expected intentional rejections
+  - expected outcome mismatch count
+  - batch-level acceptance pass/fail against the manifest contract
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
 
@@ -287,10 +302,15 @@ immediately exposed remaining green-path text-fit problems under realistic conte
 is an expected and useful result of the stronger methodology, not a reason to ignore the stress
 suite.
 
-The repo now also includes a reusable local sweep fixture set under
-`artifacts/preview_sweep_assets/`, including `sweep_fixture.pdf`, `test_identity.p12`, three
-transparent stamp images, and `single_line_matrix.json` for unattended `single_line` preview
-sweeps. The fixture set now includes both baseline and stress full-matrix manifests for all three
+The repo now includes two distinct fixture families:
+
+- `artifacts/preview_sweep_assets/` for preview/layout work, including `sweep_fixture.pdf`,
+  `test_identity.p12`, the three transparent stamp images, and the baseline/stress preview
+  manifests
+- `artifacts/generated_acceptance_assets/` for end-to-end signed acceptance, including the clean
+  signing fixture PDF and the repo-local PKCS#12 identity used by the signed acceptance matrix
+
+The preview fixture set includes both baseline and stress full-matrix manifests for all three
 current layout families:
 
 - `single_line_full_matrix.json`

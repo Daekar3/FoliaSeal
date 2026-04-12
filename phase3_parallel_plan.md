@@ -155,12 +155,14 @@ Current harness instrumentation note:
   - cryptographic verification snapshots
   - rendered signed-annotation crops
   - preview-vs-signed-output parity evidence
+  - per-scenario expected-outcome checks plus batch-level acceptance verdicts
 - the matrix now also writes a stamp-focused debug crop for stamped scenarios, with overlay boxes
   for the reserved stamp band, rendered pixmap, and projected non-transparent content bounds
 - `artifacts/phase3_preview_matrix_template.json` is the hand-editable starting point for those
   sweeps
-- `artifacts/preview_sweep_assets/` now contains a repository-local PDF/certificate/stamp suite plus
-  `single_line_matrix.json` for unattended single-line preview regression sweeps
+- `artifacts/preview_sweep_assets/` is now explicitly the preview/layout fixture family
+- `artifacts/generated_acceptance_assets/` is the clean signing-acceptance fixture family and
+  should be used for repeatable end-to-end signed-output runs
 - matrix scenarios can now override `visible_fields` explicitly, which makes compact-layout sweeps
   easier to interpret and avoids conflating field-volume problems with geometry problems
 - the checked-in single-line matrix now includes explicit text-size variation scenarios so preview

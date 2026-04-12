@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 from PIL import Image
 from pyhanko.pdf_utils import generic
+from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application import SigningDraftWorkflow
@@ -24,6 +25,11 @@ from foliaseal.application.qa_evidence_contract import (
 )
 from foliaseal.application.qa_preview_stress_fixtures import (
     STRESS_VISIBLE_APPEARANCE_PROFILE,
+)
+from foliaseal.application.qa_signed_acceptance_assets import (
+    SIGNED_ACCEPTANCE_FIXTURE_PDF,
+    SIGNED_ACCEPTANCE_IDENTITY_P12,
+    SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -45,6 +51,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _capture_interactive_state,
     _default_harness_artifacts_dir,
     _detect_text_content_bounds_in_preview,
+    _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
     _preview_edge_distances,
@@ -1056,7 +1063,9 @@ def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
     summary = _signed_matrix_diagnostic_summary(
         [
             {
+                "name": "expected_success_but_failed",
                 "signing_result": {"success": True},
+                "expected_outcome": "success",
                 "output_verification_snapshot": {"cryptographic_validation_passed": False},
                 "signed_output_preview_comparison": {
                     "preview_vs_signed_output_passed": False,
@@ -1064,7 +1073,25 @@ def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
                 },
             },
             {
+                "name": "expected_rejection_and_rejected",
+                "signing_result": {
+                    "success": False,
+                    "message": (
+                        "Visible signature content does not fit inside the selected rectangle."
+                    ),
+                },
+                "expected_outcome": "validation_rejection",
+                "expected_failure_message_contains": "does not fit inside the selected rectangle",
+                "output_verification_snapshot": {"cryptographic_validation_passed": True},
+                "signed_output_preview_comparison": {
+                    "preview_vs_signed_output_passed": True,
+                    "annotation_rect_matches_request": True,
+                },
+            },
+            {
+                "name": "expected_success_and_succeeded",
                 "signing_result": {"success": True},
+                "expected_outcome": "success",
                 "output_verification_snapshot": {"cryptographic_validation_passed": True},
                 "signed_output_preview_comparison": {
                     "preview_vs_signed_output_passed": True,
@@ -1078,6 +1105,39 @@ def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
     assert summary["cryptographic_validation_failure_count"] == 1
     assert summary["preview_output_comparison_failure_count"] == 1
     assert summary["annotation_rect_mismatch_count"] == 1
+    assert summary["expected_success_scenario_count"] == 2
+    assert summary["expected_intentional_rejection_count"] == 1
+    assert summary["matched_expected_success_count"] == 2
+    assert summary["matched_expected_intentional_rejection_count"] == 1
+    assert summary["expected_outcome_mismatch_count"] == 0
+    assert summary["acceptance_expectation_errors"] == []
+
+
+def test_evaluate_signed_matrix_acceptance_expectations_flags_contract_failures() -> None:
+    passed, errors = _evaluate_signed_matrix_acceptance_expectations(
+        summary={
+            "scenario_count": 10,
+            "successful_signing_run_count": 6,
+            "cryptographic_validation_failure_count": 1,
+            "preview_output_comparison_failure_count": 0,
+            "annotation_rect_mismatch_count": 0,
+            "matched_expected_intentional_rejection_count": 3,
+            "expected_outcome_mismatch_count": 1,
+        },
+        manifest_expectations={
+            "scenario_count": 10,
+            "minimum_successful_signing_run_count": 7,
+            "expected_intentional_rejection_count": 3,
+            "require_zero_cryptographic_validation_failures": True,
+            "require_zero_preview_output_comparison_failures": True,
+            "require_zero_annotation_rect_mismatches": True,
+        },
+    )
+
+    assert passed is False
+    assert any("at least 7 successful signings" in item for item in errors)
+    assert any("zero cryptographic validation failures" in item for item in errors)
+    assert any("zero per-scenario expectation mismatches" in item for item in errors)
 
 
 def test_default_harness_artifacts_dir_prefers_explicit_override() -> None:
@@ -2246,13 +2306,32 @@ def test_stress_preview_manifests_exist_and_parse() -> None:
 
 
 def test_signed_acceptance_manifest_exists_and_parses() -> None:
-    manifest = _load_preview_matrix_manifest(
-        str(Path("artifacts/preview_sweep_assets/signed_acceptance_matrix.json"))
+    manifest = _load_preview_matrix_manifest(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST)
+
+    assert len(manifest["scenarios"]) >= 9
+    assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+    assert manifest["fixture_role"] == "signed_acceptance"
+    assert manifest["acceptance_expectations"]["minimum_successful_signing_run_count"] >= 6
+    assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] >= 3
+    assert any("single_line" in scenario["name"] for scenario in manifest["scenarios"])
+    assert any("multi_line" in scenario["name"] for scenario in manifest["scenarios"])
+    assert any("wrapped_block" in scenario["name"] for scenario in manifest["scenarios"])
+    assert all(
+        scenario.get("expected_outcome") in {"success", "validation_rejection"}
+        for scenario in manifest["scenarios"]
     )
 
-    assert len(manifest["scenarios"]) >= 6
-    assert any("single_line" in scenario["name"] for scenario in manifest["scenarios"])
-    assert any("wrapped_block" in scenario["name"] for scenario in manifest["scenarios"])
+
+def test_signed_acceptance_fixture_assets_exist_and_are_parseable() -> None:
+    fixture_pdf = Path(SIGNED_ACCEPTANCE_FIXTURE_PDF)
+    fixture_identity = Path(SIGNED_ACCEPTANCE_IDENTITY_P12)
+
+    assert fixture_pdf.exists()
+    assert fixture_identity.exists()
+
+    with fixture_pdf.open("rb") as handle:
+        reader = PdfFileReader(handle)
+        assert len(list(reader.root["/Pages"]["/Kids"])) >= 1
 
 
 def test_stress_preview_manifests_reference_stress_fixture_profile() -> None:
@@ -2286,6 +2365,28 @@ def test_single_line_stress_manifest_includes_required_dense_field_sets() -> Non
         "company",
         "signing_time",
     ) in field_sets
+
+
+def test_signed_acceptance_manifest_includes_required_positive_and_negative_families() -> None:
+    payload = json.loads(Path(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST).read_text())
+    names = [scenario["name"] for scenario in payload["scenarios"]]
+    expected_outcomes = {
+        scenario["name"]: scenario["expected_outcome"] for scenario in payload["scenarios"]
+    }
+
+    assert "single_line_top_no_stamp_sparse_large" in names
+    assert "single_line_top_stamp_sparse_large" in names
+    assert "multi_line_top_sparse_large" in names
+    assert "multi_line_left_medium_large" in names
+    assert "multi_line_left_dense_large" in names
+    assert "wrapped_block_top_medium_relaxed" in names
+    assert "wrapped_block_right_sparse_large" in names
+    assert "single_line_top_dense_compact_reject" in names
+    assert "multi_line_left_dense_compact_reject" in names
+    assert "wrapped_block_top_dense_reject" in names
+    assert expected_outcomes["single_line_top_dense_compact_reject"] == "validation_rejection"
+    assert expected_outcomes["multi_line_left_dense_compact_reject"] == "validation_rejection"
+    assert expected_outcomes["wrapped_block_top_dense_reject"] == "validation_rejection"
 
 
 def test_stress_preview_manifests_preserve_expected_family_variants() -> None:

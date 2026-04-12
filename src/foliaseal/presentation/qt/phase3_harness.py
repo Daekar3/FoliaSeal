@@ -1093,6 +1093,14 @@ def run_phase3_signed_acceptance_matrix(
         **_signed_matrix_diagnostic_summary(results),
         "results": results,
     }
+    if "acceptance_expectations" in manifest:
+        summary["acceptance_expectations"] = manifest["acceptance_expectations"]
+    expectations_passed, expectation_errors = _evaluate_signed_matrix_acceptance_expectations(
+        summary=summary,
+        manifest_expectations=_mapping(manifest.get("acceptance_expectations")),
+    )
+    summary["acceptance_expectations_passed"] = expectations_passed
+    summary["acceptance_expectation_errors"] = expectation_errors
     summary_path = artifact_root / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return summary
@@ -1586,10 +1594,16 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
     if not manifest_path.exists():
         raise FileNotFoundError(f"Scenario manifest does not exist: {path}")
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    acceptance_expectations: dict[str, Any] | None = None
     if isinstance(payload, list):
         scenarios = payload
     elif isinstance(payload, dict):
         scenarios = payload.get("scenarios")
+        raw_expectations = payload.get("acceptance_expectations")
+        if raw_expectations is not None:
+            if not isinstance(raw_expectations, dict):
+                raise ValueError("'acceptance_expectations' must be a JSON object.")
+            acceptance_expectations = raw_expectations
     else:
         raise ValueError("Scenario manifest must be a JSON object or array.")
     if not isinstance(scenarios, list) or not scenarios:
@@ -1601,8 +1615,22 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
         name = scenario.get("name")
         if not isinstance(name, str) or not name.strip():
             raise ValueError(f"Scenario at index {index} must define a non-empty 'name'.")
+        expected_outcome = scenario.get("expected_outcome")
+        if expected_outcome is not None and expected_outcome not in (
+            "success",
+            "validation_rejection",
+        ):
+            raise ValueError(
+                f"Scenario '{name}' has unsupported expected_outcome: {expected_outcome!r}"
+            )
         validated.append(scenario)
-    return {"scenarios": validated}
+    manifest: dict[str, Any] = {"scenarios": validated}
+    if acceptance_expectations is not None:
+        manifest["acceptance_expectations"] = acceptance_expectations
+    for key in ("fixture_profile", "fixture_role"):
+        if isinstance(payload, dict) and key in payload:
+            manifest[key] = payload[key]
+    return manifest
 
 
 def _execute_preview_matrix_scenario(
@@ -1725,6 +1753,8 @@ def _execute_signed_acceptance_scenario(
     return {
         "name": scenario["name"],
         "profile_name": scenario.get("profile_name"),
+        "expected_outcome": scenario.get("expected_outcome"),
+        "expected_failure_message_contains": scenario.get("expected_failure_message_contains"),
         "preview_snapshot": preview_snapshot,
         "preview_text": preview_text,
         "validation_text": validation_text,
@@ -1838,11 +1868,47 @@ def _preview_matrix_diagnostic_summary(results: list[dict[str, Any]]) -> dict[st
     }
 
 
+def _signed_scenario_matches_expectation(result: dict[str, Any]) -> tuple[bool | None, str | None]:
+    expected_outcome = result.get("expected_outcome")
+    if expected_outcome is None:
+        return None, None
+    signing_result = _mapping(result.get("signing_result"))
+    actual_success = signing_result.get("success") is True
+    if expected_outcome == "success":
+        if actual_success:
+            return True, None
+        message = signing_result.get("message")
+        return False, (
+            "Expected signing success but scenario failed"
+            + (f": {message}" if isinstance(message, str) and message else ".")
+        )
+    if expected_outcome == "validation_rejection":
+        if actual_success:
+            return False, "Expected an intentional validation rejection but signing succeeded."
+        fragment = result.get("expected_failure_message_contains")
+        if isinstance(fragment, str) and fragment:
+            message = signing_result.get("message")
+            if not isinstance(message, str) or fragment not in message:
+                return (
+                    False,
+                    "Expected rejection message to contain "
+                    f"{fragment!r}, got {message!r}.",
+                )
+        return True, None
+    return False, f"Unsupported expected_outcome: {expected_outcome!r}"
+
+
 def _signed_matrix_diagnostic_summary(results: list[dict[str, Any]]) -> dict[str, int]:
     cryptographic_failures = 0
     preview_output_failures = 0
     annotation_rect_mismatches = 0
     sign_success_count = 0
+    expected_success_count = 0
+    expected_rejection_count = 0
+    matched_expected_success_count = 0
+    matched_expected_rejection_count = 0
+    expected_outcome_mismatch_count = 0
+    expectation_errors: list[str] = []
     for result in results:
         signing_result = _mapping(result.get("signing_result"))
         if signing_result.get("success") is True:
@@ -1855,12 +1921,89 @@ def _signed_matrix_diagnostic_summary(results: list[dict[str, Any]]) -> dict[str
             preview_output_failures += 1
         if comparison.get("annotation_rect_matches_request") is False:
             annotation_rect_mismatches += 1
+        expected_outcome = result.get("expected_outcome")
+        if expected_outcome == "success":
+            expected_success_count += 1
+        elif expected_outcome == "validation_rejection":
+            expected_rejection_count += 1
+        matched, error = _signed_scenario_matches_expectation(result)
+        if matched is True:
+            if expected_outcome == "success":
+                matched_expected_success_count += 1
+            elif expected_outcome == "validation_rejection":
+                matched_expected_rejection_count += 1
+        elif matched is False:
+            expected_outcome_mismatch_count += 1
+            expectation_errors.append(f"{result.get('name')}: {error}")
     return {
         "successful_signing_run_count": sign_success_count,
         "cryptographic_validation_failure_count": cryptographic_failures,
         "preview_output_comparison_failure_count": preview_output_failures,
         "annotation_rect_mismatch_count": annotation_rect_mismatches,
+        "expected_success_scenario_count": expected_success_count,
+        "expected_intentional_rejection_count": expected_rejection_count,
+        "matched_expected_success_count": matched_expected_success_count,
+        "matched_expected_intentional_rejection_count": matched_expected_rejection_count,
+        "expected_outcome_mismatch_count": expected_outcome_mismatch_count,
+        "acceptance_expectation_errors": expectation_errors,
     }
+
+
+def _evaluate_signed_matrix_acceptance_expectations(
+    *,
+    summary: dict[str, Any],
+    manifest_expectations: dict[str, Any] | None,
+) -> tuple[bool, list[str]]:
+    if not manifest_expectations:
+        return True, []
+    errors: list[str] = []
+    scenario_count = int(summary.get("scenario_count", 0))
+    success_count = int(summary.get("successful_signing_run_count", 0))
+    rejection_count = int(summary.get("matched_expected_intentional_rejection_count", 0))
+    mismatch_count = int(summary.get("expected_outcome_mismatch_count", 0))
+    crypto_failures = int(summary.get("cryptographic_validation_failure_count", 0))
+    comparison_failures = int(summary.get("preview_output_comparison_failure_count", 0))
+    annotation_mismatches = int(summary.get("annotation_rect_mismatch_count", 0))
+
+    if "scenario_count" in manifest_expectations:
+        expected = int(manifest_expectations["scenario_count"])
+        if scenario_count != expected:
+            errors.append(f"Expected {expected} scenarios, observed {scenario_count}.")
+    if "minimum_successful_signing_run_count" in manifest_expectations:
+        expected = int(manifest_expectations["minimum_successful_signing_run_count"])
+        if success_count < expected:
+            errors.append(
+                f"Expected at least {expected} successful signings, observed {success_count}."
+            )
+    if "expected_intentional_rejection_count" in manifest_expectations:
+        expected = int(manifest_expectations["expected_intentional_rejection_count"])
+        if rejection_count != expected:
+            errors.append(
+                "Expected "
+                f"{expected} intentional rejections, observed {rejection_count}."
+            )
+    if manifest_expectations.get("require_zero_cryptographic_validation_failures") is True:
+        if crypto_failures != 0:
+            errors.append(
+                "Expected zero cryptographic validation failures, observed "
+                f"{crypto_failures}."
+            )
+    if manifest_expectations.get("require_zero_preview_output_comparison_failures") is True:
+        if comparison_failures != 0:
+            errors.append(
+                "Expected zero preview/output comparison failures, observed "
+                f"{comparison_failures}."
+            )
+    if manifest_expectations.get("require_zero_annotation_rect_mismatches") is True:
+        if annotation_mismatches != 0:
+            errors.append(
+                f"Expected zero annotation rect mismatches, observed {annotation_mismatches}."
+            )
+    if mismatch_count != 0:
+        errors.append(
+            f"Expected zero per-scenario expectation mismatches, observed {mismatch_count}."
+        )
+    return not errors, errors
 
 
 def _apply_preview_matrix_scenario(
