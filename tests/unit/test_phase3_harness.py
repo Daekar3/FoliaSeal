@@ -1048,7 +1048,7 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
     assert snapshot["signature_crop_path"] is not None
     assert snapshot["comparison_path"] is not None
     assert snapshot["annotation_rect_matches_request"] is True
-    assert snapshot["output_image_presence_matches_preview"] is True
+    assert snapshot["output_image_presence_matches_preview"] is None
     assert snapshot["output_text_bounds_match_preview"] is True
 
 

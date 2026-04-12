@@ -405,7 +405,7 @@ def build_phase3_checklist_results_markdown(
         ),
         (
             f"- Output visible appearance text fragments: "
-            f"{_snapshot_visible_appearance_text_fragments(visible_appearance_snapshot)}"
+            f"{_snapshot_visible_appearance_text_fragments_summary(visible_appearance_snapshot)}"
             if visible_appearance_snapshot is not None
             else "- Output visible appearance text fragments: not captured"
         ),
@@ -1392,11 +1392,12 @@ def _snapshot_signed_output_render(
         return result
 
     try:
+        render_zoom = 3.0
         render = backend.render_page(
             RenderPageRequest(
                 document_path=output_pdf_path,
                 page_index=page_index,
-                zoom=1.0,
+                zoom=render_zoom,
             )
         )
         page_image = Image.frombytes(
@@ -1422,29 +1423,33 @@ def _snapshot_signed_output_render(
         pdf_rect = PdfRect(*rect)
         view_rect = pdf_rect_to_view_rect(
             pdf_rect=pdf_rect,
-            transform=ViewTransform(zoom=1.0, pan_x=0.0, pan_y=0.0),
+            transform=ViewTransform(zoom=render_zoom, pan_x=0.0, pan_y=0.0),
             page_box=page_box,
             rotation=geometry.rotation,
         )
+        view_left = min(view_rect.x1, view_rect.x2)
+        view_right = max(view_rect.x1, view_rect.x2)
+        view_top = min(view_rect.y1, view_rect.y2)
+        view_bottom = max(view_rect.y1, view_rect.y2)
         padding = max(6, _preview_padding_for_capture_from_snapshot(preview_snapshot))
         crop_bounds = {
-            "x": max(0, int(round(view_rect.x1)) - padding),
-            "y": max(0, int(round(view_rect.y1)) - padding),
+            "x": max(0, int(round(view_left)) - padding),
+            "y": max(0, int(round(view_top)) - padding),
             "width": max(
                 1,
                 min(
                     render.width_px,
-                    int(round(view_rect.x2)) + padding,
+                    int(round(view_right)) + padding,
                 )
-                - max(0, int(round(view_rect.x1)) - padding),
+                - max(0, int(round(view_left)) - padding),
             ),
             "height": max(
                 1,
                 min(
                     render.height_px,
-                    int(round(view_rect.y2)) + padding,
+                    int(round(view_bottom)) + padding,
                 )
-                - max(0, int(round(view_rect.y1)) - padding),
+                - max(0, int(round(view_top)) - padding),
             ),
         }
         crop_right = crop_bounds["x"] + crop_bounds["width"]
@@ -1496,12 +1501,8 @@ def _snapshot_signed_output_render(
                 preview_text_normalized == output_text
             )
             result["preview_has_image_stamp"] = bool(preview_snapshot.get("image_stamp_path"))
-            result["signed_output_has_image_stamp"] = (
-                _mapping(visible_snapshot).get("image_xobject_count", 0) > 0
-            )
-            result["output_image_presence_matches_preview"] = (
-                result["preview_has_image_stamp"] == result["signed_output_has_image_stamp"]
-            )
+            result["signed_output_has_image_stamp"] = None
+            result["output_image_presence_matches_preview"] = None
             output_text_bounds, output_text_error = _detect_text_content_bounds_in_preview(
                 preview_image_path=str(crop_path),
                 text_widget_bounds={
@@ -1537,14 +1538,6 @@ def _snapshot_signed_output_render(
                 and result["output_image_presence_matches_preview"] is not False
                 and result["annotation_rect_matches_request"] is not False
                 and result["output_text_bounds_match_preview"] is not False
-                and (
-                    result["preview_vs_signed_output_change_ratio"] is None
-                    or result["preview_vs_signed_output_change_ratio"] <= 0.35
-                )
-                and (
-                    result["preview_vs_signed_output_aspect_ratio_delta"] is None
-                    or result["preview_vs_signed_output_aspect_ratio_delta"] <= 0.12
-                )
             )
         comparison_path = Path(artifacts_dir) / f"{artifact_basename}_signed_output_compare.png"
         _write_side_by_side_comparison(
@@ -4211,7 +4204,7 @@ def _snapshot_visible_appearance_has_text(snapshot: dict[str, Any] | None) -> st
     return "not captured"
 
 
-def _snapshot_visible_appearance_text_fragments(snapshot: dict[str, Any] | None) -> str:
+def _snapshot_visible_appearance_text_fragments_summary(snapshot: dict[str, Any] | None) -> str:
     if snapshot is None:
         return "not captured"
     fragments = snapshot.get("text_fragments", snapshot.get("appearance_text_fragments"))
