@@ -775,16 +775,16 @@ def _fit_vertical_preview_band_geometry(
     if inner_body_height_px <= 0:
         return (0, 0, 0)
 
-    _unused_detail_hint_height_px = detail_hint_height_px
     minimum_stamp_height = 0
     if stamp_visible:
         minimum_stamp_height = min(inner_body_height_px, 6)
 
-    # Keep preview text constrained to the backend-reserved band height instead
-    # of letting Qt size hints silently borrow extra room. Preview honesty should
-    # come from shared reservation geometry, not from layout-engine growth.
+    # Keep the total preview card geometry fixed, but let the rendered text claim
+    # the height it actually needs by borrowing from separator space first and
+    # then from the stamp band down to a small visible minimum.
+    target_text_height = max(text_height, detail_hint_height_px)
     max_text_height = max(0, inner_body_height_px - minimum_stamp_height)
-    fitted_text_height = min(text_height, max_text_height)
+    fitted_text_height = min(target_text_height, max_text_height)
 
     remaining_height = max(0, inner_body_height_px - fitted_text_height)
     fitted_separator_height = min(
@@ -943,11 +943,17 @@ def _preview_text_style(preview: SigningDraftPreview) -> str:
 
 def _preview_font_stack(font_family: str) -> str:
     normalized = font_family.strip().lower()
+    if "sans serif" in normalized or "sans-serif" in normalized:
+        return "'Helvetica', 'Arial', 'Nimbus Sans', sans-serif"
     if "courier" in normalized or "mono" in normalized or "code" in normalized:
-        return "'Courier New', 'Courier', monospace"
+        return "'Courier New', 'Consolas', 'Courier', monospace"
+    if "cursive" in normalized or "script" in normalized:
+        return "'Brush Script MT', 'Segoe Script', 'Lucida Handwriting', cursive"
+    if "fantasy" in normalized or "display" in normalized or "decor" in normalized:
+        return "'Papyrus', 'Copperplate', 'Impact', fantasy"
     if "times" in normalized or "serif" in normalized:
-        return "'Times New Roman', 'Times', serif"
-    return "'Helvetica', 'Arial', sans-serif"
+        return "'Times New Roman', 'Georgia', 'Times', serif"
+    return "'Helvetica', 'Arial', 'Nimbus Sans', sans-serif"
 
 
 def _build_preview_issue(

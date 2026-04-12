@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import re
@@ -95,6 +96,7 @@ class Phase3HarnessCapture:
     interaction_counts: dict[str, int]
     errors: tuple[str, ...]
     captured_states: tuple[dict[str, Any], ...] = ()
+    captured_state_transition_diagnostics: tuple[dict[str, Any], ...] = ()
 
     def to_json(self) -> str:
         """Return a stable JSON representation for later review."""
@@ -657,6 +659,9 @@ def run_phase3_signing_harness(
         "errors": tuple(errors),
         "captured_states": tuple(captured_states + [final_state]),
     }
+    capture_payload["captured_state_transition_diagnostics"] = (
+        _analyze_capture_state_transitions(capture_payload["captured_states"])
+    )
     contract = evaluate_phase3_evidence_contract(capture_payload)
     capture = Phase3HarnessCapture(
         pdf_path=capture_payload["pdf_path"],
@@ -694,6 +699,9 @@ def run_phase3_signing_harness(
         interaction_counts=capture_payload["interaction_counts"],
         errors=capture_payload["errors"],
         captured_states=capture_payload["captured_states"],
+        captured_state_transition_diagnostics=capture_payload[
+            "captured_state_transition_diagnostics"
+        ],
     )
     _write_optional_text(target_path=summary_json_path, content=capture.to_json() + "\n")
     checklist_results = build_phase3_checklist_results_markdown(
@@ -1447,16 +1455,17 @@ def _capture_preview_render(
     text_content_error = None
     text_reference_content_bounds = None
     text_reference_error = None
+    if text_widget_bounds is not None:
+        text_reference_content_bounds, text_reference_error = _reference_text_content_bounds(
+            source_label=active_detail,
+            text_color_rgba=_preview_text_color_rgba(preview),
+        )
     if image_path is not None and image_error is None and text_widget_bounds is not None:
         text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
             preview_image_path=image_path,
             text_widget_bounds=text_widget_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
-        )
-    if text_widget_bounds is not None:
-        text_reference_content_bounds, text_reference_error = _reference_text_content_bounds(
-            source_label=active_detail,
-            text_color_rgba=_preview_text_color_rgba(preview),
+            reference_text_content_bounds=text_reference_content_bounds,
         )
     text_diagnostics = _text_edge_diagnostics(
         preview=preview,
@@ -1503,6 +1512,14 @@ def _capture_preview_render(
             stamp_band_bounds=stamp_band_bounds,
             crop_padding=max(6, _preview_padding_for_capture(preview)),
         )
+    text_widget_image_sha256 = _image_crop_sha256(
+        preview_image_path=image_path,
+        crop_bounds=text_widget_bounds,
+    )
+    font_diagnostics = _text_font_diagnostics(
+        preview=preview,
+        active_label=active_detail,
+    )
     return {
         "preview_image_path": image_path,
         "preview_image_error": image_error,
@@ -1521,10 +1538,12 @@ def _capture_preview_render(
         "edge_distances_px": band_distances,
         "text_debug_image_path": text_debug_image_path,
         "text_debug_image_error": text_debug_image_error,
+        "text_widget_image_sha256": text_widget_image_sha256,
         "text_rendered_content_bounds_px": text_rendered_content_bounds,
         "text_content_detection_error": text_content_error,
         "text_reference_content_bounds_px": text_reference_content_bounds,
         "text_reference_detection_error": text_reference_error,
+        **font_diagnostics,
         "stamp_debug_image_path": stamp_debug_image_path,
         "stamp_debug_image_error": stamp_debug_image_error,
         "stamp_band_bounds_px": stamp_band_bounds,
@@ -1925,6 +1944,7 @@ def _detect_text_content_bounds_in_preview(
     preview_image_path: str,
     text_widget_bounds: dict[str, int],
     text_color_rgba: tuple[int, int, int, int] | None,
+    reference_text_content_bounds: dict[str, int] | None = None,
 ) -> tuple[dict[str, int] | None, str | None]:
     try:
         preview_image = Image.open(preview_image_path).convert("RGBA")
@@ -1958,6 +1978,12 @@ def _detect_text_content_bounds_in_preview(
         crop_width=crop_width,
         crop_height=crop_height,
     )
+    candidate_pixels = _restrict_candidates_to_reference_envelope(
+        candidate_pixels,
+        reference_text_content_bounds=reference_text_content_bounds,
+        crop_width=crop_width,
+        crop_height=crop_height,
+    )
     min_x = crop_width
     min_y = crop_height
     max_x = -1
@@ -1978,6 +2004,34 @@ def _detect_text_content_bounds_in_preview(
         },
         None,
     )
+
+
+def _restrict_candidates_to_reference_envelope(
+    candidate_pixels: set[tuple[int, int]],
+    *,
+    reference_text_content_bounds: dict[str, int] | None,
+    crop_width: int,
+    crop_height: int,
+) -> set[tuple[int, int]]:
+    if not candidate_pixels or reference_text_content_bounds is None:
+        return candidate_pixels
+    pad = 4
+    left = max(0, reference_text_content_bounds["x"] - pad)
+    top = max(0, reference_text_content_bounds["y"] - pad)
+    right = min(
+        crop_width,
+        reference_text_content_bounds["x"] + reference_text_content_bounds["width"] + pad,
+    )
+    bottom = min(
+        crop_height,
+        reference_text_content_bounds["y"] + reference_text_content_bounds["height"] + pad,
+    )
+    restricted = {
+        (x, y)
+        for x, y in candidate_pixels
+        if left <= x < right and top <= y < bottom
+    }
+    return restricted or candidate_pixels
 
 
 def _filter_border_like_candidate_components(
@@ -2264,6 +2318,8 @@ def _text_edge_diagnostics(
     )
     border_facing_distance = None if widget_distances is None else widget_distances.get(border_edge)
     stamp_facing_distance = None if widget_distances is None else widget_distances.get(stamp_edge)
+    width_loss_tolerance_px = 3
+    height_loss_tolerance_px = 1
     raster_tolerance_px = 3
     stamp_band_overlap = _rectangles_overlap_exceeds_tolerance(
         text_content_bounds,
@@ -2293,8 +2349,8 @@ def _text_edge_diagnostics(
     clipped_from_reference = None
     if reference_width_loss is not None and reference_height_loss is not None:
         clipped_from_reference = (
-            reference_width_loss > raster_tolerance_px
-            or reference_height_loss > raster_tolerance_px
+            reference_width_loss > width_loss_tolerance_px
+            or reference_height_loss > height_loss_tolerance_px
         )
     clipped_with_edge_contact = None
     if clipped_from_reference is not None:
@@ -2308,6 +2364,8 @@ def _text_edge_diagnostics(
         "text_content_min_border_distance_px": border_min_distance,
         "text_content_reference_width_loss_px": reference_width_loss,
         "text_content_reference_height_loss_px": reference_height_loss,
+        "text_content_reference_width_tolerance_px": width_loss_tolerance_px,
+        "text_content_reference_height_tolerance_px": height_loss_tolerance_px,
         "text_content_border_facing_distance_px": border_facing_distance,
         "text_content_stamp_facing_distance_px": stamp_facing_distance,
         "text_content_touches_widget_edge": touches_widget_edge,
@@ -2347,6 +2405,260 @@ def _text_widget_edge_roles(
     if stamp_position == SignatureStampPosition.LEFT:
         return ("right", "left")
     return ("left", "right")
+
+
+def _text_font_diagnostics(
+    *,
+    preview: Any,
+    active_label: Any,
+) -> dict[str, Any]:
+    requested_family = None
+    requested_size = None
+    text_style = getattr(preview, "text_style", None)
+    if text_style is not None:
+        requested_family = getattr(text_style, "font_family", None)
+        requested_size = getattr(text_style, "font_size_pt", None)
+    effective_family = None
+    effective_point_size = None
+    font_getter = getattr(active_label, "font", None)
+    if callable(font_getter):
+        label_font = font_getter()
+        family_getter = getattr(label_font, "family", None)
+        if callable(family_getter):
+            effective_family = family_getter()
+        point_size_getter = getattr(label_font, "pointSizeF", None)
+        if callable(point_size_getter):
+            effective_point_size = point_size_getter()
+    font_info_getter = getattr(active_label, "fontInfo", None)
+    if callable(font_info_getter):
+        font_info = font_info_getter()
+        family_getter = getattr(font_info, "family", None)
+        if callable(family_getter):
+            effective_family = family_getter() or effective_family
+        point_size_getter = getattr(font_info, "pointSizeF", None)
+        if callable(point_size_getter):
+            point_size = point_size_getter()
+            if point_size and point_size > 0:
+                effective_point_size = point_size
+    requested_category = _font_family_category(str(requested_family or ""))
+    effective_category = _font_family_category(str(effective_family or ""))
+    direct_mapping_supported = requested_category not in {"cursive", "fantasy"}
+    return {
+        "requested_text_font_family": requested_family,
+        "requested_text_font_size_pt": requested_size,
+        "effective_text_font_family": effective_family,
+        "effective_text_font_point_size_pt": effective_point_size,
+        "requested_text_font_category": requested_category,
+        "effective_text_font_category": effective_category,
+        "font_family_direct_preview_mapping_supported": direct_mapping_supported,
+        "font_family_category_mismatch": (
+            None
+            if not requested_category or not effective_category
+            else requested_category != effective_category
+        ),
+    }
+
+
+def _font_family_category(font_family: str) -> str | None:
+    normalized = font_family.strip().lower()
+    if not normalized:
+        return None
+    normalized = re.sub(r"\s*\[[^\]]+\]\s*$", "", normalized)
+    if any(
+        token in normalized
+        for token in (
+            "sans serif",
+            "sans-serif",
+            "sans",
+            "helvetica",
+            "arial",
+            "nimbus sans",
+            "liberation sans",
+            "dejavu sans",
+            "source sans",
+            "verdana",
+        )
+    ):
+        return "sans_serif"
+    if any(token in normalized for token in ("courier", "mono", "code", "consola", "menlo")):
+        return "monospace"
+    if any(
+        token in normalized
+        for token in (
+            "times",
+            "serif",
+            "georgia",
+            "garamond",
+            "cambria",
+            "baskerville",
+            "liberation serif",
+        )
+    ):
+        return "serif"
+    if any(
+        token in normalized
+        for token in ("cursive", "script", "hand", "brush", "callig", "comic", "zapfino")
+    ):
+        return "cursive"
+    if any(token in normalized for token in ("fantasy", "decor", "display", "papyrus")):
+        return "fantasy"
+    return "unknown"
+
+
+def _image_crop_sha256(
+    *,
+    preview_image_path: str | None,
+    crop_bounds: dict[str, int] | None,
+) -> str | None:
+    if preview_image_path is None or crop_bounds is None:
+        return None
+    try:
+        preview_image = Image.open(preview_image_path).convert("RGBA")
+    except OSError:
+        return None
+    crop_left = max(0, crop_bounds["x"])
+    crop_top = max(0, crop_bounds["y"])
+    crop_right = min(preview_image.width, crop_left + max(0, crop_bounds["width"]))
+    crop_bottom = min(preview_image.height, crop_top + max(0, crop_bounds["height"]))
+    if crop_right <= crop_left or crop_bottom <= crop_top:
+        return None
+    cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
+    return hashlib.sha256(cropped.tobytes()).hexdigest()
+
+
+def _image_crop_change_ratio(
+    *,
+    previous_image_path: str | None,
+    previous_bounds: dict[str, int] | None,
+    current_image_path: str | None,
+    current_bounds: dict[str, int] | None,
+) -> float | None:
+    if (
+        previous_image_path is None
+        or previous_bounds is None
+        or current_image_path is None
+        or current_bounds is None
+    ):
+        return None
+    if (
+        previous_bounds["width"] != current_bounds["width"]
+        or previous_bounds["height"] != current_bounds["height"]
+    ):
+        return None
+    try:
+        previous_image = Image.open(previous_image_path).convert("RGBA")
+        current_image = Image.open(current_image_path).convert("RGBA")
+    except OSError:
+        return None
+    previous_crop = previous_image.crop(
+        (
+            previous_bounds["x"],
+            previous_bounds["y"],
+            previous_bounds["x"] + previous_bounds["width"],
+            previous_bounds["y"] + previous_bounds["height"],
+        )
+    )
+    current_crop = current_image.crop(
+        (
+            current_bounds["x"],
+            current_bounds["y"],
+            current_bounds["x"] + current_bounds["width"],
+            current_bounds["y"] + current_bounds["height"],
+        )
+    )
+    total_pixels = previous_crop.width * previous_crop.height
+    if total_pixels <= 0 or previous_crop.size != current_crop.size:
+        return None
+    changed_pixels = 0
+    for y in range(previous_crop.height):
+        for x in range(previous_crop.width):
+            if previous_crop.getpixel((x, y)) != current_crop.getpixel((x, y)):
+                changed_pixels += 1
+    return changed_pixels / total_pixels
+
+
+def _analyze_capture_state_transitions(
+    states: tuple[dict[str, Any], ...],
+) -> tuple[dict[str, Any], ...]:
+    diagnostics: list[dict[str, Any]] = []
+    for index in range(1, len(states)):
+        previous = states[index - 1]
+        current = states[index]
+        previous_preview = previous.get("preview_snapshot") if isinstance(previous, dict) else None
+        current_preview = current.get("preview_snapshot") if isinstance(current, dict) else None
+        if not isinstance(previous_preview, dict) or not isinstance(current_preview, dict):
+            continue
+        previous_style = previous_preview.get("text_style") or {}
+        current_style = current_preview.get("text_style") or {}
+        previous_render = previous_preview.get("render_capture") or {}
+        current_render = current_preview.get("render_capture") or {}
+        if _normalized_preview_text_for_transition(previous.get("preview_text")) != (
+            _normalized_preview_text_for_transition(current.get("preview_text"))
+        ):
+            continue
+        if (
+            previous_preview.get("layout_template") != current_preview.get("layout_template")
+            or previous_preview.get("stamp_position") != current_preview.get("stamp_position")
+            or previous_preview.get("signature_rect") != current_preview.get("signature_rect")
+        ):
+            continue
+        change_ratio = _image_crop_change_ratio(
+            previous_image_path=previous_render.get("preview_image_path"),
+            previous_bounds=previous_render.get("text_widget_bounds_px"),
+            current_image_path=current_render.get("preview_image_path"),
+            current_bounds=current_render.get("text_widget_bounds_px"),
+        )
+        same_bounds = (
+            previous_render.get("text_rendered_content_bounds_px")
+            == current_render.get("text_rendered_content_bounds_px")
+            and previous_render.get("text_rendered_content_bounds_px") is not None
+        )
+        if (
+            previous_style.get("font_size_pt") != current_style.get("font_size_pt")
+            and same_bounds
+            and change_ratio is not None
+            and change_ratio < 0.005
+        ):
+            diagnostics.append(
+                {
+                    "from_capture_label": previous.get("capture_label"),
+                    "to_capture_label": current.get("capture_label"),
+                    "issue_code": "font_size_change_had_negligible_visual_effect",
+                    "previous_font_size_pt": previous_style.get("font_size_pt"),
+                    "current_font_size_pt": current_style.get("font_size_pt"),
+                    "changed_pixel_ratio": round(change_ratio, 6),
+                }
+            )
+        if (
+            previous_style.get("font_family") != current_style.get("font_family")
+            and previous_render.get("effective_text_font_category")
+            == current_render.get("effective_text_font_category")
+            and change_ratio is not None
+            and change_ratio < 0.01
+        ):
+            diagnostics.append(
+                {
+                    "from_capture_label": previous.get("capture_label"),
+                    "to_capture_label": current.get("capture_label"),
+                    "issue_code": "font_family_change_had_negligible_visual_effect",
+                    "previous_font_family": previous_style.get("font_family"),
+                    "current_font_family": current_style.get("font_family"),
+                    "effective_text_font_category": current_render.get(
+                        "effective_text_font_category"
+                    ),
+                    "changed_pixel_ratio": round(change_ratio, 6),
+                }
+            )
+    return tuple(diagnostics)
+
+
+def _normalized_preview_text_for_transition(preview_text: Any) -> str:
+    text = str(preview_text or "")
+    return re.sub(
+        r"\b\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?(?:\s+[A-Z]{2,5})?\b",
+        "<signing_time>",
+        text,
+    )
 
 
 def _rectangles_intersect(

@@ -48,6 +48,7 @@ def evaluate_phase3_evidence_contract(
     backend_reservation_snapshot = _mapping(capture.get("backend_reservation_snapshot"))
     visible_appearance_snapshot = _mapping(capture.get("output_visible_appearance_snapshot"))
     captured_states = capture.get("captured_states")
+    transition_diagnostics = capture.get("captured_state_transition_diagnostics")
 
     sign_request_count = _int(capture.get("sign_request_count"))
     sign_attempted = sign_request_count > 0
@@ -151,6 +152,11 @@ def evaluate_phase3_evidence_contract(
             render_capture=_mapping(preview_snapshot.get("render_capture")),
             context="current preview snapshot",
         )
+        _validate_signable_render_consistency(
+            errors=errors,
+            preview_snapshot=preview_snapshot,
+            context="current preview snapshot",
+        )
         if isinstance(captured_states, (list, tuple)):
             for index, state in enumerate(captured_states, start=1):
                 state_mapping = _mapping(state)
@@ -160,6 +166,20 @@ def evaluate_phase3_evidence_contract(
                     render_capture=_mapping(state_preview.get("render_capture")),
                     context=f"captured_states[{index}]",
                 )
+                _validate_signable_render_consistency(
+                    errors=errors,
+                    preview_snapshot=state_preview,
+                    context=f"captured_states[{index}]",
+                )
+        if isinstance(transition_diagnostics, (list, tuple)):
+            for index, diagnostic in enumerate(transition_diagnostics, start=1):
+                issue_code = str(_mapping(diagnostic).get("issue_code") or "")
+                if issue_code:
+                    warnings.append(
+                        "Captured-state transition diagnostic "
+                        f"{index} reported `{issue_code}`; preview control changes may "
+                        "not be producing a meaningful visual response."
+                    )
 
     if sign_attempted and not validation_text:
         warnings.append(
@@ -228,3 +248,26 @@ def _validate_preview_render_artifacts(
     ):
         if key not in render_capture:
             errors.append(f"{context} is missing `{key}` render diagnostics.")
+
+
+def _validate_signable_render_consistency(
+    *,
+    errors: list[str],
+    preview_snapshot: dict[str, Any],
+    context: str,
+) -> None:
+    if preview_snapshot.get("can_submit") is not True:
+        return
+    render_capture = _mapping(preview_snapshot.get("render_capture"))
+    if not render_capture:
+        return
+    if (
+        render_capture.get("text_content_clipped_in_preview") is True
+        or render_capture.get("text_content_overlaps_stamp_band") is True
+        or render_capture.get("text_content_overlaps_stamp_content") is True
+        or render_capture.get("stamp_content_touches_band_edge") is True
+    ):
+        errors.append(
+            f"{context} is signable even though render diagnostics report "
+            "a user-visible fit failure."
+        )

@@ -2575,7 +2575,7 @@ def test_fit_vertical_preview_band_geometry_preserves_reserved_text_height() -> 
         stamp_visible=True,
     )
 
-    assert fitted == (15, 13, 10)
+    assert fitted == (30, 6, 2)
 
 
 def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() -> None:
@@ -2589,6 +2589,20 @@ def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() ->
     )
 
     assert fitted == (18, 32, 6)
+
+
+def test_preview_font_stack_distinguishes_supported_display_families() -> None:
+    assert "sans-serif" in signing_shell_module._preview_font_stack("Sans Serif")
+    assert "serif" in signing_shell_module._preview_font_stack("Serif")
+    assert "monospace" in signing_shell_module._preview_font_stack("Monospace")
+    assert "cursive" in signing_shell_module._preview_font_stack("Cursive")
+    assert "fantasy" in signing_shell_module._preview_font_stack("Fantasy")
+    assert signing_shell_module._preview_font_stack("Sans Serif") != (
+        signing_shell_module._preview_font_stack("Serif")
+    )
+    assert signing_shell_module._preview_font_stack("Cursive") != (
+        signing_shell_module._preview_font_stack("Fantasy")
+    )
 
 
 def test_reset_widget_size_constraints_clears_fake_geometry() -> None:

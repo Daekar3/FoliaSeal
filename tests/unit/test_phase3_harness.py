@@ -37,6 +37,7 @@ from foliaseal.domain.models import (
 )
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
+    _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
@@ -56,6 +57,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _snapshot_visible_signature_appearance,
     _stamp_edge_diagnostics,
     _text_edge_diagnostics,
+    _text_font_diagnostics,
     _widget_application,
     _widget_is_visible,
     _write_stamp_debug_overlay,
@@ -725,6 +727,55 @@ def test_evidence_contract_rejects_saved_capture_without_preview_artifacts() -> 
     )
 
 
+def test_evidence_contract_rejects_signable_render_clipping() -> None:
+    evaluation = evaluate_phase3_evidence_contract(
+        {
+            "summary_json_path": "artifacts/phase3_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 0,
+            "last_signing_result_success": False,
+            "last_signature_has_visible_appearance": False,
+            "output_file_exists": False,
+            "output_signature_count": None,
+            "output_visible_appearance_snapshot": None,
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "multi_line",
+                "stamp_position": "bottom",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": "artifacts/phase3_harness_capture_artifacts/current.png",
+                    "preview_image_error": None,
+                    "text_debug_image_path": "artifacts/current_text_debug.png",
+                    "stamp_debug_image_path": "artifacts/current_stamp_debug.png",
+                    "text_rendered_content_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "text_content_clipped_in_preview": True,
+                    "text_content_overlaps_stamp_band": False,
+                    "text_content_overlaps_stamp_content": False,
+                    "stamp_content_touches_band_edge": False,
+                    "stamp_content_within_warning_distance": False,
+                },
+            },
+            "sign_request_snapshot": None,
+            "backend_reservation_snapshot": None,
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is False
+    assert any(
+        "user-visible fit failure" in item
+        for item in evaluation.errors
+    )
+
+
 def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
     tmp_path: Path,
 ) -> None:
@@ -939,6 +990,141 @@ def test_capture_interactive_state_collects_preview_and_backend_snapshots(monkey
         "preview_image_path": "artifacts/preview.png"
     }
     assert state["backend_reservation_snapshot"] == {"layout_template": "single_line"}
+
+
+def test_analyze_capture_state_transitions_flags_negligible_font_size_change(
+    tmp_path: Path,
+) -> None:
+    image_a = tmp_path / "a.png"
+    image_b = tmp_path / "b.png"
+    base = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    variant = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    for x in range(5, 25):
+        for y in range(5, 12):
+            base.putpixel((x, y), (0, 0, 0, 255))
+            variant.putpixel((x, y), (0, 0, 0, 255))
+    variant.putpixel((26, 12), (0, 0, 0, 255))
+    base.save(image_a, format="PNG")
+    variant.save(image_b, format="PNG")
+
+    diagnostics = _analyze_capture_state_transitions(
+        (
+            {
+                "capture_label": "manual_01_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:05",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.5},
+                    "render_capture": {
+                        "preview_image_path": str(image_a),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+            {
+                "capture_label": "manual_02_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:05",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.0},
+                    "render_capture": {
+                        "preview_image_path": str(image_b),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+        )
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["issue_code"] == "font_size_change_had_negligible_visual_effect"
+    assert diagnostics[0]["previous_font_size_pt"] == 8.5
+    assert diagnostics[0]["current_font_size_pt"] == 8.0
+    assert diagnostics[0]["changed_pixel_ratio"] == pytest.approx(1 / 1200, rel=0.01)
+
+
+def test_analyze_capture_state_transitions_ignores_signing_time_differences(
+    tmp_path: Path,
+) -> None:
+    image_a = tmp_path / "a.png"
+    image_b = tmp_path / "b.png"
+    base = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    variant = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    for x in range(5, 25):
+        for y in range(5, 12):
+            base.putpixel((x, y), (0, 0, 0, 255))
+            variant.putpixel((x, y), (0, 0, 0, 255))
+    variant.putpixel((26, 12), (0, 0, 0, 255))
+    base.save(image_a, format="PNG")
+    variant.save(image_b, format="PNG")
+
+    diagnostics = _analyze_capture_state_transitions(
+        (
+            {
+                "capture_label": "manual_01_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:05",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.5},
+                    "render_capture": {
+                        "preview_image_path": str(image_a),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+            {
+                "capture_label": "manual_02_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:06",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.0},
+                    "render_capture": {
+                        "preview_image_path": str(image_b),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+        )
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["issue_code"] == "font_size_change_had_negligible_visual_effect"
 
 
 def test_capture_interactive_state_preserves_render_artifacts_when_preview_capture_succeeds(
@@ -1196,6 +1382,29 @@ def test_detect_text_content_bounds_in_preview_ignores_border_strokes(
     assert bounds == {"x": 22, "y": 14, "width": 16, "height": 5}
 
 
+def test_detect_text_content_bounds_in_preview_uses_reference_envelope_to_reject_wide_noise(
+    tmp_path: Path,
+) -> None:
+    preview_path = tmp_path / "preview_reference_guided.png"
+    image = Image.new("RGBA", (120, 50), color=(255, 255, 255, 255))
+    for x in range(10, 110):
+        image.putpixel((x, 30), (0, 0, 0, 255))
+    for x in range(28, 52):
+        for y in range(16, 22):
+            image.putpixel((x, y), (0, 0, 0, 255))
+    image.save(preview_path, format="PNG")
+
+    bounds, error = _detect_text_content_bounds_in_preview(
+        preview_image_path=str(preview_path),
+        text_widget_bounds={"x": 10, "y": 10, "width": 100, "height": 24},
+        text_color_rgba=(0, 0, 0, 255),
+        reference_text_content_bounds={"x": 18, "y": 4, "width": 28, "height": 10},
+    )
+
+    assert error is None
+    assert bounds == {"x": 28, "y": 16, "width": 24, "height": 6}
+
+
 def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
     preview = type(
         "_Preview",
@@ -1261,6 +1470,96 @@ def test_text_edge_diagnostics_ignores_reference_loss_without_edge_contact() -> 
     assert diagnostics["text_content_reference_height_loss_px"] == 6
     assert diagnostics["text_content_touches_widget_edge"] is False
     assert diagnostics["text_content_clipped_in_preview"] is False
+
+
+def test_text_edge_diagnostics_flags_small_height_loss_at_edge() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.TOP},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 20},
+        text_content_bounds={"x": 12, "y": 10, "width": 60, "height": 18},
+        reference_text_content_bounds={"x": 12, "y": 10, "width": 60, "height": 20},
+        stamp_band_bounds={"x": 10, "y": 0, "width": 80, "height": 8},
+        stamp_content_bounds={"x": 15, "y": 1, "width": 40, "height": 6},
+    )
+
+    assert diagnostics["text_content_reference_height_loss_px"] == 2
+    assert diagnostics["text_content_clipped_in_preview"] is True
+
+
+def test_text_font_diagnostics_flags_unsupported_cursive_mapping() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "text_style": type(
+                "_TextStyle",
+                (),
+                {"font_family": "Cursive", "font_size_pt": 8.5},
+            )(),
+        },
+    )()
+
+    class _Font:
+        def family(self) -> str:
+            return "Liberation Sans"
+
+        def pointSizeF(self) -> float:
+            return 8.5
+
+    class _Label:
+        def font(self):
+            return _Font()
+
+        def fontInfo(self):
+            return _Font()
+
+    diagnostics = _text_font_diagnostics(preview=preview, active_label=_Label())
+
+    assert diagnostics["requested_text_font_category"] == "cursive"
+    assert diagnostics["effective_text_font_category"] == "sans_serif"
+    assert diagnostics["font_family_direct_preview_mapping_supported"] is False
+    assert diagnostics["font_family_category_mismatch"] is True
+
+
+def test_text_font_diagnostics_classifies_sans_serif_and_bracketed_qt_family() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "text_style": type(
+                "_TextStyle",
+                (),
+                {"font_family": "Sans Serif", "font_size_pt": 10.0},
+            )(),
+        },
+    )()
+
+    class _Font:
+        def family(self) -> str:
+            return "Arial [Mono]"
+
+        def pointSizeF(self) -> float:
+            return 10.0
+
+    class _Label:
+        def font(self):
+            return _Font()
+
+        def fontInfo(self):
+            return _Font()
+
+    diagnostics = _text_font_diagnostics(preview=preview, active_label=_Label())
+
+    assert diagnostics["requested_text_font_category"] == "sans_serif"
+    assert diagnostics["effective_text_font_category"] == "sans_serif"
+    assert diagnostics["font_family_category_mismatch"] is False
 
 
 def test_write_text_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
