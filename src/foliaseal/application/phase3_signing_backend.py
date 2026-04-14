@@ -328,7 +328,7 @@ class VisibleSignatureTextLayout:
 
 
 def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
-    font_factory = _font_factory_for_family(text_style.font_family)
+    font_factory = _font_factory_for_text_style(text_style)
     # Preserve the user's selected half-point font sizes in backend measurement.
     # Rounding 8.5pt up to 9pt creates avoidable preview/backend drift in narrow
     # layouts because the Qt preview renders the actual selected size.
@@ -501,7 +501,7 @@ def _single_line_horizontal_minimum_stamp_width(
     if stamp_aspect_ratio is None:
         content_width = max(6, int(round(fit_height * 1.5)))
     else:
-        content_width = max(1, int(round(fit_height * min(stamp_aspect_ratio, 6.0))))
+        content_width = max(1, int(round(fit_height * stamp_aspect_ratio)))
     return max(1, content_width + content_inset * 2)
 
 
@@ -901,36 +901,23 @@ def _ensure_layout_can_fit(
     *,
     has_visible_stamp_image: bool = False,
 ) -> None:
-    """Validate fit after reservation with explicit handling for measurement seams.
+    """Validate fit after reservation with only a tiny numeric seam correction.
 
-    The small non-single-line width allowance below is not a layout mode or a
-    user-facing threshold. It exists only to absorb 1pt disagreements created by
-    mixed integer rounding across text measurement and reservation math. Height
-    remains strict because it reflects a real visual constraint in the stacked
-    layouts.
+    Policy note: our fit decisions should come from the geometry calculations,
+    not from percentage-based tolerance tuning. The only width allowance kept
+    here is a 1pt rounding correction for mixed integer seams between text
+    measurement and reservation math. Height remains strict because visible
+    vertical clipping is a real user-facing failure.
 
     The zero-size stamp-band rejection also applies only to non-single-line
     layouts. Those templates reserve separate text and stamp regions, so a
     0pt-wide or 0pt-high image band means the image has no real reserved space
-    and the layout should fail. Single-line intentionally supports much tighter
+    and the layout should fail. Single-line intentionally supports tighter
     compact image placement, so applying the same guard there would reject valid
     compact cases that still render acceptably.
     """
-    max_text_width = layout_reservation.text_area_width_pt
-    if (
-        layout_reservation.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-    ):
-        max_text_width = int(
-            round(
-                layout_reservation.text_area_width_pt
-                * _single_line_width_overflow_tolerance(
-                    stamp_position=layout_reservation.stamp_position
-                )
-            )
-        )
-    else:
-        # This is a rounding-seam correction, not a separate compactness policy.
-        max_text_width += 1
+    # This is a numeric rounding correction, not a compactness policy.
+    max_text_width = layout_reservation.text_area_width_pt + 1
     if (
         has_visible_stamp_image
         and layout_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
@@ -987,25 +974,6 @@ def _build_stamp_text(
         layout_template=appearance.layout_template,
         body_fragments=body_fragments,
     ).stamp_text
-
-
-def _single_line_width_overflow_tolerance(
-    *,
-    stamp_position: SignatureStampPosition,
-) -> float:
-    """Allow bounded text-width de-jitter where it matches user expectations.
-
-    Horizontal single-line layouts are now strict because a signable clipped line
-    is a user-visible failure, not an acceptable trade-off. Top/bottom layouts
-    keep a small bounded tolerance so point/integer conversion seams do not make
-    compact vertical cases flap between pass and fail.
-    """
-
-    if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        return 1.0
-    return 1.7
-
-
 def _single_line_text_fits_reservation(
     *,
     appearance: SigningBackendAppearance,
@@ -1044,19 +1012,10 @@ def _effective_horizontal_text_reservation_width(
     stamp_position: SignatureStampPosition,
     text_box_width: int,
 ) -> int:
+    del stamp_position
     if layout_template != SignatureLayoutTemplate.SINGLE_LINE:
         return text_box_width
-    return max(
-        1,
-        int(
-            ceil(
-                text_box_width
-                / _single_line_width_overflow_tolerance(
-                    stamp_position=stamp_position
-                )
-            )
-        ),
-    )
+    return text_box_width
 
 
 def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
@@ -1064,7 +1023,10 @@ def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
         return None
     try:
         with Image.open(image_stamp_path) as image:
-            return PdfImage(image.copy(), writer=None)
+            normalized = image.copy()
+            if normalized.mode not in {"RGB", "RGBA"}:
+                normalized = normalized.convert("RGBA")
+            return PdfImage(normalized, writer=None)
     except FileNotFoundError as exc:
         raise ValueError(f"Image stamp path not found: {image_stamp_path}") from exc
     except OSError as exc:
@@ -1213,6 +1175,12 @@ def _measure_text_box_dimensions(
     line_count = max(1, stamp_text.count("\n") + 1)
     nominal_line_height = float(text_box_style.font_size)
     minimum_height = int(ceil(line_count * nominal_line_height))
+    if line_count > 1:
+        # Reserve one extra point for stacked-text descenders. This is a
+        # measurement correction for the backend's line-box model, not a fit
+        # tolerance: Qt/PDF rasterization consistently needs a touch more
+        # vertical room than the nominal per-line font size alone captures.
+        minimum_height += 1
     return measured_width, max(measured_height, minimum_height)
 
 
@@ -1293,12 +1261,43 @@ def _rect_to_box(signature_rect) -> tuple[int, int, int, int]:
     return (left, bottom, right, top)
 
 
-def _font_factory_for_family(font_family: str) -> SimpleFontEngineFactory:
+def _font_factory_for_text_style(text_style: SignatureTextStyle) -> SimpleFontEngineFactory:
+    return _font_factory_for_family(
+        text_style.font_family,
+        bold=text_style.bold,
+        italic=text_style.italic,
+    )
+
+
+def _font_factory_for_family(
+    font_family: str,
+    *,
+    bold: bool = False,
+    italic: bool = False,
+) -> SimpleFontEngineFactory:
     normalized = font_family.strip().lower()
     if "courier" in normalized or "mono" in normalized or "code" in normalized:
+        if bold and italic:
+            return SimpleFontEngineFactory("Courier-BoldOblique", 0.6)
+        if bold:
+            return SimpleFontEngineFactory("Courier-Bold", 0.6)
+        if italic:
+            return SimpleFontEngineFactory("Courier-Oblique", 0.6)
         return SimpleFontEngineFactory("Courier", 0.6)
     if "times" in normalized or "serif" in normalized:
+        if bold and italic:
+            return SimpleFontEngineFactory("Times-BoldItalic", 0.5)
+        if bold:
+            return SimpleFontEngineFactory("Times-Bold", 0.5)
+        if italic:
+            return SimpleFontEngineFactory("Times-Italic", 0.5)
         return SimpleFontEngineFactory("Times-Roman", 0.5)
+    if bold and italic:
+        return SimpleFontEngineFactory("Helvetica-BoldOblique", 0.5)
+    if bold:
+        return SimpleFontEngineFactory("Helvetica-Bold", 0.5)
+    if italic:
+        return SimpleFontEngineFactory("Helvetica-Oblique", 0.5)
     return SimpleFontEngineFactory("Helvetica", 0.5)
 
 

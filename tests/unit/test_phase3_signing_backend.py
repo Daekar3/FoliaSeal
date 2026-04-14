@@ -367,6 +367,33 @@ def test_layout_reservation_for_horizontal_single_line_preserves_stamp_width_for
     assert reservation.text_area_width_pt < reservation.container_width_pt
 
 
+def test_horizontal_single_line_reservation_uses_true_stamp_aspect_ratio() -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=34.3,
+            bottom_pt=428.99,
+            width_pt=260.61,
+            height_pt=23.04,
+        ),
+        text_box_width=475,
+        text_box_height=10,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=8.0,
+    )
+
+    assert reservation.stamp_area_width_pt == 120
+    assert reservation.text_area_width_pt == 133
+
+
 def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
     tmp_path: Path,
 ) -> None:
@@ -923,6 +950,35 @@ def test_build_text_box_style_preserves_half_point_font_size() -> None:
     assert style.font_size == Fraction(17, 2)
 
 
+def test_build_text_box_style_uses_italic_font_variant_for_serif() -> None:
+    style = _build_text_box_style(
+        SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.0,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        )
+    )
+
+    assert style.font.name == "Times-Italic"
+
+
+def test_stamp_background_for_gif_preserves_transparency(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "stamp.gif"
+    image = Image.new("RGBA", (12, 12), color=(0, 0, 0, 0))
+    for x in range(3, 9):
+        for y in range(3, 9):
+            image.putpixel((x, y), (0, 0, 0, 255))
+    image.save(stamp_path, format="GIF", transparency=0)
+
+    background = _stamp_background_for_path(str(stamp_path))
+
+    assert background is not None
+    assert getattr(background.image, "mode", None) == "RGBA"
+    assert background.image.getchannel("A").getbbox() is not None
+
+
 def test_measure_text_box_dimensions_reserves_nominal_height_per_line() -> None:
     style = _build_text_box_style(
         SignatureTextStyle(
@@ -937,7 +993,7 @@ def test_measure_text_box_dimensions_reserves_nominal_height_per_line() -> None:
     width, height = _measure_text_box_dimensions("Line 1\nLine 2\nLine 3", style)
 
     assert width > 0
-    assert height == 26
+    assert height == 27
 
 
 def test_multi_line_top_accepts_real_world_half_point_width_case(tmp_path: Path) -> None:
@@ -1013,6 +1069,84 @@ def test_multi_line_top_accepts_real_world_half_point_width_case(tmp_path: Path)
     )
 
     assert issues == ()
+
+
+def test_single_line_top_rejects_large_horizontal_overflow_even_with_vertical_compaction(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        signer_label_prefix="",
+        image_stamp_path=str(stamp_path),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Adam Smith",
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Secretary.LHI@Outlook.com",
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Board Secretary",
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Lawson Heirs Inc.",
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="2026-04-12 11:28",
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.0,
+            bold=False,
+            italic=True,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    signature_rect = build_signature_rect(
+        page_index=3,
+        left_pt=35.84,
+        bottom_pt=428.48,
+        width_pt=259.07,
+        height_pt=24.06,
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=signature_rect,
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+        stamp_text=(
+            "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary | "
+            "Lawson Heirs Inc. | 2026-04-12 11:28"
+        ),
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert len(issues) == 1
+    assert "does not fit" in issues[0].message
 
 
 def test_layout_reservation_for_single_line_bottom_centers_content_within_reserved_regions(
@@ -1991,7 +2125,7 @@ def test_build_stamp_text_accepts_compact_vertical_single_line_with_modest_width
     )
 
 
-def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_four_fields_at_nine_point(  # noqa: E501
+def test_visible_signature_fit_issues_reject_compact_vertical_rectangle_with_four_fields_at_nine_point(  # noqa: E501
     tmp_path: Path,
 ) -> None:
     cert_path = tmp_path / "cert.p12"
@@ -2062,10 +2196,11 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_fou
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
     )
 
-    assert issues == ()
+    assert len(issues) == 1
+    assert "does not fit" in issues[0].message
 
 
-def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_five_fields_at_eight_point_five(  # noqa: E501
+def test_visible_signature_fit_issues_reject_compact_vertical_rectangle_with_five_fields_at_eight_point_five(  # noqa: E501
     tmp_path: Path,
 ) -> None:
     cert_path = tmp_path / "cert.p12"
@@ -2138,14 +2273,15 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_fiv
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
     )
 
-    assert issues == ()
+    assert len(issues) == 1
+    assert "does not fit" in issues[0].message
 
 
 @pytest.mark.parametrize(
     "stamp_position",
     [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
 )
-def test_visible_signature_fit_issues_accept_real_world_vertical_single_line_text(
+def test_visible_signature_fit_issues_reject_real_world_vertical_single_line_text(
     tmp_path: Path,
     stamp_position: SignatureStampPosition,
 ) -> None:
@@ -2219,7 +2355,8 @@ def test_visible_signature_fit_issues_accept_real_world_vertical_single_line_tex
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
     )
 
-    assert issues == ()
+    assert len(issues) == 1
+    assert "does not fit" in issues[0].message
 
 
 def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_real_signature_gif(
@@ -2374,7 +2511,7 @@ def test_visible_signature_fit_issues_reject_compact_vertical_rectangle_when_com
     "stamp_position",
     [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
 )
-def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_six_point_text(
+def test_visible_signature_fit_issues_reject_compact_vertical_rectangle_with_six_point_text(
     tmp_path: Path,
     stamp_position: SignatureStampPosition,
 ) -> None:
@@ -2441,4 +2578,5 @@ def test_visible_signature_fit_issues_accept_compact_vertical_rectangle_with_six
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
     )
 
-    assert issues == ()
+    assert len(issues) == 1
+    assert "does not fit" in issues[0].message

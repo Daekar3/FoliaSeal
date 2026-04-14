@@ -2335,6 +2335,7 @@ def test_signing_shell_multi_line_vertical_preview_uses_reserved_band_heights(
                 widget.properties_panel.preview_controls.detail_label.sizeHint().height()
                 or raw_geometry[0]
             ),
+            rendered_line_count=max(1, detail.count("\n") + 1),
             stamp_visible=True,
         )
     )
@@ -2572,10 +2573,11 @@ def test_fit_vertical_preview_band_geometry_preserves_reserved_text_height() -> 
         separator_height=10,
         inner_body_height_px=38,
         detail_hint_height_px=30,
+        rendered_line_count=2,
         stamp_visible=True,
     )
 
-    assert fitted == (30, 6, 2)
+    assert fitted == (33, 0, 5)
 
 
 def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() -> None:
@@ -2585,10 +2587,17 @@ def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() ->
         separator_height=6,
         inner_body_height_px=56,
         detail_hint_height_px=16,
+        rendered_line_count=1,
         stamp_visible=True,
     )
 
     assert fitted == (18, 32, 6)
+
+
+def test_vertical_preview_descender_budget_scales_with_line_count() -> None:
+    assert signing_shell_module._vertical_preview_descender_budget_px(1) == 2
+    assert signing_shell_module._vertical_preview_descender_budget_px(2) == 3
+    assert signing_shell_module._vertical_preview_descender_budget_px(5) == 4
 
 
 def test_preview_font_stack_distinguishes_supported_display_families() -> None:

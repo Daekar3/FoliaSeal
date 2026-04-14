@@ -67,6 +67,10 @@ Validated so far:
 - preview typography semantics are now intended to be layout-invariant: the selected point size
   should mean the same thing in `single_line`, `multi_line`, and `wrapped_block`, with layout mode
   affecting reservation geometry and fit behavior rather than silently rescaling text
+- fit validation policy is calculation-driven: the team policy is to correct the geometry and
+  measurement model itself, not to hide bad fits behind percentage-based tolerance tuning; only
+  tiny documented numeric seam corrections are acceptable where mixed rounding would otherwise
+  create false negatives
 - the `single_line` layout path has been simplified so preview composition and pre-submit fit
   validation now share the same backend-owned text/layout input rules
 - Phase 3 harness artifacts now include a machine-validated evidence contract and explicit

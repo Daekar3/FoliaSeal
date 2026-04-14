@@ -526,7 +526,11 @@ def run_phase3_signing_harness(
     )
     signing_workflow = SigningDraftWorkflow(
         input_pdf_path=str(source_path),
-        output_pdf_path=str(source_path.with_name(source_path.stem + "-signed.pdf")),
+        output_pdf_path=_default_harness_output_pdf_path(
+            pdf_path=str(source_path),
+            artifacts_dir=artifacts_dir,
+            sign_attempt_index=1,
+        ),
         certificate_path=certificate_path,
         passphrase=passphrase,
         tsa_url="https://tsa.example.invalid",
@@ -562,6 +566,11 @@ def run_phase3_signing_harness(
 
     def on_sign_request(request: SigningRequest) -> None:
         sign_requests.append(request)
+        signing_workflow.output_pdf_path = _default_harness_output_pdf_path(
+            pdf_path=str(source_path),
+            artifacts_dir=artifacts_dir,
+            sign_attempt_index=len(sign_requests) + 1,
+        )
 
     def on_error(message: str) -> None:
         errors.append(message)
@@ -867,6 +876,20 @@ def _default_harness_artifacts_dir(
         return None
     summary_path = Path(summary_json_path)
     return str(summary_path.with_name(f"{summary_path.stem}_artifacts"))
+
+
+def _default_harness_output_pdf_path(
+    *,
+    pdf_path: str,
+    artifacts_dir: str | None,
+    sign_attempt_index: int = 1,
+) -> str:
+    source_path = Path(pdf_path)
+    if artifacts_dir is None:
+        return str(source_path.with_name(source_path.stem + "-signed.pdf"))
+    target_dir = Path(artifacts_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    return str(target_dir / f"{source_path.stem}_harness_signed_{sign_attempt_index:03d}.pdf")
 
 
 def _capture_interactive_state(
@@ -1413,6 +1436,10 @@ def _snapshot_signed_output_render(
             (render.width_px, render.height_px),
             render.rgba_bytes,
         )
+        if page_image.mode != "RGBA":
+            page_image = page_image.convert("RGBA")
+        white_page = Image.new("RGBA", page_image.size, (255, 255, 255, 255))
+        page_image = Image.alpha_composite(white_page, page_image)
         page_render_path = Path(artifacts_dir) / f"{artifact_basename}_signed_output_page.png"
         page_image.save(page_render_path)
         result["page_render_path"] = str(page_render_path)

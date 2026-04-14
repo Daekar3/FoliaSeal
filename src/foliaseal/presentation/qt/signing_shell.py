@@ -770,19 +770,25 @@ def _fit_vertical_preview_band_geometry(
     separator_height: int,
     inner_body_height_px: int,
     detail_hint_height_px: int,
+    rendered_line_count: int,
     stamp_visible: bool,
 ) -> tuple[int, int, int]:
     if inner_body_height_px <= 0:
         return (0, 0, 0)
 
+    # Do not invent extra stamp-band height in the preview. If stacked text
+    # needs to claim more of the body, the preview should reflect the actual
+    # reservation pressure instead of preserving an arbitrary visible minimum.
     minimum_stamp_height = 0
-    if stamp_visible:
-        minimum_stamp_height = min(inner_body_height_px, 6)
 
     # Keep the total preview card geometry fixed, but let the rendered text claim
     # the height it actually needs by borrowing from separator space first and
-    # then from the stamp band down to a small visible minimum.
-    target_text_height = max(text_height, detail_hint_height_px)
+    # then from the stamp band down to the true reservation floor.
+    descender_budget_px = _vertical_preview_descender_budget_px(rendered_line_count)
+    target_text_height = max(
+        text_height,
+        detail_hint_height_px + descender_budget_px,
+    )
     max_text_height = max(0, inner_body_height_px - minimum_stamp_height)
     fitted_text_height = min(target_text_height, max_text_height)
 
@@ -793,6 +799,19 @@ def _fit_vertical_preview_band_geometry(
     )
     fitted_stamp_height = max(0, remaining_height - fitted_separator_height)
     return (fitted_text_height, fitted_stamp_height, fitted_separator_height)
+
+
+def _vertical_preview_descender_budget_px(rendered_line_count: int) -> int:
+    """Reserve a tiny per-line descender budget for stacked preview text.
+
+    Qt's rendered glyph bounds in the compact stacked preview paths are
+    consistently a few pixels taller than the raw size hint alone suggests,
+    especially once descenders on the last visible line are rasterized. This is
+    part of the preview's line-box contract, not a fit-acceptance tolerance.
+    """
+
+    line_count = max(1, rendered_line_count)
+    return min(4, 1 + line_count)
 
 
 def _set_checked(check_box: Any, value: bool) -> None:
@@ -1985,6 +2004,7 @@ class SignaturePropertiesPanel:
                 detail_hint_height_px=(
                     _size_hint_height(self._preview_controls.detail_label) or text_height
                 ),
+                rendered_line_count=max(1, stamp_text.count("\n") + 1),
                 stamp_visible=raw_stamp_pixmap is not None,
             )
         stamp_pixmap = None

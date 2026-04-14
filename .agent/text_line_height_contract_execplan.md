@@ -74,9 +74,12 @@ the preview truth source for stacked layouts.
 
 Preferred direction:
 
-1. Introduce a PDF-faithful preview text render path for stacked layouts.
-2. Use the same composed stamp text and backend-owned style inputs.
-3. Render the text preview with a line-box model that matches the final stamp
+1. First correct the shared text-height calculation if the backend line-box
+   model is demonstrably undercounting stacked descenders.
+2. Then, if needed, introduce a PDF-faithful preview text render path for
+   stacked layouts.
+3. Use the same composed stamp text and backend-owned style inputs.
+4. Render the text preview with a line-box model that matches the final stamp
    rendering contract more closely than Qt QLabel does today.
 
 This can be done one of two ways:
@@ -87,7 +90,10 @@ This can be done one of two ways:
   measurement and preview rendering
 
 The first option is preferred if it is tractable, because it reduces semantic
-drift instead of creating another abstract approximation layer.
+drift instead of creating another abstract approximation layer. A small fixed
+descender-height correction in the backend measurement model is also acceptable
+if it is justified by repeatable stacked-text evidence and is applied as a
+calculation correction rather than a pass/fail tolerance.
 
 ## Execution Steps
 
@@ -121,3 +127,13 @@ Success target:
 This execplan intentionally does not bless either of the rejected experiments as
 the solution. It defines the next slice as a rendering-contract problem, not a
 "find the right fudge factor" problem.
+
+Policy note for this and future slices:
+
+- We do the hard work of getting the calculations right.
+- We do not fix fit bugs by slapping percentage-based tolerances onto the
+  backend until the numbers happen to look acceptable.
+- The only acceptable allowance is a tiny documented numeric seam correction
+  when mixed integer rounding would otherwise create false negatives.
+- We also do not pretend user-provided assets have a different aspect ratio
+  than they actually do in order to make the layout look easier to solve.

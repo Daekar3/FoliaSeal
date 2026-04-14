@@ -35,9 +35,11 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldBinding,
     SignatureFieldKey,
+    SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
+    SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
 )
@@ -50,6 +52,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_visible_fields_override,
     _capture_interactive_state,
     _default_harness_artifacts_dir,
+    _default_harness_output_pdf_path,
     _detect_text_content_bounds_in_preview,
     _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
@@ -76,6 +79,7 @@ from foliaseal.presentation.qt.phase3_harness import (
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
+    build_signature_field_binding,
     build_signature_rect,
     build_signing_request,
 )
@@ -168,13 +172,49 @@ def _write_signed_test_pdf(
         passphrase="secret",
         timestamp_required=False,
         signature_rect=signature_rect
-        or build_signature_rect(page_index=0, width_pt=1000.0, height_pt=180.0),
+        or build_signature_rect(page_index=0, width_pt=540.0, height_pt=120.0),
         signature_appearance=signature_appearance
         or build_signature_appearance(
             image_stamp_path=str(stamp_path),
-            show_field_names=True,
+            signer_label_prefix="Digitally signed by",
+            show_field_names=False,
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.TOP,
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.0,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
         ),
     )
     build_phase3_signing_executor().execute(request)
@@ -1059,6 +1099,90 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
     assert snapshot["output_text_bounds_match_preview"] is True
 
 
+def test_snapshot_signed_output_render_composites_transparent_page_over_white(
+    monkeypatch, tmp_path: Path
+) -> None:
+    preview_path = tmp_path / "preview.png"
+    Image.new("RGBA", (120, 48), color=(255, 255, 255, 255)).save(preview_path)
+    output_pdf = tmp_path / "signed.pdf"
+    output_pdf.write_bytes(b"%PDF-1.7\n")
+
+    class _FakeBackend:
+        def diagnostics(self):
+            return type("_Diag", (), {"available": True, "message": "ok"})()
+
+        def render_page(self, request):
+            image = Image.new("RGBA", (300, 400), color=(0, 0, 0, 0))
+            return type(
+                "_Render",
+                (),
+                {
+                    "width_px": image.width,
+                    "height_px": image.height,
+                    "rgba_bytes": image.tobytes(),
+                },
+            )()
+
+        def get_page_geometry(self, document_path: str, page_index: int):
+            return type(
+                "_Geom",
+                (),
+                {"crop_box": (0.0, 0.0, 300.0, 400.0), "rotation": 0},
+            )()
+
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness.QtPdfRenderBackend",
+        _FakeBackend,
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._detect_text_content_bounds_in_preview",
+        lambda **kwargs: ({"x": 14, "y": 12, "width": 64, "height": 18}, None),
+    )
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._normalized_image_crop_change_ratio",
+        lambda **kwargs: 0.0,
+    )
+
+    snapshot = _snapshot_signed_output_render(
+        output_pdf_path=str(output_pdf),
+        page_index=0,
+        preview_snapshot={
+            "image_stamp_path": None,
+            "signature_rect": {
+                "left_pt": 10.0,
+                "bottom_pt": 20.0,
+                "width_pt": 120.0,
+                "height_pt": 48.0,
+            },
+            "text_style": {"text_color_hex": "#000000"},
+            "render_capture": {
+                "preview_image_path": str(preview_path),
+                "card_bounds_px": {"x": 0, "y": 0, "width": 120, "height": 48},
+                "text_rendered_content_bounds_px": {"x": 14, "y": 12, "width": 64, "height": 18},
+            },
+            "box_style": {
+                "show_border": True,
+                "border_color_hex": "#000000",
+                "border_width_pt": 1.0,
+                "background_color_hex": "#FFFFFF",
+            },
+            "layout_template": "single_line",
+            "stamp_position": "top",
+        },
+        preview_text="Morgan Ellery | Northwind Ledger Holdings | 2026-04-11 09:00",
+        output_visible_appearance_snapshot={
+            "annotation_rect": [10.0, 20.0, 130.0, 68.0],
+            "text_fragments": ["Morgan Ellery", "Northwind Ledger Holdings", "2026-04-11 09:00"],
+        },
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_white_bg",
+    )
+
+    assert snapshot is not None
+    page_image = Image.open(snapshot["page_render_path"]).convert("RGBA")
+    assert page_image.getpixel((0, 0)) == (255, 255, 255, 255)
+
+
 def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
     summary = _signed_matrix_diagnostic_summary(
         [
@@ -1158,6 +1282,29 @@ def test_default_harness_artifacts_dir_derives_from_summary_json_path() -> None:
         )
         == "artifacts/phase3_harness_capture_artifacts"
     )
+
+
+def test_default_harness_output_pdf_path_uses_artifacts_dir_and_numbering() -> None:
+    output_path = _default_harness_output_pdf_path(
+        pdf_path="/tmp/input.pdf",
+        artifacts_dir="artifacts/phase3_harness_capture_artifacts",
+        sign_attempt_index=3,
+    )
+
+    assert (
+        output_path
+        == "artifacts/phase3_harness_capture_artifacts/input_harness_signed_003.pdf"
+    )
+
+
+def test_default_harness_output_pdf_path_falls_back_to_source_directory() -> None:
+    output_path = _default_harness_output_pdf_path(
+        pdf_path="/tmp/input.pdf",
+        artifacts_dir=None,
+        sign_attempt_index=2,
+    )
+
+    assert output_path == "/tmp/input-signed.pdf"
 
 
 def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
@@ -2588,9 +2735,45 @@ def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: P
 
     appearance = build_signature_appearance(
         image_stamp_path=str(stamp_path),
-        show_field_names=True,
+        signer_label_prefix="Digitally signed by",
+        show_field_names=False,
         layout_template=SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.TOP,
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.0,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
     )
     request = build_signing_request(
         tmp_path,
@@ -2599,7 +2782,7 @@ def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: P
         certificate_name="cert.p12",
         passphrase="secret",
         timestamp_required=False,
-        signature_rect=build_signature_rect(page_index=0, width_pt=1000.0, height_pt=180.0),
+        signature_rect=build_signature_rect(page_index=0, width_pt=540.0, height_pt=120.0),
         signature_appearance=appearance,
     )
 
@@ -2623,7 +2806,7 @@ def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
 
     assert snapshot is not None
     assert snapshot["field_name"] == "Signature1"
-    assert snapshot["annotation_rect"] == [24.0, 18.0, 1024.0, 198.0]
+    assert snapshot["annotation_rect"] == [24.0, 18.0, 564.0, 138.0]
     assert snapshot["appearance_stream_length"] > 0
     assert snapshot["appearance_has_visible_text"] is True
     assert snapshot["visible_text_present"] is True
@@ -2634,6 +2817,6 @@ def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
     assert snapshot["appearance_image_xobject_count"] >= 1
     assert snapshot["appearance_xobjects"]
     assert snapshot["image_xobjects"] == snapshot["appearance_xobjects"]
-    assert snapshot["annotation_rect_size"] == {"width": 1000.0, "height": 180.0}
+    assert snapshot["annotation_rect_size"] == {"width": 540.0, "height": 120.0}
     assert snapshot["text_fragment_count"] == len(fragments)
     assert snapshot["image_xobject_count"] == snapshot["appearance_image_xobject_count"]
