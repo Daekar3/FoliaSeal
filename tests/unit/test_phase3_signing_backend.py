@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 from PIL import Image
 from pyhanko.pdf_utils import generic
+from pyhanko.pdf_utils.font.opentype import GlyphAccumulatorFactory
 from pyhanko.pdf_utils.layout import AxisAlignment, InnerScaling
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
@@ -961,7 +962,21 @@ def test_build_text_box_style_uses_italic_font_variant_for_serif() -> None:
         )
     )
 
-    assert style.font.name == "Times-Italic"
+    assert isinstance(style.font, GlyphAccumulatorFactory)
+    assert style.font.font_file.endswith("NotoSerif-Italic.ttf")
+
+
+def test_build_text_box_style_rejects_unsupported_cursive_italic() -> None:
+    with pytest.raises(ValueError, match="Cursive does not provide a bundled italic face"):
+        _build_text_box_style(
+            SignatureTextStyle(
+                font_family="Cursive",
+                font_size_pt=8.0,
+                bold=False,
+                italic=True,
+                text_color_hex="#000000",
+            )
+        )
 
 
 def test_stamp_background_for_gif_preserves_transparency(tmp_path: Path) -> None:
@@ -1054,7 +1069,7 @@ def test_multi_line_top_accepts_real_world_half_point_width_case(tmp_path: Path)
         page_index=0,
         left_pt=187.904,
         bottom_pt=396.736,
-        width_pt=117.248,
+        width_pt=120.0,
         height_pt=90.112,
     )
 

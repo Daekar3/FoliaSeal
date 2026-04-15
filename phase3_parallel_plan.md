@@ -42,10 +42,9 @@ Validated so far:
 - the concrete backend now produces a genuinely cryptographically signed PDF through `pyHanko`
 - the preview panel width/aspect-ratio behavior is materially more stable than earlier in the
   remediation wave
-- the checked-in baseline `single_line`, `multi_line`, and `wrapped_block` preview matrices are
-  currently structurally green across the repository
-- the checked-in stress matrices are now the active content-density regression frontier and still
-  expose remaining green-path clipping cases under realistic long-form inputs
+- the checked-in preview matrices must be interpreted from the latest summary artifacts rather than
+  from narrative status notes in this document; broad rendering revisions can legitimately change
+  both baseline and stress outcomes
 - preview-matrix summaries now separate signable risk counts from rejected risk counts for both
   text and stamp diagnostics, so intentionally blocked bad layouts do not read like unresolved
   green-path regressions
@@ -54,9 +53,8 @@ Validated so far:
 - after anti-aliased stamp-content detection was tightened, a remaining 1px border-facing gap is
   treated as acceptable raster clearance; actual contact still shows up in the explicit
   stamp edge-touch counts
-- the baseline preview matrices are structurally green, but the stress matrices are intentionally
-  not green yet and should be treated as the current preview-fidelity work queue rather than as
-  product-ready acceptance proof
+- preview matrices remain the broad rendering regression net, but their exact green/red status must
+  come from the latest artifacts rather than static prose here
 - preview validation and signed-output acceptance are separate concerns:
   - preview matrices prove layout geometry and content-density behavior,
   - signed-output evidence is the end-to-end proof layer that must verify the actual signed PDF
@@ -67,6 +65,11 @@ Validated so far:
 - preview typography semantics are now intended to be layout-invariant: the selected point size
   should mean the same thing in `single_line`, `multi_line`, and `wrapped_block`, with layout mode
   affecting reservation geometry and fit behavior rather than silently rescaling text
+- visible-signature typography now has a stricter architectural contract:
+  - backend fit validation and final signed output use bundled OpenType fonts through pyHanko's
+    glyph shaping path
+  - the Qt preview loads the same bundled font assets instead of generic system fallback stacks
+  - unsupported style combinations are explicit validation errors, not silent family substitution
 - fit validation policy is calculation-driven: the team policy is to correct the geometry and
   measurement model itself, not to hide bad fits behind percentage-based tolerance tuning; only
   tiny documented numeric seam corrections are acceptable where mixed rounding would otherwise
@@ -105,6 +108,12 @@ Interpretation:
   gaps and acceptance confirmations rather than broad missing infrastructure
 - the next acceptance wave should be framed as signed-output validation rather than another
   preview-matrix sweep; the preview work is now a prerequisite, not the final proof
+- if future font/rendering bugs appear, the expected debugging order is now:
+  - bundled font registry resolution
+  - OpenType text measurement in the backend
+  - preview use of the same bundled family
+  - signed-output parity
+  and not reintroducing fallback-stack or average-width tuning
 - `artifacts/phase3_handoff_2026-04-03.md` should be treated as the tactical jump-in note for the
   next finishing wave, while this file remains the broader coordination document
 

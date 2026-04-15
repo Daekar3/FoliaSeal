@@ -1901,7 +1901,7 @@ def test_text_edge_diagnostics_flags_small_height_loss_at_edge() -> None:
     assert diagnostics["text_content_clipped_in_preview"] is True
 
 
-def test_text_font_diagnostics_flags_unsupported_cursive_mapping() -> None:
+def test_text_font_diagnostics_reports_cursive_as_direct_preview_family() -> None:
     preview = type(
         "_Preview",
         (),
@@ -1932,7 +1932,7 @@ def test_text_font_diagnostics_flags_unsupported_cursive_mapping() -> None:
 
     assert diagnostics["requested_text_font_category"] == "cursive"
     assert diagnostics["effective_text_font_category"] == "sans_serif"
-    assert diagnostics["font_family_direct_preview_mapping_supported"] is False
+    assert diagnostics["font_family_direct_preview_mapping_supported"] is True
     assert diagnostics["font_family_category_mismatch"] is True
 
 

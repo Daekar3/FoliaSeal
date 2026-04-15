@@ -12,7 +12,7 @@ from pathlib import Path
 
 from asn1crypto import pkcs12
 from PIL import Image
-from pyhanko.pdf_utils.font.basic import SimpleFontEngineFactory
+from pyhanko.pdf_utils.font.opentype import GlyphAccumulatorFactory
 from pyhanko.pdf_utils.images import PdfImage
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 from pyhanko.pdf_utils.layout import (
@@ -36,6 +36,7 @@ from foliaseal.application.sign_pdf_use_case import (
     SigningBackendRequest,
     SignPdfUseCase,
 )
+from foliaseal.application.signature_font_registry import resolve_signature_font_face
 from foliaseal.application.signing_draft_workflow import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
@@ -328,11 +329,11 @@ class VisibleSignatureTextLayout:
 
 
 def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
-    font_factory = _font_factory_for_text_style(text_style)
     # Preserve the user's selected half-point font sizes in backend measurement.
     # Rounding 8.5pt up to 9pt creates avoidable preview/backend drift in narrow
     # layouts because the Qt preview renders the actual selected size.
     font_size = max(Fraction(1, 1), Fraction(int(round(text_style.font_size_pt * 2)), 2))
+    font_factory = _font_factory_for_text_style(text_style, font_size=font_size)
     return TextBoxStyle(
         font=font_factory,
         font_size=font_size,
@@ -1261,11 +1262,16 @@ def _rect_to_box(signature_rect) -> tuple[int, int, int, int]:
     return (left, bottom, right, top)
 
 
-def _font_factory_for_text_style(text_style: SignatureTextStyle) -> SimpleFontEngineFactory:
+def _font_factory_for_text_style(
+    text_style: SignatureTextStyle,
+    *,
+    font_size: Fraction,
+) -> GlyphAccumulatorFactory:
     return _font_factory_for_family(
         text_style.font_family,
         bold=text_style.bold,
         italic=text_style.italic,
+        font_size=font_size,
     )
 
 
@@ -1274,31 +1280,13 @@ def _font_factory_for_family(
     *,
     bold: bool = False,
     italic: bool = False,
-) -> SimpleFontEngineFactory:
-    normalized = font_family.strip().lower()
-    if "courier" in normalized or "mono" in normalized or "code" in normalized:
-        if bold and italic:
-            return SimpleFontEngineFactory("Courier-BoldOblique", 0.6)
-        if bold:
-            return SimpleFontEngineFactory("Courier-Bold", 0.6)
-        if italic:
-            return SimpleFontEngineFactory("Courier-Oblique", 0.6)
-        return SimpleFontEngineFactory("Courier", 0.6)
-    if "times" in normalized or "serif" in normalized:
-        if bold and italic:
-            return SimpleFontEngineFactory("Times-BoldItalic", 0.5)
-        if bold:
-            return SimpleFontEngineFactory("Times-Bold", 0.5)
-        if italic:
-            return SimpleFontEngineFactory("Times-Italic", 0.5)
-        return SimpleFontEngineFactory("Times-Roman", 0.5)
-    if bold and italic:
-        return SimpleFontEngineFactory("Helvetica-BoldOblique", 0.5)
-    if bold:
-        return SimpleFontEngineFactory("Helvetica-Bold", 0.5)
-    if italic:
-        return SimpleFontEngineFactory("Helvetica-Oblique", 0.5)
-    return SimpleFontEngineFactory("Helvetica", 0.5)
+    font_size: Fraction,
+) -> GlyphAccumulatorFactory:
+    face = resolve_signature_font_face(font_family, bold=bold, italic=italic)
+    return GlyphAccumulatorFactory(
+        font_file=str(face.font_file),
+        font_size=float(font_size),
+    )
 
 
 def _hex_to_rgb(color_hex: str) -> tuple[float, float, float]:

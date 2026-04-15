@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "FoliaSeal Team" }]
 dependencies = [
-  "pyHanko>=0.34.1",
+  "pyHanko[opentype]>=0.34.1",
   "Pillow>=10.0",
 ]
 
@@ -26,6 +26,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+foliaseal = ["resources/fonts/*.ttf"]
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

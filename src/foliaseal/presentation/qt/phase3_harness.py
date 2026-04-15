@@ -41,6 +41,7 @@ from foliaseal.application.qa_preview_stress_fixtures import (
     apply_preview_stress_fixture_profile,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+from foliaseal.application.signature_font_registry import preview_font_family_supported
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -3259,7 +3260,7 @@ def _text_font_diagnostics(
                 effective_point_size = point_size
     requested_category = _font_family_category(str(requested_family or ""))
     effective_category = _font_family_category(str(effective_family or ""))
-    direct_mapping_supported = requested_category not in {"cursive", "fantasy"}
+    direct_mapping_supported = preview_font_family_supported(str(requested_family or ""))
     return {
         "requested_text_font_family": requested_family,
         "requested_text_font_size_pt": requested_size,
@@ -3292,6 +3293,7 @@ def _font_family_category(font_family: str) -> str | None:
             "nimbus sans",
             "liberation sans",
             "dejavu sans",
+            "noto sans",
             "source sans",
             "verdana",
         )
@@ -3302,6 +3304,17 @@ def _font_family_category(font_family: str) -> str | None:
     if any(
         token in normalized
         for token in (
+            "fantasy",
+            "decor",
+            "display",
+            "papyrus",
+            "noto serif display",
+        )
+    ):
+        return "fantasy"
+    if any(
+        token in normalized
+        for token in (
             "times",
             "serif",
             "georgia",
@@ -3309,6 +3322,7 @@ def _font_family_category(font_family: str) -> str | None:
             "cambria",
             "baskerville",
             "liberation serif",
+            "noto serif",
         )
     ):
         return "serif"
@@ -3317,8 +3331,6 @@ def _font_family_category(font_family: str) -> str | None:
         for token in ("cursive", "script", "hand", "brush", "callig", "comic", "zapfino")
     ):
         return "cursive"
-    if any(token in normalized for token in ("fantasy", "decor", "display", "papyrus")):
-        return "fantasy"
     return "unknown"
 
 

@@ -149,6 +149,12 @@ This profile should be treated as a release-gating contract and reflected in QA 
   - font sizing behavior,
   - wrapping rules,
   - overflow handling.
+- Visible-signature typography should also share one real font asset set and one glyph-metric
+  measurement story across preview, validation, and final signed output.
+  - Do not rely on PDF base-font average-width heuristics for fit validation.
+  - Do not rely on generic UI fallback font stacks for preview honesty.
+  - Prefer one bundled OpenType font family mapping used everywhere the visible signature is
+    measured or rendered.
 - The rules that determine visible-signature text/layout inputs should live in one shared
   application/backend-owned path. Preview rendering and pre-submit fit validation should consume
   that shared output rather than maintaining separate formatting logic.
@@ -224,6 +230,9 @@ This profile should be treated as a release-gating contract and reflected in QA 
 - The signed acceptance matrix should define explicit positive-path and negative-path expectations so
   the batch summary can report whether the observed outcomes matched the intended acceptance set,
   not just how many scenarios happened to sign.
+- If the implementation uses a limited bundled script/display family for `Cursive` or `Fantasy`,
+  unsupported bold/italic combinations must be rejected explicitly rather than synthesized or
+  silently mapped to another family.
 - If visual comparison is automated, it should be done using application/rendered artifacts rather
   than X11/Wayland/compositor protocol tracing.
 - Display-server-specific tracing is out of current scope unless a later debugging need proves that

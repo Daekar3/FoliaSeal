@@ -2601,11 +2601,11 @@ def test_vertical_preview_descender_budget_scales_with_line_count() -> None:
 
 
 def test_preview_font_stack_distinguishes_supported_display_families() -> None:
-    assert "sans-serif" in signing_shell_module._preview_font_stack("Sans Serif")
-    assert "serif" in signing_shell_module._preview_font_stack("Serif")
-    assert "monospace" in signing_shell_module._preview_font_stack("Monospace")
-    assert "cursive" in signing_shell_module._preview_font_stack("Cursive")
-    assert "fantasy" in signing_shell_module._preview_font_stack("Fantasy")
+    assert "Noto Sans" in signing_shell_module._preview_font_stack("Sans Serif")
+    assert "Noto Serif" in signing_shell_module._preview_font_stack("Serif")
+    assert "DejaVu Sans Mono" in signing_shell_module._preview_font_stack("Monospace")
+    assert "Dancing Script" in signing_shell_module._preview_font_stack("Cursive")
+    assert "Noto Serif Display" in signing_shell_module._preview_font_stack("Fantasy")
     assert signing_shell_module._preview_font_stack("Sans Serif") != (
         signing_shell_module._preview_font_stack("Serif")
     )

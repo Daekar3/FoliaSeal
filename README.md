@@ -58,6 +58,13 @@ Current capabilities:
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
   - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
+- Visible-signature typography now uses bundled OpenType font assets as the canonical source of
+  truth.
+  - Backend fit validation and final signed rendering use pyHanko's OpenType shaping path instead
+    of the old average-width PDF base-font engine.
+  - The Qt preview now loads the same bundled font assets instead of generic system fallback stacks.
+  - The intent is ruthless simplicity: one shared font asset set and one glyph-metric-driven
+    measurement story for preview, validation, and final output.
 - Architectural simplification rule:
   - keep exactly one authoritative backend-owned visible-signature fit gate
   - keep preview visual
@@ -69,7 +76,8 @@ Current capabilities:
 Not yet production-ready:
 
 - preview/output parity still needs signed-output acceptance coverage for representative real PDFs
-- the stress matrices still expose remaining text-fit regressions under dense, realistic content
+- broad matrix status should be taken from the current checked-in summaries rather than from stale
+  narrative notes here
 - transparent GIF stamp handling in final signed PDF output is not trustworthy yet; PNG remains the safer image-stamp format
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
@@ -88,12 +96,21 @@ Roadmap note:
 - The current visible-signature contract is text-first: honor the selected text size in points,
   reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
   fail honestly only when the chosen rectangle cannot support that result.
+- The current typography contract is bundled-font-first:
+  - `Sans Serif` -> bundled `Noto Sans`
+  - `Serif` -> bundled `Noto Serif`
+  - `Monospace` -> bundled `DejaVu Sans Mono`
+  - `Fantasy` -> bundled `Noto Serif Display`
+  - `Cursive` -> bundled script faces with explicit style limits
+- Unsupported font/style combinations are now blocking validation issues instead of silent family
+  substitution. In particular, `Cursive` does not fake italic/oblique variants.
 - The current Phase 3 finish line is now split into two distinct validation tracks:
   - preview matrices cover layout geometry and content-density regression safety,
   - signed-output acceptance covers cryptographic validity and preview/output parity on the actual
     signed PDF.
-- The baseline preview matrices are currently structurally green, but the stress matrices still
-  expose the remaining text-fit regressions under realistic content pressure.
+- The broad preview-matrix status must be read from the latest checked-in summary artifacts.
+  Font-engine and layout-contract revisions can legitimately move both baseline and stress results,
+  so this README should not be treated as the live matrix scoreboard.
 - The evidence-contract/gate machinery now exists, but it is an engineering validation layer rather
   than a substitute for signed-output acceptance.
 - The remaining engineering focus is on closing the stress-matrix green-path gaps, broadening the
@@ -172,6 +189,13 @@ The harness defaults to `timestamp_required=False` today, so it is suitable for 
 testing even before TSA-backed timestamping support lands. The certificate CLI arguments are meant
 for local development/manual QA; avoid using a production identity in shell history if that is a
 concern in your environment.
+
+Typography note for harness/manual QA:
+
+- visible-signature preview, fit validation, and final signed output now share bundled OpenType font
+  assets instead of mixing PDF base-font approximations with Qt fallback stacks
+- if a visible-signature typography mismatch is reported now, treat it as a real rendering/layout
+  bug rather than an expected artifact of using different font families in preview vs backend
 
 What it does:
 

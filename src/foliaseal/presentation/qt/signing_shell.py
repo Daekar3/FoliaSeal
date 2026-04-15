@@ -23,6 +23,11 @@ from foliaseal.application.phase3_signing_backend import (
     _single_line_stamp_content_inset,
     _single_line_vertical_stamp_border_gap,
 )
+from foliaseal.application.signature_font_registry import (
+    bundled_font_root,
+    resolve_signature_font_face,
+    validate_signature_font_request,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -54,6 +59,7 @@ SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
 )
 
 PROFILE_PLACEHOLDER = "Current draft"
+_PREVIEW_FONTS_REGISTERED = False
 
 
 class QtSigningBindingsUnavailable(RuntimeError):
@@ -946,7 +952,7 @@ def _preview_card_padding_px(preview: SigningDraftPreview) -> float:
 def _preview_text_style(preview: SigningDraftPreview) -> str:
     if preview.text_style is None:
         return "color: #1f1f1f;"
-    family = _preview_font_stack(preview.text_style.font_family)
+    family = _preview_font_family_css(preview.text_style)
     size = preview.text_style.font_size_pt
     weight = "700" if preview.text_style.bold else "500"
     style = "italic" if preview.text_style.italic else "normal"
@@ -961,18 +967,58 @@ def _preview_text_style(preview: SigningDraftPreview) -> str:
 
 
 def _preview_font_stack(font_family: str) -> str:
-    normalized = font_family.strip().lower()
-    if "sans serif" in normalized or "sans-serif" in normalized:
-        return "'Helvetica', 'Arial', 'Nimbus Sans', sans-serif"
-    if "courier" in normalized or "mono" in normalized or "code" in normalized:
-        return "'Courier New', 'Consolas', 'Courier', monospace"
+    try:
+        face = resolve_signature_font_face(font_family, bold=False, italic=False)
+        return _quoted_preview_family(face.preview_family_name, font_family)
+    except ValueError:
+        return "'Noto Sans', sans-serif"
+
+
+def _preview_font_family_css(text_style: SignatureTextStyle) -> str:
+    try:
+        face = resolve_signature_font_face(
+            text_style.font_family,
+            bold=text_style.bold,
+            italic=text_style.italic,
+        )
+    except ValueError:
+        face = resolve_signature_font_face(text_style.font_family, bold=False, italic=False)
+    return _quoted_preview_family(face.preview_family_name, text_style.font_family)
+
+
+def _quoted_preview_family(preview_family_name: str, requested_family: str) -> str:
+    normalized = requested_family.strip().lower()
+    if "mono" in normalized or "courier" in normalized or "code" in normalized:
+        return f"'{preview_family_name}', monospace"
+    if "serif" in normalized or "times" in normalized or "display" in normalized:
+        return f"'{preview_family_name}', serif"
     if "cursive" in normalized or "script" in normalized:
-        return "'Brush Script MT', 'Segoe Script', 'Lucida Handwriting', cursive"
-    if "fantasy" in normalized or "display" in normalized or "decor" in normalized:
-        return "'Papyrus', 'Copperplate', 'Impact', fantasy"
-    if "times" in normalized or "serif" in normalized:
-        return "'Times New Roman', 'Georgia', 'Times', serif"
-    return "'Helvetica', 'Arial', 'Nimbus Sans', sans-serif"
+        return f"'{preview_family_name}', cursive"
+    if "fantasy" in normalized or "decor" in normalized:
+        return f"'{preview_family_name}', fantasy"
+    return f"'{preview_family_name}', sans-serif"
+
+
+def _ensure_preview_fonts_registered() -> None:
+    global _PREVIEW_FONTS_REGISTERED
+    if _PREVIEW_FONTS_REGISTERED:
+        return
+    try:
+        qt_widgets = importlib.import_module("PySide6.QtWidgets")
+        qt_gui = importlib.import_module("PySide6.QtGui")
+    except Exception:
+        return
+    q_application = getattr(qt_widgets, "QApplication", None)
+    instance = getattr(q_application, "instance", None)
+    if not callable(instance) or instance() is None:
+        return
+    q_font_database = getattr(qt_gui, "QFontDatabase", None)
+    add_application_font = getattr(q_font_database, "addApplicationFont", None)
+    if not callable(add_application_font):
+        return
+    _PREVIEW_FONTS_REGISTERED = True
+    for font_path in sorted(bundled_font_root().glob("*.ttf")):
+        add_application_font(str(font_path))
 
 
 def _build_preview_issue(
@@ -1017,6 +1063,7 @@ class SignaturePropertiesPanel:
         on_error: Callable[[str], None] | None = None,
     ) -> None:
         self._bindings = bindings
+        _ensure_preview_fonts_registered()
         self._workflow = workflow
         self._profile_catalog_store = preset_catalog_store
         if preset_catalog is not None:
@@ -1677,6 +1724,7 @@ class SignaturePropertiesPanel:
             self._appearance_controls.background_color,
             appearance.box_style.background_color_hex,
         )
+        self._sync_font_style_control_availability()
 
     def _reload_profile_controls(self, *, selected_name: str | None = None) -> None:
         profile_combo = self._profile_controls.profile_combo
@@ -2256,7 +2304,29 @@ class SignaturePropertiesPanel:
         else:
             controls.override_edit.setEnabled(False)
 
+    def _sync_font_style_control_availability(self) -> None:
+        family = _combo_text(self._appearance_controls.font_family)
+        bold_checked = _is_checked(self._appearance_controls.bold)
+        italic_checked = _is_checked(self._appearance_controls.italic)
+        bold_supported = validate_signature_font_request(
+            family,
+            bold=True,
+            italic=False,
+        ) is None
+        italic_supported = validate_signature_font_request(
+            family,
+            bold=False,
+            italic=True,
+        ) is None
+        bold_setter = getattr(self._appearance_controls.bold, "setEnabled", None)
+        if callable(bold_setter):
+            bold_setter(bold_supported or bold_checked)
+        italic_setter = getattr(self._appearance_controls.italic, "setEnabled", None)
+        if callable(italic_setter):
+            italic_setter(italic_supported or italic_checked)
+
     def _notify_change(self) -> None:
+        self._sync_font_style_control_availability()
         if self._on_change is not None:
             self._on_change()
 
