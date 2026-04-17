@@ -14,12 +14,14 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.signing_preview_renderer import (
+    CanonicalSignaturePreviewSnapshot,
     SigningPreviewLine,
     SigningPreviewLineKind,
     SigningPreviewParityIssue,
     SigningPreviewParityReport,
     SigningPreviewRenderSnapshot,
     compare_preview_to_request,
+    render_canonical_signature_preview,
     render_signing_preview,
 )
 from foliaseal.application.viewer_session import ViewerSession, ViewerZoomLimits
@@ -32,6 +34,7 @@ __all__ = [
     "ViewerTimingSnapshot",
     "ViewerWorkflow",
     "ViewerZoomLimits",
+    "CanonicalSignaturePreviewSnapshot",
     "SigningPreviewLine",
     "SigningPreviewLineKind",
     "SigningPreviewParityIssue",
@@ -45,5 +48,6 @@ __all__ = [
     "SigningDraftValidationSeverity",
     "SigningDraftWorkflow",
     "compare_preview_to_request",
+    "render_canonical_signature_preview",
     "render_signing_preview",
 ]

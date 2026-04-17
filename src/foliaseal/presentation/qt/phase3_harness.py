@@ -6,6 +6,7 @@ import hashlib
 import importlib
 import json
 import re
+import shutil
 from collections import Counter
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
@@ -2225,13 +2226,18 @@ def _capture_preview_render(
     stamp_label = controls.stamp_label
     multi_detail = controls.multi_detail_label
     multi_stamp = controls.multi_stamp_label
+    canonical_snapshot = getattr(card_container, "_canonical_preview_snapshot", None)
     image_path = None
     image_error = None
+    target_dir = None
     if artifacts_dir is not None:
         target_dir = Path(artifacts_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
         image_path = str(target_dir / f"{artifact_basename}.png")
-        image_error = _write_widget_capture_png(card_container, image_path)
+        if canonical_snapshot is not None:
+            shutil.copyfile(canonical_snapshot.image_path, image_path)
+        else:
+            image_error = _write_widget_capture_png(card_container, image_path)
 
     use_single_body = _widget_is_visible(single_body)
     active_body = single_body if use_single_body else multi_body
@@ -2242,6 +2248,13 @@ def _capture_preview_render(
     detail_bounds = _widget_rect_snapshot(active_detail)
     stamp_bounds = _widget_rect_snapshot(active_stamp)
     card_bounds = _widget_rect_snapshot(card_container)
+    if canonical_snapshot is not None:
+        card_bounds = {
+            "x": 0,
+            "y": 0,
+            "width": canonical_snapshot.width_px,
+            "height": canonical_snapshot.height_px,
+        }
     image_card_bounds = (
         None
         if card_bounds is None
@@ -2250,6 +2263,10 @@ def _capture_preview_render(
     body_bounds = _widget_rect_snapshot_relative_to(card_container, active_body) or body_bounds
     text_widget_bounds = _widget_rect_snapshot_relative_to(card_container, active_detail)
     stamp_band_bounds = _widget_rect_snapshot_relative_to(card_container, active_stamp)
+    if canonical_snapshot is not None:
+        body_bounds = image_card_bounds
+        text_widget_bounds = canonical_snapshot.text_area_bounds_px
+        stamp_band_bounds = canonical_snapshot.stamp_area_bounds_px
     stamp_alignment = _label_alignment_snapshot(active_stamp)
     stamp_pixmap_size = _label_pixmap_size_snapshot(active_stamp)
     stamp_pixmap_bounds = _project_pixmap_bounds_within_label(
@@ -2263,6 +2280,14 @@ def _capture_preview_render(
         source_content_bounds=stamp_source_analysis.get("stamp_source_content_bounds_px"),
         pixmap_bounds=stamp_pixmap_bounds,
     )
+    if canonical_snapshot is not None:
+        stamp_content_bounds = canonical_snapshot.stamp_bounds_px
+        stamp_pixmap_bounds = canonical_snapshot.stamp_bounds_px
+        if canonical_snapshot.stamp_bounds_px is not None:
+            stamp_pixmap_size = {
+                "width": canonical_snapshot.stamp_bounds_px["width"],
+                "height": canonical_snapshot.stamp_bounds_px["height"],
+            }
     stamp_diagnostics = _stamp_edge_diagnostics(
         preview=preview,
         stamp_band_bounds=stamp_band_bounds,
@@ -2273,12 +2298,20 @@ def _capture_preview_render(
     text_content_error = None
     text_reference_content_bounds = None
     text_reference_error = None
-    if text_widget_bounds is not None:
+    if canonical_snapshot is not None:
+        text_reference_content_bounds = canonical_snapshot.text_bounds_px
+        text_rendered_content_bounds = canonical_snapshot.text_bounds_px
+    elif text_widget_bounds is not None:
         text_reference_content_bounds, text_reference_error = _reference_text_content_bounds(
             source_label=active_detail,
             text_color_rgba=_preview_text_color_rgba(preview),
         )
-    if image_path is not None and image_error is None and text_widget_bounds is not None:
+    if (
+        canonical_snapshot is None
+        and image_path is not None
+        and image_error is None
+        and text_widget_bounds is not None
+    ):
         text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
             preview_image_path=image_path,
             text_widget_bounds=text_widget_bounds,

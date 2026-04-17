@@ -1,13 +1,18 @@
 from dataclasses import replace
 from pathlib import Path
 
+from PIL import Image
+
 from foliaseal.application import compare_preview_to_request, render_signing_preview
 from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
     SigningDraftWorkflow,
 )
-from foliaseal.domain.models import SignatureStampPosition
+from foliaseal.application.signing_preview_renderer import (
+    render_canonical_signature_preview,
+)
+from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
 from tests.support.phase3_builders import (
     build_signature_appearance,
     build_signature_rect,
@@ -223,3 +228,27 @@ def test_preview_parity_reports_stamp_position_drift(tmp_path: Path) -> None:
 
     assert report.is_consistent is False
     assert {issue.code for issue in report.issues} == {"stamp_position_mismatch"}
+
+
+def test_canonical_preview_renderer_produces_raster_and_bounds(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (96, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            image_stamp_path=str(stamp_path),
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=180.0, height_pt=48.0))
+
+    preview = workflow.preview()
+    snapshot = render_canonical_signature_preview(preview, zoom=2.0)
+
+    assert snapshot is not None
+    assert Path(snapshot.image_path).exists()
+    assert snapshot.width_px > 0
+    assert snapshot.height_px > 0
+    assert snapshot.text_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None

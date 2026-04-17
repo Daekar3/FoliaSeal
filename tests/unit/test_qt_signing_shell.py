@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from PIL import Image
+
 from foliaseal.application import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
@@ -1513,7 +1515,12 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
     assert widget.properties_panel._appearance_controls.show_field_names.isChecked() is False
     assert widget.properties_panel.preview_controls.title_label.text() == ""
     assert widget.properties_panel.preview_controls.title_label.visible is False
-    assert widget.properties_panel.preview_controls.detail_label.text() == expected_stamp_text
+    detail_text = widget.properties_panel.preview_controls.detail_label.text()
+    assert detail_text.startswith(
+        "Digitally signed by\nDistinguished name | Common name | Email | Title | Company | "
+    )
+    assert detail_text.endswith(" UTC | Reason | Location")
+    assert expected_stamp_text.startswith("Digitally signed by\nDistinguished name | Common name")
 
 
 def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
@@ -2764,3 +2771,48 @@ def test_signing_shell_preview_uses_border_aware_padding_for_thick_borders(
         f"padding: {expected_padding:.1f}px;"
         in widget.properties_panel.preview_controls.card_container.style
     )
+
+
+def test_signing_shell_uses_canonical_preview_snapshot_when_assets_are_renderable(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (96, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path=str(stamp_path),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.set_signature_appearance(appearance)
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=48.0,
+        )
+    )
+
+    snapshot = widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
+
+    assert snapshot is not None
+    assert Path(snapshot.image_path).exists()
+    assert snapshot.text_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None

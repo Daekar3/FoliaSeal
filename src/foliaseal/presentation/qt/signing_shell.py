@@ -28,6 +28,10 @@ from foliaseal.application.signature_font_registry import (
     resolve_signature_font_face,
     validate_signature_font_request,
 )
+from foliaseal.application.signing_preview_renderer import (
+    CanonicalSignaturePreviewSnapshot,
+    render_canonical_signature_preview,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -160,11 +164,13 @@ class PreviewControls:
     title_label: Any
     stamp_label: Any
     detail_label: Any
+    single_render_label: Any
     single_body_container: Any
     multi_body_container: Any
     multi_content_container: Any
     multi_stamp_label: Any
     multi_detail_label: Any
+    multi_render_label: Any
     footer_label: Any
 
 def _compose_row(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
@@ -1209,29 +1215,33 @@ class SignaturePropertiesPanel:
         title_label = bindings.q_label("")
         stamp_label = bindings.q_label("")
         detail_label = bindings.q_label("")
+        single_render_label = bindings.q_label("")
         footer_label = bindings.q_label("")
         multi_stamp_label = bindings.q_label("")
         multi_detail_label = bindings.q_label("")
+        multi_render_label = bindings.q_label("")
         single_body_container = _compose_preview_column(bindings)
+        _set_container_widgets(single_body_container, single_render_label)
         multi_content_container = _compose_preview_column(bindings)
         multi_body_container = bindings.q_widget()
         multi_body_layout = bindings.q_hbox_layout(multi_body_container)
         multi_body_layout.setContentsMargins(0, 0, 0, 0)
         multi_body_layout.setSpacing(6)
-        multi_body_layout.addWidget(multi_stamp_label)
-        multi_body_layout.addWidget(multi_content_container)
+        multi_body_layout.addWidget(multi_render_label)
 
         for label in (
             title_label,
             stamp_label,
             detail_label,
+            single_render_label,
             multi_stamp_label,
             multi_detail_label,
+            multi_render_label,
             footer_label,
         ):
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
-        for label in (stamp_label, multi_stamp_label):
+        for label in (stamp_label, multi_stamp_label, single_render_label, multi_render_label):
             if hasattr(label, "setAlignment"):
                 align_center = getattr(bindings.qt, "AlignCenter", None)
                 if align_center is not None:
@@ -1269,11 +1279,13 @@ class SignaturePropertiesPanel:
             title_label=title_label,
             stamp_label=stamp_label,
             detail_label=detail_label,
+            single_render_label=single_render_label,
             single_body_container=single_body_container,
             multi_body_container=multi_body_container,
             multi_content_container=multi_content_container,
             multi_stamp_label=multi_stamp_label,
             multi_detail_label=multi_detail_label,
+            multi_render_label=multi_render_label,
             footer_label=footer_label,
         )
 
@@ -2257,6 +2269,13 @@ class SignaturePropertiesPanel:
             self._preview_controls.multi_stamp_label,
             visible=not is_vertical and stamp_pixmap is not None,
         )
+        self._apply_canonical_preview_render(
+            preview=preview,
+            preview_scale=preview_scale,
+            inner_body_width=inner_body_width,
+            inner_body_height=inner_body_height,
+            is_vertical=is_vertical,
+        )
 
     def _validation_issues(
         self,
@@ -2265,6 +2284,84 @@ class SignaturePropertiesPanel:
         if self._control_issue is None:
             return preview.issues
         return preview.issues + (self._control_issue,)
+
+    def _apply_canonical_preview_render(
+        self,
+        *,
+        preview: SigningDraftPreview,
+        preview_scale: float,
+        inner_body_width: int,
+        inner_body_height: int,
+        is_vertical: bool,
+    ) -> None:
+        try:
+            snapshot = render_canonical_signature_preview(
+                preview,
+                zoom=max(1.0, preview_scale),
+            )
+        except ValueError:
+            snapshot = None
+        self._preview_controls.card_container._canonical_preview_snapshot = snapshot
+        if snapshot is None:
+            _set_widget_visible(self._preview_controls.single_render_label, False)
+            _set_widget_visible(self._preview_controls.multi_render_label, False)
+            return
+
+        render_label = (
+            self._preview_controls.single_render_label
+            if is_vertical
+            else self._preview_controls.multi_render_label
+        )
+        pixmap = self._load_canonical_preview_pixmap(
+            snapshot=snapshot,
+            max_width=inner_body_width,
+            max_height=inner_body_height,
+        )
+        if pixmap is not None and hasattr(render_label, "setPixmap"):
+            render_label.setPixmap(pixmap)
+        if hasattr(render_label, "setFixedSize"):
+            render_label.setFixedSize(inner_body_width, inner_body_height)
+
+        _set_widget_visible(self._preview_controls.stamp_label, False)
+        _set_widget_visible(self._preview_controls.multi_stamp_label, False)
+        _set_widget_visible(self._preview_controls.detail_label, False)
+        _set_widget_visible(self._preview_controls.multi_detail_label, False)
+        _set_widget_visible(self._preview_controls.single_render_label, is_vertical)
+        _set_widget_visible(self._preview_controls.multi_render_label, not is_vertical)
+        if is_vertical:
+            _set_container_widgets(
+                self._preview_controls.single_body_container,
+                self._preview_controls.single_render_label,
+            )
+        else:
+            _set_container_widgets(
+                self._preview_controls.multi_body_container,
+                self._preview_controls.multi_render_label,
+            )
+
+    def _load_canonical_preview_pixmap(
+        self,
+        *,
+        snapshot: CanonicalSignaturePreviewSnapshot,
+        max_width: int,
+        max_height: int,
+    ) -> Any | None:
+        pixmap = self._bindings.q_pixmap(snapshot.image_path)
+        is_null = getattr(pixmap, "isNull", None)
+        if callable(is_null) and is_null():
+            return None
+        scaled = getattr(pixmap, "scaled", None)
+        if callable(scaled):
+            keep_aspect = getattr(self._bindings.qt, "KeepAspectRatio", None)
+            smooth = getattr(self._bindings.qt, "SmoothTransformation", None)
+            if keep_aspect is not None and smooth is not None:
+                return scaled(
+                    max_width,
+                    max_height,
+                    keep_aspect,
+                    smooth,
+                )
+        return pixmap
 
     def _format_validation_text(self, preview: SigningDraftPreview) -> str:
         issues = self._validation_issues(preview)

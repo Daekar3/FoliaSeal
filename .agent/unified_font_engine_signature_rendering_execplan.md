@@ -145,3 +145,36 @@ Interpretation:
 - remaining preview-matrix failures are therefore evidence that "same assets" is not yet the same
   thing as "one engine"; a further preview-canonical-rendering slice is still needed if we want
   true one-engine parity
+
+## Follow-on Slice: Canonical Preview Rendering
+
+Implemented in the current follow-on slice:
+
+- added `render_canonical_signature_preview(...)` in
+  `src/foliaseal/application/signing_preview_renderer.py`
+- the canonical renderer now:
+  - builds a temporary one-page PDF sized to the signature rectangle
+  - applies the same `TextStampStyle` content model used by signing
+  - rasterizes that page through the Qt PDF render backend
+  - records both reserved-area bounds and rendered-content bounds for text and stamp content
+- the Qt signing shell now prefers that canonical raster as the visible preview artifact when the
+  required assets are renderable
+- the Phase 3 harness now prefers the canonical preview image and canonical bounds metadata over
+  widget capture plus hidden-`QLabel` reference geometry when that metadata is available
+- added focused regression coverage for:
+  - canonical preview raster generation
+  - shell attachment of canonical preview snapshots when assets are renderable
+
+Current status of that follow-on slice:
+
+- focused tests are green
+- full suite is green
+- the broad preview-matrix rerun is still the gating verification step for this sub-slice because
+  the first rerun exposed and then helped fix a harness-integration bug where canonical full-image
+  bounds were being fed back into clipping diagnostics as text/stamp-area bounds
+
+Policy note:
+
+- the canonical preview path is still the correct direction because it removes Qt label layout from
+  the preview truth source
+- no new fit tolerances or detector slack were introduced while wiring it in
