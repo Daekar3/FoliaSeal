@@ -43,6 +43,9 @@ from foliaseal.application.qa_preview_stress_fixtures import (
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signature_font_registry import preview_font_family_supported
+from foliaseal.application.signing_preview_renderer import (
+    render_canonical_signature_preview,
+)
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -58,14 +61,20 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
     SigningRequest,
     SigningResult,
+    TimestampTrustPolicy,
 )
+from foliaseal.infra.certification import inspect_pdf_certification_reader
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.infra.tsa import build_dummy_timestamper, build_timestamp_validation_context
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
+# Matrix reliability matters more than shell reuse speed. A fresh shell per scenario
+# keeps the canonical preview sweep from accumulating Qt state across hundreds of runs.
+_PREVIEW_MATRIX_SHELL_RECYCLE_INTERVAL = 1
 
 
 @dataclass(frozen=True)
@@ -700,7 +709,14 @@ def run_phase3_signing_harness(
             output_size_bytes = output_file.stat().st_size
             output_signature_count = _count_embedded_signatures(output_file)
             output_signature_snapshot = _snapshot_output_signature(output_file)
-            output_verification_snapshot = _snapshot_output_verification(output_file)
+            output_verification_snapshot = _snapshot_output_verification(
+                output_file,
+                trust_policy=(
+                    capture_request.trust_policy
+                    if capture_request is not None
+                    else None
+                ),
+            )
             output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(output_file)
             signed_output_render_snapshot = _snapshot_signed_output_render(
                 output_pdf_path=str(output_file),
@@ -951,7 +967,6 @@ def run_phase3_preview_matrix(
 ) -> dict[str, Any]:
     """Run a repeatable preview-only scenario sweep and capture rendered artifacts."""
 
-    bindings = _load_qt_harness_bindings()
     source_path = Path(pdf_path)
     if not source_path.exists():
         raise FileNotFoundError(f"PDF does not exist: {pdf_path}")
@@ -961,46 +976,14 @@ def run_phase3_preview_matrix(
     artifact_root = Path(artifacts_dir)
     artifact_root.mkdir(parents=True, exist_ok=True)
 
-    page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
-    backend = QtPdfRenderBackend()
-    diagnostic = backend.diagnostics()
-    if not diagnostic.available:
-        raise RuntimeError(diagnostic.message)
-
-    viewer_workflow = ViewerWorkflow(
-        document_path=str(source_path),
-        render_backend=backend,
-        session=ViewerSession(page_count=page_count),
-    )
-    signing_workflow = SigningDraftWorkflow(
-        input_pdf_path=str(source_path),
-        output_pdf_path=str(source_path.with_name(source_path.stem + "-signed.pdf")),
-        certificate_path=certificate_path,
-        passphrase=passphrase,
-        tsa_url="https://tsa.example.invalid",
-        timestamp_required=False,
-    )
     profile_store = SignaturePresetCatalogStore.default()
-
-    app = bindings.q_application.instance() or bindings.q_application([])
-    window = bindings.q_main_window()
-    window.setWindowTitle(f"FoliaSeal Phase 3 Preview Matrix - {source_path.name}")
-    window.resize(1440, 980)
-    shell = build_qt_signing_shell(
-        viewer_workflow=viewer_workflow,
-        signing_workflow=signing_workflow,
-        preset_catalog_store=profile_store,
-    )
-    window.setCentralWidget(shell)
-    window.show()
-    shell.refresh_viewer()
-    app.processEvents()
-
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
         try:
-            result = _execute_preview_matrix_scenario(
-                shell=shell,
+            result = _execute_headless_preview_matrix_scenario(
+                source_path=source_path,
+                certificate_path=certificate_path,
+                passphrase=passphrase,
                 scenario=scenario,
                 profile_store=profile_store,
                 artifacts_dir=artifact_root,
@@ -1008,11 +991,6 @@ def run_phase3_preview_matrix(
         except Exception as exc:
             result = _preview_matrix_error_result(scenario=scenario, error=exc)
         results.append(result)
-        app.processEvents()
-
-    close = getattr(window, "close", None)
-    if callable(close):
-        close()
 
     summary = {
         "pdf_path": str(source_path),
@@ -1048,6 +1026,16 @@ def run_phase3_signed_acceptance_matrix(
     scenarios = manifest["scenarios"]
     artifact_root = Path(artifacts_dir)
     artifact_root.mkdir(parents=True, exist_ok=True)
+    timestamping_mode = manifest.get("timestamping_mode", "real")
+    if timestamping_mode not in {"real", "dummy"}:
+        raise ValueError("'timestamping_mode' must be one of 'real' or 'dummy'.")
+    sign_executor = build_phase3_signing_executor(
+        timestamper_factory=(
+            (lambda _tsa_url: build_dummy_timestamper())
+            if timestamping_mode == "dummy"
+            else None
+        )
+    )
 
     page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
     backend = QtPdfRenderBackend()
@@ -1078,7 +1066,7 @@ def run_phase3_signed_acceptance_matrix(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
         preset_catalog_store=profile_store,
-        sign_executor=build_phase3_signing_executor(),
+        sign_executor=sign_executor,
     )
     window.setCentralWidget(shell)
     window.show()
@@ -1096,6 +1084,7 @@ def run_phase3_signed_acceptance_matrix(
                 base_input_path=source_path,
                 certificate_path=certificate_path,
                 passphrase=passphrase,
+                sign_executor=sign_executor,
             )
         except Exception as exc:
             result = _preview_matrix_error_result(scenario=scenario, error=exc)
@@ -1120,6 +1109,7 @@ def run_phase3_signed_acceptance_matrix(
     }
     if "acceptance_expectations" in manifest:
         summary["acceptance_expectations"] = manifest["acceptance_expectations"]
+    summary["timestamping_mode"] = timestamping_mode
     expectations_passed, expectation_errors = _evaluate_signed_matrix_acceptance_expectations(
         summary=summary,
         manifest_expectations=_mapping(manifest.get("acceptance_expectations")),
@@ -1255,7 +1245,10 @@ def _snapshot_output_signature(output_file: Path) -> dict[str, Any] | None:
         return None
 
 
-def _snapshot_output_verification(output_file: Path) -> dict[str, Any] | None:
+def _snapshot_output_verification(
+    output_file: Path,
+    trust_policy: TimestampTrustPolicy | None = None,
+) -> dict[str, Any] | None:
     try:
         with output_file.open("rb") as handle:
             reader = PdfFileReader(handle)
@@ -1264,15 +1257,21 @@ def _snapshot_output_verification(output_file: Path) -> dict[str, Any] | None:
                 return {
                     "cryptographic_validation_passed": False,
                     "signature_count": 0,
+                    "docmdp_permission": None,
+                    "certification_restricted": False,
+                    "restriction_reason": None,
                     "error": "No embedded signature fields were found in the output PDF.",
                 }
 
             signature = embedded_signatures[-1]
             validation_context = ValidationContext(trust_roots=[signature.signer_cert])
+            ts_validation_context = build_timestamp_validation_context(trust_policy)
             status = validation.validate_pdf_signature(
                 signature,
                 signer_validation_context=validation_context,
+                ts_validation_context=ts_validation_context,
             )
+            certification = inspect_pdf_certification_reader(reader)
             signer_subject = None
             if getattr(signature, "signer_cert", None) is not None:
                 subject = getattr(signature.signer_cert, "subject", None)
@@ -1288,6 +1287,25 @@ def _snapshot_output_verification(output_file: Path) -> dict[str, Any] | None:
                 "trusted": bool(getattr(status, "trust_problem_indicative", False) is False),
                 "signature_count": len(embedded_signatures),
                 "timestamp_present": _status_has_timestamp_for_snapshot(status),
+                "timestamp_cryptographically_valid": (
+                    _status_timestamp_cryptographically_valid_for_snapshot(status)
+                    if trust_policy is not None
+                    else None
+                ),
+                "tsa_chain_trusted": (
+                    _status_timestamp_trusted_for_snapshot(status)
+                    if trust_policy is not None
+                    else None
+                ),
+                "timestamp_validation_error": (
+                    _describe_timestamp_trust_for_snapshot(status)
+                    if trust_policy is not None
+                    and not _status_timestamp_trusted_for_snapshot(status)
+                    else None
+                ),
+                "docmdp_permission": certification.docmdp_permission,
+                "certification_restricted": certification.certification_restricted,
+                "restriction_reason": certification.restriction_reason,
                 "field_name": signature.field_name,
                 "subfilter": signature.sig_object.get("/SubFilter"),
                 "byte_range_present": bool(signature.sig_object.get("/ByteRange")),
@@ -1299,6 +1317,9 @@ def _snapshot_output_verification(output_file: Path) -> dict[str, Any] | None:
         return {
             "cryptographic_validation_passed": False,
             "signature_count": None,
+            "docmdp_permission": None,
+            "certification_restricted": False,
+            "restriction_reason": None,
             "error": str(exc),
         }
 
@@ -1373,6 +1394,36 @@ def _status_has_timestamp_for_snapshot(status: Any) -> bool:
         getattr(timestamp_validity, "intact", True)
         and getattr(timestamp_validity, "valid", True)
     )
+
+
+def _status_timestamp_cryptographically_valid_for_snapshot(status: Any) -> bool | None:
+    timestamp_validity = getattr(status, "timestamp_validity", None)
+    if timestamp_validity is None:
+        return None
+    return bool(
+        getattr(timestamp_validity, "intact", True)
+        and getattr(timestamp_validity, "valid", True)
+    )
+
+
+def _status_timestamp_trusted_for_snapshot(status: Any) -> bool | None:
+    timestamp_validity = getattr(status, "timestamp_validity", None)
+    if timestamp_validity is None:
+        return None
+    return bool(getattr(timestamp_validity, "trusted", False))
+
+
+def _describe_timestamp_trust_for_snapshot(status: Any) -> str | None:
+    timestamp_validity = getattr(status, "timestamp_validity", None)
+    if timestamp_validity is None:
+        return None
+    describe_timestamp_trust = getattr(timestamp_validity, "describe_timestamp_trust", None)
+    if not callable(describe_timestamp_trust):
+        return None
+    try:
+        return describe_timestamp_trust()
+    except Exception:
+        return None
 
 
 def _snapshot_signed_output_render(
@@ -1624,6 +1675,7 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
         raise FileNotFoundError(f"Scenario manifest does not exist: {path}")
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     acceptance_expectations: dict[str, Any] | None = None
+    timestamping_mode: str | None = None
     if isinstance(payload, list):
         scenarios = payload
     elif isinstance(payload, dict):
@@ -1633,6 +1685,11 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
             if not isinstance(raw_expectations, dict):
                 raise ValueError("'acceptance_expectations' must be a JSON object.")
             acceptance_expectations = raw_expectations
+        raw_timestamping_mode = payload.get("timestamping_mode")
+        if raw_timestamping_mode is not None:
+            if raw_timestamping_mode not in {"real", "dummy"}:
+                raise ValueError("'timestamping_mode' must be one of 'real' or 'dummy'.")
+            timestamping_mode = raw_timestamping_mode
     else:
         raise ValueError("Scenario manifest must be a JSON object or array.")
     if not isinstance(scenarios, list) or not scenarios:
@@ -1652,10 +1709,18 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
             raise ValueError(
                 f"Scenario '{name}' has unsupported expected_outcome: {expected_outcome!r}"
             )
+        timestamp_required = scenario.get("timestamp_required")
+        if timestamp_required is not None and not isinstance(timestamp_required, bool):
+            raise ValueError(
+                f"Scenario '{name}' has unsupported timestamp_required: "
+                f"{timestamp_required!r}"
+            )
         validated.append(scenario)
     manifest: dict[str, Any] = {"scenarios": validated}
     if acceptance_expectations is not None:
         manifest["acceptance_expectations"] = acceptance_expectations
+    if timestamping_mode is not None:
+        manifest["timestamping_mode"] = timestamping_mode
     for key in ("fixture_profile", "fixture_role"):
         if isinstance(payload, dict) and key in payload:
             manifest[key] = payload[key]
@@ -1698,6 +1763,120 @@ def _execute_preview_matrix_scenario(
     }
 
 
+def _execute_headless_preview_matrix_scenario(
+    *,
+    source_path: Path,
+    certificate_path: str,
+    passphrase: str,
+    scenario: dict[str, Any],
+    profile_store: SignaturePresetCatalogStore,
+    artifacts_dir: Path,
+) -> dict[str, Any]:
+    workflow = _build_headless_preview_matrix_workflow(
+        source_path=source_path,
+        certificate_path=certificate_path,
+        passphrase=passphrase,
+    )
+    _apply_preview_matrix_scenario_to_workflow(
+        workflow=workflow,
+        scenario=scenario,
+        profile_store=profile_store,
+    )
+    preview = workflow.preview()
+    preview_text = _headless_preview_text(preview)
+    validation_text = _headless_validation_text(preview)
+    request = _snapshot_current_draft_request(workflow)
+    artifact_basename = _scenario_slug(str(scenario["name"]))
+    render_capture = _capture_headless_preview_render(
+        preview=preview,
+        artifacts_dir=str(artifacts_dir),
+        artifact_basename=artifact_basename,
+    )
+    return {
+        "name": scenario["name"],
+        "profile_name": scenario.get("profile_name"),
+        "preview_snapshot": _snapshot_preview(preview, render_capture=render_capture),
+        "preview_text": preview_text,
+        "validation_text": validation_text,
+        "sign_request_snapshot": _snapshot_signing_request(request),
+        "backend_reservation_snapshot": (
+            _snapshot_backend_reservation(request) if request is not None else None
+        ),
+    }
+
+
+def _build_headless_preview_matrix_workflow(
+    *,
+    source_path: Path,
+    certificate_path: str,
+    passphrase: str,
+) -> SigningDraftWorkflow:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(source_path),
+        output_pdf_path=str(source_path.with_name(source_path.stem + "-signed.pdf")),
+        certificate_path=certificate_path,
+        passphrase=passphrase,
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+    )
+    if workflow.signature_appearance is None:
+        workflow.set_signature_appearance(SignatureAppearance())
+    return workflow
+
+
+def _apply_preview_matrix_scenario_to_workflow(
+    *,
+    workflow: SigningDraftWorkflow,
+    scenario: dict[str, Any],
+    profile_store: SignaturePresetCatalogStore,
+) -> None:
+    catalog = profile_store.load_catalog()
+    profile_name = scenario.get("profile_name")
+    if profile_name is not None:
+        if not isinstance(profile_name, str) or not profile_name.strip():
+            raise ValueError("Scenario 'profile_name' must be a non-empty string.")
+        preset = catalog.profile_named(profile_name)
+        base_appearance = preset.appearance
+    else:
+        base_appearance = workflow.current_signature_appearance or SignatureAppearance()
+    appearance = _apply_appearance_overrides(
+        base_appearance,
+        scenario.get("appearance_overrides"),
+    )
+    workflow.set_signature_appearance(appearance)
+    if "timestamp_required" in scenario:
+        workflow.timestamp_required = bool(scenario["timestamp_required"])
+    signature_rect_payload = scenario.get("signature_rect")
+    if signature_rect_payload is not None:
+        workflow.set_signature_rect(_signature_rect_from_payload(signature_rect_payload))
+
+
+def _headless_preview_text(preview: Any) -> str:
+    title_text = (preview.signer_label_prefix or preview.title or "").strip()
+    detail_text = (getattr(preview, "detail_text", "") or "").strip()
+    if title_text and detail_text:
+        return f"{title_text}\n{detail_text}"
+    if title_text:
+        return title_text
+    if detail_text:
+        return detail_text
+    return "No visible fields selected"
+
+
+def _headless_validation_text(preview: Any) -> str:
+    issues = getattr(preview, "issues", ())
+    blocking = [issue.message for issue in issues if issue.severity.value == "error"]
+    warnings = [issue.message for issue in issues if issue.severity.value == "warning"]
+    lines: list[str] = []
+    if blocking:
+        lines.extend(blocking)
+    elif warnings:
+        lines.extend(warnings)
+    else:
+        return "Ready to sign."
+    return "\n".join(lines)
+
+
 def _execute_signed_acceptance_scenario(
     *,
     shell: Any,
@@ -1707,6 +1886,7 @@ def _execute_signed_acceptance_scenario(
     base_input_path: Path,
     certificate_path: str,
     passphrase: str,
+    sign_executor: Any,
 ) -> dict[str, Any]:
     _apply_preview_matrix_scenario(
         shell=shell,
@@ -1743,7 +1923,7 @@ def _execute_signed_acceptance_scenario(
             certificate_path=certificate_path,
             passphrase=passphrase,
         )
-        signing_result = build_phase3_signing_executor().execute(scenario_request)
+        signing_result = sign_executor.execute(scenario_request)
         signing_result_payload = {
             "success": signing_result.success,
             "failure_code": (
@@ -1755,13 +1935,32 @@ def _execute_signed_acceptance_scenario(
             "output_pdf_version": signing_result.output_pdf_version,
             "signature_subfilter": signing_result.signature_subfilter,
             "timestamp_present": signing_result.timestamp_present,
+            "timestamp_cryptographically_valid": signing_result.timestamp_cryptographically_valid,
+            "tsa_chain_trusted": signing_result.tsa_chain_trusted,
+            "timestamp_validation_error": signing_result.timestamp_validation_error,
+            "docmdp_permission": signing_result.docmdp_permission,
+            "certification_restricted": signing_result.certification_restricted,
+            "restriction_reason": signing_result.restriction_reason,
+            "operation_type": (
+                signing_result.operation_type.value
+                if getattr(signing_result, "operation_type", None) is not None
+                else None
+            ),
+            "revision_strategy": (
+                signing_result.revision_strategy.value
+                if getattr(signing_result, "revision_strategy", None) is not None
+                else None
+            ),
             "standards_summary": signing_result.standards_summary,
         }
         if signing_result.success:
             output_file_exists = scenario_output.exists()
             output_signature_count = _count_embedded_signatures(scenario_output)
             output_signature_snapshot = _snapshot_output_signature(scenario_output)
-            output_verification_snapshot = _snapshot_output_verification(scenario_output)
+            output_verification_snapshot = _snapshot_output_verification(
+                scenario_output,
+                trust_policy=scenario_request.trust_policy,
+            )
             output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(
                 scenario_output
             )
@@ -2057,6 +2256,10 @@ def _apply_preview_matrix_scenario(
         scenario.get("appearance_overrides"),
     )
     shell.properties_panel.set_signature_appearance(appearance)
+    if "timestamp_required" in scenario:
+        shell.properties_panel._workflow.timestamp_required = bool(
+            scenario["timestamp_required"]
+        )
     signature_rect_payload = scenario.get("signature_rect")
     if signature_rect_payload is not None:
         signature_rect = _signature_rect_from_payload(signature_rect_payload)
@@ -2407,6 +2610,156 @@ def _capture_preview_render(
     }
 
 
+def _capture_headless_preview_render(
+    *,
+    preview: Any,
+    artifacts_dir: str | None,
+    artifact_basename: str,
+) -> dict[str, Any]:
+    canonical_snapshot = render_canonical_signature_preview(preview)
+    image_path = None
+    image_error = None
+    target_dir = None
+    if artifacts_dir is not None:
+        target_dir = Path(artifacts_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        image_path = str(target_dir / f"{artifact_basename}.png")
+        if canonical_snapshot is not None:
+            shutil.copyfile(canonical_snapshot.image_path, image_path)
+        else:
+            image_error = "Canonical preview render is unavailable for this scenario."
+
+    card_bounds = None
+    text_widget_bounds = None
+    stamp_band_bounds = None
+    text_rendered_content_bounds = None
+    stamp_content_bounds = None
+    stamp_pixmap_bounds = None
+    stamp_pixmap_size = None
+    if canonical_snapshot is not None:
+        card_bounds = {
+            "x": 0,
+            "y": 0,
+            "width": canonical_snapshot.width_px,
+            "height": canonical_snapshot.height_px,
+        }
+        text_widget_bounds = canonical_snapshot.text_area_bounds_px
+        stamp_band_bounds = canonical_snapshot.stamp_area_bounds_px
+        text_rendered_content_bounds = canonical_snapshot.text_bounds_px
+        stamp_content_bounds = canonical_snapshot.stamp_bounds_px
+        stamp_pixmap_bounds = canonical_snapshot.stamp_bounds_px
+        if canonical_snapshot.stamp_bounds_px is not None:
+            stamp_pixmap_size = {
+                "width": canonical_snapshot.stamp_bounds_px["width"],
+                "height": canonical_snapshot.stamp_bounds_px["height"],
+            }
+
+    stamp_source_analysis = _analyze_stamp_source_image(preview.image_stamp_path)
+    stamp_diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds=stamp_band_bounds,
+        stamp_pixmap_bounds=stamp_pixmap_bounds,
+        stamp_content_bounds=stamp_content_bounds,
+    )
+    text_diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds=card_bounds,
+        text_widget_bounds=text_widget_bounds,
+        text_content_bounds=text_rendered_content_bounds,
+        reference_text_content_bounds=text_rendered_content_bounds,
+        stamp_band_bounds=stamp_band_bounds,
+        stamp_content_bounds=stamp_content_bounds,
+    )
+    band_distances = _preview_edge_distances(
+        preview=preview,
+        card_bounds=card_bounds,
+        body_bounds=card_bounds,
+        detail_bounds=text_widget_bounds,
+        stamp_bounds=stamp_band_bounds,
+    )
+    stamp_debug_image_path = None
+    stamp_debug_image_error = None
+    text_debug_image_path = None
+    text_debug_image_error = None
+    if (
+        image_path is not None
+        and image_error is None
+        and stamp_band_bounds is not None
+        and stamp_pixmap_bounds is not None
+    ):
+        stamp_debug_image_path = str(target_dir / f"{artifact_basename}_stamp_debug.png")
+        stamp_debug_image_error = _write_stamp_debug_overlay(
+            preview_image_path=image_path,
+            output_path=stamp_debug_image_path,
+            stamp_band_bounds=stamp_band_bounds,
+            stamp_pixmap_bounds=stamp_pixmap_bounds,
+            stamp_content_bounds=stamp_content_bounds,
+            crop_padding=max(6, _preview_padding_for_capture(preview)),
+        )
+    if image_path is not None and image_error is None and text_widget_bounds is not None:
+        text_debug_image_path = str(target_dir / f"{artifact_basename}_text_debug.png")
+        text_debug_image_error = _write_text_debug_overlay(
+            preview_image_path=image_path,
+            output_path=text_debug_image_path,
+            text_widget_bounds=text_widget_bounds,
+            text_content_bounds=text_rendered_content_bounds,
+            stamp_band_bounds=stamp_band_bounds,
+            crop_padding=max(6, _preview_padding_for_capture(preview)),
+        )
+    text_widget_image_sha256 = _image_crop_sha256(
+        preview_image_path=image_path,
+        crop_bounds=text_widget_bounds,
+    )
+    font_diagnostics = _headless_text_font_diagnostics(preview)
+    _cleanup_canonical_preview_tempdir(canonical_snapshot)
+    return {
+        "preview_image_path": image_path,
+        "preview_image_error": image_error,
+        "card_bounds_px": card_bounds,
+        "text_widget_bounds_px": text_widget_bounds,
+        "single_body_bounds_px": card_bounds,
+        "multi_body_bounds_px": card_bounds,
+        "detail_label_bounds_px": text_widget_bounds,
+        "stamp_label_bounds_px": stamp_band_bounds,
+        "multi_detail_bounds_px": text_widget_bounds,
+        "multi_stamp_bounds_px": stamp_band_bounds,
+        "detail_text_size_hint_px": None,
+        "stamp_pixmap_size_px": stamp_pixmap_size,
+        "layout_spacing_px": 0,
+        "preview_padding_px": _preview_padding_for_capture(preview),
+        "edge_distances_px": band_distances,
+        "text_debug_image_path": text_debug_image_path,
+        "text_debug_image_error": text_debug_image_error,
+        "text_widget_image_sha256": text_widget_image_sha256,
+        "text_rendered_content_bounds_px": text_rendered_content_bounds,
+        "text_content_detection_error": None,
+        "text_reference_content_bounds_px": text_rendered_content_bounds,
+        "text_reference_detection_error": None,
+        **font_diagnostics,
+        "stamp_debug_image_path": stamp_debug_image_path,
+        "stamp_debug_image_error": stamp_debug_image_error,
+        "stamp_band_bounds_px": stamp_band_bounds,
+        "stamp_alignment": None,
+        "stamp_rendered_pixmap_bounds_px": stamp_pixmap_bounds,
+        "stamp_rendered_content_bounds_px": stamp_content_bounds,
+        **stamp_source_analysis,
+        **text_diagnostics,
+        **stamp_diagnostics,
+    }
+
+
+def _cleanup_canonical_preview_tempdir(
+    snapshot: Any,
+) -> None:
+    if snapshot is None:
+        return
+    image_path = Path(snapshot.image_path)
+    temp_dir = image_path.parent
+    if not temp_dir.name.startswith("foliaseal-canonical-preview-"):
+        return
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 def _preview_padding_for_capture(preview: Any) -> int:
     if (
         preview.signature_rect is not None
@@ -2449,7 +2802,8 @@ def _write_stamp_debug_overlay(
     crop_padding: int,
 ) -> str | None:
     try:
-        preview_image = Image.open(preview_image_path).convert("RGBA")
+        with Image.open(preview_image_path) as image:
+            preview_image = image.convert("RGBA")
     except OSError as exc:
         return f"Failed to open preview image for stamp debug overlay: {exc}"
 
@@ -2491,7 +2845,8 @@ def _write_text_debug_overlay(
     crop_padding: int,
 ) -> str | None:
     try:
-        preview_image = Image.open(preview_image_path).convert("RGBA")
+        with Image.open(preview_image_path) as image:
+            preview_image = image.convert("RGBA")
     except OSError as exc:
         return f"Failed to open preview image for text debug overlay: {exc}"
 
@@ -2798,7 +3153,8 @@ def _detect_text_content_bounds_in_preview(
     reference_text_content_bounds: dict[str, int] | None = None,
 ) -> tuple[dict[str, int] | None, str | None]:
     try:
-        preview_image = Image.open(preview_image_path).convert("RGBA")
+        with Image.open(preview_image_path) as image:
+            preview_image = image.convert("RGBA")
     except OSError as exc:
         return None, f"Failed to open preview image for text analysis: {exc}"
 
@@ -3310,6 +3666,29 @@ def _text_font_diagnostics(
     }
 
 
+def _headless_text_font_diagnostics(
+    preview: Any,
+) -> dict[str, Any]:
+    requested_family = None
+    requested_size = None
+    text_style = getattr(preview, "text_style", None)
+    if text_style is not None:
+        requested_family = getattr(text_style, "font_family", None)
+        requested_size = getattr(text_style, "font_size_pt", None)
+    requested_category = _font_family_category(str(requested_family or ""))
+    direct_mapping_supported = preview_font_family_supported(str(requested_family or ""))
+    return {
+        "requested_text_font_family": requested_family,
+        "requested_text_font_size_pt": requested_size,
+        "effective_text_font_family": requested_family,
+        "effective_text_font_point_size_pt": requested_size,
+        "requested_text_font_category": requested_category,
+        "effective_text_font_category": requested_category,
+        "font_family_direct_preview_mapping_supported": direct_mapping_supported,
+        "font_family_category_mismatch": False if requested_category else None,
+    }
+
+
 def _font_family_category(font_family: str) -> str | None:
     normalized = font_family.strip().lower()
     if not normalized:
@@ -3375,7 +3754,8 @@ def _image_crop_sha256(
     if preview_image_path is None or crop_bounds is None:
         return None
     try:
-        preview_image = Image.open(preview_image_path).convert("RGBA")
+        with Image.open(preview_image_path) as image:
+            preview_image = image.convert("RGBA")
     except OSError:
         return None
     crop_left = max(0, crop_bounds["x"])
@@ -3408,8 +3788,10 @@ def _image_crop_change_ratio(
     ):
         return None
     try:
-        previous_image = Image.open(previous_image_path).convert("RGBA")
-        current_image = Image.open(current_image_path).convert("RGBA")
+        with Image.open(previous_image_path) as image:
+            previous_image = image.convert("RGBA")
+        with Image.open(current_image_path) as image:
+            current_image = image.convert("RGBA")
     except OSError:
         return None
     previous_crop = previous_image.crop(
@@ -3454,8 +3836,10 @@ def _normalized_image_crop_change_ratio(
     ):
         return None
     try:
-        previous_image = Image.open(previous_image_path).convert("RGBA")
-        current_image = Image.open(current_image_path).convert("RGBA")
+        with Image.open(previous_image_path) as image:
+            previous_image = image.convert("RGBA")
+        with Image.open(current_image_path) as image:
+            current_image = image.convert("RGBA")
     except OSError:
         return None
 
@@ -3532,8 +3916,10 @@ def _write_side_by_side_comparison(
             "evidence is missing."
         )
     try:
-        preview_image = Image.open(preview_image_path).convert("RGBA")
-        signed_image = Image.open(signed_image_path).convert("RGBA")
+        with Image.open(preview_image_path) as image:
+            preview_image = image.convert("RGBA")
+        with Image.open(signed_image_path) as image:
+            signed_image = image.convert("RGBA")
     except OSError as exc:
         return f"Failed to open images for comparison overlay: {exc}"
 
@@ -4056,6 +4442,18 @@ def _snapshot_text_value(snapshot: dict[str, Any] | None, key: str) -> str:
     return str(value)
 
 
+def _snapshot_timestamp_trust_policy(
+    trust_policy: TimestampTrustPolicy | None,
+) -> dict[str, Any] | None:
+    if trust_policy is None:
+        return None
+    return {
+        "use_system_store": trust_policy.use_system_store,
+        "extra_ca_bundle_path": trust_policy.extra_ca_bundle_path,
+        "revocation_mode": trust_policy.revocation_mode,
+    }
+
+
 def _snapshot_signing_request(request: SigningRequest | None) -> dict[str, Any] | None:
     if request is None:
         return None
@@ -4067,6 +4465,7 @@ def _snapshot_signing_request(request: SigningRequest | None) -> dict[str, Any] 
         "certificate_alias": request.certificate_alias,
         "timestamp_required": request.timestamp_required,
         "tsa_url": request.tsa_url,
+        "trust_policy": _snapshot_timestamp_trust_policy(request.trust_policy),
         "signature_rect": _snapshot_signature_rect(request.signature_rect),
         "signature_appearance": (
             None if appearance is None else _snapshot_signing_appearance(appearance)
@@ -4086,6 +4485,7 @@ def _snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRe
         passphrase=workflow.passphrase,
         tsa_url=workflow.tsa_url,
         timestamp_required=workflow.timestamp_required,
+        trust_policy=workflow.trust_policy,
         certificate_alias=workflow.certificate_alias,
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,

@@ -4,11 +4,13 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
+from asn1crypto import keys as asn1_keys
+from asn1crypto import x509 as asn1_x509
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from PIL import Image
 from pyhanko.pdf_utils import generic
 from pyhanko.pdf_utils.font.opentype import GlyphAccumulatorFactory
@@ -16,10 +18,14 @@ from pyhanko.pdf_utils.layout import AxisAlignment, InnerScaling
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from pyhanko.sign import validation
+from pyhanko.sign.timestamps.dummy_client import DummyTimeStamper
 from pyhanko_certvalidator import ValidationContext
+from pyhanko_certvalidator.registry import SimpleCertificateStore
 
 from foliaseal.application.phase3_signing_backend import (
     PyHankoCertificateLoader,
+    PyHankoPdfInspector,
+    PyHankoPdfSigner,
     PyHankoSignatureVerifier,
     _background_layout_for_stamp,
     _build_stamp_style,
@@ -37,7 +43,7 @@ from foliaseal.application.phase3_signing_backend import (
     _visible_signature_fit_issues_for_stamp_text,
     build_phase3_signing_executor,
 )
-from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance, SignPdfUseCase
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -46,6 +52,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
+    TimestampTrustPolicy,
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
@@ -107,6 +114,108 @@ def _write_test_pkcs12(
 def _write_test_stamp_image(path: Path) -> None:
     image = Image.new("RGB", (96, 48), color=(215, 235, 255))
     image.save(path, format="PNG")
+
+
+def _build_dummy_timestamper() -> DummyTimeStamper:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, "FoliaSeal TSA"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "FoliaSeal"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    tsa_cert = asn1_x509.Certificate.load(cert.public_bytes(serialization.Encoding.DER))
+    tsa_key = asn1_keys.PrivateKeyInfo.load(
+        key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    return DummyTimeStamper(
+        tsa_cert=tsa_cert,
+        tsa_key=tsa_key,
+        fixed_dt=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+
+
+def _build_ca_signed_dummy_timestamper(
+    *,
+    root_common_name: str = "FoliaSeal TSA Root",
+    tsa_common_name: str = "FoliaSeal TSA",
+) -> tuple[DummyTimeStamper, x509.Certificate]:
+    root_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    root_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, root_common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "FoliaSeal"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
+    root_cert = (
+        x509.CertificateBuilder()
+        .subject_name(root_subject)
+        .issuer_name(root_subject)
+        .public_key(root_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(root_key, hashes.SHA256())
+    )
+    tsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    tsa_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, tsa_common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "FoliaSeal"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
+    tsa_cert = (
+        x509.CertificateBuilder()
+        .subject_name(tsa_subject)
+        .issuer_name(root_subject)
+        .public_key(tsa_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.TIME_STAMPING]),
+            critical=False,
+        )
+        .sign(root_key, hashes.SHA256())
+    )
+    tsa_cert_asn1 = asn1_x509.Certificate.load(tsa_cert.public_bytes(serialization.Encoding.DER))
+    tsa_key_asn1 = asn1_keys.PrivateKeyInfo.load(
+        tsa_key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    root_cert_asn1 = asn1_x509.Certificate.load(root_cert.public_bytes(serialization.Encoding.DER))
+    return (
+        DummyTimeStamper(
+            tsa_cert=tsa_cert_asn1,
+            tsa_key=tsa_key_asn1,
+            certs_to_embed=SimpleCertificateStore.from_certs([root_cert_asn1]),
+            fixed_dt=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+        root_cert,
+    )
 
 
 def _signature_appearance_stream_text(pdf_path: Path) -> str:
@@ -231,6 +340,111 @@ def test_phase3_signing_executor_produces_visible_signature_without_image_stamp(
     assert appearance_text.strip()
 
 
+def test_phase3_signing_executor_adds_timestamp_when_required_with_tsa(
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=True,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=620.0,
+            height_pt=180.0,
+        ),
+        signature_appearance=build_signature_appearance(
+            image_stamp_path=None,
+            show_field_names=True,
+            signer_label_prefix="",
+        ),
+    )
+
+    signer = PyHankoPdfSigner(timestamper_factory=lambda _request: _build_dummy_timestamper())
+    use_case = SignPdfUseCase(
+        inspector=PyHankoPdfInspector(),
+        certificate_loader=PyHankoCertificateLoader(),
+        signer=signer,
+        verifier=PyHankoSignatureVerifier(),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert result.failure_code is None
+    assert output_pdf.exists()
+    assert result.timestamp_present is True
+    assert signer is not None
+    with output_pdf.open("rb") as handle:
+        reader = PdfFileReader(handle)
+        embedded_signatures = list(reader.embedded_signatures)
+        assert len(embedded_signatures) == 1
+        status = validation.validate_pdf_signature(
+            embedded_signatures[0],
+            signer_validation_context=ValidationContext(
+                trust_roots=[embedded_signatures[0].signer_cert]
+            ),
+        )
+        assert getattr(status, "timestamp_validity", None) is not None
+
+
+def test_phase3_signing_executor_reports_trusted_timestamp_when_anchors_are_configured(
+    tmp_path: Path,
+) -> None:
+    _write_test_pdf(tmp_path / "input.pdf")
+    _write_test_pkcs12(tmp_path / "cert.p12", passphrase="secret")
+    timestamper, root_cert = _build_ca_signed_dummy_timestamper()
+    root_bundle = tmp_path / "tsa-root.pem"
+    root_bundle.write_bytes(root_cert.public_bytes(serialization.Encoding.PEM))
+
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=True,
+        trust_policy=TimestampTrustPolicy(
+            use_system_store=False,
+            extra_ca_bundle_path=str(root_bundle),
+            revocation_mode="soft-fail",
+        ),
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=620.0,
+            height_pt=180.0,
+        ),
+        signature_appearance=build_signature_appearance(
+            image_stamp_path=None,
+            show_field_names=True,
+            signer_label_prefix="",
+        ),
+    )
+
+    use_case = SignPdfUseCase(
+        inspector=PyHankoPdfInspector(),
+        certificate_loader=PyHankoCertificateLoader(),
+        signer=PyHankoPdfSigner(timestamper_factory=lambda _request: timestamper),
+        verifier=PyHankoSignatureVerifier(),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert result.timestamp_present is True
+    assert result.timestamp_cryptographically_valid is True
+    assert result.tsa_chain_trusted is True
+    assert result.timestamp_validation_error is None
+
+
 def test_single_line_stamp_content_inset_is_orientation_aware() -> None:
     assert (
         _single_line_stamp_content_inset(
@@ -295,6 +509,154 @@ def test_single_line_vertical_stamp_border_gap_tracks_border_visibility() -> Non
         == 2
     )
     assert _single_line_vertical_stamp_border_gap(box_style=None) == 0
+
+
+def test_background_layout_for_top_multi_line_stamp_adds_border_facing_inset(
+) -> None:
+    stamp_path = Path("/tmp/test-top-stamp-inset.png")
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+    signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=46.0)
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=24,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=40 / 12,
+    )
+
+    background_layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=24,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    assert background_layout.margins.top > reservation.background_layout.margins.top
+
+
+def test_background_layout_for_bottom_wrapped_block_stamp_adds_border_facing_inset(
+) -> None:
+    stamp_path = Path("/tmp/test-bottom-stamp-inset.png")
+    Image.new("RGBA", (12, 40), color=(0, 0, 0, 255)).save(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+    signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=54.0)
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=24,
+        box_style=box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=12 / 40,
+    )
+
+    background_layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=24,
+        box_style=box_style,
+    )
+
+    assert background_layout.margins.bottom > reservation.background_layout.margins.bottom
+
+
+def test_background_layout_for_right_wrapped_block_stamp_adds_border_facing_inset(
+) -> None:
+    stamp_path = Path("/tmp/test-right-stamp-inset.png")
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+    signature_rect = build_signature_rect(page_index=0, width_pt=220.0, height_pt=62.0)
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.RIGHT,
+        signature_rect=signature_rect,
+        text_box_width=120,
+        text_box_height=36,
+        box_style=box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=40 / 12,
+    )
+
+    background_layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.RIGHT,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=120,
+        text_box_height=36,
+        box_style=box_style,
+    )
+
+    assert background_layout.margins.right > reservation.background_layout.margins.right
+
+
+def test_background_layout_for_left_wrapped_block_stamp_adds_border_facing_inset(
+) -> None:
+    stamp_path = Path("/tmp/test-left-stamp-inset.png")
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+    signature_rect = build_signature_rect(page_index=0, width_pt=220.0, height_pt=62.0)
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.LEFT,
+        signature_rect=signature_rect,
+        text_box_width=120,
+        text_box_height=36,
+        box_style=box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=40 / 12,
+    )
+
+    background_layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.LEFT,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=120,
+        text_box_height=36,
+        box_style=box_style,
+    )
+
+    assert background_layout.margins.left > reservation.background_layout.margins.left
 
 
 def test_single_line_horizontal_text_reservation_width_is_strict_for_left_right() -> None:
@@ -614,7 +976,22 @@ def test_phase3_signing_executor_fails_honestly_when_timestamp_is_required(
 ) -> None:
     _write_test_pdf(tmp_path / "input.pdf")
     _write_test_pkcs12(tmp_path / "cert.p12", passphrase="secret")
-    request = build_signing_request(tmp_path, passphrase="secret", timestamp_required=True)
+    request = build_signing_request(
+        tmp_path,
+        passphrase="secret",
+        tsa_url="not-a-valid-tsa-url",
+        timestamp_required=True,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=620.0,
+            height_pt=180.0,
+        ),
+        signature_appearance=build_signature_appearance(
+            image_stamp_path=None,
+            show_field_names=True,
+            signer_label_prefix="",
+        ),
+    )
 
     executor = build_phase3_signing_executor()
     result = executor.execute(request)

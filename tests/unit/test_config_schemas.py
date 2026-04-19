@@ -1,6 +1,6 @@
 import pytest
 
-from foliaseal.domain.models import SignatureStampPosition
+from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.schemas import (
     ConfigValidationError,
     SignaturePreset,
@@ -27,6 +27,23 @@ def test_trust_profile_round_trip() -> None:
     reconstructed = TrustProfile.from_dict(payload)
 
     assert reconstructed == original
+
+
+def test_trust_profile_converts_to_timestamp_trust_policy() -> None:
+    original = TrustProfile(
+        schema_version=1,
+        use_system_store=False,
+        extra_ca_bundle_path="/tmp/custom-ca.pem",
+        revocation_mode="hard-fail",
+    )
+
+    converted = original.to_timestamp_trust_policy()
+
+    assert converted == TimestampTrustPolicy(
+        use_system_store=False,
+        extra_ca_bundle_path="/tmp/custom-ca.pem",
+        revocation_mode="hard-fail",
+    )
 
 
 def test_timestamp_policy_round_trip() -> None:

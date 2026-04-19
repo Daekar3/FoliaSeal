@@ -18,6 +18,7 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
+    TimestampTrustPolicy,
 )
 from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
 
@@ -202,6 +203,7 @@ def build_signing_request(
     passphrase: str = "secret",
     tsa_url: str = "https://tsa.example.com",
     timestamp_required: bool = True,
+    trust_policy: TimestampTrustPolicy | None = None,
     certificate_alias: str | None = "signing-cert",
     signature_rect: SignatureRect | None = None,
     signature_appearance: SignatureAppearance | None = None,
@@ -214,6 +216,7 @@ def build_signing_request(
         passphrase=passphrase,
         tsa_url=tsa_url,
         timestamp_required=timestamp_required,
+        trust_policy=trust_policy,
         certificate_alias=certificate_alias,
         signature_rect=signature_rect or build_signature_rect(),
         signature_appearance=signature_appearance or build_signature_appearance(),

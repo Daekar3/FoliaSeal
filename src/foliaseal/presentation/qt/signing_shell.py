@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import importlib
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
+from pathlib import Path
 from typing import Any, Protocol
 
 from foliaseal.application import (
@@ -49,6 +51,7 @@ from foliaseal.domain.models import (
 )
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
+from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
 SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
@@ -1088,6 +1091,7 @@ class SignaturePropertiesPanel:
         self._suspend_updates = False
         self._placement_initialized = workflow.signature_rect is not None
         self._control_issue: SigningDraftValidationIssue | None = None
+        self._canonical_preview_render_backend = QtPdfRenderBackend()
         self.widget = bindings.q_widget()
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
@@ -2298,9 +2302,14 @@ class SignaturePropertiesPanel:
             snapshot = render_canonical_signature_preview(
                 preview,
                 zoom=max(1.0, preview_scale),
+                render_backend=self._canonical_preview_render_backend,
+                include_border=False,
             )
         except ValueError:
             snapshot = None
+        self._cleanup_canonical_preview_snapshot(
+            getattr(self._preview_controls.card_container, "_canonical_preview_snapshot", None)
+        )
         self._preview_controls.card_container._canonical_preview_snapshot = snapshot
         if snapshot is None:
             _set_widget_visible(self._preview_controls.single_render_label, False)
@@ -2338,6 +2347,18 @@ class SignaturePropertiesPanel:
                 self._preview_controls.multi_body_container,
                 self._preview_controls.multi_render_label,
             )
+
+    def _cleanup_canonical_preview_snapshot(
+        self,
+        snapshot: CanonicalSignaturePreviewSnapshot | None,
+    ) -> None:
+        if snapshot is None:
+            return
+        image_path = Path(snapshot.image_path)
+        temp_dir = image_path.parent
+        if not temp_dir.name.startswith("foliaseal-canonical-preview-"):
+            return
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     def _load_canonical_preview_pixmap(
         self,

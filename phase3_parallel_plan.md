@@ -59,6 +59,17 @@ Validated so far:
   - preview matrices prove layout geometry and content-density behavior,
   - signed-output evidence is the end-to-end proof layer that must verify the actual signed PDF
     against the reviewed preview
+- preview-matrix execution is now headless and canonical for batch runs:
+  - the matrix runner uses the canonical preview renderer directly instead of constructing the Qt
+    signing shell per scenario
+  - interactive manual harness review remains Qt-shell-based
+  - long preview sweeps should therefore be judged from the headless matrix artifacts, not from the
+    retired shell-batch path
+- current latest headless-matrix interpretation:
+  - all signable text-clipping, signable text/stamp-overlap, signable stamp-warning, and signable
+    stamp edge-touch counts are `0` across the six checked-in preview matrices
+  - the headless preview rebaseline is complete for the current matrix set
+  - any future preview finding should be treated as a new layout-policy or runner defect on its own
 - harness evidence is now stricter: saved manual captures with `summary_json_path` are expected to
   preserve preview render artifacts and diagnostics; missing preview image paths are treated as an
   evidence-contract defect rather than a benign omission
@@ -84,14 +95,16 @@ Not yet achieved:
 - a final Acrobat-like signing workflow suitable for true `FR-3B` acceptance
 - a fully acceptance-ready appearance workflow and product-quality preview/signing flow
 - complete preview/output parity for all realistic rectangle/layout combinations
-- remediation of the new stress-matrix green-path regressions across `single_line`, `multi_line`,
-  and `wrapped_block`
+- no remaining checked-in stress-matrix green-path regressions in `single_line`, `multi_line`, or
+  `wrapped_block`
 - manual harness revalidation of the simplified `single_line` path with real user assets
 - trustworthy transparent-GIF stamp handling in final signed output
-- TSA-backed timestamping and timestamp-required signing flows
+- TSA-backed timestamping and timestamp-required signing flows in the concrete backend
+- trust-anchor validation and timestamp trust reporting for timestamped signatures
 - final end-to-end FR-3B acceptance against representative signed output
 - a documented certificate compatibility matrix and manual QA pass across supported PKCS#12
   variations
+- dedicated ExecPlans for trust hardening and certification hardening once timestamping is wired
 
 Interpretation:
 
@@ -99,7 +112,8 @@ Interpretation:
 - it is not the final Phase 3 GUI target
 - harness success should be treated as implementation progress, not final acceptance
 - the executor seam now has a concrete cryptographic backend
-- the remaining backend gap is honest TSA/timestamp support rather than basic PDF signing
+- the remaining backend gap is certification hardening and release-readiness, not basic PDF
+  signing, timestamp-required flow wiring, or trust hardening
 - certificate support should be treated as PKCS#12-scoped for v1 until a broader identity model is
   explicitly planned
 - the acceptance/governance gap is now much smaller because the harness can distinguish debugging

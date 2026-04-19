@@ -18,6 +18,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
+    TimestampTrustPolicy,
 )
 
 
@@ -300,6 +301,14 @@ class TrustProfile:
     def to_dict(self) -> dict[str, Any]:
         """Convert to a persisted mapping."""
         return asdict(self)
+
+    def to_timestamp_trust_policy(self) -> TimestampTrustPolicy:
+        """Convert to the runtime timestamp trust policy model."""
+        return TimestampTrustPolicy(
+            use_system_store=self.use_system_store,
+            extra_ca_bundle_path=self.extra_ca_bundle_path,
+            revocation_mode=self.revocation_mode,
+        )
 
 
 @dataclass(frozen=True)

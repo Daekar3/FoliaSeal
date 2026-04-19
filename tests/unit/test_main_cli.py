@@ -283,3 +283,57 @@ def test_main_phase2_viewer_harness_dispatches_to_qt_harness(
         "checklist_results_path": "artifacts/phase2_manual_qa_results.md",
         "checklist_template_path": "phase2_manual_qa_checklist.md",
     }
+
+
+def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    def fake_run_phase3_preview_matrix(
+        *,
+        pdf_path: str,
+        certificate_path: str,
+        passphrase: str,
+        scenario_manifest_path: str,
+        artifacts_dir: str,
+    ) -> dict[str, object]:
+        captured["pdf_path"] = pdf_path
+        captured["certificate_path"] = certificate_path
+        captured["passphrase"] = passphrase
+        captured["scenario_manifest_path"] = scenario_manifest_path
+        captured["artifacts_dir"] = artifacts_dir
+        return {
+            "artifacts_dir": artifacts_dir,
+            "scenario_count": 1,
+            "successful_scenario_count": 1,
+        }
+
+    monkeypatch.setattr(
+        "foliaseal.__main__.run_phase3_preview_matrix",
+        fake_run_phase3_preview_matrix,
+    )
+
+    __main__.main(
+        [
+            "phase3-signing-preview-matrix",
+            "--pdf-path",
+            "/tmp/sample.pdf",
+            "--certificate-path",
+            "/tmp/cert.p12",
+            "--passphrase",
+            "secret",
+            "--scenario-manifest-path",
+            "/tmp/manifest.json",
+            "--artifacts-dir",
+            "/tmp/artifacts",
+        ]
+    )
+
+    assert captured == {
+        "pdf_path": "/tmp/sample.pdf",
+        "certificate_path": "/tmp/cert.p12",
+        "passphrase": "secret",
+        "scenario_manifest_path": "/tmp/manifest.json",
+        "artifacts_dir": "/tmp/artifacts",
+    }

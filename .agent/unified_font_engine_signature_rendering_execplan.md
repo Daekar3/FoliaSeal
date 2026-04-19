@@ -173,8 +173,121 @@ Current status of that follow-on slice:
   the first rerun exposed and then helped fix a harness-integration bug where canonical full-image
   bounds were being fed back into clipping diagnostics as text/stamp-area bounds
 
+## Follow-on Slice: Canonical Preview Rebaseline and Runner Stability
+
+Implemented in the current slice:
+
+- fixed canonical preview bounds extraction so text-only and stamp-only bounds are derived from the
+  same full reservation layout instead of being recomputed from separate partial layouts
+- corrected canonical stamp-area reporting to use the reserved stamp band rather than the
+  content-centered background layout
+- added shell-side cleanup for replaced canonical preview snapshot directories
+- tightened hot image-open paths in the canonical renderer and Phase 3 harness to use bounded
+  `with Image.open(...)` lifetimes instead of leaving file-backed image handles to accumulate
+- added runner-level coverage that:
+  - verifies preview-matrix summaries are written for a small batch
+  - verifies long batches recycle shell/window lifecycles
+  - verifies repeated preview refreshes keep only the latest canonical snapshot
+  - verifies one canonical preview render backend instance is reused across repeated refreshes
+
+Observed outcome:
+
+- `multi_line` baseline canonical preview rerun is clean for signable clipping/overlap
+- targeted `multi_line` stress subsets around the previously suspected stop region are clean
+- full test suite remains green
+- the full `wrapped_block` stress canonical preview batch now completes and writes `summary.json`
+  cleanly on the current codebase
+- the earlier native abort does not reproduce on the current wrapped-block stress rerun
+
+Current classification:
+
+- the earlier large `multi_line/top` overlap/clipping cluster was a canonical-bounds integration
+  bug and is fixed
+- the wrapped-block stress matrix is now rebaselined cleanly on the current codebase
+- any future long-run preview-matrix abort should be treated as a fresh runner issue and isolated
+  with a new reproducible subset before changing layout policy
+
+Implication for the next slice:
+
+- stop trying to coax the existing Qt-shell-based preview matrix through the full stress run
+- either:
+  - move the preview matrix to a headless canonical-render path that bypasses the widget shell for
+    per-scenario preview artifact generation, or
+  - isolate and replace the remaining native component that is accumulating process-wide state
+- do not loosen diagnostics or change fit policy while addressing the runner crash
+
+## TSA / Timestamping Update
+
+Implemented in a later slice:
+
+- added a concrete TSA adapter seam in `src/foliaseal/infra/tsa/`
+- wired the signing backend to honor `timestamp_required=True` using a real timestamper path
+- kept optional no-TSA signing available as the dev/admin override path
+- added deterministic dummy-TSA support to the signed acceptance matrix so required timestamp
+  behavior can be exercised in CI without depending on a public TSA
+
+Current status:
+
+- timestamp-required signing is now an implemented backend capability, not a known gap
+- the next finish work is trust/certification hardening rather than basic timestamp wiring
+
+## TSA Trust Hardening Update
+
+- created a dedicated ExecPlan for the trust-hardening slice:
+  - `.agent/tsa_trust_hardening_execplan.md`
+- the trust-hardening slice now adds:
+  - explicit timestamp trust-policy inputs
+  - timestamp trust validation reporting separate from token presence
+  - stable failure mapping for missing trust material and untrusted TSA chains
+- dummy TSA runs remain CI/test-only evidence; they are not production trust proof
+
 Policy note:
 
 - the canonical preview path is still the correct direction because it removes Qt label layout from
   the preview truth source
 - no new fit tolerances or detector slack were introduced while wiring it in
+
+## Follow-on Slice: Headless Canonical Preview Matrix Runner
+
+Implemented in the current slice:
+
+- moved preview-matrix execution off the Qt signing shell and onto a headless canonical path in the
+  Phase 3 harness
+- each preview-matrix scenario now builds a fresh draft workflow, derives the preview directly, and
+  captures artifacts from canonical preview metadata rather than widget geometry
+- preserved the existing preview-matrix summary/artifact contract while eliminating the long-run
+  native aborts that were specific to the Qt-shell batch path
+
+Observed outcome:
+
+- all six preview matrices now complete successfully on the headless path
+- all signable text-clipping and signable text/stamp-overlap counts are `0`
+- signed acceptance remains green
+- remaining signable preview findings were reduced to narrow stamp edge-touch clusters rather than
+  text-fit disagreements
+
+## Follow-on Slice: Top-Stamp Border-Facing Inset
+
+Implemented in the current slice:
+
+- added a real border-facing inset for non-single-line `TOP` stamp layouts in the stamp background
+  layout path instead of changing detector thresholds
+- added focused regressions covering:
+  - backend reserved top inset for `multi_line/top`
+  - canonical preview top inset for `multi_line/top` and `wrapped_block/top`
+  - headless harness diagnostics for the previously failing sparse `multi_line/top` case
+
+Observed outcome:
+
+- `multi_line` baseline and stress preview matrices are now clean for signable stamp warnings and
+  signable stamp edge-touch
+- `wrapped_block` baseline preview matrix remains clean
+- `wrapped_block` stress preview matrix is now also clean on the headless path
+- signed acceptance remains green
+- the headless preview-matrix rebaseline is now complete for all six checked-in families
+
+Current classification:
+
+- the top-stamp policy goal is now satisfied without loosening diagnostics
+- there is no remaining signable preview cluster in the checked-in matrices
+- any future preview regression should be treated as a new layout-policy or runner defect on its own

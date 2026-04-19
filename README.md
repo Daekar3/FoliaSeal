@@ -90,9 +90,14 @@ Roadmap note:
   including:
   - preview/output parity and rectangle-aware preview,
   - TSA-backed timestamping,
-  - trust/certification hardening,
+  - trust hardening,
+  - certification hardening,
   - remaining profile portability work,
   - packaging and full release validation.
+- Trust hardening is tracked in
+  [.agent/tsa_trust_hardening_execplan.md](/home/daekar/SignPDF/Scratch/.agent/tsa_trust_hardening_execplan.md);
+  certification hardening is tracked in
+  [.agent/certification_hardening_execplan.md](/home/daekar/SignPDF/Scratch/.agent/certification_hardening_execplan.md).
 - The current visible-signature contract is text-first: honor the selected text size in points,
   reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
   fail honestly only when the chosen rectangle cannot support that result.
@@ -185,10 +190,12 @@ Run it against a representative PDF:
   --artifacts-dir artifacts/phase3_preview_debug
 ```
 
-The harness defaults to `timestamp_required=False` today, so it is suitable for real signed-PDF
-testing even before TSA-backed timestamping support lands. The certificate CLI arguments are meant
-for local development/manual QA; avoid using a production identity in shell history if that is a
-concern in your environment.
+The harness now supports timestamp-required signing in the concrete backend. For manual QA, use the
+dummy TSA-backed acceptance path in the signed matrix or configure a real TSA explicitly if you
+want to exercise a production endpoint. Trust-anchor validation is tracked separately in the
+`tsa_trust_hardening_execplan.md` ExecPlan; dummy TSA runs remain CI/test-only trust evidence. The
+certificate CLI arguments are meant for local development/manual QA; avoid using a production
+identity in shell history if that is a concern in your environment.
 
 Typography note for harness/manual QA:
 

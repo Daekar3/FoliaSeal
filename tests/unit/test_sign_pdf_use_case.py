@@ -1,7 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
+from pyhanko.pdf_utils import generic
+from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application.sign_pdf_use_case import (
     SigningBackendRequest,
@@ -11,15 +13,20 @@ from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
     FailureCode,
+    TimestampTrustMaterialError,
     TsaUnavailableError,
 )
 from foliaseal.domain.models import (
+    DocumentOperationType,
+    RevisionStrategy,
     SignatureFieldKey,
     SignatureStampPosition,
     SigningOutput,
     SigningRequest,
+    TimestampTrustPolicy,
     VerificationSummary,
 )
+from foliaseal.infra.certification import CertificationPolicyResult
 from tests.support.phase3_builders import (
     build_signature_appearance,
     build_signing_request,
@@ -57,9 +64,28 @@ class StubSigner:
 @dataclass
 class StubVerifier:
     summary: VerificationSummary
+    last_trust_policy: TimestampTrustPolicy | None = None
 
-    def verify(self, output_pdf_path: str) -> VerificationSummary:
+    def verify(
+        self,
+        output_pdf_path: str,
+        *,
+        trust_policy: TimestampTrustPolicy | None = None,
+    ) -> VerificationSummary:
+        self.last_trust_policy = trust_policy
         return self.summary
+
+
+@dataclass
+class StubCertificationInspector:
+    result: CertificationPolicyResult
+    called: bool = False
+    last_input_pdf_path: str | None = None
+
+    def inspect(self, input_pdf_path: str) -> CertificationPolicyResult:
+        self.called = True
+        self.last_input_pdf_path = input_pdf_path
+        return self.result
 
 
 @dataclass
@@ -70,8 +96,29 @@ class RaisingSigner:
         raise self.error
 
 
+@dataclass
+class RaisingVerifier:
+    error: Exception
+
+    def verify(
+        self,
+        output_pdf_path: str,
+        *,
+        trust_policy: TimestampTrustPolicy | None = None,
+    ) -> VerificationSummary:
+        raise self.error
+
+
 def _request(tmp_path: Path) -> SigningRequest:
     return build_signing_request(tmp_path)
+
+
+def _write_test_pdf(path: Path) -> None:
+    writer = PdfFileWriter()
+    empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
+    writer.insert_page(PageObject(contents=empty_stream, media_box=(0, 0, 612, 792)))
+    with path.open("wb") as handle:
+        writer.write(handle)
 
 
 def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
@@ -103,6 +150,10 @@ def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
     assert result.output_pdf_version == "1.7"
     assert result.signature_subfilter == "adbe.pkcs7.detached"
     assert result.timestamp_present is True
+    assert result.docmdp_permission is None
+    assert result.certification_restricted is False
+    assert result.operation_type == DocumentOperationType.SIGN
+    assert result.revision_strategy == RevisionStrategy.INCREMENTAL
     assert result.standards_summary is not None
     assert (tmp_path / "output.pdf").read_bytes() == b"signed-pdf"
     assert use_case.signer.called is True
@@ -123,6 +174,195 @@ def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
         use_case.signer.last_request.signature_appearance.field_bindings[0].field_key
         == SignatureFieldKey.DISTINGUISHED_NAME
     )
+
+
+def test_sign_use_case_blocks_certification_restricted_inputs_before_signing(
+    tmp_path: Path,
+) -> None:
+    _write_test_pdf(tmp_path / "input.pdf")
+    request = build_signing_request(tmp_path)
+    request = replace(request, timestamp_required=False)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=False,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=False)
+        ),
+        certification_inspector=StubCertificationInspector(
+            result=CertificationPolicyResult(
+                docmdp_permission="no_changes",
+                certification_restricted=True,
+                restriction_reason=(
+                    "Certification-restricted PDF: DocMDP NO_CHANGES forbids signing."
+                ),
+            )
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.PDF_CERTIFICATION_RESTRICTS_SIGNING
+    assert result.docmdp_permission == "no_changes"
+    assert result.certification_restricted is True
+    assert "forbids signing" in result.message
+    assert use_case.signer.called is False
+    assert use_case.certificate_loader.called is False
+
+
+def test_sign_use_case_allows_certified_documents_when_policy_permits(
+    tmp_path: Path,
+) -> None:
+    _write_test_pdf(tmp_path / "input.pdf")
+    request = build_signing_request(tmp_path)
+    request = replace(request, timestamp_required=False)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=False,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=False)
+        ),
+        certification_inspector=StubCertificationInspector(
+            result=CertificationPolicyResult(
+                docmdp_permission="fill_forms",
+                certification_restricted=False,
+                restriction_reason=None,
+            )
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert result.docmdp_permission == "fill_forms"
+    assert result.certification_restricted is False
+    assert use_case.signer.called is True
+    assert use_case.certificate_loader.called is True
+
+
+def test_sign_use_case_passes_timestamp_trust_policy_to_verifier(
+    tmp_path: Path,
+) -> None:
+    trust_policy = TimestampTrustPolicy(
+        use_system_store=False,
+        extra_ca_bundle_path="/tmp/tsa-root.pem",
+        revocation_mode="soft-fail",
+    )
+    request = build_signing_request(tmp_path, trust_policy=trust_policy)
+    verifier = StubVerifier(
+        summary=VerificationSummary(
+            signature_count=1,
+            timestamp_present=True,
+            timestamp_cryptographically_valid=True,
+            tsa_chain_trusted=True,
+        )
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=verifier,
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert verifier.last_trust_policy == trust_policy
+    assert result.timestamp_cryptographically_valid is True
+    assert result.tsa_chain_trusted is True
+
+
+def test_sign_use_case_fails_when_timestamp_trust_chain_is_untrusted(
+    tmp_path: Path,
+) -> None:
+    trust_policy = TimestampTrustPolicy(
+        use_system_store=False,
+        extra_ca_bundle_path="/tmp/tsa-root.pem",
+        revocation_mode="soft-fail",
+    )
+    request = build_signing_request(tmp_path, trust_policy=trust_policy)
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=StubVerifier(
+            summary=VerificationSummary(
+                signature_count=1,
+                timestamp_present=True,
+                timestamp_cryptographically_valid=True,
+                tsa_chain_trusted=False,
+                timestamp_validation_error="The TSA certificate is untrusted.",
+            )
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.TIMESTAMP_TRUST_FAILED
+
+
+def test_sign_use_case_maps_timestamp_trust_material_errors(
+    tmp_path: Path,
+) -> None:
+    request = build_signing_request(
+        tmp_path,
+        trust_policy=TimestampTrustPolicy(
+            use_system_store=False,
+            extra_ca_bundle_path="/tmp/missing-tsa-root.pem",
+            revocation_mode="soft-fail",
+        ),
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"signed-pdf",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=RaisingVerifier(
+            error=TimestampTrustMaterialError("Timestamp trust bundle not found.")
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.TIMESTAMP_TRUST_MATERIAL_INVALID
 
 
 def test_sign_use_case_fails_when_timestamp_required_but_missing(tmp_path: Path) -> None:

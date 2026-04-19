@@ -14,6 +14,7 @@ from pyhanko.pdf_utils import generic
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
+import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
 from foliaseal.application.qa_evidence_contract import (
@@ -50,6 +51,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
+    _capture_headless_preview_render,
     _capture_interactive_state,
     _default_harness_artifacts_dir,
     _default_harness_output_pdf_path,
@@ -76,6 +78,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _write_stamp_debug_overlay,
     _write_text_debug_overlay,
     build_phase3_checklist_results_markdown,
+    run_phase3_preview_matrix,
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
@@ -2452,12 +2455,383 @@ def test_stress_preview_manifests_exist_and_parse() -> None:
         assert manifest["scenarios"]
 
 
+def test_run_phase3_preview_matrix_writes_summary_for_small_batch(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {"name": "Scenario A"},
+                    {"name": "Scenario B"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifacts_dir = tmp_path / "artifacts"
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "build_qt_signing_shell",
+        lambda **_kwargs: pytest.fail("preview matrix should not build the Qt shell"),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_execute_headless_preview_matrix_scenario",
+        lambda **kwargs: {
+            "scenario_name": kwargs["scenario"]["name"],
+            "preview": {"can_submit": True},
+            "render_capture": {},
+            "backend_reservation_snapshot": {"layout_template": "multi_line"},
+        },
+    )
+
+    summary = run_phase3_preview_matrix(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(manifest_path),
+        artifacts_dir=str(artifacts_dir),
+    )
+
+    summary_path = artifacts_dir / "summary.json"
+    assert summary_path.exists()
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert payload["scenario_count"] == 2
+    assert payload["successful_scenario_count"] == 2
+    assert [item["scenario_name"] for item in payload["results"]] == ["Scenario A", "Scenario B"]
+    assert summary["scenario_count"] == 2
+
+
+def test_run_phase3_preview_matrix_recycles_shell_for_long_batches(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"scenarios": [{"name": f"Scenario {index}"} for index in range(25)]}),
+        encoding="utf-8",
+    )
+    artifacts_dir = tmp_path / "artifacts"
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "build_qt_signing_shell",
+        lambda **_kwargs: pytest.fail("preview matrix should not build the Qt shell"),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_execute_headless_preview_matrix_scenario",
+        lambda **kwargs: {
+            "scenario_name": kwargs["scenario"]["name"],
+            "preview": {"can_submit": True},
+            "render_capture": {},
+            "backend_reservation_snapshot": {"layout_template": "multi_line"},
+        },
+    )
+
+    summary = run_phase3_preview_matrix(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(manifest_path),
+        artifacts_dir=str(artifacts_dir),
+    )
+
+    assert summary["scenario_count"] == 25
+
+
+def test_run_phase3_preview_matrix_uses_canonical_render_capture_fields(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"scenarios": [{"name": "Scenario A"}]}),
+        encoding="utf-8",
+    )
+    artifacts_dir = tmp_path / "artifacts"
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "build_qt_signing_shell",
+        lambda **_kwargs: pytest.fail("preview matrix should not build the Qt shell"),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_execute_headless_preview_matrix_scenario",
+        lambda **_kwargs: {
+            "name": "Scenario A",
+            "preview_snapshot": {
+                "can_submit": True,
+                "render_capture": {
+                    "card_bounds_px": {"x": 0, "y": 0, "width": 320, "height": 120},
+                    "text_widget_bounds_px": {"x": 10, "y": 20, "width": 180, "height": 30},
+                    "stamp_band_bounds_px": {"x": 10, "y": 60, "width": 100, "height": 24},
+                    "text_rendered_content_bounds_px": {
+                        "x": 12,
+                        "y": 22,
+                        "width": 160,
+                        "height": 24,
+                    },
+                    "stamp_rendered_content_bounds_px": {
+                        "x": 14,
+                        "y": 62,
+                        "width": 72,
+                        "height": 18,
+                    },
+                },
+            },
+            "preview_text": "Ready",
+            "validation_text": "Ready to sign.",
+            "sign_request_snapshot": None,
+            "backend_reservation_snapshot": None,
+        },
+    )
+
+    summary = run_phase3_preview_matrix(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(manifest_path),
+        artifacts_dir=str(artifacts_dir),
+    )
+
+    render_capture = summary["results"][0]["preview_snapshot"]["render_capture"]
+    assert render_capture["card_bounds_px"]["width"] == 320
+    assert render_capture["text_widget_bounds_px"]["height"] == 30
+    assert render_capture["stamp_band_bounds_px"]["height"] == 24
+    assert render_capture["text_rendered_content_bounds_px"]["width"] == 160
+    assert render_capture["stamp_rendered_content_bounds_px"]["width"] == 72
+
+
+def test_capture_headless_preview_render_clears_top_stamp_edge_warning_for_sparse_multi_line(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        certificate_alias="signing-cert",
+    )
+    stamp_path = tmp_path / "tall_stamp.png"
+    Image.new("RGBA", (12, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            show_field_names=False,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="2026-04-17 02:15:53 UTC",
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=260.0, height_pt=46.0))
+
+    render_capture = _capture_headless_preview_render(
+        preview=workflow.preview(),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="top_stamp_sparse",
+    )
+
+    assert render_capture["stamp_content_touches_band_edge"] is False
+    assert render_capture["stamp_content_within_warning_distance"] is False
+    assert render_capture["stamp_content_min_edge_distance_px"] is not None
+    assert render_capture["stamp_content_min_edge_distance_px"] > 0
+
+
+def test_capture_headless_preview_render_clears_bottom_stamp_edge_warning_for_sparse_wrapped_block(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        certificate_alias="signing-cert",
+    )
+    stamp_path = tmp_path / "bottom_tall_stamp.png"
+    Image.new("RGBA", (12, 40), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.BOTTOM,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=260.0, height_pt=54.0))
+
+    render_capture = _capture_headless_preview_render(
+        preview=workflow.preview(),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="bottom_stamp_sparse",
+    )
+
+    assert render_capture["stamp_content_touches_band_edge"] is False
+    assert render_capture["stamp_content_within_warning_distance"] is False
+    assert render_capture["stamp_content_min_edge_distance_px"] is not None
+    assert render_capture["stamp_content_min_edge_distance_px"] > 0
+
+
+def test_capture_headless_preview_render_clears_right_stamp_edge_warning_for_sparse_wrapped_block(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        certificate_alias="signing-cert",
+    )
+    stamp_path = tmp_path / "right_script_stamp.png"
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.RIGHT,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=220.0, height_pt=62.0))
+
+    render_capture = _capture_headless_preview_render(
+        preview=workflow.preview(),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="right_stamp_sparse",
+    )
+
+    assert render_capture["stamp_content_touches_band_edge"] is False
+    assert render_capture["stamp_content_within_warning_distance"] is False
+    assert render_capture["stamp_content_min_edge_distance_px"] is not None
+    assert render_capture["stamp_content_min_edge_distance_px"] > 0
+
+
 def test_signed_acceptance_manifest_exists_and_parses() -> None:
     manifest = _load_preview_matrix_manifest(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST)
 
     assert len(manifest["scenarios"]) >= 9
     assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
     assert manifest["fixture_role"] == "signed_acceptance"
+    assert manifest["timestamping_mode"] == "dummy"
     assert manifest["acceptance_expectations"]["minimum_successful_signing_run_count"] >= 6
     assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] >= 3
     assert any("single_line" in scenario["name"] for scenario in manifest["scenarios"])
@@ -2467,6 +2841,7 @@ def test_signed_acceptance_manifest_exists_and_parses() -> None:
         scenario.get("expected_outcome") in {"success", "validation_rejection"}
         for scenario in manifest["scenarios"]
     )
+    assert any(scenario.get("timestamp_required") is True for scenario in manifest["scenarios"])
 
 
 def test_signed_acceptance_fixture_assets_exist_and_are_parseable() -> None:

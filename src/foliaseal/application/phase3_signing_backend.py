@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from fractions import Fraction
@@ -27,6 +28,7 @@ from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
 from pyhanko.pdf_utils.writer import PdfFileWriter
 from pyhanko.sign import fields, validation
 from pyhanko.sign.signers import PdfSignatureMetadata, PdfSigner, SimpleSigner
+from pyhanko.sign.timestamps.common_utils import TimestampRequestError
 from pyhanko.stamp import TextStampStyle
 from pyhanko_certvalidator import ValidationContext
 
@@ -58,8 +60,11 @@ from foliaseal.domain.models import (
     SigningOutput,
     SigningRequest,
     SigningResult,
+    TimestampTrustPolicy,
     VerificationSummary,
 )
+from foliaseal.infra.certification import inspect_pdf_certification_reader
+from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validation_context
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 _SIG_FIELD_NAME = "Signature1"
@@ -87,8 +92,11 @@ class PyHankoCertificateLoader:
         _load_simple_signer(certificate_path, passphrase)
 
 
+@dataclass
 class PyHankoPdfSigner:
     """Produce a genuinely signed PDF using pyHanko."""
+
+    timestamper_factory: Callable[[str], object] | None = None
 
     def sign(self, request: SigningBackendRequest) -> SigningOutput:
         input_path = Path(request.input_pdf_path)
@@ -97,11 +105,6 @@ class PyHankoPdfSigner:
         appearance = request.signature_appearance
         if request.signature_rect is None or appearance is None:
             raise ValueError("A visible signature rectangle and appearance are required.")
-        if request.timestamp_required:
-            raise TsaUnavailableError(
-                "Timestamping is not configured for the concrete signing backend yet."
-            )
-
         fit_issues = _visible_signature_fit_issues(
             certificate_path=request.certificate_path,
             passphrase=request.passphrase,
@@ -125,6 +128,9 @@ class PyHankoPdfSigner:
             stamp_background=_stamp_background_for_path(appearance.image_stamp_path),
             signature_rect=request.signature_rect,
         )
+        timestamper = None
+        if request.timestamp_required:
+            timestamper = self._build_timestamper(request.tsa_url)
         metadata = PdfSignatureMetadata(
             field_name=_SIG_FIELD_NAME,
             md_algorithm="sha256",
@@ -147,10 +153,14 @@ class PyHankoPdfSigner:
             signer_engine = PdfSigner(
                 metadata,
                 signer,
+                timestamper=timestamper,
                 stamp_style=stamp_style,
                 new_field_spec=field_spec,
             )
-            signer_engine.sign_pdf(writer, output=signed_output)
+            try:
+                signer_engine.sign_pdf(writer, output=signed_output)
+            except TimestampRequestError as exc:
+                raise TsaUnavailableError(str(exc)) from exc
         output_bytes = signed_output.getvalue()
 
         return SigningOutput(
@@ -160,6 +170,13 @@ class PyHankoPdfSigner:
             signature_subfilter="adbe.pkcs7.detached",
             timestamp_present=_signature_has_timestamp(output_bytes),
         )
+
+    def _build_timestamper(self, tsa_url: str) -> object:
+        factory = self.timestamper_factory
+        timestamper = factory(tsa_url) if factory is not None else build_http_timestamper(tsa_url)
+        if timestamper is None:
+            raise TsaUnavailableError("Timestamping is required but no TSA timestamper was built.")
+        return timestamper
 
     @staticmethod
     def _fallback_pdf_version(input_path: Path) -> str:
@@ -172,7 +189,12 @@ class PyHankoPdfSigner:
 class PyHankoSignatureVerifier:
     """Cryptographically validate the signed output PDF."""
 
-    def verify(self, output_pdf_path: str) -> VerificationSummary:
+    def verify(
+        self,
+        output_pdf_path: str,
+        *,
+        trust_policy: TimestampTrustPolicy | None = None,
+    ) -> VerificationSummary:
         path = Path(output_pdf_path)
         if not path.exists():
             raise FileNotFoundError(output_pdf_path)
@@ -185,17 +207,52 @@ class PyHankoSignatureVerifier:
 
             signature = embedded_signatures[-1]
             validation_context = ValidationContext(trust_roots=[signature.signer_cert])
+            timestamp_validation_context = build_timestamp_validation_context(trust_policy)
             status = validation.validate_pdf_signature(
                 signature,
                 signer_validation_context=validation_context,
+                ts_validation_context=timestamp_validation_context,
             )
+            certification = inspect_pdf_certification_reader(reader)
 
         if not status.intact or not status.valid:
             raise ValueError("The signed PDF failed cryptographic validation.")
 
+        timestamp_validity = getattr(status, "timestamp_validity", None)
+        timestamp_cryptographically_valid = None
+        tsa_chain_trusted = None
+        timestamp_validation_error = None
+        if trust_policy is not None and timestamp_validity is not None:
+            timestamp_cryptographically_valid = bool(
+                getattr(timestamp_validity, "intact", True)
+                and getattr(timestamp_validity, "valid", True)
+            )
+            tsa_chain_trusted = bool(getattr(timestamp_validity, "trusted", False))
+            if not tsa_chain_trusted:
+                describe_timestamp_trust = getattr(
+                    timestamp_validity,
+                    "describe_timestamp_trust",
+                    None,
+                )
+                if callable(describe_timestamp_trust):
+                    try:
+                        timestamp_validation_error = describe_timestamp_trust()
+                    except Exception:
+                        timestamp_validation_error = None
+                if timestamp_validation_error is None:
+                    timestamp_validation_error = (
+                        "The timestamp token is not trusted under the configured anchors."
+                    )
+
         return VerificationSummary(
             signature_count=len(embedded_signatures),
             timestamp_present=_status_has_timestamp(status),
+            timestamp_cryptographically_valid=timestamp_cryptographically_valid,
+            tsa_chain_trusted=tsa_chain_trusted,
+            timestamp_validation_error=timestamp_validation_error,
+            docmdp_permission=certification.docmdp_permission,
+            certification_restricted=certification.certification_restricted,
+            restriction_reason=certification.restriction_reason,
         )
 
 
@@ -209,12 +266,15 @@ class Phase3SigningExecutor:
         return self.use_case.execute(request)
 
 
-def build_phase3_signing_executor() -> Phase3SigningExecutor:
+def build_phase3_signing_executor(
+    *,
+    timestamper_factory: Callable[[str], object] | None = None,
+) -> Phase3SigningExecutor:
     """Build the concrete signing executor used by the Phase 3 shell."""
     use_case = SignPdfUseCase(
         inspector=PyHankoPdfInspector(),
         certificate_loader=PyHankoCertificateLoader(),
-        signer=PyHankoPdfSigner(),
+        signer=PyHankoPdfSigner(timestamper_factory=timestamper_factory),
         verifier=PyHankoSignatureVerifier(),
     )
     return Phase3SigningExecutor(use_case=use_case)
@@ -468,6 +528,35 @@ def _single_line_vertical_stamp_border_gap(
     if box_style is None or not box_style.show_border:
         return 0
     return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
+
+
+def _top_stamp_border_facing_inset(
+    *,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    """Reserve real top clearance for non-single-line top stamp content."""
+
+    if box_style is None or not box_style.show_border:
+        return 1
+    return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
+
+
+def _border_facing_stamp_inset(
+    *,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        return 0
+    if stamp_position in {
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.TOP,
+        SignatureStampPosition.BOTTOM,
+        SignatureStampPosition.RIGHT,
+    }:
+        return _top_stamp_border_facing_inset(box_style=box_style)
+    return 0
 
 
 def _stamp_image_aspect_ratio(stamp_background: PdfImage | None) -> float | None:
@@ -790,13 +879,22 @@ def _background_layout_for_stamp(
         )
     fit_width = max(1, area_width - content_inset * 2)
     fit_height = max(1, area_height - content_inset * 2)
-    border_gap = 0
+    border_gap = _border_facing_stamp_inset(
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        box_style=box_style,
+    )
     if (
         layout_template == SignatureLayoutTemplate.SINGLE_LINE
         and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
     ):
         border_gap = _single_line_vertical_stamp_border_gap(box_style=box_style)
         fit_height = max(1, fit_height - border_gap)
+    elif stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        border_gap = _top_stamp_border_facing_inset(box_style=box_style)
+        fit_height = max(1, fit_height - border_gap)
+    elif stamp_position == SignatureStampPosition.RIGHT:
+        fit_width = max(1, fit_width - border_gap)
     aspect_ratio = image_width / image_height
     target_width = fit_width
     target_height = max(1, int(round(target_width / aspect_ratio)))
@@ -818,6 +916,39 @@ def _background_layout_for_stamp(
         else:
             extra_y_top = centered_extra_y
             extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
+    elif (
+        stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+        and border_gap > 0
+    ):
+        remaining_y = max(0, area_height - target_height)
+        centered_extra_y = max(0, remaining_y - border_gap) // 2
+        centered_extra_x = max(0, area_width - target_width) // 2
+        extra_x_left = centered_extra_x
+        extra_x_right = centered_extra_x
+        if stamp_position == SignatureStampPosition.TOP:
+            extra_y_top = min(border_gap, remaining_y) + centered_extra_y
+            extra_y_bottom = centered_extra_y
+        else:
+            extra_y_top = centered_extra_y
+            extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
+    elif stamp_position == SignatureStampPosition.RIGHT and border_gap > 0:
+        remaining_x = max(0, area_width - target_width)
+        centered_extra_x = max(0, remaining_x - border_gap) // 2
+        extra_x_left = centered_extra_x
+        extra_x_right = min(border_gap, remaining_x) + centered_extra_x
+        extra_y_top = max(0, area_height - target_height) // 2
+        extra_y_bottom = extra_y_top
+    elif stamp_position == SignatureStampPosition.LEFT and border_gap > 0:
+        max_content_width = max(1, fit_width - border_gap)
+        if target_width > max_content_width:
+            target_width = max_content_width
+            target_height = max(1, int(round(target_width / aspect_ratio)))
+        remaining_x = max(0, area_width - target_width)
+        centered_extra_x = max(0, remaining_x - border_gap) // 2
+        extra_x_left = min(border_gap, remaining_x) + centered_extra_x
+        extra_x_right = centered_extra_x
+        extra_y_top = max(0, area_height - target_height) // 2
+        extra_y_bottom = extra_y_top
     else:
         centered_extra_x = max(0, area_width - target_width) // 2
         extra_x_left = centered_extra_x

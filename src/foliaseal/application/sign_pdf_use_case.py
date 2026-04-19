@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Protocol
@@ -15,9 +15,12 @@ from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
     FailureCode,
+    TimestampTrustMaterialError,
     TsaUnavailableError,
 )
 from foliaseal.domain.models import (
+    DocumentOperationType,
+    RevisionStrategy,
     SignatureAppearance,
     SignatureBoxStyle,
     SignatureFieldKey,
@@ -30,7 +33,13 @@ from foliaseal.domain.models import (
     SigningOutput,
     SigningRequest,
     SigningResult,
+    TimestampTrustPolicy,
     VerificationSummary,
+)
+from foliaseal.infra.certification import (
+    CertificationInspectionError,
+    CertificationPolicyResult,
+    PyHankoCertificationInspector,
 )
 
 
@@ -58,8 +67,20 @@ class PdfSigner(Protocol):
 class SignatureVerifier(Protocol):
     """Performs post-sign checks."""
 
-    def verify(self, output_pdf_path: str) -> VerificationSummary:
+    def verify(
+        self,
+        output_pdf_path: str,
+        *,
+        trust_policy: TimestampTrustPolicy | None = None,
+    ) -> VerificationSummary:
         """Return structured verification summary."""
+
+
+class CertificationInspector(Protocol):
+    """Inspects PDFs for certification / DocMDP restrictions."""
+
+    def inspect(self, input_pdf_path: str) -> CertificationPolicyResult:
+        """Return the certification policy classification for the input PDF."""
 
 
 @dataclass(frozen=True)
@@ -171,6 +192,9 @@ class SignPdfUseCase:
     certificate_loader: CertificateLoader
     signer: PdfSigner
     verifier: SignatureVerifier
+    certification_inspector: CertificationInspector = field(
+        default_factory=PyHankoCertificationInspector
+    )
     compatibility_profile: PdfCompatibilityProfile = PdfCompatibilityProfile()
 
     def execute(self, request: SigningRequest) -> SigningResult:
@@ -186,6 +210,27 @@ class SignPdfUseCase:
             backend_request = SigningBackendRequest.from_signing_request(request)
             input_pdf_version = self.inspector.get_pdf_version(request.input_pdf_path)
             self.compatibility_profile.ensure_open_version_supported(input_pdf_version)
+            certification = CertificationPolicyResult(
+                docmdp_permission=None,
+                certification_restricted=False,
+                restriction_reason=None,
+            )
+            if Path(request.input_pdf_path).exists():
+                certification = self._inspect_certification(request.input_pdf_path)
+            if certification.certification_restricted:
+                return SigningResult(
+                    success=False,
+                    failure_code=FailureCode.PDF_CERTIFICATION_RESTRICTS_SIGNING,
+                    message=(
+                        certification.restriction_reason
+                        or "Certification-restricted document cannot be signed."
+                    ),
+                    docmdp_permission=certification.docmdp_permission,
+                    certification_restricted=True,
+                    restriction_reason=certification.restriction_reason,
+                    operation_type=DocumentOperationType.SIGN,
+                    revision_strategy=RevisionStrategy.INCREMENTAL,
+                )
             self.certificate_loader.validate(request.certificate_path, request.passphrase)
 
             output = self.signer.sign(backend_request)
@@ -202,13 +247,41 @@ class SignPdfUseCase:
             )
 
             self._write_atomically(request.output_pdf_path, output.output_bytes)
-            verification = self.verifier.verify(request.output_pdf_path)
+            verification = self.verifier.verify(
+                request.output_pdf_path,
+                trust_policy=request.trust_policy,
+            )
             if request.timestamp_required and not verification.timestamp_present:
                 return SigningResult(
                     success=False,
                     failure_code=FailureCode.POST_VERIFY_FAILED,
                     message="Post-sign verification did not find expected timestamp token.",
                 )
+            if request.trust_policy is not None and verification.timestamp_present:
+                if (
+                    verification.timestamp_cryptographically_valid is False
+                    or verification.tsa_chain_trusted is False
+                ):
+                    return SigningResult(
+                        success=False,
+                        failure_code=FailureCode.TIMESTAMP_TRUST_FAILED,
+                        message=(
+                            verification.timestamp_validation_error
+                            or "Timestamp trust validation failed."
+                        ),
+                        output_pdf_version=output.output_pdf_version,
+                        signature_subfilter=output.signature_subfilter,
+                        timestamp_present=verification.timestamp_present,
+                        timestamp_cryptographically_valid=(
+                            verification.timestamp_cryptographically_valid
+                        ),
+                        tsa_chain_trusted=verification.tsa_chain_trusted,
+                        timestamp_validation_error=verification.timestamp_validation_error,
+                        docmdp_permission=verification.docmdp_permission
+                        or certification.docmdp_permission,
+                        certification_restricted=verification.certification_restricted,
+                        restriction_reason=verification.restriction_reason,
+                    )
 
             standards_summary = self.compatibility_profile.build_standards_summary(
                 input_pdf_version=input_pdf_version,
@@ -223,6 +296,14 @@ class SignPdfUseCase:
                 output_pdf_version=output.output_pdf_version,
                 signature_subfilter=output.signature_subfilter,
                 timestamp_present=verification.timestamp_present,
+                timestamp_cryptographically_valid=verification.timestamp_cryptographically_valid,
+                tsa_chain_trusted=verification.tsa_chain_trusted,
+                timestamp_validation_error=verification.timestamp_validation_error,
+                docmdp_permission=verification.docmdp_permission or certification.docmdp_permission,
+                certification_restricted=verification.certification_restricted,
+                restriction_reason=verification.restriction_reason,
+                operation_type=DocumentOperationType.SIGN,
+                revision_strategy=RevisionStrategy.INCREMENTAL,
                 standards_summary=standards_summary,
             )
         except PdfCompatibilityError as exc:
@@ -230,6 +311,14 @@ class SignPdfUseCase:
                 success=False,
                 failure_code=FailureCode.INPUT_PDF_INVALID,
                 message=str(exc),
+            )
+        except CertificationInspectionError as exc:
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.INPUT_PDF_INVALID,
+                message=str(exc),
+                operation_type=DocumentOperationType.SIGN,
+                revision_strategy=RevisionStrategy.INCREMENTAL,
             )
         except SigningBackendRequestError as exc:
             return SigningResult(
@@ -253,6 +342,12 @@ class SignPdfUseCase:
             return SigningResult(
                 success=False,
                 failure_code=FailureCode.PKCS12_LOAD_FAILED,
+                message=str(exc),
+            )
+        except TimestampTrustMaterialError as exc:
+            return SigningResult(
+                success=False,
+                failure_code=FailureCode.TIMESTAMP_TRUST_MATERIAL_INVALID,
                 message=str(exc),
             )
         except TsaUnavailableError as exc:
@@ -292,6 +387,9 @@ class SignPdfUseCase:
         input_path = Path(input_pdf_path).expanduser().resolve(strict=False)
         output_path = Path(output_pdf_path).expanduser().resolve(strict=False)
         return input_path == output_path
+
+    def _inspect_certification(self, input_pdf_path: str) -> CertificationPolicyResult:
+        return self.certification_inspector.inspect(input_pdf_path)
 
     @staticmethod
     def _write_atomically(output_path: str, output_bytes: bytes) -> None:

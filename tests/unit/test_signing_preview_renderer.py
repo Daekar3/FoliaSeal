@@ -12,9 +12,14 @@ from foliaseal.application.signing_draft_workflow import (
 from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
 )
-from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
+from foliaseal.domain.models import (
+    SignatureFieldSource,
+    SignatureLayoutTemplate,
+    SignatureStampPosition,
+)
 from tests.support.phase3_builders import (
     build_signature_appearance,
+    build_signature_field_binding,
     build_signature_rect,
     build_signing_request,
 )
@@ -252,3 +257,363 @@ def test_canonical_preview_renderer_produces_raster_and_bounds(tmp_path: Path) -
     assert snapshot.height_px > 0
     assert snapshot.text_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
+
+
+def test_canonical_preview_renderer_keeps_multi_line_top_stamp_and_text_bounds_separate(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (96, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M:%S %Z",
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="2026-04-17 02:15:53 UTC",
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=260.0, height_pt=46.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview(), zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.text_area_bounds_px is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.text_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    assert snapshot.stamp_area_bounds_px["height"] > 0
+    assert snapshot.text_bounds_px["y"] >= (
+        snapshot.stamp_bounds_px["y"] + snapshot.stamp_bounds_px["height"]
+    )
+
+
+def test_canonical_preview_renderer_preserves_top_inset_for_multi_line_top_stamp(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "tall_stamp.png"
+    Image.new("RGBA", (12, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            show_field_names=False,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="2026-04-17 02:15:53 UTC",
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=260.0, height_pt=46.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview(), zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    assert snapshot.stamp_bounds_px["y"] > snapshot.stamp_area_bounds_px["y"]
+
+
+def test_canonical_preview_renderer_preserves_top_inset_for_wrapped_block_top_stamp(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "tall_stamp_wrapped.png"
+    Image.new("RGBA", (12, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.TOP,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=260.0, height_pt=54.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview(), zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    assert snapshot.stamp_bounds_px["y"] > snapshot.stamp_area_bounds_px["y"]
+
+
+def test_canonical_preview_renderer_preserves_bottom_inset_for_wrapped_block_bottom_stamp(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "bottom_tall_stamp.png"
+    Image.new("RGBA", (12, 40), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.BOTTOM,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=260.0, height_pt=54.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview(), zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    stamp_bottom = snapshot.stamp_bounds_px["y"] + snapshot.stamp_bounds_px["height"]
+    area_bottom = snapshot.stamp_area_bounds_px["y"] + snapshot.stamp_area_bounds_px["height"]
+    assert stamp_bottom < area_bottom
+
+
+def test_canonical_preview_renderer_preserves_right_inset_for_wrapped_block_right_stamp(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "right_script_stamp.png"
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.RIGHT,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=220.0, height_pt=62.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview(), zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    stamp_right = snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
+    area_right = snapshot.stamp_area_bounds_px["x"] + snapshot.stamp_area_bounds_px["width"]
+    assert stamp_right < area_right
+
+
+def test_canonical_preview_renderer_preserves_left_inset_for_wrapped_block_left_stamp(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    stamp_path = tmp_path / "left_script_stamp.png"
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.LEFT,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=220.0, height_pt=62.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview(), zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    assert snapshot.stamp_bounds_px["x"] > snapshot.stamp_area_bounds_px["x"]

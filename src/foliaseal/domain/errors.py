@@ -17,6 +17,8 @@ class FailureCode(str, Enum):  # noqa: UP042
     PDF_SIGNING_FAILED = "pdf_signing_failed"
     TSA_UNREACHABLE = "tsa_unreachable"
     TIMESTAMP_REQUIRED_BUT_MISSING = "timestamp_required_but_missing"
+    TIMESTAMP_TRUST_MATERIAL_INVALID = "timestamp_trust_material_invalid"
+    TIMESTAMP_TRUST_FAILED = "timestamp_trust_failed"
     POST_VERIFY_FAILED = "post_verify_failed"
     ATOMIC_WRITE_FAILED = "atomic_write_failed"
     UNEXPECTED_INTERNAL_ERROR = "unexpected_internal_error"
@@ -32,3 +34,15 @@ class CertificateWrongPasswordError(CertificateLoadError):
 
 class TsaUnavailableError(ValueError):
     """Raised when timestamping authority cannot be reached."""
+
+
+class TimestampTrustError(ValueError):
+    """Base class for timestamp trust policy failures."""
+
+
+class TimestampTrustMaterialError(TimestampTrustError):
+    """Raised when timestamp trust material is missing or malformed."""
+
+
+class TimestampTrustValidationError(TimestampTrustError):
+    """Raised when a timestamp token fails trust validation under policy."""

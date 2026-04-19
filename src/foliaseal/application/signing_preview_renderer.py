@@ -255,6 +255,8 @@ def render_canonical_signature_preview(
     preview: SigningDraftPreview,
     *,
     zoom: float = 2.0,
+    render_backend: QtPdfRenderBackend | None = None,
+    include_border: bool = True,
 ) -> CanonicalSignaturePreviewSnapshot | None:
     """Render the visible signature using the canonical stamp engine."""
 
@@ -273,31 +275,38 @@ def render_canonical_signature_preview(
         preview,
         include_text=True,
         include_stamp=True,
+        include_border=include_border,
     )
     full_layout = _canonical_preview_layout(
         preview,
         include_text=True,
         include_stamp=True,
+        include_border=include_border,
     )
     full_render = _render_preview_style(
         style=full_style,
         signature_rect=preview.signature_rect,
         zoom=zoom,
         output_path=temp_dir / "full.png",
+        render_backend=render_backend,
     )
     text_bounds = _render_optional_preview_bounds(
         preview=preview,
+        layout=full_layout,
         zoom=zoom,
         output_path=temp_dir / "text.png",
         include_text=True,
         include_stamp=False,
+        render_backend=render_backend,
     )
     stamp_bounds = _render_optional_preview_bounds(
         preview=preview,
+        layout=full_layout,
         zoom=zoom,
         output_path=temp_dir / "stamp.png",
         include_text=False,
         include_stamp=True,
+        render_backend=render_backend,
     )
     return CanonicalSignaturePreviewSnapshot(
         image_path=str(full_render[0]),
@@ -317,7 +326,7 @@ def render_canonical_signature_preview(
             None
             if not preview.image_stamp_path
             else _layout_rule_bounds_px(
-                full_layout.background_layout,
+                full_layout.reserved_background_layout,
                 reserved_width_pt=full_layout.reservation.stamp_area_width_pt,
                 reserved_height_pt=full_layout.reservation.stamp_area_height_pt,
                 width_px=full_render[1],
@@ -463,11 +472,13 @@ def _canonical_preview_stamp_style(
     *,
     include_text: bool,
     include_stamp: bool,
+    include_border: bool,
 ) -> TextStampStyle:
     layout = _canonical_preview_layout(
         preview,
         include_text=include_text,
         include_stamp=include_stamp,
+        include_border=include_border,
     )
     return layout.style
 
@@ -477,6 +488,7 @@ class _CanonicalPreviewLayout:
     style: TextStampStyle
     background_layout: Any
     inner_content_layout: Any
+    reserved_background_layout: Any
     reservation: Any
 
 
@@ -485,6 +497,7 @@ def _canonical_preview_layout(
     *,
     include_text: bool,
     include_stamp: bool,
+    include_border: bool,
 ) -> _CanonicalPreviewLayout:
     assert preview.signature_rect is not None
     assert preview.layout_template is not None
@@ -543,9 +556,11 @@ def _canonical_preview_layout(
     )
     return _CanonicalPreviewLayout(
         style=TextStampStyle(
-            border_width=max(0, int(round(preview.box_style.border_width_pt)))
-            if preview.box_style.show_border and include_text
-            else 0,
+            border_width=(
+                max(0, int(round(preview.box_style.border_width_pt)))
+                if preview.box_style.show_border and include_text and include_border
+                else 0
+            ),
             border_color=_hex_to_rgb(preview.box_style.border_color_hex),
             background=background,
             background_layout=background_layout,
@@ -557,6 +572,7 @@ def _canonical_preview_layout(
         ),
         background_layout=background_layout,
         inner_content_layout=layout_reservation.inner_content_layout,
+        reserved_background_layout=layout_reservation.background_layout,
         reservation=layout_reservation,
     )
 
@@ -574,28 +590,38 @@ def _stamp_aspect_ratio(stamp_background: PdfContent | None) -> float | None:
 def _render_optional_preview_bounds(
     *,
     preview: SigningDraftPreview,
+    layout: _CanonicalPreviewLayout,
     zoom: float,
     output_path: Path,
     include_text: bool,
     include_stamp: bool,
+    render_backend: QtPdfRenderBackend | None,
 ) -> dict[str, int] | None:
     if not include_text and not include_stamp:
         return None
-    if include_stamp and not preview.image_stamp_path:
+    if include_stamp and layout.style.background is None:
         return None
-    style = _canonical_preview_stamp_style(
-        preview,
-        include_text=include_text,
-        include_stamp=include_stamp,
+    style = TextStampStyle(
+        border_width=0,
+        border_color=layout.style.border_color,
+        background=layout.style.background if include_stamp else None,
+        background_layout=layout.background_layout,
+        background_opacity=layout.style.background_opacity,
+        text_box_style=layout.style.text_box_style,
+        inner_content_layout=layout.inner_content_layout,
+        stamp_text=layout.style.stamp_text if include_text else " ",
+        timestamp_format=layout.style.timestamp_format,
     )
     image_path, _width_px, _height_px = _render_preview_style(
         style=style,
         signature_rect=preview.signature_rect,
         zoom=zoom,
         output_path=output_path,
+        render_backend=render_backend,
     )
-    image = Image.open(image_path).convert("RGBA")
-    return _non_white_bounds(image)
+    with Image.open(image_path) as image:
+        rgba_image = image.convert("RGBA")
+    return _non_white_bounds(rgba_image)
 
 
 def _render_preview_style(
@@ -604,6 +630,7 @@ def _render_preview_style(
     signature_rect: SignatureRect,
     zoom: float,
     output_path: Path,
+    render_backend: QtPdfRenderBackend | None,
 ) -> tuple[Path, int, int]:
     width_pt = max(1, int(round(signature_rect.width_pt)))
     height_pt = max(1, int(round(signature_rect.height_pt)))
@@ -623,7 +650,7 @@ def _render_preview_style(
     pdf_path = output_path.with_suffix(".pdf")
     with pdf_path.open("wb") as handle:
         writer.write(handle)
-    backend = QtPdfRenderBackend()
+    backend = render_backend or QtPdfRenderBackend()
     render = backend.render_page(
         RenderPageRequest(
             document_path=str(pdf_path),

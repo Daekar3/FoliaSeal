@@ -753,9 +753,9 @@ layer.
 - Compact-rectangle behavior is validated against representative form-line cases.
 
 ## Phase 4B: Timestamping and standards hardening
-- Implement real TSA-backed timestamp integration.
-- Support timestamp-required signing flows with stable failure mapping.
-- Verify standards/compatibility reporting around timestamp presence and policy.
+- Implement real TSA-backed timestamp integration. [implemented in the concrete backend]
+- Support timestamp-required signing flows with stable failure mapping. [implemented]
+- Verify standards/compatibility reporting around timestamp presence and policy. [implemented; remaining work is trust policy hardening]
 
 **Exit criteria**
 - Timestamp-required flows succeed against a real TSA or fail with explicit stable errors.
@@ -764,9 +764,12 @@ layer.
 
 ## Phase 4C: Trust, certification constraints, and signing hardening
 - Implement trust profile loader (system store + optional extra CA bundle + revocation policy modes).
+- Distinguish timestamp token presence from timestamp trust validation in post-sign reporting.
 - Detect and enforce certification restrictions (DocMDP/permissions) with user-facing diagnostics.
 - Expand logging/audit model to include operation type and revision strategy.
 - Add cancellation/progress behavior for long-running operations.
+- Track the certification slice in
+  [.agent/certification_hardening_execplan.md](/home/daekar/SignPDF/Scratch/.agent/certification_hardening_execplan.md).
 
 **Exit criteria**
 - Certification-restricted documents are blocked with explicit rationale.

@@ -86,6 +86,32 @@ class SignatureAnchor(str, Enum):  # noqa: UP042
     BOTTOM_RIGHT = "bottom_right"
 
 
+@dataclass(frozen=True)
+class TimestampTrustPolicy:
+    """Policy inputs for validating timestamp trust anchors."""
+
+    use_system_store: bool = True
+    extra_ca_bundle_path: str | None = None
+    revocation_mode: str = "soft-fail"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "use_system_store",
+            _require_bool(self.use_system_store, "use_system_store"),
+        )
+        object.__setattr__(
+            self,
+            "extra_ca_bundle_path",
+            _require_optional_non_empty_str(self.extra_ca_bundle_path, "extra_ca_bundle_path"),
+        )
+        object.__setattr__(
+            self,
+            "revocation_mode",
+            _require_non_empty_str(self.revocation_mode, "revocation_mode"),
+        )
+
+
 def _require_non_empty_str(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string.")
@@ -446,6 +472,7 @@ class SigningRequest:
     passphrase: str
     tsa_url: str
     timestamp_required: bool = True
+    trust_policy: TimestampTrustPolicy | None = None
     certificate_alias: str | None = None
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
@@ -459,6 +486,7 @@ class SigningRequest:
         )
         tsa_url = _require_non_empty_str(self.tsa_url, "tsa_url")
         timestamp_required = _require_bool(self.timestamp_required, "timestamp_required")
+        trust_policy = self.trust_policy
         certificate_alias = _require_optional_non_empty_str(
             self.certificate_alias,
             "certificate_alias",
@@ -468,7 +496,10 @@ class SigningRequest:
         object.__setattr__(self, "certificate_path", certificate_path)
         object.__setattr__(self, "tsa_url", tsa_url)
         object.__setattr__(self, "timestamp_required", timestamp_required)
+        object.__setattr__(self, "trust_policy", trust_policy)
         object.__setattr__(self, "certificate_alias", certificate_alias)
+        if trust_policy is not None and not isinstance(trust_policy, TimestampTrustPolicy):
+            raise ValueError("trust_policy must be a TimestampTrustPolicy value.")
         if self.signature_rect is not None and not isinstance(self.signature_rect, SignatureRect):
             raise ValueError("signature_rect must be a SignatureRect value.")
         if self.signature_appearance is not None and not isinstance(
@@ -497,6 +528,12 @@ class VerificationSummary:
 
     signature_count: int
     timestamp_present: bool
+    timestamp_cryptographically_valid: bool | None = None
+    tsa_chain_trusted: bool | None = None
+    timestamp_validation_error: str | None = None
+    docmdp_permission: str | None = None
+    certification_restricted: bool = False
+    restriction_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -509,6 +546,14 @@ class SigningResult:
     output_pdf_version: str | None = None
     signature_subfilter: str | None = None
     timestamp_present: bool | None = None
+    timestamp_cryptographically_valid: bool | None = None
+    tsa_chain_trusted: bool | None = None
+    timestamp_validation_error: str | None = None
+    docmdp_permission: str | None = None
+    certification_restricted: bool = False
+    restriction_reason: str | None = None
+    operation_type: DocumentOperationType = DocumentOperationType.SIGN
+    revision_strategy: RevisionStrategy = RevisionStrategy.INCREMENTAL
     standards_summary: str | None = None
 
 
