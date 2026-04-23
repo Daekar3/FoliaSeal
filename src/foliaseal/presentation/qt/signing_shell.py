@@ -188,12 +188,19 @@ def _compose_row(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
 
 def _compose_preview_column(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
     container = bindings.q_widget()
+    if hasattr(container, "setStyleSheet"):
+        container.setStyleSheet("background: transparent; border: none;")
     layout = bindings.q_vbox_layout(container)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
     for widget in widgets:
         layout.addWidget(widget)
     return container
+
+
+def _set_preview_surface_chrome(widget: Any) -> None:
+    if hasattr(widget, "setStyleSheet"):
+        widget.setStyleSheet("background: transparent; border: none; padding: 0px;")
 
 
 def _container_layout(container: Any) -> Any | None:
@@ -958,6 +965,10 @@ def _preview_card_padding_px(preview: SigningDraftPreview) -> float:
     return _preview_card_padding_pt(preview)
 
 
+def _preview_inner_body_extent(total_extent_px: int, padding_px: float) -> int:
+    return max(1, total_extent_px - int(ceil(padding_px * 2)))
+
+
 def _preview_text_style(preview: SigningDraftPreview) -> str:
     if preview.text_style is None:
         return "color: #1f1f1f;"
@@ -1228,6 +1239,7 @@ class SignaturePropertiesPanel:
         _set_container_widgets(single_body_container, single_render_label)
         multi_content_container = _compose_preview_column(bindings)
         multi_body_container = bindings.q_widget()
+        _set_preview_surface_chrome(multi_body_container)
         multi_body_layout = bindings.q_hbox_layout(multi_body_container)
         multi_body_layout.setContentsMargins(0, 0, 0, 0)
         multi_body_layout.setSpacing(6)
@@ -1250,6 +1262,10 @@ class SignaturePropertiesPanel:
                 align_center = getattr(bindings.qt, "AlignCenter", None)
                 if align_center is not None:
                     label.setAlignment(align_center)
+            _set_preview_surface_chrome(label)
+
+        for widget in (single_body_container, multi_content_container):
+            _set_preview_surface_chrome(widget)
 
         if hasattr(stamp_label, "setStyleSheet"):
             stamp_label.setStyleSheet(
@@ -1941,7 +1957,7 @@ class SignaturePropertiesPanel:
         elif hasattr(self._preview_controls.card_container, "setFixedWidth"):
             self._preview_controls.card_container.setFixedWidth(card_width)
         preview_padding_px = _preview_card_padding_px(preview)
-        inner_body_width = max(1, body_width - int(round(preview_padding_px * 2)))
+        inner_body_width = _preview_inner_body_extent(body_width, preview_padding_px)
         reserved_text_height_px = None
         reserved_stamp_width_px = None
         reserved_stamp_height_px = None
@@ -1999,11 +2015,7 @@ class SignaturePropertiesPanel:
                 set_word_wrap(False)
         self._preview_controls.title_label.setText("")
         _set_widget_visible(self._preview_controls.title_label, False)
-        inner_body_height = max(
-            1,
-            body_height
-            - int(round(preview_padding_px * 2))
-        )
+        inner_body_height = _preview_inner_body_extent(body_height, preview_padding_px)
         if hasattr(self._preview_controls.single_body_container, "setFixedSize"):
             self._preview_controls.single_body_container.setFixedSize(
                 inner_body_width,
@@ -2304,6 +2316,7 @@ class SignaturePropertiesPanel:
                 zoom=max(1.0, preview_scale),
                 render_backend=self._canonical_preview_render_backend,
                 include_border=False,
+                flatten_to_white=False,
             )
         except ValueError:
             snapshot = None

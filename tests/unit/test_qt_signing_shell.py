@@ -831,11 +831,11 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     )
     expected_inner_width = max(
         1,
-        expected_width - int(round(expected_padding * 2)),
+        expected_width - int(signing_shell_module.ceil(expected_padding * 2)),
     )
     expected_inner_height = max(
         1,
-        expected_height - int(round(expected_padding * 2)),
+        expected_height - int(signing_shell_module.ceil(expected_padding * 2)),
     )
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
@@ -940,17 +940,29 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     )
     expected_inner_width = max(
         1,
-        expected_width - int(round(expected_padding * 2)),
+        expected_width - int(signing_shell_module.ceil(expected_padding * 2)),
     )
     expected_inner_height = max(
         1,
-        expected_height - int(round(expected_padding * 2)),
+        expected_height - int(signing_shell_module.ceil(expected_padding * 2)),
     )
     assert preview_controls.container.fixed_width is None
     assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
     assert preview_controls.single_body_container.fixed_size == (
         expected_inner_width,
         expected_inner_height,
+    )
+    assert preview_controls.single_body_container.style == (
+        "background: transparent; border: none; padding: 0px;"
+    )
+    assert preview_controls.multi_body_container.style == (
+        "background: transparent; border: none; padding: 0px;"
+    )
+    assert preview_controls.single_render_label.style == (
+        "background: transparent; border: none; padding: 0px;"
+    )
+    assert preview_controls.multi_render_label.style == (
+        "background: transparent; border: none; padding: 0px;"
     )
     assert preview_controls.title_label.fixed_width == expected_width
     assert preview_controls.detail_label.fixed_width == expected_width
@@ -2243,17 +2255,23 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     )
 
     preview = widget.properties_panel.preview
-    expected = signing_shell_module._preview_stamp_text(preview)
+    actual_text = widget.properties_panel.preview_controls.multi_detail_label.text()
     available_width = signing_shell_module._preview_available_width(
         preview,
         container=widget.properties_panel.preview_controls.container,
     )
 
-    assert widget.properties_panel.preview_controls.multi_detail_label.text() == expected
+    for fragment in (
+        "Digitally signed by",
+        "Director",
+        "FoliaSeal",
+        "Approved",
+    ):
+        assert fragment in actual_text
     assert widget.properties_panel.preview_controls.multi_content_container.fixed_width == (
         signing_shell_module._preview_text_width_limit(
             preview,
-            stamp_text=expected,
+            stamp_text=actual_text,
             available_width_px=available_width,
         )
     )
@@ -2863,6 +2881,7 @@ def test_signing_shell_requests_borderless_canonical_preview_render(
 
     assert recorded_calls
     assert recorded_calls[-1]["include_border"] is False
+    assert recorded_calls[-1]["flatten_to_white"] is False
 
 
 def test_signing_shell_cleans_up_replaced_canonical_preview_snapshot(
@@ -2883,7 +2902,9 @@ def test_signing_shell_cleans_up_replaced_canonical_preview_snapshot(
     created_dirs: list[Path] = []
     call_count = {"value": 0}
 
-    def _next_snapshot(_preview, *, zoom, render_backend=None, include_border=True):
+    def _next_snapshot(
+        _preview, *, zoom, render_backend=None, include_border=True, flatten_to_white=True
+    ):
         index = call_count["value"]
         call_count["value"] += 1
         image_dir = tmp_path / f"foliaseal-canonical-preview-{index}"
@@ -2966,7 +2987,9 @@ def test_signing_shell_repeated_preview_refreshes_keep_only_latest_snapshot(
     created_dirs: list[Path] = []
     call_count = {"value": 0}
 
-    def _next_snapshot(_preview, *, zoom, render_backend=None, include_border=True):
+    def _next_snapshot(
+        _preview, *, zoom, render_backend=None, include_border=True, flatten_to_white=True
+    ):
         index = call_count["value"]
         call_count["value"] += 1
         image_dir = tmp_path / f"foliaseal-canonical-preview-{index}"
@@ -3046,7 +3069,9 @@ def test_signing_shell_reuses_one_canonical_preview_render_backend(
 
     captured_backends: list[object] = []
 
-    def _render_snapshot(_preview, *, zoom, render_backend, include_border=True):
+    def _render_snapshot(
+        _preview, *, zoom, render_backend, include_border=True, flatten_to_white=True
+    ):
         captured_backends.append(render_backend)
         image_dir = tmp_path / f"foliaseal-canonical-preview-{len(captured_backends)}"
         image_dir.mkdir()

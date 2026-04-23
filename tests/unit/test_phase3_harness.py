@@ -31,9 +31,12 @@ from foliaseal.application.qa_signed_acceptance_assets import (
     SIGNED_ACCEPTANCE_FIXTURE_PDF,
     SIGNED_ACCEPTANCE_IDENTITY_P12,
     SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
+    SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
+    SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
+    SignatureBoxStyle,
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
@@ -43,6 +46,7 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
+    SigningResult,
 )
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
@@ -51,6 +55,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
+    _build_signed_run_bundle,
     _capture_headless_preview_render,
     _capture_interactive_state,
     _default_harness_artifacts_dir,
@@ -59,11 +64,14 @@ from foliaseal.presentation.qt.phase3_harness import (
     _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
+    _preview_appearance_snapshot_from_capture,
     _preview_edge_distances,
     _preview_matrix_diagnostic_summary,
     _preview_matrix_error_result,
     _project_content_bounds_to_preview,
+    _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
+    _signed_output_appearance_snapshot,
     _snapshot_backend_reservation,
     _snapshot_current_draft_request,
     _snapshot_output_verification,
@@ -998,6 +1006,155 @@ def test_phase3_harness_capture_to_json_serializes_captured_states() -> None:
     assert payload["captured_states"][1]["capture_kind"] == "final"
 
 
+def test_phase3_harness_capture_to_json_serializes_signed_runs() -> None:
+    capture = Phase3HarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
+        first_render_ms=12.5,
+        selection_count=1,
+        sign_request_count=1,
+        last_signature_page_index=0,
+        last_signature_page_number=1,
+        last_signature_has_visible_appearance=True,
+        last_signature_output_path="/tmp/sample-signed.pdf",
+        last_signing_result_message="Signing completed successfully.",
+        last_signing_result_success=True,
+        preview_snapshot={"title": "Current"},
+        sign_request_snapshot=None,
+        backend_reservation_snapshot=None,
+        backend_reservation_error=None,
+        output_file_exists=True,
+        output_file_size_bytes=1024,
+        output_signature_count=1,
+        output_signature_snapshot={"field_name": "Signature1"},
+        output_visible_appearance_snapshot={"field_name": "Signature1"},
+        preview_available=True,
+        preview_text="Current",
+        validation_text="Ready to sign.",
+        interaction_counts={},
+        errors=(),
+        signed_runs=(
+            {
+                "run_index": 1,
+                "capture_label": "signed_run_01_single_line_top",
+                "preview_snapshot": {"title": "At sign time"},
+                "signing_result": {"success": True, "message": "ok"},
+                "output_pdf_path": "/tmp/sample-signed.pdf",
+            },
+        ),
+    )
+
+    payload = json.loads(capture.to_json())
+
+    assert len(payload["signed_runs"]) == 1
+    assert payload["signed_runs"][0]["run_index"] == 1
+    assert payload["signed_runs"][0]["preview_snapshot"]["title"] == "At sign time"
+
+
+def test_build_signed_run_bundle_freezes_sign_time_state(monkeypatch, tmp_path: Path) -> None:
+    output_pdf = tmp_path / "signed.pdf"
+    output_pdf.write_bytes(b"%PDF-1.7\n")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="signed.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=320.0, height_pt=48.0),
+    )
+    signing_result = SigningResult(
+        success=True,
+        failure_code=None,
+        message="Signing completed successfully.",
+    )
+    sign_time_state = {
+        "capture_label": "signed_run_01_single_line_top",
+        "preview_snapshot": {"title": "Before mutation"},
+        "preview_text": "Before mutation",
+        "validation_text": "Ready to sign.",
+        "sign_request_snapshot": {"output_pdf_path": request.output_pdf_path},
+        "backend_reservation_snapshot": {"stamp_text": "Before mutation"},
+        "backend_reservation_error": None,
+    }
+
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.phase3_harness._snapshot_successful_signed_output",
+        lambda **kwargs: {
+            "output_file_exists": True,
+            "output_file_size_bytes": 9,
+            "output_signature_count": 1,
+            "output_signature_snapshot": {"field_name": "Signature1"},
+            "output_verification_snapshot": {"valid": True},
+            "output_visible_appearance_snapshot": {"field_name": "Signature1"},
+            "signed_output_render_snapshot": {"comparison_path": "compare.png"},
+            "signed_output_preview_comparison": {"preview_vs_signed_output_passed": True},
+        },
+    )
+
+    bundle = _build_signed_run_bundle(
+        run_index=1,
+        sign_time_state=sign_time_state,
+        request=request,
+        signing_result=signing_result,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_run_01_signed_output",
+    )
+
+    sign_time_state["preview_snapshot"]["title"] = "After mutation"
+    sign_time_state["sign_request_snapshot"]["output_pdf_path"] = "mutated.pdf"
+    sign_time_state["backend_reservation_snapshot"]["stamp_text"] = "After mutation"
+
+    assert bundle["preview_snapshot"]["title"] == "Before mutation"
+    assert bundle["sign_request_snapshot"]["output_pdf_path"] == str(output_pdf)
+    assert bundle["backend_reservation_snapshot"]["stamp_text"] == "Before mutation"
+    assert bundle["signed_output_preview_comparison"]["preview_vs_signed_output_passed"] is True
+
+
+def test_phase3_harness_capture_can_preserve_signed_runs_after_later_preview_changes() -> None:
+    capture = Phase3HarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
+        first_render_ms=12.5,
+        selection_count=3,
+        sign_request_count=2,
+        last_signature_page_index=0,
+        last_signature_page_number=1,
+        last_signature_has_visible_appearance=True,
+        last_signature_output_path="/tmp/sample-signed-1.pdf",
+        last_signing_result_message="Visible signature content does not fit.",
+        last_signing_result_success=False,
+        preview_snapshot={"title": "Later rejected draft"},
+        sign_request_snapshot=None,
+        backend_reservation_snapshot=None,
+        backend_reservation_error="Visible signature content does not fit.",
+        output_file_exists=True,
+        output_file_size_bytes=1024,
+        output_signature_count=1,
+        output_signature_snapshot={"field_name": "Signature1"},
+        output_visible_appearance_snapshot={"field_name": "Signature1"},
+        preview_available=True,
+        preview_text="Later rejected draft",
+        validation_text="Visible signature content does not fit.",
+        interaction_counts={"sign_success": 1, "sign_failure": 1},
+        errors=(),
+        signed_runs=(
+            {
+                "run_index": 1,
+                "preview_snapshot": {"title": "Successful sign-time preview"},
+                "signing_result": {"success": True, "message": "Signing completed successfully."},
+                "output_pdf_path": "/tmp/sample-signed-1.pdf",
+            },
+        ),
+    )
+
+    payload = json.loads(capture.to_json())
+
+    assert payload["preview_snapshot"]["title"] == "Later rejected draft"
+    assert payload["signed_runs"][0]["preview_snapshot"]["title"] == "Successful sign-time preview"
+    assert payload["signed_runs"][0]["signing_result"]["success"] is True
+
+
 def test_snapshot_output_verification_reports_cryptographic_details(tmp_path: Path) -> None:
     output_pdf = _write_signed_test_pdf(tmp_path)
 
@@ -1014,6 +1171,8 @@ def test_snapshot_output_verification_reports_cryptographic_details(tmp_path: Pa
 def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_path: Path) -> None:
     preview_path = tmp_path / "preview.png"
     Image.new("RGBA", (120, 48), color=(255, 255, 255, 255)).save(preview_path)
+    analysis_preview_path = tmp_path / "preview_analysis.png"
+    Image.new("RGBA", (120, 48), color=(255, 255, 255, 255)).save(analysis_preview_path)
     output_pdf = tmp_path / "signed.pdf"
     output_pdf.write_bytes(b"%PDF-1.7\n")
 
@@ -1044,9 +1203,15 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
         "foliaseal.presentation.qt.phase3_harness.QtPdfRenderBackend",
         _FakeBackend,
     )
+    detect_calls: list[dict[str, object]] = []
+
+    def _fake_detect(**kwargs):
+        detect_calls.append(kwargs)
+        return ({"x": 14, "y": 12, "width": 64, "height": 18}, None)
+
     monkeypatch.setattr(
         "foliaseal.presentation.qt.phase3_harness._detect_text_content_bounds_in_preview",
-        lambda **kwargs: ({"x": 14, "y": 12, "width": 64, "height": 18}, None),
+        _fake_detect,
     )
     monkeypatch.setattr(
         "foliaseal.presentation.qt.phase3_harness._normalized_image_crop_change_ratio",
@@ -1065,8 +1230,14 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
                 "height_pt": 48.0,
             },
             "text_style": {"text_color_hex": "#000000"},
+            "fields": [
+                {"visible": True, "text": "Morgan Ellery"},
+                {"visible": True, "text": "Northwind Ledger Holdings"},
+                {"visible": True, "text": "2026-04-11 09:00"},
+            ],
             "render_capture": {
                 "preview_image_path": str(preview_path),
+                "analysis_preview_image_path": str(analysis_preview_path),
                 "card_bounds_px": {"x": 0, "y": 0, "width": 120, "height": 48},
                 "text_rendered_content_bounds_px": {"x": 14, "y": 12, "width": 64, "height": 18},
             },
@@ -1084,6 +1255,7 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
             "annotation_rect": [10.0, 20.0, 130.0, 68.0],
             "image_xobject_count": 1,
             "appearance_has_visible_text": True,
+            "appearance_uses_rounded_border": True,
             "text_fragments": [
                 "Morgan Ellery",
                 "Northwind Ledger Holdings",
@@ -1096,10 +1268,26 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
 
     assert snapshot is not None
     assert snapshot["signature_crop_path"] is not None
+    assert snapshot["normalized_signature_crop_path"] is not None
     assert snapshot["comparison_path"] is not None
     assert snapshot["annotation_rect_matches_request"] is True
-    assert snapshot["output_image_presence_matches_preview"] is None
+    assert snapshot["output_image_presence_matches_preview"] is True
     assert snapshot["output_text_bounds_match_preview"] is True
+    assert snapshot["normalized_signed_crop_dimensions_px"] == {"width": 120, "height": 48}
+    assert snapshot["preview_appearance_snapshot"] is not None
+    assert snapshot["signed_output_appearance_snapshot"] is not None
+    assert snapshot["appearance_layer_comparison"] is not None
+    assert snapshot["appearance_layer_comparison"]["border"]["matches"] is True
+    assert snapshot["appearance_layer_comparison"]["text"]["matches"] is True
+    assert snapshot["appearance_layer_comparison"]["stamp"]["matches"] is True
+    assert detect_calls[-1]["preview_image_path"] == snapshot["normalized_signature_crop_path"]
+    assert detect_calls[-1]["text_widget_bounds"] == {"x": 0, "y": 0, "width": 120, "height": 48}
+    assert detect_calls[-1]["reference_text_content_bounds"] == {
+        "x": 14,
+        "y": 12,
+        "width": 64,
+        "height": 18,
+    }
 
 
 def test_snapshot_signed_output_render_composites_transparent_page_over_white(
@@ -1231,13 +1419,85 @@ def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
     assert summary["successful_signing_run_count"] == 2
     assert summary["cryptographic_validation_failure_count"] == 1
     assert summary["preview_output_comparison_failure_count"] == 1
-    assert summary["annotation_rect_mismatch_count"] == 1
-    assert summary["expected_success_scenario_count"] == 2
-    assert summary["expected_intentional_rejection_count"] == 1
-    assert summary["matched_expected_success_count"] == 2
-    assert summary["matched_expected_intentional_rejection_count"] == 1
-    assert summary["expected_outcome_mismatch_count"] == 0
-    assert summary["acceptance_expectation_errors"] == []
+
+
+def test_preview_appearance_snapshot_from_capture_restores_border_style_when_missing() -> None:
+    preview_snapshot = {
+        "box_style": {
+            "show_border": True,
+            "border_color_hex": "#000000",
+            "border_width_pt": 1.0,
+            "background_color_hex": "#FFFFFF",
+        },
+        "render_capture": {
+            "analysis_appearance_snapshot": {
+                "image_path": "analysis.png",
+                "image_size_px": {"width": 320, "height": 42},
+                "container_bounds_px": {"x": 0, "y": 0, "width": 320, "height": 42},
+                "border_bounds_px": None,
+                "border_style": None,
+                "text_bounds_px": {"x": 3, "y": 3, "width": 240, "height": 20},
+                "stamp_bounds_px": None,
+                "text_fragments": [
+                    "Digitally signed by",
+                    "Morgan Ellery | 2026-04-20 00:55:01 UTC",
+                ],
+                "line_bounds_px": [
+                    {"x": 3, "y": 3, "width": 240, "height": 8},
+                    {"x": 3, "y": 15, "width": 240, "height": 8},
+                ],
+            }
+        },
+    }
+
+    snapshot = _preview_appearance_snapshot_from_capture(preview_snapshot=preview_snapshot)
+
+    assert snapshot.border_style is not None
+    assert snapshot.border_style["shape"] == "rounded"
+    assert snapshot.border_bounds_px == {"x": 0, "y": 0, "width": 320, "height": 42}
+    assert snapshot.line_bounds_px == (
+        {"x": 3, "y": 3, "width": 240, "height": 8},
+        {"x": 3, "y": 15, "width": 240, "height": 8},
+    )
+
+
+def test_signed_output_appearance_snapshot_derives_structural_line_bounds() -> None:
+    snapshot = _signed_output_appearance_snapshot(
+        normalized_image_path="signed.png",
+        normalized_image_size={"width": 320, "height": 42},
+        text_bounds_px={"x": 4, "y": 3, "width": 250, "height": 20},
+        line_bounds_px=(
+            {"x": 4, "y": 3, "width": 120, "height": 8},
+            {"x": 4, "y": 15, "width": 250, "height": 8},
+        ),
+        visible_appearance_snapshot={
+            "appearance_uses_rounded_border": True,
+            "text_fragments": ["Digitally signed by", "Morgan Ellery"],
+            "image_xobject_count": 0,
+        },
+        preview_snapshot={
+            "text_style": {
+                "font_family": "Sans Serif",
+                "font_size_pt": 8.5,
+                "bold": False,
+                "italic": False,
+                "text_color_hex": "#000000",
+            },
+            "box_style": {
+                "show_border": True,
+                "border_color_hex": "#000000",
+                "border_width_pt": 1.0,
+                "background_color_hex": "#FFFFFF",
+            },
+            "render_capture": {},
+        },
+    )
+
+    assert len(snapshot.line_bounds_px) == 2
+    assert snapshot.line_bounds_px[0]["x"] == 4
+    assert snapshot.line_bounds_px[0]["y"] == 3
+    assert snapshot.line_bounds_px[1]["y"] > snapshot.line_bounds_px[0]["y"]
+    assert all(line["width"] > 0 for line in snapshot.line_bounds_px)
 
 
 def test_evaluate_signed_matrix_acceptance_expectations_flags_contract_failures() -> None:
@@ -1401,6 +1661,160 @@ def test_capture_interactive_state_collects_preview_and_backend_snapshots(monkey
         "preview_image_path": "artifacts/preview.png"
     }
     assert state["backend_reservation_snapshot"] == {"layout_template": "single_line"}
+
+
+def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_preview(
+    monkeypatch, tmp_path: Path
+) -> None:
+    gui_dir = tmp_path / "gui-preview"
+    gui_dir.mkdir()
+    gui_path = gui_dir / "preview.png"
+    Image.new("RGBA", (40, 20), color=(0, 0, 0, 0)).save(gui_path)
+
+    analysis_dir = tmp_path / "analysis-preview"
+    analysis_dir.mkdir()
+    analysis_path = analysis_dir / "preview.png"
+    Image.new("RGBA", (40, 20), color=(255, 255, 255, 255)).save(analysis_path)
+
+    render_calls: list[dict[str, object]] = []
+
+    def _fake_render(preview, **kwargs):
+        render_calls.append(kwargs)
+        return type(
+            "_Snapshot",
+            (),
+            {
+                "image_path": str(analysis_path),
+                "width_px": 40,
+                "height_px": 20,
+                "text_area_bounds_px": {"x": 0, "y": 0, "width": 40, "height": 20},
+                "stamp_area_bounds_px": None,
+                "text_bounds_px": {"x": 3, "y": 4, "width": 30, "height": 10},
+                "stamp_bounds_px": None,
+            },
+        )()
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "render_canonical_signature_preview",
+        _fake_render,
+    )
+
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "image_stamp_path": None,
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=30.0),
+            "text_style": SignatureTextStyle(
+                font_family="Sans Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+            "box_style": SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+        },
+    )()
+
+    class _FakePanel:
+        def __init__(self) -> None:
+            self.preview_controls = type(
+                "_Controls",
+                (),
+                {
+                    "card_container": type(
+                        "_Card",
+                        (),
+                        {
+                            "_canonical_preview_snapshot": type(
+                                "_Snapshot",
+                                (),
+                                {
+                                    "image_path": str(gui_path),
+                                    "width_px": 40,
+                                    "height_px": 20,
+                                    "text_area_bounds_px": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "width": 40,
+                                        "height": 20,
+                                    },
+                                    "stamp_area_bounds_px": None,
+                                    "text_bounds_px": {"x": 3, "y": 4, "width": 30, "height": 10},
+                                    "stamp_bounds_px": None,
+                                },
+                            )()
+                        },
+                    )(),
+                    "single_body_container": object(),
+                    "multi_body_container": object(),
+                    "detail_label": object(),
+                    "stamp_label": object(),
+                    "multi_detail_label": object(),
+                    "multi_stamp_label": object(),
+                },
+            )()
+            self._canonical_preview_render_backend = object()
+
+    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
+    monkeypatch.setattr(phase3_harness_module, "_widget_is_visible", lambda widget: True)
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_widget_rect_snapshot",
+        lambda widget: {"x": 0, "y": 0, "width": 40, "height": 20},
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_widget_rect_snapshot_relative_to",
+        lambda root, widget: {"x": 0, "y": 0, "width": 40, "height": 20},
+    )
+    monkeypatch.setattr(phase3_harness_module, "_label_alignment_snapshot", lambda label: None)
+    monkeypatch.setattr(phase3_harness_module, "_label_pixmap_size_snapshot", lambda label: None)
+    monkeypatch.setattr(phase3_harness_module, "_layout_spacing", lambda layout: 0)
+    monkeypatch.setattr(phase3_harness_module, "_size_hint_snapshot", lambda widget: None)
+    monkeypatch.setattr(phase3_harness_module, "_text_font_diagnostics", lambda **kwargs: {})
+    monkeypatch.setattr(phase3_harness_module, "_preview_edge_distances", lambda **kwargs: None)
+    monkeypatch.setattr(phase3_harness_module, "_stamp_edge_diagnostics", lambda **kwargs: {})
+    monkeypatch.setattr(phase3_harness_module, "_text_edge_diagnostics", lambda **kwargs: {})
+    monkeypatch.setattr(phase3_harness_module, "_analyze_stamp_source_image", lambda path: {})
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_project_content_bounds_to_preview",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_project_pixmap_bounds_within_label",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(phase3_harness_module, "_image_crop_sha256", lambda **kwargs: None)
+    monkeypatch.setattr(phase3_harness_module, "_write_text_debug_overlay", lambda **kwargs: None)
+    monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
+
+    capture = phase3_harness_module._capture_preview_render(
+        shell=shell,
+        preview=preview,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="interactive_state_01",
+    )
+
+    assert capture["preview_image_path"] is not None
+    assert capture["analysis_preview_image_path"] is not None
+    assert Path(capture["preview_image_path"]).read_bytes() == gui_path.read_bytes()
+    assert Path(capture["analysis_preview_image_path"]).read_bytes() == analysis_path.read_bytes()
+    assert capture["analysis_appearance_snapshot"] is not None
+    assert capture["analysis_appearance_snapshot"]["border_style"]["shape"] == "rounded"
+    assert render_calls
+    assert render_calls[-1]["include_border"] is True
+    assert render_calls[-1]["flatten_to_white"] is True
 
 
 def test_analyze_capture_state_transitions_flags_negligible_font_size_change(
@@ -2911,6 +3325,91 @@ def test_signed_acceptance_manifest_includes_required_positive_and_negative_fami
     assert expected_outcomes["wrapped_block_top_dense_reject"] == "validation_rejection"
 
 
+def test_signed_preview_parity_manifest_exists_and_parses() -> None:
+    manifest = _load_preview_matrix_manifest(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST)
+
+    assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+    assert manifest["fixture_role"] == "signed_preview_parity"
+    assert manifest["timestamping_mode"] == "dummy"
+    assert manifest["acceptance_expectations"]["scenario_count"] >= 17
+    assert (
+        manifest["acceptance_expectations"]["minimum_successful_signing_run_count"]
+        == manifest["acceptance_expectations"]["scenario_count"]
+    )
+    assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] == 0
+    assert all(scenario.get("expected_outcome") == "success" for scenario in manifest["scenarios"])
+
+
+def test_signed_preview_parity_manifest_covers_layout_families_and_positions() -> None:
+    payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
+    names = {scenario["name"] for scenario in payload["scenarios"]}
+    positions = {
+        scenario["appearance_overrides"]["stamp_position"]
+        for scenario in payload["scenarios"]
+    }
+    families = {
+        scenario["appearance_overrides"]["layout_template"]
+        for scenario in payload["scenarios"]
+    }
+
+    assert families == {"single_line", "multi_line", "wrapped_block"}
+    assert {"top", "bottom", "left", "right"} <= positions
+    assert "single_line_top_no_stamp_sparse_large" in names
+    assert "single_line_bottom_no_stamp_sparse_relaxed" in names
+    assert "single_line_left_stamp_sparse_relaxed" in names
+    assert "single_line_right_no_stamp_sparse_relaxed" in names
+    assert "multi_line_bottom_sparse_large" in names
+    assert "multi_line_top_medium_relaxed" in names
+    assert "multi_line_bottom_medium_relaxed" in names
+    assert "wrapped_block_left_sparse_large" in names
+    assert "multi_line_right_medium_large" in names
+    assert "wrapped_block_top_sparse_relaxed" in names
+    assert "wrapped_block_right_medium_relaxed" in names
+    assert "single_line_left_stamp_sparse_large" not in names
+    assert "single_line_right_stamp_sparse_large" not in names
+    assert "wrapped_block_top_dense_large" not in names
+
+
+def test_signed_fit_rejection_manifest_exists_and_parses() -> None:
+    manifest = _load_preview_matrix_manifest(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST)
+
+    assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+    assert manifest["fixture_role"] == "signed_fit_rejection"
+    assert manifest["timestamping_mode"] == "dummy"
+    assert manifest["acceptance_expectations"]["scenario_count"] >= 3
+    assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] == len(
+        manifest["scenarios"]
+    )
+    assert (
+        manifest["acceptance_expectations"].get("minimum_successful_signing_run_count", 0) == 0
+    )
+    assert all(
+        scenario.get("expected_outcome") == "validation_rejection"
+        for scenario in manifest["scenarios"]
+    )
+
+
+def test_signed_fit_rejection_manifest_covers_known_boundary_failures() -> None:
+    payload = json.loads(Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST).read_text())
+    names = {scenario["name"] for scenario in payload["scenarios"]}
+
+    assert names == {
+        "single_line_left_stamp_sparse_large",
+        "single_line_right_stamp_sparse_large",
+        "wrapped_block_top_dense_large",
+    }
+
+
+def test_signed_parity_and_rejection_manifests_are_disjoint() -> None:
+    parity_payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
+    rejection_payload = json.loads(Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST).read_text())
+
+    parity_names = {scenario["name"] for scenario in parity_payload["scenarios"]}
+    rejection_names = {scenario["name"] for scenario in rejection_payload["scenarios"]}
+
+    assert parity_names.isdisjoint(rejection_names)
+
+
 def test_stress_preview_manifests_preserve_expected_family_variants() -> None:
     expectations = {
         "multi_line_full_matrix_stress.json": {
@@ -3195,3 +3694,22 @@ def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
     assert snapshot["annotation_rect_size"] == {"width": 540.0, "height": 120.0}
     assert snapshot["text_fragment_count"] == len(fragments)
     assert snapshot["image_xobject_count"] == snapshot["appearance_image_xobject_count"]
+
+
+def test_render_signed_annotation_appearance_direct_writes_nonblank_image(
+    tmp_path: Path,
+) -> None:
+    output_pdf = _write_signed_test_pdf(tmp_path)
+
+    render = _render_signed_annotation_appearance_direct(
+        output_pdf_path=str(output_pdf),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="direct_appearance",
+    )
+
+    assert render["error"] is None
+    assert render["image_path"] is not None
+    image = Image.open(render["image_path"]).convert("RGBA")
+    white = Image.new("RGBA", image.size, (255, 255, 255, 255))
+    flattened = Image.alpha_composite(white, image)
+    assert any(pixel[:3] != (255, 255, 255) for pixel in flattened.getdata())

@@ -11,3 +11,9 @@ SIGNED_ACCEPTANCE_IDENTITY_P12 = (
 SIGNED_ACCEPTANCE_SCENARIO_MANIFEST = (
     "artifacts/preview_sweep_assets/signed_acceptance_matrix.json"
 )
+SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST = (
+    "artifacts/preview_sweep_assets/signed_preview_parity_matrix.json"
+)
+SIGNED_FIT_REJECTION_SCENARIO_MANIFEST = (
+    "artifacts/preview_sweep_assets/signed_fit_rejection_matrix.json"
+)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -13,9 +14,10 @@ from pyhanko.pdf_utils.content import PdfContent
 from pyhanko.pdf_utils.generic import StreamObject
 from pyhanko.pdf_utils.layout import BoxConstraints
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
-from pyhanko.stamp import TextStamp, TextStampStyle
+from pyhanko.stamp import TextStampStyle
 
 from foliaseal.application.phase3_signing_backend import (
+    RoundedBorderTextStampStyle,
     _background_layout_for_stamp,
     _build_text_box_style,
     _hex_to_rgb,
@@ -35,6 +37,7 @@ from foliaseal.domain.models import (
     SignatureFieldKey,
     SignatureFieldSource,
     SignatureRect,
+    SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
 )
@@ -84,6 +87,42 @@ class CanonicalSignaturePreviewSnapshot:
     stamp_area_bounds_px: dict[str, int] | None
     text_bounds_px: dict[str, int] | None
     stamp_bounds_px: dict[str, int] | None
+    appearance_snapshot: SignatureAppearanceSnapshot | None = None
+
+
+@dataclass(frozen=True)
+class SignatureAppearanceSnapshot:
+    """Normalized structural description of one rendered visible signature."""
+
+    image_path: str | None
+    image_size_px: dict[str, int] | None
+    container_bounds_px: dict[str, int] | None
+    border_bounds_px: dict[str, int] | None
+    border_style: dict[str, Any] | None
+    text_bounds_px: dict[str, int] | None
+    stamp_bounds_px: dict[str, int] | None
+    text_fragments: tuple[str, ...]
+    line_bounds_px: tuple[dict[str, int], ...] = ()
+
+
+@dataclass(frozen=True)
+class SignatureAppearanceLayerComparison:
+    """One structural comparison result for a specific visual layer."""
+
+    layer_name: str
+    matches: bool
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class SignatureAppearanceComparison:
+    """Layered comparison between preview and signed-output appearance snapshots."""
+
+    is_consistent: bool
+    border: SignatureAppearanceLayerComparison
+    text: SignatureAppearanceLayerComparison
+    stamp: SignatureAppearanceLayerComparison
+    composite: SignatureAppearanceLayerComparison
 
 
 @dataclass(frozen=True)
@@ -257,6 +296,7 @@ def render_canonical_signature_preview(
     zoom: float = 2.0,
     render_backend: QtPdfRenderBackend | None = None,
     include_border: bool = True,
+    flatten_to_white: bool = True,
 ) -> CanonicalSignaturePreviewSnapshot | None:
     """Render the visible signature using the canonical stamp engine."""
 
@@ -289,6 +329,7 @@ def render_canonical_signature_preview(
         zoom=zoom,
         output_path=temp_dir / "full.png",
         render_backend=render_backend,
+        flatten_to_white=flatten_to_white,
     )
     text_bounds = _render_optional_preview_bounds(
         preview=preview,
@@ -298,6 +339,7 @@ def render_canonical_signature_preview(
         include_text=True,
         include_stamp=False,
         render_backend=render_backend,
+        flatten_to_white=flatten_to_white,
     )
     stamp_bounds = _render_optional_preview_bounds(
         preview=preview,
@@ -307,6 +349,42 @@ def render_canonical_signature_preview(
         include_text=False,
         include_stamp=True,
         render_backend=render_backend,
+        flatten_to_white=flatten_to_white,
+    )
+    image_size_px = {"width": full_render[1], "height": full_render[2]}
+    container_bounds_px = {
+        "x": 0,
+        "y": 0,
+        "width": full_render[1],
+        "height": full_render[2],
+    }
+    text_box_bounds_px = _layout_rule_bounds_px(
+        full_layout.inner_content_layout,
+        reserved_width_pt=full_layout.reservation.text_box_width_pt,
+        reserved_height_pt=full_layout.reservation.text_box_height_pt,
+        width_px=full_render[1],
+        height_px=full_render[2],
+        container_width_pt=preview.signature_rect.width_pt,
+        container_height_pt=preview.signature_rect.height_pt,
+        include_when_empty=True,
+    )
+    border_style = _appearance_border_style(preview=preview, include_border=include_border)
+    border_bounds_px = container_bounds_px if border_style is not None else None
+    line_bounds_px = _structural_line_bounds_px(
+        text_fragments=tuple(_canonical_preview_text_fragments(preview)),
+        text_style=preview.text_style,
+        text_bounds_px=text_box_bounds_px,
+    )
+    appearance_snapshot = SignatureAppearanceSnapshot(
+        image_path=str(full_render[0]),
+        image_size_px=image_size_px,
+        container_bounds_px=container_bounds_px,
+        border_bounds_px=border_bounds_px,
+        border_style=border_style,
+        text_bounds_px=_union_rectangles(line_bounds_px) or text_box_bounds_px or text_bounds,
+        stamp_bounds_px=stamp_bounds,
+        text_fragments=tuple(_canonical_preview_text_fragments(preview)),
+        line_bounds_px=line_bounds_px,
     )
     return CanonicalSignaturePreviewSnapshot(
         image_path=str(full_render[0]),
@@ -336,8 +414,117 @@ def render_canonical_signature_preview(
                 include_when_empty=False,
             )
         ),
-        text_bounds_px=text_bounds,
+        text_bounds_px=_union_rectangles(line_bounds_px) or text_box_bounds_px or text_bounds,
         stamp_bounds_px=stamp_bounds,
+        appearance_snapshot=appearance_snapshot,
+    )
+
+
+def compare_signature_appearance_snapshots(
+    preview_snapshot: SignatureAppearanceSnapshot,
+    signed_snapshot: SignatureAppearanceSnapshot,
+    *,
+    bounds_tolerance_px: int = 6,
+) -> SignatureAppearanceComparison:
+    """Compare preview and signed appearance snapshots by visual layer."""
+
+    border_reason: str | None = None
+    border_matches = True
+    if bool(preview_snapshot.border_bounds_px) != bool(signed_snapshot.border_bounds_px):
+        border_matches = False
+        border_reason = "Border presence differs between preview and signed output."
+    elif (
+        preview_snapshot.border_bounds_px is not None
+        and signed_snapshot.border_bounds_px is not None
+    ):
+        border_matches = _rectangles_within_tolerance(
+            preview_snapshot.border_bounds_px,
+            signed_snapshot.border_bounds_px,
+            tolerance_px=bounds_tolerance_px,
+        )
+        if not border_matches:
+            border_reason = "Border bounds differ after normalization."
+        elif not _border_style_matches(
+            preview_snapshot.border_style,
+            signed_snapshot.border_style,
+        ):
+            border_matches = False
+            border_reason = "Border style differs between preview and signed output."
+
+    text_reason: str | None = None
+    text_matches = True
+    if _normalized_text_fragments(preview_snapshot.text_fragments) != _normalized_text_fragments(
+        signed_snapshot.text_fragments
+    ):
+        text_matches = False
+        text_reason = "Visible text fragments differ."
+    elif preview_snapshot.line_bounds_px or signed_snapshot.line_bounds_px:
+        if not _line_bounds_within_tolerance(
+            preview_snapshot.line_bounds_px,
+            signed_snapshot.line_bounds_px,
+            tolerance_px=bounds_tolerance_px,
+        ):
+            text_matches = False
+            text_reason = "Rendered text line bounds differ after normalization."
+    elif not _optional_rectangles_within_tolerance(
+        preview_snapshot.text_bounds_px,
+        signed_snapshot.text_bounds_px,
+        tolerance_px=bounds_tolerance_px,
+    ):
+        text_matches = False
+        text_reason = "Rendered text bounds differ after normalization."
+
+    stamp_reason: str | None = None
+    stamp_matches = True
+    if bool(preview_snapshot.stamp_bounds_px) != bool(signed_snapshot.stamp_bounds_px):
+        stamp_matches = False
+        stamp_reason = "Stamp presence differs between preview and signed output."
+    elif not _optional_rectangles_within_tolerance(
+        preview_snapshot.stamp_bounds_px,
+        signed_snapshot.stamp_bounds_px,
+        tolerance_px=bounds_tolerance_px,
+    ):
+        stamp_matches = False
+        stamp_reason = "Rendered stamp bounds differ after normalization."
+
+    composite_matches = preview_snapshot.image_size_px == signed_snapshot.image_size_px
+    composite_reason = (
+        None
+        if composite_matches
+        else "Normalized preview and signed image dimensions differ."
+    )
+
+    border = SignatureAppearanceLayerComparison(
+        layer_name="border",
+        matches=border_matches,
+        reason=border_reason,
+    )
+    text = SignatureAppearanceLayerComparison(
+        layer_name="text",
+        matches=text_matches,
+        reason=text_reason,
+    )
+    stamp = SignatureAppearanceLayerComparison(
+        layer_name="stamp",
+        matches=stamp_matches,
+        reason=stamp_reason,
+    )
+    composite = SignatureAppearanceLayerComparison(
+        layer_name="composite",
+        matches=composite_matches,
+        reason=composite_reason,
+    )
+    return SignatureAppearanceComparison(
+        is_consistent=(
+            border.matches
+            and text.matches
+            and stamp.matches
+            and composite.matches
+        ),
+        border=border,
+        text=text,
+        stamp=stamp,
+        composite=composite,
     )
 
 
@@ -455,6 +642,169 @@ def compare_preview_to_request(
     return SigningPreviewParityReport(is_consistent=not issues, issues=tuple(issues))
 
 
+def _canonical_preview_text_fragments(preview: SigningDraftPreview) -> list[str]:
+    return _rendered_text_fragments(_preview_stamp_text(preview))
+
+
+def _appearance_border_style(
+    *,
+    preview: SigningDraftPreview,
+    include_border: bool,
+) -> dict[str, Any] | None:
+    if preview.box_style is None or not include_border or not preview.box_style.show_border:
+        return None
+    return {
+        "show_border": True,
+        "shape": "rounded",
+        "border_color_hex": preview.box_style.border_color_hex,
+        "border_width_pt": preview.box_style.border_width_pt,
+        "background_color_hex": preview.box_style.background_color_hex,
+    }
+
+
+def _border_style_matches(
+    left: dict[str, Any] | None,
+    right: dict[str, Any] | None,
+) -> bool:
+    if left is None and right is None:
+        return True
+    if left is None or right is None:
+        return False
+    return left == right
+
+
+def _rendered_text_fragments(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def _normalized_text_fragments(fragments: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(_normalize_text_fragment(fragment) for fragment in fragments if fragment.strip())
+
+
+def _normalize_text_fragment(fragment: str) -> str:
+    normalized = re.sub(
+        r"\b\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?(?:\s+[A-Z]{2,5})?\b",
+        "<signing_time>",
+        fragment,
+    )
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def _structural_line_bounds_px(
+    *,
+    text_fragments: tuple[str, ...],
+    text_style: SignatureTextStyle | None,
+    text_bounds_px: dict[str, int] | None,
+) -> tuple[dict[str, int], ...]:
+    if text_style is None or text_bounds_px is None or not text_fragments:
+        return ()
+    text_box_style = _build_text_box_style(text_style)
+    line_metrics: list[tuple[int, int]] = []
+    max_line_width = 0
+    total_line_height = 0
+    for fragment in text_fragments:
+        line_width, line_height = _measure_text_box_dimensions(fragment, text_box_style)
+        line_width = max(1, int(line_width))
+        line_height = max(1, int(line_height))
+        line_metrics.append((line_width, line_height))
+        max_line_width = max(max_line_width, line_width)
+        total_line_height += line_height
+    if max_line_width <= 0 or total_line_height <= 0:
+        return ()
+
+    remaining_height = max(1, int(text_bounds_px["height"]))
+    current_y = int(text_bounds_px["y"])
+    line_bounds: list[dict[str, int]] = []
+    for index, (line_width, line_height) in enumerate(line_metrics):
+        remaining_line_count = len(line_metrics) - index
+        if index == len(line_metrics) - 1:
+            scaled_height = remaining_height
+        else:
+            scaled_height = max(
+                1,
+                int(round(text_bounds_px["height"] * (line_height / total_line_height))),
+            )
+            scaled_height = min(
+                scaled_height,
+                remaining_height - max(0, remaining_line_count - 1),
+            )
+        scaled_width = max(
+            1,
+            min(
+                int(text_bounds_px["width"]),
+                int(round(text_bounds_px["width"] * (line_width / max_line_width))),
+            ),
+        )
+        line_bounds.append(
+            {
+                "x": int(text_bounds_px["x"]),
+                "y": current_y,
+                "width": scaled_width,
+                "height": scaled_height,
+            }
+        )
+        current_y += scaled_height
+        remaining_height -= scaled_height
+    return tuple(line_bounds)
+
+
+def _union_rectangles(
+    rectangles: tuple[dict[str, int], ...],
+) -> dict[str, int] | None:
+    if not rectangles:
+        return None
+    min_x = min(rect["x"] for rect in rectangles)
+    min_y = min(rect["y"] for rect in rectangles)
+    max_x = max(rect["x"] + rect["width"] for rect in rectangles)
+    max_y = max(rect["y"] + rect["height"] for rect in rectangles)
+    return {
+        "x": min_x,
+        "y": min_y,
+        "width": max_x - min_x,
+        "height": max_y - min_y,
+    }
+
+
+def _optional_rectangles_within_tolerance(
+    left: dict[str, int] | None,
+    right: dict[str, int] | None,
+    *,
+    tolerance_px: int,
+) -> bool:
+    if left is None and right is None:
+        return True
+    if left is None or right is None:
+        return False
+    return _rectangles_within_tolerance(left, right, tolerance_px=tolerance_px)
+
+
+def _rectangles_within_tolerance(
+    left: dict[str, int],
+    right: dict[str, int],
+    *,
+    tolerance_px: int,
+) -> bool:
+    for key in ("x", "y", "width", "height"):
+        if abs(int(left[key]) - int(right[key])) > tolerance_px:
+            return False
+    return True
+
+
+def _line_bounds_within_tolerance(
+    left: tuple[dict[str, int], ...],
+    right: tuple[dict[str, int], ...],
+    *,
+    tolerance_px: int,
+) -> bool:
+    if len(left) != len(right):
+        return False
+    return all(
+        _rectangles_within_tolerance(left_rect, right_rect, tolerance_px=tolerance_px)
+        for left_rect, right_rect in zip(left, right, strict=True)
+    )
+
+
 def _preview_stamp_text(preview: SigningDraftPreview) -> str:
     title_text = (preview.signer_label_prefix or preview.title or "").strip()
     detail_text = (preview.detail_text or "").strip()
@@ -555,7 +905,7 @@ def _canonical_preview_layout(
         box_style=preview.box_style,
     )
     return _CanonicalPreviewLayout(
-        style=TextStampStyle(
+        style=RoundedBorderTextStampStyle(
             border_width=(
                 max(0, int(round(preview.box_style.border_width_pt)))
                 if preview.box_style.show_border and include_text and include_border
@@ -596,12 +946,13 @@ def _render_optional_preview_bounds(
     include_text: bool,
     include_stamp: bool,
     render_backend: QtPdfRenderBackend | None,
+    flatten_to_white: bool,
 ) -> dict[str, int] | None:
     if not include_text and not include_stamp:
         return None
     if include_stamp and layout.style.background is None:
         return None
-    style = TextStampStyle(
+    style = RoundedBorderTextStampStyle(
         border_width=0,
         border_color=layout.style.border_color,
         background=layout.style.background if include_stamp else None,
@@ -618,6 +969,7 @@ def _render_optional_preview_bounds(
         zoom=zoom,
         output_path=output_path,
         render_backend=render_backend,
+        flatten_to_white=flatten_to_white,
     )
     with Image.open(image_path) as image:
         rgba_image = image.convert("RGBA")
@@ -631,6 +983,7 @@ def _render_preview_style(
     zoom: float,
     output_path: Path,
     render_backend: QtPdfRenderBackend | None,
+    flatten_to_white: bool,
 ) -> tuple[Path, int, int]:
     width_pt = max(1, int(round(signature_rect.width_pt)))
     height_pt = max(1, int(round(signature_rect.height_pt)))
@@ -641,10 +994,10 @@ def _render_preview_style(
         media_box=(0, 0, width_pt, height_pt),
     )
     writer.insert_page(page)
-    stamp = TextStamp(
+    stamp = style.create_stamp(
         writer,
-        style,
         box=BoxConstraints(width=width_pt, height=height_pt),
+        text_params={},
     )
     stamp.apply(0, 0, 0)
     pdf_path = output_path.with_suffix(".pdf")
@@ -663,9 +1016,12 @@ def _render_preview_style(
         (render.width_px, render.height_px),
         render.rgba_bytes,
     )
-    flattened = Image.new("RGBA", image.size, (255, 255, 255, 255))
-    flattened.alpha_composite(image)
-    flattened.save(output_path)
+    if flatten_to_white:
+        flattened = Image.new("RGBA", image.size, (255, 255, 255, 255))
+        flattened.alpha_composite(image)
+        flattened.save(output_path)
+    else:
+        image.save(output_path)
     pdf_path.unlink(missing_ok=True)
     return output_path, render.width_px, render.height_px
 

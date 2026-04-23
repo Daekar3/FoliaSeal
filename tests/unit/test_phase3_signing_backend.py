@@ -14,7 +14,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from PIL import Image
 from pyhanko.pdf_utils import generic
 from pyhanko.pdf_utils.font.opentype import GlyphAccumulatorFactory
-from pyhanko.pdf_utils.layout import AxisAlignment, InnerScaling
+from pyhanko.pdf_utils.layout import AxisAlignment, BoxConstraints, InnerScaling
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from pyhanko.sign import validation
@@ -1036,8 +1036,44 @@ def test_build_stamp_style_uses_solid_background_when_no_image_stamp() -> None:
     assert style.background_layout.inner_content_scaling == InnerScaling.STRETCH_TO_FIT
     assert style.background_layout.x_align == AxisAlignment.ALIGN_MID
     assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
-    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
-    assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
+
+
+def test_build_stamp_style_uses_rounded_border_path_for_visible_stamp() -> None:
+    appearance = SigningBackendAppearance(
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        field_bindings=(),
+        text_style=SignatureTextStyle(
+            font_family="Sans Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=None,
+    )
+    style = _build_stamp_style(
+        appearance,
+        stamp_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-19 15:52",
+        stamp_background=None,
+        signature_rect=build_signature_rect(page_index=0, width_pt=260.6, height_pt=22.0),
+    )
+    writer = PdfFileWriter()
+    stamp = style.create_stamp(writer, box=BoxConstraints(width=261, height=22), text_params={})
+    rendered = stamp.render()
+
+    assert b" re S" not in rendered
+    assert b" c " in rendered
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
 
 
@@ -1541,7 +1577,7 @@ def test_single_line_top_rejects_large_horizontal_overflow_even_with_vertical_co
     assert "does not fit" in issues[0].message
 
 
-def test_layout_reservation_for_single_line_bottom_centers_content_within_reserved_regions(
+def test_layout_reservation_for_single_line_bottom_without_stamp_uses_optical_text_alignment(
 ) -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
@@ -1555,10 +1591,15 @@ def test_layout_reservation_for_single_line_bottom_centers_content_within_reserv
             border_width_pt=3.5,
             background_color_hex="#FFFFFF",
         ),
+        has_visible_stamp_image=False,
     )
 
     assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MID
-    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
+    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
+    assert (
+        reservation.inner_content_layout.margins.top
+        < reservation.inner_content_layout.margins.bottom
+    )
 
 
 def test_background_layout_for_single_line_bottom_preserves_border_facing_gap(

@@ -10,12 +10,16 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.signing_preview_renderer import (
+    SignatureAppearanceSnapshot,
+    compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
 )
 from foliaseal.domain.models import (
+    SignatureBoxStyle,
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureStampPosition,
+    SignatureTextStyle,
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
@@ -257,6 +261,132 @@ def test_canonical_preview_renderer_produces_raster_and_bounds(tmp_path: Path) -
     assert snapshot.height_px > 0
     assert snapshot.text_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
+    assert snapshot.appearance_snapshot.image_path == snapshot.image_path
+    assert snapshot.appearance_snapshot.border_style is not None
+    assert snapshot.appearance_snapshot.text_fragments
+
+
+def test_canonical_preview_renderer_optically_centers_no_stamp_single_line_text(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            image_stamp_path=None,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M:%S %Z",
+            text_style=SignatureTextStyle(
+                font_family="Sans Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+            box_style=SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Morgan Ellery",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Board Secretary",
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="FoliaSeal",
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="2026-04-19 01:18",
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(
+        build_signature_rect(page_index=2, width_pt=260.612, height_pt=23.554)
+    )
+
+    snapshot = render_canonical_signature_preview(
+        workflow.preview(),
+        zoom=1.0,
+        include_border=False,
+    )
+
+    assert snapshot is not None
+    assert snapshot.stamp_area_bounds_px is None
+    assert snapshot.stamp_bounds_px is None
+    assert snapshot.text_area_bounds_px is not None
+    assert snapshot.text_bounds_px is not None
+
+    top_gap = snapshot.text_bounds_px["y"] - snapshot.text_area_bounds_px["y"]
+    bottom_gap = (
+        snapshot.text_area_bounds_px["y"] + snapshot.text_area_bounds_px["height"]
+    ) - (
+        snapshot.text_bounds_px["y"] + snapshot.text_bounds_px["height"]
+    )
+
+    assert bottom_gap >= 0
+    assert abs(top_gap - bottom_gap) <= 2
+
+
+def test_canonical_preview_renderer_can_preserve_transparency_for_gui_use(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            image_stamp_path=None,
+        )
+    )
+    workflow.set_signature_rect(
+        build_signature_rect(page_index=2, width_pt=260.0, height_pt=24.0)
+    )
+
+    snapshot = render_canonical_signature_preview(
+        workflow.preview(),
+        zoom=1.0,
+        include_border=False,
+        flatten_to_white=False,
+    )
+
+    assert snapshot is not None
+    with Image.open(snapshot.image_path).convert("RGBA") as image:
+        alpha_values = {
+            image.getpixel((x, y))[3]
+            for y in range(image.height)
+            for x in range(image.width)
+        }
+
+    assert 0 in alpha_values
 
 
 def test_canonical_preview_renderer_keeps_multi_line_top_stamp_and_text_bounds_separate(
@@ -617,3 +747,125 @@ def test_canonical_preview_renderer_preserves_left_inset_for_wrapped_block_left_
     assert snapshot.stamp_area_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
     assert snapshot.stamp_bounds_px["x"] > snapshot.stamp_area_bounds_px["x"]
+
+
+def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:
+    preview = SignatureAppearanceSnapshot(
+        image_path="preview.png",
+        image_size_px={"width": 120, "height": 40},
+        container_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_style={"show_border": True, "shape": "rounded"},
+        text_bounds_px={"x": 8, "y": 10, "width": 90, "height": 12},
+        stamp_bounds_px=None,
+        text_fragments=("Morgan Ellery", "2026-04-11 09:00"),
+        line_bounds_px=(),
+    )
+    signed = SignatureAppearanceSnapshot(
+        image_path="signed.png",
+        image_size_px={"width": 120, "height": 40},
+        container_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_style={"show_border": True, "shape": "square"},
+        text_bounds_px={"x": 8, "y": 10, "width": 90, "height": 12},
+        stamp_bounds_px=None,
+        text_fragments=("Morgan Ellery", "2026-04-11 09:00"),
+        line_bounds_px=(),
+    )
+
+    comparison = compare_signature_appearance_snapshots(preview, signed)
+
+    assert comparison.is_consistent is False
+    assert comparison.border.matches is False
+    assert comparison.border.reason == "Border style differs between preview and signed output."
+    assert comparison.text.matches is True
+    assert comparison.stamp.matches is True
+
+
+def test_compare_signature_appearance_snapshots_normalizes_signing_time_text() -> None:
+    preview = SignatureAppearanceSnapshot(
+        image_path="preview.png",
+        image_size_px={"width": 120, "height": 40},
+        container_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_style={"show_border": True, "shape": "rounded"},
+        text_bounds_px={"x": 8, "y": 10, "width": 90, "height": 12},
+        stamp_bounds_px=None,
+        text_fragments=("Digitally signed by", "Morgan Ellery | 2026-04-20 00:55:03 UTC"),
+        line_bounds_px=(),
+    )
+    signed = SignatureAppearanceSnapshot(
+        image_path="signed.png",
+        image_size_px={"width": 120, "height": 40},
+        container_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_style={"show_border": True, "shape": "rounded"},
+        text_bounds_px={"x": 8, "y": 10, "width": 90, "height": 12},
+        stamp_bounds_px=None,
+        text_fragments=("Digitally signed by", "Morgan Ellery | 2026-04-20 00:55:04 UTC"),
+        line_bounds_px=(),
+    )
+
+    comparison = compare_signature_appearance_snapshots(preview, signed)
+
+    assert comparison.text.matches is True
+
+
+def test_compare_signature_appearance_snapshots_prefers_line_bounds_when_available() -> None:
+    preview = SignatureAppearanceSnapshot(
+        image_path="preview.png",
+        image_size_px={"width": 120, "height": 40},
+        container_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_style={"show_border": True, "shape": "rounded"},
+        text_bounds_px={"x": 8, "y": 10, "width": 90, "height": 20},
+        stamp_bounds_px=None,
+        text_fragments=("Digitally signed by", "Morgan Ellery"),
+        line_bounds_px=(
+            {"x": 8, "y": 10, "width": 70, "height": 8},
+            {"x": 8, "y": 22, "width": 90, "height": 8},
+        ),
+    )
+    signed = SignatureAppearanceSnapshot(
+        image_path="signed.png",
+        image_size_px={"width": 120, "height": 40},
+        container_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_bounds_px={"x": 0, "y": 0, "width": 120, "height": 40},
+        border_style={"show_border": True, "shape": "rounded"},
+        text_bounds_px={"x": 8, "y": 10, "width": 90, "height": 20},
+        stamp_bounds_px=None,
+        text_fragments=("Digitally signed by", "Morgan Ellery"),
+        line_bounds_px=(
+            {"x": 8, "y": 10, "width": 70, "height": 8},
+            {"x": 18, "y": 22, "width": 90, "height": 8},
+        ),
+    )
+
+    comparison = compare_signature_appearance_snapshots(preview, signed)
+
+    assert comparison.text.matches is False
+    assert comparison.text.reason == "Rendered text line bounds differ after normalization."
+
+
+def test_render_canonical_preview_includes_title_in_text_fragments(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            show_field_names=False,
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=320.0, height_pt=42.0))
+
+    snapshot = render_canonical_signature_preview(workflow.preview())
+
+    assert snapshot is not None
+    assert snapshot.appearance_snapshot is not None
+    assert snapshot.appearance_snapshot.text_fragments[0] == "Digitally signed by"
+    assert len(snapshot.appearance_snapshot.line_bounds_px) == len(
+        snapshot.appearance_snapshot.text_fragments
+    )
+    assert (
+        snapshot.appearance_snapshot.line_bounds_px[0]["y"]
+        < snapshot.appearance_snapshot.line_bounds_px[1]["y"]
+    )

@@ -348,7 +348,14 @@ def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
             return None
 
     class _RenderOptions:
-        pass
+        class RenderFlag:
+            Annotations = 1
+
+        def __init__(self):
+            self.flags = None
+
+        def setRenderFlags(self, flags):
+            self.flags = flags
 
     document = _Document()
     backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
@@ -374,6 +381,7 @@ def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
     assert image_size.width == 2
     assert image_size.height == 2
     assert isinstance(render_opts, _RenderOptions)
+    assert render_opts.flags == _RenderOptions.RenderFlag.Annotations
 
 
 def test_qt_backend_extract_image_bytes_supports_memoryview_style_tobytes() -> None:

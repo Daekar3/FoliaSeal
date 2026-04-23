@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 from collections import Counter
+from copy import deepcopy
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -16,7 +17,9 @@ from time import perf_counter
 from typing import Any
 
 from PIL import Image, ImageDraw
+from pyhanko.pdf_utils import generic
 from pyhanko.pdf_utils.reader import PdfFileReader
+from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from pyhanko.sign import validation
 from pyhanko_certvalidator import ValidationContext
 
@@ -30,11 +33,15 @@ from foliaseal.application.coordinate_transform import (
 from foliaseal.application.phase3_signing_backend import (
     _build_stamp_style,
     _build_stamp_text,
+    _build_text_box_style,
     _current_signing_time,
     _effective_layout_edge_margin,
+    _layout_reservation_for_template,
     _load_simple_signer,
+    _measure_text_box_dimensions,
     _single_line_vertical_outer_margin,
     _stamp_background_for_path,
+    _stamp_image_aspect_ratio,
     build_phase3_signing_executor,
 )
 from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
@@ -44,6 +51,10 @@ from foliaseal.application.qa_preview_stress_fixtures import (
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signature_font_registry import preview_font_family_supported
 from foliaseal.application.signing_preview_renderer import (
+    SignatureAppearanceSnapshot,
+    _layout_rule_bounds_px,
+    _structural_line_bounds_px,
+    compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
 )
 from foliaseal.application.viewer_session import ViewerSession
@@ -118,6 +129,7 @@ class Phase3HarnessCapture:
     output_verification_snapshot: dict[str, Any] | None = None
     signed_output_render_snapshot: dict[str, Any] | None = None
     signed_output_preview_comparison: dict[str, Any] | None = None
+    signed_runs: tuple[dict[str, Any], ...] = ()
     captured_states: tuple[dict[str, Any], ...] = ()
     captured_state_transition_diagnostics: tuple[dict[str, Any], ...] = ()
 
@@ -551,6 +563,7 @@ def run_phase3_signing_harness(
     sign_executor = build_phase3_signing_executor()
 
     sign_requests: list[SigningRequest] = []
+    signed_runs: list[dict[str, Any]] = []
     errors: list[str] = []
     interaction_counts: Counter[str] = Counter()
 
@@ -588,6 +601,37 @@ def run_phase3_signing_harness(
 
     def on_status_change(name: str) -> None:
         interaction_counts[name] += 1
+        if name != "sign_success" or not sign_requests:
+            return
+        signing_result = getattr(shell, "last_signing_result", None)
+        if not isinstance(signing_result, SigningResult) or not signing_result.success:
+            return
+        request = sign_requests[-1]
+        run_index = len(signed_runs) + 1
+        sign_time_state = _capture_interactive_state(
+            shell=shell,
+            request=request,
+            artifacts_dir=artifacts_dir,
+            artifact_basename=(
+                f"signed_run_{run_index:02d}_preview" if artifacts_dir is not None else None
+            ),
+            capture_index=run_index,
+            capture_kind="signed_run",
+        )
+        signed_runs.append(
+            _build_signed_run_bundle(
+                run_index=run_index,
+                sign_time_state=sign_time_state,
+                request=request,
+                signing_result=signing_result,
+                artifacts_dir=artifacts_dir,
+                artifact_basename=(
+                    f"signed_run_{run_index:02d}_signed_output"
+                    if artifacts_dir is not None
+                    else None
+                ),
+            )
+        )
 
     shell = build_qt_signing_shell(
         viewer_workflow=viewer_workflow,
@@ -702,7 +746,19 @@ def run_phase3_signing_harness(
     output_verification_snapshot = None
     output_visible_appearance_snapshot = None
     signed_output_render_snapshot = None
-    if output_path is not None:
+    if signed_runs:
+        latest_signed_run = _mapping(signed_runs[-1])
+        output_path = latest_signed_run.get("output_pdf_path")
+        output_exists = bool(latest_signed_run.get("output_file_exists"))
+        output_size_bytes = latest_signed_run.get("output_file_size_bytes")
+        output_signature_count = latest_signed_run.get("output_signature_count")
+        output_signature_snapshot = latest_signed_run.get("output_signature_snapshot")
+        output_verification_snapshot = latest_signed_run.get("output_verification_snapshot")
+        output_visible_appearance_snapshot = latest_signed_run.get(
+            "output_visible_appearance_snapshot"
+        )
+        signed_output_render_snapshot = latest_signed_run.get("signed_output_render_snapshot")
+    elif output_path is not None:
         output_file = Path(output_path)
         output_exists = output_file.exists()
         if output_exists:
@@ -810,6 +866,7 @@ def run_phase3_signing_harness(
         "validation_text": validation_text,
         "interaction_counts": dict(sorted(interaction_counts.items())),
         "errors": tuple(errors),
+        "signed_runs": tuple(signed_runs),
         "captured_states": tuple(captured_states + [final_state]),
     }
     capture_payload["captured_state_transition_diagnostics"] = (
@@ -843,6 +900,7 @@ def run_phase3_signing_harness(
         output_visible_appearance_snapshot=capture_payload["output_visible_appearance_snapshot"],
         signed_output_render_snapshot=capture_payload["signed_output_render_snapshot"],
         signed_output_preview_comparison=capture_payload["signed_output_preview_comparison"],
+        signed_runs=capture_payload["signed_runs"],
         preview_available=capture_payload["preview_available"],
         preview_text=capture_payload["preview_text"],
         validation_text=capture_payload["validation_text"],
@@ -957,6 +1015,173 @@ def _interactive_capture_label(*, preview, capture_index: int, capture_kind: str
     return f"{capture_kind}_{capture_index:02d}_{layout_name}_{stamp_name}"
 
 
+def _snapshot_signing_result_payload(signing_result: SigningResult) -> dict[str, Any]:
+    return {
+        "success": signing_result.success,
+        "failure_code": (
+            signing_result.failure_code.value
+            if getattr(signing_result, "failure_code", None) is not None
+            else None
+        ),
+        "message": signing_result.message,
+        "output_pdf_version": signing_result.output_pdf_version,
+        "signature_subfilter": signing_result.signature_subfilter,
+        "timestamp_present": signing_result.timestamp_present,
+        "timestamp_cryptographically_valid": signing_result.timestamp_cryptographically_valid,
+        "tsa_chain_trusted": signing_result.tsa_chain_trusted,
+        "timestamp_validation_error": signing_result.timestamp_validation_error,
+        "docmdp_permission": signing_result.docmdp_permission,
+        "certification_restricted": signing_result.certification_restricted,
+        "restriction_reason": signing_result.restriction_reason,
+        "operation_type": (
+            signing_result.operation_type.value
+            if getattr(signing_result, "operation_type", None) is not None
+            else None
+        ),
+        "revision_strategy": (
+            signing_result.revision_strategy.value
+            if getattr(signing_result, "revision_strategy", None) is not None
+            else None
+        ),
+        "standards_summary": signing_result.standards_summary,
+    }
+
+
+def _signed_output_preview_comparison_snapshot(
+    signed_output_render_snapshot: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if signed_output_render_snapshot is None:
+        return None
+    return {
+        "page_render_path": signed_output_render_snapshot.get("page_render_path"),
+        "signature_crop_path": signed_output_render_snapshot.get("signature_crop_path"),
+        "normalized_signature_crop_path": signed_output_render_snapshot.get(
+            "normalized_signature_crop_path"
+        ),
+        "comparison_path": signed_output_render_snapshot.get("comparison_path"),
+        "preview_crop_bounds_px": signed_output_render_snapshot.get("preview_crop_bounds_px"),
+        "signed_crop_bounds_px": signed_output_render_snapshot.get("signed_crop_bounds_px"),
+        "preview_vs_signed_output_change_ratio": signed_output_render_snapshot.get(
+            "preview_vs_signed_output_change_ratio"
+        ),
+        "preview_vs_signed_output_aspect_ratio_delta": signed_output_render_snapshot.get(
+            "preview_vs_signed_output_aspect_ratio_delta"
+        ),
+        "preview_text_fragments_match_output": signed_output_render_snapshot.get(
+            "preview_text_fragments_match_output"
+        ),
+        "annotation_rect_matches_request": signed_output_render_snapshot.get(
+            "annotation_rect_matches_request"
+        ),
+        "output_text_bounds_match_preview": signed_output_render_snapshot.get(
+            "output_text_bounds_match_preview"
+        ),
+        "output_image_presence_matches_preview": signed_output_render_snapshot.get(
+            "output_image_presence_matches_preview"
+        ),
+        "preview_vs_signed_output_passed": signed_output_render_snapshot.get(
+            "preview_vs_signed_output_passed"
+        ),
+        "preview_vs_signed_output_error": signed_output_render_snapshot.get("comparison_error")
+        or signed_output_render_snapshot.get("signature_crop_error")
+        or signed_output_render_snapshot.get("page_render_error"),
+        "appearance_layer_comparison": signed_output_render_snapshot.get(
+            "appearance_layer_comparison"
+        ),
+    }
+
+
+def _snapshot_successful_signed_output(
+    *,
+    output_file: Path,
+    page_index: int | None,
+    preview_snapshot: dict[str, Any],
+    preview_text: str,
+    trust_policy: TimestampTrustPolicy | None,
+    artifacts_dir: str | None,
+    artifact_basename: str | None,
+) -> dict[str, Any]:
+    output_signature_count = _count_embedded_signatures(output_file)
+    output_signature_snapshot = _snapshot_output_signature(output_file)
+    output_verification_snapshot = _snapshot_output_verification(
+        output_file,
+        trust_policy=trust_policy,
+    )
+    output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(output_file)
+    signed_output_render_snapshot = _snapshot_signed_output_render(
+        output_pdf_path=str(output_file),
+        page_index=page_index,
+        preview_snapshot=preview_snapshot,
+        preview_text=preview_text,
+        output_visible_appearance_snapshot=output_visible_appearance_snapshot,
+        artifacts_dir=artifacts_dir,
+        artifact_basename=artifact_basename,
+    )
+    return {
+        "output_file_exists": True,
+        "output_file_size_bytes": output_file.stat().st_size,
+        "output_signature_count": output_signature_count,
+        "output_signature_snapshot": output_signature_snapshot,
+        "output_verification_snapshot": output_verification_snapshot,
+        "output_visible_appearance_snapshot": output_visible_appearance_snapshot,
+        "signed_output_render_snapshot": signed_output_render_snapshot,
+        "signed_output_preview_comparison": _signed_output_preview_comparison_snapshot(
+            signed_output_render_snapshot
+        ),
+    }
+
+
+def _build_signed_run_bundle(
+    *,
+    run_index: int,
+    sign_time_state: dict[str, Any],
+    request: SigningRequest,
+    signing_result: SigningResult,
+    artifacts_dir: str | None,
+    artifact_basename: str | None,
+) -> dict[str, Any]:
+    bundle = {
+        "run_index": run_index,
+        "capture_label": sign_time_state.get("capture_label"),
+        "preview_snapshot": deepcopy(sign_time_state.get("preview_snapshot")),
+        "preview_text": sign_time_state.get("preview_text"),
+        "validation_text": sign_time_state.get("validation_text"),
+        "sign_request_snapshot": deepcopy(sign_time_state.get("sign_request_snapshot")),
+        "backend_reservation_snapshot": deepcopy(
+            sign_time_state.get("backend_reservation_snapshot")
+        ),
+        "backend_reservation_error": sign_time_state.get("backend_reservation_error"),
+        "signing_result": _snapshot_signing_result_payload(signing_result),
+        "output_pdf_path": request.output_pdf_path,
+        "output_file_exists": False,
+        "output_file_size_bytes": None,
+        "output_signature_count": None,
+        "output_signature_snapshot": None,
+        "output_verification_snapshot": None,
+        "output_visible_appearance_snapshot": None,
+        "signed_output_render_snapshot": None,
+        "signed_output_preview_comparison": None,
+    }
+    output_file = Path(request.output_pdf_path)
+    if signing_result.success and output_file.exists():
+        bundle.update(
+            _snapshot_successful_signed_output(
+                output_file=output_file,
+                page_index=(
+                    request.signature_rect.page_index
+                    if request.signature_rect is not None
+                    else None
+                ),
+                preview_snapshot=_mapping(sign_time_state.get("preview_snapshot")),
+                preview_text=str(sign_time_state.get("preview_text", "")),
+                trust_policy=request.trust_policy,
+                artifacts_dir=artifacts_dir,
+                artifact_basename=artifact_basename,
+            )
+        )
+    return bundle
+
+
 def run_phase3_preview_matrix(
     *,
     pdf_path: str,
@@ -1003,7 +1228,10 @@ def run_phase3_preview_matrix(
         "results": results,
     }
     summary_path = artifact_root / "summary.json"
-    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary_path.write_text(
+        json.dumps(_jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return summary
 
 
@@ -1117,7 +1345,10 @@ def run_phase3_signed_acceptance_matrix(
     summary["acceptance_expectations_passed"] = expectations_passed
     summary["acceptance_expectation_errors"] = expectation_errors
     summary_path = artifact_root / "summary.json"
-    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary_path.write_text(
+        json.dumps(_jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     return summary
 
 
@@ -1363,6 +1594,7 @@ def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] 
                 1 for item in xobject_summaries if item.get("subtype") == "/Image"
             )
             appearance_bbox = _snapshot_pdf_rect(appearance_stream.get("/BBox"))
+            rounded_border = _appearance_text_uses_rounded_border(appearance_text)
             return {
                 "field_name": signature.field_name,
                 "annotation_rect": rect,
@@ -1381,9 +1613,114 @@ def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] 
                 "appearance_bbox_size": _snapshot_rect_size(appearance_bbox),
                 "text_fragment_count": len(text_fragments),
                 "image_xobject_count": image_xobject_count,
+                "appearance_uses_rounded_border": rounded_border,
             }
     except Exception as exc:
         return {"error": str(exc)}
+
+
+def _render_signed_annotation_appearance_direct(
+    *,
+    output_pdf_path: str,
+    artifacts_dir: str,
+    artifact_basename: str,
+    zoom: float = 3.0,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "image_path": None,
+        "image_size_px": None,
+        "wrapper_pdf_path": None,
+        "error": None,
+    }
+    try:
+        output_path = Path(output_pdf_path)
+        with output_path.open("rb") as handle:
+            reader = PdfFileReader(handle)
+            embedded_signatures = list(reader.embedded_signatures)
+            if not embedded_signatures:
+                result["error"] = "Signed PDF does not contain an embedded signature."
+                return result
+            signature = embedded_signatures[-1]
+            appearance_dict = signature.sig_field.get("/AP")
+            if appearance_dict is None or appearance_dict.get("/N") is None:
+                result["error"] = "Signed PDF does not contain a normal appearance stream."
+                return result
+            normal_appearance = appearance_dict["/N"]
+
+            writer = PdfFileWriter()
+            imported_appearance = writer.import_object(normal_appearance)
+            appearance_ref = writer.add_object(imported_appearance)
+            bbox = _snapshot_pdf_rect(imported_appearance.get("/BBox"))
+            if bbox is None:
+                result["error"] = "Signed appearance stream does not define a /BBox."
+                return result
+            left, bottom, right, top = bbox
+            min_x = min(left, right)
+            max_x = max(left, right)
+            min_y = min(bottom, top)
+            max_y = max(bottom, top)
+            width = max(1.0, max_x - min_x)
+            height = max(1.0, max_y - min_y)
+
+            page_resources = generic.DictionaryObject(
+                {
+                    generic.pdf_name("/XObject"): generic.DictionaryObject(
+                        {generic.pdf_name("/Fx"): appearance_ref}
+                    )
+                }
+            )
+            content_stream = generic.StreamObject(
+                stream_data=(
+                    f"q 1 0 0 1 {-min_x} {-min_y} cm /Fx Do Q".encode("ascii")
+                )
+            )
+            stream_ref = writer.add_object(content_stream)
+            page = PageObject(
+                contents=stream_ref,
+                media_box=(0, 0, width, height),
+                resources=page_resources,
+            )
+            writer.insert_page(page)
+
+            target_dir = Path(artifacts_dir)
+            target_dir.mkdir(parents=True, exist_ok=True)
+            wrapper_pdf_path = target_dir / f"{artifact_basename}_signed_output_appearance.pdf"
+            with wrapper_pdf_path.open("wb") as handle:
+                writer.write(handle)
+            result["wrapper_pdf_path"] = str(wrapper_pdf_path)
+
+        backend = QtPdfRenderBackend()
+        diagnostic = backend.diagnostics()
+        if not diagnostic.available:
+            result["error"] = diagnostic.message
+            return result
+
+        render = backend.render_page(
+            RenderPageRequest(
+                document_path=str(wrapper_pdf_path),
+                page_index=0,
+                zoom=zoom,
+            )
+        )
+        image = Image.frombytes("RGBA", (render.width_px, render.height_px), render.rgba_bytes)
+        image_path = target_dir / f"{artifact_basename}_signed_output_appearance.png"
+        image.save(image_path)
+        result["image_path"] = str(image_path)
+        result["image_size_px"] = {"width": render.width_px, "height": render.height_px}
+        return result
+    except Exception as exc:
+        result["error"] = str(exc)
+        return result
+
+
+def _appearance_text_uses_rounded_border(appearance_text: str) -> bool | None:
+    if not appearance_text.strip():
+        return None
+    if " c " in appearance_text or appearance_text.strip().startswith("c "):
+        return True
+    if " re S" in appearance_text or "\nre\nS" in appearance_text:
+        return False
+    return None
 
 
 def _status_has_timestamp_for_snapshot(status: Any) -> bool:
@@ -1444,6 +1781,7 @@ def _snapshot_signed_output_render(
         "page_number": page_index + 1,
         "page_render_path": None,
         "signature_crop_path": None,
+        "normalized_signature_crop_path": None,
         "comparison_path": None,
         "page_render_error": None,
         "signature_crop_error": None,
@@ -1452,6 +1790,7 @@ def _snapshot_signed_output_render(
         "signed_crop_bounds_px": None,
         "preview_crop_dimensions_px": None,
         "signed_crop_dimensions_px": None,
+        "normalized_signed_crop_dimensions_px": None,
         "preview_vs_signed_output_change_ratio": None,
         "preview_vs_signed_output_aspect_ratio_delta": None,
         "preview_text_fragments_match_output": None,
@@ -1464,6 +1803,11 @@ def _snapshot_signed_output_render(
         "signed_output_has_image_stamp": None,
         "output_image_presence_matches_preview": None,
         "preview_vs_signed_output_passed": None,
+        "preview_appearance_snapshot": None,
+        "signed_output_appearance_snapshot": None,
+        "appearance_layer_comparison": None,
+        "direct_appearance_render_path": None,
+        "direct_appearance_render_error": None,
     }
     if artifacts_dir is None or artifact_basename is None:
         result["page_render_error"] = "Signed-output render artifacts are unavailable."
@@ -1499,6 +1843,15 @@ def _snapshot_signed_output_render(
     except Exception as exc:
         result["page_render_error"] = str(exc)
         return result
+
+    direct_appearance_render = _render_signed_annotation_appearance_direct(
+        output_pdf_path=output_pdf_path,
+        artifacts_dir=artifacts_dir,
+        artifact_basename=artifact_basename,
+        zoom=render_zoom,
+    )
+    result["direct_appearance_render_path"] = direct_appearance_render.get("image_path")
+    result["direct_appearance_render_error"] = direct_appearance_render.get("error")
 
     try:
         visible_snapshot = output_visible_appearance_snapshot or {}
@@ -1559,20 +1912,41 @@ def _snapshot_signed_output_render(
         result["signature_crop_sha256"] = hashlib.sha256(cropped.tobytes()).hexdigest()
         preview_crop_bounds = _snapshot_preview_card_bounds(preview_snapshot)
         if preview_crop_bounds is not None:
+            preview_analysis_image_path = _snapshot_preview_analysis_image(preview_snapshot)
+            parity_source = cropped
+            if direct_appearance_render.get("image_path"):
+                with Image.open(direct_appearance_render["image_path"]) as direct_image:
+                    parity_source = direct_image.convert("RGBA")
+            normalized_crop = parity_source.resize(
+                (
+                    preview_crop_bounds["width"],
+                    preview_crop_bounds["height"],
+                ),
+                Image.Resampling.LANCZOS,
+            )
+            normalized_crop_path = (
+                Path(artifacts_dir) / f"{artifact_basename}_signed_output_crop_normalized.png"
+            )
+            normalized_crop.save(normalized_crop_path)
+            result["normalized_signature_crop_path"] = str(normalized_crop_path)
+            result["normalized_signed_crop_dimensions_px"] = {
+                "width": normalized_crop.size[0],
+                "height": normalized_crop.size[1],
+            }
             result["preview_crop_bounds_px"] = preview_crop_bounds
             result["preview_crop_dimensions_px"] = {
                 "width": preview_crop_bounds["width"],
                 "height": preview_crop_bounds["height"],
             }
             result["preview_vs_signed_output_change_ratio"] = _normalized_image_crop_change_ratio(
-                previous_image_path=_snapshot_preview_capture_image(preview_snapshot),
+                previous_image_path=preview_analysis_image_path,
                 previous_bounds=preview_crop_bounds,
-                current_image_path=str(crop_path),
+                current_image_path=str(normalized_crop_path),
                 current_bounds={
                     "x": 0,
                     "y": 0,
-                    "width": cropped.size[0],
-                    "height": cropped.size[1],
+                    "width": normalized_crop.size[0],
+                    "height": normalized_crop.size[1],
                 },
             )
             result["preview_vs_signed_output_aspect_ratio_delta"] = _aspect_ratio_delta(
@@ -1589,21 +1963,47 @@ def _snapshot_signed_output_render(
                 preview_text_normalized == output_text
             )
             result["preview_has_image_stamp"] = bool(preview_snapshot.get("image_stamp_path"))
-            result["signed_output_has_image_stamp"] = None
-            result["output_image_presence_matches_preview"] = None
+            result["signed_output_has_image_stamp"] = bool(
+                _snapshot_visible_appearance_image_xobjects(visible_snapshot)
+            )
+            result["output_image_presence_matches_preview"] = (
+                result["preview_has_image_stamp"] == result["signed_output_has_image_stamp"]
+            )
+            render_capture = _mapping(preview_snapshot.get("render_capture"))
             output_text_bounds, output_text_error = _detect_text_content_bounds_in_preview(
-                preview_image_path=str(crop_path),
+                preview_image_path=str(normalized_crop_path),
                 text_widget_bounds={
                     "x": 0,
                     "y": 0,
-                    "width": cropped.size[0],
-                    "height": cropped.size[1],
+                    "width": normalized_crop.size[0],
+                    "height": normalized_crop.size[1],
                 },
                 text_color_rgba=_preview_text_color_rgba_from_snapshot(preview_snapshot),
-                reference_text_content_bounds=None,
+                reference_text_content_bounds=_mapping(
+                    render_capture.get(
+                        "text_rendered_content_bounds_px"
+                    )
+                ),
+            )
+            output_text_line_bounds, output_text_line_error = _detect_text_line_bounds_in_preview(
+                preview_image_path=str(normalized_crop_path),
+                text_widget_bounds={
+                    "x": 0,
+                    "y": 0,
+                    "width": normalized_crop.size[0],
+                    "height": normalized_crop.size[1],
+                },
+                text_color_rgba=_preview_text_color_rgba_from_snapshot(preview_snapshot),
+                reference_text_content_bounds=_mapping(
+                    render_capture.get(
+                        "text_rendered_content_bounds_px"
+                    )
+                ),
             )
             result["output_text_content_bounds_px"] = output_text_bounds
             result["output_text_detection_error"] = output_text_error
+            result["output_text_line_bounds_px"] = output_text_line_bounds
+            result["output_text_line_detection_error"] = output_text_line_error
             result["output_text_bounds_match_preview"] = _rectangles_within_tolerance(
                 result.get("output_text_content_bounds_px"),
                 _mapping(preview_snapshot.get("render_capture")).get(
@@ -1611,6 +2011,27 @@ def _snapshot_signed_output_render(
                 ),
                 tolerance_px=6,
             )
+            preview_appearance_snapshot = _preview_appearance_snapshot_from_capture(
+                preview_snapshot=preview_snapshot
+            )
+            signed_output_appearance_snapshot = _signed_output_appearance_snapshot(
+                normalized_image_path=str(normalized_crop_path),
+                normalized_image_size={
+                    "width": normalized_crop.size[0],
+                    "height": normalized_crop.size[1],
+                },
+                text_bounds_px=result.get("output_text_content_bounds_px"),
+                line_bounds_px=tuple(result.get("output_text_line_bounds_px") or ()),
+                visible_appearance_snapshot=visible_snapshot,
+                preview_snapshot=preview_snapshot,
+            )
+            result["preview_appearance_snapshot"] = preview_appearance_snapshot
+            result["signed_output_appearance_snapshot"] = signed_output_appearance_snapshot
+            appearance_comparison = compare_signature_appearance_snapshots(
+                preview_appearance_snapshot,
+                signed_output_appearance_snapshot,
+            )
+            result["appearance_layer_comparison"] = _jsonable_capture(appearance_comparison)
             requested_rect = _signature_rect_from_snapshot(preview_snapshot)
             if requested_rect is not None:
                 result["annotation_rect_delta_pt"] = _rect_delta(
@@ -1622,21 +2043,29 @@ def _snapshot_signed_output_render(
                     tolerance_pt=0.75,
                 )
             result["preview_vs_signed_output_passed"] = (
-                result["preview_text_fragments_match_output"] is True
-                and result["output_image_presence_matches_preview"] is not False
+                appearance_comparison.is_consistent
                 and result["annotation_rect_matches_request"] is not False
-                and result["output_text_bounds_match_preview"] is not False
             )
         comparison_path = Path(artifacts_dir) / f"{artifact_basename}_signed_output_compare.png"
         _write_side_by_side_comparison(
-            preview_image_path=_snapshot_preview_capture_image(preview_snapshot),
+            preview_image_path=_snapshot_preview_analysis_image(preview_snapshot),
             preview_bounds=preview_crop_bounds,
-            signed_image_path=str(crop_path),
+            signed_image_path=(
+                result.get("normalized_signature_crop_path") or str(crop_path)
+            ),
             signed_bounds={
                 "x": 0,
                 "y": 0,
-                "width": cropped.size[0],
-                "height": cropped.size[1],
+                "width": (
+                    preview_crop_bounds["width"]
+                    if preview_crop_bounds is not None
+                    else cropped.size[0]
+                ),
+                "height": (
+                    preview_crop_bounds["height"]
+                    if preview_crop_bounds is not None
+                    else cropped.size[1]
+                ),
             },
             output_path=str(comparison_path),
         )
@@ -1645,6 +2074,259 @@ def _snapshot_signed_output_render(
     except Exception as exc:
         result["signature_crop_error"] = str(exc)
         return result
+
+
+def _preview_appearance_snapshot_from_capture(
+    *,
+    preview_snapshot: dict[str, Any],
+) -> SignatureAppearanceSnapshot:
+    render_capture = _mapping(preview_snapshot.get("render_capture"))
+    analysis_snapshot = _mapping(render_capture.get("analysis_appearance_snapshot"))
+    box_style = _mapping(preview_snapshot.get("box_style"))
+    if analysis_snapshot:
+        border_style = _mapping(analysis_snapshot.get("border_style")) or None
+        border_bounds = _mapping(analysis_snapshot.get("border_bounds_px")) or None
+        if border_style is None and box_style.get("show_border") is True:
+            border_style = {
+                "show_border": True,
+                "shape": "rounded",
+                "border_color_hex": box_style.get("border_color_hex"),
+                "border_width_pt": box_style.get("border_width_pt"),
+                "background_color_hex": box_style.get("background_color_hex"),
+            }
+            border_bounds = _mapping(analysis_snapshot.get("container_bounds_px")) or None
+        return SignatureAppearanceSnapshot(
+            image_path=analysis_snapshot.get("image_path"),
+            image_size_px=_mapping(analysis_snapshot.get("image_size_px")) or None,
+            container_bounds_px=_mapping(analysis_snapshot.get("container_bounds_px")) or None,
+            border_bounds_px=border_bounds,
+            border_style=border_style,
+            text_bounds_px=_mapping(analysis_snapshot.get("text_bounds_px")) or None,
+            stamp_bounds_px=_mapping(analysis_snapshot.get("stamp_bounds_px")) or None,
+            text_fragments=tuple(analysis_snapshot.get("text_fragments", ())),
+            line_bounds_px=tuple(analysis_snapshot.get("line_bounds_px", ())),
+        )
+    card_bounds = _mapping(render_capture.get("card_bounds_px"))
+    image_size = None
+    if card_bounds:
+        image_size = {"width": card_bounds["width"], "height": card_bounds["height"]}
+    border_style = None
+    if box_style.get("show_border") is True:
+        border_style = {
+            "show_border": True,
+            "shape": "rounded",
+            "border_color_hex": box_style.get("border_color_hex"),
+            "border_width_pt": box_style.get("border_width_pt"),
+            "background_color_hex": box_style.get("background_color_hex"),
+        }
+    text_fragments = tuple(
+        field.get("text", "").strip()
+        for field in preview_snapshot.get("fields", ())
+        if (
+            isinstance(field, dict)
+            and field.get("visible") is True
+            and field.get("text", "").strip()
+        )
+    )
+    text_style = _signature_text_style_from_snapshot(preview_snapshot.get("text_style"))
+    text_bounds = _mapping(render_capture.get("text_rendered_content_bounds_px")) or None
+    line_bounds = tuple(render_capture.get("text_rendered_line_bounds_px", ()))
+    if not line_bounds:
+        line_bounds = _structural_line_bounds_px(
+            text_fragments=text_fragments,
+            text_style=text_style,
+            text_bounds_px=text_bounds,
+        )
+    return SignatureAppearanceSnapshot(
+        image_path=render_capture.get("analysis_preview_image_path")
+        or render_capture.get("preview_image_path"),
+        image_size_px=image_size,
+        container_bounds_px=card_bounds or None,
+        border_bounds_px=(card_bounds or None) if border_style is not None else None,
+        border_style=border_style,
+        text_bounds_px=text_bounds,
+        stamp_bounds_px=_mapping(render_capture.get("stamp_rendered_content_bounds_px")) or None,
+        text_fragments=text_fragments,
+        line_bounds_px=line_bounds,
+    )
+
+
+def _signed_output_appearance_snapshot(
+    *,
+    normalized_image_path: str,
+    normalized_image_size: dict[str, int],
+    text_bounds_px: dict[str, int] | None,
+    line_bounds_px: tuple[dict[str, int], ...] = (),
+    visible_appearance_snapshot: dict[str, Any],
+    preview_snapshot: dict[str, Any],
+) -> SignatureAppearanceSnapshot:
+    preview_box_style = _mapping(preview_snapshot.get("box_style"))
+    border_shape = "rounded"
+    if visible_appearance_snapshot.get("appearance_uses_rounded_border") is False:
+        border_shape = "square"
+    elif visible_appearance_snapshot.get("appearance_uses_rounded_border") is None:
+        border_shape = "unknown"
+    border_style = None
+    if preview_box_style.get("show_border") is True:
+        border_style = {
+            "show_border": True,
+            "shape": border_shape,
+            "border_color_hex": preview_box_style.get("border_color_hex"),
+            "border_width_pt": preview_box_style.get("border_width_pt"),
+            "background_color_hex": preview_box_style.get("background_color_hex"),
+        }
+    container_bounds = {
+        "x": 0,
+        "y": 0,
+        "width": normalized_image_size["width"],
+        "height": normalized_image_size["height"],
+    }
+    stamp_bounds = None
+    if _snapshot_visible_appearance_image_xobjects(visible_appearance_snapshot):
+        preview_render_capture = _mapping(preview_snapshot.get("render_capture"))
+        stamp_bounds = (
+            _mapping(preview_render_capture.get("stamp_rendered_content_bounds_px")) or None
+        )
+    text_fragments = tuple(_snapshot_visible_appearance_text_fragments(visible_appearance_snapshot))
+    text_style = _signature_text_style_from_snapshot(preview_snapshot.get("text_style"))
+    reconstructed_text_box_bounds = _reconstruct_text_box_bounds_px(
+        preview_snapshot=preview_snapshot,
+        text_fragments=text_fragments,
+        container_bounds_px=container_bounds,
+    )
+    structural_line_bounds = _structural_line_bounds_px(
+        text_fragments=text_fragments,
+        text_style=text_style,
+        text_bounds_px=reconstructed_text_box_bounds or text_bounds_px,
+    )
+    return SignatureAppearanceSnapshot(
+        image_path=normalized_image_path,
+        image_size_px=normalized_image_size,
+        container_bounds_px=container_bounds,
+        border_bounds_px=container_bounds if border_style is not None else None,
+        border_style=border_style,
+        text_bounds_px=(
+            _union_rectangles(structural_line_bounds)
+            or reconstructed_text_box_bounds
+            or text_bounds_px
+        ),
+        stamp_bounds_px=stamp_bounds,
+        text_fragments=text_fragments,
+        line_bounds_px=structural_line_bounds or line_bounds_px,
+    )
+
+
+def _signature_text_style_from_snapshot(snapshot: object) -> SignatureTextStyle | None:
+    if not isinstance(snapshot, dict):
+        return None
+    font_family = snapshot.get("font_family")
+    font_size_pt = snapshot.get("font_size_pt")
+    text_color_hex = snapshot.get("text_color_hex")
+    if not isinstance(font_family, str) or font_size_pt is None or not isinstance(
+        text_color_hex, str
+    ):
+        return None
+    return SignatureTextStyle(
+        font_family=font_family,
+        font_size_pt=float(font_size_pt),
+        bold=bool(snapshot.get("bold")),
+        italic=bool(snapshot.get("italic")),
+        text_color_hex=text_color_hex,
+    )
+
+
+def _signature_box_style_from_snapshot(snapshot: object) -> SignatureBoxStyle | None:
+    if not isinstance(snapshot, dict):
+        return None
+    border_color_hex = snapshot.get("border_color_hex")
+    background_color_hex = snapshot.get("background_color_hex")
+    border_width_pt = snapshot.get("border_width_pt")
+    if not isinstance(border_color_hex, str) or not isinstance(background_color_hex, str):
+        return None
+    if border_width_pt is None:
+        return None
+    return SignatureBoxStyle(
+        show_border=bool(snapshot.get("show_border")),
+        border_color_hex=border_color_hex,
+        border_width_pt=float(border_width_pt),
+        background_color_hex=background_color_hex,
+    )
+
+
+def _signature_rect_from_preview_snapshot(snapshot: object) -> SignatureRect | None:
+    if not isinstance(snapshot, dict):
+        return None
+    rect = snapshot.get("signature_rect")
+    if not isinstance(rect, dict):
+        return None
+    try:
+        return SignatureRect(
+            page_index=int(rect["page_index"]),
+            left_pt=float(rect["left_pt"]),
+            bottom_pt=float(rect["bottom_pt"]),
+            width_pt=float(rect["width_pt"]),
+            height_pt=float(rect["height_pt"]),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _reconstruct_text_box_bounds_px(
+    *,
+    preview_snapshot: dict[str, Any],
+    text_fragments: tuple[str, ...],
+    container_bounds_px: dict[str, int],
+) -> dict[str, int] | None:
+    if not text_fragments:
+        return None
+    layout_template_value = preview_snapshot.get("layout_template")
+    stamp_position_value = preview_snapshot.get("stamp_position")
+    if not isinstance(layout_template_value, str) or not isinstance(stamp_position_value, str):
+        return None
+    text_style = _signature_text_style_from_snapshot(preview_snapshot.get("text_style"))
+    box_style = _signature_box_style_from_snapshot(preview_snapshot.get("box_style"))
+    signature_rect = _signature_rect_from_preview_snapshot(preview_snapshot)
+    if text_style is None or box_style is None or signature_rect is None:
+        return None
+    try:
+        layout_template = SignatureLayoutTemplate(layout_template_value)
+        stamp_position = SignatureStampPosition(stamp_position_value)
+    except ValueError:
+        return None
+    stamp_text = "\n".join(fragment for fragment in text_fragments if fragment.strip())
+    if not stamp_text:
+        return None
+    text_box_style = _build_text_box_style(text_style)
+    text_box_width, text_box_height = _measure_text_box_dimensions(
+        stamp_text,
+        text_box_style,
+    )
+    image_stamp_path = preview_snapshot.get("image_stamp_path")
+    stamp_background = (
+        _stamp_background_for_path(image_stamp_path)
+        if isinstance(image_stamp_path, str) and image_stamp_path
+        else None
+    )
+    reservation = _layout_reservation_for_template(
+        layout_template,
+        stamp_position=stamp_position,
+        signature_rect=signature_rect,
+        text_box_width=text_box_width,
+        text_box_height=text_box_height,
+        box_style=box_style,
+        has_visible_stamp_image=stamp_background is not None,
+        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
+    )
+    return _layout_rule_bounds_px(
+        reservation.inner_content_layout,
+        reserved_width_pt=reservation.text_box_width_pt,
+        reserved_height_pt=reservation.text_box_height_pt,
+        width_px=container_bounds_px["width"],
+        height_px=container_bounds_px["height"],
+        container_width_pt=signature_rect.width_pt,
+        container_height_pt=signature_rect.height_pt,
+        include_when_empty=True,
+    )
 
 
 def _snapshot_preview(preview, *, render_capture: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1924,59 +2606,32 @@ def _execute_signed_acceptance_scenario(
             passphrase=passphrase,
         )
         signing_result = sign_executor.execute(scenario_request)
-        signing_result_payload = {
-            "success": signing_result.success,
-            "failure_code": (
-                signing_result.failure_code.value
-                if getattr(signing_result, "failure_code", None) is not None
-                else None
-            ),
-            "message": signing_result.message,
-            "output_pdf_version": signing_result.output_pdf_version,
-            "signature_subfilter": signing_result.signature_subfilter,
-            "timestamp_present": signing_result.timestamp_present,
-            "timestamp_cryptographically_valid": signing_result.timestamp_cryptographically_valid,
-            "tsa_chain_trusted": signing_result.tsa_chain_trusted,
-            "timestamp_validation_error": signing_result.timestamp_validation_error,
-            "docmdp_permission": signing_result.docmdp_permission,
-            "certification_restricted": signing_result.certification_restricted,
-            "restriction_reason": signing_result.restriction_reason,
-            "operation_type": (
-                signing_result.operation_type.value
-                if getattr(signing_result, "operation_type", None) is not None
-                else None
-            ),
-            "revision_strategy": (
-                signing_result.revision_strategy.value
-                if getattr(signing_result, "revision_strategy", None) is not None
-                else None
-            ),
-            "standards_summary": signing_result.standards_summary,
-        }
+        signing_result_payload = _snapshot_signing_result_payload(signing_result)
         if signing_result.success:
             output_file_exists = scenario_output.exists()
-            output_signature_count = _count_embedded_signatures(scenario_output)
-            output_signature_snapshot = _snapshot_output_signature(scenario_output)
-            output_verification_snapshot = _snapshot_output_verification(
-                scenario_output,
-                trust_policy=scenario_request.trust_policy,
-            )
-            output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(
-                scenario_output
-            )
-            signed_output_render_snapshot = _snapshot_signed_output_render(
-                output_pdf_path=str(scenario_output),
-                page_index=(
-                    scenario_request.signature_rect.page_index
-                    if scenario_request.signature_rect is not None
-                    else None
-                ),
-                preview_snapshot=preview_snapshot,
-                preview_text=preview_text,
-                output_visible_appearance_snapshot=output_visible_appearance_snapshot,
-                artifacts_dir=str(artifacts_dir),
-                artifact_basename=artifact_basename,
-            )
+            if output_file_exists:
+                output_snapshot = _snapshot_successful_signed_output(
+                    output_file=scenario_output,
+                    page_index=(
+                        scenario_request.signature_rect.page_index
+                        if scenario_request.signature_rect is not None
+                        else None
+                    ),
+                    preview_snapshot=preview_snapshot,
+                    preview_text=preview_text,
+                    trust_policy=scenario_request.trust_policy,
+                    artifacts_dir=str(artifacts_dir),
+                    artifact_basename=artifact_basename,
+                )
+                output_signature_count = output_snapshot["output_signature_count"]
+                output_signature_snapshot = output_snapshot["output_signature_snapshot"]
+                output_verification_snapshot = output_snapshot["output_verification_snapshot"]
+                output_visible_appearance_snapshot = output_snapshot[
+                    "output_visible_appearance_snapshot"
+                ]
+                signed_output_render_snapshot = output_snapshot[
+                    "signed_output_render_snapshot"
+                ]
 
     return {
         "name": scenario["name"],
@@ -2430,7 +3085,9 @@ def _capture_preview_render(
     multi_detail = controls.multi_detail_label
     multi_stamp = controls.multi_stamp_label
     canonical_snapshot = getattr(card_container, "_canonical_preview_snapshot", None)
+    analysis_snapshot = None
     image_path = None
+    analysis_image_path = None
     image_error = None
     target_dir = None
     if artifacts_dir is not None:
@@ -2439,8 +3096,29 @@ def _capture_preview_render(
         image_path = str(target_dir / f"{artifact_basename}.png")
         if canonical_snapshot is not None:
             shutil.copyfile(canonical_snapshot.image_path, image_path)
+            analysis_snapshot = render_canonical_signature_preview(
+                preview,
+                zoom=1.0,
+                render_backend=getattr(
+                    shell.properties_panel,
+                    "_canonical_preview_render_backend",
+                    None,
+                ),
+                include_border=True,
+                flatten_to_white=True,
+            )
+            if analysis_snapshot is not None:
+                analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
+                shutil.copyfile(analysis_snapshot.image_path, analysis_image_path)
+            else:
+                analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
+                _flatten_preview_image_to_white(
+                    source_path=canonical_snapshot.image_path,
+                    output_path=analysis_image_path,
+                )
         else:
             image_error = _write_widget_capture_png(card_container, image_path)
+            analysis_image_path = image_path
 
     use_single_body = _widget_is_visible(single_body)
     active_body = single_body if use_single_body else multi_body
@@ -2498,9 +3176,11 @@ def _capture_preview_render(
         stamp_content_bounds=stamp_content_bounds,
     )
     text_rendered_content_bounds = None
+    text_rendered_line_bounds: tuple[dict[str, int], ...] = ()
     text_content_error = None
     text_reference_content_bounds = None
     text_reference_error = None
+    text_line_detection_error = None
     if canonical_snapshot is not None:
         text_reference_content_bounds = canonical_snapshot.text_bounds_px
         text_rendered_content_bounds = canonical_snapshot.text_bounds_px
@@ -2517,6 +3197,13 @@ def _capture_preview_render(
     ):
         text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
             preview_image_path=image_path,
+            text_widget_bounds=text_widget_bounds,
+            text_color_rgba=_preview_text_color_rgba(preview),
+            reference_text_content_bounds=text_reference_content_bounds,
+        )
+    if image_path is not None and image_error is None and text_widget_bounds is not None:
+        text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
+            preview_image_path=analysis_image_path or image_path,
             text_widget_bounds=text_widget_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
             reference_text_content_bounds=text_reference_content_bounds,
@@ -2574,8 +3261,52 @@ def _capture_preview_render(
         preview=preview,
         active_label=active_detail,
     )
+    analysis_appearance_snapshot = None
+    if canonical_snapshot is not None:
+        base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
+        if base_snapshot is None:
+            base_snapshot = SignatureAppearanceSnapshot(
+                image_path=analysis_image_path,
+                image_size_px=(
+                    None
+                    if image_card_bounds is None
+                    else {
+                        "width": image_card_bounds["width"],
+                        "height": image_card_bounds["height"],
+                    }
+                ),
+                container_bounds_px=image_card_bounds,
+                border_bounds_px=image_card_bounds,
+                border_style=(
+                    None
+                    if preview.box_style is None or not preview.box_style.show_border
+                    else {
+                        "show_border": True,
+                        "shape": "rounded",
+                        "border_color_hex": preview.box_style.border_color_hex,
+                        "border_width_pt": preview.box_style.border_width_pt,
+                        "background_color_hex": preview.box_style.background_color_hex,
+                    }
+                ),
+                text_bounds_px=text_rendered_content_bounds,
+                stamp_bounds_px=stamp_content_bounds,
+                text_fragments=(),
+                line_bounds_px=(),
+            )
+        analysis_appearance_snapshot = replace(
+            base_snapshot,
+            image_path=analysis_image_path,
+            line_bounds_px=base_snapshot.line_bounds_px or text_rendered_line_bounds,
+        )
+    _cleanup_canonical_preview_tempdir(analysis_snapshot)
     return {
         "preview_image_path": image_path,
+        "analysis_preview_image_path": analysis_image_path,
+        "analysis_appearance_snapshot": (
+            None
+            if analysis_appearance_snapshot is None
+            else _jsonable_capture(analysis_appearance_snapshot)
+        ),
         "preview_image_error": image_error,
         "card_bounds_px": card_bounds,
         "text_widget_bounds_px": text_widget_bounds,
@@ -2595,6 +3326,8 @@ def _capture_preview_render(
         "text_widget_image_sha256": text_widget_image_sha256,
         "text_rendered_content_bounds_px": text_rendered_content_bounds,
         "text_content_detection_error": text_content_error,
+        "text_rendered_line_bounds_px": text_rendered_line_bounds,
+        "text_line_detection_error": text_line_detection_error,
         "text_reference_content_bounds_px": text_reference_content_bounds,
         "text_reference_detection_error": text_reference_error,
         **font_diagnostics,
@@ -2618,6 +3351,7 @@ def _capture_headless_preview_render(
 ) -> dict[str, Any]:
     canonical_snapshot = render_canonical_signature_preview(preview)
     image_path = None
+    analysis_image_path = None
     image_error = None
     target_dir = None
     if artifacts_dir is not None:
@@ -2626,6 +3360,7 @@ def _capture_headless_preview_render(
         image_path = str(target_dir / f"{artifact_basename}.png")
         if canonical_snapshot is not None:
             shutil.copyfile(canonical_snapshot.image_path, image_path)
+            analysis_image_path = image_path
         else:
             image_error = "Canonical preview render is unavailable for this scenario."
 
@@ -2633,6 +3368,7 @@ def _capture_headless_preview_render(
     text_widget_bounds = None
     stamp_band_bounds = None
     text_rendered_content_bounds = None
+    text_rendered_line_bounds: tuple[dict[str, int], ...] = ()
     stamp_content_bounds = None
     stamp_pixmap_bounds = None
     stamp_pixmap_size = None
@@ -2661,6 +3397,14 @@ def _capture_headless_preview_render(
         stamp_pixmap_bounds=stamp_pixmap_bounds,
         stamp_content_bounds=stamp_content_bounds,
     )
+    text_line_detection_error = None
+    if image_path is not None and image_error is None and text_widget_bounds is not None:
+        text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
+            preview_image_path=analysis_image_path or image_path,
+            text_widget_bounds=text_widget_bounds,
+            text_color_rgba=_preview_text_color_rgba(preview),
+            reference_text_content_bounds=text_rendered_content_bounds,
+        )
     text_diagnostics = _text_edge_diagnostics(
         preview=preview,
         card_bounds=card_bounds,
@@ -2711,9 +3455,52 @@ def _capture_headless_preview_render(
         crop_bounds=text_widget_bounds,
     )
     font_diagnostics = _headless_text_font_diagnostics(preview)
+    analysis_appearance_snapshot = None
+    if canonical_snapshot is not None:
+        base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
+        if base_snapshot is None:
+            base_snapshot = SignatureAppearanceSnapshot(
+                image_path=analysis_image_path,
+                image_size_px=(
+                    None
+                    if card_bounds is None
+                    else {
+                        "width": card_bounds["width"],
+                        "height": card_bounds["height"],
+                    }
+                ),
+                container_bounds_px=card_bounds,
+                border_bounds_px=card_bounds,
+                border_style=(
+                    None
+                    if preview.box_style is None or not preview.box_style.show_border
+                    else {
+                        "show_border": True,
+                        "shape": "rounded",
+                        "border_color_hex": preview.box_style.border_color_hex,
+                        "border_width_pt": preview.box_style.border_width_pt,
+                        "background_color_hex": preview.box_style.background_color_hex,
+                    }
+                ),
+                text_bounds_px=text_rendered_content_bounds,
+                stamp_bounds_px=stamp_content_bounds,
+                text_fragments=(),
+                line_bounds_px=(),
+            )
+        analysis_appearance_snapshot = replace(
+            base_snapshot,
+            image_path=analysis_image_path,
+            line_bounds_px=base_snapshot.line_bounds_px or text_rendered_line_bounds,
+        )
     _cleanup_canonical_preview_tempdir(canonical_snapshot)
     return {
         "preview_image_path": image_path,
+        "analysis_preview_image_path": analysis_image_path,
+        "analysis_appearance_snapshot": (
+            None
+            if analysis_appearance_snapshot is None
+            else _jsonable_capture(analysis_appearance_snapshot)
+        ),
         "preview_image_error": image_error,
         "card_bounds_px": card_bounds,
         "text_widget_bounds_px": text_widget_bounds,
@@ -2733,6 +3520,8 @@ def _capture_headless_preview_render(
         "text_widget_image_sha256": text_widget_image_sha256,
         "text_rendered_content_bounds_px": text_rendered_content_bounds,
         "text_content_detection_error": None,
+        "text_rendered_line_bounds_px": text_rendered_line_bounds,
+        "text_line_detection_error": text_line_detection_error,
         "text_reference_content_bounds_px": text_rendered_content_bounds,
         "text_reference_detection_error": None,
         **font_diagnostics,
@@ -3152,11 +3941,43 @@ def _detect_text_content_bounds_in_preview(
     text_color_rgba: tuple[int, int, int, int] | None,
     reference_text_content_bounds: dict[str, int] | None = None,
 ) -> tuple[dict[str, int] | None, str | None]:
+    text_bounds, _line_bounds, error = _detect_text_geometry_in_preview(
+        preview_image_path=preview_image_path,
+        text_widget_bounds=text_widget_bounds,
+        text_color_rgba=text_color_rgba,
+        reference_text_content_bounds=reference_text_content_bounds,
+    )
+    return text_bounds, error
+
+
+def _detect_text_line_bounds_in_preview(
+    *,
+    preview_image_path: str,
+    text_widget_bounds: dict[str, int],
+    text_color_rgba: tuple[int, int, int, int] | None,
+    reference_text_content_bounds: dict[str, int] | None = None,
+) -> tuple[tuple[dict[str, int], ...], str | None]:
+    _text_bounds, line_bounds, error = _detect_text_geometry_in_preview(
+        preview_image_path=preview_image_path,
+        text_widget_bounds=text_widget_bounds,
+        text_color_rgba=text_color_rgba,
+        reference_text_content_bounds=reference_text_content_bounds,
+    )
+    return line_bounds, error
+
+
+def _detect_text_geometry_in_preview(
+    *,
+    preview_image_path: str,
+    text_widget_bounds: dict[str, int],
+    text_color_rgba: tuple[int, int, int, int] | None,
+    reference_text_content_bounds: dict[str, int] | None = None,
+) -> tuple[dict[str, int] | None, tuple[dict[str, int], ...], str | None]:
     try:
         with Image.open(preview_image_path) as image:
             preview_image = image.convert("RGBA")
     except OSError as exc:
-        return None, f"Failed to open preview image for text analysis: {exc}"
+        return None, (), f"Failed to open preview image for text analysis: {exc}"
 
     image_width, image_height = preview_image.size
     crop_left = max(0, text_widget_bounds["x"])
@@ -3164,10 +3985,38 @@ def _detect_text_content_bounds_in_preview(
     crop_right = min(image_width, crop_left + max(0, text_widget_bounds["width"]))
     crop_bottom = min(image_height, crop_top + max(0, text_widget_bounds["height"]))
     if crop_right <= crop_left or crop_bottom <= crop_top:
-        return None, "Text widget bounds do not intersect the captured preview image."
+        return None, (), "Text widget bounds do not intersect the captured preview image."
 
     cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
     crop_width, crop_height = cropped.size
+    candidate_pixels = _text_candidate_pixels_in_crop(
+        cropped=cropped,
+        crop_width=crop_width,
+        crop_height=crop_height,
+        text_color_rgba=text_color_rgba,
+        reference_text_content_bounds=reference_text_content_bounds,
+    )
+    if not candidate_pixels:
+        return None, (), "No rendered text pixels detected in the preview text widget."
+    line_bounds = _line_bounds_from_candidate_pixels(
+        candidate_pixels,
+        crop_left=crop_left,
+        crop_top=crop_top,
+    )
+    if not line_bounds:
+        return None, (), "No rendered text pixels detected in the preview text widget."
+    text_bounds = _union_rectangles(line_bounds)
+    return text_bounds, line_bounds, None
+
+
+def _text_candidate_pixels_in_crop(
+    *,
+    cropped: Image.Image,
+    crop_width: int,
+    crop_height: int,
+    text_color_rgba: tuple[int, int, int, int] | None,
+    reference_text_content_bounds: dict[str, int] | None,
+) -> set[tuple[int, int]]:
     background = _estimate_crop_background_rgba(cropped)
     candidate_pixels: set[tuple[int, int]] = set()
     for y in range(crop_height):
@@ -3185,32 +4034,62 @@ def _detect_text_content_bounds_in_preview(
         crop_width=crop_width,
         crop_height=crop_height,
     )
-    candidate_pixels = _restrict_candidates_to_reference_envelope(
+    return _restrict_candidates_to_reference_envelope(
         candidate_pixels,
         reference_text_content_bounds=reference_text_content_bounds,
         crop_width=crop_width,
         crop_height=crop_height,
     )
-    min_x = crop_width
-    min_y = crop_height
-    max_x = -1
-    max_y = -1
-    for x, y in candidate_pixels:
-        min_x = min(min_x, x)
-        min_y = min(min_y, y)
-        max_x = max(max_x, x)
-        max_y = max(max_y, y)
-    if max_x < min_x or max_y < min_y:
-        return None, "No rendered text pixels detected in the preview text widget."
-    return (
-        {
-            "x": crop_left + min_x,
-            "y": crop_top + min_y,
-            "width": (max_x - min_x) + 1,
-            "height": (max_y - min_y) + 1,
-        },
-        None,
-    )
+
+
+def _line_bounds_from_candidate_pixels(
+    candidate_pixels: set[tuple[int, int]],
+    *,
+    crop_left: int,
+    crop_top: int,
+) -> tuple[dict[str, int], ...]:
+    if not candidate_pixels:
+        return ()
+    row_values = sorted({y for _x, y in candidate_pixels})
+    groups: list[list[int]] = [[row_values[0]]]
+    for row in row_values[1:]:
+        if row <= groups[-1][-1] + 2:
+            groups[-1].append(row)
+        else:
+            groups.append([row])
+    line_bounds: list[dict[str, int]] = []
+    for group in groups:
+        group_pixels = [(x, y) for x, y in candidate_pixels if group[0] <= y <= group[-1]]
+        if not group_pixels:
+            continue
+        min_x = min(x for x, _y in group_pixels)
+        max_x = max(x for x, _y in group_pixels)
+        min_y = min(y for _x, y in group_pixels)
+        max_y = max(y for _x, y in group_pixels)
+        line_bounds.append(
+            {
+                "x": crop_left + min_x,
+                "y": crop_top + min_y,
+                "width": (max_x - min_x) + 1,
+                "height": (max_y - min_y) + 1,
+            }
+        )
+    return tuple(line_bounds)
+
+
+def _union_rectangles(rectangles: tuple[dict[str, int], ...]) -> dict[str, int] | None:
+    if not rectangles:
+        return None
+    min_x = min(rect["x"] for rect in rectangles)
+    min_y = min(rect["y"] for rect in rectangles)
+    max_x = max(rect["x"] + rect["width"] - 1 for rect in rectangles)
+    max_y = max(rect["y"] + rect["height"] - 1 for rect in rectangles)
+    return {
+        "x": min_x,
+        "y": min_y,
+        "width": (max_x - min_x) + 1,
+        "height": (max_y - min_y) + 1,
+    }
 
 
 def _restrict_candidates_to_reference_envelope(
@@ -3766,6 +4645,14 @@ def _image_crop_sha256(
         return None
     cropped = preview_image.crop((crop_left, crop_top, crop_right, crop_bottom))
     return hashlib.sha256(cropped.tobytes()).hexdigest()
+
+
+def _flatten_preview_image_to_white(*, source_path: str, output_path: str) -> None:
+    with Image.open(source_path) as image:
+        rgba_image = image.convert("RGBA")
+    flattened = Image.new("RGBA", rgba_image.size, (255, 255, 255, 255))
+    flattened.alpha_composite(rgba_image)
+    flattened.save(output_path)
 
 
 def _image_crop_change_ratio(
@@ -4350,6 +5237,18 @@ def _snapshot_preview_capture_image(snapshot: dict[str, Any] | None) -> str | No
     if not isinstance(render_capture, dict):
         return None
     image_path = render_capture.get("preview_image_path")
+    return str(image_path) if image_path is not None else None
+
+
+def _snapshot_preview_analysis_image(snapshot: dict[str, Any] | None) -> str | None:
+    if snapshot is None:
+        return None
+    render_capture = snapshot.get("render_capture")
+    if not isinstance(render_capture, dict):
+        return None
+    image_path = render_capture.get("analysis_preview_image_path")
+    if image_path is None:
+        image_path = render_capture.get("preview_image_path")
     return str(image_path) if image_path is not None else None
 
 

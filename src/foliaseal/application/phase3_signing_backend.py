@@ -29,7 +29,7 @@ from pyhanko.pdf_utils.writer import PdfFileWriter
 from pyhanko.sign import fields, validation
 from pyhanko.sign.signers import PdfSignatureMetadata, PdfSigner, SimpleSigner
 from pyhanko.sign.timestamps.common_utils import TimestampRequestError
-from pyhanko.stamp import TextStampStyle
+from pyhanko.stamp import TextStamp, TextStampStyle
 from pyhanko_certvalidator import ValidationContext
 
 from foliaseal.application.sign_pdf_use_case import (
@@ -68,6 +68,130 @@ from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validati
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 _SIG_FIELD_NAME = "Signature1"
+
+
+def _fmt_pdf_number(value: float) -> bytes:
+    return f"{value:.4f}".rstrip("0").rstrip(".").encode("ascii")
+
+
+def _rounded_border_radius_pt(width: float, height: float) -> float:
+    shortest_edge = max(1.0, min(width, height))
+    return min(6.0, shortest_edge / 4.0)
+
+
+def _rounded_rect_stroke_command(*, width: float, height: float, border_width: float) -> bytes:
+    inset = max(0.0, border_width / 2.0)
+    stroke_width = max(0.0, width - border_width)
+    stroke_height = max(0.0, height - border_width)
+    radius = min(_rounded_border_radius_pt(width, height), stroke_width / 2.0, stroke_height / 2.0)
+    if radius <= 0:
+        return b"%s w %s %s %s %s re S" % (
+            _fmt_pdf_number(border_width),
+            _fmt_pdf_number(inset),
+            _fmt_pdf_number(inset),
+            _fmt_pdf_number(stroke_width),
+            _fmt_pdf_number(stroke_height),
+        )
+    kappa = 0.5522847498
+    control = radius * kappa
+    left = inset
+    bottom = inset
+    right = left + stroke_width
+    top = bottom + stroke_height
+    return b" ".join(
+        [
+            _fmt_pdf_number(border_width),
+            b"w",
+            _fmt_pdf_number(left + radius),
+            _fmt_pdf_number(bottom),
+            b"m",
+            _fmt_pdf_number(right - radius),
+            _fmt_pdf_number(bottom),
+            b"l",
+            _fmt_pdf_number(right - radius + control),
+            _fmt_pdf_number(bottom),
+            _fmt_pdf_number(right),
+            _fmt_pdf_number(bottom + radius - control),
+            _fmt_pdf_number(right),
+            _fmt_pdf_number(bottom + radius),
+            b"c",
+            _fmt_pdf_number(right),
+            _fmt_pdf_number(top - radius),
+            b"l",
+            _fmt_pdf_number(right),
+            _fmt_pdf_number(top - radius + control),
+            _fmt_pdf_number(right - radius + control),
+            _fmt_pdf_number(top),
+            _fmt_pdf_number(right - radius),
+            _fmt_pdf_number(top),
+            b"c",
+            _fmt_pdf_number(left + radius),
+            _fmt_pdf_number(top),
+            b"l",
+            _fmt_pdf_number(left + radius - control),
+            _fmt_pdf_number(top),
+            _fmt_pdf_number(left),
+            _fmt_pdf_number(top - radius + control),
+            _fmt_pdf_number(left),
+            _fmt_pdf_number(top - radius),
+            b"c",
+            _fmt_pdf_number(left),
+            _fmt_pdf_number(bottom + radius),
+            b"l",
+            _fmt_pdf_number(left),
+            _fmt_pdf_number(bottom + radius - control),
+            _fmt_pdf_number(left + radius - control),
+            _fmt_pdf_number(bottom),
+            _fmt_pdf_number(left + radius),
+            _fmt_pdf_number(bottom),
+            b"c",
+            b"S",
+        ]
+    )
+
+
+class RoundedBorderTextStamp(TextStamp):
+    def render(self):
+        command_stream = [b"q"]
+
+        inner_content = self._render_inner_content()
+        if self.style.background:
+            command_stream.append(self._render_background())
+        if inner_content:
+            command_stream.extend(inner_content)
+
+        bbox = self.box
+        border_width = self.style.border_width
+        border_color = self.style.border_color
+        if border_width:
+            if border_color:
+                command_stream.append(b"%g %g %g RG" % border_color)
+            command_stream.append(
+                _rounded_rect_stroke_command(
+                    width=bbox.width,
+                    height=bbox.height,
+                    border_width=border_width,
+                )
+            )
+
+        command_stream.append(b"Q")
+        return b" ".join(command_stream)
+
+
+@dataclass(frozen=True)
+class RoundedBorderTextStampStyle(TextStampStyle):
+    def create_stamp(
+        self,
+        writer: PdfFileWriter,
+        box: BoxConstraints,
+        text_params: dict,
+    ) -> RoundedBorderTextStamp:
+        return RoundedBorderTextStamp(
+            writer=writer,
+            style=self,
+            box=box,
+            text_params=text_params,
+        )
 
 
 class PyHankoPdfInspector:
@@ -347,7 +471,7 @@ def _build_stamp_style(
         text_box_height=text_box_height,
         box_style=appearance.box_style,
     )
-    return TextStampStyle(
+    return RoundedBorderTextStampStyle(
         border_width=border_width,
         border_color=border_color,
         background=background,
@@ -485,6 +609,24 @@ def _single_line_vertical_outer_margin(
         box_height=box_height,
         box_style=box_style,
     )
+
+
+def _single_line_no_stamp_vertical_optical_shift(
+    *,
+    available_height: int,
+    text_box_height: int,
+    outer_margin: int,
+) -> int:
+    """Shift no-stamp single-line text upward within the reserved box.
+
+    The full signature box already belongs to text in this path, but the
+    rendered glyph ink sits low relative to the nominal text-box metrics.
+    Bound the correction by the existing outer inset so we improve visual
+    centering without inventing a new tolerance regime.
+    """
+
+    free_height = max(0, available_height - text_box_height)
+    return min(free_height, max(0, outer_margin))
 
 
 def _single_line_stamp_content_inset(
@@ -625,11 +767,16 @@ def _layout_reservation_for_template(
                 box_style=box_style,
             )
             available_height = max(box_height - vertical_margin * 2, 0)
+        optical_shift = _single_line_no_stamp_vertical_optical_shift(
+            available_height=available_height,
+            text_box_height=text_box_height,
+            outer_margin=vertical_margin,
+        )
         full_margins = Margins(
             left=edge_margin,
             right=edge_margin,
-            top=vertical_margin,
-            bottom=vertical_margin,
+            top=max(0, vertical_margin - optical_shift),
+            bottom=vertical_margin + optical_shift,
         )
         return _SignatureLayoutReservation(
             layout_template=layout_template,
@@ -653,7 +800,7 @@ def _layout_reservation_for_template(
                 AxisAlignment.ALIGN_MIN
                 if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.LEFT}
                 else AxisAlignment.ALIGN_MID,
-                AxisAlignment.ALIGN_MID,
+                AxisAlignment.ALIGN_MAX,
                 margins=full_margins,
                 inner_content_scaling=InnerScaling.NO_SCALING,
             ),

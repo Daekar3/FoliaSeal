@@ -98,6 +98,7 @@ class QtPdfRenderBackend:
         image.fill(0)
 
         render_opts = self._bindings.qpdf_document_render_options()  # type: ignore[union-attr]
+        render_opts.setRenderFlags(render_opts.RenderFlag.Annotations)
         rendered = document.render(  # type: ignore[no-untyped-call]
             page_index,
             self._bindings.qsize(target_width, target_height),  # type: ignore[union-attr]
