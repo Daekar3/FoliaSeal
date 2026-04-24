@@ -76,6 +76,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _snapshot_current_draft_request,
     _snapshot_output_verification,
     _snapshot_preview,
+    _snapshot_sign_time_fit_diagnostics,
     _snapshot_signed_output_render,
     _snapshot_visible_signature_appearance,
     _stamp_edge_diagnostics,
@@ -1685,12 +1686,32 @@ def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_prev
             (),
             {
                 "image_path": str(analysis_path),
-                "width_px": 40,
-                "height_px": 20,
-                "text_area_bounds_px": {"x": 0, "y": 0, "width": 40, "height": 20},
+                "width_px": 52,
+                "height_px": 26,
+                "text_area_bounds_px": {"x": 1, "y": 2, "width": 48, "height": 20},
                 "stamp_area_bounds_px": None,
-                "text_bounds_px": {"x": 3, "y": 4, "width": 30, "height": 10},
+                "text_bounds_px": {"x": 4, "y": 5, "width": 34, "height": 11},
                 "stamp_bounds_px": None,
+                "appearance_snapshot": phase3_harness_module.SignatureAppearanceSnapshot(
+                    image_path=str(analysis_path),
+                    image_size_px={"width": 52, "height": 26},
+                    container_bounds_px={"x": 0, "y": 0, "width": 52, "height": 26},
+                    border_bounds_px={"x": 0, "y": 0, "width": 52, "height": 26},
+                    border_style={
+                        "show_border": True,
+                        "shape": "rounded",
+                        "border_color_hex": "#000000",
+                        "border_width_pt": 1.0,
+                        "background_color_hex": "#FFFFFF",
+                    },
+                    text_bounds_px={"x": 4, "y": 5, "width": 34, "height": 11},
+                    stamp_bounds_px=None,
+                    text_fragments=("Digitally signed by", "Alice Example"),
+                    line_bounds_px=(
+                        {"x": 4, "y": 5, "width": 18, "height": 5},
+                        {"x": 4, "y": 11, "width": 34, "height": 5},
+                    ),
+                ),
             },
         )()
 
@@ -1750,6 +1771,29 @@ def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_prev
                                     "stamp_area_bounds_px": None,
                                     "text_bounds_px": {"x": 3, "y": 4, "width": 30, "height": 10},
                                     "stamp_bounds_px": None,
+                                    "appearance_snapshot": (
+                                        phase3_harness_module.SignatureAppearanceSnapshot(
+                                        image_path=str(gui_path),
+                                        image_size_px={"width": 40, "height": 20},
+                                        container_bounds_px={
+                                            "x": 0,
+                                            "y": 0,
+                                            "width": 40,
+                                            "height": 20,
+                                        },
+                                        border_bounds_px=None,
+                                        border_style=None,
+                                        text_bounds_px={
+                                            "x": 3,
+                                            "y": 4,
+                                            "width": 30,
+                                            "height": 10,
+                                        },
+                                        stamp_bounds_px=None,
+                                        text_fragments=(),
+                                        line_bounds_px=(),
+                                        )
+                                    ),
                                 },
                             )()
                         },
@@ -1811,6 +1855,19 @@ def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_prev
     assert Path(capture["preview_image_path"]).read_bytes() == gui_path.read_bytes()
     assert Path(capture["analysis_preview_image_path"]).read_bytes() == analysis_path.read_bytes()
     assert capture["analysis_appearance_snapshot"] is not None
+    assert capture["analysis_appearance_snapshot"]["image_size_px"] == {"width": 52, "height": 26}
+    assert capture["analysis_appearance_snapshot"]["container_bounds_px"] == {
+        "x": 0,
+        "y": 0,
+        "width": 52,
+        "height": 26,
+    }
+    assert capture["analysis_appearance_snapshot"]["text_bounds_px"] == {
+        "x": 4,
+        "y": 5,
+        "width": 34,
+        "height": 11,
+    }
     assert capture["analysis_appearance_snapshot"]["border_style"]["shape"] == "rounded"
     assert render_calls
     assert render_calls[-1]["include_border"] is True
@@ -3572,6 +3629,85 @@ def test_backend_reservation_snapshot_retains_error_details_for_bad_request() ->
     assert "missing-cert.p12" in snapshot["error"]
 
 
+def test_backend_reservation_snapshot_retains_fit_numbers_for_layout_failure(
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    _write_test_stamp_image(stamp_path)
+
+    appearance = build_signature_appearance(
+        image_stamp_path=str(stamp_path),
+        signer_label_prefix="Digitally signed by",
+        show_field_names=False,
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Morgan Ellery-Prescott",
+            show_in_visible_appearance=True,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Deputy Board Secretary",
+            show_in_visible_appearance=True,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="FoliaSeal Governance Holdings",
+            show_in_visible_appearance=True,
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="2026-04-24 00:59 EDT",
+            show_in_visible_appearance=True,
+        ),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Sans Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+    )
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=246.4, height_pt=87.68),
+        signature_appearance=appearance,
+    )
+
+    snapshot = _snapshot_backend_reservation(request)
+
+    assert snapshot is not None
+    assert snapshot["fit_gate_passed"] is False
+    assert snapshot["measured_text_box_width_pt"] is not None
+    assert snapshot["fit_gate_width_limit_pt"] is not None
+    assert snapshot["measured_text_box_width_pt"] > snapshot["fit_gate_width_limit_pt"]
+    assert snapshot["text_area_width_pt"] is not None
+    assert snapshot["stamp_area_height_pt"] is not None
+    assert "does not fit inside the selected rectangle" in snapshot["error"]
+
+
 def test_snapshot_current_draft_request_uses_workflow_state(tmp_path: Path) -> None:
     request = build_signing_request(
         tmp_path,
@@ -3669,6 +3805,56 @@ def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: P
     assert "error" not in snapshot
     assert snapshot["stamp_text_length"] > 0
     assert snapshot["background_layout"]["inner_content_scaling"] == "shrink_to_fit"
+    assert snapshot["fit_gate_passed"] is True
+    assert snapshot["measured_text_box_width_pt"] is not None
+    assert snapshot["text_area_width_pt"] is not None
+
+
+def test_snapshot_sign_time_fit_diagnostics_combines_backend_and_canonical_geometry() -> None:
+    diagnostics = _snapshot_sign_time_fit_diagnostics(
+        preview_render_capture={
+            "analysis_preview_image_path": "artifacts/preview.png",
+            "card_bounds_px": {"x": 0, "y": 0, "width": 343, "height": 115},
+            "analysis_appearance_snapshot": {
+                "image_path": "artifacts/preview_analysis.png",
+                "image_size_px": {"width": 257, "height": 86},
+                "container_bounds_px": {"x": 0, "y": 0, "width": 257, "height": 86},
+                "text_bounds_px": {"x": 5, "y": 85, "width": 333, "height": 24},
+                "line_bounds_px": (
+                    {"x": 5, "y": 85, "width": 97, "height": 12},
+                    {"x": 5, "y": 97, "width": 333, "height": 12},
+                ),
+                "stamp_bounds_px": {"x": 6, "y": 11, "width": 273, "height": 64},
+            },
+        },
+        backend_reservation_snapshot={
+            "measured_text_box_width_pt": 250,
+            "measured_text_box_height_pt": 18,
+            "text_area_width_pt": 249,
+            "text_area_height_pt": 18,
+            "stamp_area_width_pt": 249,
+            "stamp_area_height_pt": 54,
+            "reserved_primary_extent_pt": 54,
+            "fit_gate_width_limit_pt": 250,
+            "fit_gate_height_limit_pt": 18,
+            "fit_gate_passed": True,
+            "error": None,
+        },
+    )
+
+    assert diagnostics is not None
+    assert diagnostics["backend_fit"]["coordinate_space"] == "pdf_points"
+    assert diagnostics["backend_fit"]["measured_text_box_width_pt"] == 250
+    assert diagnostics["backend_fit"]["fit_gate_passed"] is True
+    assert diagnostics["canonical_preview_geometry"]["coordinate_space"] == (
+        "canonical_preview_pixels"
+    )
+    assert diagnostics["canonical_preview_geometry"]["image_size_px"] == {
+        "width": 257,
+        "height": 86,
+    }
+    assert diagnostics["canonical_preview_geometry"]["text_bounds_px"]["width"] == 333
+    assert len(diagnostics["canonical_preview_geometry"]["line_bounds_px"]) == 2
 
 
 def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(

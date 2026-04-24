@@ -2836,7 +2836,7 @@ def test_signing_shell_uses_canonical_preview_snapshot_when_assets_are_renderabl
     assert snapshot.stamp_bounds_px is not None
 
 
-def test_signing_shell_requests_borderless_canonical_preview_render(
+def test_signing_shell_requests_bordered_canonical_preview_render(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2880,8 +2880,104 @@ def test_signing_shell_requests_borderless_canonical_preview_render(
     widget.properties_panel.refresh_preview()
 
     assert recorded_calls
-    assert recorded_calls[-1]["include_border"] is False
+    assert recorded_calls[-1]["include_border"] is True
     assert recorded_calls[-1]["flatten_to_white"] is False
+
+
+def test_signing_shell_sizes_canonical_render_label_to_scaled_pixmap(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    preview_path = tmp_path / "preview.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
+
+    def _fake_render(preview, **kwargs):
+        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
+            image_path=str(preview_path),
+            width_px=120,
+            height_px=60,
+            text_area_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
+            stamp_area_bounds_px=None,
+            text_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
+            stamp_bounds_px=None,
+        )
+
+    monkeypatch.setattr(
+        signing_shell_module,
+        "render_canonical_signature_preview",
+        _fake_render,
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SignaturePropertiesPanel,
+        "_load_canonical_preview_pixmap",
+        lambda self, **kwargs: _FakePixmap("preview", width=91, height=37),
+        raising=False,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.refresh_preview()
+
+    assert widget.properties_panel.preview_controls.single_render_label.fixed_size == (91, 37)
+
+
+def test_signing_shell_suppresses_outer_card_chrome_when_canonical_preview_is_active(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    preview_path = tmp_path / "preview.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
+
+    def _fake_render(preview, **kwargs):
+        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
+            image_path=str(preview_path),
+            width_px=120,
+            height_px=60,
+            text_area_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
+            stamp_area_bounds_px=None,
+            text_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
+            stamp_bounds_px=None,
+        )
+
+    monkeypatch.setattr(
+        signing_shell_module,
+        "render_canonical_signature_preview",
+        _fake_render,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    widget.properties_panel.refresh_preview()
+
+    assert widget.properties_panel.preview_controls.card_container.style == (
+        "QGroupBox { border: none; background: transparent; padding: 0px; }"
+    )
 
 
 def test_signing_shell_cleans_up_replaced_canonical_preview_snapshot(

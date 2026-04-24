@@ -2315,7 +2315,7 @@ class SignaturePropertiesPanel:
                 preview,
                 zoom=max(1.0, preview_scale),
                 render_backend=self._canonical_preview_render_backend,
-                include_border=False,
+                include_border=True,
                 flatten_to_white=False,
             )
         except ValueError:
@@ -2325,9 +2325,25 @@ class SignaturePropertiesPanel:
         )
         self._preview_controls.card_container._canonical_preview_snapshot = snapshot
         if snapshot is None:
+            if hasattr(self._preview_controls.card_container, "setStyleSheet"):
+                border_css, background_color = _preview_box_styles(preview)
+                preview_padding_px = _preview_card_padding_px(preview)
+                self._preview_controls.card_container.setStyleSheet(
+                    "QGroupBox {"
+                    f" {border_css}"
+                    " border-radius: 6px;"
+                    f" background: {background_color};"
+                    f" padding: {preview_padding_px:.1f}px;"
+                    "}"
+                )
             _set_widget_visible(self._preview_controls.single_render_label, False)
             _set_widget_visible(self._preview_controls.multi_render_label, False)
             return
+
+        if hasattr(self._preview_controls.card_container, "setStyleSheet"):
+            self._preview_controls.card_container.setStyleSheet(
+                "QGroupBox { border: none; background: transparent; padding: 0px; }"
+            )
 
         render_label = (
             self._preview_controls.single_render_label
@@ -2342,7 +2358,16 @@ class SignaturePropertiesPanel:
         if pixmap is not None and hasattr(render_label, "setPixmap"):
             render_label.setPixmap(pixmap)
         if hasattr(render_label, "setFixedSize"):
-            render_label.setFixedSize(inner_body_width, inner_body_height)
+            pixmap_width = getattr(pixmap, "width", None)
+            pixmap_height = getattr(pixmap, "height", None)
+            if callable(pixmap_width):
+                pixmap_width = pixmap_width()
+            if callable(pixmap_height):
+                pixmap_height = pixmap_height()
+            if isinstance(pixmap_width, int) and isinstance(pixmap_height, int):
+                render_label.setFixedSize(pixmap_width, pixmap_height)
+            else:
+                render_label.setFixedSize(inner_body_width, inner_body_height)
 
         _set_widget_visible(self._preview_controls.stamp_label, False)
         _set_widget_visible(self._preview_controls.multi_stamp_label, False)
