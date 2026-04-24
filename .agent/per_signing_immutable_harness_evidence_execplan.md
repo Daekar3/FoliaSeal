@@ -628,3 +628,333 @@ Verification:
 - `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py README.md phase3_parallel_plan.md pdf_signing_app_feasibility.md .agent/per_signing_immutable_harness_evidence_execplan.md`
 - `pytest -q`
 - Result: `457 passed`
+
+## Next Slice: Tighten the Live GUI Preview to the Canonical Render Bounds
+
+### Problem Statement
+
+The latest manual ladder changed the diagnosis again:
+
+- backend fit numbers for the exact `Morgan Ellery | Board Secretary | FoliaSeal`
+  cases are consistent with HarfBuzz advance/extents
+- the remaining mismatch is primarily visual:
+  - cap 3 and cap 4 look like they should fit
+  - cap 5 shows much more horizontal room in the live preview than the
+    canonical analysis image reports
+
+The likely cause is that the live Qt preview still displays the canonical
+render inside a larger body container than the render itself, which makes the
+preview look looser than the actual canonical image the fit diagnostics are
+based on.
+
+### Relevant Code Path
+
+- live canonical preview composition:
+  - `src/foliaseal/presentation/qt/signing_shell.py`
+  - `SigningShellAdapter._apply_canonical_preview_render(...)`
+- preview body sizing in `refresh_preview()`
+- harness capture:
+  - `src/foliaseal/presentation/qt/phase3_harness.py`
+  - `_capture_preview_render(...)`
+
+### Required Changes
+
+1. Add automated tracer-bullet coverage for the current manual ladder shape.
+   - exact `single_line/top + stamp` style
+   - widths representing:
+     - clearly red
+     - near-boundary red
+     - first green
+   - assert the live preview body does not retain extra width beyond the actual
+     canonical render bounds when a canonical pixmap is active
+
+2. Tighten the live preview layout.
+   - when a canonical preview pixmap is present, size the active body container
+     to that pixmap as well as the render label
+   - do not leave the render label floating inside a larger blank body region
+
+3. Keep the current bordered canonical render and transparency behavior.
+   - this slice is about body/container sizing, not another border change
+
+### TDD Plan
+
+1. Add a Qt shell regression proving the active preview body container is sized
+   to the scaled canonical pixmap, not the larger inner-body allowance.
+2. Add one harness-side regression proving the captured live preview bounds
+   align with the canonical render width for the current single-line path.
+3. Implement the container-sizing change.
+4. Run focused tests, then `ruff`, then the full suite.
+
+### Acceptance Criteria
+
+- the live GUI preview no longer shows “ocean of space” around the canonical
+  signature for the same cap-3/cap-5 class
+- the live preview more closely matches the canonical analysis image used by the
+  fit diagnostics
+- the new automated tests cover this ladder so manual harness reruns are not
+  the only signal
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `tests/unit/test_qt_signing_shell.py`
+
+What landed:
+
+- when a canonical preview pixmap is active, the active preview body container
+  is now sized to the scaled pixmap as well as the render label
+- this removes the larger blank body region that previously made the live GUI
+  preview look looser than the canonical render the fit diagnostics were based
+  on
+
+Automated guardrail added:
+
+- a Qt shell regression now proves that when the scaled canonical pixmap is
+  `91x37`, both:
+  - `single_render_label.fixed_size`
+  - `single_body_container.fixed_size`
+  resolve to `91x37`
+
+Verification:
+
+- focused Qt shell regressions: passed
+- `python -m ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `pytest -q`
+- Result: `457 passed`
+
+## Next Slice: Use Analysis-Space Bounds for Raster Glyph Detection
+
+### Problem Statement
+
+The latest manual ladder shows the remaining diagnostics problem clearly:
+
+- the interactive harness writes a 1x bordered analysis image
+- but the raster glyph detector in `_capture_preview_render(...)` still uses
+  live widget bounds from the larger on-screen preview
+- those bounds are then applied directly to the smaller analysis image
+
+That means the detector is still mixing coordinate spaces. In the current
+captures, `text_widget_bounds_px.width` can be around `330`, while the analysis
+image width is only around `255`. The crop then degenerates into “almost the
+entire analysis image”, which can falsely report too much or too little text
+width.
+
+### Relevant Code Path
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+  - `_capture_preview_render(...)`
+  - `_detect_text_content_bounds_in_preview(...)`
+  - `_detect_text_line_bounds_in_preview(...)`
+
+### Required Changes
+
+1. In the interactive harness path, use analysis-space bounds when the detector
+   reads from the analysis image:
+   - `analysis_snapshot.text_area_bounds_px`
+   - `analysis_snapshot.stamp_area_bounds_px`
+   instead of the live widget/card bounds.
+
+2. Keep live widget bounds separately for GUI capture metadata and live preview
+   review. Do not overwrite them.
+
+3. Add automated regression coverage so the detector cannot silently fall back
+   to mixed coordinate spaces again.
+
+### TDD Plan
+
+1. Add a harness regression that forces:
+   - one set of live widget bounds
+   - a different set of analysis-space bounds
+   - and asserts the detector is called with the analysis-space bounds
+2. Implement the interactive capture fix.
+3. Run focused harness tests, then `ruff`, then the full suite.
+
+### Acceptance Criteria
+
+- raster glyph detection on the interactive harness uses the analysis image's
+  own coordinate system
+- manual ladder diagnostics stop conflating live widget bounds with analysis
+  image bounds
+- this failure mode is covered by an automated regression
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_harness.py`
+
+What landed:
+
+- interactive raster glyph detection now uses the analysis image's own
+  `text_area_bounds_px` when the detector reads from the bordered 1x analysis
+  image
+- live widget bounds are still preserved separately for GUI metadata, but they
+  are no longer fed directly into the analysis-image detector
+
+Automated guardrail added:
+
+- a harness regression now forces different live-widget and analysis-space
+  bounds and asserts that `_detect_text_content_bounds_in_preview(...)` is
+  called with the analysis-space rectangle
+
+Verification:
+
+- focused harness regressions: passed
+- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `pytest -q`
+- Result: `458 passed`
+
+## Next Slice: Backend Single-Line Rendered-Ink Fit Fallback
+
+### Goal
+
+Stop using the manual harness to rediscover the same `single_line/top + image`
+fit mismatch. The current artifacts are now coherent enough to show that the
+remaining problem is in the backend fit gate:
+
+- the gate still validates against the structural text-box width
+- the preview now exposes materially smaller rendered glyph ink
+- the current red/red/green ladder should be automated before any more manual
+  runs
+
+### Relevant Code Path
+
+- fit issue entry point:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_visible_signature_fit_issues_for_stamp_text(...)`
+- current structural rejection seam:
+  - `_build_stamp_style(...)`
+  - `_ensure_layout_can_fit(...)`
+- canonical rendered truth source:
+  - `src/foliaseal/application/signing_preview_renderer.py`
+  - `render_canonical_signature_preview(...)`
+- raster glyph detector:
+  - currently used by the harness and split out into a shared application
+    helper in this slice
+
+### Current Evidence
+
+From the latest manual ladder:
+
+- width `247.294 pt`: red
+- width `256.29 pt`: red
+- width `261.29 pt`: green
+
+while the rendered glyph-ink width remains effectively unchanged across those
+states. The structural width remains `254 pt`, so the gate only flips once the
+reservation catches up to the structural box. That is the mismatch this slice
+addresses.
+
+### Required Changes
+
+1. Add a tracer-bullet backend ladder test with the exact current manual text:
+   - `Digitally signed by`
+   - `Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26`
+   and the current manual widths:
+   - `247.294 pt`
+   - `256.29 pt`
+   - `261.29 pt`
+   plus one smaller fail case below the visible threshold.
+
+2. Extract the raster text detector into a shared application helper.
+   - The harness and backend must use the same image-space text candidate rules
+     and border filtering.
+
+3. Add a narrow rendered-ink fallback in `_build_stamp_style(...)`.
+   - Keep `_ensure_layout_can_fit(...)` as the first-pass structural gate.
+   - Only when that gate fails for the current disputed class:
+     `SignatureLayoutTemplate.SINGLE_LINE` with a visible `TOP` stamp image,
+     render the canonical preview and detect actual text ink inside the
+     reserved text area.
+   - If the rendered ink matches the roomy reference render and still fits
+     inside the reserved text area, allow the style to proceed.
+   - Fail closed on render/detection errors.
+
+4. Keep the slice narrow.
+   - No multi-line or wrapped-block fit-policy changes.
+   - No new tolerance slack in `_ensure_layout_can_fit(...)`.
+   - No preview-only exceptions.
+
+### Why Rasterization Is Used Here
+
+This is not a return to rasterization as the primary layout model. Structural
+reservation math remains the first pass. Rasterization comes back only as the
+deciding signal for *visible fit* on a single disputed class where the
+structural text box is now proven too pessimistic relative to the rendered
+appearance the user sees.
+
+### TDD Plan
+
+1. Red:
+   - add the explicit backend ladder test
+   - assert the smaller width still fails
+   - assert the current manual ladder widths pass after the fallback
+
+2. Green:
+   - add the shared raster detector module
+   - wire the single-line rendered-ink fallback into `_build_stamp_style(...)`
+
+3. Refactor:
+   - keep the detector shared at the application layer
+   - keep the fallback helper local to the backend seam
+
+4. Verify:
+   - focused backend tests
+   - `ruff check`
+   - full `pytest -q`
+
+### Acceptance Criteria
+
+- the current manual cap-2 / cap-3 / cap-4 ladder is reproduced in automated
+  backend tests
+- those tests pass without another manual harness run
+- the backend no longer rejects the current visually acceptable ladder widths
+  on this single-line stamped path
+- genuinely tighter widths still fail
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/text_raster_analysis.py`
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+What landed:
+
+- the harness text-raster detector was extracted into a shared application
+  helper so the backend and harness now analyze text ink with the same pixel
+  rules
+- `_build_stamp_style(...)` now keeps the structural gate as the first pass
+- when that gate fails for the narrow disputed class:
+  - `single_line`
+  - visible image stamp
+  - `stamp_position == TOP`
+  the backend renders the canonical preview, detects rendered text ink inside
+  the reserved text area, and compares it against a roomy reference render of
+  the same text
+- if the current rendered ink matches the roomy reference and still fits inside
+  the current reserved text area, the style proceeds
+- tighter widths below the current manual threshold still fail in the tracer
+  bullet test
+
+Automated coverage added:
+
+- a backend ladder test now reproduces the exact current manual widths:
+  - `247.294 pt`
+  - `256.29 pt`
+  - `261.29 pt`
+  and asserts they pass for the current real-world `Morgan Ellery` top-stamp
+  case
+- the test also includes a smaller `244 pt` control case that still fails
+
+Verification:
+
+- focused backend regressions: passed
+- `python -m ruff check src/foliaseal/application/text_raster_analysis.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_phase3_harness.py .agent/per_signing_immutable_harness_evidence_execplan.md`
+  passed
+- `pytest -q` passed: `462 passed`

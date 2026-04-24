@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -40,9 +41,11 @@ from foliaseal.application.sign_pdf_use_case import (
 )
 from foliaseal.application.signature_font_registry import resolve_signature_font_face
 from foliaseal.application.signing_draft_workflow import (
+    SigningDraftPreview,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
 )
+from foliaseal.application.text_raster_analysis import detect_text_content_bounds_in_image
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
@@ -458,10 +461,18 @@ def _build_stamp_style(
         has_visible_stamp_image=stamp_background is not None,
         stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
     )
-    _ensure_layout_can_fit(
-        layout_reservation,
-        has_visible_stamp_image=stamp_background is not None,
-    )
+    try:
+        _ensure_layout_can_fit(
+            layout_reservation,
+            has_visible_stamp_image=stamp_background is not None,
+        )
+    except ValueError:
+        if not _single_line_rendered_ink_fits_reservation(
+            signature_rect=signature_rect,
+            signature_appearance=appearance,
+            stamp_text=stamp_text,
+        ):
+            raise
     background_layout = _background_layout_for_stamp(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
@@ -1173,6 +1184,155 @@ def _visible_signature_fit_issues_for_stamp_text(
             ),
         )
     return ()
+
+
+def _single_line_rendered_ink_fits_reservation(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+) -> bool:
+    if (
+        signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or signature_appearance.image_stamp_path is None
+        or signature_appearance.stamp_position != SignatureStampPosition.TOP
+    ):
+        return False
+    snapshot = None
+    reference_snapshot = None
+    try:
+        from foliaseal.application.signing_preview_renderer import (
+            render_canonical_signature_preview,
+        )
+
+        preview = _signing_draft_preview_for_stamp_text(
+            signature_rect=signature_rect,
+            signature_appearance=signature_appearance,
+            stamp_text=stamp_text,
+        )
+        snapshot = render_canonical_signature_preview(
+            preview,
+            zoom=1.0,
+            include_border=True,
+            flatten_to_white=True,
+        )
+        if snapshot is None or snapshot.text_area_bounds_px is None:
+            return False
+        text_bounds, _error = detect_text_content_bounds_in_image(
+            preview_image_path=snapshot.image_path,
+            text_widget_bounds=snapshot.text_area_bounds_px,
+            text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
+            reference_text_content_bounds=snapshot.text_bounds_px,
+        )
+        if text_bounds is None:
+            return False
+        reference_preview = _signing_draft_preview_for_stamp_text(
+            signature_rect=replace(
+                signature_rect,
+                width_pt=max(signature_rect.width_pt, 420.0),
+            ),
+            signature_appearance=signature_appearance,
+            stamp_text=stamp_text,
+        )
+        reference_snapshot = render_canonical_signature_preview(
+            reference_preview,
+            zoom=1.0,
+            include_border=True,
+            flatten_to_white=True,
+        )
+        if reference_snapshot is None or reference_snapshot.text_area_bounds_px is None:
+            return False
+        reference_text_bounds, _reference_error = detect_text_content_bounds_in_image(
+            preview_image_path=reference_snapshot.image_path,
+            text_widget_bounds=reference_snapshot.text_area_bounds_px,
+            text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
+            reference_text_content_bounds=reference_snapshot.text_bounds_px,
+        )
+        if reference_text_bounds is None:
+            return False
+        return (
+            text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
+            and text_bounds["height"] <= snapshot.text_area_bounds_px["height"]
+            and text_bounds["width"] >= reference_text_bounds["width"] - 1
+            and text_bounds["height"] >= reference_text_bounds["height"] - 1
+        )
+    except Exception:
+        return False
+    finally:
+        if snapshot is not None:
+            _cleanup_canonical_preview_snapshot(snapshot)
+        if reference_snapshot is not None:
+            _cleanup_canonical_preview_snapshot(reference_snapshot)
+
+
+def _signing_draft_preview_for_stamp_text(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+) -> SigningDraftPreview:
+    title_text, detail_text = _stamp_text_preview_parts(
+        stamp_text,
+        signature_appearance=signature_appearance,
+    )
+    return SigningDraftPreview(
+        title=title_text,
+        page_index=signature_rect.page_index,
+        signature_rect=signature_rect,
+        signer_label_prefix=title_text,
+        layout_template=signature_appearance.layout_template,
+        stamp_position=signature_appearance.stamp_position,
+        timezone_display_mode=signature_appearance.timezone_display_mode,
+        show_field_names=signature_appearance.show_field_names,
+        datetime_format=signature_appearance.datetime_format,
+        text_style=signature_appearance.text_style,
+        box_style=signature_appearance.box_style,
+        image_stamp_path=signature_appearance.image_stamp_path,
+        fields=(),
+        detail_text=detail_text,
+        issues=(),
+        can_submit=True,
+    )
+
+
+def _stamp_text_preview_parts(
+    stamp_text: str,
+    *,
+    signature_appearance: SigningBackendAppearance,
+) -> tuple[str, str]:
+    lines = stamp_text.splitlines()
+    if not lines:
+        return signature_appearance.signer_label_prefix, ""
+    if len(lines) == 1:
+        prefix = (signature_appearance.signer_label_prefix or "").strip()
+        if prefix and lines[0].startswith(prefix):
+            return prefix, lines[0][len(prefix) :].lstrip(" \n|")
+        return "", lines[0]
+    return lines[0], "\n".join(lines[1:])
+
+
+def _text_style_color_rgba(text_style: SignatureTextStyle) -> tuple[int, int, int, int] | None:
+    normalized = text_style.text_color_hex.strip().lstrip("#")
+    if len(normalized) != 6:
+        return None
+    try:
+        return (
+            int(normalized[0:2], 16),
+            int(normalized[2:4], 16),
+            int(normalized[4:6], 16),
+            255,
+        )
+    except ValueError:
+        return None
+
+
+def _cleanup_canonical_preview_snapshot(snapshot: object) -> None:
+    image_path = getattr(snapshot, "image_path", None)
+    if not isinstance(image_path, str):
+        return
+    temp_dir = Path(image_path).parent
+    if temp_dir.name.startswith("foliaseal-canonical-preview-"):
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def _ensure_layout_can_fit(

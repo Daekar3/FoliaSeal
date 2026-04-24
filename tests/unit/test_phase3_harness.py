@@ -1902,6 +1902,194 @@ def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_prev
     assert render_calls[-1]["flatten_to_white"] is True
 
 
+def test_capture_preview_render_uses_analysis_space_bounds_for_raster_detection(
+    monkeypatch, tmp_path: Path
+) -> None:
+    gui_dir = tmp_path / "gui-preview"
+    gui_dir.mkdir()
+    gui_path = gui_dir / "preview.png"
+    Image.new("RGBA", (80, 40), color=(0, 0, 0, 0)).save(gui_path)
+
+    analysis_dir = tmp_path / "analysis-preview"
+    analysis_dir.mkdir()
+    analysis_path = analysis_dir / "preview.png"
+    Image.new("RGBA", (52, 26), color=(255, 255, 255, 255)).save(analysis_path)
+
+    detector_calls: list[dict[str, object]] = []
+
+    def _fake_render(preview, **kwargs):
+        return type(
+            "_Snapshot",
+            (),
+            {
+                "image_path": str(analysis_path),
+                "width_px": 52,
+                "height_px": 26,
+                "text_area_bounds_px": {"x": 1, "y": 2, "width": 48, "height": 20},
+                "stamp_area_bounds_px": {"x": 1, "y": 1, "width": 48, "height": 8},
+                "text_bounds_px": {"x": 4, "y": 5, "width": 34, "height": 11},
+                "stamp_bounds_px": None,
+                "appearance_snapshot": phase3_harness_module.SignatureAppearanceSnapshot(
+                    image_path=str(analysis_path),
+                    image_size_px={"width": 52, "height": 26},
+                    container_bounds_px={"x": 0, "y": 0, "width": 52, "height": 26},
+                    border_bounds_px={"x": 0, "y": 0, "width": 52, "height": 26},
+                    border_style={
+                        "show_border": True,
+                        "shape": "rounded",
+                        "border_color_hex": "#000000",
+                        "border_width_pt": 1.0,
+                        "background_color_hex": "#FFFFFF",
+                    },
+                    text_bounds_px={"x": 4, "y": 5, "width": 34, "height": 11},
+                    stamp_bounds_px=None,
+                    text_fragments=("Digitally signed by", "Alice Example"),
+                    line_bounds_px=(
+                        {"x": 4, "y": 5, "width": 18, "height": 5},
+                        {"x": 4, "y": 11, "width": 34, "height": 5},
+                    ),
+                ),
+            },
+        )()
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "render_canonical_signature_preview",
+        _fake_render,
+    )
+
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "image_stamp_path": None,
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=30.0),
+            "text_style": SignatureTextStyle(
+                font_family="Sans Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+            "box_style": SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+        },
+    )()
+
+    class _FakePanel:
+        def __init__(self) -> None:
+            self.preview_controls = type(
+                "_Controls",
+                (),
+                {
+                    "card_container": type(
+                        "_Card",
+                        (),
+                        {
+                            "_canonical_preview_snapshot": type(
+                                "_Snapshot",
+                                (),
+                                {
+                                    "image_path": str(gui_path),
+                                    "width_px": 80,
+                                    "height_px": 40,
+                                    "text_area_bounds_px": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "width": 80,
+                                        "height": 40,
+                                    },
+                                    "stamp_area_bounds_px": None,
+                                    "text_bounds_px": {"x": 3, "y": 4, "width": 60, "height": 20},
+                                    "stamp_bounds_px": None,
+                                },
+                            )()
+                        },
+                    )(),
+                    "single_body_container": object(),
+                    "multi_body_container": object(),
+                    "detail_label": object(),
+                    "stamp_label": object(),
+                    "multi_detail_label": object(),
+                    "multi_stamp_label": object(),
+                },
+            )()
+            self._canonical_preview_render_backend = object()
+
+    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
+    monkeypatch.setattr(phase3_harness_module, "_widget_is_visible", lambda widget: True)
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_widget_rect_snapshot",
+        lambda widget: {"x": 0, "y": 0, "width": 80, "height": 40},
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_widget_rect_snapshot_relative_to",
+        lambda root, widget: {"x": 0, "y": 0, "width": 80, "height": 40},
+    )
+    monkeypatch.setattr(phase3_harness_module, "_label_alignment_snapshot", lambda label: None)
+    monkeypatch.setattr(phase3_harness_module, "_label_pixmap_size_snapshot", lambda label: None)
+    monkeypatch.setattr(phase3_harness_module, "_layout_spacing", lambda layout: 0)
+    monkeypatch.setattr(phase3_harness_module, "_size_hint_snapshot", lambda widget: None)
+    monkeypatch.setattr(phase3_harness_module, "_text_font_diagnostics", lambda **kwargs: {})
+    monkeypatch.setattr(phase3_harness_module, "_preview_edge_distances", lambda **kwargs: None)
+    monkeypatch.setattr(phase3_harness_module, "_stamp_edge_diagnostics", lambda **kwargs: {})
+    monkeypatch.setattr(phase3_harness_module, "_text_edge_diagnostics", lambda **kwargs: {})
+    monkeypatch.setattr(phase3_harness_module, "_analyze_stamp_source_image", lambda path: {})
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_project_content_bounds_to_preview",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_project_pixmap_bounds_within_label",
+        lambda **kwargs: None,
+    )
+
+    def _record_content_detection(**kwargs):
+        detector_calls.append(kwargs)
+        return {"x": 6, "y": 7, "width": 28, "height": 9}, None
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_detect_text_content_bounds_in_preview",
+        _record_content_detection,
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_detect_text_line_bounds_in_preview",
+        lambda **kwargs: (
+            (
+                {"x": 6, "y": 7, "width": 16, "height": 4},
+                {"x": 6, "y": 12, "width": 28, "height": 4},
+            ),
+            None,
+        ),
+    )
+    monkeypatch.setattr(phase3_harness_module, "_image_crop_sha256", lambda **kwargs: None)
+    monkeypatch.setattr(phase3_harness_module, "_write_text_debug_overlay", lambda **kwargs: None)
+    monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
+
+    phase3_harness_module._capture_preview_render(
+        shell=shell,
+        preview=preview,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="interactive_state_01",
+    )
+
+    assert detector_calls
+    assert detector_calls[-1]["preview_image_path"].endswith("_analysis.png")
+    assert detector_calls[-1]["text_widget_bounds"] == {"x": 1, "y": 2, "width": 48, "height": 20}
+
+
 def test_analyze_capture_state_transitions_flags_negligible_font_size_change(
     tmp_path: Path,
 ) -> None:

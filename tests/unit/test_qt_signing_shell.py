@@ -2932,6 +2932,7 @@ def test_signing_shell_sizes_canonical_render_label_to_scaled_pixmap(
     widget.properties_panel.refresh_preview()
 
     assert widget.properties_panel.preview_controls.single_render_label.fixed_size == (91, 37)
+    assert widget.properties_panel.preview_controls.single_body_container.fixed_size == (91, 37)
 
 
 def test_signing_shell_suppresses_outer_card_chrome_when_canonical_preview_is_active(

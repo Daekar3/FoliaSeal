@@ -2350,6 +2350,11 @@ class SignaturePropertiesPanel:
             if is_vertical
             else self._preview_controls.multi_render_label
         )
+        render_body = (
+            self._preview_controls.single_body_container
+            if is_vertical
+            else self._preview_controls.multi_body_container
+        )
         pixmap = self._load_canonical_preview_pixmap(
             snapshot=snapshot,
             max_width=inner_body_width,
@@ -2366,8 +2371,12 @@ class SignaturePropertiesPanel:
                 pixmap_height = pixmap_height()
             if isinstance(pixmap_width, int) and isinstance(pixmap_height, int):
                 render_label.setFixedSize(pixmap_width, pixmap_height)
+                if hasattr(render_body, "setFixedSize"):
+                    render_body.setFixedSize(pixmap_width, pixmap_height)
             else:
                 render_label.setFixedSize(inner_body_width, inner_body_height)
+                if hasattr(render_body, "setFixedSize"):
+                    render_body.setFixedSize(inner_body_width, inner_body_height)
 
         _set_widget_visible(self._preview_controls.stamp_label, False)
         _set_widget_visible(self._preview_controls.multi_stamp_label, False)

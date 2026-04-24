@@ -2792,6 +2792,65 @@ def test_visible_signature_fit_issues_reject_real_world_vertical_single_line_tex
     assert "does not fit" in issues[0].message
 
 
+@pytest.mark.parametrize(
+    ("width_pt", "expected_pass"),
+    [
+        (244.0, False),
+        (247.294, True),
+        (256.29, True),
+        (261.29, True),
+    ],
+)
+def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_single_line_top_stamp_ladder(  # noqa: E501
+    tmp_path: Path,
+    width_pt: float,
+    expected_pass: bool,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (640, 160), color=(255, 255, 255, 0)).save(stamp_path, format="PNG")
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+    stamp_text = (
+        "Digitally signed by\n"
+        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=width_pt,
+            height_pt=61.44,
+        ),
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    if expected_pass:
+        assert issues == ()
+    else:
+        assert len(issues) == 1
+        assert "does not fit" in issues[0].message
+
+
 def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_real_signature_gif(
     tmp_path: Path,
 ) -> None:

@@ -59,6 +59,10 @@ from foliaseal.application.signing_preview_renderer import (
     compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
 )
+from foliaseal.application.text_raster_analysis import (
+    detect_text_content_bounds_in_image,
+    detect_text_line_bounds_in_image,
+)
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -3169,6 +3173,7 @@ def _capture_preview_render(
     image_path = None
     analysis_image_path = None
     image_error = None
+    analysis_text_widget_bounds = None
     target_dir = None
     if artifacts_dir is not None:
         target_dir = Path(artifacts_dir)
@@ -3190,6 +3195,7 @@ def _capture_preview_render(
             if analysis_snapshot is not None:
                 analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
                 shutil.copyfile(analysis_snapshot.image_path, analysis_image_path)
+                analysis_text_widget_bounds = analysis_snapshot.text_area_bounds_px
             else:
                 analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
                 _flatten_preview_image_to_white(
@@ -3275,14 +3281,15 @@ def _capture_preview_render(
             text_color_rgba=_preview_text_color_rgba(preview),
         )
     analysis_text_image_path = analysis_image_path or image_path
+    analysis_detection_bounds = analysis_text_widget_bounds or text_widget_bounds
     if (
         analysis_text_image_path is not None
         and image_error is None
-        and text_widget_bounds is not None
+        and analysis_detection_bounds is not None
     ):
         text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
             preview_image_path=analysis_text_image_path,
-            text_widget_bounds=text_widget_bounds,
+            text_widget_bounds=analysis_detection_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
             reference_text_content_bounds=text_reference_content_bounds,
         )
@@ -3291,11 +3298,11 @@ def _capture_preview_render(
     if (
         analysis_text_image_path is not None
         and image_error is None
-        and text_widget_bounds is not None
+        and analysis_detection_bounds is not None
     ):
         text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
             preview_image_path=analysis_text_image_path,
-            text_widget_bounds=text_widget_bounds,
+            text_widget_bounds=analysis_detection_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
             reference_text_content_bounds=text_reference_content_bounds,
         )
@@ -4059,13 +4066,12 @@ def _detect_text_content_bounds_in_preview(
     text_color_rgba: tuple[int, int, int, int] | None,
     reference_text_content_bounds: dict[str, int] | None = None,
 ) -> tuple[dict[str, int] | None, str | None]:
-    text_bounds, _line_bounds, error = _detect_text_geometry_in_preview(
+    return detect_text_content_bounds_in_image(
         preview_image_path=preview_image_path,
         text_widget_bounds=text_widget_bounds,
         text_color_rgba=text_color_rgba,
         reference_text_content_bounds=reference_text_content_bounds,
     )
-    return text_bounds, error
 
 
 def _detect_text_line_bounds_in_preview(
@@ -4075,13 +4081,12 @@ def _detect_text_line_bounds_in_preview(
     text_color_rgba: tuple[int, int, int, int] | None,
     reference_text_content_bounds: dict[str, int] | None = None,
 ) -> tuple[tuple[dict[str, int], ...], str | None]:
-    _text_bounds, line_bounds, error = _detect_text_geometry_in_preview(
+    return detect_text_line_bounds_in_image(
         preview_image_path=preview_image_path,
         text_widget_bounds=text_widget_bounds,
         text_color_rgba=text_color_rgba,
         reference_text_content_bounds=reference_text_content_bounds,
     )
-    return line_bounds, error
 
 
 def _detect_text_geometry_in_preview(
