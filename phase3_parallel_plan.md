@@ -81,6 +81,10 @@ Validated so far:
     glyph shaping path
   - the Qt preview loads the same bundled font assets instead of generic system fallback stacks
   - unsupported style combinations are explicit validation errors, not silent family substitution
+- manual harness fit triage now uses two explicit text-bound models:
+  - structural bounds from the canonical text layout, which explain the backend fit gate
+  - raster glyph-ink bounds from the canonical analysis image, which explain what visibly fits
+  Rasterization was reintroduced here as review instrumentation, not as a replacement fit policy.
 - fit validation policy is calculation-driven: the team policy is to correct the geometry and
   measurement model itself, not to hide bad fits behind percentage-based tolerance tuning; only
   tiny documented numeric seam corrections are acceptable where mixed rounding would otherwise

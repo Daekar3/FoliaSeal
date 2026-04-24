@@ -1839,6 +1839,22 @@ def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_prev
         "_project_pixmap_bounds_within_label",
         lambda **kwargs: None,
     )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_detect_text_content_bounds_in_preview",
+        lambda **kwargs: ({"x": 6, "y": 7, "width": 28, "height": 9}, None),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_detect_text_line_bounds_in_preview",
+        lambda **kwargs: (
+            (
+                {"x": 6, "y": 7, "width": 16, "height": 4},
+                {"x": 6, "y": 12, "width": 28, "height": 4},
+            ),
+            None,
+        ),
+    )
     monkeypatch.setattr(phase3_harness_module, "_image_crop_sha256", lambda **kwargs: None)
     monkeypatch.setattr(phase3_harness_module, "_write_text_debug_overlay", lambda **kwargs: None)
     monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
@@ -1867,6 +1883,18 @@ def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_prev
         "y": 5,
         "width": 34,
         "height": 11,
+    }
+    assert capture["text_structural_content_bounds_px"] == {
+        "x": 3,
+        "y": 4,
+        "width": 30,
+        "height": 10,
+    }
+    assert capture["text_rendered_content_bounds_px"] == {
+        "x": 6,
+        "y": 7,
+        "width": 28,
+        "height": 9,
     }
     assert capture["analysis_appearance_snapshot"]["border_style"]["shape"] == "rounded"
     assert render_calls
@@ -3814,6 +3842,11 @@ def test_snapshot_sign_time_fit_diagnostics_combines_backend_and_canonical_geome
     diagnostics = _snapshot_sign_time_fit_diagnostics(
         preview_render_capture={
             "analysis_preview_image_path": "artifacts/preview.png",
+            "text_rendered_content_bounds_px": {"x": 7, "y": 86, "width": 316, "height": 19},
+            "text_rendered_line_bounds_px": (
+                {"x": 7, "y": 86, "width": 92, "height": 9},
+                {"x": 7, "y": 96, "width": 316, "height": 9},
+            ),
             "card_bounds_px": {"x": 0, "y": 0, "width": 343, "height": 115},
             "analysis_appearance_snapshot": {
                 "image_path": "artifacts/preview_analysis.png",
@@ -3853,7 +3886,9 @@ def test_snapshot_sign_time_fit_diagnostics_combines_backend_and_canonical_geome
         "width": 257,
         "height": 86,
     }
-    assert diagnostics["canonical_preview_geometry"]["text_bounds_px"]["width"] == 333
+    assert diagnostics["canonical_preview_geometry"]["text_bounds_px"]["width"] == 316
+    assert diagnostics["canonical_preview_geometry"]["glyph_ink_text_bounds_px"]["width"] == 316
+    assert diagnostics["canonical_preview_geometry"]["structural_text_bounds_px"]["width"] == 333
     assert len(diagnostics["canonical_preview_geometry"]["line_bounds_px"]) == 2
 
 

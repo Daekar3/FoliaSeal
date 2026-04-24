@@ -513,3 +513,118 @@ Verification:
 - `python -m ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py`
 - `pytest -q`
 - Result: `457 passed`
+
+## Next Slice: Separate Structural Text Boxes from Raster Glyph-Ink Bounds
+
+### Problem Statement
+
+Recent manual review showed that the current diagnostics still overstate
+apparent preview crowding. The root cause is now clear:
+
+- `signing_preview_renderer._structural_line_bounds_px(...)` derives line bounds
+  from `_measure_text_box_dimensions(...)`
+- those bounds describe structural text boxes, not raster glyph ink
+- the harness was reporting those structural boxes as `text_bounds_px` in
+  manual fit diagnostics
+
+That made statements like "the border is 13 px into the text" unsound even when
+visible white space remained between the border and the rendered glyph pixels.
+
+### Relevant Code Path
+
+- structural preview bounds:
+  - `src/foliaseal/application/signing_preview_renderer.py`
+  - `_structural_line_bounds_px(...)`
+  - `render_canonical_signature_preview(...)`
+- manual harness preview capture:
+  - `src/foliaseal/presentation/qt/phase3_harness.py`
+  - `_capture_preview_render(...)`
+  - `_capture_headless_preview_render(...)`
+  - `_snapshot_sign_time_fit_diagnostics(...)`
+- raster text detection:
+  - `src/foliaseal/presentation/qt/phase3_harness.py`
+  - `_detect_text_content_bounds_in_preview(...)`
+  - `_detect_text_line_bounds_in_preview(...)`
+
+### Required Changes
+
+1. Preserve structural bounds explicitly
+   - `text_structural_content_bounds_px`
+   - `text_structural_line_bounds_px`
+
+2. Detect raster glyph-ink bounds from the canonical analysis image and record
+   them separately:
+   - `text_rendered_content_bounds_px`
+   - `text_rendered_line_bounds_px`
+
+3. Update `sign_time_diagnostics.canonical_preview_geometry` to report both:
+   - structural bounds for backend-fit reasoning
+   - glyph-ink bounds for visible-fit judgment
+
+4. Keep the backend fit gate unchanged.
+   - This slice changes instrumentation and review semantics only.
+
+### TDD Plan
+
+1. Add a harness regression proving canonical captures preserve structural
+   bounds and also record raster glyph-ink bounds when detection succeeds.
+2. Update sign-time diagnostics tests so visible-fit review defaults to the
+   glyph-ink bounds while still preserving structural bounds.
+3. Implement the capture and diagnostics changes.
+4. Update docs to explain why rasterization returned here: not to drive fit
+   policy, but to judge preview honesty.
+
+### Acceptance Criteria
+
+- manual harness diagnostics no longer present structural text boxes as if they
+  were glyph-pixel bounds
+- review payloads clearly distinguish:
+  - backend structural fit reasoning
+  - visible glyph-ink clearance in the preview
+- docs state explicitly that rasterization is review instrumentation, not the
+  primary fit engine
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_harness.py`
+- `README.md`
+- `phase3_parallel_plan.md`
+- `pdf_signing_app_feasibility.md`
+
+What landed:
+
+- canonical preview captures now preserve both:
+  - structural text bounds from the canonical text layout
+  - raster glyph-ink bounds detected from the canonical analysis image
+- the harness now records:
+  - `text_structural_content_bounds_px`
+  - `text_structural_line_bounds_px`
+  - `text_rendered_content_bounds_px`
+  - `text_rendered_line_bounds_px`
+- `sign_time_diagnostics.canonical_preview_geometry` now exposes both models:
+  - `structural_text_bounds_px`
+  - `structural_line_bounds_px`
+  - `glyph_ink_text_bounds_px`
+  - `glyph_ink_line_bounds_px`
+- for visible-fit review, the compatibility `text_bounds_px` / `line_bounds_px`
+  fields now prefer the glyph-ink bounds when available.
+
+Documentation updates:
+
+- `README.md`
+- `phase3_parallel_plan.md`
+- `pdf_signing_app_feasibility.md`
+
+Those docs now state explicitly that rasterization returned only for review and
+QA instrumentation. The backend fit engine remains structural and
+calculation-driven.
+
+Verification:
+
+- focused harness regressions: passed
+- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py README.md phase3_parallel_plan.md pdf_signing_app_feasibility.md .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `pytest -q`
+- Result: `457 passed`

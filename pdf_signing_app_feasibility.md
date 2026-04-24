@@ -161,6 +161,11 @@ This profile should be treated as a release-gating contract and reflected in QA 
 - If the chosen rectangle is too small or awkward for the selected content/layout, the UI should
   make that limitation apparent instead of implying a cleaner final result than the backend can
   render.
+- Preview-review instrumentation should distinguish structural text layout bounds from raster
+  glyph-ink bounds.
+  - Structural bounds remain the basis for fit-policy calculations and backend reasoning.
+  - Raster glyph-ink bounds may be used in QA/harness tooling to judge whether the preview is
+    visually honest about what actually fits inside the border.
 - Visible-signature text sizing should be treated as a text-first contract:
   - the selected font size is specified in points and should be honored in the final output,
   - text space should be reserved before sizing the image stamp,

@@ -65,6 +65,11 @@ Current capabilities:
   - The Qt preview now loads the same bundled font assets instead of generic system fallback stacks.
   - The intent is ruthless simplicity: one shared font asset set and one glyph-metric-driven
     measurement story for preview, validation, and final output.
+- Manual harness fit review now distinguishes between:
+  - structural text boxes derived from the same glyph-metric model the backend fit gate uses, and
+  - raster glyph-ink bounds detected from the canonical analysis preview image.
+  The raster path is used only to judge what visibly fits in the preview. It does not replace the
+  backend fit gate.
 - Architectural simplification rule:
   - keep exactly one authoritative backend-owned visible-signature fit gate
   - keep preview visual

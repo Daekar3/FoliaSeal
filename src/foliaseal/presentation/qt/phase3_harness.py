@@ -2172,14 +2172,16 @@ def _snapshot_sign_time_fit_diagnostics(
     if not backend and not render_capture:
         return None
     analysis_snapshot = _mapping(render_capture.get("analysis_appearance_snapshot"))
-    canonical_line_bounds = tuple(
+    structural_line_bounds = tuple(
         analysis_snapshot.get("line_bounds_px")
-        or render_capture.get("text_rendered_line_bounds_px")
+        or render_capture.get("text_structural_line_bounds_px")
         or ()
     )
-    canonical_text_bounds = _mapping(analysis_snapshot.get("text_bounds_px")) or _mapping(
-        render_capture.get("text_rendered_content_bounds_px")
+    structural_text_bounds = _mapping(analysis_snapshot.get("text_bounds_px")) or _mapping(
+        render_capture.get("text_structural_content_bounds_px")
     )
+    glyph_ink_line_bounds = tuple(render_capture.get("text_rendered_line_bounds_px") or ())
+    glyph_ink_text_bounds = _mapping(render_capture.get("text_rendered_content_bounds_px"))
     canonical_stamp_bounds = _mapping(analysis_snapshot.get("stamp_bounds_px")) or _mapping(
         render_capture.get("stamp_rendered_content_bounds_px")
     )
@@ -2212,8 +2214,12 @@ def _snapshot_sign_time_fit_diagnostics(
             "image_size_px": canonical_image_size,
             "container_bounds_px": _mapping(analysis_snapshot.get("container_bounds_px"))
             or _mapping(render_capture.get("card_bounds_px")),
-            "text_bounds_px": canonical_text_bounds,
-            "line_bounds_px": canonical_line_bounds,
+            "text_bounds_px": glyph_ink_text_bounds or structural_text_bounds,
+            "line_bounds_px": glyph_ink_line_bounds or structural_line_bounds,
+            "structural_text_bounds_px": structural_text_bounds,
+            "structural_line_bounds_px": structural_line_bounds,
+            "glyph_ink_text_bounds_px": glyph_ink_text_bounds,
+            "glyph_ink_line_bounds_px": glyph_ink_line_bounds,
             "stamp_bounds_px": canonical_stamp_bounds,
         },
     }
@@ -3251,37 +3257,50 @@ def _capture_preview_render(
     )
     text_rendered_content_bounds = None
     text_rendered_line_bounds: tuple[dict[str, int], ...] = ()
+    text_structural_content_bounds = None
+    text_structural_line_bounds: tuple[dict[str, int], ...] = ()
     text_content_error = None
     text_reference_content_bounds = None
     text_reference_error = None
     text_line_detection_error = None
     if canonical_snapshot is not None:
+        text_structural_content_bounds = canonical_snapshot.text_bounds_px
         text_reference_content_bounds = canonical_snapshot.text_bounds_px
-        text_rendered_content_bounds = canonical_snapshot.text_bounds_px
+        base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
+        if base_snapshot is not None:
+            text_structural_line_bounds = tuple(base_snapshot.line_bounds_px or ())
     elif text_widget_bounds is not None:
         text_reference_content_bounds, text_reference_error = _reference_text_content_bounds(
             source_label=active_detail,
             text_color_rgba=_preview_text_color_rgba(preview),
         )
+    analysis_text_image_path = analysis_image_path or image_path
     if (
-        canonical_snapshot is None
-        and image_path is not None
+        analysis_text_image_path is not None
         and image_error is None
         and text_widget_bounds is not None
     ):
         text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
-            preview_image_path=image_path,
+            preview_image_path=analysis_text_image_path,
             text_widget_bounds=text_widget_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
             reference_text_content_bounds=text_reference_content_bounds,
         )
-    if image_path is not None and image_error is None and text_widget_bounds is not None:
+        if text_rendered_content_bounds is None and canonical_snapshot is not None:
+            text_rendered_content_bounds = text_structural_content_bounds
+    if (
+        analysis_text_image_path is not None
+        and image_error is None
+        and text_widget_bounds is not None
+    ):
         text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
-            preview_image_path=analysis_image_path or image_path,
+            preview_image_path=analysis_text_image_path,
             text_widget_bounds=text_widget_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
             reference_text_content_bounds=text_reference_content_bounds,
         )
+        if not text_rendered_line_bounds and canonical_snapshot is not None:
+            text_rendered_line_bounds = text_structural_line_bounds
     text_diagnostics = _text_edge_diagnostics(
         preview=preview,
         card_bounds=image_card_bounds,
@@ -3403,8 +3422,10 @@ def _capture_preview_render(
         "text_debug_image_error": text_debug_image_error,
         "text_widget_image_sha256": text_widget_image_sha256,
         "text_rendered_content_bounds_px": text_rendered_content_bounds,
+        "text_structural_content_bounds_px": text_structural_content_bounds,
         "text_content_detection_error": text_content_error,
         "text_rendered_line_bounds_px": text_rendered_line_bounds,
+        "text_structural_line_bounds_px": text_structural_line_bounds,
         "text_line_detection_error": text_line_detection_error,
         "text_reference_content_bounds_px": text_reference_content_bounds,
         "text_reference_detection_error": text_reference_error,
@@ -3475,14 +3496,31 @@ def _capture_headless_preview_render(
         stamp_pixmap_bounds=stamp_pixmap_bounds,
         stamp_content_bounds=stamp_content_bounds,
     )
+    text_structural_content_bounds = text_rendered_content_bounds
+    text_structural_line_bounds: tuple[dict[str, int], ...] = ()
+    if canonical_snapshot is not None:
+        base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
+        if base_snapshot is not None:
+            text_structural_line_bounds = tuple(base_snapshot.line_bounds_px or ())
+    text_content_error = None
     text_line_detection_error = None
     if image_path is not None and image_error is None and text_widget_bounds is not None:
+        text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
+            preview_image_path=analysis_image_path or image_path,
+            text_widget_bounds=text_widget_bounds,
+            text_color_rgba=_preview_text_color_rgba(preview),
+            reference_text_content_bounds=text_structural_content_bounds,
+        )
+        if text_rendered_content_bounds is None and canonical_snapshot is not None:
+            text_rendered_content_bounds = text_structural_content_bounds
         text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
             preview_image_path=analysis_image_path or image_path,
             text_widget_bounds=text_widget_bounds,
             text_color_rgba=_preview_text_color_rgba(preview),
-            reference_text_content_bounds=text_rendered_content_bounds,
+            reference_text_content_bounds=text_structural_content_bounds,
         )
+        if not text_rendered_line_bounds and canonical_snapshot is not None:
+            text_rendered_line_bounds = text_structural_line_bounds
     text_diagnostics = _text_edge_diagnostics(
         preview=preview,
         card_bounds=card_bounds,
@@ -3597,10 +3635,12 @@ def _capture_headless_preview_render(
         "text_debug_image_error": text_debug_image_error,
         "text_widget_image_sha256": text_widget_image_sha256,
         "text_rendered_content_bounds_px": text_rendered_content_bounds,
-        "text_content_detection_error": None,
+        "text_structural_content_bounds_px": text_structural_content_bounds,
+        "text_content_detection_error": text_content_error,
         "text_rendered_line_bounds_px": text_rendered_line_bounds,
+        "text_structural_line_bounds_px": text_structural_line_bounds,
         "text_line_detection_error": text_line_detection_error,
-        "text_reference_content_bounds_px": text_rendered_content_bounds,
+        "text_reference_content_bounds_px": text_structural_content_bounds,
         "text_reference_detection_error": None,
         **font_diagnostics,
         "stamp_debug_image_path": stamp_debug_image_path,
