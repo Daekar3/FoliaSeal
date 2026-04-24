@@ -3947,6 +3947,11 @@ def _widget_rect_snapshot_relative_to(root_widget: Any, widget: Any) -> dict[str
     bounds = _widget_rect_snapshot(widget)
     if root_widget is None or widget is None or bounds is None:
         return bounds
+    if root_widget is widget:
+        return bounds
+    is_ancestor_of = getattr(root_widget, "isAncestorOf", None)
+    if callable(is_ancestor_of) and not is_ancestor_of(widget):
+        return bounds
     map_to = getattr(widget, "mapTo", None)
     if not callable(map_to):
         return bounds

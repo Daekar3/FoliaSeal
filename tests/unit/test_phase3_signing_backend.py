@@ -23,6 +23,7 @@ from pyhanko_certvalidator import ValidationContext
 from pyhanko_certvalidator.registry import SimpleCertificateStore
 
 from foliaseal.application.phase3_signing_backend import (
+    _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
     PyHankoCertificateLoader,
     PyHankoPdfInspector,
     PyHankoPdfSigner,
@@ -36,6 +37,7 @@ from foliaseal.application.phase3_signing_backend import (
     _layout_reservation_for_template,
     _load_simple_signer,
     _measure_text_box_dimensions,
+    _single_line_rendered_ink_fits_reservation,
     _single_line_stamp_content_inset,
     _single_line_vertical_stamp_border_gap,
     _stamp_background_for_path,
@@ -2849,6 +2851,96 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
     else:
         assert len(issues) == 1
         assert "does not fit" in issues[0].message
+
+
+def test_single_line_rendered_ink_fallback_caches_identical_preview_checks(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+    stamp_path = tmp_path / "stamp.png"
+    current_png = tmp_path / "current.png"
+    reference_png = tmp_path / "reference.png"
+    Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
+    Image.new("RGBA", (300, 90), color=(255, 255, 255, 255)).save(current_png, format="PNG")
+    Image.new("RGBA", (420, 90), color=(255, 255, 255, 255)).save(reference_png, format="PNG")
+
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+    render_calls: list[float] = []
+
+    def _fake_render(preview, **_kwargs):
+        render_calls.append(preview.signature_rect.width_pt)
+        if len(render_calls) == 1:
+            path = current_png
+            bounds = {"x": 4, "y": 28, "width": 240, "height": 16}
+            image_width = 250
+        else:
+            path = reference_png
+            bounds = {"x": 4, "y": 28, "width": 240, "height": 16}
+            image_width = 420
+        return type(
+            "_Snapshot",
+            (),
+            {
+                "image_path": str(path),
+                "width_px": image_width,
+                "height_px": 90,
+                "text_area_bounds_px": {"x": 0, "y": 24, "width": image_width, "height": 20},
+                "stamp_area_bounds_px": {"x": 0, "y": 0, "width": image_width, "height": 24},
+                "text_bounds_px": bounds,
+                "stamp_bounds_px": None,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "foliaseal.application.signing_preview_renderer.render_canonical_signature_preview",
+        _fake_render,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend.detect_text_content_bounds_in_image",
+        lambda **kwargs: ({"x": 4, "y": 28, "width": 240, "height": 16}, None),
+    )
+
+    signature_rect = build_signature_rect(
+        page_index=0,
+        left_pt=35.0,
+        bottom_pt=428.0,
+        width_pt=247.294,
+        height_pt=61.44,
+    )
+    stamp_text = (
+        "Digitally signed by\n"
+        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
+    )
+
+    assert _single_line_rendered_ink_fits_reservation(
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+    )
+    assert _single_line_rendered_ink_fits_reservation(
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+    )
+    assert render_calls == [247.294, 420.0]
 
 
 def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_real_signature_gif(

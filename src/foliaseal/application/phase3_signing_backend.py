@@ -71,6 +71,7 @@ from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validati
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 _SIG_FIELD_NAME = "Signature1"
+_SINGLE_LINE_RENDERED_INK_FIT_CACHE: dict[tuple[object, ...], bool] = {}
 
 
 def _fmt_pdf_number(value: float) -> bytes:
@@ -1198,6 +1199,14 @@ def _single_line_rendered_ink_fits_reservation(
         or signature_appearance.stamp_position != SignatureStampPosition.TOP
     ):
         return False
+    cache_key = _single_line_rendered_ink_fit_cache_key(
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
+    )
+    cached = _SINGLE_LINE_RENDERED_INK_FIT_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
     snapshot = None
     reference_snapshot = None
     try:
@@ -1250,12 +1259,16 @@ def _single_line_rendered_ink_fits_reservation(
         )
         if reference_text_bounds is None:
             return False
-        return (
+        result = (
             text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
             and text_bounds["height"] <= snapshot.text_area_bounds_px["height"]
             and text_bounds["width"] >= reference_text_bounds["width"] - 1
             and text_bounds["height"] >= reference_text_bounds["height"] - 1
         )
+        if len(_SINGLE_LINE_RENDERED_INK_FIT_CACHE) >= 256:
+            _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+        _SINGLE_LINE_RENDERED_INK_FIT_CACHE[cache_key] = result
+        return result
     except Exception:
         return False
     finally:
@@ -1263,6 +1276,34 @@ def _single_line_rendered_ink_fits_reservation(
             _cleanup_canonical_preview_snapshot(snapshot)
         if reference_snapshot is not None:
             _cleanup_canonical_preview_snapshot(reference_snapshot)
+
+
+def _single_line_rendered_ink_fit_cache_key(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+) -> tuple[object, ...]:
+    box_style = signature_appearance.box_style
+    text_style = signature_appearance.text_style
+    return (
+        round(signature_rect.width_pt, 3),
+        round(signature_rect.height_pt, 3),
+        stamp_text,
+        signature_appearance.image_stamp_path,
+        signature_appearance.signer_label_prefix,
+        signature_appearance.datetime_format,
+        signature_appearance.show_field_names,
+        text_style.font_family,
+        round(text_style.font_size_pt, 3),
+        text_style.bold,
+        text_style.italic,
+        text_style.text_color_hex,
+        box_style.show_border,
+        box_style.border_color_hex,
+        round(box_style.border_width_pt, 3),
+        box_style.background_color_hex,
+    )
 
 
 def _signing_draft_preview_for_stamp_text(

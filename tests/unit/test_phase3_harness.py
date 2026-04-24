@@ -2090,6 +2090,39 @@ def test_capture_preview_render_uses_analysis_space_bounds_for_raster_detection(
     assert detector_calls[-1]["text_widget_bounds"] == {"x": 1, "y": 2, "width": 48, "height": 20}
 
 
+def test_widget_rect_snapshot_relative_to_skips_mapto_for_non_ancestor_root() -> None:
+    calls: list[tuple[object, object]] = []
+
+    class _Root:
+        def isAncestorOf(self, widget) -> bool:
+            return False
+
+    class _Widget:
+        def mapTo(self, root, point):
+            calls.append((root, point))
+            raise AssertionError("mapTo should not be called when root is not an ancestor")
+
+    root = _Root()
+    widget = _Widget()
+    original = phase3_harness_module._widget_rect_snapshot
+    try:
+        phase3_harness_module._widget_rect_snapshot = lambda target: {
+            "x": 7,
+            "y": 9,
+            "width": 11,
+            "height": 13,
+        }
+        assert phase3_harness_module._widget_rect_snapshot_relative_to(root, widget) == {
+            "x": 7,
+            "y": 9,
+            "width": 11,
+            "height": 13,
+        }
+        assert calls == []
+    finally:
+        phase3_harness_module._widget_rect_snapshot = original
+
+
 def test_analyze_capture_state_transitions_flags_negligible_font_size_change(
     tmp_path: Path,
 ) -> None:
