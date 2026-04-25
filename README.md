@@ -344,6 +344,20 @@ The repo now includes two distinct fixture families:
 - `artifacts/generated_acceptance_assets/` for end-to-end signed acceptance, including the clean
   signing fixture PDF and the repo-local PKCS#12 identity used by the signed acceptance matrix
 
+Artifact hygiene:
+
+- keep durable inputs in git, including fixture PDFs, stamp images, test identities, and scenario
+  manifests
+- keep small curated evidence documents in git when they are intentionally part of project status,
+  such as acceptance worksheets or handoff notes
+- keep generated run output out of git by default, including per-scenario PNGs, debug overlays,
+  signed PDFs, comparison crops, and repeated matrix run directories
+- generated output directories are ignored in `.gitignore`; if a file was already tracked before
+  the ignore rule existed, remove it from tracking with `git rm --cached` rather than deleting the
+  local file
+- if a generated artifact is needed for a specific review, prefer sharing the run directory outside
+  source control or committing only a small summary with an explicit rationale
+
 The preview fixture set includes both baseline and stress full-matrix manifests for all three
 current layout families:
 
