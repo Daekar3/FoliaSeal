@@ -1195,8 +1195,8 @@ def _single_line_rendered_ink_fits_reservation(
 ) -> bool:
     if (
         signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or signature_appearance.image_stamp_path is None
-        or signature_appearance.stamp_position != SignatureStampPosition.TOP
+        or signature_appearance.stamp_position
+        not in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
     ):
         return False
     cache_key = _single_line_rendered_ink_fit_cache_key(
@@ -1208,7 +1208,6 @@ def _single_line_rendered_ink_fits_reservation(
     if cached is not None:
         return cached
     snapshot = None
-    reference_snapshot = None
     try:
         from foliaseal.application.signing_preview_renderer import (
             render_canonical_signature_preview,
@@ -1227,6 +1226,13 @@ def _single_line_rendered_ink_fits_reservation(
         )
         if snapshot is None or snapshot.text_area_bounds_px is None:
             return False
+        nominal_width_overflow = (
+            (snapshot.text_bounds_px["width"] - snapshot.text_area_bounds_px["width"])
+            if snapshot.text_bounds_px is not None
+            else 0
+        )
+        if nominal_width_overflow > 16:
+            return False
         text_bounds, _error = detect_text_content_bounds_in_image(
             preview_image_path=snapshot.image_path,
             text_widget_bounds=snapshot.text_area_bounds_px,
@@ -1235,35 +1241,9 @@ def _single_line_rendered_ink_fits_reservation(
         )
         if text_bounds is None:
             return False
-        reference_preview = _signing_draft_preview_for_stamp_text(
-            signature_rect=replace(
-                signature_rect,
-                width_pt=max(signature_rect.width_pt, 420.0),
-            ),
-            signature_appearance=signature_appearance,
-            stamp_text=stamp_text,
-        )
-        reference_snapshot = render_canonical_signature_preview(
-            reference_preview,
-            zoom=1.0,
-            include_border=True,
-            flatten_to_white=True,
-        )
-        if reference_snapshot is None or reference_snapshot.text_area_bounds_px is None:
-            return False
-        reference_text_bounds, _reference_error = detect_text_content_bounds_in_image(
-            preview_image_path=reference_snapshot.image_path,
-            text_widget_bounds=reference_snapshot.text_area_bounds_px,
-            text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
-            reference_text_content_bounds=reference_snapshot.text_bounds_px,
-        )
-        if reference_text_bounds is None:
-            return False
         result = (
             text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
             and text_bounds["height"] <= snapshot.text_area_bounds_px["height"]
-            and text_bounds["width"] >= reference_text_bounds["width"] - 1
-            and text_bounds["height"] >= reference_text_bounds["height"] - 1
         )
         if len(_SINGLE_LINE_RENDERED_INK_FIT_CACHE) >= 256:
             _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
@@ -1274,8 +1254,6 @@ def _single_line_rendered_ink_fits_reservation(
     finally:
         if snapshot is not None:
             _cleanup_canonical_preview_snapshot(snapshot)
-        if reference_snapshot is not None:
-            _cleanup_canonical_preview_snapshot(reference_snapshot)
 
 
 def _single_line_rendered_ink_fit_cache_key(

@@ -7,6 +7,7 @@ from foliaseal.application import compare_preview_to_request, render_signing_pre
 from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
+    SigningDraftPreview,
     SigningDraftWorkflow,
 )
 from foliaseal.application.signing_preview_renderer import (
@@ -747,6 +748,55 @@ def test_canonical_preview_renderer_preserves_left_inset_for_wrapped_block_left_
     assert snapshot.stamp_area_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
     assert snapshot.stamp_bounds_px["x"] > snapshot.stamp_area_bounds_px["x"]
+
+
+def test_canonical_preview_renderer_suppresses_stamp_when_single_line_left_text_lane_collapses(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "left_script_stamp.png"
+    Image.new("RGBA", (640, 160), color=(0, 0, 0, 160)).save(stamp_path)
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=0,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.84,
+            bottom_pt=427.46,
+            width_pt=258.302,
+            height_pt=89.608,
+        ),
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        timezone_display_mode=None,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:37",
+        issues=(),
+        can_submit=False,
+    )
+
+    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_bounds_px is None
+    assert snapshot.text_bounds_px is not None
+    assert snapshot.text_bounds_px["x"] < snapshot.width_px
 
 
 def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:

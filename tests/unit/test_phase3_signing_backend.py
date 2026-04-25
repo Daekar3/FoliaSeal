@@ -2853,17 +2853,94 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
         assert "does not fit" in issues[0].message
 
 
-def test_single_line_rendered_ink_fallback_caches_identical_preview_checks(
+@pytest.mark.parametrize(
+    ("width_pt", "stamp_position", "stamp_path", "font_family", "stamp_text"),
+    [
+        (
+            241.664,
+            SignatureStampPosition.TOP,
+            None,
+            "Sans Serif",
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:34",
+        ),
+        (
+            248.66,
+            SignatureStampPosition.TOP,
+            None,
+            "Sans Serif",
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:35",
+        ),
+        (
+            250.106,
+            SignatureStampPosition.BOTTOM,
+            "stamp.png",
+            "Serif",
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:37",
+        ),
+    ],
+)
+def test_visible_signature_fit_issues_use_rendered_ink_for_manual_vertical_single_line_false_negatives(  # noqa: E501
+    tmp_path: Path,
+    width_pt: float,
+    stamp_position: SignatureStampPosition,
+    stamp_path: str | None,
+    font_family: str,
+    stamp_text: str,
+) -> None:
+    image_stamp_path = None
+    if stamp_path is not None:
+        image_stamp_path = str(tmp_path / stamp_path)
+        Image.new("RGBA", (640, 160), color=(0, 0, 0, 160)).save(
+            image_stamp_path,
+            format="PNG",
+        )
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=stamp_position,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=image_stamp_path,
+            text_style=SignatureTextStyle(
+                font_family=font_family,
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=width_pt,
+            height_pt=87.562 if stamp_position == SignatureStampPosition.BOTTOM else 24.58,
+        ),
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background_for_path(image_stamp_path),
+    )
+
+    assert issues == ()
+
+
+def test_single_line_rendered_ink_fallback_caches_identical_checks(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
     stamp_path = tmp_path / "stamp.png"
     current_png = tmp_path / "current.png"
-    reference_png = tmp_path / "reference.png"
     Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
     Image.new("RGBA", (300, 90), color=(255, 255, 255, 255)).save(current_png, format="PNG")
-    Image.new("RGBA", (420, 90), color=(255, 255, 255, 255)).save(reference_png, format="PNG")
 
     appearance = SigningBackendAppearance.from_signature_appearance(
         build_signature_appearance(
@@ -2887,14 +2964,9 @@ def test_single_line_rendered_ink_fallback_caches_identical_preview_checks(
 
     def _fake_render(preview, **_kwargs):
         render_calls.append(preview.signature_rect.width_pt)
-        if len(render_calls) == 1:
-            path = current_png
-            bounds = {"x": 4, "y": 28, "width": 240, "height": 16}
-            image_width = 250
-        else:
-            path = reference_png
-            bounds = {"x": 4, "y": 28, "width": 240, "height": 16}
-            image_width = 420
+        path = current_png
+        bounds = {"x": 4, "y": 28, "width": 240, "height": 16}
+        image_width = 250
         return type(
             "_Snapshot",
             (),
@@ -2940,7 +3012,7 @@ def test_single_line_rendered_ink_fallback_caches_identical_preview_checks(
         signature_appearance=appearance,
         stamp_text=stamp_text,
     )
-    assert render_calls == [247.294, 420.0]
+    assert render_calls == [247.294]
 
 
 def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_real_signature_gif(

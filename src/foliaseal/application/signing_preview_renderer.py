@@ -36,7 +36,9 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureLayoutTemplate,
     SignatureRect,
+    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
@@ -895,6 +897,26 @@ def _canonical_preview_layout(
             None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
         ),
     )
+    if (
+        include_stamp
+        and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and preview.stamp_position
+        in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+        and layout_reservation.text_area_width_pt <= 4
+        and text_box_width > layout_reservation.text_area_width_pt
+    ):
+        background = None
+        stamp_background = None
+        layout_reservation = _layout_reservation_for_template(
+            preview.layout_template,
+            stamp_position=preview.stamp_position,
+            signature_rect=preview.signature_rect,
+            text_box_width=text_box_width,
+            text_box_height=text_box_height,
+            box_style=preview.box_style,
+            has_visible_stamp_image=False,
+            stamp_aspect_ratio=None,
+        )
     background_layout = _background_layout_for_stamp(
         preview.layout_template,
         stamp_position=preview.stamp_position,
