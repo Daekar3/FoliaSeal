@@ -1291,6 +1291,113 @@ def test_snapshot_signed_output_render_captures_output_parity(monkeypatch, tmp_p
     }
 
 
+def test_snapshot_signed_output_render_normalizes_to_analysis_surface(
+    monkeypatch, tmp_path: Path
+) -> None:
+    pdf_path = tmp_path / "signed.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n%%EOF\n")
+    preview_path = tmp_path / "preview.png"
+    analysis_preview_path = tmp_path / "preview_analysis.png"
+    Image.new("RGBA", (427, 56), (255, 255, 255, 255)).save(preview_path)
+    Image.new("RGBA", (320, 42), (255, 255, 255, 255)).save(analysis_preview_path)
+
+    class _FakeBackend:
+        def diagnostics(self):
+            return type("_Diag", (), {"available": True, "message": "ok"})()
+
+        def render_page(self, request):
+            image = Image.new("RGBA", (900, 900), color=(255, 255, 255, 255))
+            return type(
+                "_Render",
+                (),
+                {
+                    "width_px": image.width,
+                    "height_px": image.height,
+                    "rgba_bytes": image.tobytes(),
+                },
+            )()
+
+        def get_page_geometry(self, document_path: str, page_index: int):
+            return type(
+                "_Geom",
+                (),
+                {"crop_box": (0.0, 0.0, 300.0, 300.0), "rotation": 0},
+            )()
+
+    monkeypatch.setattr(phase3_harness_module, "QtPdfRenderBackend", _FakeBackend)
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_render_signed_annotation_appearance_direct",
+        lambda **_: {
+            "image_path": str(tmp_path / "direct.png"),
+            "error": None,
+        },
+    )
+    Image.new("RGBA", (320, 42), (255, 255, 255, 255)).save(tmp_path / "direct.png")
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_detect_text_content_bounds_in_preview",
+        lambda **_: ({"x": 3, "y": 0, "width": 280, "height": 18}, None),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_detect_text_line_bounds_in_preview",
+        lambda **_: (({"x": 3, "y": 0, "width": 280, "height": 9},), None),
+    )
+
+    snapshot = _snapshot_signed_output_render(
+        output_pdf_path=str(pdf_path),
+        page_index=0,
+        preview_snapshot={
+            "signature_rect": {
+                "page_index": 0,
+                "left_pt": 10,
+                "bottom_pt": 20,
+                "width_pt": 120,
+                "height_pt": 48,
+            },
+            "render_capture": {
+                "preview_image_path": str(preview_path),
+                "analysis_preview_image_path": str(analysis_preview_path),
+                "card_bounds_px": {"x": 0, "y": 0, "width": 427, "height": 56},
+                "analysis_appearance_snapshot": {
+                    "image_path": str(analysis_preview_path),
+                    "image_size_px": {"width": 320, "height": 42},
+                    "container_bounds_px": {"x": 0, "y": 0, "width": 320, "height": 42},
+                    "text_bounds_px": {"x": 3, "y": 0, "width": 280, "height": 18},
+                    "line_bounds_px": (
+                        {"x": 3, "y": 0, "width": 280, "height": 9},
+                    ),
+                    "text_fragments": ("Morgan Ellery",),
+                },
+                "text_rendered_content_bounds_px": {"x": 3, "y": 0, "width": 280, "height": 18},
+            },
+            "box_style": {
+                "show_border": True,
+                "border_color_hex": "#000000",
+                "border_width_pt": 1.0,
+                "background_color_hex": "#FFFFFF",
+            },
+            "layout_template": "single_line",
+            "stamp_position": "top",
+        },
+        preview_text="Morgan Ellery",
+        output_visible_appearance_snapshot={
+            "annotation_rect": [10.0, 20.0, 130.0, 68.0],
+            "appearance_has_visible_text": True,
+            "appearance_uses_rounded_border": True,
+            "text_fragments": ["Morgan Ellery"],
+        },
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_case",
+    )
+
+    assert snapshot is not None
+    assert snapshot["preview_crop_bounds_px"] == {"x": 0, "y": 0, "width": 320, "height": 42}
+    assert snapshot["normalized_signed_crop_dimensions_px"] == {"width": 320, "height": 42}
+    assert snapshot["appearance_layer_comparison"]["composite"]["matches"] is True
+
+
 def test_snapshot_signed_output_render_composites_transparent_page_over_white(
     monkeypatch, tmp_path: Path
 ) -> None:

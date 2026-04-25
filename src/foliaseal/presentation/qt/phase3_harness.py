@@ -5386,6 +5386,15 @@ def _snapshot_preview_card_bounds(snapshot: dict[str, Any] | None) -> dict[str, 
     render_capture = snapshot.get("render_capture")
     if not isinstance(render_capture, dict):
         return None
+    analysis_snapshot = _mapping(render_capture.get("analysis_appearance_snapshot"))
+    analysis_bounds = _mapping_int_bounds(analysis_snapshot.get("container_bounds_px"))
+    if analysis_bounds is not None:
+        return analysis_bounds
+    analysis_size = _mapping(analysis_snapshot.get("image_size_px"))
+    analysis_width = analysis_size.get("width")
+    analysis_height = analysis_size.get("height")
+    if isinstance(analysis_width, int) and isinstance(analysis_height, int):
+        return {"x": 0, "y": 0, "width": analysis_width, "height": analysis_height}
     bounds = render_capture.get("card_bounds_px")
     return _mapping_int_bounds(bounds)
 
