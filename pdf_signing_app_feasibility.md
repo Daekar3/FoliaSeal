@@ -713,8 +713,9 @@ Phase 3 turned out to contain several independent failure modes: shell UX, previ
 
 Status note: substantial portions of this slice have already landed in the Phase 3 codebase,
 including rectangle-aware preview, app-level preview/output instrumentation, and unattended preview
-matrix sweeps. The remaining work is now split between tightening preview fidelity on the stress
-matrices and finishing the separate signed-output acceptance layer rather than a greenfield
+matrix sweeps. The current fixture signed-output parity and fit-rejection matrices are green, so
+the remaining work is now split between representative manual gate-candidate evidence, tightening
+preview fidelity on the stress matrices, and compatibility hardening rather than a greenfield
 instrumentation effort.
 
 - Make the preview geometry-aware once a real signature rectangle exists.
@@ -724,8 +725,8 @@ instrumentation effort.
 - Prioritize the remaining narrow blockers exposed by late Phase 3 manual runs:
   - some image-format edge cases such as transparent GIF stamps are still not trustworthy in final
     PDF output,
-  - final preview/output acceptance still needs representative signed-output comparison runs after
-    the current parity fixes settle,
+  - final preview/output acceptance still needs representative manual signed-output comparison runs
+    against real PDFs now that the fixture parity matrices are green,
   - recent architecture simplification and no-wrap cleanup still need manual confirmation against
     real signing assets and representative PDFs.
 

@@ -80,7 +80,8 @@ Current capabilities:
 
 Not yet production-ready:
 
-- preview/output parity still needs signed-output acceptance coverage for representative real PDFs
+- automated preview/output parity is green for the current signed fixture matrices, but still needs
+  representative manual gate-candidate review against real PDFs
 - broad matrix status should be taken from the current checked-in summaries rather than from stale
   narrative notes here
 - transparent GIF stamp handling in final signed PDF output is not trustworthy yet; PNG remains the safer image-stamp format
@@ -121,8 +122,9 @@ Roadmap note:
   so this README should not be treated as the live matrix scoreboard.
 - The evidence-contract/gate machinery now exists, but it is an engineering validation layer rather
   than a substitute for signed-output acceptance.
-- The remaining engineering focus is on closing the stress-matrix green-path gaps, broadening the
-  signed-output acceptance checks, and finishing TSA/timestamp support.
+- The current signed preview parity and fit-rejection matrices are green for the fixture corpus.
+  The remaining engineering focus is on representative manual gate evidence, closing the
+  stress-matrix green-path gaps, and finishing TSA/timestamp support.
 
 ## Local development
 
@@ -179,7 +181,9 @@ Signed-output acceptance:
 - Preview matrices are for geometry and content-density sweeps.
 - Signed-output acceptance is the end-to-end check that the actual signed PDF is cryptographically valid and that its rendered visible appearance matches the reviewed preview within acceptable tolerance.
 - The signed-output evidence captured by the harness should be reviewed separately from preview-matrix status.
-- A broad representative signed-output matrix is the next acceptance layer after the preview matrices are stable.
+- The current fixture signed-output parity matrix and intentional fit-rejection matrix are green in
+  automation. The next acceptance layer is a representative manual harness run against a real PDF
+  using the same evidence contract.
 
 Run it against a representative PDF:
 
@@ -287,6 +291,15 @@ What it writes:
 - preview-vs-signed-output side-by-side comparisons
 - cryptographic verification details for the embedded signature
 - a summary JSON with per-scenario signing/parity verdicts
+
+Current automated signed-output baseline:
+
+- `signed_preview_parity_matrix`: `18` expected-success scenarios passed with zero
+  preview-output comparison failures in the latest local run
+- `signed_fit_rejection_matrix`: `3` expected intentional rejections matched expectations in the
+  latest local run
+- these generated run directories are intentionally ignored by git; rerun the commands when fresh
+  local evidence is needed
 
 How to interpret it:
 
