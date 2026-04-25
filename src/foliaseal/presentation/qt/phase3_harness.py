@@ -2262,8 +2262,11 @@ def _signed_output_appearance_snapshot(
     stamp_bounds = None
     if _snapshot_visible_appearance_image_xobjects(visible_appearance_snapshot):
         preview_render_capture = _mapping(preview_snapshot.get("render_capture"))
+        analysis_snapshot = _mapping(preview_render_capture.get("analysis_appearance_snapshot"))
         stamp_bounds = (
-            _mapping(preview_render_capture.get("stamp_rendered_content_bounds_px")) or None
+            _mapping(analysis_snapshot.get("stamp_bounds_px"))
+            or _mapping(preview_render_capture.get("stamp_rendered_content_bounds_px"))
+            or None
         )
     text_fragments = tuple(_snapshot_visible_appearance_text_fragments(visible_appearance_snapshot))
     text_style = _signature_text_style_from_snapshot(preview_snapshot.get("text_style"))

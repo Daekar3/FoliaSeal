@@ -1368,7 +1368,14 @@ def test_snapshot_signed_output_render_normalizes_to_analysis_surface(
                     "line_bounds_px": (
                         {"x": 3, "y": 0, "width": 280, "height": 9},
                     ),
+                    "stamp_bounds_px": {"x": 6, "y": 8, "width": 54, "height": 13},
                     "text_fragments": ("Morgan Ellery",),
+                },
+                "stamp_rendered_content_bounds_px": {
+                    "x": 8,
+                    "y": 10,
+                    "width": 74,
+                    "height": 18,
                 },
                 "text_rendered_content_bounds_px": {"x": 3, "y": 0, "width": 280, "height": 18},
             },
@@ -1386,6 +1393,7 @@ def test_snapshot_signed_output_render_normalizes_to_analysis_surface(
             "annotation_rect": [10.0, 20.0, 130.0, 68.0],
             "appearance_has_visible_text": True,
             "appearance_uses_rounded_border": True,
+            "image_xobject_count": 1,
             "text_fragments": ["Morgan Ellery"],
         },
         artifacts_dir=str(tmp_path),
@@ -1395,7 +1403,14 @@ def test_snapshot_signed_output_render_normalizes_to_analysis_surface(
     assert snapshot is not None
     assert snapshot["preview_crop_bounds_px"] == {"x": 0, "y": 0, "width": 320, "height": 42}
     assert snapshot["normalized_signed_crop_dimensions_px"] == {"width": 320, "height": 42}
+    assert snapshot["signed_output_appearance_snapshot"].stamp_bounds_px == {
+        "x": 6,
+        "y": 8,
+        "width": 54,
+        "height": 13,
+    }
     assert snapshot["appearance_layer_comparison"]["composite"]["matches"] is True
+    assert snapshot["appearance_layer_comparison"]["stamp"]["matches"] is True
 
 
 def test_snapshot_signed_output_render_composites_transparent_page_over_white(
