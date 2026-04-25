@@ -2625,18 +2625,15 @@ def test_vertical_preview_descender_budget_scales_with_line_count() -> None:
     assert signing_shell_module._vertical_preview_descender_budget_px(5) == 4
 
 
-def test_preview_font_stack_distinguishes_supported_display_families() -> None:
+def test_preview_font_stack_distinguishes_supported_core_families() -> None:
     assert "Noto Sans" in signing_shell_module._preview_font_stack("Sans Serif")
     assert "Noto Serif" in signing_shell_module._preview_font_stack("Serif")
     assert "DejaVu Sans Mono" in signing_shell_module._preview_font_stack("Monospace")
-    assert "Dancing Script" in signing_shell_module._preview_font_stack("Cursive")
-    assert "Noto Serif Display" in signing_shell_module._preview_font_stack("Fantasy")
     assert signing_shell_module._preview_font_stack("Sans Serif") != (
         signing_shell_module._preview_font_stack("Serif")
     )
-    assert signing_shell_module._preview_font_stack("Cursive") != (
-        signing_shell_module._preview_font_stack("Fantasy")
-    )
+    assert signing_shell_module._preview_font_stack("Cursive") == "'Noto Sans', sans-serif"
+    assert signing_shell_module._preview_font_stack("Fantasy") == "'Noto Sans', sans-serif"
 
 
 def test_reset_widget_size_constraints_clears_fake_geometry() -> None:

@@ -110,10 +110,8 @@ Roadmap note:
   - `Sans Serif` -> bundled `Noto Sans`
   - `Serif` -> bundled `Noto Serif`
   - `Monospace` -> bundled `DejaVu Sans Mono`
-  - `Fantasy` -> bundled `Noto Serif Display`
-  - `Cursive` -> bundled script faces with explicit style limits
-- Unsupported font/style combinations are now blocking validation issues instead of silent family
-  substitution. In particular, `Cursive` does not fake italic/oblique variants.
+- The user-facing font surface is intentionally limited to those three families.
+- Removed niche families now fail honestly if an old saved config still references them.
 - The current Phase 3 finish line is now split into two distinct validation tracks:
   - preview matrices cover layout geometry and content-density regression safety,
   - signed-output acceptance covers cryptographic validity and preview/output parity on the actual

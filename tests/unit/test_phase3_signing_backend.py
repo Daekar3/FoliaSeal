@@ -1381,14 +1381,14 @@ def test_build_text_box_style_uses_italic_font_variant_for_serif() -> None:
     assert style.font.font_file.endswith("NotoSerif-Italic.ttf")
 
 
-def test_build_text_box_style_rejects_unsupported_cursive_italic() -> None:
-    with pytest.raises(ValueError, match="Cursive does not provide a bundled italic face"):
+def test_build_text_box_style_rejects_removed_cursive_family() -> None:
+    with pytest.raises(ValueError, match="Unsupported signature font family 'Cursive'"):
         _build_text_box_style(
             SignatureTextStyle(
                 font_family="Cursive",
                 font_size_pt=8.0,
                 bold=False,
-                italic=True,
+                italic=False,
                 text_color_hex="#000000",
             )
         )

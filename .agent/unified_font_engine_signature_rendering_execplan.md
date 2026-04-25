@@ -40,8 +40,13 @@ Planned bundled mapping:
 - `Sans Serif` -> `Noto Sans` (regular, italic, bold, bold italic)
 - `Serif` -> `Noto Serif` (regular, italic, bold, bold italic)
 - `Monospace` -> `DejaVu Sans Mono` (regular, oblique, bold, bold oblique)
-- `Fantasy` -> `Noto Serif Display` (regular, italic, bold, bold italic)
-- `Cursive` -> explicit bundled script faces with limited support; unsupported style combinations must block signing rather than falling back silently
+
+Current product note:
+
+- The user-facing font surface has since been simplified to `Sans Serif`, `Serif`, and
+  `Monospace` only.
+- Earlier `Cursive` / `Fantasy` exploration is superseded and should not be treated as current
+  product scope.
 
 ### 2. Switch backend measurement/final rendering to OpenType shaping
 
@@ -59,7 +64,6 @@ Update the Qt signing shell so the preview:
 
 - registers the bundled fonts with Qt at shell startup
 - uses the resolved bundled family names instead of generic font stacks
-- no longer reports `Cursive` / `Fantasy` as unsupported direct preview mappings when those bundled assets are present
 
 The preview may still use Qt to rasterize text, but it must use the same font assets and style choices as the backend.
 
@@ -67,7 +71,7 @@ The preview may still use Qt to rasterize text, but it must use the same font as
 
 Adjust harness assumptions to reflect the new direct mapping contract:
 
-- font diagnostics should report all five UI families as direct preview mappings when the bundled assets are loaded
+- font diagnostics should report the active user-facing families as direct preview mappings
 - transition diagnostics should remain active for "control changed but preview barely changed" regressions
 - no detector thresholds are to be loosened to accommodate the architectural change
 
@@ -76,7 +80,6 @@ Adjust harness assumptions to reflect the new direct mapping contract:
 Add or update tests for:
 
 - bundled font registry resolution
-- unsupported style handling for limited cursive combinations
 - backend text-style construction using OpenType factories
 - preview font-family resolution using bundled assets
 - harness font diagnostics reflecting the new direct mapping story

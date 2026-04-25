@@ -34,8 +34,6 @@ def preview_font_family_supported(font_family: str) -> bool:
         "Sans Serif",
         "Serif",
         "Monospace",
-        "Cursive",
-        "Fantasy",
     }
 
 
@@ -150,24 +148,4 @@ def _face_name_for_request(
         if italic:
             return ("DejaVuSansMono-Oblique.ttf", "DejaVu Sans Mono")
         return ("DejaVuSansMono.ttf", "DejaVu Sans Mono")
-    if canonical_family == "Fantasy":
-        if bold and italic:
-            return ("NotoSerifDisplay-BoldItalic.ttf", "Noto Serif Display")
-        if bold:
-            return ("NotoSerifDisplay-Bold.ttf", "Noto Serif Display")
-        if italic:
-            return ("NotoSerifDisplay-Italic.ttf", "Noto Serif Display")
-        return ("NotoSerifDisplay-Regular.ttf", "Noto Serif Display")
-    if canonical_family == "Cursive":
-        if italic and bold:
-            raise ValueError(
-                "Cursive does not provide a bundled bold italic face. Choose another style."
-            )
-        if italic:
-            raise ValueError(
-                "Cursive does not provide a bundled italic face. Choose another style."
-            )
-        if bold:
-            return ("Segoe_Script_Bold.ttf", "Segoe Script")
-        return ("Dancing_Script_Regular.ttf", "Dancing Script")
     raise ValueError(f"Unsupported signature font family '{canonical_family}'.")

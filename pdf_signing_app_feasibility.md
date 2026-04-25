@@ -235,9 +235,8 @@ This profile should be treated as a release-gating contract and reflected in QA 
 - The signed acceptance matrix should define explicit positive-path and negative-path expectations so
   the batch summary can report whether the observed outcomes matched the intended acceptance set,
   not just how many scenarios happened to sign.
-- If the implementation uses a limited bundled script/display family for `Cursive` or `Fantasy`,
-  unsupported bold/italic combinations must be rejected explicitly rather than synthesized or
-  silently mapped to another family.
+- The visible-signature font surface should stay intentionally narrow unless a later slice adds a
+  new family with both clear product value and clear redistribution rights.
 - If visual comparison is automated, it should be done using application/rendered artifacts rather
   than X11/Wayland/compositor protocol tracing.
 - Display-server-specific tracing is out of current scope unless a later debugging need proves that

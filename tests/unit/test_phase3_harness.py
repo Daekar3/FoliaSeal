@@ -2655,7 +2655,7 @@ def test_text_font_diagnostics_reports_cursive_as_direct_preview_family() -> Non
 
     assert diagnostics["requested_text_font_category"] == "cursive"
     assert diagnostics["effective_text_font_category"] == "sans_serif"
-    assert diagnostics["font_family_direct_preview_mapping_supported"] is True
+    assert diagnostics["font_family_direct_preview_mapping_supported"] is False
     assert diagnostics["font_family_category_mismatch"] is True
 
 

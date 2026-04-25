@@ -1538,7 +1538,7 @@ class SignaturePropertiesPanel:
         font_family.addItems(
             _choice_combo_items(
                 preferred="Sans Serif",
-                options=("Sans Serif", "Serif", "Monospace", "Cursive", "Fantasy"),
+                options=("Sans Serif", "Serif", "Monospace"),
             )
         )
 
