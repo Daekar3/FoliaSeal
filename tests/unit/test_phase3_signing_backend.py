@@ -2880,6 +2880,22 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
             "Digitally signed by\n"
             "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:37",
         ),
+        (
+            258.56,
+            SignatureStampPosition.LEFT,
+            None,
+            "Sans Serif",
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:50",
+        ),
+        (
+            258.56,
+            SignatureStampPosition.RIGHT,
+            None,
+            "Sans Serif",
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:51",
+        ),
     ],
 )
 def test_visible_signature_fit_issues_use_rendered_ink_for_manual_vertical_single_line_false_negatives(  # noqa: E501

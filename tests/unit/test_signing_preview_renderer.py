@@ -799,6 +799,55 @@ def test_canonical_preview_renderer_suppresses_stamp_when_single_line_left_text_
     assert snapshot.text_bounds_px["x"] < snapshot.width_px
 
 
+def test_canonical_preview_renderer_suppresses_stamp_when_single_line_left_text_would_overlap(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "left_script_stamp.png"
+    Image.new("RGBA", (640, 160), color=(0, 0, 0, 160)).save(stamp_path)
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=0,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=36.35,
+            bottom_pt=428.48,
+            width_pt=257.538,
+            height_pt=55.288,
+        ),
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        timezone_display_mode=None,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:52",
+        issues=(),
+        can_submit=False,
+    )
+
+    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+    assert snapshot is not None
+    assert snapshot.stamp_bounds_px is None
+    assert snapshot.text_bounds_px is not None
+    assert snapshot.text_bounds_px["width"] > 100
+
+
 def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:
     preview = SignatureAppearanceSnapshot(
         image_path="preview.png",
