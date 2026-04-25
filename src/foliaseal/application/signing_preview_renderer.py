@@ -903,8 +903,8 @@ def _canonical_preview_layout(
         and preview.stamp_position
         in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
         and (
-            text_box_width > layout_reservation.text_area_width_pt
-            or text_box_height > layout_reservation.text_area_height_pt
+            layout_reservation.text_area_width_pt * 2 < text_box_width
+            or layout_reservation.text_area_height_pt < text_box_height
         )
     ):
         background = None
