@@ -958,3 +958,111 @@ Verification:
 - `python -m ruff check src/foliaseal/application/text_raster_analysis.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_phase3_harness.py .agent/per_signing_immutable_harness_evidence_execplan.md`
   passed
 - `pytest -q` passed: `462 passed`
+
+## Slice: Restore Text-First Horizontal Stamp Sizing
+
+### Triggering Observation
+
+The latest manual harness run shows `single_line` with `LEFT`/`RIGHT` image
+stamps no longer shrinking the stamp from the space left after text. The
+reported cases are captures 5, 6, 7, and 9. Capture 10 has visibly separated
+text and stamp content but still reports red validation.
+
+The current artifact values confirm the problem:
+
+- Cap 9 and Cap 10 both use a `373.25 pt x 36.86 pt` rectangle.
+- The measured text box is `254 pt x 18 pt`.
+- The reservation is `text_area_width_pt = 250` and
+  `stamp_area_width_pt = 115`.
+- Validation fails because the text box is wider than the protected text lane.
+- The protected `115 pt` stamp lane comes from
+  `_single_line_horizontal_minimum_stamp_width(...)`, which sizes the stamp
+  from available height and aspect ratio before allocating text.
+
+That policy is backwards for this template. Horizontal `single_line` should be
+text-first: allocate the measured text lane first, then give the stamp whatever
+width remains after the normal separator. The stamp should shrink to that
+remaining lane rather than forcing text to lose space.
+
+### Requirements
+
+- Keep the existing shared reservation model. Do not add another preview-only
+  fit path.
+- For horizontal `single_line` with a visible stamp, remove the protected
+  minimum stamp width from the reservation calculation.
+- Preserve the existing text-first behavior for horizontal `single_line`
+  without a stamp.
+- Keep vertical `single_line` behavior unchanged.
+- Keep non-`single_line` layout behavior unchanged.
+- Validation should pass when the measured text box fits in the text-first lane
+  and a nonzero remaining stamp lane exists.
+- Very narrow rectangles should remain invalid when the measured text still
+  cannot fit.
+
+### TDD Plan
+
+1. Red:
+   - add a reservation regression for the current cap-10 geometry proving
+     horizontal `single_line/right` allocates the full `254 pt` text lane before
+     assigning the remaining stamp lane
+   - add a validation regression proving the same geometry has no fit issue
+   - add a tighter control proving a width that cannot fit the text still fails
+
+2. Green:
+   - remove `_single_line_horizontal_minimum_stamp_width(...)` from the
+     left/right reservation calculation
+   - delete or rewrite tests that encoded the now-invalid protected stamp
+     minimum
+
+3. Refactor:
+   - remove the unused helper if nothing else calls it
+   - keep the code path linear: text width, remaining width, separator, stamp
+     width
+
+4. Verify:
+   - focused backend and preview renderer tests
+   - `ruff check` on touched files
+   - full `pytest -q`
+
+### Acceptance Criteria
+
+- Cap-10-equivalent geometry is validated as fit by automated tests.
+- The stamp area for cap-10-equivalent geometry is derived from remaining width,
+  not from height/aspect-ratio preallocation.
+- The stamp image remains rendered in canonical preview when remaining width is
+  nonzero.
+- A tighter width below the measured text requirement remains red.
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_signing_preview_renderer.py`
+- `tests/unit/test_qt_signing_shell.py`
+
+What landed:
+
+- removed the horizontal `single_line` minimum stamp-width preallocation
+- restored the simple reservation sequence for horizontal `single_line`:
+  measured text width, remaining width, separator, stamp width
+- kept vertical `single_line` and non-`single_line` reservation behavior
+  unchanged
+- updated stale tests that expected protected stamp width or red validation for
+  compact horizontal cases that now fit under text-first sizing
+- added cap-10-equivalent backend and preview regressions
+
+Replay against the latest manual capture states after the change:
+
+- Cap 5: `text_area_width_pt = 254`, `stamp_area_width_pt = 4`, no fit issue
+- Cap 6: `text_area_width_pt = 254`, `stamp_area_width_pt = 58`, no fit issue
+- Cap 7: `text_area_width_pt = 254`, `stamp_area_width_pt = 111`, no fit issue
+- Cap 9: `text_area_width_pt = 254`, `stamp_area_width_pt = 105`, no fit issue
+- Cap 10: `text_area_width_pt = 254`, `stamp_area_width_pt = 105`, no fit issue
+
+Verification:
+
+- focused backend and preview tests passed: `114 passed`
+- full suite passed: `477 passed, 1 warning`
+- `ruff check` passed on touched files

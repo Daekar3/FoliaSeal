@@ -725,30 +725,6 @@ def _stamp_image_aspect_ratio(stamp_background: PdfImage | None) -> float | None
     return image_width / image_height
 
 
-def _single_line_horizontal_minimum_stamp_width(
-    *,
-    available_height: int,
-    box_width: int,
-    box_height: int,
-    stamp_aspect_ratio: float | None,
-) -> int:
-    if available_height <= 0:
-        return 0
-    content_inset = _single_line_stamp_content_inset(
-        stamp_position=SignatureStampPosition.RIGHT,
-        box_width=box_width,
-        box_height=box_height,
-        reserved_width=box_width,
-        reserved_height=available_height,
-    )
-    fit_height = max(1, available_height - content_inset * 2)
-    if stamp_aspect_ratio is None:
-        content_width = max(6, int(round(fit_height * 1.5)))
-    else:
-        content_width = max(1, int(round(fit_height * stamp_aspect_ratio)))
-    return max(1, content_width + content_inset * 2)
-
-
 def _layout_reservation_for_template(
     layout_template: SignatureLayoutTemplate,
     *,
@@ -819,24 +795,16 @@ def _layout_reservation_for_template(
         )
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        minimum_stamp_width = 0
-        if layout_template == SignatureLayoutTemplate.SINGLE_LINE and has_visible_stamp_image:
-            minimum_stamp_width = _single_line_horizontal_minimum_stamp_width(
-                available_height=available_height,
-                box_width=box_width,
-                box_height=box_height,
-                stamp_aspect_ratio=stamp_aspect_ratio,
-            )
         text_area_width = min(
             _effective_horizontal_text_reservation_width(
                 layout_template=layout_template,
                 stamp_position=stamp_position,
                 text_box_width=text_box_width,
             ),
-            max(available_width - minimum_stamp_width, 0),
+            available_width,
         )
         remaining_width = max(available_width - text_area_width, 0)
-        separator_width = min(gap, max(remaining_width - minimum_stamp_width, 0))
+        separator_width = min(gap, remaining_width)
         stamp_area_width = max(remaining_width - separator_width, 0)
         reserved_primary_extent = stamp_area_width
         stamp_area_height = available_height

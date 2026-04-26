@@ -705,7 +705,7 @@ def test_build_text_box_style_preserves_half_point_font_size_in_stamp_style() ->
     assert style.text_box_style.font_size == Fraction(17, 2)
 
 
-def test_layout_reservation_for_horizontal_single_line_preserves_stamp_width_for_image() -> None:
+def test_layout_reservation_for_horizontal_single_line_gives_overwide_text_the_full_lane() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.RIGHT,
@@ -728,11 +728,11 @@ def test_layout_reservation_for_horizontal_single_line_preserves_stamp_width_for
         stamp_aspect_ratio=4.0,
     )
 
-    assert reservation.stamp_area_width_pt > 0
-    assert reservation.text_area_width_pt < reservation.container_width_pt
+    assert reservation.text_area_width_pt == reservation.container_width_pt - 8
+    assert reservation.stamp_area_width_pt == 0
 
 
-def test_horizontal_single_line_reservation_uses_true_stamp_aspect_ratio() -> None:
+def test_horizontal_single_line_reservation_does_not_protect_stamp_width_over_text() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.RIGHT,
@@ -755,8 +755,123 @@ def test_horizontal_single_line_reservation_uses_true_stamp_aspect_ratio() -> No
         stamp_aspect_ratio=8.0,
     )
 
-    assert reservation.stamp_area_width_pt == 120
-    assert reservation.text_area_width_pt == 133
+    assert reservation.text_area_width_pt == reservation.container_width_pt - 8
+    assert reservation.stamp_area_width_pt == 0
+
+
+def test_horizontal_single_line_reservation_prioritizes_text_before_stamp() -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=34.82,
+            bottom_pt=428.48,
+            width_pt=373.25,
+            height_pt=36.86,
+        ),
+        text_box_width=254,
+        text_box_height=18,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.1,
+    )
+
+    assert reservation.text_area_width_pt == 254
+    assert reservation.stamp_area_width_pt == 105
+    assert reservation.stamp_area_height_pt == 29
+
+
+def test_horizontal_single_line_cap10_geometry_passes_after_text_first_reservation(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "signature.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.RIGHT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=34.82,
+            bottom_pt=428.48,
+            width_pt=373.25,
+            height_pt=36.86,
+        ),
+        signature_appearance=appearance,
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
+        ),
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert issues == ()
+
+
+def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "signature.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.RIGHT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=34.82,
+            bottom_pt=428.48,
+            width_pt=248.0,
+            height_pt=36.86,
+        ),
+        signature_appearance=appearance,
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
+        ),
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert issues
+    assert issues[0].code == "visible_signature_layout_unavailable"
 
 
 def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
@@ -2167,7 +2282,7 @@ def test_build_stamp_text_wraps_horizontal_single_line_when_stamp_is_present(
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
 )
-def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_realistic_text(
+def test_visible_signature_fit_issues_accept_compact_horizontal_rectangle_with_realistic_text(
     tmp_path: Path,
     stamp_position: SignatureStampPosition,
 ) -> None:
@@ -2237,8 +2352,7 @@ def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_r
         signature_appearance=appearance,
     )
 
-    assert issues
-    assert issues[0].code == "visible_signature_layout_unavailable"
+    assert issues == ()
 
 
 def test_build_stamp_text_keeps_single_line_body_single_when_roomy(

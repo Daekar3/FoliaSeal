@@ -2528,14 +2528,14 @@ def test_preview_stamp_max_size_is_not_capped_to_legacy_dimensions(tmp_path: Pat
         box_style=appearance.box_style,
         image_stamp_path=appearance.image_stamp_path,
         fields=(),
-        detail_text="Adam Smith | Board Secretary | Lawson Heirs Inc.",
+        detail_text="Adam Smith",
         issues=(),
         can_submit=True,
     )
 
     max_width, max_height = signing_shell_module._preview_stamp_max_size(
         preview,
-        stamp_text="Adam Smith | Board Secretary | Lawson Heirs Inc.",
+        stamp_text="Adam Smith",
         raw_pixmap=_FakePixmap("/tmp/stamp.png", width=400, height=50),
         stamp_aspect_ratio=8.0,
         available_width_px=520,

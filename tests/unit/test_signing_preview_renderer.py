@@ -897,6 +897,61 @@ def test_canonical_preview_renderer_keeps_best_effort_stamp_for_usable_text_lane
     assert snapshot.stamp_bounds_px["x"] < snapshot.text_bounds_px["x"]
 
 
+def test_canonical_preview_renderer_sizes_horizontal_single_line_stamp_from_remaining_lane(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "right_script_stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=3,
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=34.82,
+            bottom_pt=428.48,
+            width_pt=373.25,
+            height_pt=36.86,
+        ),
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        timezone_display_mode=None,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26",
+        issues=(),
+        can_submit=False,
+    )
+
+    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+    assert snapshot is not None
+    assert snapshot.text_area_bounds_px is not None
+    assert snapshot.stamp_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    assert snapshot.text_area_bounds_px["width"] >= 254
+    assert snapshot.stamp_area_bounds_px["width"] < 115
+    assert snapshot.stamp_bounds_px["width"] <= snapshot.stamp_area_bounds_px["width"]
+    assert snapshot.text_area_bounds_px["x"] + snapshot.text_area_bounds_px["width"] <= (
+        snapshot.stamp_area_bounds_px["x"]
+    )
+
+
 def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:
     preview = SignatureAppearanceSnapshot(
         image_path="preview.png",
