@@ -1196,3 +1196,87 @@ Verification:
 - focused backend/preview/Qt suite passed: `177 passed`
 - full suite passed: `482 passed, 1 warning`
 - `ruff check` passed on touched files
+
+## Slice: Align Horizontal Single-Line Text By Visible Ink
+
+### Triggering Observation
+
+Manual caps 5 and 6 improved stamp scaling, but the right-side whitespace after
+the rightmost text remained visibly larger than the behavior already achieved
+for `single_line/top` and `single_line/bottom`.
+
+Latest capture evidence:
+
+- Cap 5 is green at `296.96 pt x 22.53 pt`.
+- The backend reserves `text_area_width_pt = 254` and
+  `stamp_area_width_pt = 29`.
+- The canonical structural text box reaches near the right border, but rendered
+  glyph ink ends significantly inside that nominal box.
+- Width-ladder probes showed that reducing the text reservation width just
+  clips/moves the left side; it does not move the rightmost glyph ink closer to
+  the border.
+- Applying an optical shift equal to the text lane height moves the glyph ink to
+  within a few pixels of the right border without changing validation
+  thresholds.
+
+There is also a harness artifact issue: the interactive text-debug overlay can
+draw 1x analysis bounds on the zoomed preview image, exaggerating the apparent
+right whitespace. The diagnostics should use the same analysis image/bounds that
+produced the detected text ink.
+
+### Requirements
+
+- Do not reduce the text lane width as a proxy for visible glyph width.
+- Do not add a hard-coded pixel or point threshold.
+- For horizontal `single_line` image stamps, let the border-facing text edge
+  optically bleed by the existing text lane height.
+- Keep left/right symmetric:
+  - stamp on left: right text margin gets the optical bleed
+  - stamp on right: left text margin gets the optical bleed
+- Keep top/bottom and non-single-line behavior unchanged.
+- Make the harness text debug overlay use the analysis image and analysis bounds
+  when those are the source of text detection.
+
+### TDD Plan
+
+1. Red:
+   - add backend layout tests for left and right horizontal `single_line` image
+     stamps proving the border-facing margin is adjusted by the text lane height
+   - add a canonical preview raster test proving cap-5-equivalent rendered text
+     ink lands near the right border
+
+2. Green:
+   - apply the optical bleed in `_layout_reservation_for_template`
+   - update interactive harness text-debug overlay image/bounds selection
+
+3. Verify:
+   - focused backend and canonical preview tests
+   - focused harness tests
+   - `ruff check`
+   - full suite
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_signing_preview_renderer.py`
+
+What landed:
+
+- horizontal `single_line` image-stamp text now optically bleeds toward the
+  border-facing edge by the text lane height
+- the bleed is disabled when border-safe inset expands the normal edge margin,
+  so thick-border safety remains intact
+- cap-5-equivalent canonical preview raster coverage asserts rendered text ink
+  reaches within a few pixels of the right border
+- the interactive harness text-debug overlay now uses the analysis image and
+  analysis bounds when those produced the detected text ink
+
+Verification:
+
+- focused backend/preview/harness suites passed: `214 passed, 1 warning`
+- full suite passed: `485 passed, 1 warning`
+- `ruff check` passed on touched files

@@ -749,11 +749,11 @@ def _layout_reservation_for_template(
     """Compute the actual reserved-space split for the requested rectangle."""
     box_width = max(1, int(round(signature_rect.width_pt)))
     box_height = max(1, int(round(signature_rect.height_pt)))
-    edge_margin, gap = _base_layout_spacing(
+    base_edge_margin, gap = _base_layout_spacing(
         stamp_position=stamp_position,
         box_height=box_height,
     )
-    edge_margin = max(edge_margin, _border_safe_inset(box_style))
+    edge_margin = max(base_edge_margin, _border_safe_inset(box_style))
     available_width = max(box_width - edge_margin * 2, 0)
     available_height = max(box_height - edge_margin * 2, 0)
 
@@ -835,6 +835,15 @@ def _layout_reservation_for_template(
             )
             background_alignment = AxisAlignment.ALIGN_MIN
             text_alignment = AxisAlignment.ALIGN_MAX
+            if (
+                layout_template == SignatureLayoutTemplate.SINGLE_LINE
+                and has_visible_stamp_image
+                and edge_margin == base_edge_margin
+            ):
+                text_margins = replace(
+                    text_margins,
+                    right=text_margins.right - text_area_height,
+                )
         else:
             background_margins = Margins(
                 left=text_area_width + separator_width + edge_margin,
@@ -850,6 +859,15 @@ def _layout_reservation_for_template(
             )
             background_alignment = AxisAlignment.ALIGN_MAX
             text_alignment = AxisAlignment.ALIGN_MIN
+            if (
+                layout_template == SignatureLayoutTemplate.SINGLE_LINE
+                and has_visible_stamp_image
+                and edge_margin == base_edge_margin
+            ):
+                text_margins = replace(
+                    text_margins,
+                    left=text_margins.left - text_area_height,
+                )
 
         return _SignatureLayoutReservation(
             layout_template=layout_template,

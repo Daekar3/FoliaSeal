@@ -815,6 +815,62 @@ def test_horizontal_single_line_reservation_prioritizes_text_before_stamp() -> N
     assert reservation.stamp_area_height_pt == 29
 
 
+def test_horizontal_single_line_left_optically_bleeds_text_to_border_facing_edge() -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.84,
+            bottom_pt=428.99,
+            width_pt=296.96,
+            height_pt=22.53,
+        ),
+        text_box_width=254,
+        text_box_height=18,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.1,
+    )
+
+    assert reservation.inner_content_layout.margins.right == (
+        4 - reservation.text_area_height_pt
+    )
+
+
+def test_horizontal_single_line_right_optically_bleeds_text_to_border_facing_edge() -> None:
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.84,
+            bottom_pt=428.99,
+            width_pt=296.96,
+            height_pt=22.53,
+        ),
+        text_box_width=254,
+        text_box_height=18,
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.1,
+    )
+
+    assert reservation.inner_content_layout.margins.left == (
+        4 - reservation.text_area_height_pt
+    )
+
+
 def test_horizontal_single_line_cap10_geometry_passes_after_text_first_reservation(
     tmp_path: Path,
 ) -> None:

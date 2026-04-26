@@ -3346,12 +3346,18 @@ def _capture_preview_render(
             stamp_content_bounds=stamp_content_bounds,
             crop_padding=max(6, _preview_padding_for_capture(preview)),
         )
-    if image_path is not None and image_error is None and text_widget_bounds is not None:
+    text_debug_image_source = analysis_text_image_path or image_path
+    text_debug_widget_bounds = analysis_detection_bounds or text_widget_bounds
+    if (
+        text_debug_image_source is not None
+        and image_error is None
+        and text_debug_widget_bounds is not None
+    ):
         text_debug_image_path = str(target_dir / f"{artifact_basename}_text_debug.png")
         text_debug_image_error = _write_text_debug_overlay(
-            preview_image_path=image_path,
+            preview_image_path=text_debug_image_source,
             output_path=text_debug_image_path,
-            text_widget_bounds=text_widget_bounds,
+            text_widget_bounds=text_debug_widget_bounds,
             text_content_bounds=text_rendered_content_bounds,
             stamp_band_bounds=stamp_band_bounds,
             crop_padding=max(6, _preview_padding_for_capture(preview)),
