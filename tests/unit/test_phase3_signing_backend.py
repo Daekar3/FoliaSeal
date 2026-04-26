@@ -902,6 +902,49 @@ def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
     assert issues[0].code == "visible_signature_layout_unavailable"
 
 
+def test_horizontal_single_line_short_height_uses_rendered_ink_fit(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "signature.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.LOCAL,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=34.3,
+            bottom_pt=428.99,
+            width_pt=423.43,
+            height_pt=24.068,
+        ),
+        signature_appearance=appearance,
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:27"
+        ),
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert issues == ()
+
+
 def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
     tmp_path: Path,
 ) -> None:

@@ -1139,3 +1139,60 @@ Verification so far:
 - focused backend/Qt/preview renderer suite passed: `175 passed`
 - full suite passed: `480 passed, 1 warning`
 - `ruff check` passed on touched files
+
+## Slice: Accept Horizontal Single-Line Short-Height Ink Fit
+
+### Triggering Observation
+
+Cap 6 has substantial horizontal room for a left-positioned image stamp, but the
+preview suppresses the stamp and validation remains red. The artifact data
+shows:
+
+- layout: `single_line/left`
+- rectangle: `423.43 pt x 24.068 pt`
+- measured text box: `254 pt x 18 pt`
+- reserved text/stamp lane height: `16 pt`
+- reserved stamp lane width: `155 pt`
+- rendered GUI text ink: `13 px` high
+
+The failure is caused by nominal text height exceeding the lane by 2 pt. That
+prevents the canonical preview from showing the stamp at all, so the stamp never
+gets the opportunity to shrink vertically into the available lane.
+
+### Requirements
+
+- Keep the horizontal stamp visible when the only nominal overflow is text
+  height and the stamp still has a real rendered lane.
+- Allow backend validation to use the existing rendered-ink fallback for
+  horizontal image stamps, not just top/bottom image stamps.
+- Do not let rendered-ink fallback pass cases where no real horizontal stamp
+  lane remains.
+- Keep the existing wide-overflow guard so genuinely collapsed text lanes still
+  fail.
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/application/signing_preview_renderer.py`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_signing_preview_renderer.py`
+
+What landed:
+
+- `_single_line_rendered_ink_fits_reservation` now supports horizontal
+  left/right image stamps
+- the rendered-ink fallback for horizontal image stamps requires both a real
+  stamp area and rendered stamp bounds, so zero-lane stamp cases still fail
+- canonical preview no longer suppresses horizontal stamps solely because the
+  nominal text box is taller than the lane
+- cap-6-equivalent geometry is covered by backend validation and canonical
+  preview tests
+
+Verification:
+
+- focused cap-6 regressions passed
+- focused backend/preview/Qt suite passed: `177 passed`
+- full suite passed: `482 passed, 1 warning`
+- `ruff check` passed on touched files

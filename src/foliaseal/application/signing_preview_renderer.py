@@ -902,10 +902,7 @@ def _canonical_preview_layout(
         and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
         and preview.stamp_position
         in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-        and (
-            layout_reservation.text_area_width_pt * 2 < text_box_width
-            or layout_reservation.text_area_height_pt < text_box_height
-        )
+        and layout_reservation.text_area_width_pt * 2 < text_box_width
     ):
         background = None
         stamp_background = None

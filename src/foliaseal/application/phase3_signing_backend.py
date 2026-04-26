@@ -1180,14 +1180,7 @@ def _single_line_rendered_ink_fits_reservation(
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
 ) -> bool:
-    if (
-        signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or (
-            signature_appearance.image_stamp_path is not None
-            and signature_appearance.stamp_position
-            not in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-        )
-    ):
+    if signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE:
         return False
     cache_key = _single_line_rendered_ink_fit_cache_key(
         signature_rect=signature_rect,
@@ -1215,6 +1208,16 @@ def _single_line_rendered_ink_fits_reservation(
             flatten_to_white=True,
         )
         if snapshot is None or snapshot.text_area_bounds_px is None:
+            return False
+        if (
+            signature_appearance.image_stamp_path is not None
+            and signature_appearance.stamp_position
+            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+            and (
+                snapshot.stamp_area_bounds_px is None
+                or snapshot.stamp_bounds_px is None
+            )
+        ):
             return False
         nominal_width_overflow = (
             (snapshot.text_bounds_px["width"] - snapshot.text_area_bounds_px["width"])
