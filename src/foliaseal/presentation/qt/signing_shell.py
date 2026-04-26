@@ -22,6 +22,7 @@ from foliaseal.application.phase3_signing_backend import (
     _build_text_box_style,
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
+    _single_line_horizontal_stamp_vertical_inset,
     _single_line_stamp_content_inset,
     _single_line_vertical_stamp_border_gap,
 )
@@ -639,8 +640,18 @@ def _preview_stamp_max_size(
             reserved_width=area_width,
             reserved_height=area_height,
         )
+    vertical_inset = content_inset
+    if (
+        preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and preview.stamp_position
+        in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        vertical_inset = _single_line_horizontal_stamp_vertical_inset(
+            box_style=preview.box_style,
+            content_inset=content_inset,
+        )
     area_width = max(1, area_width - content_inset * 2)
-    area_height = max(1, area_height - content_inset * 2)
+    area_height = max(1, area_height - vertical_inset * 2)
 
     pixmap_width = getattr(raw_pixmap, "width", None)
     pixmap_height = getattr(raw_pixmap, "height", None)

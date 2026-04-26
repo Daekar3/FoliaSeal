@@ -1066,3 +1066,76 @@ Verification:
 - focused backend and preview tests passed: `114 passed`
 - full suite passed: `477 passed, 1 warning`
 - `ruff check` passed on touched files
+
+## Slice: Improve Horizontal Single-Line Stamp Vertical Scaling
+
+### Triggering Observation
+
+The next manual harness run showed that horizontal `single_line` left/right
+stamps were scaling in width after the text-first change, but still looked too
+tall for the available vertical lane. Multi-line cases were not exercised in
+that run, so this slice is intentionally limited to horizontal `single_line`.
+
+Latest harness evidence:
+
+- Cap 7 and Cap 8 are green `single_line/left` cases.
+- Their backend lane is `stamp_area_width_pt = 117` and
+  `stamp_area_height_pt = 21`.
+- Before this slice, the fitted stamp content for the cap-7/cap-8 geometry was
+  `81 x 19 pt`, leaving only about one point of top/bottom breathing room.
+- The PDF/canonical analysis render and GUI preview were consistent enough to
+  show this is a shared fit-policy issue, not a preview-only mismatch.
+
+### Requirements
+
+- Keep the change in the shared sizing path used by signed output and canonical
+  preview.
+- Do not change validation thresholds.
+- Do not alter vertical `top/bottom` single-line behavior.
+- Do not alter multi-line behavior until a manual run exercises those cases.
+- Base the additional vertical shrink on existing border-safe spacing rather
+  than a new magic width or height threshold.
+
+### TDD Plan
+
+1. Red:
+   - add a backend layout regression for the cap-7/cap-8 geometry proving the
+     horizontal stamp fit height keeps a larger internal vertical gutter
+   - add a Qt preview max-size regression for the same geometry
+
+2. Green:
+   - add a shared helper that returns the horizontal single-line vertical inset
+     as `max(content_inset, border_safe_inset)`
+   - apply that helper to backend stamp fitting
+   - apply the same helper to `_preview_stamp_max_size`
+
+3. Verify:
+   - focused backend tests
+   - focused Qt preview sizing tests
+   - `ruff check` on touched files
+   - full suite before commit
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/signing_shell.py`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_qt_signing_shell.py`
+
+What landed:
+
+- horizontal `single_line` stamps now use a vertical inset equal to the existing
+  border-safe inset when that is larger than the content inset
+- backend and Qt preview sizing use the same helper
+- cap-7/cap-8 geometry now fits stamp content at `71 x 17 pt` instead of
+  `81 x 19 pt` inside the same `117 x 21 pt` stamp lane
+
+Verification so far:
+
+- focused backend regressions passed
+- focused Qt preview sizing regressions passed
+- focused backend/Qt/preview renderer suite passed: `175 passed`
+- full suite passed: `480 passed, 1 warning`
+- `ruff check` passed on touched files

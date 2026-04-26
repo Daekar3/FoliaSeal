@@ -37,6 +37,7 @@ from foliaseal.application.phase3_signing_backend import (
     _layout_reservation_for_template,
     _load_simple_signer,
     _measure_text_box_dimensions,
+    _single_line_horizontal_stamp_vertical_inset,
     _single_line_rendered_ink_fits_reservation,
     _single_line_stamp_content_inset,
     _single_line_vertical_stamp_border_gap,
@@ -511,6 +512,33 @@ def test_single_line_vertical_stamp_border_gap_tracks_border_visibility() -> Non
         == 2
     )
     assert _single_line_vertical_stamp_border_gap(box_style=None) == 0
+
+
+def test_single_line_horizontal_stamp_vertical_inset_uses_border_safe_spacing() -> None:
+    assert (
+        _single_line_horizontal_stamp_vertical_inset(
+            box_style=SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+            content_inset=1,
+        )
+        == 2
+    )
+    assert (
+        _single_line_horizontal_stamp_vertical_inset(
+            box_style=SignatureBoxStyle(
+                show_border=False,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+            content_inset=1,
+        )
+        == 1
+    )
 
 
 def test_background_layout_for_top_multi_line_stamp_adds_border_facing_inset(
@@ -1950,6 +1978,54 @@ def test_build_stamp_style_uses_template_specific_layout_for_multi_line(
     assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MID
     assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
+
+
+def test_background_layout_for_horizontal_single_line_keeps_stamp_vertically_inside_lane(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "wide_signature.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+    signature_rect = build_signature_rect(
+        page_index=3,
+        left_pt=36.86,
+        bottom_pt=429.5,
+        width_pt=384.506,
+        height_pt=28.678,
+    )
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        signature_rect=signature_rect,
+        text_box_width=254,
+        text_box_height=18,
+        box_style=box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=1400 / 334,
+    )
+
+    layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=254,
+        text_box_height=18,
+        box_style=box_style,
+    )
+
+    fitted_height = (
+        reservation.container_height_pt
+        - layout.margins.top
+        - layout.margins.bottom
+    )
+    assert fitted_height <= reservation.stamp_area_height_pt - 4
 
 
 def test_build_stamp_style_uses_template_specific_layout_for_left_position(

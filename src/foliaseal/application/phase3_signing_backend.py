@@ -684,6 +684,16 @@ def _single_line_vertical_stamp_border_gap(
     return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
 
 
+def _single_line_horizontal_stamp_vertical_inset(
+    *,
+    box_style: SignatureBoxStyle | None,
+    content_inset: int,
+) -> int:
+    """Keep horizontal single-line stamps optically inside the text-height lane."""
+
+    return max(content_inset, _border_safe_inset(box_style))
+
+
 def _top_stamp_border_facing_inset(
     *,
     box_style: SignatureBoxStyle | None,
@@ -1004,8 +1014,17 @@ def _background_layout_for_stamp(
             reserved_width=area_width,
             reserved_height=area_height,
         )
+    horizontal_single_line_vertical_inset = content_inset
+    if (
+        layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        horizontal_single_line_vertical_inset = _single_line_horizontal_stamp_vertical_inset(
+            box_style=box_style,
+            content_inset=content_inset,
+        )
     fit_width = max(1, area_width - content_inset * 2)
-    fit_height = max(1, area_height - content_inset * 2)
+    fit_height = max(1, area_height - horizontal_single_line_vertical_inset * 2)
     border_gap = _border_facing_stamp_inset(
         layout_template=layout_template,
         stamp_position=stamp_position,

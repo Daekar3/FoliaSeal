@@ -2545,6 +2545,59 @@ def test_preview_stamp_max_size_is_not_capped_to_legacy_dimensions(tmp_path: Pat
     assert max_height > 0
 
 
+def test_preview_stamp_max_size_keeps_horizontal_single_line_stamp_inside_short_lane() -> None:
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path="/tmp/stamp.png",
+        signer_label_prefix="Digitally signed by",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+    )
+    preview = signing_shell_module.SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=3,
+        signature_rect=signing_shell_module.SignatureRect(
+            page_index=3,
+            left_pt=36.86,
+            bottom_pt=429.5,
+            width_pt=384.506,
+            height_pt=28.678,
+        ),
+        signer_label_prefix=appearance.signer_label_prefix,
+        layout_template=appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        timezone_display_mode=appearance.timezone_display_mode,
+        show_field_names=appearance.show_field_names,
+        datetime_format=appearance.datetime_format,
+        text_style=appearance.text_style,
+        box_style=appearance.box_style,
+        image_stamp_path=appearance.image_stamp_path,
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:08",
+        issues=(),
+        can_submit=True,
+    )
+
+    _max_width, max_height = signing_shell_module._preview_stamp_max_size(
+        preview,
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:08"
+        ),
+        raw_pixmap=_FakePixmap("/tmp/stamp.png", width=1400, height=334),
+        stamp_aspect_ratio=1400 / 334,
+        available_width_px=514,
+    )
+
+    assert max_height <= 23
+
+
 def test_preview_body_size_caps_card_to_physical_pdf_scale() -> None:
     preview = signing_shell_module.SigningDraftPreview(
         title="",
