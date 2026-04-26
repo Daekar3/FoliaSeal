@@ -1,0 +1,44 @@
+{
+  "description": "Distilled manual harness cap 4-8 replay for horizontal single-line left image-stamp geometry.",
+  "appearance": {
+    "layout_template": "single_line",
+    "stamp_position": "left",
+    "font_family": "Serif",
+    "font_size_pt": 8.5,
+    "datetime_format": "%Y-%m-%d %H:%M",
+    "signer_label_prefix": "Digitally signed by",
+    "stamp_text": "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+  },
+  "cases": [
+    {
+      "label": "manual_04_single_line_left",
+      "width_pt": 248.37768,
+      "height_pt": 42.92536,
+      "expected_backend_ready": false
+    },
+    {
+      "label": "manual_05_single_line_left",
+      "width_pt": 258.53576,
+      "height_pt": 42.92536,
+      "expected_backend_ready": false
+    },
+    {
+      "label": "manual_06_single_line_left",
+      "width_pt": 273.60904,
+      "height_pt": 42.59768,
+      "expected_backend_ready": true
+    },
+    {
+      "label": "manual_07_single_line_left",
+      "width_pt": 289.99304,
+      "height_pt": 42.59768,
+      "expected_backend_ready": true
+    },
+    {
+      "label": "manual_08_single_line_left",
+      "width_pt": 316.53512,
+      "height_pt": 42.27,
+      "expected_backend_ready": true
+    }
+  ]
+}

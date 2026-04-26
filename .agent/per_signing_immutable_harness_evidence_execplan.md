@@ -1280,3 +1280,287 @@ Verification:
 - focused backend/preview/harness suites passed: `214 passed, 1 warning`
 - full suite passed: `485 passed, 1 warning`
 - `ruff check` passed on touched files
+
+## Investigation: Horizontal Single-Line Stamp/Text Separator
+
+### Triggering Observation
+
+After visible-ink right-edge alignment, the right-side border spacing for
+`single_line/left` is correct, but manual caps still show more whitespace than
+desired between the stamp image and the first visible text glyph. The user asked
+whether the gap could be reduced to roughly 20% of its current size.
+
+The investigation showed two separate contributors:
+
+- The explicit layout separator is the old `6 pt` left/right gap.
+- The larger visible gap is mostly geometric: preserving the right-border ink
+  alignment while the rendered text ink is narrower than the available interval
+  necessarily leaves space on the stamp-facing side.
+
+Therefore, reducing the whole visible gap to 20% is not possible without one of
+these tradeoffs:
+
+- degrade the right-border text alignment that was just fixed
+- reduce text size or horizontally scale text
+- allow stamp/text overlap
+
+An implementation was attempted that shrank only the explicit separator to 20%
+of the existing base gap. The follow-up trace showed that this did not address
+the root cause because the dominant whitespace came from the negative
+border-facing optical bleed, not from the separator itself.
+
+### Decision
+
+- Do not land the separator-only change.
+- Restore the base separator for now so the layout has one simple reservation
+  model.
+- Address clipped text first; only revisit separator size after the preview can
+  no longer validate truncated text.
+
+## Slice: Revert Flawed Horizontal Optical Bleed And Reject Clipped Ink
+
+### Triggering Observation
+
+The next manual run showed that caps 4-8 regressed:
+
+- text on the border-facing edge can run into or past the rectangle border
+- caps with a visible stamp can turn green even when text is visibly clipped
+- the visible gap between stamp ink and text ink remains large
+
+The trace through the relevant code paths showed why:
+
+- `_layout_reservation_for_template(...)` applied a negative border-facing text
+  margin equal to `text_area_height` for horizontal `single_line` image-stamp
+  layouts.
+- That did not shrink internal whitespace independently. It shifted the whole
+  nominal text widget toward the border, which violated the earlier border-safe
+  text guard.
+- `_single_line_rendered_ink_fits_reservation(...)` then accepted some clipped
+  cases because it only checked whether the detected visible ink subset fit
+  inside the text area. It did not require the detected ink to preserve the
+  reference text ink width/height.
+- The uncommitted separator-tightening slice depended on the same flawed
+  optical-bleed premise. Reducing the explicit separator by itself cannot fix a
+  text widget that is being shifted out of bounds.
+
+### Requirements
+
+- Restore the simple horizontal `single_line` reservation contract:
+  text first, base separator second, remaining lane for the stamp.
+- Preserve the normal border-facing text margin; do not use negative margins to
+  push text toward the border.
+- Do not let rendered-ink fallback pass if detected text ink has lost more than
+  the same raster tolerances already used by harness diagnostics:
+  `3 px` width loss or `1 px` height loss against the reference bounds.
+- Keep vertical `single_line`, top/bottom stamp, no-stamp, and non-single-line
+  behavior unchanged.
+- Leave manual harness artifacts unstaged.
+
+### TDD Plan
+
+1. Red:
+   - change the horizontal left/right reservation tests to require normal
+     border-facing margins instead of negative optical-bleed margins
+   - add a rendered-ink fallback test that simulates a cap-6-style clipped
+     visible subset and requires rejection
+   - change the canonical preview test to assert a positive border-facing text
+     guard instead of near-border optical alignment
+
+2. Green:
+   - remove the negative-margin optical bleed from
+     `_layout_reservation_for_template(...)`
+   - remove the uncommitted horizontal separator helper and restore the base
+     separator
+   - add reference ink loss checks to
+     `_single_line_rendered_ink_fits_reservation(...)`
+
+3. Verify:
+   - focused backend horizontal `single_line` tests
+   - focused preview renderer border-guard test
+   - focused backend/harness/preview suites
+   - `ruff check`
+   - full suite if focused verification is clean
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_signing_preview_renderer.py`
+
+What changed:
+
+- removed the horizontal `single_line` negative border-facing margin
+- restored the base horizontal separator instead of the attempted 20% separator
+- added reference ink loss rejection for horizontal `single_line` image-stamp
+  rendered-ink fallback
+- changed tests so the desired invariant is a positive border-facing guard and
+  rejection of cap-6-style clipped visible ink
+
+Verification:
+
+- focused horizontal/rendered-ink backend tests passed: `21 passed`
+- focused preview renderer tests passed: `2 passed`
+- focused backend/preview/harness suites passed: `215 passed, 1 warning`
+- full suite passed: `486 passed, 1 warning`
+- `ruff check` passed on touched files
+
+## Slice: Add Layout Safety Invariants Before Further Visual Tuning
+
+### Triggering Observation
+
+The reverted horizontal `single_line` optical-bleed slice looked plausible
+because it attacked a real visual defect: rendered text ink had excessive
+border-facing whitespace even though the structural text box was already fully
+reserved. The implementation failed because it moved the whole text widget
+outside the safe layout box. That violated the border guard, increased
+stamp-facing whitespace, and exposed a validation fallback that could pass a
+clipped visible subset.
+
+Future preview/PDF parity work needs explicit invariant tests before any more
+appearance tuning. The invariants should make it hard to accidentally trade one
+edge for another, or to let validation green-light a clipped render.
+
+### Requirements
+
+- Add automated tests that encode non-negotiable layout invariants for
+  horizontal `single_line` image-stamp layouts:
+  - border-facing text margin must remain non-negative and at least the active
+    border-safe inset
+  - stamp-facing text margin must equal `stamp_area + separator + edge_margin`
+    and must not silently grow because of border-facing alignment
+  - stamp/text rectangles must not overlap
+  - the rendered text fallback must reject visible ink that loses more than the
+    reference raster tolerance
+- Add a small helper or assertion utility in tests only if it reduces repeated
+  geometry arithmetic. Do not add production abstraction solely for tests.
+- Extend canonical preview raster coverage to check both text edges in the same
+  test case, not just the edge being tuned.
+- Keep the tolerance vocabulary aligned with the existing harness diagnostics:
+  `3 px` width loss and `1 px` height loss for reference ink preservation.
+- Update documentation in this ExecPlan to require a "cannot override" section
+  for any future fit relaxation or optical tuning slice.
+- Do not modify generated harness artifacts as part of this slice.
+
+### TDD Plan
+
+1. Red:
+   - add backend reservation tests for `single_line/left` and
+     `single_line/right` with image stamps that assert both edge margins and
+     separator-derived geometry
+   - add canonical preview tests that detect rendered text ink and assert:
+     border-facing distance is positive, stamp-facing distance is positive, and
+     text ink does not overlap stamp bounds
+   - add or expand rendered-ink fallback tests so a clipped current render fails
+     even when the detected subset fits inside the text area
+
+2. Green:
+   - keep production layout simple unless tests expose a real invariant gap
+   - if existing production logic already satisfies the invariants, land only
+     tests and documentation
+   - if a failure appears, fix the smallest production path that violates the
+     invariant rather than adding a second branch or special-case threshold
+
+3. Refactor:
+   - remove duplicated test arithmetic only after the tests are proving the
+     right behavior
+   - avoid introducing any new layout mode, threshold ladder, or alternate fit
+     path unless the invariant tests prove the existing model cannot express the
+     behavior
+
+4. Verify:
+   - focused backend reservation and rendered-ink fallback tests
+   - focused canonical preview renderer tests
+   - focused `phase3_harness` tests that cover text clipping diagnostics
+   - `ruff check` on touched files
+   - full `pytest` before declaring the slice complete
+
+### Future ExecPlan Rule
+
+Any future slice that relaxes fit validation, changes optical alignment, or
+modifies reserved layout geometry must include a "Cannot Override" subsection
+before implementation. It must explicitly state how the change preserves:
+
+- non-negative border-safe margins
+- stamp/text non-overlap
+- full-reference text ink preservation
+- preview/PDF parity instrumentation
+- simple single-path layout logic without arbitrary split boundaries
+
+### Execution Result
+
+Implemented in:
+
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_signing_preview_renderer.py`
+- `tests/unit/test_phase3_harness.py`
+
+What changed:
+
+- added horizontal `single_line` image-stamp reservation invariant tests for
+  left/right stamp positions and normal/thick borders
+- added canonical preview raster tests that check both border-facing and
+  stamp-facing text distances, plus stamp/text non-overlap
+- added harness text-edge diagnostics coverage for horizontal border-edge
+  reference ink loss
+- production layout code did not need to change; the current implementation
+  already satisfies these invariants after the previous regression fix
+
+Verification:
+
+- focused backend invariant tests passed: `7 passed`
+- focused preview invariant tests passed: `3 passed`
+- focused harness clipping diagnostics tests passed: `2 passed`
+- focused backend/preview/harness suites passed: `222 passed, 1 warning`
+- full suite passed: `493 passed, 1 warning`
+- `ruff check` passed on touched files
+
+## Slice: Add Distilled Manual Cap 4-8 Replay Fixture
+
+### Triggering Observation
+
+The safety invariant slice covered the class of regression, but it still did not
+preserve the exact manual harness ladder that exposed the bug. Caps 4-8 should
+be reproducible without another GUI pass and without committing bulky generated
+artifact images.
+
+### Requirements
+
+- Create a small, stable fixture that captures the manual cap 4-8 geometry:
+  label, width, height, and expected backend readiness.
+- Keep the fixture self-contained by generating a local stamp image in tests
+  instead of depending on the user's local GIF path or generated artifacts.
+- Replay the fixture through backend validation so the red/green ladder remains
+  stable:
+  - caps 4 and 5 reject
+  - caps 6, 7, and 8 accept
+- Replay the same fixture through canonical preview rendering and assert the
+  geometry invariants that matter for this failure mode:
+  - text ink keeps a positive border-facing distance
+  - text ink does not overlap stamp ink
+  - when stamp ink exists, text keeps a positive stamp-facing distance
+- Do not stage or depend on `artifacts/phase3_harness_capture*`.
+
+### Execution Result
+
+Implemented in:
+
+- `tests/fixtures/phase3_horizontal_single_line_manual_replay.json`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_signing_preview_renderer.py`
+
+What changed:
+
+- added a distilled JSON replay fixture for manual caps 4-8
+- added backend validation replay coverage for the captured ladder
+- added canonical preview geometry replay coverage using the same cases
+- kept the fixture small and independent of generated harness artifacts
+
+Verification:
+
+- focused replay/invariant backend tests passed: `6 passed`
+- focused replay/invariant preview tests passed: `3 passed`
+- focused backend/preview/harness suites passed: `224 passed, 1 warning`
+- full suite passed: `495 passed, 1 warning`
+- `ruff check` passed on touched Python files

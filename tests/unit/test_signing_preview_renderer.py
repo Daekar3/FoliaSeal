@@ -1,6 +1,8 @@
+import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from foliaseal.application import compare_preview_to_request, render_signing_preview
@@ -30,6 +32,16 @@ from tests.support.phase3_builders import (
     build_signing_request,
 )
 
+_MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "phase3_horizontal_single_line_manual_replay.json"
+)
+
+
+def _load_manual_horizontal_single_line_replay() -> dict:
+    return json.loads(_MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH.read_text())
+
 
 def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
     return SigningDraftWorkflow(
@@ -40,6 +52,15 @@ def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
         tsa_url="https://tsa.example.com",
         timestamp_required=True,
         certificate_alias="signing-cert",
+    )
+
+
+def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:
+    return (
+        first["x"] < second["x"] + second["width"]
+        and second["x"] < first["x"] + first["width"]
+        and first["y"] < second["y"] + second["height"]
+        and second["y"] < first["y"] + first["height"]
     )
 
 
@@ -1004,7 +1025,7 @@ def test_canonical_preview_renderer_keeps_left_stamp_when_only_nominal_height_ov
     assert snapshot.stamp_bounds_px["x"] < snapshot.text_bounds_px["x"]
 
 
-def test_canonical_preview_renderer_optically_aligns_horizontal_text_to_right_border(
+def test_canonical_preview_renderer_preserves_horizontal_text_border_guard(
     tmp_path: Path,
 ) -> None:
     stamp_path = tmp_path / "left_script_stamp.png"
@@ -1058,7 +1079,151 @@ def test_canonical_preview_renderer_optically_aligns_horizontal_text_to_right_bo
 
     assert error is None
     assert text_bounds is not None
-    assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) <= 6
+    assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) >= 1
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
+)
+def test_canonical_preview_renderer_preserves_both_horizontal_text_edges(
+    tmp_path: Path,
+    stamp_position: SignatureStampPosition,
+) -> None:
+    stamp_path = tmp_path / "script_stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=3,
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=430.0,
+            height_pt=44.0,
+        ),
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        timezone_display_mode=None,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:34",
+        issues=(),
+        can_submit=True,
+    )
+
+    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+    assert snapshot is not None
+    assert snapshot.text_area_bounds_px is not None
+    assert snapshot.stamp_bounds_px is not None
+    text_bounds, error = detect_text_content_bounds_in_image(
+        preview_image_path=snapshot.image_path,
+        text_widget_bounds=snapshot.text_area_bounds_px,
+        text_color_rgba=(0, 0, 0, 255),
+        reference_text_content_bounds=snapshot.text_bounds_px,
+    )
+
+    assert error is None
+    assert text_bounds is not None
+    assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px)
+    if stamp_position == SignatureStampPosition.LEFT:
+        assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0
+        assert text_bounds["x"] - (
+            snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
+        ) > 0
+    else:
+        assert text_bounds["x"] > 0
+        assert snapshot.stamp_bounds_px["x"] - (
+            text_bounds["x"] + text_bounds["width"]
+        ) > 0
+
+
+def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
+    tmp_path: Path,
+) -> None:
+    replay = _load_manual_horizontal_single_line_replay()
+    stamp_path = tmp_path / "manual-replay-signature.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance_config = replay["appearance"]
+    _title, detail_text = appearance_config["stamp_text"].split("\n", 1)
+
+    for case in replay["cases"]:
+        preview = SigningDraftPreview(
+            title=appearance_config["signer_label_prefix"],
+            page_index=3,
+            signature_rect=build_signature_rect(
+                page_index=3,
+                left_pt=36.7,
+                bottom_pt=428.6,
+                width_pt=case["width_pt"],
+                height_pt=case["height_pt"],
+            ),
+            signer_label_prefix=appearance_config["signer_label_prefix"],
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=None,
+            show_field_names=False,
+            datetime_format=appearance_config["datetime_format"],
+            text_style=SignatureTextStyle(
+                font_family=appearance_config["font_family"],
+                font_size_pt=appearance_config["font_size_pt"],
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+            box_style=SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+            image_stamp_path=str(stamp_path),
+            fields=(),
+            detail_text=detail_text,
+            issues=(),
+            can_submit=case["expected_backend_ready"],
+        )
+
+        snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+        assert snapshot is not None, case["label"]
+        assert snapshot.text_area_bounds_px is not None, case["label"]
+        text_bounds, error = detect_text_content_bounds_in_image(
+            preview_image_path=snapshot.image_path,
+            text_widget_bounds=snapshot.text_area_bounds_px,
+            text_color_rgba=(0, 0, 0, 255),
+            reference_text_content_bounds=snapshot.text_bounds_px,
+        )
+
+        assert error is None, case["label"]
+        assert text_bounds is not None, case["label"]
+        assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0, (
+            case["label"]
+        )
+        if snapshot.stamp_bounds_px is not None:
+            assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px), (
+                case["label"]
+            )
+            assert text_bounds["x"] - (
+                snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
+            ) > 0, case["label"]
 
 
 def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:

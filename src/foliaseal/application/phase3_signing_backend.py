@@ -835,15 +835,6 @@ def _layout_reservation_for_template(
             )
             background_alignment = AxisAlignment.ALIGN_MIN
             text_alignment = AxisAlignment.ALIGN_MAX
-            if (
-                layout_template == SignatureLayoutTemplate.SINGLE_LINE
-                and has_visible_stamp_image
-                and edge_margin == base_edge_margin
-            ):
-                text_margins = replace(
-                    text_margins,
-                    right=text_margins.right - text_area_height,
-                )
         else:
             background_margins = Margins(
                 left=text_area_width + separator_width + edge_margin,
@@ -859,15 +850,6 @@ def _layout_reservation_for_template(
             )
             background_alignment = AxisAlignment.ALIGN_MAX
             text_alignment = AxisAlignment.ALIGN_MIN
-            if (
-                layout_template == SignatureLayoutTemplate.SINGLE_LINE
-                and has_visible_stamp_image
-                and edge_margin == base_edge_margin
-            ):
-                text_margins = replace(
-                    text_margins,
-                    left=text_margins.left - text_area_height,
-                )
 
         return _SignatureLayoutReservation(
             layout_template=layout_template,
@@ -1252,6 +1234,22 @@ def _single_line_rendered_ink_fits_reservation(
         )
         if text_bounds is None:
             return False
+        enforce_reference_ink_preservation = (
+            signature_appearance.image_stamp_path is not None
+            and signature_appearance.stamp_position
+            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+        )
+        if enforce_reference_ink_preservation and snapshot.text_bounds_px is not None:
+            reference_width_loss = max(
+                0,
+                snapshot.text_bounds_px["width"] - text_bounds["width"],
+            )
+            reference_height_loss = max(
+                0,
+                snapshot.text_bounds_px["height"] - text_bounds["height"],
+            )
+            if reference_width_loss > 3 or reference_height_loss > 1:
+                return False
         result = (
             text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
             and text_bounds["height"] <= snapshot.text_area_bounds_px["height"]

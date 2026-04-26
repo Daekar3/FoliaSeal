@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import UTC, datetime, timedelta
 from fractions import Fraction
@@ -29,6 +30,7 @@ from foliaseal.application.phase3_signing_backend import (
     PyHankoPdfSigner,
     PyHankoSignatureVerifier,
     _background_layout_for_stamp,
+    _border_safe_inset,
     _build_stamp_style,
     _build_stamp_text,
     _build_text_box_style,
@@ -63,6 +65,16 @@ from tests.support.phase3_builders import (
     build_signature_rect,
     build_signing_request,
 )
+
+_MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "phase3_horizontal_single_line_manual_replay.json"
+)
+
+
+def _load_manual_horizontal_single_line_replay() -> dict:
+    return json.loads(_MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH.read_text())
 
 
 def _write_test_pdf(path: Path) -> None:
@@ -815,7 +827,7 @@ def test_horizontal_single_line_reservation_prioritizes_text_before_stamp() -> N
     assert reservation.stamp_area_height_pt == 29
 
 
-def test_horizontal_single_line_left_optically_bleeds_text_to_border_facing_edge() -> None:
+def test_horizontal_single_line_left_preserves_border_facing_text_margin() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.LEFT,
@@ -838,12 +850,12 @@ def test_horizontal_single_line_left_optically_bleeds_text_to_border_facing_edge
         stamp_aspect_ratio=4.1,
     )
 
-    assert reservation.inner_content_layout.margins.right == (
-        4 - reservation.text_area_height_pt
-    )
+    assert reservation.stamp_area_width_pt == 29
+    assert reservation.inner_content_layout.margins.left == 39
+    assert reservation.inner_content_layout.margins.right == 4
 
 
-def test_horizontal_single_line_right_optically_bleeds_text_to_border_facing_edge() -> None:
+def test_horizontal_single_line_right_preserves_border_facing_text_margin() -> None:
     reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.RIGHT,
@@ -866,9 +878,65 @@ def test_horizontal_single_line_right_optically_bleeds_text_to_border_facing_edg
         stamp_aspect_ratio=4.1,
     )
 
-    assert reservation.inner_content_layout.margins.left == (
-        4 - reservation.text_area_height_pt
+    assert reservation.stamp_area_width_pt == 29
+    assert reservation.inner_content_layout.margins.left == 4
+    assert reservation.inner_content_layout.margins.right == 39
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
+)
+@pytest.mark.parametrize("border_width_pt", [1.0, 8.0])
+def test_horizontal_single_line_image_reservation_preserves_both_edge_invariants(
+    stamp_position: SignatureStampPosition,
+    border_width_pt: float,
+) -> None:
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=border_width_pt,
+        background_color_hex="#FFFFFF",
     )
+    signature_rect = build_signature_rect(
+        page_index=0,
+        left_pt=35.84,
+        bottom_pt=428.99,
+        width_pt=430.0,
+        height_pt=44.0,
+    )
+    reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=stamp_position,
+        signature_rect=signature_rect,
+        text_box_width=254,
+        text_box_height=18,
+        box_style=box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.1,
+    )
+
+    edge_margin = max(4, _border_safe_inset(box_style))
+    separator_width = min(
+        6,
+        max(
+            int(round(signature_rect.width_pt)) - edge_margin * 2
+            - reservation.text_area_width_pt,
+            0,
+        ),
+    )
+    stamp_facing_margin = (
+        reservation.stamp_area_width_pt + separator_width + edge_margin
+    )
+
+    assert reservation.inner_content_layout.margins.top == edge_margin
+    assert reservation.inner_content_layout.margins.bottom == edge_margin
+    if stamp_position == SignatureStampPosition.LEFT:
+        assert reservation.inner_content_layout.margins.right == edge_margin
+        assert reservation.inner_content_layout.margins.left == stamp_facing_margin
+    else:
+        assert reservation.inner_content_layout.margins.left == edge_margin
+        assert reservation.inner_content_layout.margins.right == stamp_facing_margin
 
 
 def test_horizontal_single_line_cap10_geometry_passes_after_text_first_reservation(
@@ -958,7 +1026,7 @@ def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
     assert issues[0].code == "visible_signature_layout_unavailable"
 
 
-def test_horizontal_single_line_short_height_uses_rendered_ink_fit(
+def test_horizontal_single_line_short_height_rejects_clipped_rendered_ink(
     tmp_path: Path,
 ) -> None:
     stamp_path = tmp_path / "signature.png"
@@ -998,7 +1066,52 @@ def test_horizontal_single_line_short_height_uses_rendered_ink_fit(
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
 
-    assert issues == ()
+    assert len(issues) == 1
+    assert issues[0].code == "visible_signature_layout_unavailable"
+
+
+def test_manual_caps_4_to_8_replay_backend_validation_ladder(
+    tmp_path: Path,
+) -> None:
+    replay = _load_manual_horizontal_single_line_replay()
+    stamp_path = tmp_path / "manual-replay-signature.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance_config = replay["appearance"]
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix=appearance_config["signer_label_prefix"],
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format=appearance_config["datetime_format"],
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family=appearance_config["font_family"],
+                font_size_pt=appearance_config["font_size_pt"],
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+
+    for case in replay["cases"]:
+        issues = _visible_signature_fit_issues_for_stamp_text(
+            signature_rect=build_signature_rect(
+                page_index=3,
+                left_pt=36.7,
+                bottom_pt=428.6,
+                width_pt=case["width_pt"],
+                height_pt=case["height_pt"],
+            ),
+            signature_appearance=appearance,
+            stamp_text=appearance_config["stamp_text"],
+            stamp_background=stamp_background,
+        )
+
+        assert (issues == ()) is case["expected_backend_ready"], case["label"]
 
 
 def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
@@ -1402,7 +1515,7 @@ def test_layout_reservation_for_horizontal_multi_line_can_fail_from_height_not_w
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
 )
-def test_layout_reservation_for_horizontal_single_line_frees_more_stamp_space(
+def test_layout_reservation_for_horizontal_single_line_uses_base_separator(
     stamp_position: SignatureStampPosition,
 ) -> None:
     signature_rect = build_signature_rect(
@@ -3318,6 +3431,75 @@ def test_single_line_rendered_ink_fallback_caches_identical_checks(
         stamp_text=stamp_text,
     )
     assert render_calls == [247.294]
+
+
+def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+    stamp_path = tmp_path / "stamp.png"
+    current_png = tmp_path / "current.png"
+    Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
+    Image.new("RGBA", (300, 90), color=(255, 255, 255, 255)).save(current_png, format="PNG")
+
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+
+    def _fake_render(preview, **_kwargs):
+        return type(
+            "_Snapshot",
+            (),
+            {
+                "image_path": str(current_png),
+                "width_px": 300,
+                "height_px": 90,
+                "text_area_bounds_px": {"x": 40, "y": 24, "width": 254, "height": 20},
+                "stamp_area_bounds_px": {"x": 4, "y": 4, "width": 30, "height": 82},
+                "text_bounds_px": {"x": 40, "y": 28, "width": 254, "height": 18},
+                "stamp_bounds_px": {"x": 4, "y": 35, "width": 28, "height": 7},
+            },
+        )()
+
+    monkeypatch.setattr(
+        "foliaseal.application.signing_preview_renderer.render_canonical_signature_preview",
+        _fake_render,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend.detect_text_content_bounds_in_image",
+        lambda **kwargs: ({"x": 75, "y": 28, "width": 217, "height": 17}, None),
+    )
+
+    assert not _single_line_rendered_ink_fits_reservation(
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=273.61,
+            height_pt=42.60,
+        ),
+        signature_appearance=appearance,
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+        ),
+    )
 
 
 def test_visible_signature_fit_issues_reject_compact_horizontal_rectangle_with_real_signature_gif(

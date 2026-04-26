@@ -2703,6 +2703,30 @@ def test_text_edge_diagnostics_flags_reference_content_loss_as_clipping() -> Non
     assert diagnostics["text_content_clipped_in_preview"] is True
 
 
+def test_text_edge_diagnostics_flags_horizontal_border_edge_reference_loss(
+) -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.LEFT},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 300, "height": 80},
+        text_widget_bounds={"x": 40, "y": 10, "width": 240, "height": 30},
+        text_content_bounds={"x": 58, "y": 12, "width": 222, "height": 18},
+        reference_text_content_bounds={"x": 40, "y": 12, "width": 240, "height": 18},
+        stamp_band_bounds={"x": 5, "y": 10, "width": 30, "height": 30},
+        stamp_content_bounds={"x": 8, "y": 20, "width": 24, "height": 6},
+    )
+
+    assert diagnostics["text_content_reference_width_loss_px"] == 18
+    assert diagnostics["text_content_touches_widget_edge"] is True
+    assert diagnostics["text_content_touches_border_facing_edge"] is True
+    assert diagnostics["text_content_clipped_in_preview"] is True
+
+
 def test_text_edge_diagnostics_ignores_reference_loss_without_edge_contact() -> None:
     preview = type(
         "_Preview",
