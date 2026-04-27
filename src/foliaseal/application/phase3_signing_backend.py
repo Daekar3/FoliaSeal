@@ -468,15 +468,16 @@ def _build_stamp_style(
         has_visible_stamp_image=stamp_background is not None,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
-    validation_reservation = _horizontal_single_line_ink_validation_reservation(
+    ink_reservation = _horizontal_single_line_ink_reservation_for_stamp_text(
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+        structural_reservation=layout_reservation,
+        has_visible_stamp_image=stamp_background is not None,
+    )
+    placement_reservation = _horizontal_single_line_ink_validation_reservation(
         layout_reservation,
-        ink_reservation=_horizontal_single_line_ink_reservation_for_stamp_text(
-            signature_rect=signature_rect,
-            signature_appearance=appearance,
-            stamp_text=stamp_text,
-            structural_reservation=layout_reservation,
-            has_visible_stamp_image=stamp_background is not None,
-        ),
+        ink_reservation=ink_reservation,
         signature_rect=signature_rect,
         box_style=appearance.box_style,
         has_visible_stamp_image=stamp_background is not None,
@@ -484,7 +485,7 @@ def _build_stamp_style(
     )
     try:
         _ensure_layout_can_fit(
-            validation_reservation,
+            placement_reservation,
             has_visible_stamp_image=stamp_background is not None,
         )
     except ValueError:
@@ -499,7 +500,7 @@ def _build_stamp_style(
         stamp_position=appearance.stamp_position,
         stamp_background=stamp_background,
         signature_rect=signature_rect,
-        text_box_width=text_box_width,
+        text_box_width=placement_reservation.text_box_width_pt,
         text_box_height=text_box_height,
         box_style=appearance.box_style,
     )
@@ -510,7 +511,7 @@ def _build_stamp_style(
         background_layout=background_layout,
         background_opacity=1.0,
         text_box_style=text_box_style,
-        inner_content_layout=layout_reservation.inner_content_layout,
+        inner_content_layout=placement_reservation.inner_content_layout,
         stamp_text=stamp_text,
         timestamp_format=appearance.datetime_format,
     )

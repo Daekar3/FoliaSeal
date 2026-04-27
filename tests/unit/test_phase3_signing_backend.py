@@ -23,6 +23,7 @@ from pyhanko.sign.timestamps.dummy_client import DummyTimeStamper
 from pyhanko_certvalidator import ValidationContext
 from pyhanko_certvalidator.registry import SimpleCertificateStore
 
+from foliaseal.application import signing_preview_renderer as signing_preview_renderer_module
 from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     HorizontalSingleLineRenderedReference,
@@ -54,6 +55,7 @@ from foliaseal.application.phase3_signing_backend import (
     build_phase3_signing_executor,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance, SignPdfUseCase
+from foliaseal.application.signing_draft_workflow import SigningDraftPreview
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -2391,6 +2393,249 @@ def test_build_stamp_style_uses_template_specific_layout_for_single_line(
     assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
     assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
+
+
+def test_build_stamp_style_uses_ink_reservation_for_horizontal_single_line_pdf_layout(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+    signature_rect = build_signature_rect(
+        page_index=3,
+        left_pt=34.82,
+        bottom_pt=428.48,
+        width_pt=373.25,
+        height_pt=36.86,
+    )
+    stamp_text = (
+        "Digitally signed by\n"
+        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+    )
+    structural_reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        signature_rect=signature_rect,
+        text_box_width=254,
+        text_box_height=18,
+        box_style=appearance.box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.1,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend."
+        "measure_horizontal_single_line_rendered_reference",
+        lambda *_args, **_kwargs: HorizontalSingleLineRenderedReference(
+            preview_size_px={"width": 640, "height": 90},
+            structural_text_bounds_px={"x": 40, "y": 4, "width": 254, "height": 18},
+            rendered_ink_bounds_px={"x": 52, "y": 45, "width": 210, "height": 12},
+            structural_text_bounds_pt={"x": 40, "y": 4, "width": 254, "height": 18},
+            rendered_ink_bounds_pt={"x": 52, "y": 45, "width": 210, "height": 12},
+            px_to_pt=1.0,
+        ),
+    )
+
+    style = _build_stamp_style(
+        appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        signature_rect=signature_rect,
+    )
+
+    assert (
+        style.inner_content_layout.margins.left
+        > structural_reservation.inner_content_layout.margins.left
+    )
+    assert style.inner_content_layout.margins.right == (
+        structural_reservation.inner_content_layout.margins.right
+    )
+    assert (
+        style.background_layout.margins.right
+        < structural_reservation.background_layout.margins.right
+    )
+
+
+def test_build_stamp_style_falls_back_to_structural_horizontal_layout_without_ink_reference(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+    )
+    signature_rect = build_signature_rect(
+        page_index=3,
+        left_pt=34.82,
+        bottom_pt=428.48,
+        width_pt=373.25,
+        height_pt=36.86,
+    )
+    stamp_text = (
+        "Digitally signed by\n"
+        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+    )
+    structural_reservation = _layout_reservation_for_template(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        signature_rect=signature_rect,
+        text_box_width=254,
+        text_box_height=18,
+        box_style=appearance.box_style,
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.1,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend."
+        "measure_horizontal_single_line_rendered_reference",
+        lambda *_args, **_kwargs: None,
+    )
+
+    style = _build_stamp_style(
+        appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        signature_rect=signature_rect,
+    )
+
+    assert style.inner_content_layout.margins.left == (
+        structural_reservation.inner_content_layout.margins.left
+    )
+    assert style.inner_content_layout.margins.right == (
+        structural_reservation.inner_content_layout.margins.right
+    )
+
+
+def test_build_stamp_style_matches_canonical_preview_ink_reservation_margins(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    signature_rect = build_signature_rect(
+        page_index=3,
+        left_pt=34.82,
+        bottom_pt=428.48,
+        width_pt=373.25,
+        height_pt=36.86,
+    )
+    text_style = SignatureTextStyle(
+        font_family="Serif",
+        font_size_pt=8.5,
+        bold=False,
+        italic=False,
+        text_color_hex="#000000",
+    )
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    rendered_reference = HorizontalSingleLineRenderedReference(
+        preview_size_px={"width": 640, "height": 90},
+        structural_text_bounds_px={"x": 40, "y": 4, "width": 254, "height": 18},
+        rendered_ink_bounds_px={"x": 52, "y": 45, "width": 210, "height": 12},
+        structural_text_bounds_pt={"x": 40, "y": 4, "width": 254, "height": 18},
+        rendered_ink_bounds_pt={"x": 52, "y": 45, "width": 210, "height": 12},
+        px_to_pt=1.0,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend."
+        "measure_horizontal_single_line_rendered_reference",
+        lambda *_args, **_kwargs: rendered_reference,
+    )
+    monkeypatch.setattr(
+        signing_preview_renderer_module,
+        "measure_horizontal_single_line_rendered_reference",
+        lambda *_args, **_kwargs: rendered_reference,
+    )
+    stamp_text = (
+        "Digitally signed by\n"
+        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+    )
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=text_style,
+            box_style=box_style,
+        )
+    )
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=3,
+        signature_rect=signature_rect,
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=text_style,
+        box_style=box_style,
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19",
+        issues=(),
+        can_submit=True,
+    )
+
+    pdf_style = _build_stamp_style(
+        appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        signature_rect=signature_rect,
+    )
+    preview_layout = signing_preview_renderer_module._canonical_preview_layout(
+        preview,
+        include_text=True,
+        include_stamp=True,
+        include_border=True,
+    )
+
+    assert pdf_style.inner_content_layout.margins == (
+        preview_layout.inner_content_layout.margins
+    )
+    assert pdf_style.background_layout.margins == preview_layout.background_layout.margins
 
 
 def test_build_stamp_style_uses_template_specific_layout_for_multi_line(

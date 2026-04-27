@@ -2064,3 +2064,65 @@ Verification:
 - `pytest -q tests/unit/test_qt_signing_shell.py`
 - `python -m ruff check src/foliaseal/application/horizontal_signature_reservation.py src/foliaseal/application/signing_preview_renderer.py tests/unit/test_horizontal_signature_reservation.py tests/unit/test_signing_preview_renderer.py`
 - `pytest -q`
+
+### Issue #45 Guidance: Signed PDF Style Must Use The Same Ink Lane As Preview
+
+Code-path review before starting issue #45 found the remaining mismatch:
+
+- `_build_stamp_style(...)` now computes an ink-informed reservation for
+  validation, but still returns `background_layout` and `inner_content_layout`
+  from the structural reservation.
+- `signing_preview_renderer._canonical_preview_layout(...)` now uses the
+  ink-informed lane in the returned canonical preview style.
+- Therefore preview and signed PDF can still diverge even though both validation
+  and preview are improved.
+
+Issue #45 should:
+
+- compute one optional ink-informed layout reservation in `_build_stamp_style`
+  after structural measurement
+- use that reservation for validation and for the returned signed-PDF
+  `inner_content_layout`
+- use the same text lane width when computing signed-PDF `background_layout`, so
+  the stamp lane matches canonical preview
+- keep the structural reservation as the conservative fallback when reference
+  measurement or reservation construction fails
+- avoid adding a separate signed-PDF-only translation rule; signed PDF and
+  canonical preview should both interpret the lane-width reservation the same
+  way
+
+Tests should prove:
+
+- `_build_stamp_style(...)` returns a wider stamp lane and narrower text lane for
+  horizontal `single_line` image-stamp layouts when an ink reference is
+  available
+- missing reference measurement preserves the previous structural margins
+- canonical preview and signed-PDF style margins match for the same
+  cap-5/cap-6-style input
+
+### Issue #45 Execution Result: Signed PDF Style Uses Ink Reservation
+
+Implemented with TDD in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+What landed:
+
+- `_build_stamp_style(...)` now computes the optional ink-informed reservation
+  once and uses it for both validation and returned signed-PDF layout
+- signed-PDF `inner_content_layout` now uses the ink-informed text lane when a
+  horizontal `single_line` image-stamp reference is available
+- signed-PDF `background_layout` is computed with the same ink-informed text
+  lane width so the stamp lane matches canonical preview
+- missing reference measurement still falls back to the previous structural
+  margins
+- tests assert signed-PDF style margins and canonical preview margins match for
+  the same cap-5/cap-6-style input
+
+Verification:
+
+- `pytest -q tests/unit/test_phase3_signing_backend.py -k "pdf_layout or falls_back_to_structural_horizontal_layout or matches_canonical_preview"`
+- `pytest -q tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_horizontal_signature_reservation.py`
+- `python -m ruff check src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py`
+- `pytest -q`
