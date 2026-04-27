@@ -71,6 +71,7 @@ def measure_horizontal_single_line_rendered_reference(
             zoom=zoom,
             include_border=True,
             flatten_to_white=True,
+            use_horizontal_ink_reservation=False,
         )
         if (
             snapshot is None
@@ -138,20 +139,13 @@ def build_horizontal_single_line_ink_reservation(
         return None
 
     ink_left_px = rendered_ink_bounds_px["x"] - structural_text_bounds_px["x"]
-    ink_top_px = rendered_ink_bounds_px["y"] - structural_text_bounds_px["y"]
     ink_right_slack_px = (
         structural_text_bounds_px["x"]
         + structural_text_bounds_px["width"]
         - rendered_ink_bounds_px["x"]
         - rendered_ink_bounds_px["width"]
     )
-    ink_bottom_slack_px = (
-        structural_text_bounds_px["y"]
-        + structural_text_bounds_px["height"]
-        - rendered_ink_bounds_px["y"]
-        - rendered_ink_bounds_px["height"]
-    )
-    if min(ink_left_px, ink_top_px, ink_right_slack_px, ink_bottom_slack_px) < 0:
+    if min(ink_left_px, ink_right_slack_px) < 0:
         return None
 
     ink_width_pt = _px_to_int_pt(rendered_ink_bounds_px["width"], px_to_pt)

@@ -1985,3 +1985,82 @@ Verification:
 - `pytest -q tests/unit/test_phase3_signing_backend.py`
 - `python -m ruff check src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py`
 - `pytest -q`
+
+### Issue #44 Guidance: Canonical Preview Must Avoid Reference-Render Recursion
+
+Code-path review before starting issue #44 found one additional constraint:
+
+- `measure_horizontal_single_line_rendered_reference(...)` currently obtains its
+  reference by calling `render_canonical_signature_preview(...)`.
+- If canonical preview rendering starts consuming that helper unconditionally,
+  the reference render can recursively request another reference render.
+
+Issue #44 must therefore add an explicit bypass for reference renders, for
+example:
+
+- a private/internal flag on `render_canonical_signature_preview(...)` or
+  `_canonical_preview_layout(...)` that disables ink-informed reservation while
+  measuring a roomy reference
+- or a separate structural-only layout helper used by the measurement path
+
+The preview slice should also keep these boundaries clear:
+
+- It may change canonical preview reservation and structural bounds.
+- It may not change signed-PDF placement; that remains issue #45.
+- It should not remove the existing stamp-suppression guard unless the new
+  ink-informed reservation proves a real non-zero stamp lane.
+- It should reuse the same application-layer reservation construction as the
+  backend, including fallback to structural layout when reference measurement is
+  unavailable.
+- The first preview tests should compare a structural render to an
+  ink-informed render and assert that the stamp lane grows while rendered text
+  ink remains inside the border and does not overlap the stamp.
+
+Additional detail found during implementation:
+
+- The canonical preview structural Y bounds can disagree with rendered glyph
+  ink Y bounds because they describe text-box structure, not raster ink.
+- The shared reservation model only uses horizontal ink offsets and slack.
+- Therefore reservation construction should require horizontal containment and
+  rendered ink height preservation, but should not reject solely because the
+  raster ink Y coordinate falls outside the structural Y box.
+
+### Issue #44 Execution Result: Canonical Preview Uses Ink Reservation
+
+Implemented with TDD in:
+
+- `src/foliaseal/application/signing_preview_renderer.py`
+- `src/foliaseal/application/horizontal_signature_reservation.py`
+- `tests/unit/test_signing_preview_renderer.py`
+- `tests/unit/test_horizontal_signature_reservation.py`
+
+What landed:
+
+- `render_canonical_signature_preview(...)` now has an internal
+  `use_horizontal_ink_reservation` switch
+- default canonical preview rendering uses the ink-informed text lane for
+  horizontal `single_line` image-stamp layouts when measurement succeeds
+- rendered-reference measurement explicitly disables ink reservation to avoid
+  recursive reference rendering
+- structural-only preview rendering remains available for regression tests and
+  reference measurement
+- the canonical preview stamp lane grows relative to the structural reservation
+  while rendered text ink remains inside the border and does not overlap the
+  stamp
+- reservation construction now ignores structural Y offset disagreement while
+  still requiring horizontal containment and rendered-height preservation
+
+Important boundary:
+
+- Signed-PDF placement is still unchanged. Issue #45 must wire equivalent
+  translation into the PDF signing path before manual preview/PDF parity should
+  be considered complete.
+
+Verification:
+
+- `pytest -q tests/unit/test_signing_preview_renderer.py -k "uses_ink_reservation"`
+- `pytest -q tests/unit/test_horizontal_signature_reservation.py`
+- `pytest -q tests/unit/test_horizontal_signature_reservation.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py`
+- `pytest -q tests/unit/test_qt_signing_shell.py`
+- `python -m ruff check src/foliaseal/application/horizontal_signature_reservation.py src/foliaseal/application/signing_preview_renderer.py tests/unit/test_horizontal_signature_reservation.py tests/unit/test_signing_preview_renderer.py`
+- `pytest -q`

@@ -16,10 +16,15 @@ from pyhanko.pdf_utils.layout import BoxConstraints
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from pyhanko.stamp import TextStampStyle
 
+from foliaseal.application.horizontal_signature_reservation import (
+    build_horizontal_single_line_ink_reservation,
+    measure_horizontal_single_line_rendered_reference,
+)
 from foliaseal.application.phase3_signing_backend import (
     RoundedBorderTextStampStyle,
     _background_layout_for_stamp,
     _build_text_box_style,
+    _effective_layout_edge_margin,
     _hex_to_rgb,
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
@@ -299,6 +304,7 @@ def render_canonical_signature_preview(
     render_backend: QtPdfRenderBackend | None = None,
     include_border: bool = True,
     flatten_to_white: bool = True,
+    use_horizontal_ink_reservation: bool = True,
 ) -> CanonicalSignaturePreviewSnapshot | None:
     """Render the visible signature using the canonical stamp engine."""
 
@@ -318,12 +324,14 @@ def render_canonical_signature_preview(
         include_text=True,
         include_stamp=True,
         include_border=include_border,
+        use_horizontal_ink_reservation=use_horizontal_ink_reservation,
     )
     full_layout = _canonical_preview_layout(
         preview,
         include_text=True,
         include_stamp=True,
         include_border=include_border,
+        use_horizontal_ink_reservation=use_horizontal_ink_reservation,
     )
     full_render = _render_preview_style(
         style=full_style,
@@ -825,12 +833,14 @@ def _canonical_preview_stamp_style(
     include_text: bool,
     include_stamp: bool,
     include_border: bool,
+    use_horizontal_ink_reservation: bool = True,
 ) -> TextStampStyle:
     layout = _canonical_preview_layout(
         preview,
         include_text=include_text,
         include_stamp=include_stamp,
         include_border=include_border,
+        use_horizontal_ink_reservation=use_horizontal_ink_reservation,
     )
     return layout.style
 
@@ -850,6 +860,7 @@ def _canonical_preview_layout(
     include_text: bool,
     include_stamp: bool,
     include_border: bool,
+    use_horizontal_ink_reservation: bool = True,
 ) -> _CanonicalPreviewLayout:
     assert preview.signature_rect is not None
     assert preview.layout_template is not None
@@ -897,6 +908,27 @@ def _canonical_preview_layout(
             None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
         ),
     )
+    ink_layout_text_box_width = _horizontal_single_line_ink_preview_text_lane_width(
+        preview=preview,
+        stamp_text=stamp_text,
+        structural_text_box_width=text_box_width,
+        structural_text_box_height=text_box_height,
+        has_visible_stamp_image=stamp_background is not None and include_stamp,
+        use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+    )
+    if ink_layout_text_box_width is not None:
+        layout_reservation = _layout_reservation_for_template(
+            preview.layout_template,
+            stamp_position=preview.stamp_position,
+            signature_rect=preview.signature_rect,
+            text_box_width=ink_layout_text_box_width,
+            text_box_height=text_box_height,
+            box_style=preview.box_style,
+            has_visible_stamp_image=stamp_background is not None and include_stamp,
+            stamp_aspect_ratio=(
+                None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
+            ),
+        )
     if (
         include_stamp
         and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
@@ -921,7 +953,7 @@ def _canonical_preview_layout(
         stamp_position=preview.stamp_position,
         stamp_background=stamp_background if include_stamp else None,
         signature_rect=preview.signature_rect,
-        text_box_width=text_box_width,
+        text_box_width=ink_layout_text_box_width or text_box_width,
         text_box_height=text_box_height,
         box_style=preview.box_style,
     )
@@ -946,6 +978,51 @@ def _canonical_preview_layout(
         reserved_background_layout=layout_reservation.background_layout,
         reservation=layout_reservation,
     )
+
+
+def _horizontal_single_line_ink_preview_text_lane_width(
+    *,
+    preview: SigningDraftPreview,
+    stamp_text: str,
+    structural_text_box_width: int,
+    structural_text_box_height: int,
+    has_visible_stamp_image: bool,
+    use_horizontal_ink_reservation: bool,
+) -> int | None:
+    if (
+        not use_horizontal_ink_reservation
+        or not has_visible_stamp_image
+        or preview.signature_rect is None
+        or preview.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or preview.stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+        or preview.box_style is None
+    ):
+        return None
+
+    reference = measure_horizontal_single_line_rendered_reference(preview, zoom=1.0)
+    if reference is None:
+        return None
+    edge_margin = _effective_layout_edge_margin(
+        stamp_position=preview.stamp_position,
+        box_height=max(1, int(round(preview.signature_rect.height_pt))),
+        box_style=preview.box_style,
+    )
+    ink_reservation = build_horizontal_single_line_ink_reservation(
+        layout_template=preview.layout_template,
+        stamp_position=preview.stamp_position,
+        has_visible_stamp_image=has_visible_stamp_image,
+        structural_text_box_width_pt=structural_text_box_width,
+        structural_text_box_height_pt=structural_text_box_height,
+        structural_text_bounds_px=reference.structural_text_bounds_px,
+        rendered_ink_bounds_px=reference.rendered_ink_bounds_px,
+        px_to_pt=reference.px_to_pt,
+        border_facing_padding_pt=edge_margin,
+        stamp_facing_padding_pt=edge_margin,
+    )
+    if ink_reservation is None or ink_reservation.lane_width_pt >= structural_text_box_width:
+        return None
+    return ink_reservation.lane_width_pt
 
 
 def _stamp_aspect_ratio(stamp_background: PdfContent | None) -> float | None:

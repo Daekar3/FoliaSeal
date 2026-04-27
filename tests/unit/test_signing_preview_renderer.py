@@ -819,7 +819,11 @@ def test_canonical_preview_renderer_suppresses_stamp_when_single_line_left_text_
         can_submit=False,
     )
 
-    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+    snapshot = render_canonical_signature_preview(
+        preview,
+        zoom=1.0,
+        use_horizontal_ink_reservation=False,
+    )
 
     assert snapshot is not None
     assert snapshot.stamp_bounds_px is None
@@ -868,7 +872,11 @@ def test_canonical_preview_renderer_suppresses_stamp_when_single_line_left_text_
         can_submit=False,
     )
 
-    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+    snapshot = render_canonical_signature_preview(
+        preview,
+        zoom=1.0,
+        use_horizontal_ink_reservation=False,
+    )
 
     assert snapshot is not None
     assert snapshot.stamp_bounds_px is None
@@ -966,7 +974,11 @@ def test_canonical_preview_renderer_sizes_horizontal_single_line_stamp_from_rema
         can_submit=False,
     )
 
-    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+    snapshot = render_canonical_signature_preview(
+        preview,
+        zoom=1.0,
+        use_horizontal_ink_reservation=False,
+    )
 
     assert snapshot is not None
     assert snapshot.text_area_bounds_px is not None
@@ -978,6 +990,76 @@ def test_canonical_preview_renderer_sizes_horizontal_single_line_stamp_from_rema
     assert snapshot.text_area_bounds_px["x"] + snapshot.text_area_bounds_px["width"] <= (
         snapshot.stamp_area_bounds_px["x"]
     )
+
+
+def test_canonical_preview_renderer_uses_ink_reservation_for_horizontal_single_line_stamp(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "script_stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=3,
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=34.82,
+            bottom_pt=428.48,
+            width_pt=373.25,
+            height_pt=36.86,
+        ),
+        signer_label_prefix="Digitally signed by",
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        timezone_display_mode=None,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19",
+        issues=(),
+        can_submit=True,
+    )
+
+    structural_snapshot = render_canonical_signature_preview(
+        preview,
+        zoom=1.0,
+        use_horizontal_ink_reservation=False,
+    )
+    ink_snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+    assert structural_snapshot is not None
+    assert structural_snapshot.stamp_area_bounds_px is not None
+    assert ink_snapshot is not None
+    assert ink_snapshot.stamp_area_bounds_px is not None
+    assert ink_snapshot.stamp_area_bounds_px["width"] > structural_snapshot.stamp_area_bounds_px[
+        "width"
+    ]
+    assert ink_snapshot.stamp_bounds_px is not None
+    assert ink_snapshot.text_area_bounds_px is not None
+    text_bounds, error = detect_text_content_bounds_in_image(
+        preview_image_path=ink_snapshot.image_path,
+        text_widget_bounds=ink_snapshot.text_area_bounds_px,
+        text_color_rgba=(0, 0, 0, 255),
+        reference_text_content_bounds=ink_snapshot.text_bounds_px,
+    )
+
+    assert error is None
+    assert text_bounds is not None
+    assert not _rectangles_overlap(text_bounds, ink_snapshot.stamp_bounds_px)
+    assert ink_snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0
 
 
 def test_canonical_preview_renderer_keeps_left_stamp_when_only_nominal_height_overflows(

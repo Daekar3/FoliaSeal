@@ -99,6 +99,25 @@ def test_horizontal_single_line_ink_reservation_falls_back_when_reference_is_not
     )
 
 
+def test_horizontal_single_line_ink_reservation_does_not_reject_vertical_structural_offset(
+) -> None:
+    reservation = build_horizontal_single_line_ink_reservation(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        has_visible_stamp_image=True,
+        structural_text_box_width_pt=254,
+        structural_text_box_height_pt=18,
+        structural_text_bounds_px={"x": 40, "y": 4, "width": 254, "height": 18},
+        rendered_ink_bounds_px={"x": 52, "y": 45, "width": 210, "height": 12},
+        px_to_pt=1.0,
+        border_facing_padding_pt=4,
+        stamp_facing_padding_pt=4,
+    )
+
+    assert reservation is not None
+    assert reservation.lane_width_pt == 218
+
+
 def test_measure_horizontal_single_line_rendered_reference_returns_roomy_ink_geometry(
     tmp_path,
 ) -> None:
