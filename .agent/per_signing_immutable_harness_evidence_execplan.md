@@ -1852,3 +1852,33 @@ place the structural text box as before.
   border shape.
 - The implementation has no negative margins, no arbitrary width threshold, and
   no separate preview-only placement rule.
+
+### Issue #41 Execution Result: Shared Horizontal Ink Reservation Model
+
+Implemented with TDD in:
+
+- `src/foliaseal/application/horizontal_signature_reservation.py`
+- `src/foliaseal/application/__init__.py`
+- `tests/unit/test_horizontal_signature_reservation.py`
+
+What landed:
+
+- added `HorizontalSingleLineInkReservation`
+- added `build_horizontal_single_line_ink_reservation(...)`
+- limited construction to horizontal `single_line` layouts with a visible image
+  stamp
+- preserved conservative fallback behavior by returning `None` when reference
+  geometry is missing, outside the structural text box, overwide after named
+  padding, or otherwise unsafe
+- exported the model/helper from the application package for later backend,
+  preview, and signed-PDF wiring
+
+No production layout behavior is wired to the model yet. That is deliberate:
+issue #41 establishes the shared contract only, so later slices can consume it
+without mixing model creation with fit-policy changes.
+
+Verification:
+
+- `pytest -q tests/unit/test_horizontal_signature_reservation.py`
+- `pytest -q tests/unit/test_horizontal_signature_reservation.py tests/unit/test_phase3_signing_backend.py`
+- `python -m ruff check src/foliaseal/application/horizontal_signature_reservation.py src/foliaseal/application/__init__.py tests/unit/test_horizontal_signature_reservation.py`

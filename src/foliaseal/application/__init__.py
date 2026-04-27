@@ -1,5 +1,9 @@
 """Application layer helpers for orchestration and viewer workflows."""
 
+from foliaseal.application.horizontal_signature_reservation import (
+    HorizontalSingleLineInkReservation,
+    build_horizontal_single_line_ink_reservation,
+)
 from foliaseal.application.performance_timing import (
     ViewerPerformanceTracker,
     ViewerTimingSnapshot,
@@ -39,6 +43,7 @@ __all__ = [
     "ViewerWorkflow",
     "ViewerZoomLimits",
     "CanonicalSignaturePreviewSnapshot",
+    "HorizontalSingleLineInkReservation",
     "SignatureAppearanceComparison",
     "SignatureAppearanceLayerComparison",
     "SignatureAppearanceSnapshot",
@@ -56,6 +61,7 @@ __all__ = [
     "SigningDraftWorkflow",
     "compare_signature_appearance_snapshots",
     "compare_preview_to_request",
+    "build_horizontal_single_line_ink_reservation",
     "render_canonical_signature_preview",
     "render_signing_preview",
 ]
