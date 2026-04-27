@@ -2126,3 +2126,66 @@ Verification:
 - `pytest -q tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_horizontal_signature_reservation.py`
 - `python -m ruff check src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py`
 - `pytest -q`
+
+### Issue #46 Guidance: Parity Matrix Must Cover Horizontal Single-Line Ladder
+
+Code-path and asset review before starting issue #46 found that the existing
+`signed_preview_parity_matrix.json` covers layout families and stamp positions,
+but it only has one relaxed horizontal `single_line` image-stamp case. It does
+not explicitly encode the cap-4-through-cap-8 manual replay ladder that drove
+the ink-reservation work.
+
+Issue #46 should:
+
+- extend the signed preview/PDF parity manifest with horizontal `single_line`
+  image-stamp scenarios derived from
+  `tests/fixtures/phase3_horizontal_single_line_manual_replay.json`
+- include both left and right stamp positions
+- include compact accepted cases near the minimum validated size, not only roomy
+  cases
+- keep these as expected-success parity cases; the intentional rejection ladder
+  remains in the signed fit rejection manifest
+- preserve strict signed matrix expectations:
+  - every scenario signs successfully
+  - zero preview/output comparison failures
+  - zero annotation-rect mismatches
+
+Tests should prove:
+
+- the parity manifest contains the horizontal manual replay scenarios by name
+- those scenarios use `single_line`, horizontal stamp positions, visible image
+  stamps, and expected success
+- the manifest acceptance expectation scenario count matches the scenario list
+  exactly after adding the new cases
+
+### Issue #46 Execution Result: Horizontal Single-Line Parity Matrix Cases
+
+Implemented with TDD in:
+
+- `artifacts/preview_sweep_assets/signed_preview_parity_matrix.json`
+- `tests/unit/test_phase3_harness.py`
+
+What landed:
+
+- extended the signed preview/PDF parity manifest from 18 to 23 expected-success
+  scenarios
+- added five horizontal `single_line` image-stamp scenarios derived from the
+  manual replay ladder:
+  - `single_line_left_stamp_manual_replay_06_minimum_success`
+  - `single_line_left_stamp_manual_replay_07_success`
+  - `single_line_left_stamp_manual_replay_08_roomy_success`
+  - `single_line_right_stamp_manual_replay_07_short_height_success`
+  - `single_line_left_stamp_manual_replay_08_short_height_success`
+- included both left and right stamp positions
+- kept the matrix strict: every scenario is expected to sign successfully and
+  the manifest requires zero preview/output comparison failures
+- added manifest tests proving the horizontal replay ladder is present and that
+  `acceptance_expectations.scenario_count` exactly matches the scenario list
+
+Verification:
+
+- `pytest -q tests/unit/test_phase3_harness.py -k "signed_preview_parity_manifest"`
+- `pytest -q tests/unit/test_phase3_harness.py`
+- `python -m json.tool artifacts/preview_sweep_assets/signed_preview_parity_matrix.json`
+- `python -m ruff check tests/unit/test_phase3_harness.py`
+- `pytest -q`
