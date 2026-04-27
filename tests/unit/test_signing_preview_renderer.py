@@ -43,6 +43,12 @@ def _load_manual_horizontal_single_line_replay() -> dict:
     return json.loads(_MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH.read_text())
 
 
+def _replay_stamp_position(case: dict) -> SignatureStampPosition:
+    if case.get("stamp_position") == "right":
+        return SignatureStampPosition.RIGHT
+    return SignatureStampPosition.LEFT
+
+
 def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
     return SigningDraftWorkflow(
         input_pdf_path=str(tmp_path / "input.pdf"),
@@ -1165,6 +1171,7 @@ def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
     _title, detail_text = appearance_config["stamp_text"].split("\n", 1)
 
     for case in replay["cases"]:
+        stamp_position = _replay_stamp_position(case)
         preview = SigningDraftPreview(
             title=appearance_config["signer_label_prefix"],
             page_index=3,
@@ -1177,7 +1184,7 @@ def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
             ),
             signer_label_prefix=appearance_config["signer_label_prefix"],
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-            stamp_position=SignatureStampPosition.LEFT,
+            stamp_position=stamp_position,
             timezone_display_mode=None,
             show_field_names=False,
             datetime_format=appearance_config["datetime_format"],
@@ -1221,9 +1228,14 @@ def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
             assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px), (
                 case["label"]
             )
-            assert text_bounds["x"] - (
-                snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
-            ) > 0, case["label"]
+            if stamp_position == SignatureStampPosition.LEFT:
+                assert text_bounds["x"] - (
+                    snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
+                ) > 0, case["label"]
+            else:
+                assert snapshot.stamp_bounds_px["x"] - (
+                    text_bounds["x"] + text_bounds["width"]
+                ) > 0, case["label"]
 
 
 def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:

@@ -39,6 +39,27 @@
       "width_pt": 316.53512,
       "height_pt": 42.27,
       "expected_backend_ready": true
+    },
+    {
+      "label": "manual_latest_04_single_line_left_requires_visible_stamp",
+      "stamp_position": "left",
+      "width_pt": 261.328,
+      "height_pt": 44.65,
+      "expected_backend_ready": false
+    },
+    {
+      "label": "manual_latest_07_single_line_right_short_height_fits_ink",
+      "stamp_position": "right",
+      "width_pt": 330.1464,
+      "height_pt": 24.1744,
+      "expected_backend_ready": true
+    },
+    {
+      "label": "manual_latest_08_single_line_left_short_height_fits_ink",
+      "stamp_position": "left",
+      "width_pt": 309.6668,
+      "height_pt": 23.7696,
+      "expected_backend_ready": true
     }
   ]
 }

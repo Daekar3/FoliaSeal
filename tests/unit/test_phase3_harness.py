@@ -2651,7 +2651,7 @@ def test_detect_text_content_bounds_in_preview_uses_reference_envelope_to_reject
         preview_image_path=str(preview_path),
         text_widget_bounds={"x": 10, "y": 10, "width": 100, "height": 24},
         text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds={"x": 18, "y": 4, "width": 28, "height": 10},
+        reference_text_content_bounds={"x": 28, "y": 16, "width": 28, "height": 10},
     )
 
     assert error is None

@@ -1191,6 +1191,7 @@ def _single_line_rendered_ink_fits_reservation(
     if cached is not None:
         return cached
     snapshot = None
+    reference_snapshot = None
     try:
         from foliaseal.application.signing_preview_renderer import (
             render_canonical_signature_preview,
@@ -1239,16 +1240,53 @@ def _single_line_rendered_ink_fits_reservation(
             and signature_appearance.stamp_position
             in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
         )
-        if enforce_reference_ink_preservation and snapshot.text_bounds_px is not None:
+        if enforce_reference_ink_preservation:
+            reference_rect = replace(
+                signature_rect,
+                width_pt=max(
+                    signature_rect.width_pt,
+                    signature_rect.width_pt
+                    + float((snapshot.text_bounds_px or {}).get("width", 0))
+                    + 64.0,
+                ),
+                height_pt=max(
+                    signature_rect.height_pt,
+                    float((snapshot.text_bounds_px or {}).get("height", 0)) + 64.0,
+                ),
+            )
+            reference_preview = _signing_draft_preview_for_stamp_text(
+                signature_rect=reference_rect,
+                signature_appearance=signature_appearance,
+                stamp_text=stamp_text,
+            )
+            reference_snapshot = render_canonical_signature_preview(
+                reference_preview,
+                zoom=1.0,
+                include_border=True,
+                flatten_to_white=True,
+            )
+            if (
+                reference_snapshot is None
+                or reference_snapshot.text_area_bounds_px is None
+            ):
+                return False
+            reference_text_bounds, _reference_error = detect_text_content_bounds_in_image(
+                preview_image_path=reference_snapshot.image_path,
+                text_widget_bounds=reference_snapshot.text_area_bounds_px,
+                text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
+                reference_text_content_bounds=reference_snapshot.text_bounds_px,
+            )
+            if reference_text_bounds is None:
+                return False
             reference_width_loss = max(
                 0,
-                snapshot.text_bounds_px["width"] - text_bounds["width"],
+                reference_text_bounds["width"] - text_bounds["width"],
             )
             reference_height_loss = max(
                 0,
-                snapshot.text_bounds_px["height"] - text_bounds["height"],
+                reference_text_bounds["height"] - text_bounds["height"],
             )
-            if reference_width_loss > 3 or reference_height_loss > 1:
+            if reference_width_loss > 3 or reference_height_loss > 2:
                 return False
         result = (
             text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
@@ -1263,6 +1301,8 @@ def _single_line_rendered_ink_fits_reservation(
     finally:
         if snapshot is not None:
             _cleanup_canonical_preview_snapshot(snapshot)
+        if reference_snapshot is not None:
+            _cleanup_canonical_preview_snapshot(reference_snapshot)
 
 
 def _single_line_rendered_ink_fit_cache_key(
@@ -1376,18 +1416,19 @@ def _ensure_layout_can_fit(
     measurement and reservation math. Height remains strict because visible
     vertical clipping is a real user-facing failure.
 
-    The zero-size stamp-band rejection also applies only to non-single-line
-    layouts. Those templates reserve separate text and stamp regions, so a
-    0pt-wide or 0pt-high image band means the image has no real reserved space
-    and the layout should fail. Single-line intentionally supports tighter
-    compact image placement, so applying the same guard there would reject valid
-    compact cases that still render acceptably.
+    A selected horizontal visible stamp must retain real reserved width. A
+    0pt-wide image band means the image cannot be visible, even if the text
+    happens to fit.
     """
     # This is a numeric rounding correction, not a compactness policy.
     max_text_width = layout_reservation.text_area_width_pt + 1
     if (
         has_visible_stamp_image
-        and layout_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        and (
+            layout_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+            or layout_reservation.stamp_position
+            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+        )
         and (
         layout_reservation.stamp_area_width_pt <= 0
         or layout_reservation.stamp_area_height_pt <= 0

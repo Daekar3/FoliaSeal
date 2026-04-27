@@ -1564,3 +1564,291 @@ Verification:
 - focused backend/preview/harness suites passed: `224 passed, 1 warning`
 - full suite passed: `495 passed, 1 warning`
 - `ruff check` passed on touched Python files
+
+## Slice: Require Visible Horizontal Stamps And Fix Ink Reference Coordinates
+
+### Triggering Observation
+
+The next manual run showed three separate issues:
+
+- Cap 4 validated green even though a left image stamp was selected, the stamp
+  had no visible reserved lane, and no stamp appeared.
+- Caps 7 and 8 looked visually acceptable but validated red in short-height
+  horizontal `single_line` cases.
+- Harness diagnostics reported very large left-stamp text width loss that did
+  not match the visible preview.
+
+### Cannot Override
+
+- A selected horizontal image stamp must have non-zero reserved width and
+  height.
+- Rendered-ink fallback may relax structural text-box height only when the
+  current rendered ink still matches a roomy rendered reference.
+- Reference text bounds passed to raster detection are absolute preview
+  coordinates and must be converted into crop-local coordinates before
+  filtering candidate pixels.
+- The fix must not reintroduce negative text margins, stamp/text overlap, or a
+  second layout branch for visual tuning.
+
+### Requirements
+
+- Reject horizontal `single_line` layouts with a selected stamp image when the
+  reserved stamp band has zero width or height.
+- Preserve the existing non-single-line zero-stamp-band rejection.
+- Compare horizontal `single_line` fallback against a roomy rendered reference
+  image, not structural text bounds.
+- Allow the small observed `2 px` rendered-height delta between compact and
+  roomy horizontal references while keeping width preservation strict.
+- Fix `text_raster_analysis` so absolute reference envelopes are translated
+  into crop-local coordinates.
+- Add tests covering the absolute/crop coordinate conversion and the latest
+  cap-4, cap-7, and cap-8 replay outcomes.
+
+### Execution Result
+
+Implemented in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/application/text_raster_analysis.py`
+- `tests/fixtures/phase3_horizontal_single_line_manual_replay.json`
+- `tests/unit/test_phase3_signing_backend.py`
+- `tests/unit/test_phase3_harness.py`
+- `tests/unit/test_signing_preview_renderer.py`
+- `tests/unit/test_text_raster_analysis.py`
+
+What changed:
+
+- horizontal `single_line` image-stamp validation now rejects zero-size stamp
+  lanes instead of allowing green validation with no visible stamp
+- rendered-ink fallback now compares compact horizontal cases against a roomy
+  rendered reference and accepts cap-7/cap-8-style short-height cases when ink
+  is preserved
+- text raster analysis now treats reference bounds as absolute preview
+  coordinates and converts them to crop-local coordinates before envelope
+  filtering
+- the manual replay fixture now includes the latest cap-4/cap-7/cap-8 geometry
+
+Verification:
+
+- focused backend/rendered-ink/replay tests passed: `8 passed`
+- focused preview replay tests passed: `4 passed`
+- focused harness text-edge diagnostics tests passed: `5 passed`
+- focused backend/preview/harness/raster suites passed: `225 passed, 1 warning`
+- full suite passed: `496 passed, 1 warning`
+- `ruff check` passed on touched files
+
+### Remaining Decision Point
+
+The fresh cap-5/cap-6 spacing complaint is now separated from validation and
+instrumentation correctness. The next slice should decide whether horizontal
+`single_line` should reserve text width from rendered ink rather than structural
+text-box width. That change may improve stamp scaling, but it affects signed PDF
+appearance and preview/PDF parity, so it should be implemented only with a
+dedicated ExecPlan and parity tests.
+
+## Slice: Rendered-Ink-Informed Horizontal Single-Line Reservation
+
+### Triggering Observation
+
+After fixing zero-stamp validation, rendered-ink fallback, and reference
+coordinate handling, the remaining manual issue is visual efficiency:
+
+- Cap 5 has a left stamp and green validation, but the right edge of the border
+  is meaningfully farther from the rightmost glyphs than in `single_line/top`
+  or `single_line/bottom`.
+- Cap 6 has a right stamp and green validation, but the gap between the
+  rightmost glyphs and the left edge of the stamp is larger than necessary.
+- Cap 7 and Cap 8 were validation issues before the previous slice; after the
+  rendered-reference fallback fix, they should validate based on preserved ink.
+- The current horizontal reservation still uses structural text-box width
+  (`254 pt` in the observed cases), while the rendered glyph ink is materially
+  narrower. That structural slack reduces the available stamp lane and makes
+  the stamp smaller than necessary.
+
+The tempting simple fix is to reserve only the rendered ink width. That is not
+safe by itself. The actual PDF signature is written through pyHanko text boxes
+and layout margins, not by copying preview pixels. Font side bearings and
+line-box whitespace mean the glyph ink does not start at the text-box origin.
+If reservation uses raw ink width but PDF placement still aligns the structural
+text box, preview and signed PDF output can diverge or clip.
+
+### Cannot Override
+
+- Do not reintroduce negative margins or optical bleed outside the existing safe
+  box.
+- Do not size the text lane from raw rendered-ink width alone.
+- Do not let the preview and signed PDF independently interpret the horizontal
+  text translation.
+- Preserve selected-stamp visibility: horizontal image-stamp layouts must retain
+  a real non-zero stamp lane.
+- Preserve full-reference text ink: validation may not pass if the current
+  render loses glyph ink relative to a roomy rendered reference.
+- Preserve stamp/text non-overlap and positive border-facing/stamp-facing text
+  distances.
+- Keep a single shared reservation/translation model consumed by preview,
+  backend validation, and signed PDF generation.
+
+### Decision
+
+Proceed with rendered-ink-informed reservation, but model the ink envelope and
+translation explicitly.
+
+Do not implement:
+
+- `text_lane_width = rendered_ink_width`
+- another hard-coded optical shift
+- a layout split based on an arbitrary rectangle width threshold
+
+Implement instead:
+
+- measure a roomy rendered reference for horizontal `single_line` image-stamp
+  layouts
+- capture both ink size and ink offset within the structural text box
+- reserve a tighter text lane using the ink width plus named safe padding
+- translate the structural text box inside that lane so the glyph ink lands at
+  the same intended offset in preview and signed PDF output
+
+### Proposed Model
+
+Introduce a small shared model for horizontal `single_line` ink reservation,
+owned by the application layer and used by both preview and signing paths:
+
+```python
+@dataclass(frozen=True)
+class HorizontalSingleLineInkReservation:
+    lane_width_pt: int
+    ink_width_pt: int
+    ink_height_pt: int
+    ink_left_offset_pt: int
+    ink_right_slack_pt: int
+    border_facing_padding_pt: int
+    stamp_facing_padding_pt: int
+```
+
+The model should be constructed only when all of these are true:
+
+- layout template is `single_line`
+- stamp position is `left` or `right`
+- a visible image stamp is selected
+- a roomy rendered reference can be measured
+
+Fallback behavior:
+
+- If the rendered reference cannot be measured, use the current structural
+  reservation path and keep validation conservative.
+- Do not guess a tighter lane without a rendered reference.
+
+### Translation Rules
+
+The reservation model must describe both width and translation:
+
+- `lane_width_pt = ink_width_pt + stamp_facing_padding_pt + border_facing_padding_pt`
+- for a left stamp, align the text ink's border-facing edge to
+  `border_facing_padding_pt` inside the text lane
+- for a right stamp, mirror the same rule
+- derive the structural text-box margin adjustment from the measured ink offset:
+  the text box may move inside the lane, but the lane itself must stay inside
+  the safe border box
+- never let the translated structural box cause stamp/text ink overlap or
+  border contact
+
+The PDF writer must consume the same translation model. The signed appearance
+cannot simply receive a narrower text width while leaving pyHanko alignment to
+place the structural text box as before.
+
+### Implementation Plan
+
+1. Add reference measurement support.
+   - Add a shared helper that renders or reuses a roomy canonical reference for
+     horizontal `single_line` image-stamp layouts.
+   - Measure rendered text ink bounds and structural text bounds from that
+     reference.
+   - Convert pixel measurements to point-space using the canonical preview
+     scale for the signature rectangle.
+   - Keep the helper deterministic and cacheable by the existing rendered-ink
+     cache key inputs.
+
+2. Add reservation model computation.
+   - Compute `ink_width_pt`, `ink_left_offset_pt`, and `ink_right_slack_pt`.
+   - Choose named padding from existing layout concepts:
+     - initial proposal: `border_facing_padding_pt = edge_margin`
+     - initial proposal: `stamp_facing_padding_pt = edge_margin`
+   - Clamp `lane_width_pt` so it never exceeds the current structural
+     reservation width and never drops below the measured ink plus padding.
+   - If clamping would remove required padding, reject or fall back to
+     structural reservation.
+
+3. Apply reservation to `_layout_reservation_for_template`.
+   - Add an optional reservation override parameter rather than adding a second
+     independent layout branch.
+   - Keep the existing text-first/separator/stamp-remainder sequence.
+   - Replace only the horizontal `single_line` text reservation width with the
+     ink-informed lane width when the model is available.
+
+4. Apply translation to preview and PDF signing.
+   - Extend the returned reservation/layout data with enough information to
+     translate the structural text box inside the reserved lane.
+   - Ensure `signing_preview_renderer` and `_build_stamp_style` consume the
+     same translation data.
+   - Do not let the GUI-only live preview invent its own placement. It should
+     either use canonical rendering or the same application-layer reservation
+     and translation.
+
+5. Preserve validation correctness.
+   - Keep zero horizontal stamp-lane rejection.
+   - Keep rendered-reference ink preservation checks.
+   - Add checks that the translated ink remains inside the border-safe box and
+     does not overlap stamp ink.
+
+### TDD Plan
+
+1. Red: backend reservation.
+   - Add cap-5/cap-6 replay cases proving the horizontal text lane becomes
+     narrower than structural reservation while preserving positive
+     border-facing and stamp-facing distances.
+   - Add left/right symmetry tests.
+   - Add a fallback test proving missing reference measurement keeps structural
+     reservation.
+
+2. Red: preview geometry.
+   - Add canonical preview tests proving the stamp grows for cap-5/cap-6-style
+     cases while text ink remains inside the border and away from the stamp.
+   - Assert no negative margins and no stamp/text overlap.
+
+3. Red: signed PDF parity.
+   - Add or extend signed-output comparison tests so the actual PDF signature
+     uses the same horizontal ink placement as the preview.
+   - The test should compare text ink bounds, stamp ink bounds, and rounded
+     border presence in normalized preview/PDF crops.
+
+4. Green.
+   - Implement the shared reference measurement and reservation model.
+   - Wire it through backend validation, canonical preview, GUI preview if
+     needed, and PDF stamp style construction.
+   - Keep implementation single-path; avoid one-off cap-specific conditions.
+
+5. Refactor.
+   - Move shared math into narrowly named helpers only after the tests are
+     passing.
+   - Document why raw ink width alone is not used and why translation is
+     required for PDF output.
+
+6. Verify.
+   - focused backend reservation tests
+   - focused canonical preview tests
+   - focused signed-output parity tests
+   - focused harness tests for replay artifacts
+   - full parity matrix if available
+   - `ruff check`
+   - full `pytest`
+
+### Acceptance Criteria
+
+- Cap-5/cap-6-style horizontal cases allocate more stamp width than structural
+  reservation without losing or clipping text ink.
+- Cap-4 remains red when the selected stamp has no real lane.
+- Cap-7/cap-8 remain green when rendered ink is preserved.
+- Preview and actual signed PDF match for text placement, stamp placement, and
+  border shape.
+- The implementation has no negative margins, no arbitrary width threshold, and
+  no separate preview-only placement rule.

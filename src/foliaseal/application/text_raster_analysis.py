@@ -62,6 +62,8 @@ def detect_text_geometry_in_image(
     crop_width, crop_height = cropped.size
     candidate_pixels = _text_candidate_pixels_in_crop(
         cropped=cropped,
+        crop_left=crop_left,
+        crop_top=crop_top,
         crop_width=crop_width,
         crop_height=crop_height,
         text_color_rgba=text_color_rgba,
@@ -98,6 +100,8 @@ def union_rectangles(rectangles: tuple[dict[str, int], ...]) -> dict[str, int] |
 def _text_candidate_pixels_in_crop(
     *,
     cropped: Image.Image,
+    crop_left: int,
+    crop_top: int,
     crop_width: int,
     crop_height: int,
     text_color_rgba: tuple[int, int, int, int] | None,
@@ -123,6 +127,8 @@ def _text_candidate_pixels_in_crop(
     return _restrict_candidates_to_reference_envelope(
         candidate_pixels,
         reference_text_content_bounds=reference_text_content_bounds,
+        crop_left=crop_left,
+        crop_top=crop_top,
         crop_width=crop_width,
         crop_height=crop_height,
     )
@@ -167,21 +173,25 @@ def _restrict_candidates_to_reference_envelope(
     candidate_pixels: set[tuple[int, int]],
     *,
     reference_text_content_bounds: dict[str, int] | None,
+    crop_left: int,
+    crop_top: int,
     crop_width: int,
     crop_height: int,
 ) -> set[tuple[int, int]]:
     if not candidate_pixels or reference_text_content_bounds is None:
         return candidate_pixels
     pad = 4
-    left = max(0, reference_text_content_bounds["x"] - pad)
-    top = max(0, reference_text_content_bounds["y"] - pad)
+    reference_left = reference_text_content_bounds["x"] - crop_left
+    reference_top = reference_text_content_bounds["y"] - crop_top
+    left = max(0, reference_left - pad)
+    top = max(0, reference_top - pad)
     right = min(
         crop_width,
-        reference_text_content_bounds["x"] + reference_text_content_bounds["width"] + pad,
+        reference_left + reference_text_content_bounds["width"] + pad,
     )
     bottom = min(
         crop_height,
-        reference_text_content_bounds["y"] + reference_text_content_bounds["height"] + pad,
+        reference_top + reference_text_content_bounds["height"] + pad,
     )
     restricted = {
         (x, y)

@@ -77,6 +77,12 @@ def _load_manual_horizontal_single_line_replay() -> dict:
     return json.loads(_MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH.read_text())
 
 
+def _replay_stamp_position(case: dict) -> SignatureStampPosition:
+    if case.get("stamp_position") == "right":
+        return SignatureStampPosition.RIGHT
+    return SignatureStampPosition.LEFT
+
+
 def _write_test_pdf(path: Path) -> None:
     writer = PdfFileWriter()
     empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
@@ -1026,7 +1032,7 @@ def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
     assert issues[0].code == "visible_signature_layout_unavailable"
 
 
-def test_horizontal_single_line_short_height_rejects_clipped_rendered_ink(
+def test_horizontal_single_line_short_height_accepts_preserved_rendered_ink(
     tmp_path: Path,
 ) -> None:
     stamp_path = tmp_path / "signature.png"
@@ -1066,8 +1072,7 @@ def test_horizontal_single_line_short_height_rejects_clipped_rendered_ink(
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
 
-    assert len(issues) == 1
-    assert issues[0].code == "visible_signature_layout_unavailable"
+    assert issues == ()
 
 
 def test_manual_caps_4_to_8_replay_backend_validation_ladder(
@@ -1077,27 +1082,28 @@ def test_manual_caps_4_to_8_replay_backend_validation_ladder(
     stamp_path = tmp_path / "manual-replay-signature.png"
     Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
     appearance_config = replay["appearance"]
-    appearance = SigningBackendAppearance.from_signature_appearance(
-        build_signature_appearance(
-            signer_label_prefix=appearance_config["signer_label_prefix"],
-            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-            stamp_position=SignatureStampPosition.LEFT,
-            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
-            show_field_names=False,
-            datetime_format=appearance_config["datetime_format"],
-            image_stamp_path=str(stamp_path),
-            text_style=SignatureTextStyle(
-                font_family=appearance_config["font_family"],
-                font_size_pt=appearance_config["font_size_pt"],
-                bold=False,
-                italic=False,
-                text_color_hex="#000000",
-            ),
-        )
-    )
     stamp_background = _stamp_background_for_path(str(stamp_path))
 
     for case in replay["cases"]:
+        stamp_position = _replay_stamp_position(case)
+        appearance = SigningBackendAppearance.from_signature_appearance(
+            build_signature_appearance(
+                signer_label_prefix=appearance_config["signer_label_prefix"],
+                layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+                stamp_position=stamp_position,
+                timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+                show_field_names=False,
+                datetime_format=appearance_config["datetime_format"],
+                image_stamp_path=str(stamp_path),
+                text_style=SignatureTextStyle(
+                    font_family=appearance_config["font_family"],
+                    font_size_pt=appearance_config["font_size_pt"],
+                    bold=False,
+                    italic=False,
+                    text_color_hex="#000000",
+                ),
+            )
+        )
         issues = _visible_signature_fit_issues_for_stamp_text(
             signature_rect=build_signature_rect(
                 page_index=3,
@@ -3481,9 +3487,15 @@ def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
         "foliaseal.application.signing_preview_renderer.render_canonical_signature_preview",
         _fake_render,
     )
+    detected_bounds = iter(
+        (
+            {"x": 75, "y": 28, "width": 217, "height": 17},
+            {"x": 40, "y": 28, "width": 254, "height": 18},
+        )
+    )
     monkeypatch.setattr(
         "foliaseal.application.phase3_signing_backend.detect_text_content_bounds_in_image",
-        lambda **kwargs: ({"x": 75, "y": 28, "width": 217, "height": 17}, None),
+        lambda **kwargs: (next(detected_bounds), None),
     )
 
     assert not _single_line_rendered_ink_fits_reservation(
