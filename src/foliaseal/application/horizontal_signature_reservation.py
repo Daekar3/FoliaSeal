@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
+from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.domain.models import SignatureLayoutTemplate, SignatureRect, SignatureStampPosition
+
+
+@dataclass(frozen=True)
+class HorizontalSingleLineRenderedReference:
+    """Roomy canonical render measurement for horizontal single-line text ink."""
+
+    preview_size_px: dict[str, int]
+    structural_text_bounds_px: dict[str, int]
+    rendered_ink_bounds_px: dict[str, int]
+    structural_text_bounds_pt: dict[str, int]
+    rendered_ink_bounds_pt: dict[str, int]
+    px_to_pt: float
 
 
 @dataclass(frozen=True)
@@ -19,6 +32,71 @@ class HorizontalSingleLineInkReservation:
     ink_right_slack_pt: int
     border_facing_padding_pt: int
     stamp_facing_padding_pt: int
+
+
+def measure_horizontal_single_line_rendered_reference(
+    preview: SigningDraftPreview,
+    *,
+    zoom: float = 1.0,
+    roomy_width_padding_pt: float = 384.0,
+    roomy_height_padding_pt: float = 64.0,
+) -> HorizontalSingleLineRenderedReference | None:
+    """Measure structural and glyph-ink text bounds in a roomy canonical render."""
+
+    if not _applies_to_horizontal_single_line_image_stamp(
+        layout_template=preview.layout_template,
+        stamp_position=preview.stamp_position,
+        has_visible_stamp_image=preview.image_stamp_path is not None,
+    ):
+        return None
+    if preview.signature_rect is None or preview.text_style is None:
+        return None
+
+    reference_rect = _roomy_reference_rect(
+        preview.signature_rect,
+        width_padding_pt=roomy_width_padding_pt,
+        height_padding_pt=roomy_height_padding_pt,
+    )
+    try:
+        from foliaseal.application.phase3_signing_backend import _text_style_color_rgba
+        from foliaseal.application.signing_preview_renderer import (
+            render_canonical_signature_preview,
+        )
+        from foliaseal.application.text_raster_analysis import (
+            detect_text_content_bounds_in_image,
+        )
+
+        snapshot = render_canonical_signature_preview(
+            replace(preview, signature_rect=reference_rect),
+            zoom=zoom,
+            include_border=True,
+            flatten_to_white=True,
+        )
+        if (
+            snapshot is None
+            or snapshot.text_area_bounds_px is None
+            or snapshot.text_bounds_px is None
+        ):
+            return None
+        rendered_ink_bounds_px, _error = detect_text_content_bounds_in_image(
+            preview_image_path=snapshot.image_path,
+            text_widget_bounds=snapshot.text_area_bounds_px,
+            text_color_rgba=_text_style_color_rgba(preview.text_style),
+            reference_text_content_bounds=snapshot.text_bounds_px,
+        )
+        if rendered_ink_bounds_px is None:
+            return None
+        px_to_pt = reference_rect.width_pt / max(1, snapshot.width_px)
+        return HorizontalSingleLineRenderedReference(
+            preview_size_px={"width": snapshot.width_px, "height": snapshot.height_px},
+            structural_text_bounds_px=dict(snapshot.text_bounds_px),
+            rendered_ink_bounds_px=dict(rendered_ink_bounds_px),
+            structural_text_bounds_pt=_rect_px_to_pt(snapshot.text_bounds_px, px_to_pt),
+            rendered_ink_bounds_pt=_rect_px_to_pt(rendered_ink_bounds_px, px_to_pt),
+            px_to_pt=px_to_pt,
+        )
+    except Exception:
+        return None
 
 
 def build_horizontal_single_line_ink_reservation(
@@ -112,3 +190,25 @@ def _applies_to_horizontal_single_line_image_stamp(
 
 def _px_to_int_pt(value_px: int, px_to_pt: float) -> int:
     return max(0, int(round(value_px * px_to_pt)))
+
+
+def _rect_px_to_pt(bounds_px: Mapping[str, int], px_to_pt: float) -> dict[str, int]:
+    return {
+        "x": _px_to_int_pt(bounds_px["x"], px_to_pt),
+        "y": _px_to_int_pt(bounds_px["y"], px_to_pt),
+        "width": _px_to_int_pt(bounds_px["width"], px_to_pt),
+        "height": _px_to_int_pt(bounds_px["height"], px_to_pt),
+    }
+
+
+def _roomy_reference_rect(
+    signature_rect: SignatureRect,
+    *,
+    width_padding_pt: float,
+    height_padding_pt: float,
+) -> SignatureRect:
+    return replace(
+        signature_rect,
+        width_pt=max(signature_rect.width_pt, signature_rect.width_pt + width_padding_pt),
+        height_pt=max(signature_rect.height_pt, signature_rect.height_pt + height_padding_pt),
+    )

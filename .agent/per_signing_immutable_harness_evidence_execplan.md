@@ -1882,3 +1882,35 @@ Verification:
 - `pytest -q tests/unit/test_horizontal_signature_reservation.py`
 - `pytest -q tests/unit/test_horizontal_signature_reservation.py tests/unit/test_phase3_signing_backend.py`
 - `python -m ruff check src/foliaseal/application/horizontal_signature_reservation.py src/foliaseal/application/__init__.py tests/unit/test_horizontal_signature_reservation.py`
+
+### Issue #42 Execution Result: Roomy Rendered Reference Measurement
+
+Implemented with TDD in:
+
+- `src/foliaseal/application/horizontal_signature_reservation.py`
+- `src/foliaseal/application/__init__.py`
+- `tests/unit/test_horizontal_signature_reservation.py`
+
+What landed:
+
+- added `HorizontalSingleLineRenderedReference`
+- added `measure_horizontal_single_line_rendered_reference(...)`
+- the helper is limited to horizontal `single_line` layouts with a visible image
+  stamp
+- the helper creates a deterministic roomy reference rectangle, renders through
+  the canonical preview engine, detects rendered glyph ink from that reference,
+  and returns both structural and rendered-ink bounds
+- the payload includes pixel bounds, point-space bounds, preview size, and the
+  `px_to_pt` scale needed by later reservation/translation slices
+- unavailable or contradictory measurement returns `None` so later consumers can
+  fall back conservatively
+
+No backend fit decision, preview placement, or signed-PDF placement uses this
+measurement yet. That wiring belongs to the next dependent issues.
+
+Verification:
+
+- `pytest -q tests/unit/test_horizontal_signature_reservation.py`
+- `pytest -q tests/unit/test_horizontal_signature_reservation.py tests/unit/test_signing_preview_renderer.py`
+- `python -m ruff check src/foliaseal/application/horizontal_signature_reservation.py src/foliaseal/application/__init__.py tests/unit/test_horizontal_signature_reservation.py`
+- `pytest -q`
