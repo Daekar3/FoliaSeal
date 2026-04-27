@@ -1914,3 +1914,74 @@ Verification:
 - `pytest -q tests/unit/test_horizontal_signature_reservation.py tests/unit/test_signing_preview_renderer.py`
 - `python -m ruff check src/foliaseal/application/horizontal_signature_reservation.py src/foliaseal/application/__init__.py tests/unit/test_horizontal_signature_reservation.py`
 - `pytest -q`
+
+### Issue #43 Guidance: Backend Validation Uses Reservation, Not Placement
+
+Code-path review before starting issue #43 found a boundary that must remain
+explicit:
+
+- `_build_stamp_style(...)` currently computes `_SignatureLayoutReservation` and
+  then returns pyHanko `background_layout` / `inner_content_layout` objects.
+- Those returned layout objects are also the signed-PDF placement path.
+- Therefore issue #43 must not change the returned stamp style placement or
+  pyHanko margins. That belongs to issue #45 after canonical preview translation
+  is addressed in issue #44.
+
+Issue #43 should instead add a validation-only reservation path:
+
+- compute the existing structural reservation first
+- when the layout is horizontal `single_line` with a visible image stamp, attempt
+  to build a `HorizontalSingleLineInkReservation` from the roomy rendered
+  reference
+- create an ink-informed validation reservation by replacing only the text lane
+  width used by the fit gate
+- keep the existing text-first / separator / stamp-remainder sequence
+- require the resulting reservation to keep a non-zero stamp lane
+- preserve the rendered-reference ink preservation check before accepting a
+  layout that structural validation rejected
+- if reference measurement or ink reservation construction fails, use the
+  structural reservation and keep the current conservative behavior
+
+The tests for issue #43 should prove:
+
+- cap-5/cap-6-style geometry produces a validation reservation with a narrower
+  text lane and wider stamp lane than the structural reservation
+- left and right stamp positions mirror correctly at the reservation level
+- missing/unsafe rendered reference data returns the structural reservation
+- cap-4-style zero-stamp-lane geometry remains rejected
+- no production preview/PDF placement contract changes are asserted in this
+  slice
+
+### Issue #43 Execution Result: Backend Validation Consumes Ink Reservation
+
+Implemented with TDD in:
+
+- `src/foliaseal/application/phase3_signing_backend.py`
+- `tests/unit/test_phase3_signing_backend.py`
+
+What landed:
+
+- added `_horizontal_single_line_ink_validation_reservation(...)`
+- added `_horizontal_single_line_ink_reservation_for_stamp_text(...)`
+- `_build_stamp_style(...)` now computes the normal structural reservation, then
+  computes an ink-informed validation reservation only for horizontal
+  `single_line` image-stamp layouts when a roomy rendered reference is available
+- validation uses the ink-informed reservation for the fit gate, but the
+  returned pyHanko layout objects still come from the structural reservation
+- missing rendered-reference data falls back to structural validation
+- the existing rendered-ink preservation fallback remains in place for cases
+  where validation still fails
+
+Important boundary:
+
+- This issue deliberately does not change canonical preview placement or signed
+  PDF placement. Those remain issue #44 and issue #45. Until those land, this
+  slice should be treated as backend-validation plumbing, not as a manual-harness
+  ready visual parity fix.
+
+Verification:
+
+- `pytest -q tests/unit/test_phase3_signing_backend.py -k "ink_validation_reservation or backend_validation_uses_ink_reference or backend_validation_falls_back_without_ink_reference"`
+- `pytest -q tests/unit/test_phase3_signing_backend.py`
+- `python -m ruff check src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py`
+- `pytest -q`

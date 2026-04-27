@@ -33,6 +33,11 @@ from pyhanko.sign.timestamps.common_utils import TimestampRequestError
 from pyhanko.stamp import TextStamp, TextStampStyle
 from pyhanko_certvalidator import ValidationContext
 
+from foliaseal.application.horizontal_signature_reservation import (
+    HorizontalSingleLineInkReservation,
+    build_horizontal_single_line_ink_reservation,
+    measure_horizontal_single_line_rendered_reference,
+)
 from foliaseal.application.sign_pdf_use_case import (
     SigningBackendAppearance,
     SigningBackendFieldBinding,
@@ -452,6 +457,7 @@ def _build_stamp_style(
         stamp_text,
         text_box_style,
     )
+    stamp_aspect_ratio = _stamp_image_aspect_ratio(stamp_background)
     layout_reservation = _layout_reservation_for_template(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
@@ -460,11 +466,25 @@ def _build_stamp_style(
         text_box_height=text_box_height,
         box_style=appearance.box_style,
         has_visible_stamp_image=stamp_background is not None,
-        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
+        stamp_aspect_ratio=stamp_aspect_ratio,
+    )
+    validation_reservation = _horizontal_single_line_ink_validation_reservation(
+        layout_reservation,
+        ink_reservation=_horizontal_single_line_ink_reservation_for_stamp_text(
+            signature_rect=signature_rect,
+            signature_appearance=appearance,
+            stamp_text=stamp_text,
+            structural_reservation=layout_reservation,
+            has_visible_stamp_image=stamp_background is not None,
+        ),
+        signature_rect=signature_rect,
+        box_style=appearance.box_style,
+        has_visible_stamp_image=stamp_background is not None,
+        stamp_aspect_ratio=stamp_aspect_ratio,
     )
     try:
         _ensure_layout_can_fit(
-            layout_reservation,
+            validation_reservation,
             has_visible_stamp_image=stamp_background is not None,
         )
     except ValueError:
@@ -966,6 +986,86 @@ def _layout_reservation_for_template(
             margins=text_margins,
             inner_content_scaling=InnerScaling.NO_SCALING,
         ),
+    )
+
+
+def _horizontal_single_line_ink_validation_reservation(
+    structural_reservation: _SignatureLayoutReservation,
+    *,
+    ink_reservation: HorizontalSingleLineInkReservation | None,
+    signature_rect: SignatureRect,
+    box_style: SignatureBoxStyle | None,
+    has_visible_stamp_image: bool,
+    stamp_aspect_ratio: float | None,
+) -> _SignatureLayoutReservation:
+    """Return an ink-informed reservation for validation without changing placement."""
+
+    if (
+        ink_reservation is None
+        or not has_visible_stamp_image
+        or structural_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or structural_reservation.stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        return structural_reservation
+    if ink_reservation.lane_width_pt >= structural_reservation.text_area_width_pt:
+        return structural_reservation
+
+    return _layout_reservation_for_template(
+        structural_reservation.layout_template,
+        stamp_position=structural_reservation.stamp_position,
+        signature_rect=signature_rect,
+        text_box_width=ink_reservation.lane_width_pt,
+        text_box_height=structural_reservation.text_box_height_pt,
+        box_style=box_style,
+        has_visible_stamp_image=has_visible_stamp_image,
+        stamp_aspect_ratio=stamp_aspect_ratio,
+    )
+
+
+def _horizontal_single_line_ink_reservation_for_stamp_text(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+    structural_reservation: _SignatureLayoutReservation,
+    has_visible_stamp_image: bool,
+) -> HorizontalSingleLineInkReservation | None:
+    if (
+        not has_visible_stamp_image
+        or signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or signature_appearance.stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        return None
+
+    reference = measure_horizontal_single_line_rendered_reference(
+        _signing_draft_preview_for_stamp_text(
+            signature_rect=signature_rect,
+            signature_appearance=signature_appearance,
+            stamp_text=stamp_text,
+        ),
+        zoom=1.0,
+    )
+    if reference is None:
+        return None
+
+    edge_margin = _effective_layout_edge_margin(
+        stamp_position=signature_appearance.stamp_position,
+        box_height=structural_reservation.container_height_pt,
+        box_style=signature_appearance.box_style,
+    )
+    return build_horizontal_single_line_ink_reservation(
+        layout_template=signature_appearance.layout_template,
+        stamp_position=signature_appearance.stamp_position,
+        has_visible_stamp_image=has_visible_stamp_image,
+        structural_text_box_width_pt=structural_reservation.text_box_width_pt,
+        structural_text_box_height_pt=structural_reservation.text_box_height_pt,
+        structural_text_bounds_px=reference.structural_text_bounds_px,
+        rendered_ink_bounds_px=reference.rendered_ink_bounds_px,
+        px_to_pt=reference.px_to_pt,
+        border_facing_padding_pt=edge_margin,
+        stamp_facing_padding_pt=edge_margin,
     )
 
 
