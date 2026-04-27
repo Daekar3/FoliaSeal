@@ -17,11 +17,13 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from pyhanko.stamp import TextStampStyle
 
 from foliaseal.application.horizontal_signature_reservation import (
+    HorizontalSingleLineInkReservation,
     build_horizontal_single_line_ink_reservation,
     measure_horizontal_single_line_rendered_reference,
 )
 from foliaseal.application.phase3_signing_backend import (
     RoundedBorderTextStampStyle,
+    _apply_horizontal_single_line_ink_text_alignment,
     _background_layout_for_stamp,
     _build_text_box_style,
     _effective_layout_edge_margin,
@@ -908,13 +910,16 @@ def _canonical_preview_layout(
             None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
         ),
     )
-    ink_layout_text_box_width = _horizontal_single_line_ink_preview_text_lane_width(
+    ink_reservation = _horizontal_single_line_ink_preview_reservation(
         preview=preview,
         stamp_text=stamp_text,
         structural_text_box_width=text_box_width,
         structural_text_box_height=text_box_height,
         has_visible_stamp_image=stamp_background is not None and include_stamp,
         use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+    )
+    ink_layout_text_box_width = (
+        None if ink_reservation is None else ink_reservation.lane_width_pt
     )
     if ink_layout_text_box_width is not None:
         layout_reservation = _layout_reservation_for_template(
@@ -929,6 +934,10 @@ def _canonical_preview_layout(
                 None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
             ),
         )
+    layout_reservation = _apply_horizontal_single_line_ink_text_alignment(
+        layout_reservation,
+        ink_reservation=ink_reservation,
+    )
     if (
         include_stamp
         and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
@@ -980,7 +989,7 @@ def _canonical_preview_layout(
     )
 
 
-def _horizontal_single_line_ink_preview_text_lane_width(
+def _horizontal_single_line_ink_preview_reservation(
     *,
     preview: SigningDraftPreview,
     stamp_text: str,
@@ -988,7 +997,7 @@ def _horizontal_single_line_ink_preview_text_lane_width(
     structural_text_box_height: int,
     has_visible_stamp_image: bool,
     use_horizontal_ink_reservation: bool,
-) -> int | None:
+) -> HorizontalSingleLineInkReservation | None:
     if (
         not use_horizontal_ink_reservation
         or not has_visible_stamp_image
@@ -1022,7 +1031,7 @@ def _horizontal_single_line_ink_preview_text_lane_width(
     )
     if ink_reservation is None or ink_reservation.lane_width_pt >= structural_text_box_width:
         return None
-    return ink_reservation.lane_width_pt
+    return ink_reservation
 
 
 def _stamp_aspect_ratio(stamp_background: PdfContent | None) -> float | None:

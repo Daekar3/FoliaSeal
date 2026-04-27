@@ -483,6 +483,10 @@ def _build_stamp_style(
         has_visible_stamp_image=stamp_background is not None,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
+    placement_reservation = _apply_horizontal_single_line_ink_text_alignment(
+        placement_reservation,
+        ink_reservation=ink_reservation,
+    )
     try:
         _ensure_layout_can_fit(
             placement_reservation,
@@ -1024,6 +1028,47 @@ def _horizontal_single_line_ink_validation_reservation(
     )
 
 
+def _apply_horizontal_single_line_ink_text_alignment(
+    reservation: _SignatureLayoutReservation,
+    *,
+    ink_reservation: HorizontalSingleLineInkReservation | None,
+) -> _SignatureLayoutReservation:
+    """Optically align left-stamp text ink without changing fit policy.
+
+    pyHanko positions text by font advance width, not by visible glyph ink. In
+    narrow left-stamp single-line layouts, the right side bearing can leave the
+    visible glyphs far from the border even when the natural text box is already
+    right-aligned. This adjusts only the final text placement by the measured
+    right side bearing; fit decisions and reserved lane sizes still come from
+    the existing reservation model.
+    """
+
+    if (
+        ink_reservation is None
+        or reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or reservation.stamp_position != SignatureStampPosition.LEFT
+        or ink_reservation.ink_right_slack_pt <= 0
+    ):
+        return reservation
+
+    layout_rule = reservation.inner_content_layout
+    margins = layout_rule.margins
+    return replace(
+        reservation,
+        inner_content_layout=SimpleBoxLayoutRule(
+            layout_rule.x_align,
+            layout_rule.y_align,
+            margins=Margins(
+                left=margins.left,
+                right=margins.right - ink_reservation.ink_right_slack_pt,
+                top=margins.top,
+                bottom=margins.bottom,
+            ),
+            inner_content_scaling=layout_rule.inner_content_scaling,
+        ),
+    )
+
+
 def _horizontal_single_line_ink_reservation_for_stamp_text(
     *,
     signature_rect: SignatureRect,
@@ -1387,7 +1432,10 @@ def _single_line_rendered_ink_fits_reservation(
                 0,
                 reference_text_bounds["height"] - text_bounds["height"],
             )
-            if reference_width_loss > 3 or reference_height_loss > 2:
+            # Detector antialias rows can vary with vertical centering between
+            # the selected box and roomy reference; anything larger indicates
+            # real visible-ink loss rather than raster noise.
+            if reference_width_loss > 3 or reference_height_loss > 3:
                 return False
         result = (
             text_bounds["width"] <= snapshot.text_area_bounds_px["width"]

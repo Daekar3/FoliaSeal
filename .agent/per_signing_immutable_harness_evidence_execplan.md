@@ -119,6 +119,128 @@ Follow-on remains unchanged:
 - review the `Fantasy` font choice against the originally discussed
   Papyrus-style direction
 
+## Follow-up Slice: Horizontal Left-Stamp Text Ink Alignment
+
+### Goal
+
+Make horizontal single-line previews and signed PDF appearances keep visible
+text ink as close to the border as the established top/bottom behavior, while
+preserving stamp scaling and the existing no-clipping invariants.
+
+The current Issue #47 manual run showed that preview/PDF parity is encouraging,
+but left-stamp single-line captures still reserve too much right-side whitespace
+before the rounded border:
+
+- Cap 4 left-stamp preview: canonical glyph ink ended about `19 px` from the
+  right border.
+- Cap 5 top-stamp preview: the same text family can safely approach the border
+  at about `3 px`.
+- The left-stamp excess whitespace shrinks the stamp sooner than necessary
+  because the layout treats invisible text side-bearing slack as visible content.
+
+### Relevant Code Path
+
+- Shared text style and text-box alignment:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_build_text_box_style(...)`
+- Preview canonical renderer:
+  - `src/foliaseal/application/signing_preview_renderer.py`
+  - `_canonical_preview_layout(...)`
+- Signed PDF style construction:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_build_stamp_style(...)`
+- Horizontal rendered-ink reservation:
+  - `src/foliaseal/application/horizontal_signature_reservation.py`
+  - `measure_horizontal_single_line_rendered_reference(...)`
+  - `build_horizontal_single_line_ink_reservation(...)`
+
+The horizontal ink reservation correctly narrows the text lane from rendered
+ink width plus border/stamp padding. The remaining defect is that pyHanko places
+the text object by natural font advance width, while the visible glyph ink can
+have substantial right side-bearing. For a left-side stamp, that preserves
+invisible right-side slack and leaves the visible glyph ink far from the right
+border.
+
+### Required Approach
+
+1. Add a focused red test that replays the Cap 4-style left-stamp geometry and
+   asserts:
+   - visible glyph ink remains inside the rounded-border guard
+   - visible glyph ink is no farther from the right border than the established
+     close-border target
+   - the stamp remains visible
+   - stamp and text ink do not overlap
+
+2. First attempt the simplest text-style alignment seam used by preview and
+   signed PDF generation. If pyHanko line rendering does not expose line-level
+   alignment there, use the measured horizontal ink reservation instead of an
+   arbitrary threshold.
+
+3. Do not change fit policy in this slice:
+   - no altered width thresholds
+   - no expanded reservation lane
+   - no top/bottom layout behavior changes
+   - any optical text translation must be derived from measured rendered-ink
+     side-bearing and must preserve visible ink inside the border guard
+
+4. Use the same alignment helper in:
+   - canonical preview rendering
+   - signed PDF style construction
+   - any backend measurement path that must match the rendered appearance
+
+5. Verify with focused tests first, then run the relevant broader preview and
+   backend suites.
+
+### Acceptance Criteria
+
+This slice is complete when:
+
+- the Cap 4-style preview test fails before the implementation and passes after
+  it
+- left-stamp single-line visible text can approach the right border like
+  top/bottom single-line text
+- stamp scaling improves because invisible right-side text slack no longer
+  consumes the stamp lane
+- preview and signed PDF generation use the same text alignment decision
+- existing horizontal edge-safety tests still pass
+
+### Execution Result
+
+Implemented with TDD.
+
+What landed:
+
+- Added a Cap 4-style preview regression test asserting the visible text ink is
+  within `1..6 px` of the right border, the stamp remains visible, and text/stamp
+  ink do not overlap.
+- Traced pyHanko text rendering and confirmed `TextBoxStyle` horizontal
+  alignment does not move the visible glyph ink in this multiline case because
+  the natural text advance is already right-aligned; the residual gap is font
+  side-bearing.
+- Added `_apply_horizontal_single_line_ink_text_alignment(...)` to translate
+  left-stamp single-line text placement by the measured rendered-ink right
+  side-bearing. This changes final appearance only; fit reservation and lane
+  sizing still come from the existing ink reservation model.
+- Wired the same alignment helper into canonical preview rendering and signed
+  PDF style construction.
+- Updated backend tests to assert the measured side-bearing margin adjustment
+  instead of the old unchanged-right-margin assumption.
+- Kept the rendered-ink preservation check intact, with a documented `3 px`
+  reference-height tolerance for antialias row variance between the selected box
+  and roomy reference render.
+
+Observed result:
+
+- The Cap 4-style preview right glyph-to-border gap moved from `19 px` to
+  `4 px`.
+- Stamp remains visible and non-overlapping in the regression test.
+
+Verification:
+
+- Focused preview/backend horizontal tests passed.
+- `python -m ruff check ...` passed for touched code/tests.
+- `pytest -q` passed: `513 passed, 1 warning`.
+
 ## Next Slice: Sign-Time Fit and Geometry Diagnostics for Manual Harness Runs
 
 ### Goal

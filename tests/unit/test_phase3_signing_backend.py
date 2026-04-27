@@ -2465,7 +2465,7 @@ def test_build_stamp_style_uses_ink_reservation_for_horizontal_single_line_pdf_l
         > structural_reservation.inner_content_layout.margins.left
     )
     assert style.inner_content_layout.margins.right == (
-        structural_reservation.inner_content_layout.margins.right
+        structural_reservation.inner_content_layout.margins.right - 32
     )
     assert (
         style.background_layout.margins.right
