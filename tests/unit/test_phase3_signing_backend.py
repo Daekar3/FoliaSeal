@@ -1937,6 +1937,65 @@ def test_multi_line_bottom_rejects_zero_height_stamp_band(tmp_path: Path) -> Non
     assert "does not fit" in issues[0].message
 
 
+@pytest.mark.parametrize(
+    ("stamp_position", "width_pt", "height_pt"),
+    [
+        (SignatureStampPosition.LEFT, 296.956, 50.684),
+        (SignatureStampPosition.LEFT, 293.884, 49.66),
+        (SignatureStampPosition.RIGHT, 293.88, 49.66),
+    ],
+)
+def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_rendered_layout_fits(  # noqa: E501
+    tmp_path: Path,
+    stamp_position: SignatureStampPosition,
+    width_pt: float,
+    height_pt: float,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=stamp_position,
+        signer_label_prefix="Digitally signed by",
+        image_stamp_path=str(stamp_path),
+        show_field_names=False,
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=True,
+            border_color_hex="#000000",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+
+    issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=36.86,
+            bottom_pt=428.99,
+            width_pt=width_pt,
+            height_pt=height_pt,
+        ),
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery\n"
+            "Board Secretary\n"
+            "FoliaSeal\n"
+            "2026-04-28 23:56"
+        ),
+        stamp_background=_stamp_background_for_path(str(stamp_path)),
+    )
+
+    assert issues == ()
+
+
 def test_build_text_box_style_preserves_half_point_font_size() -> None:
     style = _build_text_box_style(
         SignatureTextStyle(
@@ -2389,7 +2448,7 @@ def test_build_stamp_style_uses_template_specific_layout_for_single_line(
     assert style.background_layout.y_align == AxisAlignment.ALIGN_MAX
     assert style.background_layout.inner_content_scaling == InnerScaling.SHRINK_TO_FIT
     assert style.background_layout.margins.bottom >= style.inner_content_layout.margins.bottom
-    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
+    assert style.inner_content_layout.x_align == AxisAlignment.ALIGN_MIN
     assert style.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
     assert style.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING

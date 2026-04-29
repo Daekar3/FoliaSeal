@@ -241,6 +241,99 @@ Verification:
 - `python -m ruff check ...` passed for touched code/tests.
 - `pytest -q` passed: `513 passed, 1 warning`.
 
+## Follow-up Slice: Vertical Single-Line Alignment and Horizontal Multi-Line Fit Honesty
+
+### Goal
+
+Address the latest manual harness observations without broadening fit policy:
+
+- Caps 5-7: top/bottom single-line image stamps are left-packed with good border
+  spacing, but their text remains centered, producing an inconsistent preview.
+- Caps 10-12: horizontal multi-line layouts look visually valid, but validation
+  is red because structural text height is `44 pt` while the reserved text lane
+  is `42-43 pt`.
+
+### Relevant Code Path
+
+- Shared reservation layout:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_layout_reservation_for_template(...)`
+- Stamp image fitting:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_background_layout_for_stamp(...)`
+- Backend validation and rendered fallback:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_ensure_layout_can_fit(...)`
+  - `_single_line_rendered_ink_fits_reservation(...)`
+- Canonical preview tests:
+  - `tests/unit/test_signing_preview_renderer.py`
+
+### Required Approach
+
+1. Add preview regression tests for the Cap 5-7 class:
+   - top and bottom single-line image-stamp layouts should keep the text block
+     aligned with the left-packed stamp rather than horizontally centered
+   - stamp remains visible and non-overlapping
+
+2. Change only the single-line top/bottom image-stamp text x-alignment:
+   - keep the existing left-packed stamp behavior because manual review says the
+     stamp border spacing is good
+   - align text to the same left edge for visual consistency
+   - do not change no-stamp single-line behavior
+   - do not change multi-line/wrapped top/bottom behavior
+
+3. Add backend regression tests for Caps 10-12:
+   - horizontal multi-line left/right image-stamp layouts with small structural
+     height overflow should validate when canonical preview geometry shows text
+     and stamp inside the border with no overlap
+
+4. Add a narrow multi-line rendered-layout fallback:
+   - only for `multi_line` + visible image stamp + `left/right`
+   - only when structural width still fits and structural height overflow is
+     small
+   - canonical preview structural text bounds and stamp bounds must be inside
+     the container
+   - text and stamp bounds must not overlap
+
+5. Preserve existing rejection behavior:
+   - no zero-width/zero-height stamp bands
+   - no large text overflow acceptance
+   - no top/bottom multi-line relaxation
+
+### Acceptance Criteria
+
+- Cap 5-7 style previews no longer show left-packed stamp with centered text.
+- Cap 10-12 style horizontal multi-line cases validate when canonical preview
+  geometry is visibly non-overlapping and inside the border.
+- Existing compact rejection tests still pass.
+- Full suite passes.
+
+### Execution Result
+
+Implemented with TDD.
+
+What landed:
+
+- Added top/bottom single-line preview regression coverage that reproduces the
+  Cap 5-7 mismatch and asserts text stays visually near the left-packed stamp.
+- Updated single-line top/bottom image-stamp text x-alignment to `ALIGN_MIN`
+  only when a real image stamp is present. Default/no-image reservation behavior
+  remains centered.
+- Added horizontal multi-line regression coverage for the Cap 10-12 dimensions.
+- Added `_horizontal_multi_line_rendered_layout_fits_reservation(...)`, a narrow
+  fallback used only after structural validation fails. It accepts only
+  `multi_line` + `left/right` image-stamp cases with no structural width
+  overflow, small structural height overflow, canonical text/stamp bounds inside
+  the rendered container, and no text/stamp overlap.
+- Existing compact rejection tests still pass.
+
+Verification:
+
+- Focused red/green tests passed.
+- Related layout/rejection tests passed.
+- `python -m ruff check ...` passed for touched code/tests.
+- `pytest -q` passed: `518 passed, 1 warning`.
+
 ## Next Slice: Sign-Time Fit and Geometry Diagnostics for Manual Harness Runs
 
 ### Goal

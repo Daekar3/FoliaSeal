@@ -493,10 +493,18 @@ def _build_stamp_style(
             has_visible_stamp_image=stamp_background is not None,
         )
     except ValueError:
-        if not _single_line_rendered_ink_fits_reservation(
-            signature_rect=signature_rect,
-            signature_appearance=appearance,
-            stamp_text=stamp_text,
+        if not (
+            _single_line_rendered_ink_fits_reservation(
+                signature_rect=signature_rect,
+                signature_appearance=appearance,
+                stamp_text=stamp_text,
+            )
+            or _horizontal_multi_line_rendered_layout_fits_reservation(
+                signature_rect=signature_rect,
+                signature_appearance=appearance,
+                stamp_text=stamp_text,
+                layout_reservation=placement_reservation,
+            )
         ):
             raise
     background_layout = _background_layout_for_stamp(
@@ -938,7 +946,13 @@ def _layout_reservation_for_template(
             if layout_template == SignatureLayoutTemplate.SINGLE_LINE
             else AxisAlignment.ALIGN_MID
         )
-        text_alignment = AxisAlignment.ALIGN_MID
+        text_alignment = (
+            AxisAlignment.ALIGN_MIN
+            if layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and has_visible_stamp_image
+            and stamp_aspect_ratio is not None
+            else AxisAlignment.ALIGN_MID
+        )
         background_y_alignment = AxisAlignment.ALIGN_MAX
         text_y_alignment = AxisAlignment.ALIGN_MIN
     else:
@@ -959,7 +973,13 @@ def _layout_reservation_for_template(
             if layout_template == SignatureLayoutTemplate.SINGLE_LINE
             else AxisAlignment.ALIGN_MID
         )
-        text_alignment = AxisAlignment.ALIGN_MID
+        text_alignment = (
+            AxisAlignment.ALIGN_MIN
+            if layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and has_visible_stamp_image
+            and stamp_aspect_ratio is not None
+            else AxisAlignment.ALIGN_MID
+        )
         if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
             background_y_alignment = AxisAlignment.ALIGN_MID
             text_y_alignment = AxisAlignment.ALIGN_MID
@@ -1452,6 +1472,92 @@ def _single_line_rendered_ink_fits_reservation(
             _cleanup_canonical_preview_snapshot(snapshot)
         if reference_snapshot is not None:
             _cleanup_canonical_preview_snapshot(reference_snapshot)
+
+
+def _horizontal_multi_line_rendered_layout_fits_reservation(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+    layout_reservation: _SignatureLayoutReservation,
+) -> bool:
+    if (
+        signature_appearance.layout_template != SignatureLayoutTemplate.MULTI_LINE
+        or signature_appearance.image_stamp_path is None
+        or signature_appearance.stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        return False
+
+    width_overflow = layout_reservation.text_box_width_pt - (
+        layout_reservation.text_area_width_pt + 1
+    )
+    height_overflow = (
+        layout_reservation.text_box_height_pt - layout_reservation.text_area_height_pt
+    )
+    if width_overflow > 0 or height_overflow <= 0 or height_overflow > 3:
+        return False
+
+    snapshot = None
+    try:
+        from foliaseal.application.signing_preview_renderer import (
+            render_canonical_signature_preview,
+        )
+
+        preview = _signing_draft_preview_for_stamp_text(
+            signature_rect=signature_rect,
+            signature_appearance=signature_appearance,
+            stamp_text=stamp_text,
+        )
+        snapshot = render_canonical_signature_preview(
+            preview,
+            zoom=1.0,
+            include_border=True,
+            flatten_to_white=True,
+        )
+        appearance_snapshot = getattr(snapshot, "appearance_snapshot", None)
+        text_bounds = (
+            None
+            if appearance_snapshot is None
+            else appearance_snapshot.text_bounds_px
+        )
+        stamp_bounds = getattr(snapshot, "stamp_bounds_px", None)
+        if text_bounds is None or stamp_bounds is None:
+            return False
+        if stamp_bounds["width"] <= 0 or stamp_bounds["height"] <= 0:
+            return False
+        container = {"x": 0, "y": 0, "width": snapshot.width_px, "height": snapshot.height_px}
+        return (
+            _rect_inside_container(text_bounds, container)
+            and _rect_inside_container(stamp_bounds, container)
+            and not _rectangles_overlap(text_bounds, stamp_bounds)
+        )
+    except Exception:
+        return False
+    finally:
+        if snapshot is not None:
+            _cleanup_canonical_preview_snapshot(snapshot)
+
+
+def _rect_inside_container(
+    rect: dict[str, int],
+    container: dict[str, int],
+) -> bool:
+    return (
+        rect["x"] >= container["x"]
+        and rect["y"] >= container["y"]
+        and rect["x"] + rect["width"] <= container["x"] + container["width"]
+        and rect["y"] + rect["height"] <= container["y"] + container["height"]
+    )
+
+
+def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:
+    return (
+        first["x"] < second["x"] + second["width"]
+        and second["x"] < first["x"] + first["width"]
+        and first["y"] < second["y"] + second["height"]
+        and second["y"] < first["y"] + first["height"]
+    )
 
 
 def _single_line_rendered_ink_fit_cache_key(
