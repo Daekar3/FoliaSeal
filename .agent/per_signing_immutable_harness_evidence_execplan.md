@@ -2677,3 +2677,259 @@ Verification:
 - Horizontal edge-safety/manual replay/backend validation tests passed.
 - `python -m ruff check ...` passed for touched code/tests.
 - `pytest -q` passed: `528 passed, 1 warning`.
+
+## Follow-up Slice: Rendered-Ink Layout Matrix Review
+
+### Goal
+
+Review and normalize the visible-signature layout matrix so every combination
+of layout template and stamp position has an explicit answer to this question:
+
+Does stamp allocation and validation use rendered glyph ink, or does it still
+use structural text-box dimensions?
+
+The latest manual harness run shows `single_line` + `right` still has more
+stamp-facing whitespace than the newly improved `single_line` + `left` path.
+That is expected from the current code: the rendered-ink background allocation
+helper only applies to `LEFT`.
+
+### Current Matrix From Code Review
+
+`single_line` + `left`
+
+- Current state: most complete rendered-ink path.
+- Uses `measure_horizontal_single_line_rendered_reference(...)`.
+- Uses `HorizontalSingleLineInkReservation`.
+- Uses `_horizontal_single_line_ink_validation_reservation(...)`.
+- Uses `_apply_horizontal_single_line_ink_text_alignment(...)` to move visible
+  glyph ink toward the border by measured right side-bearing.
+- Uses `_horizontal_single_line_background_text_width(...)` to size the stamp
+  lane from rendered text ink plus explicit stamp-facing guard.
+- Uses text-only canonical renders for tests/fallback where stamp and text ink
+  can legally occupy overlapping structural boxes.
+- Manual observation: improved substantially; now the reference implementation
+  for the rendered-ink approach.
+
+`single_line` + `right`
+
+- Current state: partial rendered-ink path.
+- Uses `measure_horizontal_single_line_rendered_reference(...)`.
+- Uses `HorizontalSingleLineInkReservation`.
+- Uses `_horizontal_single_line_ink_validation_reservation(...)`.
+- Does not use a mirrored text side-bearing alignment.
+- Does not use `_horizontal_single_line_background_text_width(...)` because that
+  helper returns the fallback width unless `stamp_position == LEFT`.
+- Latest Cap 5 geometry showed text-to-stamp gap around `6 px`, while the target
+  behavior is the same explicit rendered-ink guard used by left.
+- Required next implementation target.
+
+`single_line` + `top`
+
+- Current state: structural allocation plus rendered-ink fit fallback.
+- Vertical stamp/text allocation is determined by `_layout_reservation_for_template(...)`
+  and vertical single-line helpers:
+  - `_single_line_vertical_outer_margin(...)`
+  - `_single_line_vertical_stamp_border_gap(...)`
+  - `_single_line_no_stamp_vertical_optical_shift(...)`
+- `_single_line_rendered_ink_fits_reservation(...)` can accept cases where
+  rendered ink fits even when nominal structural metrics are pessimistic.
+- It does not currently allocate stamp height from rendered text ink in the same
+  explicit way as `single_line` + `left` allocates stamp width.
+- Manual result from the latest run looked acceptable, but the matrix needs an
+  automated probe proving the stamp-facing and border-facing rendered-ink guards
+  are intentional.
+
+`single_line` + `bottom`
+
+- Current state: same category as `single_line` + `top`.
+- Structural vertical allocation with rendered-ink fit fallback.
+- Needs the same matrix probe and may not need implementation if rendered-ink
+  guards already match the established visual target.
+
+`multi_line` + `left`
+
+- Current state: structural allocation with horizontal rendered-layout fallback.
+- `_horizontal_multi_line_rendered_layout_fits_reservation(...)` exists, but it
+  is a fit-honesty fallback rather than stamp allocation from rendered ink.
+- Latest manual Cap 7 showed `5 px` stamp-to-text gap and `4 px` border gap,
+  which is visually consistent.
+- Needs automated matrix coverage so future changes do not regress this.
+
+`multi_line` + `right`
+
+- Current state: structural allocation with horizontal rendered-layout fallback.
+- Latest manual Cap 6 showed `6 px` text-to-stamp gap and `4 px` border gap.
+- Needs review against the target guard; likely the same mirror issue as
+  `single_line` + `right`, but less severe because multi-line text width is
+  narrower and structural layout happens to be close.
+
+`multi_line` + `top`
+
+- Current state: structural allocation.
+- Existing tests preserve top inset and separate stamp/text bounds.
+- No rendered-ink allocation comparable to `single_line` + `left`.
+- Needs matrix instrumentation before deciding whether an implementation change
+  is warranted.
+
+`multi_line` + `bottom`
+
+- Current state: structural allocation.
+- Existing backend tests cover compact bottom width rounding and zero-height
+  stamp rejection.
+- No rendered-ink allocation comparable to `single_line` + `left`.
+- Needs matrix instrumentation before deciding whether an implementation change
+  is warranted.
+
+`wrapped_block` + `left`
+
+- Current state: structural allocation.
+- Latest manual Caps 8-9 showed `5 px` stamp-to-text gap and `4 px` border gap,
+  which is visually consistent.
+- No rendered-ink allocation comparable to `single_line` + `left`; this may be
+  acceptable because wrapped text is intentionally block-shaped and uses the
+  structural block width.
+
+`wrapped_block` + `right`
+
+- Current state: structural allocation.
+- Existing tests preserve right inset.
+- Needs matrix probe, especially because the right-side mirror issue can hide in
+  any layout where text ink is narrower than the structural text block.
+
+`wrapped_block` + `top`
+
+- Current state: structural allocation.
+- Existing tests preserve top inset.
+- Needs matrix probe only unless artifacts show visible mismatch.
+
+`wrapped_block` + `bottom`
+
+- Current state: structural allocation.
+- Existing tests preserve bottom inset.
+- Needs matrix probe only unless artifacts show visible mismatch.
+
+### Required Approach
+
+1. Add a matrix test/probe that renders canonical previews for:
+   - `single_line`, `multi_line`, `wrapped_block`
+   - `top`, `bottom`, `left`, `right`
+   - with an image stamp and the same representative text/font settings used in
+     manual harness captures.
+
+2. The probe must report, per case:
+   - rendered text ink bounds from text-only canonical render
+   - stamp ink bounds from stamp-only canonical render
+   - border-facing rendered-ink gap
+   - stamp-facing rendered-ink gap
+   - validation result from backend fit path
+   - whether preview/PDF style construction share the same margins
+
+3. Add assertions only where the intended behavior is already clear:
+   - no stamp/text rendered-ink overlap
+   - stamp is visible when validation is green and an image stamp is selected
+   - border-facing rendered text ink remains inside the border guard
+   - `single_line` + `left` remains at the established tight guard
+   - `single_line` + `right` is expected to fail the new mirrored tight-guard
+     assertion before implementation
+
+4. Implement the first normalization target: `single_line` + `right`.
+   - Mirror `_apply_horizontal_single_line_ink_text_alignment(...)` using
+     measured left side-bearing, not a new arbitrary threshold.
+   - Generalize `_horizontal_single_line_background_text_width(...)` so it
+     handles both `LEFT` and `RIGHT` from rendered ink plus stamp-facing guard.
+   - Preserve `_layout_reservation_for_template(...)` fit policy.
+   - Preserve text-only measurement for cases where stamp ink can legally enter
+     invisible text side-bearing space.
+
+5. After `single_line` + `right` passes, use the matrix output to decide whether
+   multi-line or wrapped-block should change.
+   - Do not assume every layout should receive the single-line treatment.
+   - Multi-line and wrapped-block may intentionally reserve structural block
+     space if the rendered-ink approach would make text columns appear unstable
+     as content changes.
+   - Any change outside horizontal single-line must be justified by a failing
+     rendered-ink gap assertion and preview/PDF parity need.
+
+6. Update harness documentation so manual testers know which cases still rely
+   on structural block behavior and which are rendered-ink allocated.
+
+### Acceptance Criteria
+
+- The ExecPlan contains an explicit matrix status for all twelve combinations.
+- Automated matrix probe covers all twelve combinations.
+- `single_line` + `right` uses the same rendered-ink allocation principle as
+  `single_line` + `left`.
+- Preview and signed PDF style construction still share all placement decisions.
+- No validation policy is relaxed.
+- Full test suite passes.
+
+### Notes For Implementation
+
+- Avoid adding another one-off branch.
+- Prefer renaming `_horizontal_single_line_background_text_width(...)` only if
+  the helper becomes conceptually broader; otherwise keep it focused and mirror
+  its internal position logic.
+- If right-side text alignment requires negative left margins, the amount must
+  be derived from measured `ink_left_offset_pt` and must be guarded by rendered
+  ink preservation tests.
+- Treat full-render text detection as invalid for same-color stamp/text gap
+  checks; use text-only and stamp-only canonical layers for matrix assertions.
+
+### Execution Result
+
+Implemented with TDD.
+
+What landed:
+
+- Added a 12-case canonical preview matrix covering:
+  - `single_line`, `multi_line`, `wrapped_block`
+  - `top`, `bottom`, `left`, `right`
+- The matrix records the rendered-ink contract by asserting:
+  - backend validation is green for representative valid rectangles
+  - preview and signed PDF style construction produce matching margins
+  - text-only rendered ink and stamp-only rendered ink do not overlap
+  - rendered text ink remains inside the border-facing guard
+  - horizontal single-line left/right stamp-facing gaps are tight
+- Confirmed the expected red case before implementation:
+  - `single_line` + `right` had a `14 px` rendered text-to-stamp gap
+- Mirrored the horizontal single-line rendered-ink implementation:
+  - `_apply_horizontal_single_line_ink_text_alignment(...)` now handles
+    `RIGHT` using measured `ink_left_offset_pt`
+  - `_horizontal_single_line_background_text_width(...)` now handles both
+    `LEFT` and `RIGHT`
+  - validation/reservation policy remains unchanged
+
+Measured matrix after implementation:
+
+- `single_line` + `top`: stamp-facing gap `8 px`, border-facing gap `1 px`
+- `single_line` + `bottom`: stamp-facing gap `3 px`, border-facing gap `6 px`
+- `single_line` + `left`: stamp-facing gap `4 px`, border-facing gap `4 px`
+- `single_line` + `right`: stamp-facing gap `4 px`, border-facing gap `4 px`
+- `multi_line` + `top`: stamp-facing gap `9 px`, border-facing gap `3 px`
+- `multi_line` + `bottom`: stamp-facing gap `6 px`, border-facing gap `6 px`
+- `multi_line` + `left`: stamp-facing gap `5 px`, border-facing gap `8 px`
+- `multi_line` + `right`: stamp-facing gap `10 px`, border-facing gap `4 px`
+- `wrapped_block` + `top`: stamp-facing gap `9 px`, border-facing gap `3 px`
+- `wrapped_block` + `bottom`: stamp-facing gap `5 px`, border-facing gap `6 px`
+- `wrapped_block` + `left`: stamp-facing gap `6 px`, border-facing gap `10 px`
+- `wrapped_block` + `right`: stamp-facing gap `12 px`, border-facing gap `4 px`
+
+Decision from the matrix:
+
+- Horizontal `single_line` left/right now use the same rendered-ink allocation
+  principle.
+- `single_line` top/bottom continue to use structural vertical allocation plus
+  rendered-ink fit fallback; current measured gaps are acceptable and do not
+  justify a vertical allocation change in this slice.
+- `multi_line` and `wrapped_block` remain structural block layouts. Their
+  larger gaps are visible in the matrix, especially right-side stamp positions,
+  but changing them to rendered-ink allocation would make block-width behavior
+  content-dependent. That should be a separate design decision, not a hidden
+  follow-on to the single-line fix.
+
+Verification:
+
+- Matrix probe passed: `12 passed`
+- Focused horizontal/manual replay/backend parity tests passed: `8 passed`
+- `python -m ruff check ...` passed for touched code/tests.
+- `pytest -q` passed: `540 passed, 1 warning`.

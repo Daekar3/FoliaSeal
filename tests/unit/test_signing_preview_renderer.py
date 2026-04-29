@@ -7,6 +7,12 @@ from PIL import Image
 
 from foliaseal.application import compare_preview_to_request, render_signing_preview
 from foliaseal.application.coordinate_transform import PageBox
+from foliaseal.application.phase3_signing_backend import (
+    _build_stamp_style,
+    _stamp_background_for_path,
+    _visible_signature_fit_issues_for_stamp_text,
+)
+from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
     SigningDraftPreview,
@@ -92,6 +98,227 @@ def _render_text_only_bounds_for_preview(
         render_backend=None,
         flatten_to_white=True,
     )
+
+
+def _render_stamp_only_bounds_for_preview(
+    preview: SigningDraftPreview,
+    *,
+    output_path: Path,
+) -> dict[str, int] | None:
+    layout = _canonical_preview_layout(
+        preview,
+        include_text=True,
+        include_stamp=True,
+        include_border=True,
+    )
+    return _render_optional_preview_bounds(
+        preview=preview,
+        layout=layout,
+        zoom=1.0,
+        output_path=output_path,
+        include_text=False,
+        include_stamp=True,
+        render_backend=None,
+        flatten_to_white=True,
+    )
+
+
+def _axis_gap_between(
+    *,
+    text_bounds: dict[str, int],
+    stamp_bounds: dict[str, int],
+    stamp_position: SignatureStampPosition,
+) -> int:
+    if stamp_position == SignatureStampPosition.LEFT:
+        return text_bounds["x"] - (stamp_bounds["x"] + stamp_bounds["width"])
+    if stamp_position == SignatureStampPosition.RIGHT:
+        return stamp_bounds["x"] - (text_bounds["x"] + text_bounds["width"])
+    if stamp_position == SignatureStampPosition.TOP:
+        return text_bounds["y"] - (stamp_bounds["y"] + stamp_bounds["height"])
+    return stamp_bounds["y"] - (text_bounds["y"] + text_bounds["height"])
+
+
+def _border_facing_text_gap(
+    *,
+    text_bounds: dict[str, int],
+    image_width: int,
+    image_height: int,
+    stamp_position: SignatureStampPosition,
+) -> int:
+    if stamp_position == SignatureStampPosition.LEFT:
+        return image_width - (text_bounds["x"] + text_bounds["width"])
+    if stamp_position == SignatureStampPosition.RIGHT:
+        return text_bounds["x"]
+    if stamp_position == SignatureStampPosition.TOP:
+        return image_height - (text_bounds["y"] + text_bounds["height"])
+    return text_bounds["y"]
+
+
+@pytest.mark.parametrize(
+    "layout_template",
+    [
+        SignatureLayoutTemplate.SINGLE_LINE,
+        SignatureLayoutTemplate.MULTI_LINE,
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+    ],
+)
+@pytest.mark.parametrize(
+    "stamp_position",
+    [
+        SignatureStampPosition.TOP,
+        SignatureStampPosition.BOTTOM,
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.RIGHT,
+    ],
+)
+def test_canonical_preview_rendered_ink_matrix_documents_all_layout_positions(
+    tmp_path: Path,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+) -> None:
+    stamp_path = tmp_path / f"{layout_template.value}_{stamp_position.value}.png"
+    Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
+    text_style = SignatureTextStyle(
+        font_family="Serif",
+        font_size_pt=8.5,
+        bold=False,
+        italic=False,
+        text_color_hex="#000000",
+    )
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+    rect_dimensions = {
+        SignatureLayoutTemplate.SINGLE_LINE: {
+            SignatureStampPosition.TOP: (262.0, 42.1),
+            SignatureStampPosition.BOTTOM: (262.0, 42.1),
+            SignatureStampPosition.LEFT: (289.66, 23.68),
+            SignatureStampPosition.RIGHT: (289.66, 23.68),
+        },
+        SignatureLayoutTemplate.MULTI_LINE: {
+            SignatureStampPosition.TOP: (180.0, 92.0),
+            SignatureStampPosition.BOTTOM: (180.0, 92.0),
+            SignatureStampPosition.LEFT: (232.32, 53.38),
+            SignatureStampPosition.RIGHT: (232.32, 53.38),
+        },
+        SignatureLayoutTemplate.WRAPPED_BLOCK: {
+            SignatureStampPosition.TOP: (223.1, 92.0),
+            SignatureStampPosition.BOTTOM: (223.1, 92.0),
+            SignatureStampPosition.LEFT: (223.1, 52.36),
+            SignatureStampPosition.RIGHT: (223.1, 52.36),
+        },
+    }
+    detail_text_by_template = {
+        SignatureLayoutTemplate.SINGLE_LINE: (
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-29 01:07"
+        ),
+        SignatureLayoutTemplate.MULTI_LINE: (
+            "Morgan Ellery\nBoard Secretary\nFoliaSeal\n2026-04-29 01:07"
+        ),
+        SignatureLayoutTemplate.WRAPPED_BLOCK: (
+            "Morgan Ellery\nBoard Secretary\nFoliaSeal 2026-04-29 01:07"
+        ),
+    }
+    width_pt, height_pt = rect_dimensions[layout_template][stamp_position]
+    preview = SigningDraftPreview(
+        title="Digitally signed by",
+        page_index=3,
+        signature_rect=build_signature_rect(
+            page_index=3,
+            left_pt=35.84,
+            bottom_pt=428.61,
+            width_pt=width_pt,
+            height_pt=height_pt,
+        ),
+        signer_label_prefix="Digitally signed by",
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        timezone_display_mode=None,
+        show_field_names=False,
+        datetime_format="%Y-%m-%d %H:%M",
+        text_style=text_style,
+        box_style=box_style,
+        image_stamp_path=str(stamp_path),
+        fields=(),
+        detail_text=detail_text_by_template[layout_template],
+        issues=(),
+        can_submit=True,
+    )
+    stamp_text = f"{preview.signer_label_prefix}\n{preview.detail_text}"
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix=preview.signer_label_prefix,
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            show_field_names=False,
+            datetime_format=preview.datetime_format,
+            image_stamp_path=str(stamp_path),
+            text_style=text_style,
+            box_style=box_style,
+        )
+    )
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+
+    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / f"{layout_template.value}_{stamp_position.value}_text.png",
+    )
+    stamp_bounds = _render_stamp_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / f"{layout_template.value}_{stamp_position.value}_stamp.png",
+    )
+    backend_issues = _visible_signature_fit_issues_for_stamp_text(
+        signature_rect=preview.signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=stamp_background,
+    )
+    pdf_style = _build_stamp_style(
+        appearance,
+        stamp_text=stamp_text,
+        stamp_background=stamp_background,
+        signature_rect=preview.signature_rect,
+    )
+    preview_layout = _canonical_preview_layout(
+        preview,
+        include_text=True,
+        include_stamp=True,
+        include_border=True,
+    )
+
+    assert snapshot is not None
+    assert text_bounds is not None
+    assert stamp_bounds is not None
+    assert backend_issues == ()
+    assert pdf_style.inner_content_layout.margins == (
+        preview_layout.inner_content_layout.margins
+    )
+    assert pdf_style.background_layout.margins == preview_layout.background_layout.margins
+    assert not _rectangles_overlap(text_bounds, stamp_bounds)
+    assert (
+        _border_facing_text_gap(
+            text_bounds=text_bounds,
+            image_width=snapshot.width_px,
+            image_height=snapshot.height_px,
+            stamp_position=stamp_position,
+        )
+        >= 1
+    )
+
+    stamp_facing_gap = _axis_gap_between(
+        text_bounds=text_bounds,
+        stamp_bounds=stamp_bounds,
+        stamp_position=stamp_position,
+    )
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE and stamp_position in {
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.RIGHT,
+    }:
+        assert 1 <= stamp_facing_gap <= 5
 
 
 def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) -> None:

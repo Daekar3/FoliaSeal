@@ -1060,37 +1060,49 @@ def _apply_horizontal_single_line_ink_text_alignment(
     *,
     ink_reservation: HorizontalSingleLineInkReservation | None,
 ) -> _SignatureLayoutReservation:
-    """Optically align left-stamp text ink without changing fit policy.
+    """Optically align horizontal single-line text ink without changing fit policy.
 
     pyHanko positions text by font advance width, not by visible glyph ink. In
-    narrow left-stamp single-line layouts, the right side bearing can leave the
-    visible glyphs far from the border even when the natural text box is already
-    right-aligned. This adjusts only the final text placement by the measured
-    right side bearing; fit decisions and reserved lane sizes still come from
-    the existing reservation model.
+    narrow horizontal single-line layouts, side bearings can leave visible glyphs
+    far from the border even when the natural text box is aligned correctly.
+    This adjusts only final text placement by measured side bearing; fit
+    decisions and reserved lane sizes still come from the reservation model.
     """
 
     if (
         ink_reservation is None
         or reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or reservation.stamp_position != SignatureStampPosition.LEFT
-        or ink_reservation.ink_right_slack_pt <= 0
+        or reservation.stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
     ):
         return reservation
 
     layout_rule = reservation.inner_content_layout
     margins = layout_rule.margins
+    if reservation.stamp_position == SignatureStampPosition.LEFT:
+        if ink_reservation.ink_right_slack_pt <= 0:
+            return reservation
+        adjusted_margins = Margins(
+            left=margins.left,
+            right=margins.right - ink_reservation.ink_right_slack_pt,
+            top=margins.top,
+            bottom=margins.bottom,
+        )
+    else:
+        if ink_reservation.ink_left_offset_pt <= 0:
+            return reservation
+        adjusted_margins = Margins(
+            left=margins.left - ink_reservation.ink_left_offset_pt,
+            right=margins.right,
+            top=margins.top,
+            bottom=margins.bottom,
+        )
     return replace(
         reservation,
         inner_content_layout=SimpleBoxLayoutRule(
             layout_rule.x_align,
             layout_rule.y_align,
-            margins=Margins(
-                left=margins.left,
-                right=margins.right - ink_reservation.ink_right_slack_pt,
-                top=margins.top,
-                bottom=margins.bottom,
-            ),
+            margins=adjusted_margins,
             inner_content_scaling=layout_rule.inner_content_scaling,
         ),
     )
@@ -1116,7 +1128,8 @@ def _horizontal_single_line_background_text_width(
     if (
         ink_reservation is None
         or layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or stamp_position != SignatureStampPosition.LEFT
+        or stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
     ):
         return fallback_text_box_width
 
