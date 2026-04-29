@@ -1938,11 +1938,18 @@ def test_multi_line_bottom_rejects_zero_height_stamp_band(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize(
-    ("stamp_position", "width_pt", "height_pt"),
+    ("stamp_position", "width_pt", "height_pt", "expected_pass"),
     [
-        (SignatureStampPosition.LEFT, 296.956, 50.684),
-        (SignatureStampPosition.LEFT, 293.884, 49.66),
-        (SignatureStampPosition.RIGHT, 293.88, 49.66),
+        (SignatureStampPosition.LEFT, 237.28, 48.45, True),
+        (SignatureStampPosition.LEFT, 237.28, 47.45, True),
+        (SignatureStampPosition.LEFT, 245.28, 47.45, True),
+        (SignatureStampPosition.LEFT, 245.28, 48.45, True),
+        (SignatureStampPosition.RIGHT, 245.28, 48.45, True),
+        (SignatureStampPosition.RIGHT, 238.28, 48.45, True),
+        (SignatureStampPosition.RIGHT, 211.2464, 29.6084, False),
+        (SignatureStampPosition.LEFT, 296.956, 50.684, True),
+        (SignatureStampPosition.LEFT, 293.884, 49.66, True),
+        (SignatureStampPosition.RIGHT, 293.88, 49.66, True),
     ],
 )
 def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_rendered_layout_fits(  # noqa: E501
@@ -1950,6 +1957,7 @@ def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_ren
     stamp_position: SignatureStampPosition,
     width_pt: float,
     height_pt: float,
+    expected_pass: bool,
 ) -> None:
     stamp_path = tmp_path / "stamp.png"
     Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
@@ -1993,7 +2001,11 @@ def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_ren
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
 
-    assert issues == ()
+    if expected_pass:
+        assert issues == ()
+    else:
+        assert len(issues) == 1
+        assert "does not fit" in issues[0].message
 
 
 def test_build_text_box_style_preserves_half_point_font_size() -> None:

@@ -1495,7 +1495,7 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
     height_overflow = (
         layout_reservation.text_box_height_pt - layout_reservation.text_area_height_pt
     )
-    if width_overflow > 0 or height_overflow <= 0 or height_overflow > 3:
+    if width_overflow > 0 or height_overflow <= 0 or height_overflow > 6:
         return False
 
     snapshot = None
@@ -1515,12 +1515,15 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
             include_border=True,
             flatten_to_white=True,
         )
-        appearance_snapshot = getattr(snapshot, "appearance_snapshot", None)
-        text_bounds = (
-            None
-            if appearance_snapshot is None
-            else appearance_snapshot.text_bounds_px
+        if snapshot.text_area_bounds_px is None:
+            return False
+        rendered_text_bounds, _error = detect_text_content_bounds_in_image(
+            preview_image_path=snapshot.image_path,
+            text_widget_bounds=snapshot.text_area_bounds_px,
+            text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
+            reference_text_content_bounds=snapshot.text_bounds_px,
         )
+        text_bounds = rendered_text_bounds
         stamp_bounds = getattr(snapshot, "stamp_bounds_px", None)
         if text_bounds is None or stamp_bounds is None:
             return False

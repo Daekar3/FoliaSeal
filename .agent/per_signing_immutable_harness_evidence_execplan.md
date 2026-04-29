@@ -334,6 +334,38 @@ Verification:
 - `python -m ruff check ...` passed for touched code/tests.
 - `pytest -q` passed: `518 passed, 1 warning`.
 
+### Follow-up Correction
+
+The next manual harness run showed Caps 4-9 still red even though they should
+pass, while Cap 10 was an intentional failure that should remain red.
+
+Root cause:
+
+- The horizontal multi-line fallback was capped at `3 pt` structural height
+  overflow.
+- The new valid manual cases had `4-5 pt` structural height overflow but still
+  rendered visibly inside the border without text/stamp overlap.
+- The fallback also checked structural text bounds against the container, which
+  rejected one-pixel structural overflow even when the visible rendered ink was
+  inside.
+
+Correction:
+
+- Expanded the narrow horizontal multi-line fallback limit to `6 pt` structural
+  height overflow.
+- Kept the large-overflow rejection path; the intentional Cap 10-style case
+  remains rejected.
+- Changed the final fallback geometry check to use rendered text ink bounds
+  instead of structural text bounds, preserving the rendered-output fit policy.
+- Added regression cases for the Cap 4-10 dimensions.
+
+Verification:
+
+- Cap 4-10 regression matrix passed with Caps 4-9 green and Cap 10 red.
+- Related compact rejection tests passed.
+- `python -m ruff check ...` passed for touched code/tests.
+- `pytest -q` passed: `525 passed, 1 warning`.
+
 ## Next Slice: Sign-Time Fit and Geometry Diagnostics for Manual Harness Runs
 
 ### Goal
