@@ -2436,3 +2436,124 @@ Verification:
 - `python -m json.tool artifacts/preview_sweep_assets/signed_preview_parity_matrix.json`
 - `python -m ruff check tests/unit/test_phase3_harness.py`
 - `pytest -q`
+
+## Follow-up Slice: Single-Line Left Stamp-Facing Gap
+
+### Goal
+
+Fix the current manual-harness single-line-left appearance issue without
+regressing the border-facing text fit that is now working.
+
+The latest harness run shows:
+
+- Cap 4: validation green, right text-to-border gap is `4 px`, but stamp-to-text
+  glyph gap is `16 px`.
+- Cap 5: validation green, right text-to-border gap is `4 px`, but stamp-to-text
+  glyph gap is `13 px`.
+- Cap 6: validation green, right text-to-border gap is `4 px`, but stamp-to-text
+  glyph gap is `26 px`.
+- Cap 10 is an intentional fail case and must remain red.
+
+This is now an appearance/stamp-allocation problem, not a validation problem.
+The right-side text guard is good; the left/stamp-facing gap is too large, which
+makes the text consume horizontal space too early and shrinks the stamp sooner
+than necessary.
+
+### Relevant Code Path
+
+- Horizontal single-line layout split:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_layout_reservation_for_template(...)`
+- Horizontal rendered-ink reservation:
+  - `src/foliaseal/application/horizontal_signature_reservation.py`
+  - `build_horizontal_single_line_ink_reservation(...)`
+- Single-line left optical text placement:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_apply_horizontal_single_line_ink_text_alignment(...)`
+- Canonical preview uses the same helper through:
+  - `src/foliaseal/application/signing_preview_renderer.py`
+  - `_canonical_preview_layout(...)`
+
+The current implementation correctly uses measured right side-bearing to keep
+the rightmost glyphs close to the rounded border. However, for left-stamp
+single-line layouts, that correction can leave excessive stamp-facing whitespace
+between the stamp ink and the leftmost text glyphs.
+
+### Required Approach
+
+1. Add regression tests for Cap 4-6 style `single_line` + `left` image-stamp
+   previews.
+   - Assert validation remains green.
+   - Assert right text-to-border gap remains close, around `4 px`.
+   - Assert stamp and text do not overlap.
+   - Assert stamp-to-text glyph gap is reduced to a small guard rather than
+     `13-26 px`.
+
+2. Adjust placement using measured ink data, not arbitrary box expansion.
+   - Keep the existing border-facing right side-bearing correction.
+   - Add a bounded stamp-facing correction so visible text ink can move closer
+     to the stamp when there is excessive gap.
+   - The correction must be derived from the measured rendered-ink side bearings
+     and/or the existing configured separator, not a percentage of rectangle
+     width.
+
+3. Do not change validation policy in this slice.
+   - Cap 4-6 already validate green.
+   - Cap 10 must remain red.
+   - Existing rendered-fit fallbacks should remain scoped as they are.
+
+4. Keep preview and signed PDF parity.
+   - The final text placement helper is shared by canonical preview and signed
+     PDF style construction.
+   - Any adjustment must happen at that shared helper, or be represented in the
+     shared reservation model before both renderers consume it.
+
+5. Preserve the simplicity constraint.
+   - Do not add independent preview-only or PDF-only special cases.
+   - Do not introduce new threshold ladders.
+   - Do not make margins negative unless the test explicitly proves visible ink
+     remains inside the border and the alternative would reintroduce structural
+     side-bearing pessimism. If negative margins are used, they must represent
+     measured invisible side-bearing only, not fit relaxation.
+
+### Acceptance Criteria
+
+- Cap 4-6 style automated preview tests pass with:
+  - right text-to-border gap still close
+  - stamp-to-text glyph gap materially smaller than the current `13-26 px`
+  - no text/stamp overlap
+  - stamp still visible
+- Cap 10-style intentional rejection remains red.
+- Existing horizontal single-line edge-safety tests still pass.
+- Full suite passes.
+
+### Execution Result
+
+Implemented with TDD.
+
+What landed:
+
+- Added Cap 4-6 style canonical preview regression coverage for
+  `single_line` + `left` image-stamp layouts.
+- Kept validation/reservation math unchanged after the first implementation
+  attempt showed that changing the separator in `_layout_reservation_for_template`
+  altered backend validation policy.
+- Changed only stamp/background placement:
+  - left single-line image stamps get a slightly wider drawing lane for the
+    background image
+  - stamp content is aligned toward the text inside that lane
+  - text placement and validation still use the existing ink-informed text lane
+- This keeps preview and signed PDF on the same shared background-layout path.
+
+Measured result:
+
+- Cap-style stamp-to-text gaps improved to `11 px`, `10 px`, and `9 px`.
+- Right text-to-border gap stayed at `4 px`.
+- Stamp and text do not overlap.
+
+Verification:
+
+- Focused Cap 4-6 preview regression tests passed.
+- Horizontal edge-safety and manual replay tests passed.
+- `python -m ruff check ...` passed for touched code/tests.
+- `pytest -q` passed: `528 passed, 1 warning`.

@@ -1145,6 +1145,12 @@ def _background_layout_for_stamp(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
+    if (
+        layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and stamp_position == SignatureStampPosition.LEFT
+        and stamp_background is not None
+    ):
+        text_box_width = max(1, text_box_width - 4)
     reservation = _layout_reservation_for_template(
         layout_template,
         stamp_position=stamp_position,
@@ -1259,6 +1265,14 @@ def _background_layout_for_stamp(
         centered_extra_x = max(0, remaining_x - border_gap) // 2
         extra_x_left = min(border_gap, remaining_x) + centered_extra_x
         extra_x_right = centered_extra_x
+        extra_y_top = max(0, area_height - target_height) // 2
+        extra_y_bottom = extra_y_top
+    elif (
+        layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and stamp_position == SignatureStampPosition.LEFT
+    ):
+        extra_x_left = max(0, area_width - target_width)
+        extra_x_right = 0
         extra_y_top = max(0, area_height - target_height) // 2
         extra_y_bottom = extra_y_top
     else:
