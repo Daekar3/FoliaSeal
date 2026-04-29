@@ -13,6 +13,8 @@ dist/
 # remain trackable.
 artifacts/preview_sweep_runs/
 artifacts/phase3_harness_capture_artifacts/
+artifacts/phase3_fr3b_acceptance_results.md
+artifacts/phase3_harness_capture.json
 artifacts/signed_acceptance_matrix_run*/
 artifacts/signed_preview_parity_matrix_run*/
 artifacts/signed_fit_rejection_matrix_run*/
