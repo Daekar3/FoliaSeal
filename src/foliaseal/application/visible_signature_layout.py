@@ -1,0 +1,428 @@
+"""Visible-signature layout planning boundary.
+
+This module is the public application-layer seam for visible-signature geometry.
+The first implementation preserves current behavior by delegating to the
+existing backend layout helpers; later slices can move the policy here.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Protocol
+
+from PIL import Image
+
+from foliaseal.application.horizontal_signature_reservation import (
+    build_horizontal_single_line_ink_reservation,
+)
+from foliaseal.application.signing_draft_workflow import SigningDraftValidationSeverity
+from foliaseal.domain.models import (
+    SignatureBoxStyle,
+    SignatureLayoutTemplate,
+    SignatureRect,
+    SignatureStampPosition,
+    SignatureTextStyle,
+)
+
+
+@dataclass(frozen=True)
+class TextMetrics:
+    """Measured visible-signature text box dimensions in PDF points."""
+
+    width_pt: int
+    height_pt: int
+    line_count: int
+
+
+@dataclass(frozen=True)
+class ImageMetrics:
+    """Stamp image dimensions used by layout policy."""
+
+    width_px: int
+    height_px: int
+    aspect_ratio: float
+
+
+@dataclass(frozen=True)
+class RectBounds:
+    """Integer rectangle bounds, usually from raster measurements."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+        }
+
+
+@dataclass(frozen=True)
+class HorizontalInkMeasurementRequest:
+    """Inputs needed to measure horizontal single-line rendered ink."""
+
+    signature_rect: SignatureRect
+    layout_template: SignatureLayoutTemplate
+    stamp_position: SignatureStampPosition
+    text_style: SignatureTextStyle
+    box_style: SignatureBoxStyle
+    stamp_text: str
+    image_stamp_path: str
+    structural_text_box_width_pt: int
+    structural_text_box_height_pt: int
+
+
+@dataclass(frozen=True)
+class HorizontalInkMeasurement:
+    """Rendered ink bounds measured from a local preview render."""
+
+    structural_text_bounds_px: RectBounds
+    rendered_ink_bounds_px: RectBounds
+    px_to_pt: float
+
+
+@dataclass(frozen=True)
+class HorizontalInkReservation:
+    """Point-space text lane reservation derived from rendered ink."""
+
+    lane_width_pt: int
+    ink_width_pt: int
+    ink_height_pt: int
+    ink_left_offset_pt: int
+    ink_right_slack_pt: int
+    border_facing_padding_pt: int
+    stamp_facing_padding_pt: int
+
+
+@dataclass(frozen=True)
+class LayoutMargins:
+    """Margins for a layout rule in PDF points."""
+
+    left: int
+    right: int
+    top: int
+    bottom: int
+
+
+@dataclass(frozen=True)
+class LayoutRuleSpec:
+    """Plain-data view of a pyHanko layout rule."""
+
+    x_align: str
+    y_align: str
+    margins: LayoutMargins
+    scaling: str
+
+
+@dataclass(frozen=True)
+class VisibleSignatureFitIssue:
+    """Typed layout fit issue returned by the planning boundary."""
+
+    code: str
+    message: str
+    severity: SigningDraftValidationSeverity = SigningDraftValidationSeverity.ERROR
+    field_name: str = "signature_appearance"
+
+
+@dataclass(frozen=True)
+class LayoutRequest:
+    """Inputs for visible-signature layout planning."""
+
+    signature_rect: SignatureRect
+    layout_template: SignatureLayoutTemplate
+    stamp_position: SignatureStampPosition
+    text_style: SignatureTextStyle
+    box_style: SignatureBoxStyle
+    stamp_text: str
+    image_stamp_path: str | None
+    use_horizontal_ink_reservation: bool = True
+
+
+@dataclass(frozen=True)
+class SignatureLayoutPlan:
+    """Canonical visible-signature layout result for callers and adapters."""
+
+    container_width_pt: int
+    container_height_pt: int
+    text_box: TextMetrics
+    has_visible_stamp_image: bool
+    text_area_width_pt: int
+    text_area_height_pt: int
+    stamp_area_width_pt: int
+    stamp_area_height_pt: int
+    reserved_primary_extent_pt: int
+    text_layout: LayoutRuleSpec
+    stamp_layout: LayoutRuleSpec
+    background_text_box_width_pt: int
+    ink_reservation: HorizontalInkReservation | None
+    fit_issues: tuple[VisibleSignatureFitIssue, ...]
+    backend_reservation: object
+    stamp_image: ImageMetrics | None
+
+
+class TextMeasurer(Protocol):
+    """Port for measuring visible-signature text."""
+
+    def measure(self, text: str, text_style: SignatureTextStyle) -> TextMetrics:
+        """Return point-space dimensions for the rendered text box."""
+
+
+class StampImageProbe(Protocol):
+    """Port for inspecting optional stamp image metadata."""
+
+    def inspect(self, image_stamp_path: str | None) -> ImageMetrics | None:
+        """Return image metrics or None when there is no visible stamp image."""
+
+
+class HorizontalInkMeasurer(Protocol):
+    """Port for local rendered-ink measurement."""
+
+    def measure(
+        self,
+        request: HorizontalInkMeasurementRequest,
+    ) -> HorizontalInkMeasurement | None:
+        """Return rendered ink bounds for horizontal single-line layout."""
+
+
+class PyHankoTextMeasurer:
+    """Production text measurer backed by the current pyHanko text engine."""
+
+    def measure(self, text: str, text_style: SignatureTextStyle) -> TextMetrics:
+        from foliaseal.application.phase3_signing_backend import (
+            _build_text_box_style,
+            _measure_text_box_dimensions,
+        )
+
+        text_box_style = _build_text_box_style(text_style)
+        width_pt, height_pt = _measure_text_box_dimensions(text, text_box_style)
+        return TextMetrics(
+            width_pt=width_pt,
+            height_pt=height_pt,
+            line_count=max(1, len(text.splitlines()) or 1),
+        )
+
+
+class PillowStampImageProbe:
+    """Production stamp image probe backed by Pillow."""
+
+    def inspect(self, image_stamp_path: str | None) -> ImageMetrics | None:
+        if image_stamp_path is None:
+            return None
+        try:
+            with Image.open(image_stamp_path) as image:
+                width_px, height_px = image.size
+        except FileNotFoundError as exc:
+            raise ValueError(f"Image stamp path not found: {image_stamp_path}") from exc
+        except OSError as exc:
+            raise ValueError(
+                f"Image stamp path is not a readable image: {image_stamp_path}"
+            ) from exc
+        if width_px <= 0 or height_px <= 0:
+            return None
+        return ImageMetrics(
+            width_px=width_px,
+            height_px=height_px,
+            aspect_ratio=width_px / height_px,
+        )
+
+
+@dataclass
+class VisibleSignatureLayoutEngine:
+    """Plan visible-signature layout through one application boundary."""
+
+    text_measurer: TextMeasurer | None = None
+    image_probe: StampImageProbe | None = None
+    ink_measurer: HorizontalInkMeasurer | None = None
+
+    def plan(self, request: LayoutRequest) -> SignatureLayoutPlan:
+        """Return the visible-signature layout plan for one request."""
+
+        text_measurer = self.text_measurer or PyHankoTextMeasurer()
+        image_probe = self.image_probe or PillowStampImageProbe()
+        text_box = text_measurer.measure(request.stamp_text, request.text_style)
+        stamp_image = image_probe.inspect(request.image_stamp_path)
+        has_visible_stamp_image = stamp_image is not None
+
+        from foliaseal.application.phase3_signing_backend import (
+            _apply_horizontal_single_line_ink_text_alignment,
+            _effective_layout_edge_margin,
+            _ensure_layout_can_fit,
+            _horizontal_single_line_background_text_width,
+            _horizontal_single_line_ink_validation_reservation,
+            _layout_reservation_for_template,
+        )
+
+        structural_reservation = _layout_reservation_for_template(
+            request.layout_template,
+            stamp_position=request.stamp_position,
+            signature_rect=request.signature_rect,
+            text_box_width=text_box.width_pt,
+            text_box_height=text_box.height_pt,
+            box_style=request.box_style,
+            has_visible_stamp_image=has_visible_stamp_image,
+            stamp_aspect_ratio=None if stamp_image is None else stamp_image.aspect_ratio,
+        )
+        ink_reservation = self._horizontal_ink_reservation(
+            request=request,
+            text_box=text_box,
+            has_visible_stamp_image=has_visible_stamp_image,
+            edge_margin=_effective_layout_edge_margin(
+                stamp_position=request.stamp_position,
+                box_height=structural_reservation.container_height_pt,
+                box_style=request.box_style,
+            ),
+        )
+        placement_reservation = _horizontal_single_line_ink_validation_reservation(
+            structural_reservation,
+            ink_reservation=ink_reservation,
+            signature_rect=request.signature_rect,
+            box_style=request.box_style,
+            has_visible_stamp_image=has_visible_stamp_image,
+            stamp_aspect_ratio=None if stamp_image is None else stamp_image.aspect_ratio,
+        )
+        placement_reservation = _apply_horizontal_single_line_ink_text_alignment(
+            placement_reservation,
+            ink_reservation=ink_reservation,
+        )
+        fit_issues = self._fit_issues(
+            placement_reservation,
+            has_visible_stamp_image=has_visible_stamp_image,
+            fit_checker=_ensure_layout_can_fit,
+        )
+        background_text_box_width = _horizontal_single_line_background_text_width(
+            layout_template=request.layout_template,
+            stamp_position=request.stamp_position,
+            box_height=placement_reservation.container_height_pt,
+            fallback_text_box_width=placement_reservation.text_box_width_pt,
+            ink_reservation=ink_reservation,
+        )
+
+        return SignatureLayoutPlan(
+            container_width_pt=placement_reservation.container_width_pt,
+            container_height_pt=placement_reservation.container_height_pt,
+            text_box=text_box,
+            has_visible_stamp_image=has_visible_stamp_image,
+            text_area_width_pt=placement_reservation.text_area_width_pt,
+            text_area_height_pt=placement_reservation.text_area_height_pt,
+            stamp_area_width_pt=placement_reservation.stamp_area_width_pt,
+            stamp_area_height_pt=placement_reservation.stamp_area_height_pt,
+            reserved_primary_extent_pt=placement_reservation.reserved_primary_extent_pt,
+            text_layout=_layout_rule_spec(placement_reservation.inner_content_layout),
+            stamp_layout=_layout_rule_spec(placement_reservation.background_layout),
+            background_text_box_width_pt=background_text_box_width,
+            ink_reservation=_public_ink_reservation(ink_reservation),
+            fit_issues=fit_issues,
+            backend_reservation=placement_reservation,
+            stamp_image=stamp_image,
+        )
+
+    def validate(self, request: LayoutRequest) -> tuple[VisibleSignatureFitIssue, ...]:
+        """Return only visible-signature layout fit issues."""
+
+        return self.plan(request).fit_issues
+
+    def _horizontal_ink_reservation(
+        self,
+        *,
+        request: LayoutRequest,
+        text_box: TextMetrics,
+        has_visible_stamp_image: bool,
+        edge_margin: int,
+    ) -> object | None:
+        if (
+            self.ink_measurer is None
+            or not request.use_horizontal_ink_reservation
+            or not has_visible_stamp_image
+            or request.image_stamp_path is None
+            or request.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+            or request.stamp_position
+            not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+        ):
+            return None
+
+        measurement = self.ink_measurer.measure(
+            HorizontalInkMeasurementRequest(
+                signature_rect=request.signature_rect,
+                layout_template=request.layout_template,
+                stamp_position=request.stamp_position,
+                text_style=request.text_style,
+                box_style=request.box_style,
+                stamp_text=request.stamp_text,
+                image_stamp_path=request.image_stamp_path,
+                structural_text_box_width_pt=text_box.width_pt,
+                structural_text_box_height_pt=text_box.height_pt,
+            )
+        )
+        if measurement is None:
+            return None
+
+        return build_horizontal_single_line_ink_reservation(
+            layout_template=request.layout_template,
+            stamp_position=request.stamp_position,
+            has_visible_stamp_image=has_visible_stamp_image,
+            structural_text_box_width_pt=text_box.width_pt,
+            structural_text_box_height_pt=text_box.height_pt,
+            structural_text_bounds_px=measurement.structural_text_bounds_px.as_dict(),
+            rendered_ink_bounds_px=measurement.rendered_ink_bounds_px.as_dict(),
+            px_to_pt=measurement.px_to_pt,
+            border_facing_padding_pt=edge_margin,
+            stamp_facing_padding_pt=edge_margin,
+        )
+
+    @staticmethod
+    def _fit_issues(
+        reservation: object,
+        *,
+        has_visible_stamp_image: bool,
+        fit_checker: object,
+    ) -> tuple[VisibleSignatureFitIssue, ...]:
+        try:
+            fit_checker(reservation, has_visible_stamp_image=has_visible_stamp_image)
+        except Exception as exc:
+            return (
+                VisibleSignatureFitIssue(
+                    code="visible_signature_layout_unavailable",
+                    message=str(exc),
+                ),
+            )
+        return ()
+
+
+def _public_ink_reservation(reservation: object | None) -> HorizontalInkReservation | None:
+    if reservation is None:
+        return None
+    return HorizontalInkReservation(
+        lane_width_pt=reservation.lane_width_pt,
+        ink_width_pt=reservation.ink_width_pt,
+        ink_height_pt=reservation.ink_height_pt,
+        ink_left_offset_pt=reservation.ink_left_offset_pt,
+        ink_right_slack_pt=reservation.ink_right_slack_pt,
+        border_facing_padding_pt=reservation.border_facing_padding_pt,
+        stamp_facing_padding_pt=reservation.stamp_facing_padding_pt,
+    )
+
+
+def _layout_rule_spec(rule: object) -> LayoutRuleSpec:
+    margins = getattr(rule, "margins")
+    return LayoutRuleSpec(
+        x_align=_enum_name(getattr(rule, "x_align")),
+        y_align=_enum_name(getattr(rule, "y_align")),
+        margins=LayoutMargins(
+            left=int(round(getattr(margins, "left", 0))),
+            right=int(round(getattr(margins, "right", 0))),
+            top=int(round(getattr(margins, "top", 0))),
+            bottom=int(round(getattr(margins, "bottom", 0))),
+        ),
+        scaling=_enum_name(getattr(rule, "inner_content_scaling")),
+    )
+
+
+def _enum_name(value: object) -> str:
+    name = getattr(value, "name", None)
+    if isinstance(name, str):
+        return name
+    return str(value)
