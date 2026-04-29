@@ -405,6 +405,8 @@ class PyHankoSignatureAppearanceAdapter:
         signature_rect: SignatureRect,
         layout_plan: SignatureLayoutPlan,
         allow_fit_issues: bool = False,
+        include_border: bool = True,
+        include_background: bool = True,
     ) -> object:
         """Return the pyHanko stamp style represented by ``layout_plan``."""
 
@@ -420,8 +422,16 @@ class PyHankoSignatureAppearanceAdapter:
         )
 
         box_style = appearance.box_style
-        border_width = max(0, int(round(box_style.border_width_pt))) if box_style.show_border else 0
-        background = stamp_background or _solid_background_for_color(box_style.background_color_hex)
+        border_width = (
+            max(0, int(round(box_style.border_width_pt)))
+            if box_style.show_border and include_border
+            else 0
+        )
+        background = (
+            stamp_background or _solid_background_for_color(box_style.background_color_hex)
+            if include_background
+            else None
+        )
         text_box_style = _build_text_box_style(appearance.text_style)
         background_layout = _background_layout_for_stamp(
             appearance.layout_template,

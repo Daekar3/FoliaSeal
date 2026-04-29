@@ -17,21 +17,12 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from pyhanko.stamp import TextStampStyle
 
 from foliaseal.application.horizontal_signature_reservation import (
-    HorizontalSingleLineInkReservation,
-    build_horizontal_single_line_ink_reservation,
     measure_horizontal_single_line_rendered_reference,
 )
 from foliaseal.application.phase3_signing_backend import (
     RoundedBorderTextStampStyle,
-    _apply_horizontal_single_line_ink_text_alignment,
-    _background_layout_for_stamp,
     _build_text_box_style,
-    _effective_layout_edge_margin,
-    _hex_to_rgb,
-    _horizontal_single_line_background_text_width,
-    _layout_reservation_for_template,
     _measure_text_box_dimensions,
-    _solid_background_for_color,
     _stamp_background_for_path,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
@@ -39,6 +30,14 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreview,
     SigningDraftPreviewField,
     SigningDraftValidationIssue,
+)
+from foliaseal.application.visible_signature_layout import (
+    HorizontalInkMeasurement,
+    HorizontalInkMeasurementRequest,
+    LayoutRequest,
+    PyHankoSignatureAppearanceAdapter,
+    RectBounds,
+    VisibleSignatureLayoutEngine,
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -886,160 +885,92 @@ def _canonical_preview_layout(
     )
     stamp_text = _preview_stamp_text(preview) if include_text else " "
     stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
-    background: PdfContent | None
-    if include_stamp:
-        background = stamp_background or _solid_background_for_color(
-            preview.box_style.background_color_hex
+    layout_engine = VisibleSignatureLayoutEngine(
+        ink_measurer=(
+            _PreviewHorizontalInkMeasurer(preview)
+            if use_horizontal_ink_reservation
+            else None
         )
-    else:
-        background = None
-
-    text_box_style = _build_text_box_style(preview.text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(
-        stamp_text,
-        text_box_style,
     )
-    layout_reservation = _layout_reservation_for_template(
-        preview.layout_template,
-        stamp_position=preview.stamp_position,
+    layout_request = LayoutRequest(
         signature_rect=preview.signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
+        layout_template=preview.layout_template,
+        stamp_position=preview.stamp_position,
+        text_style=preview.text_style,
         box_style=preview.box_style,
-        has_visible_stamp_image=stamp_background is not None and include_stamp,
-        stamp_aspect_ratio=(
-            None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
-        ),
-    )
-    ink_reservation = _horizontal_single_line_ink_preview_reservation(
-        preview=preview,
         stamp_text=stamp_text,
-        structural_text_box_width=text_box_width,
-        structural_text_box_height=text_box_height,
-        has_visible_stamp_image=stamp_background is not None and include_stamp,
+        image_stamp_path=appearance.image_stamp_path,
         use_horizontal_ink_reservation=use_horizontal_ink_reservation,
     )
-    ink_layout_text_box_width = (
-        None if ink_reservation is None else ink_reservation.lane_width_pt
-    )
-    if ink_layout_text_box_width is not None:
-        layout_reservation = _layout_reservation_for_template(
-            preview.layout_template,
-            stamp_position=preview.stamp_position,
-            signature_rect=preview.signature_rect,
-            text_box_width=ink_layout_text_box_width,
-            text_box_height=text_box_height,
-            box_style=preview.box_style,
-            has_visible_stamp_image=stamp_background is not None and include_stamp,
-            stamp_aspect_ratio=(
-                None if stamp_background is None else _stamp_aspect_ratio(stamp_background)
-            ),
-        )
-    layout_reservation = _apply_horizontal_single_line_ink_text_alignment(
-        layout_reservation,
-        ink_reservation=ink_reservation,
-    )
+    layout_plan = layout_engine.plan(layout_request)
+    stamp_suppressed = False
     if (
         include_stamp
         and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
         and preview.stamp_position
         in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-        and layout_reservation.text_area_width_pt * 2 < text_box_width
+        and layout_plan.text_area_width_pt * 2 < layout_plan.text_box.width_pt
     ):
-        background = None
+        stamp_suppressed = True
         stamp_background = None
-        layout_reservation = _layout_reservation_for_template(
-            preview.layout_template,
-            stamp_position=preview.stamp_position,
-            signature_rect=preview.signature_rect,
-            text_box_width=text_box_width,
-            text_box_height=text_box_height,
-            box_style=preview.box_style,
-            has_visible_stamp_image=False,
-            stamp_aspect_ratio=None,
+        layout_plan = layout_engine.plan(
+            LayoutRequest(
+                signature_rect=preview.signature_rect,
+                layout_template=preview.layout_template,
+                stamp_position=preview.stamp_position,
+                text_style=preview.text_style,
+                box_style=preview.box_style,
+                stamp_text=stamp_text,
+                image_stamp_path=None,
+                use_horizontal_ink_reservation=False,
+            )
         )
-    background_text_box_width = _horizontal_single_line_background_text_width(
-        layout_template=preview.layout_template,
-        stamp_position=preview.stamp_position,
-        box_height=layout_reservation.container_height_pt,
-        fallback_text_box_width=ink_layout_text_box_width or text_box_width,
-        ink_reservation=ink_reservation,
-    )
-    background_layout = _background_layout_for_stamp(
-        preview.layout_template,
-        stamp_position=preview.stamp_position,
+    style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
         stamp_background=stamp_background if include_stamp else None,
         signature_rect=preview.signature_rect,
-        text_box_width=background_text_box_width,
-        text_box_height=text_box_height,
-        box_style=preview.box_style,
+        layout_plan=layout_plan,
+        include_border=include_text and include_border,
+        include_background=include_stamp and not stamp_suppressed,
+        allow_fit_issues=True,
     )
     return _CanonicalPreviewLayout(
-        style=RoundedBorderTextStampStyle(
-            border_width=(
-                max(0, int(round(preview.box_style.border_width_pt)))
-                if preview.box_style.show_border and include_text and include_border
-                else 0
+        style=style,
+        background_layout=style.background_layout,
+        inner_content_layout=layout_plan.backend_reservation.inner_content_layout,
+        reserved_background_layout=layout_plan.backend_reservation.background_layout,
+        reservation=layout_plan.backend_reservation,
+    )
+
+
+@dataclass(frozen=True)
+class _PreviewHorizontalInkMeasurer:
+    preview: SigningDraftPreview
+
+    def measure(
+        self,
+        request: HorizontalInkMeasurementRequest,
+    ) -> HorizontalInkMeasurement | None:
+        reference = measure_horizontal_single_line_rendered_reference(self.preview, zoom=1.0)
+        if reference is None:
+            return None
+        return HorizontalInkMeasurement(
+            structural_text_bounds_px=_rect_bounds_from_mapping(
+                reference.structural_text_bounds_px
             ),
-            border_color=_hex_to_rgb(preview.box_style.border_color_hex),
-            background=background,
-            background_layout=background_layout,
-            background_opacity=1.0,
-            text_box_style=text_box_style,
-            inner_content_layout=layout_reservation.inner_content_layout,
-            stamp_text=stamp_text,
-            timestamp_format=preview.datetime_format,
-        ),
-        background_layout=background_layout,
-        inner_content_layout=layout_reservation.inner_content_layout,
-        reserved_background_layout=layout_reservation.background_layout,
-        reservation=layout_reservation,
-    )
+            rendered_ink_bounds_px=_rect_bounds_from_mapping(reference.rendered_ink_bounds_px),
+            px_to_pt=reference.px_to_pt,
+        )
 
 
-def _horizontal_single_line_ink_preview_reservation(
-    *,
-    preview: SigningDraftPreview,
-    stamp_text: str,
-    structural_text_box_width: int,
-    structural_text_box_height: int,
-    has_visible_stamp_image: bool,
-    use_horizontal_ink_reservation: bool,
-) -> HorizontalSingleLineInkReservation | None:
-    if (
-        not use_horizontal_ink_reservation
-        or not has_visible_stamp_image
-        or preview.signature_rect is None
-        or preview.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or preview.stamp_position
-        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-        or preview.box_style is None
-    ):
-        return None
-
-    reference = measure_horizontal_single_line_rendered_reference(preview, zoom=1.0)
-    if reference is None:
-        return None
-    edge_margin = _effective_layout_edge_margin(
-        stamp_position=preview.stamp_position,
-        box_height=max(1, int(round(preview.signature_rect.height_pt))),
-        box_style=preview.box_style,
+def _rect_bounds_from_mapping(bounds: dict[str, int]) -> RectBounds:
+    return RectBounds(
+        x=bounds["x"],
+        y=bounds["y"],
+        width=bounds["width"],
+        height=bounds["height"],
     )
-    ink_reservation = build_horizontal_single_line_ink_reservation(
-        layout_template=preview.layout_template,
-        stamp_position=preview.stamp_position,
-        has_visible_stamp_image=has_visible_stamp_image,
-        structural_text_box_width_pt=structural_text_box_width,
-        structural_text_box_height_pt=structural_text_box_height,
-        structural_text_bounds_px=reference.structural_text_bounds_px,
-        rendered_ink_bounds_px=reference.rendered_ink_bounds_px,
-        px_to_pt=reference.px_to_pt,
-        border_facing_padding_pt=edge_margin,
-        stamp_facing_padding_pt=edge_margin,
-    )
-    if ink_reservation is None or ink_reservation.lane_width_pt >= structural_text_box_width:
-        return None
-    return ink_reservation
 
 
 def _stamp_aspect_ratio(stamp_background: PdfContent | None) -> float | None:

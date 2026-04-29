@@ -20,7 +20,7 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - [x] (2026-04-29T22:36Z) Committed the first additive boundary slice as `aaa8466dc` with message `Add visible signature layout boundary`.
 - [x] (2026-04-29T22:43Z) Added pyHanko adapter equivalence tests and a `PyHankoSignatureAppearanceAdapter` that builds the same observable `RoundedBorderTextStampStyle` fields currently produced by `_build_stamp_style`.
 - [x] (2026-04-29T22:47Z) Migrated backend stamp-style construction and backend fit validation to consume `VisibleSignatureLayoutEngine.plan()` through `PyHankoSignatureAppearanceAdapter` while preserving the existing rendered-fit fallback behavior.
-- [ ] Next slice: migrate canonical preview layout in `signing_preview_renderer.py` to consume the same plan instead of reconstructing reservation and ink alignment separately.
+- [x] (2026-04-29T22:51Z) Migrated canonical preview layout in `signing_preview_renderer.py` to consume `VisibleSignatureLayoutEngine.plan()` and `PyHankoSignatureAppearanceAdapter` instead of reconstructing reservation and ink alignment separately.
 - [ ] Next slice: migrate Qt preview sizing in `signing_shell.py` to consume a Qt geometry adapter derived from `SignatureLayoutPlan`.
 - [ ] Final cleanup slice: delete or demote private-helper tests once boundary and adapter tests cover their behavior.
 
@@ -43,6 +43,9 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Observation: backend migration must preserve the existing rendered-fit fallback after layout planning.
   Evidence: the old `_build_stamp_style()` allowed some nominal `_ensure_layout_can_fit()` failures when `_single_line_rendered_ink_fits_reservation()` or `_horizontal_multi_line_rendered_layout_fits_reservation()` passed. The migrated `_build_stamp_style()` now checks `layout_plan.fit_issues` and applies the same fallback functions before asking the adapter to build the final style.
+
+- Observation: canonical preview still needs `RoundedBorderTextStampStyle` directly for optional text-only and stamp-only bounds rendering.
+  Evidence: the first test run after moving `_canonical_preview_layout()` onto the layout engine failed with `NameError: name 'RoundedBorderTextStampStyle' is not defined` in `_render_optional_preview_bounds()`. Restoring that import fixed the preview and backend fallback failures.
 
 ## Decision Log
 
@@ -72,6 +75,10 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Decision: keep the rendered-fit fallback in `phase3_signing_backend.py` during backend migration.
   Rationale: the fallback depends on backend-only raster checks and cache behavior that are not part of the pure layout plan yet. Keeping it at the backend layer preserves current signing behavior while still moving structural layout planning and style construction onto the new boundary.
+  Date/Author: 2026-04-29 / Codex
+
+- Decision: keep preview-only stamp suppression in `signing_preview_renderer.py`.
+  Rationale: the preview has an existing rule that suppresses a horizontal single-line stamp when the text lane collapses. That behavior is presentation-specific and should not be moved into backend signing during this slice.
   Date/Author: 2026-04-29 / Codex
 
 ## Outcomes & Retrospective
@@ -168,6 +175,30 @@ Verification results:
     205 passed in 25.49s
 
 The next slice should migrate canonical preview layout in `src/foliaseal/application/signing_preview_renderer.py` to consume `SignatureLayoutPlan`. Preserve current preview/output parity tests and keep Qt preview sizing for a later slice.
+
+The canonical-preview migration slice succeeded.
+
+What changed:
+
+- `_canonical_preview_layout()` now builds a `LayoutRequest`, plans it through `VisibleSignatureLayoutEngine`, and uses `PyHankoSignatureAppearanceAdapter` to build the canonical preview stamp style.
+- Added `_PreviewHorizontalInkMeasurer` in `signing_preview_renderer.py` to bridge canonical preview inputs into the layout engine's `HorizontalInkMeasurer` port.
+- Preserved the preview-only horizontal single-line stamp-suppression rule by replanning without an image stamp when the text lane collapses.
+- Kept `_render_optional_preview_bounds()` on `RoundedBorderTextStampStyle` for text-only and stamp-only diagnostics.
+
+What did not change:
+
+- Qt preview sizing in `signing_shell.py` still uses its existing reservation helper path.
+- Preview text measurement helpers are still imported for structural line-bound diagnostics elsewhere in `signing_preview_renderer.py`.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/visible_signature_layout.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py tests/unit/test_visible_signature_layout.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py tests/unit/test_visible_signature_layout.py
+    178 passed in 25.36s
+
+The next slice should migrate Qt preview sizing in `src/foliaseal/presentation/qt/signing_shell.py` to consume a small Qt geometry adapter derived from `SignatureLayoutPlan`. Keep that slice focused on Qt preview sizing and run the Qt shell, harness, and preview tests named in the validation section.
 
 ## Context and Orientation
 
@@ -330,3 +361,5 @@ Revision note: Updated 2026-04-29 by Codex after committing the first slice as `
 Revision note: Updated 2026-04-29 by Codex after completing the pyHanko adapter-equivalence slice; recorded snapshot-based equivalence strategy, verification output, and the next backend-migration target.
 
 Revision note: Updated 2026-04-29 by Codex after migrating backend stamp-style construction and fit validation onto the visible layout engine and pyHanko adapter; recorded fallback-preservation details and focused verification output.
+
+Revision note: Updated 2026-04-29 by Codex after migrating canonical preview layout onto the visible layout engine and pyHanko adapter; recorded preview-only suppression behavior and focused verification output.
