@@ -17,6 +17,12 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - [x] (2026-04-29T22:36Z) Exported the new boundary from `src/foliaseal/application/__init__.py`.
 - [x] (2026-04-29T22:38Z) Added focused tests in `tests/unit/test_visible_signature_layout.py` covering structural reservations, no-stamp behavior, injected ink reservation, conservative fallback, and fit issues.
 - [x] (2026-04-29T22:40Z) Ran ruff, the new boundary tests, and adjacent backend/preview/reservation tests successfully.
+- [x] (2026-04-29T22:36Z) Committed the first additive boundary slice as `aaa8466dc` with message `Add visible signature layout boundary`.
+- [ ] Next slice: add pyHanko adapter equivalence tests and a `PyHankoSignatureAppearanceAdapter` that builds the same `RoundedBorderTextStampStyle` currently produced by `_build_stamp_style`.
+- [ ] Next slice: migrate `PyHankoPdfSigner.sign()` and `_visible_signature_fit_issues_for_stamp_text()` to consume `VisibleSignatureLayoutEngine.plan()` through the pyHanko adapter while preserving current fit behavior.
+- [ ] Next slice: migrate canonical preview layout in `signing_preview_renderer.py` to consume the same plan instead of reconstructing reservation and ink alignment separately.
+- [ ] Next slice: migrate Qt preview sizing in `signing_shell.py` to consume a Qt geometry adapter derived from `SignatureLayoutPlan`.
+- [ ] Final cleanup slice: delete or demote private-helper tests once boundary and adapter tests cover their behavior.
 
 ## Surprises & Discoveries
 
@@ -41,6 +47,10 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Decision: allow the first `SignatureLayoutPlan` to carry the existing pyHanko layout objects as adapter payloads while also exposing plain dimensions and margins.
   Rationale: the existing helper path already computes pyHanko `SimpleBoxLayoutRule` objects. Carrying them avoids behavior drift in the first slice. Later slices can introduce neutral `LayoutRuleSpec` adapters after equivalence tests are in place.
+  Date/Author: 2026-04-29 / Codex
+
+- Decision: make the next Issue #48 slice adapter-equivalence work before migrating production callers.
+  Rationale: the highest-risk part of the migration is preserving exact pyHanko stamp style behavior. Equivalence tests around a dedicated adapter create a safety net before backend signing or preview rendering is changed.
   Date/Author: 2026-04-29 / Codex
 
 ## Outcomes & Retrospective
@@ -82,6 +92,10 @@ Retrospective:
 
 This is the right first slice because it gives the codebase a public seam without risking preview/output parity. The plan still carries the current backend reservation object as an opaque payload to reduce migration risk. The next slice should add adapter equivalence tests for pyHanko style construction before moving any production caller to the new plan.
 
+Commit:
+
+    aaa8466dc Add visible signature layout boundary
+
 ## Context and Orientation
 
 This repository is a Python package under `src/foliaseal`. The visible-signature layout code currently lives mainly in `src/foliaseal/application/phase3_signing_backend.py`. That module signs PDFs through pyHanko, a PDF signing library, and also contains private helper functions that measure text, decide how much room the text and stamp image should receive, and validate whether a selected rectangle can contain the requested visible signature.
@@ -91,6 +105,8 @@ The canonical preview path lives in `src/foliaseal/application/signing_preview_r
 The new module `src/foliaseal/application/visible_signature_layout.py` will define the public application boundary. A "boundary" here means the small set of public types and methods callers should use instead of private helper functions. A "plan" means the typed result of applying layout policy to a request. A "port" means a small protocol that hides a dependency such as text measurement, stamp image inspection, or rendered ink measurement. Ports let tests provide deterministic stand-ins.
 
 The first slice does not delete or move existing helpers. Instead, `VisibleSignatureLayoutEngine` delegates to the current helper path so the new tests describe existing behavior. Later slices can move policy into the new module, then update backend signing, canonical preview rendering, Qt preview sizing, and harness diagnostics to consume the plan.
+
+At the time of this revision, the first slice is committed. The remaining Issue #48 work should be done in narrow follow-up slices. The next slice should focus on a pyHanko adapter. In this repository, "pyHanko adapter" means a small object that takes the new `SignatureLayoutPlan` and existing appearance inputs, then returns the pyHanko `RoundedBorderTextStampStyle` used by signing and canonical preview. That adapter should be tested against the current `_build_stamp_style` result before any production caller is migrated.
 
 ## Plan of Work
 
@@ -117,6 +133,20 @@ Add `tests/unit/test_visible_signature_layout.py`. These tests should use fake p
 - contradictory or too-large ink measurement falls back to structural layout;
 - a rectangle too small for the measured text returns a `visible_signature_layout_unavailable` fit issue.
 
+The next required Issue #48 slice should add adapter-equivalence coverage. Add a `PyHankoSignatureAppearanceAdapter` in `src/foliaseal/application/visible_signature_layout.py` or a small adjacent module if the file becomes too large. It should accept the existing domain/application objects needed for stamp style construction and a `SignatureLayoutPlan`. It should return the same effective pyHanko `RoundedBorderTextStampStyle` currently returned by `_build_stamp_style` in `phase3_signing_backend.py`.
+
+For that next slice, add tests that build the old stamp style and the new adapter stamp style for representative cases:
+
+- single-line, multi-line, and wrapped-block layout templates;
+- top, bottom, left, and right stamp positions;
+- image-stamp and no-image-stamp cases;
+- bordered and borderless boxes;
+- horizontal single-line ink reservation when a deterministic fake ink measurement is injected.
+
+The equivalence tests should compare stable observable fields rather than object identity: border width, border color, stamp text, timestamp format, text box style font size, inner-content layout margins and alignment, background layout margins and alignment, and whether a background image/solid background exists. If comparing pyHanko objects directly is brittle, create small helper functions inside the test file that extract these stable fields into dictionaries.
+
+After adapter equivalence is green, migrate production callers one area at a time. The backend signing migration should update `_build_stamp_style` or its caller so `PyHankoPdfSigner.sign()` and `_visible_signature_fit_issues_for_stamp_text()` use `VisibleSignatureLayoutEngine.plan()` and the adapter. The canonical preview migration should update `_canonical_preview_layout()` in `signing_preview_renderer.py` to consume the same plan. The Qt migration should replace `_preview_layout_reservation()` in `signing_shell.py` with a small adapter that derives preview band geometry from `SignatureLayoutPlan`.
+
 ## Concrete Steps
 
 Work from the repository root:
@@ -135,6 +165,19 @@ Run focused verification:
     .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/__init__.py tests/unit/test_visible_signature_layout.py
     .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py
 
+For the next adapter-equivalence slice, run:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+
+For the backend migration slice, also run:
+
+    .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_horizontal_signature_reservation.py
+
+For the Qt preview migration slice, also run:
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py
+
 If `.venv/bin/pytest` is unavailable, use:
 
     python -m pytest -q tests/unit/test_visible_signature_layout.py
@@ -149,6 +192,21 @@ This slice is accepted when all of the following are true:
 - The new boundary tests pass and do not instantiate Qt, render PDFs, or require image files.
 - Existing production callers remain behaviorally unchanged because they still use the old helper path.
 - The ExecPlan records the commands run and outcomes observed.
+
+The next adapter-equivalence slice is accepted when all of the following are true:
+
+- `PyHankoSignatureAppearanceAdapter` or equivalent exists and builds a pyHanko stamp style from a `SignatureLayoutPlan`.
+- Representative tests prove the adapter matches the stable observable fields of the existing `_build_stamp_style` path.
+- No production caller has been migrated unless those equivalence tests are already green.
+- The focused backend and preview suites still pass.
+
+The backend migration slice is accepted when all of the following are true:
+
+- backend signing and backend fit validation consume `VisibleSignatureLayoutEngine.plan()` through the adapter;
+- existing signing backend tests still pass without weakening fit checks;
+- no canonical preview or Qt caller migration is mixed into the same commit unless required by an import cycle.
+
+The canonical preview and Qt migration slices are accepted when each caller consumes `SignatureLayoutPlan` instead of private backend reservation helpers, and their existing focused suites pass.
 
 The behavior to observe is internal but demonstrable: `pytest -q tests/unit/test_visible_signature_layout.py` should pass, and the tests should show that the new plan boundary can represent current visible-signature layout behavior.
 
@@ -193,3 +251,5 @@ The default text measurer may import private helpers from `phase3_signing_backen
 Revision note: Created 2026-04-29 by Codex to make issue #48 executable as an incremental, behavior-preserving migration plan.
 
 Revision note: Updated 2026-04-29 by Codex after completing the first additive boundary slice and recording verification results.
+
+Revision note: Updated 2026-04-29 by Codex after committing the first slice as `aaa8466dc`; added the required follow-up slices for pyHanko adapter equivalence, backend migration, canonical preview migration, Qt preview migration, and private-helper test cleanup.
