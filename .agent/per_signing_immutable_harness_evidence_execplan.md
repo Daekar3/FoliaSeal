@@ -2557,3 +2557,123 @@ Verification:
 - Horizontal edge-safety and manual replay tests passed.
 - `python -m ruff check ...` passed for touched code/tests.
 - `pytest -q` passed: `528 passed, 1 warning`.
+
+## Follow-up Slice: Rendered-Ink Stamp Allocation
+
+### Goal
+
+Replace the provisional left-stamp background-width tweak with a shared,
+rendered-ink-based allocation rule so the stamp scales against the actual
+visible text footprint rather than structural text side-bearing.
+
+The previous slice improved stamp-to-text gaps from `13-26 px` to `9-11 px`,
+but the desired rule is stricter: the stamp should consume the rectangle up to
+the rendered text ink guard, not stop at a structural text-box edge. The user
+correctly clarified the invariant as:
+
+- text protected space is the rendered glyph ink required by the selected text
+  settings
+- the stamp image receives the remaining rectangle space
+- the guard is measured between stamp ink and text glyph ink
+- preview and actual PDF signing must compute the same placement from the same
+  request data, not from GUI-only measured coordinates
+
+### Relevant Code Path
+
+- Shared ink reservation:
+  - `src/foliaseal/application/horizontal_signature_reservation.py`
+  - `HorizontalSingleLineInkReservation`
+  - `build_horizontal_single_line_ink_reservation(...)`
+- Signed PDF style construction:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_build_stamp_style(...)`
+  - `_horizontal_single_line_ink_validation_reservation(...)`
+  - `_apply_horizontal_single_line_ink_text_alignment(...)`
+  - `_background_layout_for_stamp(...)`
+- Canonical preview style construction:
+  - `src/foliaseal/application/signing_preview_renderer.py`
+  - `_canonical_preview_layout(...)`
+- Rendered-fit fallback:
+  - `src/foliaseal/application/phase3_signing_backend.py`
+  - `_single_line_rendered_ink_fits_reservation(...)`
+
+### Required Approach
+
+1. Add a failing regression for Cap 4-6 style `single_line` + `left` layouts
+   requiring the stamp-to-rendered-text gap to be `<= 5 px`, while preserving:
+   - close right text-to-border gap
+   - no stamp/text ink overlap
+   - visible stamp bounds
+
+2. Replace the hidden arithmetic inside `_background_layout_for_stamp(...)`.
+   - That helper should receive an already-decided text width.
+   - It must not contain secret left-stamp point subtraction.
+   - The allocation decision belongs in a named helper used by both preview and
+     backend signing.
+
+3. Add `_horizontal_single_line_background_text_width(...)`.
+   - For non-target layouts, return the existing fallback text width.
+   - For `single_line` + `left` with ink reservation, reserve
+     `ink_width + stamp_facing_padding - base_separator`.
+   - Rationale: `_layout_reservation_for_template(...)` always inserts the base
+     separator between stamp and text, while `stamp_facing_padding` is the
+     desired rendered-ink guard. Subtracting the separator avoids counting the
+     gap twice.
+
+4. Use this helper in both construction paths.
+   - `_build_stamp_style(...)` for signed PDF appearance.
+   - `_canonical_preview_layout(...)` for preview appearance.
+   - The PDF signer will recompute this from `SigningRequest`/appearance data
+     and rendered text measurement; no GUI-only placement values are passed to
+     signing.
+
+5. Fix instrumentation where the new legal layout crosses structural boxes.
+   - A black stamp can now occupy invisible text side-bearing space.
+   - Tests and rendered-fit fallback must measure text ink from a text-only
+     render of the same canonical layout.
+   - Full-render text detection is no longer valid for stamp-to-text gap checks
+     when stamp and text are the same color.
+
+6. Preserve fit safety.
+   - Keep validation/reservation thresholds unchanged.
+   - Retain reference-render ink preservation.
+   - Permit only the existing kind of raster seam: a `1 px` rendered-height
+     difference in the rendered-ink fallback after reference preservation proves
+     no visible ink is lost.
+
+### Acceptance Criteria
+
+- Cap 4-6 style tests show rendered stamp-to-text gaps no larger than `5 px`.
+- Right text-to-border gaps remain close.
+- Manual replay tests measure text ink from text-only canonical renders and do
+  not misclassify stamp pixels as text.
+- The backend manual replay validation ladder remains unchanged.
+- Preview and PDF style construction share the same background text-width
+  helper.
+- Focused horizontal tests, ruff, and full pytest pass.
+
+### Execution Result
+
+Implemented with TDD.
+
+What landed:
+
+- Added/updated the Cap-style preview regression to require `<= 5 px`
+  stamp-to-text rendered-ink gap.
+- Added `_horizontal_single_line_background_text_width(...)` and wired it into
+  both `_build_stamp_style(...)` and `_canonical_preview_layout(...)`.
+- Removed hidden point subtraction from `_background_layout_for_stamp(...)`.
+- Updated preview geometry tests to use text-only canonical renders for
+  rendered text ink when comparing stamp-to-text spacing.
+- Updated `_single_line_rendered_ink_fits_reservation(...)` to use text-only
+  canonical renders for selected and reference text ink so stamp pixels cannot
+  contaminate the text measurement.
+- Preserved the manual replay validation ladder, with a documented `1 px`
+  raster-height seam allowance after reference ink preservation.
+
+Verification:
+
+- Focused Cap-style preview regression passed.
+- Horizontal edge-safety/manual replay/backend validation tests passed.
+- `python -m ruff check ...` passed for touched code/tests.
+- `pytest -q` passed: `528 passed, 1 warning`.

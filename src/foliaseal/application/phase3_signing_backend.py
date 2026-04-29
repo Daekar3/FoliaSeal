@@ -507,12 +507,19 @@ def _build_stamp_style(
             )
         ):
             raise
+    background_text_box_width = _horizontal_single_line_background_text_width(
+        layout_template=appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        box_height=placement_reservation.container_height_pt,
+        fallback_text_box_width=placement_reservation.text_box_width_pt,
+        ink_reservation=ink_reservation,
+    )
     background_layout = _background_layout_for_stamp(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
         stamp_background=stamp_background,
         signature_rect=signature_rect,
-        text_box_width=placement_reservation.text_box_width_pt,
+        text_box_width=background_text_box_width,
         text_box_height=text_box_height,
         box_style=appearance.box_style,
     )
@@ -1089,6 +1096,42 @@ def _apply_horizontal_single_line_ink_text_alignment(
     )
 
 
+def _horizontal_single_line_background_text_width(
+    *,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    box_height: int,
+    fallback_text_box_width: int,
+    ink_reservation: HorizontalSingleLineInkReservation | None,
+) -> int:
+    """Text width to reserve when sizing the horizontal single-line stamp image.
+
+    The visible text already uses the full structural text box plus an optical
+    side-bearing translation. The stamp image should instead yield to rendered
+    ink plus the explicit stamp-facing guard. `_layout_reservation_for_template`
+    also inserts the base separator between stamp and text, so subtract that
+    separator here to avoid counting the gap twice.
+    """
+
+    if (
+        ink_reservation is None
+        or layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or stamp_position != SignatureStampPosition.LEFT
+    ):
+        return fallback_text_box_width
+
+    _edge_margin, separator_width = _base_layout_spacing(
+        stamp_position=stamp_position,
+        box_height=box_height,
+    )
+    return max(
+        1,
+        ink_reservation.ink_width_pt
+        + ink_reservation.stamp_facing_padding_pt
+        - separator_width,
+    )
+
+
 def _horizontal_single_line_ink_reservation_for_stamp_text(
     *,
     signature_rect: SignatureRect,
@@ -1145,12 +1188,6 @@ def _background_layout_for_stamp(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
-    if (
-        layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and stamp_position == SignatureStampPosition.LEFT
-        and stamp_background is not None
-    ):
-        text_box_width = max(1, text_box_width - 4)
     reservation = _layout_reservation_for_template(
         layout_template,
         stamp_position=stamp_position,
@@ -1354,6 +1391,31 @@ def _visible_signature_fit_issues_for_stamp_text(
     return ()
 
 
+def _single_line_text_only_ink_bounds(
+    *,
+    preview: SigningDraftPreview,
+    output_path: Path,
+    canonical_layout: Callable[..., object],
+    optional_bounds_renderer: Callable[..., dict[str, int] | None],
+) -> dict[str, int] | None:
+    layout = canonical_layout(
+        preview,
+        include_text=True,
+        include_stamp=True,
+        include_border=True,
+    )
+    return optional_bounds_renderer(
+        preview=preview,
+        layout=layout,
+        zoom=1.0,
+        output_path=output_path,
+        include_text=True,
+        include_stamp=False,
+        render_backend=None,
+        flatten_to_white=True,
+    )
+
+
 def _single_line_rendered_ink_fits_reservation(
     *,
     signature_rect: SignatureRect,
@@ -1374,6 +1436,8 @@ def _single_line_rendered_ink_fits_reservation(
     reference_snapshot = None
     try:
         from foliaseal.application.signing_preview_renderer import (
+            _canonical_preview_layout,
+            _render_optional_preview_bounds,
             render_canonical_signature_preview,
         )
 
@@ -1407,11 +1471,11 @@ def _single_line_rendered_ink_fits_reservation(
         )
         if nominal_width_overflow > 16:
             return False
-        text_bounds, _error = detect_text_content_bounds_in_image(
-            preview_image_path=snapshot.image_path,
-            text_widget_bounds=snapshot.text_area_bounds_px,
-            text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
-            reference_text_content_bounds=snapshot.text_bounds_px,
+        text_bounds = _single_line_text_only_ink_bounds(
+            preview=preview,
+            output_path=Path(snapshot.image_path).parent / "fit-text-only.png",
+            canonical_layout=_canonical_preview_layout,
+            optional_bounds_renderer=_render_optional_preview_bounds,
         )
         if text_bounds is None:
             return False
@@ -1450,11 +1514,12 @@ def _single_line_rendered_ink_fits_reservation(
                 or reference_snapshot.text_area_bounds_px is None
             ):
                 return False
-            reference_text_bounds, _reference_error = detect_text_content_bounds_in_image(
-                preview_image_path=reference_snapshot.image_path,
-                text_widget_bounds=reference_snapshot.text_area_bounds_px,
-                text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
-                reference_text_content_bounds=reference_snapshot.text_bounds_px,
+            reference_text_bounds = _single_line_text_only_ink_bounds(
+                preview=reference_preview,
+                output_path=Path(reference_snapshot.image_path).parent
+                / "fit-reference-text-only.png",
+                canonical_layout=_canonical_preview_layout,
+                optional_bounds_renderer=_render_optional_preview_bounds,
             )
             if reference_text_bounds is None:
                 return False
@@ -1471,9 +1536,13 @@ def _single_line_rendered_ink_fits_reservation(
             # real visible-ink loss rather than raster noise.
             if reference_width_loss > 3 or reference_height_loss > 3:
                 return False
+        # The rendered-ink fallback compares raster output, so allow the same
+        # 1px integer seam vertically that `_ensure_layout_can_fit` allows for
+        # nominal width. The reference-preservation check above still rejects
+        # real ink loss.
         result = (
             text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
-            and text_bounds["height"] <= snapshot.text_area_bounds_px["height"]
+            and text_bounds["height"] <= snapshot.text_area_bounds_px["height"] + 1
         )
         if len(_SINGLE_LINE_RENDERED_INK_FIT_CACHE) >= 256:
             _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()

@@ -28,6 +28,7 @@ from foliaseal.application.phase3_signing_backend import (
     _build_text_box_style,
     _effective_layout_edge_margin,
     _hex_to_rgb,
+    _horizontal_single_line_background_text_width,
     _layout_reservation_for_template,
     _measure_text_box_dimensions,
     _solid_background_for_color,
@@ -957,12 +958,19 @@ def _canonical_preview_layout(
             has_visible_stamp_image=False,
             stamp_aspect_ratio=None,
         )
+    background_text_box_width = _horizontal_single_line_background_text_width(
+        layout_template=preview.layout_template,
+        stamp_position=preview.stamp_position,
+        box_height=layout_reservation.container_height_pt,
+        fallback_text_box_width=ink_layout_text_box_width or text_box_width,
+        ink_reservation=ink_reservation,
+    )
     background_layout = _background_layout_for_stamp(
         preview.layout_template,
         stamp_position=preview.stamp_position,
         stamp_background=stamp_background if include_stamp else None,
         signature_rect=preview.signature_rect,
-        text_box_width=ink_layout_text_box_width or text_box_width,
+        text_box_width=background_text_box_width,
         text_box_height=text_box_height,
         box_style=preview.box_style,
     )

@@ -4025,15 +4025,15 @@ def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
         "foliaseal.application.signing_preview_renderer.render_canonical_signature_preview",
         _fake_render,
     )
-    detected_bounds = iter(
+    text_only_bounds = iter(
         (
             {"x": 75, "y": 28, "width": 217, "height": 17},
             {"x": 40, "y": 28, "width": 254, "height": 18},
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend.detect_text_content_bounds_in_image",
-        lambda **kwargs: (next(detected_bounds), None),
+        "foliaseal.application.phase3_signing_backend._single_line_text_only_ink_bounds",
+        lambda **kwargs: next(text_only_bounds),
     )
 
     assert not _single_line_rendered_ink_fits_reservation(

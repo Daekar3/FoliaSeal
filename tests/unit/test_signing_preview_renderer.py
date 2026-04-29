@@ -14,10 +14,11 @@ from foliaseal.application.signing_draft_workflow import (
 )
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
+    _canonical_preview_layout,
+    _render_optional_preview_bounds,
     compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
 )
-from foliaseal.application.text_raster_analysis import detect_text_content_bounds_in_image
 from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureFieldSource,
@@ -67,6 +68,29 @@ def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:
         and second["x"] < first["x"] + first["width"]
         and first["y"] < second["y"] + second["height"]
         and second["y"] < first["y"] + first["height"]
+    )
+
+
+def _render_text_only_bounds_for_preview(
+    preview: SigningDraftPreview,
+    *,
+    output_path: Path,
+) -> dict[str, int] | None:
+    layout = _canonical_preview_layout(
+        preview,
+        include_text=True,
+        include_stamp=True,
+        include_border=True,
+    )
+    return _render_optional_preview_bounds(
+        preview=preview,
+        layout=layout,
+        zoom=1.0,
+        output_path=output_path,
+        include_text=True,
+        include_stamp=False,
+        render_backend=None,
+        flatten_to_white=True,
     )
 
 
@@ -1049,14 +1073,11 @@ def test_canonical_preview_renderer_uses_ink_reservation_for_horizontal_single_l
     ]
     assert ink_snapshot.stamp_bounds_px is not None
     assert ink_snapshot.text_area_bounds_px is not None
-    text_bounds, error = detect_text_content_bounds_in_image(
-        preview_image_path=ink_snapshot.image_path,
-        text_widget_bounds=ink_snapshot.text_area_bounds_px,
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds=ink_snapshot.text_bounds_px,
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / "ink_text_only.png",
     )
 
-    assert error is None
     assert text_bounds is not None
     assert not _rectangles_overlap(text_bounds, ink_snapshot.stamp_bounds_px)
     assert ink_snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0
@@ -1158,14 +1179,11 @@ def test_canonical_preview_renderer_preserves_horizontal_text_border_guard(
 
     assert snapshot is not None
     assert snapshot.text_area_bounds_px is not None
-    text_bounds, error = detect_text_content_bounds_in_image(
-        preview_image_path=snapshot.image_path,
-        text_widget_bounds=snapshot.text_area_bounds_px,
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds=snapshot.text_bounds_px,
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / "left_text_ink.png",
     )
 
-    assert error is None
     assert text_bounds is not None
     assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) >= 1
 
@@ -1216,14 +1234,11 @@ def test_canonical_preview_renderer_aligns_left_stamp_text_ink_to_border(
     assert snapshot is not None
     assert snapshot.text_area_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
-    text_bounds, error = detect_text_content_bounds_in_image(
-        preview_image_path=snapshot.image_path,
-        text_widget_bounds=snapshot.text_area_bounds_px,
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds=snapshot.text_bounds_px,
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / "left_text_ink.png",
     )
 
-    assert error is None
     assert text_bounds is not None
     right_border_gap_px = snapshot.width_px - (
         text_bounds["x"] + text_bounds["width"]
@@ -1235,9 +1250,9 @@ def test_canonical_preview_renderer_aligns_left_stamp_text_ink_to_border(
 @pytest.mark.parametrize(
     ("width_pt", "height_pt", "max_stamp_to_text_gap_px"),
     [
-        (292.352, 24.056, 12),
-        (284.672, 23.544, 12),
-        (314.88, 24.056, 12),
+        (292.352, 24.056, 5),
+        (284.672, 23.544, 5),
+        (314.88, 24.056, 5),
     ],
 )
 def test_canonical_preview_renderer_keeps_left_stamp_close_to_text_ink(
@@ -1289,14 +1304,11 @@ def test_canonical_preview_renderer_keeps_left_stamp_close_to_text_ink(
     assert snapshot is not None
     assert snapshot.text_area_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
-    text_bounds, error = detect_text_content_bounds_in_image(
-        preview_image_path=snapshot.image_path,
-        text_widget_bounds=snapshot.text_area_bounds_px,
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds=snapshot.text_bounds_px,
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / f"text_only_{width_pt}.png",
     )
 
-    assert error is None
     assert text_bounds is not None
     stamp_to_text_gap_px = text_bounds["x"] - (
         snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
@@ -1360,14 +1372,11 @@ def test_canonical_preview_renderer_aligns_vertical_single_line_text_with_stamp(
     assert snapshot is not None
     assert snapshot.text_area_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
-    text_bounds, error = detect_text_content_bounds_in_image(
-        preview_image_path=snapshot.image_path,
-        text_widget_bounds=snapshot.text_area_bounds_px,
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds=snapshot.text_bounds_px,
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / f"text_only_{stamp_position.value}.png",
     )
 
-    assert error is None
     assert text_bounds is not None
     assert snapshot.stamp_bounds_px["x"] <= 6
     assert text_bounds["x"] <= snapshot.stamp_bounds_px["x"] + 30
@@ -1425,14 +1434,11 @@ def test_canonical_preview_renderer_preserves_both_horizontal_text_edges(
     assert snapshot is not None
     assert snapshot.text_area_bounds_px is not None
     assert snapshot.stamp_bounds_px is not None
-    text_bounds, error = detect_text_content_bounds_in_image(
-        preview_image_path=snapshot.image_path,
-        text_widget_bounds=snapshot.text_area_bounds_px,
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds=snapshot.text_bounds_px,
+    text_bounds = _render_text_only_bounds_for_preview(
+        preview,
+        output_path=tmp_path / f"text_only_{stamp_position.value}.png",
     )
 
-    assert error is None
     assert text_bounds is not None
     assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px)
     if stamp_position == SignatureStampPosition.LEFT:
@@ -1498,14 +1504,11 @@ def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
 
         assert snapshot is not None, case["label"]
         assert snapshot.text_area_bounds_px is not None, case["label"]
-        text_bounds, error = detect_text_content_bounds_in_image(
-            preview_image_path=snapshot.image_path,
-            text_widget_bounds=snapshot.text_area_bounds_px,
-            text_color_rgba=(0, 0, 0, 255),
-            reference_text_content_bounds=snapshot.text_bounds_px,
+        text_bounds = _render_text_only_bounds_for_preview(
+            preview,
+            output_path=tmp_path / f"{case['label']}_text_only.png",
         )
 
-        assert error is None, case["label"]
         assert text_bounds is not None, case["label"]
         assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0, (
             case["label"]
