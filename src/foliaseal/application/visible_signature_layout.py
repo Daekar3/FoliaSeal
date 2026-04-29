@@ -404,10 +404,11 @@ class PyHankoSignatureAppearanceAdapter:
         stamp_background: object | None,
         signature_rect: SignatureRect,
         layout_plan: SignatureLayoutPlan,
+        allow_fit_issues: bool = False,
     ) -> object:
         """Return the pyHanko stamp style represented by ``layout_plan``."""
 
-        if layout_plan.fit_issues:
+        if layout_plan.fit_issues and not allow_fit_issues:
             raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
 
         from foliaseal.application.phase3_signing_backend import (

@@ -51,6 +51,14 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftValidationSeverity,
 )
 from foliaseal.application.text_raster_analysis import detect_text_content_bounds_in_image
+from foliaseal.application.visible_signature_layout import (
+    HorizontalInkMeasurement,
+    HorizontalInkMeasurementRequest,
+    LayoutRequest,
+    PyHankoSignatureAppearanceAdapter,
+    RectBounds,
+    VisibleSignatureLayoutEngine,
+)
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
@@ -447,92 +455,79 @@ def _build_stamp_style(
     stamp_background: PdfImage | None,
     signature_rect: SignatureRect,
 ) -> TextStampStyle:
-    text_style = appearance.text_style
-    box_style = appearance.box_style
-    border_width = max(0, int(round(box_style.border_width_pt))) if box_style.show_border else 0
-    border_color = _hex_to_rgb(box_style.border_color_hex)
-    background = stamp_background or _solid_background_for_color(box_style.background_color_hex)
-    text_box_style = _build_text_box_style(text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(
-        stamp_text,
-        text_box_style,
-    )
-    stamp_aspect_ratio = _stamp_image_aspect_ratio(stamp_background)
-    layout_reservation = _layout_reservation_for_template(
-        appearance.layout_template,
-        stamp_position=appearance.stamp_position,
-        signature_rect=signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=appearance.box_style,
-        has_visible_stamp_image=stamp_background is not None,
-        stamp_aspect_ratio=stamp_aspect_ratio,
-    )
-    ink_reservation = _horizontal_single_line_ink_reservation_for_stamp_text(
-        signature_rect=signature_rect,
-        signature_appearance=appearance,
-        stamp_text=stamp_text,
-        structural_reservation=layout_reservation,
-        has_visible_stamp_image=stamp_background is not None,
-    )
-    placement_reservation = _horizontal_single_line_ink_validation_reservation(
-        layout_reservation,
-        ink_reservation=ink_reservation,
-        signature_rect=signature_rect,
-        box_style=appearance.box_style,
-        has_visible_stamp_image=stamp_background is not None,
-        stamp_aspect_ratio=stamp_aspect_ratio,
-    )
-    placement_reservation = _apply_horizontal_single_line_ink_text_alignment(
-        placement_reservation,
-        ink_reservation=ink_reservation,
-    )
-    try:
-        _ensure_layout_can_fit(
-            placement_reservation,
-            has_visible_stamp_image=stamp_background is not None,
+    layout_plan = VisibleSignatureLayoutEngine(
+        ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+    ).plan(
+        LayoutRequest(
+            signature_rect=signature_rect,
+            layout_template=appearance.layout_template,
+            stamp_position=appearance.stamp_position,
+            text_style=appearance.text_style,
+            box_style=appearance.box_style,
+            stamp_text=stamp_text,
+            image_stamp_path=appearance.image_stamp_path,
         )
-    except ValueError:
-        if not (
-            _single_line_rendered_ink_fits_reservation(
-                signature_rect=signature_rect,
-                signature_appearance=appearance,
-                stamp_text=stamp_text,
-            )
-            or _horizontal_multi_line_rendered_layout_fits_reservation(
-                signature_rect=signature_rect,
-                signature_appearance=appearance,
-                stamp_text=stamp_text,
-                layout_reservation=placement_reservation,
-            )
-        ):
-            raise
-    background_text_box_width = _horizontal_single_line_background_text_width(
-        layout_template=appearance.layout_template,
-        stamp_position=appearance.stamp_position,
-        box_height=placement_reservation.container_height_pt,
-        fallback_text_box_width=placement_reservation.text_box_width_pt,
-        ink_reservation=ink_reservation,
     )
-    background_layout = _background_layout_for_stamp(
-        appearance.layout_template,
-        stamp_position=appearance.stamp_position,
+    if layout_plan.fit_issues and not (
+        _single_line_rendered_ink_fits_reservation(
+            signature_rect=signature_rect,
+            signature_appearance=appearance,
+            stamp_text=stamp_text,
+        )
+        or _horizontal_multi_line_rendered_layout_fits_reservation(
+            signature_rect=signature_rect,
+            signature_appearance=appearance,
+            stamp_text=stamp_text,
+            layout_reservation=layout_plan.backend_reservation,
+        )
+    ):
+        raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
+
+    return PyHankoSignatureAppearanceAdapter().build_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
         stamp_background=stamp_background,
         signature_rect=signature_rect,
-        text_box_width=background_text_box_width,
-        text_box_height=text_box_height,
-        box_style=appearance.box_style,
+        layout_plan=layout_plan,
+        allow_fit_issues=True,
     )
-    return RoundedBorderTextStampStyle(
-        border_width=border_width,
-        border_color=border_color,
-        background=background,
-        background_layout=background_layout,
-        background_opacity=1.0,
-        text_box_style=text_box_style,
-        inner_content_layout=placement_reservation.inner_content_layout,
-        stamp_text=stamp_text,
-        timestamp_format=appearance.datetime_format,
+
+
+@dataclass(frozen=True)
+class _BackendHorizontalInkMeasurer:
+    """Adapter from backend stamp text inputs to the layout engine ink port."""
+
+    signature_appearance: SigningBackendAppearance
+
+    def measure(
+        self,
+        request: HorizontalInkMeasurementRequest,
+    ) -> HorizontalInkMeasurement | None:
+        reference = measure_horizontal_single_line_rendered_reference(
+            _signing_draft_preview_for_stamp_text(
+                signature_rect=request.signature_rect,
+                signature_appearance=self.signature_appearance,
+                stamp_text=request.stamp_text,
+            ),
+            zoom=1.0,
+        )
+        if reference is None:
+            return None
+        return HorizontalInkMeasurement(
+            structural_text_bounds_px=_rect_bounds_from_mapping(
+                reference.structural_text_bounds_px
+            ),
+            rendered_ink_bounds_px=_rect_bounds_from_mapping(reference.rendered_ink_bounds_px),
+            px_to_pt=reference.px_to_pt,
+        )
+
+
+def _rect_bounds_from_mapping(bounds: dict[str, int]) -> RectBounds:
+    return RectBounds(
+        x=bounds["x"],
+        y=bounds["y"],
+        width=bounds["width"],
+        height=bounds["height"],
     )
 
 

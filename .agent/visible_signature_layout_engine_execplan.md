@@ -19,7 +19,7 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - [x] (2026-04-29T22:40Z) Ran ruff, the new boundary tests, and adjacent backend/preview/reservation tests successfully.
 - [x] (2026-04-29T22:36Z) Committed the first additive boundary slice as `aaa8466dc` with message `Add visible signature layout boundary`.
 - [x] (2026-04-29T22:43Z) Added pyHanko adapter equivalence tests and a `PyHankoSignatureAppearanceAdapter` that builds the same observable `RoundedBorderTextStampStyle` fields currently produced by `_build_stamp_style`.
-- [ ] Next slice: migrate `PyHankoPdfSigner.sign()` and `_visible_signature_fit_issues_for_stamp_text()` to consume `VisibleSignatureLayoutEngine.plan()` through the pyHanko adapter while preserving current fit behavior.
+- [x] (2026-04-29T22:47Z) Migrated backend stamp-style construction and backend fit validation to consume `VisibleSignatureLayoutEngine.plan()` through `PyHankoSignatureAppearanceAdapter` while preserving the existing rendered-fit fallback behavior.
 - [ ] Next slice: migrate canonical preview layout in `signing_preview_renderer.py` to consume the same plan instead of reconstructing reservation and ink alignment separately.
 - [ ] Next slice: migrate Qt preview sizing in `signing_shell.py` to consume a Qt geometry adapter derived from `SignatureLayoutPlan`.
 - [ ] Final cleanup slice: delete or demote private-helper tests once boundary and adapter tests cover their behavior.
@@ -40,6 +40,9 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Observation: the controlled horizontal rendered-ink path requires patching the backend module's imported `measure_horizontal_single_line_rendered_reference` symbol, not only providing the new engine with a fake ink measurer.
   Evidence: `_build_stamp_style()` calls `_horizontal_single_line_ink_reservation_for_stamp_text()`, which uses the symbol imported into `phase3_signing_backend.py`; the new equivalence test patches that symbol and gives `VisibleSignatureLayoutEngine` an equivalent fake `HorizontalInkMeasurer`.
+
+- Observation: backend migration must preserve the existing rendered-fit fallback after layout planning.
+  Evidence: the old `_build_stamp_style()` allowed some nominal `_ensure_layout_can_fit()` failures when `_single_line_rendered_ink_fits_reservation()` or `_horizontal_multi_line_rendered_layout_fits_reservation()` passed. The migrated `_build_stamp_style()` now checks `layout_plan.fit_issues` and applies the same fallback functions before asking the adapter to build the final style.
 
 ## Decision Log
 
@@ -65,6 +68,10 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Decision: keep `PyHankoSignatureAppearanceAdapter` in `visible_signature_layout.py` for this slice.
   Rationale: the adapter is small and still tightly coupled to the layout plan. Splitting it now would add navigation overhead before production callers have migrated.
+  Date/Author: 2026-04-29 / Codex
+
+- Decision: keep the rendered-fit fallback in `phase3_signing_backend.py` during backend migration.
+  Rationale: the fallback depends on backend-only raster checks and cache behavior that are not part of the pure layout plan yet. Keeping it at the backend layer preserves current signing behavior while still moving structural layout planning and style construction onto the new boundary.
   Date/Author: 2026-04-29 / Codex
 
 ## Outcomes & Retrospective
@@ -136,6 +143,31 @@ Verification results:
     178 passed in 25.33s
 
 The next slice should migrate backend signing and backend fit validation to consume `VisibleSignatureLayoutEngine.plan()` through `PyHankoSignatureAppearanceAdapter`. Keep that slice limited to `phase3_signing_backend.py`, the layout module if adapter gaps appear, and the backend-focused tests.
+
+The backend migration slice succeeded.
+
+What changed:
+
+- `_build_stamp_style()` in `src/foliaseal/application/phase3_signing_backend.py` now creates a `LayoutRequest`, plans it through `VisibleSignatureLayoutEngine`, preserves the existing rendered fallback checks when the plan reports fit issues, and delegates final pyHanko style construction to `PyHankoSignatureAppearanceAdapter`.
+- Added `_BackendHorizontalInkMeasurer` in `phase3_signing_backend.py` as the bridge from backend signing inputs to the layout engine's `HorizontalInkMeasurer` port.
+- Added a small `_rect_bounds_from_mapping()` helper to convert existing rendered-reference dictionaries into `RectBounds` for the layout boundary.
+- Updated `PyHankoSignatureAppearanceAdapter.build_stamp_style()` so backend callers can explicitly allow pre-approved fit issues after preserving the existing fallback checks.
+
+What did not change:
+
+- Canonical preview rendering still reconstructs its own plan in `signing_preview_renderer.py`.
+- Qt preview sizing still calls private reservation helpers.
+- Private backend helper tests remain in place until the preview and Qt migrations are complete.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_sign_pdf_use_case.py tests/unit/test_horizontal_signature_reservation.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_horizontal_signature_reservation.py tests/unit/test_visible_signature_layout.py
+    205 passed in 25.49s
+
+The next slice should migrate canonical preview layout in `src/foliaseal/application/signing_preview_renderer.py` to consume `SignatureLayoutPlan`. Preserve current preview/output parity tests and keep Qt preview sizing for a later slice.
 
 ## Context and Orientation
 
@@ -296,3 +328,5 @@ Revision note: Updated 2026-04-29 by Codex after completing the first additive b
 Revision note: Updated 2026-04-29 by Codex after committing the first slice as `aaa8466dc`; added the required follow-up slices for pyHanko adapter equivalence, backend migration, canonical preview migration, Qt preview migration, and private-helper test cleanup.
 
 Revision note: Updated 2026-04-29 by Codex after completing the pyHanko adapter-equivalence slice; recorded snapshot-based equivalence strategy, verification output, and the next backend-migration target.
+
+Revision note: Updated 2026-04-29 by Codex after migrating backend stamp-style construction and fit validation onto the visible layout engine and pyHanko adapter; recorded fallback-preservation details and focused verification output.
