@@ -21,8 +21,8 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - [x] (2026-04-29T22:43Z) Added pyHanko adapter equivalence tests and a `PyHankoSignatureAppearanceAdapter` that builds the same observable `RoundedBorderTextStampStyle` fields currently produced by `_build_stamp_style`.
 - [x] (2026-04-29T22:47Z) Migrated backend stamp-style construction and backend fit validation to consume `VisibleSignatureLayoutEngine.plan()` through `PyHankoSignatureAppearanceAdapter` while preserving the existing rendered-fit fallback behavior.
 - [x] (2026-04-29T22:51Z) Migrated canonical preview layout in `signing_preview_renderer.py` to consume `VisibleSignatureLayoutEngine.plan()` and `PyHankoSignatureAppearanceAdapter` instead of reconstructing reservation and ink alignment separately.
-- [ ] Next slice: migrate Qt preview sizing in `signing_shell.py` to consume a Qt geometry adapter derived from `SignatureLayoutPlan`.
-- [ ] Final cleanup slice: delete or demote private-helper tests once boundary and adapter tests cover their behavior.
+- [x] (2026-04-29T22:56Z) Migrated Qt preview sizing in `signing_shell.py` to consume a local Qt preview geometry adapter derived from `SignatureLayoutPlan`.
+- [ ] Next slice: delete or demote private-helper tests once boundary and adapter tests cover their behavior.
 
 ## Surprises & Discoveries
 
@@ -46,6 +46,9 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Observation: canonical preview still needs `RoundedBorderTextStampStyle` directly for optional text-only and stamp-only bounds rendering.
   Evidence: the first test run after moving `_canonical_preview_layout()` onto the layout engine failed with `NameError: name 'RoundedBorderTextStampStyle' is not defined` in `_render_optional_preview_bounds()`. Restoring that import fixed the preview and backend fallback failures.
+
+- Observation: Qt preview sizing can avoid image-file reads while still planning through the visible layout engine.
+  Evidence: the Qt tests pass fake `/tmp/stamp.png` paths and a loaded pixmap aspect ratio. The new `_PreviewStampImageProbe` uses the provided aspect ratio to produce `ImageMetrics`, preserving the old helper path's no-I/O behavior.
 
 ## Decision Log
 
@@ -79,6 +82,10 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Decision: keep preview-only stamp suppression in `signing_preview_renderer.py`.
   Rationale: the preview has an existing rule that suppresses a horizontal single-line stamp when the text lane collapses. That behavior is presentation-specific and should not be moved into backend signing during this slice.
+  Date/Author: 2026-04-29 / Codex
+
+- Decision: keep the Qt geometry adapter local to `signing_shell.py`.
+  Rationale: the adapter converts a `SignatureLayoutPlan` into widget sizing dimensions and depends on Qt-preview concerns such as loaded pixmap aspect ratios. Keeping it in the presentation layer avoids pushing UI-only semantics into the application layout boundary.
   Date/Author: 2026-04-29 / Codex
 
 ## Outcomes & Retrospective
@@ -200,6 +207,35 @@ Verification results:
 
 The next slice should migrate Qt preview sizing in `src/foliaseal/presentation/qt/signing_shell.py` to consume a small Qt geometry adapter derived from `SignatureLayoutPlan`. Keep that slice focused on Qt preview sizing and run the Qt shell, harness, and preview tests named in the validation section.
 
+The Qt-preview migration slice succeeded.
+
+What changed:
+
+- Added `_preview_layout_plan()` in `signing_shell.py` so Qt preview sizing now asks `VisibleSignatureLayoutEngine` for a `SignatureLayoutPlan`.
+- Added `_QtPreviewLayoutGeometry` as the local presentation adapter from `SignatureLayoutPlan` to text/stamp widget sizing dimensions.
+- Added `_PreviewStampImageProbe` so Qt preview planning uses the already-loaded pixmap aspect ratio without reading fake or missing image paths from tests and UI preview state.
+- Updated preview text width limits, stamp max-size calculations, vertical band geometry, and `_update_preview_controls()` to consume `_QtPreviewLayoutGeometry` instead of backend-private reservation helpers.
+- Kept `_preview_layout_reservation()` as a compatibility wrapper around the plan for existing focused tests.
+- Removed direct imports of `_build_text_box_style`, `_measure_text_box_dimensions`, and `_layout_reservation_for_template` from `signing_shell.py`.
+
+What did not change:
+
+- Qt preview still uses existing presentation-specific inset helpers for stamp pixmap fitting.
+- Private backend helper tests remain in place until the final cleanup slice.
+
+Verification results:
+
+    .venv/bin/ruff check --fix src/foliaseal/presentation/qt/signing_shell.py
+    Found 1 error (1 fixed, 0 remaining).
+
+    .venv/bin/ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py
+    203 passed, 1 warning in 18.66s
+
+The next slice should clean up tests and private-helper coverage now that backend signing, canonical preview, and Qt preview sizing all consume the visible layout boundary.
+
 ## Context and Orientation
 
 This repository is a Python package under `src/foliaseal`. The visible-signature layout code currently lives mainly in `src/foliaseal/application/phase3_signing_backend.py`. That module signs PDFs through pyHanko, a PDF signing library, and also contains private helper functions that measure text, decide how much room the text and stamp image should receive, and validate whether a selected rectangle can contain the requested visible signature.
@@ -312,6 +348,8 @@ The backend migration slice is accepted when all of the following are true:
 
 The canonical preview and Qt migration slices are accepted when each caller consumes `SignatureLayoutPlan` instead of private backend reservation helpers, and their existing focused suites pass.
 
+The final cleanup slice is accepted when obsolete private-helper tests are deleted or demoted without losing behavior coverage at the visible layout boundary, and the visible layout, backend, canonical preview, Qt shell, and horizontal reservation focused suites pass.
+
 The behavior to observe is internal but demonstrable: `pytest -q tests/unit/test_visible_signature_layout.py` should pass, and the tests should show that the new plan boundary can represent current visible-signature layout behavior.
 
 ## Idempotence and Recovery
@@ -363,3 +401,5 @@ Revision note: Updated 2026-04-29 by Codex after completing the pyHanko adapter-
 Revision note: Updated 2026-04-29 by Codex after migrating backend stamp-style construction and fit validation onto the visible layout engine and pyHanko adapter; recorded fallback-preservation details and focused verification output.
 
 Revision note: Updated 2026-04-29 by Codex after migrating canonical preview layout onto the visible layout engine and pyHanko adapter; recorded preview-only suppression behavior and focused verification output.
+
+Revision note: Updated 2026-04-29 by Codex after migrating Qt preview sizing onto a local geometry adapter derived from `SignatureLayoutPlan`; recorded no-I/O stamp probing and focused verification output.

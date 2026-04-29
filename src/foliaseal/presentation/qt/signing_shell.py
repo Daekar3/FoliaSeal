@@ -19,9 +19,6 @@ from foliaseal.application import (
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
 from foliaseal.application.phase3_signing_backend import (
-    _build_text_box_style,
-    _layout_reservation_for_template,
-    _measure_text_box_dimensions,
     _single_line_horizontal_stamp_vertical_inset,
     _single_line_stamp_content_inset,
     _single_line_vertical_stamp_border_gap,
@@ -36,6 +33,12 @@ from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.application.visible_signature_layout import (
+    ImageMetrics,
+    LayoutRequest,
+    SignatureLayoutPlan,
+    VisibleSignatureLayoutEngine,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
@@ -536,14 +539,14 @@ def _preview_text_width_limit(
             stamp_text = title_line
         elif detail_text:
             stamp_text = detail_text
-    reservation = _preview_layout_reservation(
+    geometry = _preview_layout_geometry(
         preview,
         stamp_text=stamp_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
-    if reservation is None:
+    if geometry is None:
         return body_width
-    text_width_pt = max(1, reservation.text_area_width_pt)
+    text_width_pt = max(1, geometry.text_area_width_pt)
     return max(
         1,
         int(
@@ -597,6 +600,40 @@ def _raw_pixmap_aspect_ratio(raw_pixmap: Any | None) -> float | None:
     return pixmap_width / pixmap_height
 
 
+@dataclass(frozen=True)
+class _PreviewStampImageProbe:
+    stamp_aspect_ratio: float | None
+
+    def inspect(self, image_stamp_path: str | None) -> ImageMetrics | None:
+        if image_stamp_path is None:
+            return None
+        aspect_ratio = self.stamp_aspect_ratio if self.stamp_aspect_ratio else 1.0
+        if aspect_ratio <= 0:
+            aspect_ratio = 1.0
+        return ImageMetrics(
+            width_px=max(1, int(round(aspect_ratio * 1000))),
+            height_px=1000,
+            aspect_ratio=aspect_ratio,
+        )
+
+
+@dataclass(frozen=True)
+class _QtPreviewLayoutGeometry:
+    text_area_width_pt: int
+    text_area_height_pt: int
+    stamp_area_width_pt: int
+    stamp_area_height_pt: int
+
+    @classmethod
+    def from_plan(cls, plan: SignatureLayoutPlan) -> _QtPreviewLayoutGeometry:
+        return cls(
+            text_area_width_pt=plan.text_area_width_pt,
+            text_area_height_pt=plan.text_area_height_pt,
+            stamp_area_width_pt=plan.stamp_area_width_pt,
+            stamp_area_height_pt=plan.stamp_area_height_pt,
+        )
+
+
 def _preview_stamp_max_size(
     preview: SigningDraftPreview,
     *,
@@ -622,15 +659,15 @@ def _preview_stamp_max_size(
             stamp_text = title_line
         elif detail_text:
             stamp_text = detail_text
-    reservation = _preview_layout_reservation(
+    geometry = _preview_layout_geometry(
         preview,
         stamp_text=stamp_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
-    if reservation is None:
+    if geometry is None:
         return (148, 92)
-    area_width = max(1, reservation.stamp_area_width_pt)
-    area_height = max(1, reservation.stamp_area_height_pt)
+    area_width = max(1, geometry.stamp_area_width_pt)
+    area_height = max(1, geometry.stamp_area_height_pt)
     content_inset = 0
     if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
         content_inset = _single_line_stamp_content_inset(
@@ -706,21 +743,39 @@ def _preview_vertical_band_geometry(
             stamp_text = title_line
         elif detail_text:
             stamp_text = detail_text
-    reservation = _preview_layout_reservation(
+    geometry = _preview_layout_geometry(
         preview,
         stamp_text=stamp_text,
         stamp_aspect_ratio=stamp_aspect_ratio,
     )
-    if reservation is None:
+    if geometry is None:
         return None
     preview_scale = _preview_display_scale(
         preview,
         available_width_px=available_width_px,
     )
-    text_height = max(1, int(round(reservation.text_area_height_pt * preview_scale)))
-    stamp_height = max(1, int(round(reservation.stamp_area_height_pt * preview_scale)))
+    text_height = max(1, int(round(geometry.text_area_height_pt * preview_scale)))
+    stamp_height = max(1, int(round(geometry.stamp_area_height_pt * preview_scale)))
     separator_height = max(0, inner_body_height_px - text_height - stamp_height)
     return (text_height, stamp_height, separator_height)
+
+
+def _preview_layout_geometry(
+    preview: SigningDraftPreview,
+    *,
+    detail_text: str | None = None,
+    stamp_text: str | None = None,
+    stamp_aspect_ratio: float | None = None,
+) -> _QtPreviewLayoutGeometry | None:
+    plan = _preview_layout_plan(
+        preview,
+        detail_text=detail_text,
+        stamp_text=stamp_text,
+        stamp_aspect_ratio=stamp_aspect_ratio,
+    )
+    if plan is None:
+        return None
+    return _QtPreviewLayoutGeometry.from_plan(plan)
 
 
 def _preview_layout_reservation(
@@ -730,6 +785,24 @@ def _preview_layout_reservation(
     stamp_text: str | None = None,
     stamp_aspect_ratio: float | None = None,
 ):
+    plan = _preview_layout_plan(
+        preview,
+        detail_text=detail_text,
+        stamp_text=stamp_text,
+        stamp_aspect_ratio=stamp_aspect_ratio,
+    )
+    if plan is None:
+        return None
+    return plan.backend_reservation
+
+
+def _preview_layout_plan(
+    preview: SigningDraftPreview,
+    *,
+    detail_text: str | None = None,
+    stamp_text: str | None = None,
+    stamp_aspect_ratio: float | None = None,
+) -> SignatureLayoutPlan | None:
     if (
         preview.signature_rect is None
         or preview.text_style is None
@@ -741,17 +814,19 @@ def _preview_layout_reservation(
     if stamp_text is None and detail_text is not None:
         stamp_text = detail_text
     stamp_text = (stamp_text or _preview_stamp_text(preview)).strip() or " "
-    text_box_style = _build_text_box_style(preview.text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(stamp_text, text_box_style)
-    return _layout_reservation_for_template(
-        preview.layout_template,
-        stamp_position=preview.stamp_position,
-        signature_rect=preview.signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=preview.box_style,
-        has_visible_stamp_image=preview.image_stamp_path is not None,
-        stamp_aspect_ratio=stamp_aspect_ratio,
+    return VisibleSignatureLayoutEngine(
+        image_probe=_PreviewStampImageProbe(stamp_aspect_ratio),
+    ).plan(
+        LayoutRequest(
+            signature_rect=preview.signature_rect,
+            layout_template=preview.layout_template,
+            stamp_position=preview.stamp_position,
+            text_style=preview.text_style,
+            box_style=preview.box_style,
+            stamp_text=stamp_text,
+            image_stamp_path=preview.image_stamp_path,
+            use_horizontal_ink_reservation=False,
+        )
     )
 
 
@@ -1938,16 +2013,16 @@ class SignaturePropertiesPanel:
             preview,
             available_width_px=available_width_px,
         )
-        preview_reservation = _preview_layout_reservation(
+        preview_geometry = _preview_layout_geometry(
             preview,
             stamp_text=stamp_text,
             stamp_aspect_ratio=stamp_aspect_ratio,
         )
         reserved_text_width_px = None
-        if preview_reservation is not None:
+        if preview_geometry is not None:
             reserved_text_width_px = max(
                 1,
-                int(round(preview_reservation.text_area_width_pt * preview_scale)),
+                int(round(preview_geometry.text_area_width_pt * preview_scale)),
             )
         detail_width = (
             body_width
@@ -1972,18 +2047,18 @@ class SignaturePropertiesPanel:
         reserved_text_height_px = None
         reserved_stamp_width_px = None
         reserved_stamp_height_px = None
-        if preview_reservation is not None:
+        if preview_geometry is not None:
             reserved_text_height_px = max(
                 1,
-                int(round(preview_reservation.text_area_height_pt * preview_scale)),
+                int(round(preview_geometry.text_area_height_pt * preview_scale)),
             )
             reserved_stamp_width_px = max(
                 1,
-                int(round(preview_reservation.stamp_area_width_pt * preview_scale)),
+                int(round(preview_geometry.stamp_area_width_pt * preview_scale)),
             )
             reserved_stamp_height_px = max(
                 1,
-                int(round(preview_reservation.stamp_area_height_pt * preview_scale)),
+                int(round(preview_geometry.stamp_area_height_pt * preview_scale)),
             )
         for widget in (
             self._preview_controls.title_label,
