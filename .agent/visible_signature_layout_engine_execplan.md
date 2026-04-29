@@ -18,7 +18,7 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - [x] (2026-04-29T22:38Z) Added focused tests in `tests/unit/test_visible_signature_layout.py` covering structural reservations, no-stamp behavior, injected ink reservation, conservative fallback, and fit issues.
 - [x] (2026-04-29T22:40Z) Ran ruff, the new boundary tests, and adjacent backend/preview/reservation tests successfully.
 - [x] (2026-04-29T22:36Z) Committed the first additive boundary slice as `aaa8466dc` with message `Add visible signature layout boundary`.
-- [ ] Next slice: add pyHanko adapter equivalence tests and a `PyHankoSignatureAppearanceAdapter` that builds the same `RoundedBorderTextStampStyle` currently produced by `_build_stamp_style`.
+- [x] (2026-04-29T22:43Z) Added pyHanko adapter equivalence tests and a `PyHankoSignatureAppearanceAdapter` that builds the same observable `RoundedBorderTextStampStyle` fields currently produced by `_build_stamp_style`.
 - [ ] Next slice: migrate `PyHankoPdfSigner.sign()` and `_visible_signature_fit_issues_for_stamp_text()` to consume `VisibleSignatureLayoutEngine.plan()` through the pyHanko adapter while preserving current fit behavior.
 - [ ] Next slice: migrate canonical preview layout in `signing_preview_renderer.py` to consume the same plan instead of reconstructing reservation and ink alignment separately.
 - [ ] Next slice: migrate Qt preview sizing in `signing_shell.py` to consume a Qt geometry adapter derived from `SignatureLayoutPlan`.
@@ -34,6 +34,12 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Observation: the first boundary tests initially had incorrect expectations for the current margin policy rather than exposing implementation bugs.
   Evidence: the first `pytest -q tests/unit/test_visible_signature_layout.py` run failed because existing helper behavior produced `32` points of horizontal usable height, `254` points of no-stamp text width, and an `88` point ink lane. The tests were corrected to match current behavior, and the final run passed with `5 passed`.
+
+- Observation: adapter equivalence can be tested by comparing stable style fields instead of direct pyHanko object identity.
+  Evidence: `tests/unit/test_visible_signature_layout.py` now snapshots border settings, background and text layout margins/alignment/scaling, font size, text color, stamp text, and timestamp format. The focused suite passed with `178 passed`.
+
+- Observation: the controlled horizontal rendered-ink path requires patching the backend module's imported `measure_horizontal_single_line_rendered_reference` symbol, not only providing the new engine with a fake ink measurer.
+  Evidence: `_build_stamp_style()` calls `_horizontal_single_line_ink_reservation_for_stamp_text()`, which uses the symbol imported into `phase3_signing_backend.py`; the new equivalence test patches that symbol and gives `VisibleSignatureLayoutEngine` an equivalent fake `HorizontalInkMeasurer`.
 
 ## Decision Log
 
@@ -51,6 +57,14 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Decision: make the next Issue #48 slice adapter-equivalence work before migrating production callers.
   Rationale: the highest-risk part of the migration is preserving exact pyHanko stamp style behavior. Equivalence tests around a dedicated adapter create a safety net before backend signing or preview rendering is changed.
+  Date/Author: 2026-04-29 / Codex
+
+- Decision: compare adapter output through stable snapshots rather than object identity.
+  Rationale: pyHanko style objects contain nested library objects whose identity is not meaningful for this migration. The migration risk is whether the effective margins, alignment, scaling, border, text, and timestamp fields match.
+  Date/Author: 2026-04-29 / Codex
+
+- Decision: keep `PyHankoSignatureAppearanceAdapter` in `visible_signature_layout.py` for this slice.
+  Rationale: the adapter is small and still tightly coupled to the layout plan. Splitting it now would add navigation overhead before production callers have migrated.
   Date/Author: 2026-04-29 / Codex
 
 ## Outcomes & Retrospective
@@ -95,6 +109,33 @@ This is the right first slice because it gives the codebase a public seam withou
 Commit:
 
     aaa8466dc Add visible signature layout boundary
+
+The adapter-equivalence slice also succeeded.
+
+What changed:
+
+- Added `PyHankoSignatureAppearanceAdapter` to build pyHanko `RoundedBorderTextStampStyle` objects from `SignatureLayoutPlan`.
+- Exported `PyHankoSignatureAppearanceAdapter` through `src/foliaseal/application/__init__.py`.
+- Extended `tests/unit/test_visible_signature_layout.py` with representative adapter-equivalence tests covering single-line, multi-line, wrapped-block, top/bottom/left/right stamp positions, image-stamp and no-image cases, bordered and borderless boxes, and a controlled horizontal rendered-ink reservation.
+
+What did not change:
+
+- Production backend signing still calls `_build_stamp_style()` directly.
+- Canonical preview rendering still calls its existing private-helper path.
+- Qt preview sizing is still unmigrated.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/__init__.py tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py
+    11 passed in 0.29s
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    178 passed in 25.33s
+
+The next slice should migrate backend signing and backend fit validation to consume `VisibleSignatureLayoutEngine.plan()` through `PyHankoSignatureAppearanceAdapter`. Keep that slice limited to `phase3_signing_backend.py`, the layout module if adapter gaps appear, and the backend-focused tests.
 
 ## Context and Orientation
 
@@ -253,3 +294,5 @@ Revision note: Created 2026-04-29 by Codex to make issue #48 executable as an in
 Revision note: Updated 2026-04-29 by Codex after completing the first additive boundary slice and recording verification results.
 
 Revision note: Updated 2026-04-29 by Codex after committing the first slice as `aaa8466dc`; added the required follow-up slices for pyHanko adapter equivalence, backend migration, canonical preview migration, Qt preview migration, and private-helper test cleanup.
+
+Revision note: Updated 2026-04-29 by Codex after completing the pyHanko adapter-equivalence slice; recorded snapshot-based equivalence strategy, verification output, and the next backend-migration target.

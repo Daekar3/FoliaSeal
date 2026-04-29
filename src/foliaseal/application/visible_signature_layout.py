@@ -15,6 +15,7 @@ from PIL import Image
 from foliaseal.application.horizontal_signature_reservation import (
     build_horizontal_single_line_ink_reservation,
 )
+from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_workflow import SigningDraftValidationSeverity
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -390,6 +391,57 @@ class VisibleSignatureLayoutEngine:
                 ),
             )
         return ()
+
+
+class PyHankoSignatureAppearanceAdapter:
+    """Build pyHanko stamp styles from a visible-signature layout plan."""
+
+    def build_stamp_style(
+        self,
+        *,
+        appearance: SigningBackendAppearance,
+        stamp_text: str,
+        stamp_background: object | None,
+        signature_rect: SignatureRect,
+        layout_plan: SignatureLayoutPlan,
+    ) -> object:
+        """Return the pyHanko stamp style represented by ``layout_plan``."""
+
+        if layout_plan.fit_issues:
+            raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
+
+        from foliaseal.application.phase3_signing_backend import (
+            RoundedBorderTextStampStyle,
+            _background_layout_for_stamp,
+            _build_text_box_style,
+            _hex_to_rgb,
+            _solid_background_for_color,
+        )
+
+        box_style = appearance.box_style
+        border_width = max(0, int(round(box_style.border_width_pt))) if box_style.show_border else 0
+        background = stamp_background or _solid_background_for_color(box_style.background_color_hex)
+        text_box_style = _build_text_box_style(appearance.text_style)
+        background_layout = _background_layout_for_stamp(
+            appearance.layout_template,
+            stamp_position=appearance.stamp_position,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+            text_box_width=layout_plan.background_text_box_width_pt,
+            text_box_height=layout_plan.text_box.height_pt,
+            box_style=appearance.box_style,
+        )
+        return RoundedBorderTextStampStyle(
+            border_width=border_width,
+            border_color=_hex_to_rgb(box_style.border_color_hex),
+            background=background,
+            background_layout=background_layout,
+            background_opacity=1.0,
+            text_box_style=text_box_style,
+            inner_content_layout=layout_plan.backend_reservation.inner_content_layout,
+            stamp_text=stamp_text,
+            timestamp_format=appearance.datetime_format,
+        )
 
 
 def _public_ink_reservation(reservation: object | None) -> HorizontalInkReservation | None:

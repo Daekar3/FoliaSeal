@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+from PIL import Image
+
+from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
     ImageMetrics,
     LayoutRequest,
+    PyHankoSignatureAppearanceAdapter,
     RectBounds,
     SignatureLayoutPlan,
     TextMetrics,
@@ -19,6 +24,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
 )
+from tests.support.phase3_builders import build_signature_appearance
 
 
 @dataclass(frozen=True)
@@ -200,3 +206,259 @@ def test_fit_issue_is_returned_for_text_that_cannot_fit() -> None:
     assert issue.code == "visible_signature_layout_unavailable"
     assert issue.field_name == "signature_appearance"
     assert "Visible signature content does not fit" in issue.message
+
+
+@pytest.mark.parametrize(
+    ("layout_template", "stamp_position", "with_image", "show_border"),
+    [
+        (
+            SignatureLayoutTemplate.SINGLE_LINE,
+            SignatureStampPosition.TOP,
+            True,
+            True,
+        ),
+        (
+            SignatureLayoutTemplate.SINGLE_LINE,
+            SignatureStampPosition.BOTTOM,
+            False,
+            True,
+        ),
+        (
+            SignatureLayoutTemplate.MULTI_LINE,
+            SignatureStampPosition.LEFT,
+            True,
+            True,
+        ),
+        (
+            SignatureLayoutTemplate.WRAPPED_BLOCK,
+            SignatureStampPosition.RIGHT,
+            True,
+            False,
+        ),
+        (
+            SignatureLayoutTemplate.MULTI_LINE,
+            SignatureStampPosition.BOTTOM,
+            False,
+            False,
+        ),
+    ],
+)
+def test_pyhanko_adapter_matches_existing_stamp_style_for_representative_cases(
+    tmp_path,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    with_image: bool,
+    show_border: bool,
+) -> None:
+    stamp_path = _write_stamp(tmp_path) if with_image else None
+    appearance = _backend_appearance(
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        image_stamp_path=stamp_path,
+        show_border=show_border,
+    )
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=320.0,
+        height_pt=120.0,
+    )
+    stamp_text = "Digitally signed by\nMorgan Ellery\nFoliaSeal"
+
+    expected_style = _existing_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        signature_rect=signature_rect,
+    )
+    layout_plan = VisibleSignatureLayoutEngine().plan(
+        _layout_request(
+            signature_rect=signature_rect,
+            appearance=appearance,
+            stamp_text=stamp_text,
+        )
+    )
+    actual_style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        layout_plan=layout_plan,
+    )
+
+    assert _style_snapshot(actual_style) == _style_snapshot(expected_style)
+
+
+def test_pyhanko_adapter_matches_existing_stamp_style_with_injected_horizontal_ink(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from foliaseal.application import phase3_signing_backend as backend
+    from foliaseal.application.horizontal_signature_reservation import (
+        HorizontalSingleLineRenderedReference,
+    )
+
+    stamp_path = _write_stamp(tmp_path)
+    appearance = _backend_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path=stamp_path,
+        show_border=True,
+    )
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=320.0,
+        height_pt=42.0,
+    )
+    stamp_text = "Digitally signed by\nMorgan Ellery"
+
+    def fake_reference(*_args: object, **_kwargs: object) -> HorizontalSingleLineRenderedReference:
+        return HorizontalSingleLineRenderedReference(
+            preview_size_px={"width": 704, "height": 106},
+            structural_text_bounds_px={"x": 40, "y": 8, "width": 200, "height": 18},
+            rendered_ink_bounds_px={"x": 52, "y": 10, "width": 20, "height": 12},
+            structural_text_bounds_pt={"x": 40, "y": 8, "width": 200, "height": 18},
+            rendered_ink_bounds_pt={"x": 52, "y": 10, "width": 20, "height": 12},
+            px_to_pt=1.0,
+        )
+
+    monkeypatch.setattr(
+        backend,
+        "measure_horizontal_single_line_rendered_reference",
+        fake_reference,
+    )
+
+    expected_style = _existing_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        signature_rect=signature_rect,
+    )
+    ink_measurer = FakeHorizontalInkMeasurer(
+        measurement=HorizontalInkMeasurement(
+            structural_text_bounds_px=RectBounds(x=40, y=8, width=200, height=18),
+            rendered_ink_bounds_px=RectBounds(x=52, y=10, width=20, height=12),
+            px_to_pt=1.0,
+        ),
+        requests=[],
+    )
+    layout_plan = VisibleSignatureLayoutEngine(ink_measurer=ink_measurer).plan(
+        _layout_request(
+            signature_rect=signature_rect,
+            appearance=appearance,
+            stamp_text=stamp_text,
+        )
+    )
+    actual_style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        layout_plan=layout_plan,
+    )
+
+    assert layout_plan.ink_reservation is not None
+    assert _style_snapshot(actual_style) == _style_snapshot(expected_style)
+
+
+def _backend_appearance(
+    *,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    image_stamp_path: str | None,
+    show_border: bool,
+) -> SigningBackendAppearance:
+    appearance = build_signature_appearance(
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        image_stamp_path=image_stamp_path,
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#123456",
+        ),
+        box_style=SignatureBoxStyle(
+            show_border=show_border,
+            border_color_hex="#333333",
+            border_width_pt=1.0,
+            background_color_hex="#FFFFFF",
+        ),
+    )
+    return SigningBackendAppearance.from_signature_appearance(appearance)
+
+
+def _layout_request(
+    *,
+    signature_rect: SignatureRect,
+    appearance: SigningBackendAppearance,
+    stamp_text: str,
+) -> LayoutRequest:
+    return LayoutRequest(
+        signature_rect=signature_rect,
+        layout_template=appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        text_style=appearance.text_style,
+        box_style=appearance.box_style,
+        stamp_text=stamp_text,
+        image_stamp_path=appearance.image_stamp_path,
+    )
+
+
+def _write_stamp(tmp_path) -> str:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (400, 100), color=(0, 0, 0, 160)).save(stamp_path)
+    return str(stamp_path)
+
+
+def _existing_stamp_style(
+    *,
+    appearance: SigningBackendAppearance,
+    stamp_text: str,
+    signature_rect: SignatureRect,
+):
+    from foliaseal.application.phase3_signing_backend import _build_stamp_style
+
+    return _build_stamp_style(
+        appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+    )
+
+
+def _stamp_background(image_stamp_path: str | None):
+    from foliaseal.application.phase3_signing_backend import _stamp_background_for_path
+
+    return _stamp_background_for_path(image_stamp_path)
+
+
+def _style_snapshot(style) -> dict[str, object]:
+    return {
+        "border_width": style.border_width,
+        "border_color": style.border_color,
+        "background_present": style.background is not None,
+        "background_layout": _layout_snapshot(style.background_layout),
+        "inner_content_layout": _layout_snapshot(style.inner_content_layout),
+        "font_size": str(style.text_box_style.font_size),
+        "text_color": style.text_box_style.text_color,
+        "stamp_text": style.stamp_text,
+        "timestamp_format": style.timestamp_format,
+    }
+
+
+def _layout_snapshot(layout) -> dict[str, object]:
+    margins = layout.margins
+    return {
+        "x_align": layout.x_align,
+        "y_align": layout.y_align,
+        "scaling": layout.inner_content_scaling,
+        "margins": (
+            margins.left,
+            margins.right,
+            margins.top,
+            margins.bottom,
+        ),
+    }
