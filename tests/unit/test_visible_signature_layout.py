@@ -169,6 +169,147 @@ def test_horizontal_ink_measurement_can_reduce_text_lane() -> None:
     assert plan.fit_issues == ()
 
 
+def test_horizontal_single_line_plan_gives_overwide_text_the_full_lane() -> None:
+    plan = _engine(
+        text_width=475,
+        text_height=10,
+        image=ImageMetrics(width_px=400, height_px=100, aspect_ratio=4.0),
+    ).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=34.3,
+                bottom_pt=428.99,
+                width_pt=260.61,
+                height_pt=23.04,
+            ),
+            stamp_position=SignatureStampPosition.RIGHT,
+        )
+    )
+
+    assert plan.text_area_width_pt == plan.container_width_pt - 8
+    assert plan.stamp_area_width_pt == 0
+
+
+def test_horizontal_single_line_plan_prioritizes_text_before_stamp() -> None:
+    plan = _engine(
+        text_width=254,
+        text_height=18,
+        image=ImageMetrics(width_px=410, height_px=100, aspect_ratio=4.1),
+    ).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=34.82,
+                bottom_pt=428.48,
+                width_pt=373.25,
+                height_pt=36.86,
+            ),
+            stamp_position=SignatureStampPosition.RIGHT,
+        )
+    )
+
+    assert plan.text_area_width_pt == 254
+    assert plan.stamp_area_width_pt == 105
+    assert plan.stamp_area_height_pt == 29
+
+
+@pytest.mark.parametrize(
+    (
+        "layout_template",
+        "stamp_position",
+        "rect",
+        "expected_text_width",
+        "expected_text_height",
+        "expected_stamp_width",
+        "expected_stamp_height",
+        "expected_stamp_x_align",
+        "expected_text_x_align",
+    ),
+    [
+        (
+            SignatureLayoutTemplate.SINGLE_LINE,
+            SignatureStampPosition.TOP,
+            SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=240.0,
+                height_pt=72.0,
+            ),
+            232,
+            18,
+            232,
+            40,
+            "ALIGN_MID",
+            "ALIGN_MIN",
+        ),
+        (
+            SignatureLayoutTemplate.MULTI_LINE,
+            SignatureStampPosition.RIGHT,
+            SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=240.0,
+                height_pt=72.0,
+            ),
+            110,
+            64,
+            116,
+            64,
+            "ALIGN_MAX",
+            "ALIGN_MIN",
+        ),
+        (
+            SignatureLayoutTemplate.WRAPPED_BLOCK,
+            SignatureStampPosition.BOTTOM,
+            SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=240.0,
+                height_pt=72.0,
+            ),
+            232,
+            18,
+            232,
+            40,
+            "ALIGN_MID",
+            "ALIGN_MID",
+        ),
+    ],
+)
+def test_plan_allocates_template_specific_text_and_stamp_areas(
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    rect: SignatureRect,
+    expected_text_width: int,
+    expected_text_height: int,
+    expected_stamp_width: int,
+    expected_stamp_height: int,
+    expected_stamp_x_align: str,
+    expected_text_x_align: str,
+) -> None:
+    plan = _engine(text_width=110, text_height=18).plan(
+        _request(
+            rect=rect,
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+        )
+    )
+
+    assert plan.reserved_primary_extent_pt > 0
+    assert plan.text_area_width_pt == expected_text_width
+    assert plan.text_area_height_pt == expected_text_height
+    assert plan.stamp_area_width_pt == expected_stamp_width
+    assert plan.stamp_area_height_pt == expected_stamp_height
+    assert plan.stamp_layout.x_align == expected_stamp_x_align
+    assert plan.text_layout.x_align == expected_text_x_align
+    assert plan.stamp_layout.scaling == "STRETCH_TO_FIT"
+    assert plan.text_layout.scaling == "NO_SCALING"
+
+
 def test_unsafe_horizontal_ink_measurement_falls_back_to_structural_layout() -> None:
     ink = FakeHorizontalInkMeasurer(
         measurement=HorizontalInkMeasurement(

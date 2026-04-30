@@ -2,13 +2,13 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`. It records the plan for implementing GitHub issue #48, "RFC: Deepen visible signature layout engine boundary."
+This document must be maintained in accordance with `docs/PLANS.md`. It records the plan for implementing GitHub issue #48, "RFC: Deepen visible signature layout engine boundary."
 
 ## Purpose / Big Picture
 
 After this work, FoliaSeal will have one application-layer boundary for visible-signature layout planning. A visible signature is the rectangular appearance shown on a signed PDF page. Today the rules for dividing that rectangle between text and an optional stamp image are spread across backend signing, canonical preview rendering, horizontal ink measurement, and Qt preview sizing. This makes preview/output parity hard to reason about because several callers import private helper functions and repeat the same sequence of layout decisions.
 
-The first executable slice is intentionally behavior-preserving. It introduces `foliaseal.application.visible_signature_layout` and boundary tests around it, but it does not yet migrate backend signing or Qt preview callers. A developer can see the new boundary working by running the new tests and observing that the new `VisibleSignatureLayoutEngine.plan()` returns the same reservation and fit behavior as the existing helper path.
+The initial production migration is complete. `foliaseal.application.visible_signature_layout` exists, backend signing uses it for stamp style planning, canonical preview uses it for pyHanko preview layout, and Qt preview sizing derives widget geometry from `SignatureLayoutPlan`. The next slice is a cleanup and boundary-hardening slice: move obsolete private-helper test coverage to the visible layout boundary where practical, keep only tests that protect genuinely backend-specific pyHanko behavior, and document or close any remaining private-helper call sites such as harness diagnostics.
 
 ## Progress
 
@@ -22,7 +22,9 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - [x] (2026-04-29T22:47Z) Migrated backend stamp-style construction and backend fit validation to consume `VisibleSignatureLayoutEngine.plan()` through `PyHankoSignatureAppearanceAdapter` while preserving the existing rendered-fit fallback behavior.
 - [x] (2026-04-29T22:51Z) Migrated canonical preview layout in `signing_preview_renderer.py` to consume `VisibleSignatureLayoutEngine.plan()` and `PyHankoSignatureAppearanceAdapter` instead of reconstructing reservation and ink alignment separately.
 - [x] (2026-04-29T22:56Z) Migrated Qt preview sizing in `signing_shell.py` to consume a local Qt preview geometry adapter derived from `SignatureLayoutPlan`.
-- [ ] Next slice: delete or demote private-helper tests once boundary and adapter tests cover their behavior.
+- [x] (2026-04-30T22:15Z) Reviewed Issue #48 state after the Qt migration and architecture documentation. Focused ruff passed and the focused Issue #48 pytest set passed with `332 passed, 1 warning`.
+- [x] (2026-04-30T22:20Z) Completed the first private-helper coverage cleanup pass by moving representative generic reservation expectations into `tests/unit/test_visible_signature_layout.py` and deleting duplicated backend-private reservation tests.
+- [ ] Next slice: continue reducing residual `_layout_reservation_for_template()` tests that assert generic border, optical alignment, and horizontal inset policy, then reassess `phase3_harness.py` diagnostics.
 
 ## Surprises & Discoveries
 
@@ -49,6 +51,15 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 
 - Observation: Qt preview sizing can avoid image-file reads while still planning through the visible layout engine.
   Evidence: the Qt tests pass fake `/tmp/stamp.png` paths and a loaded pixmap aspect ratio. The new `_PreviewStampImageProbe` uses the provided aspect ratio to produce `ImageMetrics`, preserving the old helper path's no-I/O behavior.
+
+- Observation: the production backend, canonical preview, and Qt preview sizing call paths now consume `SignatureLayoutPlan`, but harness diagnostics and several backend tests still import private layout helpers directly.
+  Evidence: `rg -n "_layout_reservation_for_template|_build_stamp_style|_build_text_box_style|_measure_text_box_dimensions" src tests` on 2026-04-30 showed remaining private-helper imports in `src/foliaseal/presentation/qt/phase3_harness.py`, `tests/unit/test_phase3_signing_backend.py`, `tests/unit/test_signing_preview_renderer.py`, and the layout engine's compatibility delegation.
+
+- Observation: the layout boundary is public but not yet fully neutral.
+  Evidence: `SignatureLayoutPlan` still exposes `backend_reservation`, `VisibleSignatureLayoutEngine.plan()` imports `_layout_reservation_for_template()` and related helpers from `phase3_signing_backend.py`, and `PyHankoSignatureAppearanceAdapter` still reads `layout_plan.backend_reservation.inner_content_layout`.
+
+- Observation: the first private-helper cleanup pass removed the most duplicated generic reservation tests, but a deliberate residue remains in backend tests.
+  Evidence: after the pass, `tests/unit/test_phase3_signing_backend.py` still imports `_layout_reservation_for_template()` for backend-adjacent background-layout comparisons, border-facing inset assertions, rendered-fit fallback setup, and detailed layout policy assertions that should be moved or justified in a later slice. `_build_text_box_style()`, `_measure_text_box_dimensions()`, and `_build_stamp_style()` remain covered there because they protect pyHanko font/style construction and rendered signing behavior.
 
 ## Decision Log
 
@@ -87,6 +98,18 @@ The first executable slice is intentionally behavior-preserving. It introduces `
 - Decision: keep the Qt geometry adapter local to `signing_shell.py`.
   Rationale: the adapter converts a `SignatureLayoutPlan` into widget sizing dimensions and depends on Qt-preview concerns such as loaded pixmap aspect ratios. Keeping it in the presentation layer avoids pushing UI-only semantics into the application layout boundary.
   Date/Author: 2026-04-29 / Codex
+
+- Decision: make the next slice a test cleanup and boundary-hardening slice, not a policy-moving slice.
+  Rationale: moving the remaining layout policy out of `phase3_signing_backend.py` would be a larger behavior-risk slice. The immediate next value is to reduce private-helper test coupling while preserving green parity suites, then record which private helpers remain because production compatibility still depends on them.
+  Date/Author: 2026-04-30 / Codex
+
+- Decision: keep harness diagnostics out of the next cleanup unless a small adapter replacement is obviously behavior-neutral.
+  Rationale: `phase3_harness.py` uses backend-private helpers to snapshot diagnostic reservation data. That is not part of the main production preview/signing path, and changing harness evidence shape should not be mixed with private-helper test cleanup unless the replacement is a direct call to `VisibleSignatureLayoutEngine.plan()` with identical output fields.
+  Date/Author: 2026-04-30 / Codex
+
+- Decision: make the first cleanup execution a coverage relocation pass only.
+  Rationale: the obvious duplicated tests could be moved behind `VisibleSignatureLayoutEngine.plan()` without production changes. The remaining private-helper assertions are either backend-specific or detailed enough that moving them should be done with focused public-boundary additions, not opportunistically during the same pass.
+  Date/Author: 2026-04-30 / Codex
 
 ## Outcomes & Retrospective
 
@@ -236,6 +259,65 @@ Verification results:
 
 The next slice should clean up tests and private-helper coverage now that backend signing, canonical preview, and Qt preview sizing all consume the visible layout boundary.
 
+The Issue #48 state review after architecture documentation found the codebase in a good post-migration state but not architecturally complete.
+
+What is complete:
+
+- The public layout boundary exists and is exported.
+- Backend signing uses `VisibleSignatureLayoutEngine.plan()` and `PyHankoSignatureAppearanceAdapter`.
+- Canonical preview uses `VisibleSignatureLayoutEngine.plan()` and `PyHankoSignatureAppearanceAdapter`.
+- Qt preview sizing uses a local geometry adapter derived from `SignatureLayoutPlan`.
+- Focused Issue #48 ruff and pytest validation passed.
+
+What remains:
+
+- `tests/unit/test_phase3_signing_backend.py` still contains broad direct coverage of `_layout_reservation_for_template()`, `_build_stamp_style()`, `_build_text_box_style()`, and `_measure_text_box_dimensions()`.
+- `tests/unit/test_signing_preview_renderer.py` still imports `_build_stamp_style()` for a parity check.
+- `src/foliaseal/presentation/qt/phase3_harness.py` still uses private backend helpers for diagnostic snapshots.
+- `VisibleSignatureLayoutEngine` still delegates layout policy to private helpers and `SignatureLayoutPlan.backend_reservation` remains an opaque backend payload.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/signing_preview_renderer.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py
+    332 passed, 1 warning in 30.15s
+
+The next slice should make private-helper tests less central without changing production behavior. Treat this as a cleanup/status slice: move representative layout-reservation expectations into `tests/unit/test_visible_signature_layout.py`, keep or rename only backend tests that protect backend-only pyHanko behavior, and update this ExecPlan with the exact helpers that remain intentionally private.
+
+The first private-helper cleanup pass succeeded.
+
+What changed:
+
+- Added public-boundary tests in `tests/unit/test_visible_signature_layout.py` for horizontal single-line overwide text, horizontal text-first stamp allocation, and template-specific text/stamp area allocation for single-line, multi-line, and wrapped-block layouts.
+- Deleted duplicated backend-private reservation tests from `tests/unit/test_phase3_signing_backend.py` that asserted the same generic layout policy through `_layout_reservation_for_template()`.
+- Left backend tests that still protect pyHanko style construction, font/text measurement, background-layout rendering details, rendered-fit fallback behavior, and signed PDF behavior.
+- Left `phase3_harness.py` diagnostics unchanged in this pass.
+
+Verification results:
+
+    .venv/bin/ruff check tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py
+    128 passed in 11.27s
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py src/foliaseal/presentation/qt/phase3_harness.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_harness.py
+    272 passed, 1 warning in 26.25s
+
+Remaining private-helper usage after this pass:
+
+- `tests/unit/test_visible_signature_layout.py` imports `_build_stamp_style()` only to compare `PyHankoSignatureAppearanceAdapter` output with the legacy backend path.
+- `tests/unit/test_signing_preview_renderer.py` imports `_build_stamp_style()` for a preview/backend parity check.
+- `tests/unit/test_phase3_signing_backend.py` still imports `_layout_reservation_for_template()`, `_build_stamp_style()`, `_build_text_box_style()`, and `_measure_text_box_dimensions()` for backend-specific behavior and residual detailed layout-policy tests.
+- `src/foliaseal/presentation/qt/phase3_harness.py` still imports private helpers for diagnostic snapshot generation and remains intentionally deferred.
+
+The next slice should continue this cleanup by moving or justifying the remaining generic `_layout_reservation_for_template()` assertions around border-aware outer insets, optical text alignment, compact vertical single-line layout, and horizontal left/right edge invariants.
+
 ## Context and Orientation
 
 This repository is a Python package under `src/foliaseal`. The visible-signature layout code currently lives mainly in `src/foliaseal/application/phase3_signing_backend.py`. That module signs PDFs through pyHanko, a PDF signing library, and also contains private helper functions that measure text, decide how much room the text and stamp image should receive, and validate whether a selected rectangle can contain the requested visible signature.
@@ -244,11 +326,34 @@ The canonical preview path lives in `src/foliaseal/application/signing_preview_r
 
 The new module `src/foliaseal/application/visible_signature_layout.py` will define the public application boundary. A "boundary" here means the small set of public types and methods callers should use instead of private helper functions. A "plan" means the typed result of applying layout policy to a request. A "port" means a small protocol that hides a dependency such as text measurement, stamp image inspection, or rendered ink measurement. Ports let tests provide deterministic stand-ins.
 
-The first slice does not delete or move existing helpers. Instead, `VisibleSignatureLayoutEngine` delegates to the current helper path so the new tests describe existing behavior. Later slices can move policy into the new module, then update backend signing, canonical preview rendering, Qt preview sizing, and harness diagnostics to consume the plan.
+The first slice did not delete or move existing helpers. Instead, `VisibleSignatureLayoutEngine` delegates to the current helper path so the new tests describe existing behavior. Later slices migrated backend signing, canonical preview rendering, and Qt preview sizing to consume the plan. The remaining work is to reduce private-helper test coupling and then, in a later larger slice, consider moving policy itself out of `phase3_signing_backend.py`.
 
-At the time of this revision, the first slice is committed. The remaining Issue #48 work should be done in narrow follow-up slices. The next slice should focus on a pyHanko adapter. In this repository, "pyHanko adapter" means a small object that takes the new `SignatureLayoutPlan` and existing appearance inputs, then returns the pyHanko `RoundedBorderTextStampStyle` used by signing and canonical preview. That adapter should be tested against the current `_build_stamp_style` result before any production caller is migrated.
+At the time of this revision, the boundary, adapter, backend migration, canonical preview migration, and Qt preview migration slices are committed. The remaining Issue #48 work should be done in narrow follow-up slices. The immediate next slice should focus on tests and intentional private-helper usage, not on changing layout policy.
 
 ## Plan of Work
+
+The next implementation slice is "private-helper coverage cleanup, pass two."
+
+Start by classifying the remaining direct test imports of these private helpers:
+
+    _layout_reservation_for_template
+    _build_stamp_style
+    _build_text_box_style
+    _measure_text_box_dimensions
+
+Use `rg` to find them in `tests/unit/test_phase3_signing_backend.py`, `tests/unit/test_signing_preview_renderer.py`, and `tests/unit/test_visible_signature_layout.py`. For each remaining test, choose one of three outcomes:
+
+1. Move the behavior expectation to `tests/unit/test_visible_signature_layout.py` by asserting on `SignatureLayoutPlan`, `LayoutRuleSpec`, `HorizontalInkReservation`, or `PyHankoSignatureAppearanceAdapter` output.
+2. Keep the test in `tests/unit/test_phase3_signing_backend.py` only if it protects backend-only behavior such as pyHanko font creation, final stamp rendering details, fallback rendered-fit checks, certificate loading, timestamping, or signed PDF output.
+3. Delete or demote the test if it duplicates a stronger public-boundary test and does not protect backend-only behavior.
+
+Do not change visible-signature layout policy in this slice. If a test fails because the public boundary does not expose a value currently asserted through a private helper, add the smallest neutral field or test helper around existing `SignatureLayoutPlan` data only if it improves the public boundary. Do not add new production behavior just to preserve a private-helper assertion.
+
+Use the first cleanup pass as the baseline: the broad overwide-text, text-priority, and template-area allocation expectations already live in `tests/unit/test_visible_signature_layout.py`. The next pass should focus only on remaining generic layout reservation assertions, especially border-aware outer insets, optical text alignment, compact vertical single-line layout, and horizontal left/right edge invariants. Keep pyHanko stamp-style, text-style, text-measurement, rendered-fit fallback, and signing-output tests in `tests/unit/test_phase3_signing_backend.py`.
+
+If the cleanup reveals harness code that can be trivially switched from private helper calls to `VisibleSignatureLayoutEngine.plan()` without changing the output shape, make that replacement in the same slice. Otherwise, record the harness private-helper usage as intentionally deferred.
+
+Historical completed work is retained below for context.
 
 Create `src/foliaseal/application/visible_signature_layout.py`. Define dataclasses for `TextMetrics`, `ImageMetrics`, `RectBounds`, `HorizontalInkMeasurement`, `HorizontalInkReservation`, `LayoutMargins`, `LayoutRuleSpec`, `VisibleSignatureFitIssue`, `LayoutRequest`, and `SignatureLayoutPlan`. Define protocol ports named `TextMeasurer`, `StampImageProbe`, and `HorizontalInkMeasurer`.
 
@@ -295,10 +400,32 @@ Work from the repository root:
 
 Create or update these files:
 
-    .agent/visible_signature_layout_engine_execplan.md
+    docs/ExecPlans/visible_signature_layout_engine_execplan.md
     src/foliaseal/application/visible_signature_layout.py
     src/foliaseal/application/__init__.py
     tests/unit/test_visible_signature_layout.py
+
+For the next private-helper coverage cleanup slice, create or update these files only as needed:
+
+    docs/ExecPlans/visible_signature_layout_engine_execplan.md
+    tests/unit/test_visible_signature_layout.py
+    tests/unit/test_phase3_signing_backend.py
+    tests/unit/test_signing_preview_renderer.py
+    src/foliaseal/presentation/qt/phase3_harness.py
+    src/foliaseal/application/visible_signature_layout.py
+
+Start with this inventory command:
+
+    rg -n "_layout_reservation_for_template|_build_stamp_style|_build_text_box_style|_measure_text_box_dimensions" tests src/foliaseal/presentation/qt/phase3_harness.py src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/visible_signature_layout.py
+
+Then run the focused cleanup validation:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py src/foliaseal/presentation/qt/phase3_harness.py
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_harness.py
+
+If Qt preview sizing or signing shell helpers are touched unexpectedly, also run:
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
 
 Run focused verification:
 
@@ -349,6 +476,14 @@ The backend migration slice is accepted when all of the following are true:
 The canonical preview and Qt migration slices are accepted when each caller consumes `SignatureLayoutPlan` instead of private backend reservation helpers, and their existing focused suites pass.
 
 The final cleanup slice is accepted when obsolete private-helper tests are deleted or demoted without losing behavior coverage at the visible layout boundary, and the visible layout, backend, canonical preview, Qt shell, and horizontal reservation focused suites pass.
+
+The next private-helper coverage cleanup slice is accepted when all of the following are true:
+
+- every remaining direct private-helper test import is explicitly justified as backend-only behavior or removed;
+- representative structural reservation, adapter, and fit-issue expectations live in `tests/unit/test_visible_signature_layout.py`;
+- `tests/unit/test_phase3_signing_backend.py` no longer acts as the primary specification for generic layout reservation policy;
+- any remaining private-helper usage in `src/foliaseal/presentation/qt/phase3_harness.py` is either replaced by `VisibleSignatureLayoutEngine.plan()` or documented in this ExecPlan as intentionally deferred;
+- focused ruff and pytest validation passes.
 
 The behavior to observe is internal but demonstrable: `pytest -q tests/unit/test_visible_signature_layout.py` should pass, and the tests should show that the new plan boundary can represent current visible-signature layout behavior.
 
@@ -403,3 +538,7 @@ Revision note: Updated 2026-04-29 by Codex after migrating backend stamp-style c
 Revision note: Updated 2026-04-29 by Codex after migrating canonical preview layout onto the visible layout engine and pyHanko adapter; recorded preview-only suppression behavior and focused verification output.
 
 Revision note: Updated 2026-04-29 by Codex after migrating Qt preview sizing onto a local geometry adapter derived from `SignatureLayoutPlan`; recorded no-I/O stamp probing and focused verification output.
+
+Revision note: Updated 2026-04-30 by Codex after reviewing Issue #48 against the current repo; converted the next step into a private-helper coverage cleanup and boundary-hardening slice, updated the plan path to `docs/PLANS.md`, and recorded current focused validation results.
+
+Revision note: Updated 2026-04-30 by Codex after executing the first private-helper coverage cleanup pass; moved representative generic reservation expectations behind the visible layout boundary, deleted duplicated backend-private tests, and scoped the next cleanup pass to remaining generic reservation details and harness diagnostics.

@@ -758,88 +758,6 @@ def test_build_text_box_style_preserves_half_point_font_size_in_stamp_style() ->
     assert style.text_box_style.font_size == Fraction(17, 2)
 
 
-def test_layout_reservation_for_horizontal_single_line_gives_overwide_text_the_full_lane() -> None:
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.RIGHT,
-        signature_rect=build_signature_rect(
-            page_index=0,
-            left_pt=34.3,
-            bottom_pt=428.99,
-            width_pt=260.61,
-            height_pt=23.04,
-        ),
-        text_box_width=475,
-        text_box_height=10,
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=1.0,
-            background_color_hex="#FFFFFF",
-        ),
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=4.0,
-    )
-
-    assert reservation.text_area_width_pt == reservation.container_width_pt - 8
-    assert reservation.stamp_area_width_pt == 0
-
-
-def test_horizontal_single_line_reservation_does_not_protect_stamp_width_over_text() -> None:
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.RIGHT,
-        signature_rect=build_signature_rect(
-            page_index=0,
-            left_pt=34.3,
-            bottom_pt=428.99,
-            width_pt=260.61,
-            height_pt=23.04,
-        ),
-        text_box_width=475,
-        text_box_height=10,
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=1.0,
-            background_color_hex="#FFFFFF",
-        ),
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=8.0,
-    )
-
-    assert reservation.text_area_width_pt == reservation.container_width_pt - 8
-    assert reservation.stamp_area_width_pt == 0
-
-
-def test_horizontal_single_line_reservation_prioritizes_text_before_stamp() -> None:
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.RIGHT,
-        signature_rect=build_signature_rect(
-            page_index=0,
-            left_pt=34.82,
-            bottom_pt=428.48,
-            width_pt=373.25,
-            height_pt=36.86,
-        ),
-        text_box_width=254,
-        text_box_height=18,
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=1.0,
-            background_color_hex="#FFFFFF",
-        ),
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=4.1,
-    )
-
-    assert reservation.text_area_width_pt == 254
-    assert reservation.stamp_area_width_pt == 105
-    assert reservation.stamp_area_height_pt == 29
-
-
 @pytest.mark.parametrize(
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
@@ -1664,50 +1582,6 @@ def test_build_stamp_style_uses_rounded_border_path_for_visible_stamp() -> None:
     assert style.text_box_style.box_layout_rule.inner_content_scaling == InnerScaling.NO_SCALING
 
 
-def test_layout_reservation_for_single_line_allocates_right_text_space() -> None:
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        signature_rect=build_signature_rect(page_index=0, width_pt=240.0, height_pt=72.0),
-        text_box_width=110,
-        text_box_height=18,
-    )
-
-    assert reservation.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-    assert reservation.reserved_primary_extent_pt > 0
-    assert reservation.stamp_area_width_pt < reservation.container_width_pt
-    assert reservation.stamp_area_height_pt < reservation.container_height_pt
-    assert reservation.text_area_width_pt < reservation.container_width_pt
-    assert reservation.text_area_height_pt < reservation.container_height_pt
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MID
-    assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MAX
-    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
-    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MIN
-    assert reservation.background_layout.inner_content_scaling == InnerScaling.STRETCH_TO_FIT
-    assert reservation.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
-
-
-def test_layout_reservation_for_multi_line_allocates_right_text_space() -> None:
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.MULTI_LINE,
-        stamp_position=SignatureStampPosition.RIGHT,
-        signature_rect=build_signature_rect(page_index=0, width_pt=240.0, height_pt=72.0),
-        text_box_width=110,
-        text_box_height=18,
-    )
-
-    assert reservation.layout_template == SignatureLayoutTemplate.MULTI_LINE
-    assert reservation.reserved_primary_extent_pt > 0
-    assert reservation.stamp_area_width_pt < reservation.container_width_pt
-    assert reservation.stamp_area_height_pt == 64
-    assert reservation.text_area_width_pt < reservation.container_width_pt
-    assert reservation.text_area_height_pt == 64
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MAX
-    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MIN
-    assert reservation.background_layout.inner_content_scaling == InnerScaling.STRETCH_TO_FIT
-    assert reservation.inner_content_layout.inner_content_scaling == InnerScaling.NO_SCALING
-
-
 @pytest.mark.parametrize(
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
@@ -1771,25 +1645,6 @@ def test_layout_reservation_for_horizontal_single_line_uses_base_separator(
     assert reservation.text_area_width_pt == text_box_width
     assert reservation.stamp_area_width_pt == old_stamp_area_width
     assert reservation.text_box_width_pt == text_box_width
-
-
-def test_layout_reservation_for_wrapped_block_allocates_bottom_text_space() -> None:
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.BOTTOM,
-        signature_rect=build_signature_rect(page_index=0, width_pt=240.0, height_pt=72.0),
-        text_box_width=110,
-        text_box_height=18,
-    )
-
-    assert reservation.layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK
-    assert reservation.reserved_primary_extent_pt > 0
-    assert reservation.stamp_area_width_pt == reservation.text_area_width_pt
-    assert reservation.stamp_area_height_pt < reservation.container_height_pt
-    assert reservation.background_layout.x_align == AxisAlignment.ALIGN_MID
-    assert reservation.inner_content_layout.x_align == AxisAlignment.ALIGN_MID
-    assert reservation.background_layout.y_align == AxisAlignment.ALIGN_MIN
-    assert reservation.inner_content_layout.y_align == AxisAlignment.ALIGN_MAX
 
 
 def test_multi_line_bottom_allows_one_point_width_rounding_overflow(tmp_path: Path) -> None:
