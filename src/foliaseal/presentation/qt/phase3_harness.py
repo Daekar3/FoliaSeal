@@ -34,16 +34,11 @@ from foliaseal.application.phase3_signing_backend import (
     _background_layout_for_stamp,
     _build_stamp_style,
     _build_stamp_text,
-    _build_text_box_style,
     _current_signing_time,
     _effective_layout_edge_margin,
-    _ensure_layout_can_fit,
-    _layout_reservation_for_template,
     _load_simple_signer,
-    _measure_text_box_dimensions,
     _single_line_vertical_outer_margin,
     _stamp_background_for_path,
-    _stamp_image_aspect_ratio,
     build_phase3_signing_executor,
 )
 from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
@@ -65,6 +60,10 @@ from foliaseal.application.text_raster_analysis import (
 )
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.application.visible_signature_layout import (
+    LayoutRequest,
+    VisibleSignatureLayoutEngine,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
@@ -2377,31 +2376,28 @@ def _reconstruct_text_box_bounds_px(
     stamp_text = "\n".join(fragment for fragment in text_fragments if fragment.strip())
     if not stamp_text:
         return None
-    text_box_style = _build_text_box_style(text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(
-        stamp_text,
-        text_box_style,
-    )
-    image_stamp_path = preview_snapshot.get("image_stamp_path")
-    stamp_background = (
-        _stamp_background_for_path(image_stamp_path)
-        if isinstance(image_stamp_path, str) and image_stamp_path
+    image_stamp_path_value = preview_snapshot.get("image_stamp_path")
+    image_stamp_path = (
+        image_stamp_path_value
+        if isinstance(image_stamp_path_value, str) and image_stamp_path_value
         else None
     )
-    reservation = _layout_reservation_for_template(
-        layout_template,
-        stamp_position=stamp_position,
-        signature_rect=signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=box_style,
-        has_visible_stamp_image=stamp_background is not None,
-        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
+    layout_plan = VisibleSignatureLayoutEngine().plan(
+        LayoutRequest(
+            signature_rect=signature_rect,
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            text_style=text_style,
+            box_style=box_style,
+            stamp_text=stamp_text,
+            image_stamp_path=image_stamp_path,
+        )
     )
+    reservation = layout_plan.backend_reservation
     return _layout_rule_bounds_px(
         reservation.inner_content_layout,
-        reserved_width_pt=reservation.text_box_width_pt,
-        reserved_height_pt=reservation.text_box_height_pt,
+        reserved_width_pt=layout_plan.text_box.width_pt,
+        reserved_height_pt=layout_plan.text_box.height_pt,
         width_px=container_bounds_px["width"],
         height_px=container_bounds_px["height"],
         container_width_pt=signature_rect.width_pt,
@@ -5559,32 +5555,25 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
             signature_rect=request.signature_rect,
         )
         stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
-        text_box_style = _build_text_box_style(appearance.text_style)
-        text_box_width, text_box_height = _measure_text_box_dimensions(
-            stamp_text,
-            text_box_style,
+        layout_plan = VisibleSignatureLayoutEngine().plan(
+            LayoutRequest(
+                signature_rect=request.signature_rect,
+                layout_template=appearance.layout_template,
+                stamp_position=appearance.stamp_position,
+                text_style=appearance.text_style,
+                box_style=appearance.box_style,
+                stamp_text=stamp_text,
+                image_stamp_path=appearance.image_stamp_path,
+            )
         )
-        layout_reservation = _layout_reservation_for_template(
-            appearance.layout_template,
-            stamp_position=appearance.stamp_position,
-            signature_rect=request.signature_rect,
-            text_box_width=text_box_width,
-            text_box_height=text_box_height,
-            box_style=appearance.box_style,
-            has_visible_stamp_image=stamp_background is not None,
-            stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
-        )
+        layout_reservation = layout_plan.backend_reservation
+        text_box_width = layout_plan.text_box.width_pt
+        text_box_height = layout_plan.text_box.height_pt
         fit_gate_width_limit = layout_reservation.text_area_width_pt + 1
         fit_gate_height_limit = layout_reservation.text_area_height_pt
-        fit_gate_passed = True
-        try:
-            _ensure_layout_can_fit(
-                layout_reservation,
-                has_visible_stamp_image=stamp_background is not None,
-            )
-        except Exception as exc:
-            fit_gate_passed = False
-            snapshot["error"] = str(exc)
+        fit_gate_passed = not layout_plan.fit_issues
+        if layout_plan.fit_issues:
+            snapshot["error"] = layout_plan.fit_issues[0].message
         background_layout = _background_layout_for_stamp(
             appearance.layout_template,
             stamp_position=appearance.stamp_position,

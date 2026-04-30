@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil
 
 import pytest
 from PIL import Image
@@ -64,11 +65,15 @@ class FakeHorizontalInkMeasurer:
         return self.measurement
 
 
-def _box_style(*, show_border: bool = True) -> SignatureBoxStyle:
+def _box_style(
+    *,
+    show_border: bool = True,
+    border_width_pt: float = 1.0,
+) -> SignatureBoxStyle:
     return SignatureBoxStyle(
         show_border=show_border,
         border_color_hex="#000000",
-        border_width_pt=1.0,
+        border_width_pt=border_width_pt,
         background_color_hex="#FFFFFF",
     )
 
@@ -80,6 +85,7 @@ def _request(
     stamp_position: SignatureStampPosition = SignatureStampPosition.LEFT,
     image_stamp_path: str | None = "stamp.png",
     show_border: bool = True,
+    border_width_pt: float = 1.0,
 ) -> LayoutRequest:
     return LayoutRequest(
         signature_rect=rect
@@ -93,7 +99,10 @@ def _request(
         layout_template=layout_template,
         stamp_position=stamp_position,
         text_style=SignatureTextStyle(font_family="Serif", font_size_pt=8.5),
-        box_style=_box_style(show_border=show_border),
+        box_style=_box_style(
+            show_border=show_border,
+            border_width_pt=border_width_pt,
+        ),
         stamp_text="Digitally signed by\nMorgan Ellery",
         image_stamp_path=image_stamp_path,
     )
@@ -308,6 +317,209 @@ def test_plan_allocates_template_specific_text_and_stamp_areas(
     assert plan.text_layout.x_align == expected_text_x_align
     assert plan.stamp_layout.scaling == "STRETCH_TO_FIT"
     assert plan.text_layout.scaling == "NO_SCALING"
+
+
+def test_bottom_no_stamp_plan_uses_optical_text_alignment() -> None:
+    plan = _engine(text_width=180, text_height=16, image=None).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=260.0,
+                height_pt=25.0,
+            ),
+            stamp_position=SignatureStampPosition.BOTTOM,
+            image_stamp_path=None,
+            border_width_pt=3.5,
+        )
+    )
+
+    assert plan.stamp_layout.y_align == "ALIGN_MID"
+    assert plan.text_layout.y_align == "ALIGN_MAX"
+    assert plan.text_layout.margins.top < plan.text_layout.margins.bottom
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
+)
+def test_compact_vertical_single_line_plan_uses_symmetric_outer_clearance(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    plan = _engine(text_width=180, text_height=16).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=262.0,
+                height_pt=25.0,
+            ),
+            stamp_position=stamp_position,
+        )
+    )
+
+    if stamp_position == SignatureStampPosition.TOP:
+        assert plan.stamp_layout.margins.top == plan.text_layout.margins.bottom
+    else:
+        assert plan.text_layout.margins.top == plan.stamp_layout.margins.bottom
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM],
+)
+def test_compact_vertical_single_line_plan_increases_outer_clearance_with_border(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=262.0,
+        height_pt=25.0,
+    )
+    thin_plan = _engine(text_width=180, text_height=16).plan(
+        _request(
+            rect=rect,
+            stamp_position=stamp_position,
+            border_width_pt=1.0,
+        )
+    )
+    thick_plan = _engine(text_width=180, text_height=16).plan(
+        _request(
+            rect=rect,
+            stamp_position=stamp_position,
+            border_width_pt=3.5,
+        )
+    )
+
+    if stamp_position == SignatureStampPosition.TOP:
+        assert thick_plan.stamp_layout.margins.top > thin_plan.stamp_layout.margins.top
+        assert thick_plan.text_layout.margins.bottom > thin_plan.text_layout.margins.bottom
+    else:
+        assert thick_plan.text_layout.margins.top > thin_plan.text_layout.margins.top
+        assert thick_plan.stamp_layout.margins.bottom > thin_plan.stamp_layout.margins.bottom
+
+
+@pytest.mark.parametrize(
+    "stamp_position, width_pt, height_pt",
+    [
+        (SignatureStampPosition.TOP, 260.0, 22.0),
+        (SignatureStampPosition.BOTTOM, 260.0, 22.0),
+        (SignatureStampPosition.LEFT, 260.0, 40.0),
+        (SignatureStampPosition.RIGHT, 260.0, 40.0),
+    ],
+)
+def test_plan_uses_border_aware_outer_insets(
+    stamp_position: SignatureStampPosition,
+    width_pt: float,
+    height_pt: float,
+) -> None:
+    plan = _engine(text_width=120, text_height=18).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=width_pt,
+                height_pt=height_pt,
+            ),
+            stamp_position=stamp_position,
+            border_width_pt=7.0,
+        )
+    )
+
+    expected_edge_margin = 5
+    for layout in (plan.stamp_layout, plan.text_layout):
+        assert layout.margins.top >= expected_edge_margin
+        assert layout.margins.bottom >= expected_edge_margin
+        assert layout.margins.left >= expected_edge_margin
+        assert layout.margins.right >= expected_edge_margin
+
+
+@pytest.mark.parametrize(
+    (
+        "stamp_position",
+        "expected_text_left_margin",
+        "expected_text_right_margin",
+    ),
+    [
+        (SignatureStampPosition.LEFT, 39, 4),
+        (SignatureStampPosition.RIGHT, 4, 39),
+    ],
+)
+def test_horizontal_single_line_plan_preserves_border_facing_text_margin(
+    stamp_position: SignatureStampPosition,
+    expected_text_left_margin: int,
+    expected_text_right_margin: int,
+) -> None:
+    plan = _engine(
+        text_width=254,
+        text_height=18,
+        image=ImageMetrics(width_px=410, height_px=100, aspect_ratio=4.1),
+    ).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=35.84,
+                bottom_pt=428.99,
+                width_pt=296.96,
+                height_pt=22.53,
+            ),
+            stamp_position=stamp_position,
+        )
+    )
+
+    assert plan.stamp_area_width_pt == 29
+    assert plan.text_layout.margins.left == expected_text_left_margin
+    assert plan.text_layout.margins.right == expected_text_right_margin
+
+
+@pytest.mark.parametrize(
+    "stamp_position",
+    [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
+)
+@pytest.mark.parametrize("border_width_pt", [1.0, 8.0])
+def test_horizontal_single_line_image_plan_preserves_both_edge_invariants(
+    stamp_position: SignatureStampPosition,
+    border_width_pt: float,
+) -> None:
+    rect = SignatureRect(
+        page_index=0,
+        left_pt=35.84,
+        bottom_pt=428.99,
+        width_pt=430.0,
+        height_pt=44.0,
+    )
+    plan = _engine(
+        text_width=254,
+        text_height=18,
+        image=ImageMetrics(width_px=410, height_px=100, aspect_ratio=4.1),
+    ).plan(
+        _request(
+            rect=rect,
+            stamp_position=stamp_position,
+            border_width_pt=border_width_pt,
+        )
+    )
+
+    edge_margin = max(4, int(ceil(border_width_pt / 2.0)) + 1)
+    separator_width = min(
+        6,
+        max(int(round(rect.width_pt)) - edge_margin * 2 - plan.text_area_width_pt, 0),
+    )
+    stamp_facing_margin = plan.stamp_area_width_pt + separator_width + edge_margin
+
+    assert plan.text_layout.margins.top == edge_margin
+    assert plan.text_layout.margins.bottom == edge_margin
+    if stamp_position == SignatureStampPosition.LEFT:
+        assert plan.text_layout.margins.right == edge_margin
+        assert plan.text_layout.margins.left == stamp_facing_margin
+    else:
+        assert plan.text_layout.margins.left == edge_margin
+        assert plan.text_layout.margins.right == stamp_facing_margin
 
 
 def test_unsafe_horizontal_ink_measurement_falls_back_to_structural_layout() -> None:
