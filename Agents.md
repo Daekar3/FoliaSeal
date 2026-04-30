@@ -12,6 +12,18 @@
 - Bias to action: default to implementing with reasonable assumptions; do not end your turn with clarifications unless truly blocked.
 - Avoid excessive looping or repetition; if you find yourself re-reading or re-editing the same files without clear progress, stop and end the turn with a concise summary and any clarifying questions needed.
 
+## Architecture documentation
+
+This repository maintains a project-level architecture document at `docs/ARCHITECTURE.md`.
+
+When making changes that affect module boundaries, public APIs, object models, data models, file ownership, control flow, contracts, persistence, configuration, external integrations, or cross-component behavior, update `docs/ARCHITECTURE.md` in the same change.
+
+Before editing architecture-level behavior, consult `docs/ARCHITECTURE.md`.
+
+If the document appears outdated, incomplete, or contradicted by the code, stop and report the discrepancy before making design-level changes.
+
+Use the `architecture-steward` skill when creating, auditing, or updating this document.
+
 
 # Code Implementation
 
@@ -127,30 +139,12 @@ You are producing plain text that will later be styled by the CLI. Follow these 
 
 # ExecPlans
 
-When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
+When writing complex features or significant refactors, use an ExecPlan (as described in docs/PLANS.md) from design to implementation.
 
 # Other Guidlines
 
 ## Platform Scope (Hard Constraint)
 This project is Linux-only for current scope (target: Linux Mint 22.3 / Ubuntu-compatible runtime).
-
-### Out of scope by default
-- macOS compatibility work
-- Windows compatibility work
-- Cross-platform packaging/CI expansion
-- Platform-abstraction refactors motivated by non-Linux support
-
-If a request implies non-Linux support, stop and request explicit approval before proposing or implementing changes.
-
-## Scope Gate for Proposed Work
-Only propose work that directly improves the Linux PDF viewing/signing flow defined in `pdf_signing_app_feasibility.md`.
-
-Before suggesting changes, verify:
-1. Linux user value is immediate and clear.
-2. No new non-Linux conditionals/dependencies are introduced.
-3. Packaging/testing remains Linux-targeted.
-
-If not, mark as “Out of current scope (defer).”
 
 ## Scope & Delivery Guardrails (v1)
 
@@ -298,10 +292,6 @@ Coordinator expectations:
 
 # AI Coding Guidelines: Torvalds Doctrine
 
-> "Code is cheap. Show me the proompt"
->
-> "If you need more than three levels of indentation, you're screwed anyway."
-
 Behavioral guidelines for AI coding with hardware reality in mind. These are not gentle suggestions. They are the baseline.
 
 ## 1. Data Supremacy: The Data Structure is the Design
@@ -373,65 +363,16 @@ For multi-step tasks, use this format:
 
 When reviewing or generating code, explicitly detect and call out these failure modes:
 
-- **Bogus shit** — abstraction with no concrete payoff
-- **Total and utter crap** — code that is both overcomplicated and unnecessary
-- **Brain-damaged API** — interface that makes common usage painful
-- **Garbage patch** — broad unrelated changes disguised as cleanup
-- **Hand-wavy bullshit** — unproven claims about speed, safety, or correctness
-- **Enterprise sludge** — layers of factories, builders, managers, and config knobs for a trivial task
-- **Special-case insanity** — a pile of conditionals that should have been fixed in the data model
-- **Voodoo programming** — barriers, loops, helpers, or retries added without understanding
-- **Hack upon hack** — layering new ugliness on top of old ugliness
-- **Rats nest code** — unreadable, entangled logic nobody sane can maintain
-- **Pointless merge crap** — useless merge noise, rebases, and branch games
-- **Too ugly to live** — code so ugly it should simply not exist
+- abstraction with no concrete payoff
+- code that is both overcomplicated and unnecessary
+- interface that makes common usage painful
+- broad unrelated changes disguised as cleanup
+- unproven claims about speed, safety, or correctness
+- layers of factories, builders, managers, and config knobs for a trivial task
+- a pile of conditionals that should have been fixed in the data model
+- barriers, loops, helpers, or retries added without understanding
+- layering new ugliness on top of old ugliness
+- unreadable, entangled logic nobody sane can maintain
+- useless merge noise, rebases, and branch games
 
-Use blunt technical language about the patch or design. Do not turn it into personal abuse.
-
-## 7. Standard Rejection Phrases
-
-Use these when the code earns them:
-
-- "This is bogus shit."
-- "This patch is total and utter crap."
-- "This API is brain-damaged."
-- "This is random churn, not cleanup."
-- "This is voodoo programming."
-- "This is hack upon hack."
-- "This code is a rats nest."
-- "This is an abomination."
-- "This patch makes my eyes bleed."
-- "This is too ugly to live."
-- "Stop adding enterprise sludge to a simple problem."
-- "Show numbers or stop pretending this is a performance fix."
-- "Fix the data structure instead of spraying conditionals everywhere."
-- "Do not break userspace just because your design is a mess."
-- "Do not send known-broken crap."
-- "Your merge message sucks."
-
-## 8. Do Not Break Userspace
-
-**What part of "we don't break userspace" do you not understand?**
-
-- Existing user behavior matters more than your theory of cleanliness
-- Regressions are not acceptable just because the new model feels nicer to you
-- Binary compatibility is not optional
-- "Users should just change" is not an argument, it is an admission of failure
-
-If a patch breaks userspace, existing binaries, existing workflows, or established interfaces, reject it unless the user explicitly asked for that break and understands the cost.
-
-## 9. The Review Process
-
-1. Reject code that violates the principles above
-2. Say exactly why it is wrong
-3. Fix the actual problem, not the symptom circus around it
-4. Do not accept "we'll clean it up later"
-5. Do not accept regressions dressed up as cleanups or design purity
-
-## Integration
-
-Merge project-specific instructions below these principles if needed. Do not dilute the doctrine into bureaucratic sludge.
-
-## The Bottom Line
-
-If the patch is vague, bloated, user-hostile, or unverified, it is not ready.
+Use blunt technical language about the patch or design.
