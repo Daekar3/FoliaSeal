@@ -11,15 +11,20 @@ After this slice, the live signing draft workflow will use the new visible-signa
 ## Progress
 
 - [x] (2026-05-01T18:19Z) Created this ExecPlan as the second issue #50 slice.
-- [ ] Confirm the foundation plan has added `VisibleSignatureSemanticsService` and its tests.
-- [ ] Migrate `SigningDraftWorkflow.preview()` and visible-fit validation to consume the semantics service.
-- [ ] Preserve existing public methods and `SigningDraftPreview` shape for Qt callers.
-- [ ] Run workflow, preview, Qt shell, and semantics validation and record results here.
+- [x] (2026-05-01T18:40Z) Confirmed the foundation plan added `VisibleSignatureSemanticsService`, public exports, and focused tests.
+- [x] (2026-05-01T18:40Z) Migrated `SigningDraftWorkflow.preview()` and visible-fit validation to resolve fields, detail text, stamp text, and fit issues through `VisibleSignatureSemanticsService`.
+- [x] (2026-05-01T18:40Z) Preserved existing public methods and `SigningDraftPreview` shape for Qt callers.
+- [x] (2026-05-01T18:40Z) Removed now-unused workflow text-composition helpers that imported backend-private `_compose_visible_signature_text_layout()`.
+- [x] (2026-05-01T18:40Z) Ran workflow, preview, Qt shell, and semantics validation successfully.
+- [ ] Next slice: execute `docs/ExecPlans/visible_signature_semantics_preview_migration_execplan.md` so canonical preview stops composing stamp text independently.
 
 ## Surprises & Discoveries
 
 - Observation: No migration work has started.
   Evidence: this plan was created before code edits for the workflow slice.
+
+- Observation: `SigningDraftWorkflow` still needs a backend-private fit validator adapter.
+  Evidence: after this slice, `rg -n "_compose_visible_signature_text_layout|_visible_signature_fit_issues_for_stamp_text" src/foliaseal/application/signing_draft_workflow.py` shows only `_visible_signature_fit_issues_for_stamp_text` inside the workflow-local `VisibleSignatureFitValidator` adapter. The backend text-composition helper import is gone. The remaining fit helper is transitional because backend fit validation and final signing semantics move in later plans.
 
 ## Decision Log
 
@@ -33,7 +38,33 @@ After this slice, the live signing draft workflow will use the new visible-signa
 
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, summarize which workflow helper methods were removed, kept as wrappers, or deferred.
+The workflow migration slice succeeded.
+
+What changed:
+
+- `SigningDraftWorkflow.preview()` now calls `VisibleSignatureSemanticsService.resolve()` and maps resolved fields back into the existing `SigningDraftPreviewField` DTO.
+- `_validate_visible_signature_fit()` delegates to the semantics resolver so fit validation receives the same resolved stamp text used for preview detail text.
+- Workflow-local adapters now bridge existing PKCS#12 preview value caching and backend fit validation into the new semantics ports.
+- Removed unused workflow-private preview field/detail/fragment helpers that duplicated the new semantics boundary and imported backend-private text composition.
+
+What did not change:
+
+- The public `SigningDraftWorkflow` API is unchanged.
+- `SigningDraftPreview` shape is unchanged.
+- `signing_preview_renderer.py` still has `_preview_stamp_text()` until the next plan.
+- Backend signing still owns final signing stamp text and metadata helpers until the backend migration plan.
+- The workflow still uses backend-private `_visible_signature_fit_issues_for_stamp_text()` behind a local adapter; this is documented transitional debt for the backend migration plan.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/signing_draft_workflow.py src/foliaseal/application/visible_signature_semantics.py tests/unit/test_signing_draft_workflow.py tests/unit/test_visible_signature_semantics.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_semantics.py tests/unit/test_signing_draft_workflow.py
+    16 passed in 0.62s
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py::test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order tests/unit/test_signing_preview_renderer.py::test_preview_renderer_formats_semantics_deterministically
+    2 passed in 0.33s
 
 ## Context and Orientation
 
@@ -106,3 +137,5 @@ The next plan, `visible_signature_semantics_preview_migration_execplan.md`, depe
 The workflow should depend on the public interface of `visible_signature_semantics.py`, not backend-private helpers in `phase3_signing_backend.py`. Any remaining backend-private import in `signing_draft_workflow.py` after this slice must be recorded in this plan with a reason and follow-up owner.
 
 Revision note: Created 2026-05-01 by Codex to define the workflow migration slice for issue #50.
+
+Revision note: Updated 2026-05-01 by Codex after migrating `SigningDraftWorkflow.preview()` and fit validation onto `VisibleSignatureSemanticsService` while preserving the public workflow and preview DTO shape.

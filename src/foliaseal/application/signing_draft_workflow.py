@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Self
@@ -110,35 +109,6 @@ class SigningDraftPreview:
     detail_text: str
     issues: tuple[SigningDraftValidationIssue, ...]
     can_submit: bool
-
-
-def _field_label(field_key: SignatureFieldKey) -> str:
-    labels = {
-        SignatureFieldKey.DISTINGUISHED_NAME: "Distinguished name",
-        SignatureFieldKey.COMMON_NAME: "Common name",
-        SignatureFieldKey.EMAIL: "Email",
-        SignatureFieldKey.SIGNING_TIME: "Signing time",
-        SignatureFieldKey.REASON: "Reason",
-        SignatureFieldKey.LOCATION: "Location",
-        SignatureFieldKey.TITLE: "Title",
-        SignatureFieldKey.COMPANY: "Company",
-    }
-    return labels[field_key]
-
-
-def _derived_preview_text(field_key: SignatureFieldKey) -> str:
-    return _field_label(field_key)
-
-
-def _preview_signing_time(
-    *,
-    datetime_format: str,
-    timezone_mode: SignatureTimezoneDisplayMode,
-) -> str:
-    timestamp = datetime.now(UTC)
-    if timezone_mode == SignatureTimezoneDisplayMode.LOCAL:
-        timestamp = timestamp.astimezone()
-    return timestamp.strftime(datetime_format)
 
 
 def _issue(
@@ -376,10 +346,21 @@ class SigningDraftWorkflow:
         """Return a normalized, UI-friendly preview payload."""
         appearance = self.signature_appearance
         issues = self.validation_issues()
-        fields = self._build_preview_fields(appearance) if appearance is not None else ()
+        semantics = self._resolve_visible_signature_semantics()
+        fields = tuple(
+            SigningDraftPreviewField(
+                field_key=field.field_key,
+                label=field.label,
+                text=field.text,
+                visible=field.visible,
+                source=field.source,
+                hint=field.hint,
+            )
+            for field in semantics.fields
+        )
         detail_text = ""
         if appearance is not None:
-            detail_text = self._build_preview_detail_text(appearance, fields)
+            detail_text = semantics.text.detail_text
         return SigningDraftPreview(
             title=appearance.signer_label_prefix if appearance else "Signature draft",
             page_index=self.signature_rect.page_index if self.signature_rect else None,
@@ -420,91 +401,6 @@ class SigningDraftWorkflow:
             signature_rect=self.signature_rect,
             signature_appearance=self.signature_appearance,
         )
-
-    def _build_preview_fields(
-        self,
-        appearance: SignatureAppearance,
-    ) -> tuple[SigningDraftPreviewField, ...]:
-        certificate_values = self._certificate_values_for_preview()
-        certificate_available = self._certificate_preview_available
-        fields: list[SigningDraftPreviewField] = []
-        for field_key, binding in appearance.iter_field_bindings():
-            label = _field_label(field_key)
-            if (
-                not binding.show_in_visible_appearance
-                or binding.source == SignatureFieldSource.HIDDEN
-            ):
-                fields.append(
-                    SigningDraftPreviewField(
-                        field_key=field_key,
-                        label=label,
-                        text="",
-                        visible=False,
-                        source=binding.source,
-                    )
-                )
-                continue
-
-            if binding.source == SignatureFieldSource.OVERRIDE:
-                text = binding.override_text or ""
-                hint = None
-            elif field_key == SignatureFieldKey.SIGNING_TIME:
-                text = _preview_signing_time(
-                    datetime_format=appearance.datetime_format,
-                    timezone_mode=appearance.timezone_display_mode,
-                )
-                hint = "sign time"
-            else:
-                if certificate_available:
-                    text = certificate_values.get(field_key, "")
-                    hint = "from certificate" if text else None
-                else:
-                    text = binding.display_label or _derived_preview_text(field_key)
-                    hint = "from certificate"
-
-            fields.append(
-                SigningDraftPreviewField(
-                    field_key=field_key,
-                    label=label,
-                    text=text,
-                    visible=bool(text),
-                    source=binding.source,
-                    hint=hint,
-                )
-            )
-
-        return tuple(fields)
-
-    def _build_preview_detail_text(
-        self,
-        appearance: SignatureAppearance,
-        fields: tuple[SigningDraftPreviewField, ...],
-    ) -> str:
-        from foliaseal.application.phase3_signing_backend import (
-            _compose_visible_signature_text_layout,
-        )
-
-        visible_fragments = self._visible_preview_fragments(appearance, fields)
-        return _compose_visible_signature_text_layout(
-            signer_label_prefix=appearance.signer_label_prefix,
-            layout_template=appearance.layout_template,
-            body_fragments=visible_fragments,
-        ).detail_text
-
-    def _visible_preview_fragments(
-        self,
-        appearance: SignatureAppearance,
-        fields: tuple[SigningDraftPreviewField, ...],
-    ) -> list[str]:
-        fragments: list[str] = []
-        for preview_field in fields:
-            if not preview_field.visible or not preview_field.text:
-                continue
-            if appearance.show_field_names:
-                fragments.append(f"{preview_field.label}: {preview_field.text}")
-            else:
-                fragments.append(preview_field.text)
-        return fragments
 
     def _certificate_values_for_preview(self) -> dict[SignatureFieldKey, str]:
         if self._certificate_preview_values is not None:
@@ -628,45 +524,78 @@ class SigningDraftWorkflow:
         return self.placement_context
 
     def _validate_visible_signature_fit(self) -> tuple[SigningDraftValidationIssue, ...]:
-        if self.signature_rect is None or self.signature_appearance is None:
-            return ()
-        if not Path(self.certificate_path).exists():
-            return ()
+        return self._resolve_visible_signature_semantics().issues
 
-        from foliaseal.application.phase3_signing_backend import (
-            _compose_visible_signature_text_layout,
-            _stamp_background_for_path,
-            _visible_signature_fit_issues_for_stamp_text,
+    def _resolve_visible_signature_semantics(self):
+        from foliaseal.application.visible_signature_semantics import (
+            CertificateFieldValues,
+            VisibleSignatureFitRequest,
+            VisibleSignatureSemanticsRequest,
+            VisibleSignatureSemanticsService,
         )
-        from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 
-        fields = self._build_preview_fields(self.signature_appearance)
-        visible_fragments = self._visible_preview_fragments(
-            self.signature_appearance,
-            fields,
-        )
-        stamp_text = _compose_visible_signature_text_layout(
-            signer_label_prefix=self.signature_appearance.signer_label_prefix,
-            layout_template=self.signature_appearance.layout_template,
-            body_fragments=visible_fragments,
-        ).stamp_text
-        try:
-            stamp_background = _stamp_background_for_path(
-                self.signature_appearance.image_stamp_path
+        workflow = self
+
+        class _WorkflowCertificateFieldReader:
+            def read_fields(
+                self,
+                certificate_path: str,
+                passphrase: str,
+            ) -> CertificateFieldValues:
+                del certificate_path, passphrase
+                values = workflow._certificate_values_for_preview()
+                return CertificateFieldValues(
+                    available=workflow._certificate_preview_available,
+                    values=values,
+                )
+
+        class _WorkflowVisibleSignatureFitValidator:
+            def validate(
+                self,
+                request: VisibleSignatureFitRequest,
+            ) -> tuple[SigningDraftValidationIssue, ...]:
+                if not Path(workflow.certificate_path).exists():
+                    return ()
+                from foliaseal.application.phase3_signing_backend import (
+                    _stamp_background_for_path,
+                    _visible_signature_fit_issues_for_stamp_text,
+                )
+                from foliaseal.application.sign_pdf_use_case import (
+                    SigningBackendAppearance,
+                )
+
+                if workflow.signature_appearance is None:
+                    return ()
+                try:
+                    stamp_background = _stamp_background_for_path(
+                        workflow.signature_appearance.image_stamp_path
+                    )
+                except ValueError as exc:
+                    return (
+                        _issue(
+                            "visible_signature_layout_unavailable",
+                            str(exc),
+                            field_name="signature_appearance",
+                        ),
+                    )
+                return _visible_signature_fit_issues_for_stamp_text(
+                    signature_rect=request.signature_rect,
+                    signature_appearance=SigningBackendAppearance.from_signature_appearance(
+                        workflow.signature_appearance
+                    ),
+                    stamp_text=request.stamp_text,
+                    stamp_background=stamp_background,
+                )
+
+        return VisibleSignatureSemanticsService(
+            certificate_reader=_WorkflowCertificateFieldReader(),
+            fit_validator=_WorkflowVisibleSignatureFitValidator(),
+        ).resolve(
+            VisibleSignatureSemanticsRequest(
+                certificate_path=self.certificate_path,
+                passphrase=self.passphrase,
+                signature_rect=self.signature_rect,
+                appearance=self.signature_appearance,
+                placement_context=self.placement_context,
             )
-        except ValueError as exc:
-            return (
-                _issue(
-                    "visible_signature_layout_unavailable",
-                    str(exc),
-                    field_name="signature_appearance",
-                ),
-            )
-        return _visible_signature_fit_issues_for_stamp_text(
-            signature_rect=self.signature_rect,
-            signature_appearance=SigningBackendAppearance.from_signature_appearance(
-                self.signature_appearance
-            ),
-            stamp_text=stamp_text,
-            stamp_background=stamp_background,
         )
