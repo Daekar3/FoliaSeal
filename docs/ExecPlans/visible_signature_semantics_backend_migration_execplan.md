@@ -11,15 +11,25 @@ After this slice, final PDF signing will consume the same visible-signature sema
 ## Progress
 
 - [x] (2026-05-01T18:19Z) Created this ExecPlan as the fourth issue #50 slice.
-- [ ] Confirm preview migration is complete and semantics-derived stamp text is available.
-- [ ] Migrate backend visible stamp text and metadata derivation to the semantics boundary.
-- [ ] Preserve existing signing output behavior and failure-code mapping.
-- [ ] Run backend, preview, and sign-use-case validation and record results here.
+- [x] (2026-05-01T19:14Z) Confirmed preview migration is complete and semantics-derived stamp text is available on `SigningDraftPreview.stamp_text`.
+- [x] (2026-05-01T19:14Z) Added backend-local pyHanko signer and fixed-clock adapters for `VisibleSignatureSemanticsService`.
+- [x] (2026-05-01T19:14Z) Migrated final signing stamp text and PDF metadata derivation to the semantics boundary.
+- [x] (2026-05-01T19:14Z) Migrated backend fit validation to use the same semantics-derived stamp text.
+- [x] (2026-05-01T19:14Z) Preserved existing signing output behavior and failure-code mapping.
+- [x] (2026-05-01T19:14Z) Ran backend, preview, and sign-use-case validation and recorded results here.
+- [x] (2026-05-01T21:40Z) Commit this backend migration slice.
+- [ ] Begin the cleanup plan.
 
 ## Surprises & Discoveries
 
-- Observation: No backend migration work has started.
-  Evidence: this plan was created before code edits for the backend slice.
+- Observation: `_build_stamp_text()`, `_visible_reason()`, `_visible_location()`, and `_visible_email()` can stay as backend compatibility wrappers.
+  Evidence: production signing now resolves semantics once in `PyHankoPdfSigner.sign()`, while these private helpers delegate to `_resolve_visible_signature_semantics()` for direct tests or transitional callers.
+
+- Observation: The backend still needs a pyHanko-specific certificate-field adapter.
+  Evidence: `_PyHankoSignerCertificateFieldReader` converts `SimpleSigner.signing_cert.subject.native` into the field map expected by `VisibleSignatureSemanticsService`; this keeps the semantics core free of pyHanko imports.
+
+- Observation: The old backend text-layout dataclass and composition helper are now dead code.
+  Evidence: `rg -n "_compose_visible_signature_text_layout|VisibleSignatureTextLayout" src/foliaseal/application/phase3_signing_backend.py` shows definitions only. The cleanup plan should remove them after this slice is committed.
 
 ## Decision Log
 
@@ -31,9 +41,33 @@ After this slice, final PDF signing will consume the same visible-signature sema
   Rationale: semantics should decide text and metadata. `phase3_signing_backend.py` and the visible layout boundary still own pyHanko stamp style construction and signed PDF output.
   Date/Author: 2026-05-01 / Codex
 
+- Decision: keep the pyHanko signer-to-field adapter backend-local.
+  Rationale: the adapter depends on `SimpleSigner.signing_cert.subject.native`; moving it into `visible_signature_semantics.py` would make the application semantics boundary depend on concrete pyHanko signing objects.
+  Date/Author: 2026-05-01 / Codex
+
+- Decision: resolve final-signing semantics once per signing operation before fit validation and stamp style construction.
+  Rationale: a single semantics payload makes fit validation, visible stamp text, and PDF metadata share the same timestamp and certificate-derived values.
+  Date/Author: 2026-05-01 / Codex
+
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, summarize which backend-private helpers were removed, wrapped, or kept because they protect pyHanko-specific behavior.
+Final PDF signing now consumes `VisibleSignatureSemanticsService` for visible stamp text and PDF metadata. `PyHankoPdfSigner.sign()` loads the signer, captures one signing time, resolves final-signing semantics, validates layout fit with `semantics.text.stamp_text`, builds the pyHanko stamp style with the same text, and passes `semantics.text.metadata_reason`, `metadata_location`, and `metadata_contact_info` into `PdfSignatureMetadata`.
+
+The backend-private `_build_stamp_text()`, `_visible_reason()`, `_visible_location()`, and `_visible_email()` helpers were retained as compatibility wrappers and now delegate to semantic resolution. The pyHanko style/layout helpers remain backend-owned.
+
+Validation completed:
+
+    .venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/visible_signature_semantics.py tests/unit/test_phase3_signing_backend.py tests/unit/test_visible_signature_semantics.py tests/unit/test_signing_preview_renderer.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_phase3_signing_backend.py::test_backend_visible_semantics_resolve_stamp_text_and_metadata tests/unit/test_phase3_signing_backend.py::test_visible_signature_fit_issues_use_semantics_stamp_text
+    2 passed in 0.40s.
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_semantics.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    154 passed in 25.26s.
+
+    .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_phase3_signing_backend.py::test_phase3_signing_executor_produces_signed_pdf_and_validates
+    22 passed in 0.42s.
 
 ## Context and Orientation
 

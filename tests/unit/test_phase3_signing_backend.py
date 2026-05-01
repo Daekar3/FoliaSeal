@@ -44,6 +44,7 @@ from foliaseal.application.phase3_signing_backend import (
     _layout_reservation_for_template,
     _load_simple_signer,
     _measure_text_box_dimensions,
+    _resolve_visible_signature_semantics,
     _single_line_horizontal_stamp_vertical_inset,
     _single_line_rendered_ink_fits_reservation,
     _single_line_stamp_content_inset,
@@ -2452,6 +2453,122 @@ def test_build_stamp_text_uses_real_derived_values_without_placeholder_labels(
     assert "Wytheville, Virginia, US" in stamp_text
     assert "Reason" not in stamp_text
     assert "Location" not in stamp_text
+
+
+def test_backend_visible_semantics_resolve_stamp_text_and_metadata(tmp_path: Path) -> None:
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    signer = _load_simple_signer(str(cert_path), "secret")
+    signing_time = datetime(2026, 5, 1, 14, 30, tzinfo=UTC)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            show_field_names=False,
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            email=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            title=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            company=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            signing_time=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                override_text="Approved for release",
+            ),
+            location=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+        )
+    )
+
+    semantics = _resolve_visible_signature_semantics(
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        appearance=appearance,
+        signer=signer,
+        signing_time=signing_time,
+        signature_rect=build_signature_rect(page_index=0),
+    )
+
+    assert semantics.text.stamp_text == (
+        "Digitally signed by\n"
+        "Test User\n"
+        "test@example.com\n"
+        "Board Secretary\n"
+        "FoliaSeal\n"
+        "2026-05-01 14:30\n"
+        "Approved for release\n"
+        "Wytheville, Virginia, US"
+    )
+    assert semantics.text.metadata_reason == "Approved for release"
+    assert semantics.text.metadata_location == "Wytheville, Virginia, US"
+    assert semantics.text.metadata_contact_info == "test@example.com"
+    assert (
+        _build_stamp_text(
+            appearance=appearance,
+            signer=signer,
+            signing_time=signing_time,
+            signature_rect=build_signature_rect(page_index=0),
+        )
+        == semantics.text.stamp_text
+    )
+
+
+def test_visible_signature_fit_issues_use_semantics_stamp_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    signer = _load_simple_signer(str(cert_path), "secret")
+    signing_time = datetime(2026, 5, 1, 14, 30, tzinfo=UTC)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            show_field_names=False,
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            email=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            title=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            company=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            signing_time=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(source=SignatureFieldSource.DERIVED),
+        )
+    )
+    captured: dict[str, str] = {}
+
+    def _capture_fit_issues(**kwargs):
+        captured["stamp_text"] = kwargs["stamp_text"]
+        return ()
+
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend."
+        "_visible_signature_fit_issues_for_stamp_text",
+        _capture_fit_issues,
+    )
+
+    issues = _visible_signature_fit_issues(
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        signature_rect=build_signature_rect(page_index=0),
+        signature_appearance=appearance,
+        signer=signer,
+        signing_time=signing_time,
+    )
+
+    assert issues == ()
+    assert captured["stamp_text"] == (
+        "Digitally signed by\n"
+        "Test User | test@example.com | Board Secretary | FoliaSeal | "
+        "2026-05-01 14:30 | Wytheville, Virginia, US"
+    )
 
 
 def test_build_stamp_text_wraps_single_line_content_for_compact_rectangle(

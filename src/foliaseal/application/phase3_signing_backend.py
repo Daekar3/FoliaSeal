@@ -59,6 +59,13 @@ from foliaseal.application.visible_signature_layout import (
     RectBounds,
     VisibleSignatureLayoutEngine,
 )
+from foliaseal.application.visible_signature_semantics import (
+    CertificateFieldValues,
+    VisibleSignatureSemantics,
+    VisibleSignatureSemanticsMode,
+    VisibleSignatureSemanticsRequest,
+    VisibleSignatureSemanticsService,
+)
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
@@ -233,6 +240,54 @@ class PyHankoCertificateLoader:
         _load_simple_signer(certificate_path, passphrase)
 
 
+@dataclass(frozen=True)
+class _PyHankoSignerCertificateFieldReader:
+    signer: SimpleSigner
+
+    def read_fields(self, certificate_path: str, passphrase: str) -> CertificateFieldValues:
+        del certificate_path, passphrase
+        subject = self.signer.signing_cert.subject.native
+        common_name = _subject_value(subject, "common_name")
+        email = _subject_value(subject, "email_address")
+        title = _subject_value(subject, "title") or _subject_value(
+            subject, "organizational_unit_name"
+        )
+        company = _subject_value(subject, "organization_name")
+        location = _derived_location(subject)
+        distinguished_name = ", ".join(
+            value
+            for value in (
+                common_name,
+                email,
+                title,
+                company,
+                location,
+            )
+            if value
+        )
+        return CertificateFieldValues(
+            available=True,
+            values={
+                SignatureFieldKey.DISTINGUISHED_NAME: distinguished_name,
+                SignatureFieldKey.COMMON_NAME: common_name or self.signer.subject_name,
+                SignatureFieldKey.EMAIL: email or "",
+                SignatureFieldKey.TITLE: title or "",
+                SignatureFieldKey.COMPANY: company or "",
+                SignatureFieldKey.REASON: "",
+                SignatureFieldKey.LOCATION: location,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class _FixedSigningClock:
+    signing_time: datetime
+
+    def now(self, mode: SignatureTimezoneDisplayMode) -> datetime:
+        del mode
+        return self.signing_time
+
+
 @dataclass
 class PyHankoPdfSigner:
     """Produce a genuinely signed PDF using pyHanko."""
@@ -246,23 +301,29 @@ class PyHankoPdfSigner:
         appearance = request.signature_appearance
         if request.signature_rect is None or appearance is None:
             raise ValueError("A visible signature rectangle and appearance are required.")
-        fit_issues = _visible_signature_fit_issues(
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            signature_rect=request.signature_rect,
-            signature_appearance=appearance,
-        )
-        if any(issue.severity == SigningDraftValidationSeverity.ERROR for issue in fit_issues):
-            raise ValueError("; ".join(issue.message for issue in fit_issues))
-
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         signing_time = _current_signing_time(appearance.timezone_display_mode)
-        stamp_text = _build_stamp_text(
+        semantics = _resolve_visible_signature_semantics(
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
             appearance=appearance,
             signer=signer,
             signing_time=signing_time,
             signature_rect=request.signature_rect,
         )
+        fit_issues = _visible_signature_fit_issues(
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            signature_rect=request.signature_rect,
+            signature_appearance=appearance,
+            signer=signer,
+            signing_time=signing_time,
+            semantics=semantics,
+        )
+        if any(issue.severity == SigningDraftValidationSeverity.ERROR for issue in fit_issues):
+            raise ValueError("; ".join(issue.message for issue in fit_issues))
+
+        stamp_text = semantics.text.stamp_text
         stamp_style = _build_stamp_style(
             appearance,
             stamp_text=stamp_text,
@@ -276,9 +337,9 @@ class PyHankoPdfSigner:
             field_name=_SIG_FIELD_NAME,
             md_algorithm="sha256",
             name=_signature_name_for_metadata(request, signer),
-            reason=_visible_reason(appearance, signer),
-            location=_visible_location(appearance, signer),
-            contact_info=_visible_email(appearance, signer),
+            reason=semantics.text.metadata_reason,
+            location=semantics.text.metadata_location,
+            contact_info=semantics.text.metadata_contact_info,
             subfilter=fields.SigSeedSubFilter.ADOBE_PKCS7_DETACHED,
         )
         field_spec = fields.SigFieldSpec(
@@ -1344,22 +1405,29 @@ def _visible_signature_fit_issues(
     passphrase: str,
     signature_rect: SignatureRect,
     signature_appearance: SigningBackendAppearance,
+    signer: SimpleSigner | None = None,
+    signing_time: datetime | None = None,
+    semantics: VisibleSignatureSemantics | None = None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
     """Return backend-side layout fit issues for the requested visible signature."""
     try:
-        signer = _load_simple_signer(certificate_path, passphrase)
-        signing_time = _current_signing_time(signature_appearance.timezone_display_mode)
-        stamp_text = _build_stamp_text(
+        resolved_signer = signer or _load_simple_signer(certificate_path, passphrase)
+        resolved_signing_time = signing_time or _current_signing_time(
+            signature_appearance.timezone_display_mode
+        )
+        resolved_semantics = semantics or _resolve_visible_signature_semantics(
+            certificate_path=certificate_path,
+            passphrase=passphrase,
             appearance=signature_appearance,
-            signer=signer,
-            signing_time=signing_time,
+            signer=resolved_signer,
+            signing_time=resolved_signing_time,
             signature_rect=signature_rect,
         )
         stamp_background = _stamp_background_for_path(signature_appearance.image_stamp_path)
         return _visible_signature_fit_issues_for_stamp_text(
             signature_rect=signature_rect,
             signature_appearance=signature_appearance,
-            stamp_text=stamp_text,
+            stamp_text=resolved_semantics.text.stamp_text,
             stamp_background=stamp_background,
         )
     except Exception as exc:
@@ -1806,31 +1874,41 @@ def _build_stamp_text(
     signing_time: datetime,
     signature_rect: SignatureRect | None = None,
 ) -> str:
-    body_fragments: list[str] = []
-    prefix = appearance.signer_label_prefix.strip()
+    semantics = _resolve_visible_signature_semantics(
+        certificate_path="",
+        passphrase="",
+        appearance=appearance,
+        signer=signer,
+        signing_time=signing_time,
+        signature_rect=signature_rect,
+    )
+    return semantics.text.stamp_text
 
-    for binding in appearance.field_bindings:
-        field_key = binding.field_key
-        if not _should_render_field(binding):
-            continue
-        text = _resolve_visible_field_text(
-            field_key,
-            binding,
-            signer=signer,
+
+def _resolve_visible_signature_semantics(
+    *,
+    certificate_path: str,
+    passphrase: str,
+    appearance: SigningBackendAppearance,
+    signer: SimpleSigner,
+    signing_time: datetime,
+    signature_rect: SignatureRect | None = None,
+) -> VisibleSignatureSemantics:
+    service = VisibleSignatureSemanticsService(
+        certificate_reader=_PyHankoSignerCertificateFieldReader(signer),
+        clock=_FixedSigningClock(signing_time),
+    )
+    return service.resolve(
+        VisibleSignatureSemanticsRequest(
+            certificate_path=certificate_path,
+            passphrase=passphrase,
+            signature_rect=signature_rect,
             appearance=appearance,
-            signing_time=signing_time,
+            mode=VisibleSignatureSemanticsMode.FINAL_SIGNING,
         )
-        if not text:
-            continue
-        if appearance.show_field_names:
-            body_fragments.append(f"{_field_label(field_key)}: {text}")
-        else:
-            body_fragments.append(text)
-    return _compose_visible_signature_text_layout(
-        signer_label_prefix=prefix,
-        layout_template=appearance.layout_template,
-        body_fragments=body_fragments,
-    ).stamp_text
+    )
+
+
 def _single_line_text_fits_reservation(
     *,
     appearance: SigningBackendAppearance,
@@ -2061,42 +2139,33 @@ def _signature_name_for_metadata(
 
 
 def _visible_reason(appearance: SigningBackendAppearance, signer: SimpleSigner) -> str | None:
-    binding = _binding_for_field(appearance, SignatureFieldKey.REASON)
-    if binding is None or not _should_render_field(binding):
-        return None
-    return _resolve_visible_field_text(
-        SignatureFieldKey.REASON,
-        binding,
-        signer=signer,
+    return _resolve_visible_signature_semantics(
+        certificate_path="",
+        passphrase="",
         appearance=appearance,
+        signer=signer,
         signing_time=_current_signing_time(appearance.timezone_display_mode),
-    )
+    ).text.metadata_reason
 
 
 def _visible_location(appearance: SigningBackendAppearance, signer: SimpleSigner) -> str | None:
-    binding = _binding_for_field(appearance, SignatureFieldKey.LOCATION)
-    if binding is None or not _should_render_field(binding):
-        return None
-    return _resolve_visible_field_text(
-        SignatureFieldKey.LOCATION,
-        binding,
-        signer=signer,
+    return _resolve_visible_signature_semantics(
+        certificate_path="",
+        passphrase="",
         appearance=appearance,
+        signer=signer,
         signing_time=_current_signing_time(appearance.timezone_display_mode),
-    )
+    ).text.metadata_location
 
 
 def _visible_email(appearance: SigningBackendAppearance, signer: SimpleSigner) -> str | None:
-    binding = _binding_for_field(appearance, SignatureFieldKey.EMAIL)
-    if binding is None or not _should_render_field(binding):
-        return None
-    return _resolve_visible_field_text(
-        SignatureFieldKey.EMAIL,
-        binding,
-        signer=signer,
+    return _resolve_visible_signature_semantics(
+        certificate_path="",
+        passphrase="",
         appearance=appearance,
+        signer=signer,
         signing_time=_current_signing_time(appearance.timezone_display_mode),
-    )
+    ).text.metadata_contact_info
 
 
 def _current_signing_time(timezone_mode: SignatureTimezoneDisplayMode) -> datetime:
