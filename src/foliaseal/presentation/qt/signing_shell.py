@@ -1020,6 +1020,8 @@ def _preview_detail_text(preview: SigningDraftPreview) -> str:
 
 
 def _preview_stamp_text(preview: SigningDraftPreview) -> str:
+    if preview.stamp_text:
+        return preview.stamp_text
     title_text = (preview.signer_label_prefix or preview.title or "").strip()
     detail_text = (preview.detail_text or "").strip()
     if title_text and detail_text:

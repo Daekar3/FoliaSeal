@@ -654,7 +654,7 @@ def compare_preview_to_request(
 
 
 def _canonical_preview_text_fragments(preview: SigningDraftPreview) -> list[str]:
-    return _rendered_text_fragments(_preview_stamp_text(preview))
+    return _rendered_text_fragments(_semantic_preview_stamp_text(preview))
 
 
 def _appearance_border_style(
@@ -818,7 +818,9 @@ def _line_bounds_within_tolerance(
     )
 
 
-def _preview_stamp_text(preview: SigningDraftPreview) -> str:
+def _semantic_preview_stamp_text(preview: SigningDraftPreview) -> str:
+    if preview.stamp_text:
+        return preview.stamp_text
     title_text = (preview.signer_label_prefix or preview.title or "").strip()
     detail_text = (preview.detail_text or "").strip()
     if title_text and detail_text:
@@ -884,7 +886,7 @@ def _canonical_preview_layout(
         box_style=preview.box_style,
         image_stamp_path=preview.image_stamp_path if include_stamp else None,
     )
-    stamp_text = _preview_stamp_text(preview) if include_text else " "
+    stamp_text = _semantic_preview_stamp_text(preview) if include_text else " "
     stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
     layout_engine = VisibleSignatureLayoutEngine(
         ink_measurer=(

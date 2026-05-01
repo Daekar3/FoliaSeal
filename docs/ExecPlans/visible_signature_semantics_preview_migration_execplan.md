@@ -11,15 +11,22 @@ After this slice, canonical preview rendering will no longer reconstruct visible
 ## Progress
 
 - [x] (2026-05-01T18:19Z) Created this ExecPlan as the third issue #50 slice.
-- [ ] Confirm `SigningDraftWorkflow.preview()` now receives text from the semantics boundary.
-- [ ] Migrate canonical preview stamp-text construction away from `_preview_stamp_text()` duplication.
-- [ ] Preserve preview/output parity tests and canonical preview geometry behavior.
-- [ ] Run focused preview, layout, workflow, and Qt shell validation and record results here.
+- [x] (2026-05-01T18:44Z) Confirmed `SigningDraftWorkflow.preview()` now receives text from the semantics boundary.
+- [x] (2026-05-01T18:44Z) Added `SigningDraftPreview.stamp_text` and populated it from `VisibleSignatureSemantics.text.stamp_text`.
+- [x] (2026-05-01T18:44Z) Migrated canonical preview fragment and layout text construction to prefer semantics-derived preview stamp text.
+- [x] (2026-05-01T18:44Z) Updated the Qt shell preview text helper to prefer the same preview stamp text field.
+- [x] (2026-05-01T18:44Z) Preserved preview/output parity tests and canonical preview geometry behavior.
+- [x] (2026-05-01T18:44Z) Ran focused preview, layout, workflow, Qt shell, and harness validation and recorded results here.
+- [x] (2026-05-01T19:09Z) Commit this preview migration slice.
+- [ ] Begin the backend signing migration plan.
 
 ## Surprises & Discoveries
 
-- Observation: No preview migration work has started.
-  Evidence: this plan was created before code edits for the preview slice.
+- Observation: Some tests and presentation helpers still construct or consume `SigningDraftPreview` directly.
+  Evidence: direct preview construction in `tests/unit/test_signing_preview_renderer.py` and the Qt shell preview helper both needed compatibility with missing or unset `stamp_text`.
+
+- Observation: The Qt shell has its own preview text accessor separate from canonical raster rendering.
+  Evidence: `src/foliaseal/presentation/qt/signing_shell.py` defines `_preview_stamp_text(preview)`.
 
 ## Decision Log
 
@@ -31,9 +38,30 @@ After this slice, canonical preview rendering will no longer reconstruct visible
   Rationale: issue #50 is about semantic text and metadata, not Qt/PDF raster rendering. Folding rendering into the semantics service would make the interface broad and expensive for common draft updates.
   Date/Author: 2026-05-01 / Codex
 
+- Decision: add nullable `stamp_text` to `SigningDraftPreview` instead of importing the semantics service into canonical rendering.
+  Rationale: the workflow already owns draft semantic resolution. Carrying the resolved text in the preview payload keeps renderers as consumers and avoids making the render path reconstruct workflow state.
+  Date/Author: 2026-05-01 / Codex
+
+- Decision: retain fallback text composition in preview helpers for compatibility.
+  Rationale: several tests and adapters instantiate `SigningDraftPreview` directly. The fallback keeps those callers stable while migrated workflow previews use the semantic field.
+  Date/Author: 2026-05-01 / Codex
+
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, summarize whether `_preview_stamp_text()` was deleted, demoted to a compatibility wrapper, or retained for a documented reason.
+Preview rendering now consumes semantics-derived stamp text through `SigningDraftPreview.stamp_text`. `SigningDraftWorkflow.preview()` populates the field from `VisibleSignatureSemanticsService`, canonical preview fragment/layout construction prefers it, and the Qt shell preview accessor also prefers it.
+
+The renderer helper was retained as a compatibility wrapper for direct `SigningDraftPreview` construction rather than deleted. A focused regression test, `test_canonical_preview_text_fragments_use_semantics_stamp_text`, documents that canonical text fragments ignore stale detail fields when semantic stamp text is available.
+
+Validation completed:
+
+    .venv/bin/ruff check src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/application/visible_signature_semantics.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_signing_preview_renderer.py tests/unit/test_signing_draft_workflow.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_semantics.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_preview_renderer.py
+    66 passed in 15.72s.
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py::test_signing_shell_uses_canonical_preview_snapshot_when_assets_are_renderable tests/unit/test_phase3_harness.py::test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_preview
+    2 passed in 0.37s.
 
 ## Context and Orientation
 

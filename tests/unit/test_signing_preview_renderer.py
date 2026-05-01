@@ -21,6 +21,7 @@ from foliaseal.application.signing_draft_workflow import (
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
     _canonical_preview_layout,
+    _canonical_preview_text_fragments,
     _render_optional_preview_bounds,
     compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
@@ -381,6 +382,22 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         line.kind.value == "status" and line.text == "Ready to sign"
         for line in snapshot.lines
     )
+
+
+def test_canonical_preview_text_fragments_use_semantics_stamp_text(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    workflow.set_signature_rect(build_signature_rect(page_index=2))
+    preview = replace(
+        workflow.preview(),
+        detail_text="stale detail text that should not drive canonical rendering",
+        stamp_text="Resolved title\nResolved detail",
+    )
+
+    assert _canonical_preview_text_fragments(preview) == [
+        "Resolved title",
+        "Resolved detail",
+    ]
 
 
 def test_preview_renderer_omits_blank_title_line_when_prefix_is_empty(tmp_path: Path) -> None:

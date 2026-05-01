@@ -109,6 +109,7 @@ class SigningDraftPreview:
     detail_text: str
     issues: tuple[SigningDraftValidationIssue, ...]
     can_submit: bool
+    stamp_text: str | None = None
 
 
 def _issue(
@@ -378,6 +379,7 @@ class SigningDraftWorkflow:
             detail_text=detail_text,
             issues=issues,
             can_submit=self.can_build_request(),
+            stamp_text=semantics.text.stamp_text,
         )
 
     def build_signing_request(self) -> SigningRequest:
