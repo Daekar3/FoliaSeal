@@ -72,8 +72,8 @@ Tests/docs that must be updated with the rename:
 - [`tests/unit/test_signature_font_registry.py`](/home/daekar/SignPDF/Scratch/tests/unit/test_signature_font_registry.py)
 - [`tests/unit/test_qt_signing_shell.py`](/home/daekar/SignPDF/Scratch/tests/unit/test_qt_signing_shell.py)
 - [`README.md`](/home/daekar/SignPDF/Scratch/README.md)
-- [`pdf_signing_app_feasibility.md`](/home/daekar/SignPDF/Scratch/pdf_signing_app_feasibility.md)
-- [`phase3_parallel_plan.md`](/home/daekar/SignPDF/Scratch/phase3_parallel_plan.md)
+- [`docs/pdf_signing_app_feasibility.md`](/home/daekar/SignPDF/Scratch/docs/pdf_signing_app_feasibility.md)
+- [`docs/ExecPlans/phase3_parallel_plan.md`](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase3_parallel_plan.md)
 - [`.agent/unified_font_engine_signature_rendering_execplan.md`](/home/daekar/SignPDF/Scratch/.agent/unified_font_engine_signature_rendering_execplan.md)
 
 Font asset location:

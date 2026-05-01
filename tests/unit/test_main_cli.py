@@ -281,7 +281,7 @@ def test_main_phase2_viewer_harness_dispatches_to_qt_harness(
         "summary_json_path": "/tmp/capture.json",
         "evidence_command_path": "/tmp/evidence-command.sh",
         "checklist_results_path": "artifacts/phase2_manual_qa_results.md",
-        "checklist_template_path": "phase2_manual_qa_checklist.md",
+        "checklist_template_path": "docs/ExecPlans/phase2_manual_qa_checklist.md",
     }
 
 

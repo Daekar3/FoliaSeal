@@ -117,7 +117,7 @@ Status after this patch: **🟡 Still in progress** (runtime Qt validation + mea
     - Navigation: `PgUp`/`PgDn`, arrow keys, `Home`/`End`
   - Improved error callback wording to be clarity-first with appended technical details for diagnostics.
   - Added/updated unit coverage for keyboard wiring and revised error-message behavior.
-- Updated `phase2_manual_qa_checklist.md` to explicitly include keyboard interaction checks and FR-16 runtime footprint evidence capture.
+- Updated `docs/ExecPlans/phase2_manual_qa_checklist.md` to explicitly include keyboard interaction checks and FR-16 runtime footprint evidence capture.
 
 ### Remaining blocking actions
 
@@ -248,7 +248,7 @@ Status after this patch: **🟡 Still in progress** (real Qt-host execution is s
   - This reduces copy/paste drift and makes it easier to attach immutable evidence output to this review after Qt-host execution.
 - **Step 1 (runtime validation sweep): checklist guidance aligned with artifact output.**
   - Updated the manual QA checklist command to include `--write-markdown-file artifacts/phase2_runtime_evidence.md`.
-  - Added explicit checklist guidance to paste the generated artifact into `phase2_review.md` after run completion.
+  - Added explicit checklist guidance to paste the generated artifact into `docs/ExecPlans/phase2_review.md` after run completion.
 
 ### Updated recommended evidence command for Qt-enabled host
 
@@ -259,7 +259,7 @@ python -m foliaseal phase2-evidence \
   --collect-runtime-footprint \
   --measure-startup-command <pyinstaller_one_dir_executable> \
   --bundle-dir <pyinstaller_one_dir_output> \
-  --qa-checklist-file phase2_manual_qa_checklist.md \
+  --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md \
   --qa-issue "<optional issue note>" \
   --write-markdown-file artifacts/phase2_runtime_evidence.md
 ```
@@ -300,7 +300,7 @@ python -m foliaseal phase2-evidence \
   --collect-runtime-footprint \
   --measure-startup-command <pyinstaller_one_dir_executable> \
   --bundle-dir <pyinstaller_one_dir_output> \
-  --qa-checklist-file phase2_manual_qa_checklist.md \
+  --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md \
   --qa-issue "<optional issue note>" \
   --check-qt-runtime \
   --write-markdown-file artifacts/phase2_runtime_evidence.md
@@ -442,7 +442,7 @@ python -m foliaseal phase2-evidence \
   --collect-runtime-footprint \
   --measure-startup-command <pyinstaller_one_dir_executable> \
   --bundle-dir <pyinstaller_one_dir_output> \
-  --qa-checklist-file phase2_manual_qa_checklist.md \
+  --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md \
   --qa-issue "<optional issue note>"
 ```
 
@@ -465,7 +465,7 @@ Status after this patch: **🟡 Still in progress** (Qt-enabled host execution r
 
 - **Step 1 (runtime validation sweep): attempted and documented in generated evidence artifact.**
   - Executed the evidence workflow with checklist parsing and Qt readiness checks enabled:
-    - `PYTHONPATH=src python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - `PYTHONPATH=src python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Current host result remains blocked for runtime sweep execution:
     - `PySide6`: unavailable
     - `PySide6.QtPdf`: unavailable
@@ -518,7 +518,7 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 
 - **Step 1 evidence state clarified for the active dev environment.**
   - Re-generated `artifacts/phase2_runtime_evidence.md` using the project venv:
-    - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md --collect-runtime-footprint --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Result from the active venv now confirms:
     - `PySide6`: available
     - `PySide6.QtPdf`: available
@@ -526,7 +526,7 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
   - The older review note claiming this host was not Qt-ready reflected an earlier non-venv interpreter run and is now obsolete.
   - The checked-in evidence artifact is now aligned with the currently used `.venv`-based workflow.
 - **Documentation scope clarified.**
-  - `phase2_manual_qa_checklist.md` now tracks only the manual runtime execution steps that require an actual interactive Qt session.
+  - `docs/ExecPlans/phase2_manual_qa_checklist.md` now tracks only the manual runtime execution steps that require an actual interactive Qt session.
   - `artifacts/phase2_runtime_evidence.md` remains the generated source of truth for Qt readiness, timing snapshots, runtime footprint metrics, and checklist-derived pass/fail counts.
 
 ### Evidence artifact snapshot (current `.venv` run)
@@ -547,7 +547,7 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 Status after this patch: **✅ Complete** (interactive runtime validation, timing evidence, and runtime footprint evidence are all attached and validated).
 
 Note for any future rerun of the manual validation flow: the immutable checklist template is
-[`phase2_manual_qa_checklist.md`](/home/daekar/SignPDF/Scratch/phase2_manual_qa_checklist.md), but the evidence command should consume the run-specific results file written by the harness at
+[`docs/ExecPlans/phase2_manual_qa_checklist.md`](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase2_manual_qa_checklist.md), but the evidence command should consume the run-specific results file written by the harness at
 [`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
 Older review entries that point `--qa-checklist-file` at the template checklist are superseded by that newer evidence flow.
 
@@ -636,7 +636,7 @@ Status after this patch: **🟡 Still in progress** (interactive Qt runtime vali
 
 Historical note: this section reflects the packaging-only state before the final interactive sign-off was completed.
 The command example below is retained for historical traceability only and is superseded by the final evidence flow in
-[`phase2_review.md`](/home/daekar/SignPDF/Scratch/phase2_review.md#L545), which uses the run-specific checklist results file at
+[`docs/ExecPlans/phase2_review.md`](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase2_review.md#L545), which uses the run-specific checklist results file at
 [`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
 
 ### Completed from the plan in this patch
@@ -644,7 +644,7 @@ The command example below is retained for historical traceability only and is su
 - **Step 4 (FR-16 runtime metrics): partially advanced with current packaged artifact measurements.**
   - Rebuilt the PyInstaller one-dir bundle with `./scripts/build_pyinstaller.sh`.
   - Re-generated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) against the packaged executable using:
-    - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file phase2_manual_qa_checklist.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
+    - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
     - Superseded for final sign-off by the run-specific checklist workflow:
       `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file artifacts/phase2_manual_qa_results.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - Current packaged-app measurements from this environment:

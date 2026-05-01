@@ -12,7 +12,7 @@ The proof is documentary rather than executable: the core docs and one dedicated
 
 ## Progress
 
-- [x] (2026-04-03 23:28Z) Audited the current canonical docs (`README.md`, `pdf_signing_app_feasibility.md`, `phase3_parallel_plan.md`) plus the acceptance artifacts and the new acceptance-governance ExecPlan.
+- [x] (2026-04-03 23:28Z) Audited the current canonical docs (`README.md`, `docs/pdf_signing_app_feasibility.md`, `docs/ExecPlans/phase3_parallel_plan.md`) plus the acceptance artifacts and the new acceptance-governance ExecPlan.
 - [x] (2026-04-03 23:39Z) Updated the canonical docs so they describe the current Phase 3 state and remaining blockers more honestly.
 - [x] (2026-04-03 23:39Z) Added a dedicated Phase 3 handoff document for the next finishing wave.
 - [x] (2026-04-03 23:43Z) Verified that the docs agree on what is working, what is blocked, and how to continue.
@@ -22,10 +22,10 @@ The proof is documentary rather than executable: the core docs and one dedicated
 - Observation: the acceptance docs are now stronger about gate classification, but they are still not the best “start here” guide for a new agent.
   Evidence: `artifacts/phase3_fr3b_acceptance_checklist.md` is focused on run execution and pass/fail recording, not on engineering handoff.
 
-- Observation: `README.md` and `phase3_parallel_plan.md` already contain much of the right material, but the most current blocker set still lives mostly in chat history and recent harness observations.
+- Observation: `README.md` and `docs/ExecPlans/phase3_parallel_plan.md` already contain much of the right material, but the most current blocker set still lives mostly in chat history and recent harness observations.
   Evidence: the docs acknowledge preview/output parity issues broadly, but they do not yet call out the current narrow blockers like horizontal stamp packing and GIF transparency.
 
-- Observation: one important contradiction had survived in `phase3_parallel_plan.md`: it still implied there was no real user-facing concept of appearance in the GUI, even though the shell already has named appearance profiles and focused appearance controls.
+- Observation: one important contradiction had survived in `docs/ExecPlans/phase3_parallel_plan.md`: it still implied there was no real user-facing concept of appearance in the GUI, even though the shell already has named appearance profiles and focused appearance controls.
   Evidence: the old `Not yet achieved` list included “a real end-user concept of "appearance" in the GUI”.
 
 ## Decision Log
@@ -47,13 +47,13 @@ remaining Phase 3 blockers and on the role of the acceptance/gate machinery.
 
 ## Context and Orientation
 
-The canonical product/process requirements live in `pdf_signing_app_feasibility.md`. The current Phase 3 execution and ownership context lives in `phase3_parallel_plan.md`. The short repo entry point is `README.md`. The manual QA/gating workflow is described in `artifacts/phase3_fr3b_acceptance_checklist.md` and `artifacts/phase3_fr3b_acceptance_results.md`.
+The canonical product/process requirements live in `docs/pdf_signing_app_feasibility.md`. The current Phase 3 execution and ownership context lives in `docs/ExecPlans/phase3_parallel_plan.md`. The short repo entry point is `README.md`. The manual QA/gating workflow is described in `artifacts/phase3_fr3b_acceptance_checklist.md` and `artifacts/phase3_fr3b_acceptance_results.md`.
 
 What is currently missing is a concise engineering handoff document that says: “here is what already works, here is what remains broken, here is how to rerun the current evidence flow, and here are the code modules you should inspect first.” That is what this refresh adds.
 
 ## Plan of Work
 
-First, tighten `README.md` so it states the current Phase 3 status more concretely, especially the new evidence contract, the acceptance boundary, and the real remaining visible-signature issues. Second, update `phase3_parallel_plan.md` so its “Current Status” and remaining-work framing reflect the latest wins and blockers instead of only broad categories. Third, update `pdf_signing_app_feasibility.md` where needed so the post-Phase-3 roadmap names the current Phase 4A focus more concretely. Finally, add a dedicated handoff file under `artifacts/` that a new agent can use as a jump-in brief.
+First, tighten `README.md` so it states the current Phase 3 status more concretely, especially the new evidence contract, the acceptance boundary, and the real remaining visible-signature issues. Second, update `docs/ExecPlans/phase3_parallel_plan.md` so its “Current Status” and remaining-work framing reflect the latest wins and blockers instead of only broad categories. Third, update `docs/pdf_signing_app_feasibility.md` where needed so the post-Phase-3 roadmap names the current Phase 4A focus more concretely. Finally, add a dedicated handoff file under `artifacts/` that a new agent can use as a jump-in brief.
 
 ## Concrete Steps
 
@@ -64,15 +64,15 @@ Work from the repository root:
 After editing, verify the docs agree on the core terms:
 
     rg -n "engineering_run|gate_candidate|release_gate_passed|Phase 4A|Phase 3 is not yet accepted|remaining blockers" \
-      README.md pdf_signing_app_feasibility.md phase3_parallel_plan.md artifacts/phase3_fr3b_acceptance_checklist.md artifacts/phase3_handoff_2026-04-03.md
+      README.md docs/pdf_signing_app_feasibility.md docs/ExecPlans/phase3_parallel_plan.md artifacts/phase3_fr3b_acceptance_checklist.md artifacts/phase3_handoff_2026-04-03.md
 
 ## Validation and Acceptance
 
 The refresh is successful when:
 
 - `README.md` tells a new reader what Phase 3 can do now, what is still blocked, and how the harness/gate works.
-- `phase3_parallel_plan.md` describes the current Phase 3 state honestly enough that a new agent can pick up the next finishing wave.
-- `pdf_signing_app_feasibility.md` continues to hold the durable roadmap/policy truth without contradicting the more tactical docs.
+- `docs/ExecPlans/phase3_parallel_plan.md` describes the current Phase 3 state honestly enough that a new agent can pick up the next finishing wave.
+- `docs/pdf_signing_app_feasibility.md` continues to hold the durable roadmap/policy truth without contradicting the more tactical docs.
 - `artifacts/phase3_handoff_2026-04-03.md` exists and gives a clean starting brief for the next agent.
 
 ## Idempotence and Recovery
@@ -88,8 +88,8 @@ The main deliverable is the new handoff note in `artifacts/phase3_handoff_2026-0
 No new runtime dependency is needed. The only “interfaces” in scope are documentation contracts:
 
 - `README.md` remains the concise repo entry point.
-- `pdf_signing_app_feasibility.md` remains the canonical product/process source.
-- `phase3_parallel_plan.md` remains the current Phase 3 coordination document.
+- `docs/pdf_signing_app_feasibility.md` remains the canonical product/process source.
+- `docs/ExecPlans/phase3_parallel_plan.md` remains the current Phase 3 coordination document.
 - `artifacts/phase3_handoff_2026-04-03.md` becomes the tactical handoff note for the next Phase 3 finishing wave.
 
 Revision note: created on 2026-04-03 to prepare the repository docs for a Phase 3 handoff into a new chat/agent context.

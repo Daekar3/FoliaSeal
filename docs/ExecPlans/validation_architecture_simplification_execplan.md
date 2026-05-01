@@ -85,10 +85,10 @@ What did not change:
 
 Verification results:
 
-- `ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py README.md phase3_parallel_plan.md Agents.md .agent/validation_architecture_simplification_execplan.md`
+- `ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py README.md docs/ExecPlans/phase3_parallel_plan.md Agents.md .agent/validation_architecture_simplification_execplan.md`
 - `pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py`
 - `pytest -q`
-- `.venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_draft_workflow.py .agent/validation_architecture_simplification_execplan.md README.md phase3_parallel_plan.md Agents.md`
+- `.venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_draft_workflow.py .agent/validation_architecture_simplification_execplan.md README.md docs/ExecPlans/phase3_parallel_plan.md Agents.md`
 - `.venv/bin/pytest -q tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py`
 - `.venv/bin/pytest -q`
 
@@ -150,7 +150,7 @@ Work from the repository root:
 Document the architectural decision:
 
     sed -n '1,220p' README.md
-    sed -n '1,220p' phase3_parallel_plan.md
+    sed -n '1,220p' docs/ExecPlans/phase3_parallel_plan.md
     sed -n '1,220p' Agents.md
 
 Inspect the current shell/backend boundary:

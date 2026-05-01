@@ -156,7 +156,7 @@ Second, run the unattended preview matrix separately for each manifest. Write ou
 
 Then inspect each `summary.json` programmatically. Record total scenarios, invalid scenarios, warning counts, and any recurring clusters by layout position, rectangle family, or stamp asset. If both matrices are already clean, the implementation part of this plan is mostly evidence capture plus documentation refresh. If there are clustered failures, trace the corresponding code path in `phase3_signing_backend.py` and `signing_shell.py`, fix the smallest shared logic defect that explains the cluster, and rerun the affected matrix until the summary stabilizes.
 
-Third, document the new coverage in `README.md` and `phase3_parallel_plan.md`. The README should name the new checked-in manifests and explain that `single_line`, `multi_line`, and `wrapped_block` now each have dedicated unattended sweep coverage. The parallel plan should record the current matrix status as historical baseline for whoever performs the next manual harness pass.
+Third, document the new coverage in `README.md` and `docs/ExecPlans/phase3_parallel_plan.md`. The README should name the new checked-in manifests and explain that `single_line`, `multi_line`, and `wrapped_block` now each have dedicated unattended sweep coverage. The parallel plan should record the current matrix status as historical baseline for whoever performs the next manual harness pass.
 
 Finally, add or adjust focused tests only where the new matrices expose a real code-path defect or where new helper behavior becomes part of the stable contract. Tests must prove actual user-facing layout behavior, not old threshold implementation details.
 

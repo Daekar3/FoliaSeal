@@ -32,7 +32,7 @@ Use this file as the immutable template. The harness now writes a run-specific c
   - `python -m foliaseal phase2-evidence --first-render-ms <value> --navigation-ms <value> ... --collect-runtime-footprint --measure-startup-command <pyinstaller_one_dir_executable_or_probe_command> --startup-ready-after-seconds <value> --bundle-dir <pyinstaller_one_dir_output> --qa-checklist-file artifacts/phase2_manual_qa_results.md --qa-issue "<optional issue note>" --check-qt-runtime --write-markdown-file artifacts/phase2_runtime_evidence.md`
   - `--measure-startup-command` measures launch readiness. Use a short-lived probe command when available; for a GUI executable, set `--startup-ready-after-seconds` to the window that should count as a successful launch.
   - The harness seeds `artifacts/phase2_manual_qa_results.md` automatically; review that file and check any remaining manual-only items before running the evidence command.
-  - Paste `artifacts/phase2_runtime_evidence.md` into `phase2_review.md` under the latest completion-plan update section.
+  - Paste `artifacts/phase2_runtime_evidence.md` into `docs/ExecPlans/phase2_review.md` under the latest completion-plan update section.
 - [ ] Attach hardware + OS context (CPU model, memory, Linux distro/version).
 
 ## Exit criteria confirmation

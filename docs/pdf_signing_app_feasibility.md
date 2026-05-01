@@ -642,7 +642,7 @@ Failure codes to expose in UI and logs:
 ## Delivery milestones (historical development phase plan)
 
 Historical note: the milestone breakdown below is retained as planning history. Current status and
-near-term engineering focus should be taken from `README.md`, `phase3_parallel_plan.md`, and the
+near-term engineering focus should be taken from `README.md`, `docs/ExecPlans/phase3_parallel_plan.md`, and the
 latest living ExecPlans rather than assuming every unresolved bullet below is still an active
 present-tense blocker.
 

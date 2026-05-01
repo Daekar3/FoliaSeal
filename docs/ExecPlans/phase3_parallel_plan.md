@@ -17,8 +17,8 @@ The goal of Phase 3 is to deliver the first end-user signing workflow on top of 
 
 Primary requirements source:
 
-- `FR-3`, `FR-3A`, `FR-3B` in `pdf_signing_app_feasibility.md`
-- Phase 3 milestone and exit criteria in `pdf_signing_app_feasibility.md`
+- `FR-3`, `FR-3A`, `FR-3B` in `docs/pdf_signing_app_feasibility.md`
+- Phase 3 milestone and exit criteria in `docs/pdf_signing_app_feasibility.md`
 
 Current implementation baseline:
 
@@ -255,7 +255,7 @@ Historical note:
   - overwrite confirmation,
   - delete with confirmation.
 - Remaining profile portability/completion work now belongs to the smaller post-Phase-3 roadmap
-  slices in `pdf_signing_app_feasibility.md`, not a monolithic old “Phase 4” bucket.
+  slices in `docs/pdf_signing_app_feasibility.md`, not a monolithic old “Phase 4” bucket.
 
 It is acceptable in Phase 3 to support:
 
@@ -928,7 +928,7 @@ Requirements to satisfy:
 
 - FR-3
 - FR-3B
-- the intended Acrobat-like visible-signature flow in `phase3_parallel_plan.md`
+- the intended Acrobat-like visible-signature flow in `docs/ExecPlans/phase3_parallel_plan.md`
 
 Expected deliverables:
 
@@ -1027,7 +1027,7 @@ Files you should avoid editing unless absolutely necessary:
 Requirements to satisfy:
 
 - FR-3A real-time preview requirement
-- the remaining product-preview goals in `phase3_parallel_plan.md`
+- the remaining product-preview goals in `docs/ExecPlans/phase3_parallel_plan.md`
 
 Expected deliverables:
 
@@ -1070,7 +1070,7 @@ Files you should avoid editing unless absolutely necessary:
 
 Requirements to satisfy:
 
-- the product-readiness goals in `phase3_parallel_plan.md`
+- the product-readiness goals in `docs/ExecPlans/phase3_parallel_plan.md`
 
 Expected deliverables:
 
@@ -1114,7 +1114,7 @@ Files you should avoid editing unless absolutely necessary:
 Requirements to satisfy:
 
 - FR-3B acceptance alignment
-- the implementation-vs-acceptance distinction established in `phase3_parallel_plan.md`
+- the implementation-vs-acceptance distinction established in `docs/ExecPlans/phase3_parallel_plan.md`
 
 Expected deliverables:
 
@@ -2468,11 +2468,11 @@ Do not resume broader Phase 3 work until all of the following are true:
 
 When opening a new chat or spawning a new agent, reference this file directly:
 
-- `phase3_parallel_plan.md`
+- `docs/ExecPlans/phase3_parallel_plan.md`
 
 Suggested instruction:
 
-"Please use `phase3_parallel_plan.md` as the Phase 3 coordination document. Follow the ownership boundaries and deliverables for the assigned workstream, and avoid unrelated refactors."
+"Please use `docs/ExecPlans/phase3_parallel_plan.md` as the Phase 3 coordination document. Follow the ownership boundaries and deliverables for the assigned workstream, and avoid unrelated refactors."
 
 ## Follow-Up Visible Appearance Parity Wave
 
@@ -3135,8 +3135,8 @@ Review scope:
 
 - `README.md`
 - `Agents.md`
-- `pdf_signing_app_feasibility.md`
-- `phase3_parallel_plan.md`
+- `docs/pdf_signing_app_feasibility.md`
+- `docs/ExecPlans/phase3_parallel_plan.md`
 - `artifacts/phase3_fr3b_acceptance_checklist.md`
 - `artifacts/phase3_fr3b_acceptance_results.md`
 
@@ -3166,8 +3166,8 @@ Review scope:
 
 - `README.md`
 - `Agents.md`
-- `pdf_signing_app_feasibility.md`
-- `phase3_parallel_plan.md`
+- `docs/pdf_signing_app_feasibility.md`
+- `docs/ExecPlans/phase3_parallel_plan.md`
 - `artifacts/phase3_fr3b_acceptance_checklist.md`
 - `artifacts/phase3_fr3b_acceptance_results.md`
 
@@ -3268,7 +3268,7 @@ Use this template for:
 Copy and adapt the following:
 
 ```text
-Use /home/daekar/SignPDF/Scratch/phase3_parallel_plan.md as the shared coordination document. This is a review-only task.
+Use /home/daekar/SignPDF/Scratch/docs/ExecPlans/phase3_parallel_plan.md as the shared coordination document. This is a review-only task.
 
 Review scope:
 - <list the exact workstreams, files, or follow-up patches>

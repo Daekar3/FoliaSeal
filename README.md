@@ -92,7 +92,7 @@ Roadmap note:
 
 - The original Phase 3 scope turned out to bundle several independent failure modes.
 - The remaining roadmap is now split into smaller post-Phase-3 slices in
-  [pdf_signing_app_feasibility.md](/home/daekar/SignPDF/Scratch/pdf_signing_app_feasibility.md),
+  [docs/pdf_signing_app_feasibility.md](/home/daekar/SignPDF/Scratch/docs/pdf_signing_app_feasibility.md),
   including:
   - preview/output parity and rectangle-aware preview,
   - TSA-backed timestamping,
@@ -431,5 +431,5 @@ See also:
 - [phase3_fr3b_acceptance_checklist.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_checklist.md)
 - [phase3_fr3b_acceptance_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
 - [phase3_handoff_2026-04-03.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_handoff_2026-04-03.md)
-- [phase3_parallel_plan.md](/home/daekar/SignPDF/Scratch/phase3_parallel_plan.md)
+- [docs/ExecPlans/phase3_parallel_plan.md](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase3_parallel_plan.md)
 - [phase3_preview_matrix_template.json](/home/daekar/SignPDF/Scratch/artifacts/phase3_preview_matrix_template.json)

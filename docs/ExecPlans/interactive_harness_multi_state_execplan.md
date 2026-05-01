@@ -16,7 +16,7 @@ The user-visible outcome is straightforward. The interactive harness keeps its e
 - [x] (2026-04-05 23:50Z) Wrote this ExecPlan and fixed the scope around a minimal slice: explicit manual state capture in the interactive harness, not automatic capture on every control change.
 - [x] (2026-04-05 23:59Z) Implemented manual multi-state capture storage in `src/foliaseal/presentation/qt/phase3_harness.py`, including the `Capture State` toolbar action, the additive `captured_states` payload, and concise terminal summary output.
 - [x] (2026-04-06 00:02Z) Added tests for the new history payload and helper functions in `tests/unit/test_phase3_harness.py`.
-- [x] (2026-04-06 00:04Z) Updated `README.md` and `phase3_parallel_plan.md` so the new interactive harness behavior is discoverable.
+- [x] (2026-04-06 00:04Z) Updated `README.md` and `docs/ExecPlans/phase3_parallel_plan.md` so the new interactive harness behavior is discoverable.
 - [x] (2026-04-06 00:05Z) Ran focused validation and updated this plan with the final behavior and the discovered constraints.
 
 ## Surprises & Discoveries
@@ -53,7 +53,7 @@ What changed:
 - The top-level capture remains a final-state summary exactly as before, and `captured_states` adds history instead of replacing that summary.
 - The final state is always appended into `captured_states` as a `final` entry, even if the operator never clicks `Capture State`.
 - When `--summary-json-path` is supplied, the harness now prints a compact summary that includes the number of captured states instead of dumping the full JSON payload to the terminal.
-- `README.md` and `phase3_parallel_plan.md` now describe the new one-run multi-state review workflow.
+- `README.md` and `docs/ExecPlans/phase3_parallel_plan.md` now describe the new one-run multi-state review workflow.
 
 What did not change:
 

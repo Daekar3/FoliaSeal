@@ -90,8 +90,8 @@ Add or update tests for:
 Refresh:
 
 - `README.md`
-- `phase3_parallel_plan.md`
-- `pdf_signing_app_feasibility.md`
+- `docs/ExecPlans/phase3_parallel_plan.md`
+- `docs/pdf_signing_app_feasibility.md`
 
 to describe:
 

@@ -18,7 +18,7 @@ from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
-DEFAULT_CHECKLIST_TEMPLATE_PATH = "phase2_manual_qa_checklist.md"
+DEFAULT_CHECKLIST_TEMPLATE_PATH = "docs/ExecPlans/phase2_manual_qa_checklist.md"
 DEFAULT_CHECKLIST_RESULTS_PATH = "artifacts/phase2_manual_qa_results.md"
 
 

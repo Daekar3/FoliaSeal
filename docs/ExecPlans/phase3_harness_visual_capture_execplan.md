@@ -15,7 +15,7 @@ The user-visible proof is straightforward. Run the interactive harness with prev
 - [x] (2026-04-04 21:02Z) Read `Agents.md`, `.agent/PLANS.md`, `src/foliaseal/presentation/qt/phase3_harness.py`, `src/foliaseal/__main__.py`, and the existing harness tests to scope the missing instrumentation surface.
 - [x] (2026-04-04 22:10Z) Implemented interactive harness preview artifact capture, widget geometry snapshots, and explicit edge-distance metrics, including preview PNG output, widget bounds, size hints, spacing, and border-to-content distance telemetry.
 - [x] (2026-04-04 22:28Z) Implemented a repeatable `phase3-signing-preview-matrix` runner with manifest-driven appearance overrides, per-scenario artifact directories, and summary JSON output.
-- [x] (2026-04-04 22:41Z) Updated `README.md`, `phase3_parallel_plan.md`, `artifacts/phase3_handoff_2026-04-03.md`, and the template artifacts so future contributors can run the new instrumentation without reconstructing the workflow.
+- [x] (2026-04-04 22:41Z) Updated `README.md`, `docs/ExecPlans/phase3_parallel_plan.md`, `artifacts/phase3_handoff_2026-04-03.md`, and the template artifacts so future contributors can run the new instrumentation without reconstructing the workflow.
 - [x] (2026-04-04 22:55Z) Added regression coverage for the new preview capture payloads and CLI surface, then completed focused verification with `106` passing tests across the touched harness, parser, preview, and backend suites.
 
 ## Surprises & Discoveries
@@ -58,7 +58,7 @@ Second, add small helper functions in `src/foliaseal/presentation/qt/phase3_harn
 
 Third, add a dedicated batch command in `src/foliaseal/__main__.py` plus corresponding harness support that reads a JSON scenario manifest. Each scenario will define a name plus appearance and placement overrides such as layout template, stamp position, image stamp path, border width, and signature rectangle. The runner will build the shell, apply each scenario deterministically, refresh the preview, capture the preview artifact and geometry, append a per-scenario summary object, and write an overall matrix summary JSON. This command is for preview validation only; it does not need to submit a signing request.
 
-Fourth, update `README.md` and `phase3_parallel_plan.md` so contributors know that preview debugging should now use visual artifacts rather than terminal output alone. Add a short operator-facing note to `artifacts/phase3_handoff_2026-04-03.md` or a refreshed handoff artifact so the next contributor knows where the preview PNGs and matrix summaries live and how to use them.
+Fourth, update `README.md` and `docs/ExecPlans/phase3_parallel_plan.md` so contributors know that preview debugging should now use visual artifacts rather than terminal output alone. Add a short operator-facing note to `artifacts/phase3_handoff_2026-04-03.md` or a refreshed handoff artifact so the next contributor knows where the preview PNGs and matrix summaries live and how to use them.
 
 Fifth, add or update tests in `tests/unit/test_phase3_harness.py` and `tests/unit/test_cli_parser.py`. The tests must cover the new preview capture fields, the matrix-manifest parsing path, and the new CLI command wiring. Focus the assertions on observable payload shape and deterministic artifact naming rather than brittle pixel data.
 

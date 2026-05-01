@@ -77,7 +77,7 @@ In this plan, an “appearance snapshot” means a machine-readable description 
 
 In this repository, “parity” means that the preview shown to the user and the visible signature embedded into the signed PDF match closely enough that the preview is a trustworthy promise. The current harness already records parity booleans. This plan upgrades that into a layered comparison model that can explain failures and drive autonomous iteration.
 
-The relevant documents already point in this direction. `README.md` and `phase3_parallel_plan.md` treat preview/output parity as a first-class acceptance concern. `pdf_signing_app_feasibility.md` Phase 4A explicitly calls for stronger preview/output instrumentation, structured comparisons, and reduced reliance on manual harness runs.
+The relevant documents already point in this direction. `README.md` and `docs/ExecPlans/phase3_parallel_plan.md` treat preview/output parity as a first-class acceptance concern. `docs/pdf_signing_app_feasibility.md` Phase 4A explicitly calls for stronger preview/output instrumentation, structured comparisons, and reduced reliance on manual harness runs.
 
 ## Plan of Work
 
@@ -93,7 +93,7 @@ Once the snapshot and comparison model exist, add a deterministic parity regress
 
 After the test suite is in place, update the harness JSON contract in `src/foliaseal/presentation/qt/phase3_harness.py` so the saved capture includes the new snapshot and comparison structure. Keep existing fields where practical, but add explicit nested objects for preview appearance snapshot, signed appearance snapshot, and parity layer results. This is an instrumentation slice, so richer evidence is allowed to change the capture schema as long as the result is documented and tested.
 
-Finally, update `README.md`, `phase3_parallel_plan.md`, and if necessary `pdf_signing_app_feasibility.md` so the repository’s current truth is explicit: appearance parity is now expected to be debuggable through saved structural snapshots and autonomous parity tests, not only through manual image inspection.
+Finally, update `README.md`, `docs/ExecPlans/phase3_parallel_plan.md`, and if necessary `docs/pdf_signing_app_feasibility.md` so the repository’s current truth is explicit: appearance parity is now expected to be debuggable through saved structural snapshots and autonomous parity tests, not only through manual image inspection.
 
 ## Milestones
 
@@ -119,7 +119,7 @@ The work belongs in `src/foliaseal/presentation/qt/phase3_harness.py` or a small
 
 At the end of this milestone, the harness JSON, repository docs, and plan/status docs will all describe the new autonomous appearance instrumentation. A novice contributor should be able to open the harness capture JSON, see the preview and signed-output snapshots, and understand how to interpret a parity failure without reading old discussion.
 
-This work belongs in `README.md`, `phase3_parallel_plan.md`, and optionally `pdf_signing_app_feasibility.md` if the instrumentation expectations need a clearer statement there. Run the same validation commands again after the documentation edits to ensure nothing drifted.
+This work belongs in `README.md`, `docs/ExecPlans/phase3_parallel_plan.md`, and optionally `docs/pdf_signing_app_feasibility.md` if the instrumentation expectations need a clearer statement there. Run the same validation commands again after the documentation edits to ensure nothing drifted.
 
 ## Concrete Steps
 

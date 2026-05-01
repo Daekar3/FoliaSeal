@@ -838,8 +838,8 @@ Implemented in:
 - `src/foliaseal/presentation/qt/phase3_harness.py`
 - `tests/unit/test_phase3_harness.py`
 - `README.md`
-- `phase3_parallel_plan.md`
-- `pdf_signing_app_feasibility.md`
+- `docs/ExecPlans/phase3_parallel_plan.md`
+- `docs/pdf_signing_app_feasibility.md`
 
 What landed:
 
@@ -862,8 +862,8 @@ What landed:
 Documentation updates:
 
 - `README.md`
-- `phase3_parallel_plan.md`
-- `pdf_signing_app_feasibility.md`
+- `docs/ExecPlans/phase3_parallel_plan.md`
+- `docs/pdf_signing_app_feasibility.md`
 
 Those docs now state explicitly that rasterization returned only for review and
 QA instrumentation. The backend fit engine remains structural and
@@ -872,7 +872,7 @@ calculation-driven.
 Verification:
 
 - focused harness regressions: passed
-- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py README.md phase3_parallel_plan.md pdf_signing_app_feasibility.md .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py README.md docs/ExecPlans/phase3_parallel_plan.md docs/pdf_signing_app_feasibility.md .agent/per_signing_immutable_harness_evidence_execplan.md`
 - `pytest -q`
 - Result: `457 passed`
 
