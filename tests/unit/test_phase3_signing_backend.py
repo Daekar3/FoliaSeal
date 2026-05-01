@@ -1473,7 +1473,7 @@ def test_build_stamp_style_uses_rounded_border_path_for_visible_stamp() -> None:
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
 )
-def test_layout_reservation_for_horizontal_multi_line_can_fail_from_height_not_width(
+def test_backend_horizontal_multi_line_fit_gate_can_fail_from_height_not_width(
     stamp_position: SignatureStampPosition,
 ) -> None:
     reservation = _layout_reservation_for_template(
@@ -1506,7 +1506,7 @@ def test_layout_reservation_for_horizontal_multi_line_can_fail_from_height_not_w
     "stamp_position",
     [SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT],
 )
-def test_layout_reservation_for_horizontal_single_line_uses_base_separator(
+def test_backend_horizontal_single_line_structural_reservation_keeps_separator(
     stamp_position: SignatureStampPosition,
 ) -> None:
     signature_rect = build_signature_rect(

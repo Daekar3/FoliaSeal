@@ -21,8 +21,6 @@ from foliaseal.application.horizontal_signature_reservation import (
 )
 from foliaseal.application.phase3_signing_backend import (
     RoundedBorderTextStampStyle,
-    _build_text_box_style,
-    _measure_text_box_dimensions,
     _stamp_background_for_path,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
@@ -36,6 +34,7 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     LayoutRequest,
     PyHankoSignatureAppearanceAdapter,
+    PyHankoTextMeasurer,
     RectBounds,
     VisibleSignatureLayoutEngine,
 )
@@ -711,12 +710,14 @@ def _structural_line_bounds_px(
 ) -> tuple[dict[str, int], ...]:
     if text_style is None or text_bounds_px is None or not text_fragments:
         return ()
-    text_box_style = _build_text_box_style(text_style)
+    text_measurer = PyHankoTextMeasurer()
     line_metrics: list[tuple[int, int]] = []
     max_line_width = 0
     total_line_height = 0
     for fragment in text_fragments:
-        line_width, line_height = _measure_text_box_dimensions(fragment, text_box_style)
+        metrics = text_measurer.measure(fragment, text_style)
+        line_width = metrics.width_pt
+        line_height = metrics.height_pt
         line_width = max(1, int(line_width))
         line_height = max(1, int(line_height))
         line_metrics.append((line_width, line_height))
