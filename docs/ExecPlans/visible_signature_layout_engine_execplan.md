@@ -31,7 +31,12 @@ The initial production migration is complete. `foliaseal.application.visible_sig
 - [x] (2026-05-01T00:53Z) Fixed GitHub CI dependency coverage by adding `PySide6>=6.7` to the `dev` extra and committed it as `16fe757ff` with message `Add PySide6 to dev dependencies`.
 - [x] (2026-05-01T00:53Z) Updated the next Issue #48 slice after the CI fix; remaining work is preview diagnostics and backend test ownership, not dependency setup.
 - [x] (2026-05-01T01:00Z) Executed the preview diagnostics and backend test ownership slice: moved preview structural line measurement onto `PyHankoTextMeasurer` and renamed remaining generic-sounding backend reservation tests around backend fit/structural behavior.
-- [ ] Next slice: decide whether to move the still-private layout policy implementation out of `phase3_signing_backend.py` into the visible layout boundary, or explicitly declare the current backend delegation as an acceptable transitional state for Issue #48.
+- [x] (2026-05-01T01:00Z) Committed the preview diagnostics cleanup as `ad48a19b8` with message `Move preview diagnostics onto layout boundary`.
+- [x] (2026-05-01T03:03Z) Refined the next Issue #48 slice so it starts with a layout-policy ownership decision instead of additional test relocation.
+- [x] (2026-05-01T03:28Z) Accepted deferred policy extraction as the Issue #48 end state: production callers use `VisibleSignatureLayoutEngine`, while the engine may delegate to backend compatibility helpers until architecture-steward follow-up defines the final module split.
+- [x] (2026-05-01T03:30Z) Closed the Issue #48 documentation loop: `docs/ARCHITECTURE.md` now records the transitional visible-signature layout boundary and GitHub issue #49 tracks post-architecture-steward layout-policy extraction.
+- [x] (2026-05-01T03:35Z) Prepared the Issue #48 closure report: validation is green, remaining private-helper usage matches the documented allowed categories, and future extraction is assigned to GitHub issue #49.
+- [ ] Next slice: run a new architecture-discovery pass before selecting the next refactor RFC; do not assume issue #49 is automatically the next best architecture slice.
 
 ## Surprises & Discoveries
 
@@ -82,6 +87,9 @@ The initial production migration is complete. `foliaseal.application.visible_sig
 
 - Observation: remaining backend reservation tests are backend-specific enough to keep in `tests/unit/test_phase3_signing_backend.py`.
   Evidence: the remaining `_layout_reservation_for_template()` calls support background-layout comparison, rendered-fit fallback setup, ink-validation reservation setup, pyHanko stamp-style parity, and fit gate behavior. Generic public layout-policy expectations have been moved to `tests/unit/test_visible_signature_layout.py`.
+
+- Observation: moving the remaining helper implementation now would be more than a safe mechanical extraction.
+  Evidence: `VisibleSignatureLayoutEngine.plan()` still imports backend reservation and fit helpers; `SignatureLayoutPlan` still carries `backend_reservation`; `PyHankoSignatureAppearanceAdapter` still reads pyHanko-shaped layout objects; and backend rendered-fit fallback behavior still depends on backend-specific rendering checks. Extracting these helpers before the architecture-steward follow-up defines a clean split risks moving backend-shaped implementation into the public layout module.
 
 ## Decision Log
 
@@ -147,6 +155,10 @@ The initial production migration is complete. `foliaseal.application.visible_sig
 
 - Decision: keep the current backend-private reservation tests, but name generic-looking cases around backend ownership.
   Rationale: after moving public layout-policy expectations to `test_visible_signature_layout.py`, the remaining reservation tests protect backend fit gates, rendered fallback setup, background-layout comparison, and pyHanko stamp-style parity. Removing them now would reduce backend safety without further clarifying the public boundary.
+  Date/Author: 2026-05-01 / Codex
+
+- Decision: defer layout-policy extraction from `phase3_signing_backend.py` until after architecture-steward follow-up.
+  Rationale: Issue #48 has achieved the caller-facing boundary: backend signing, canonical preview, Qt preview sizing, and harness diagnostics consume `VisibleSignatureLayoutEngine` or `SignatureLayoutPlan`. The remaining helper implementation is entangled with pyHanko layout objects and backend rendered-fit behavior. Deferring extraction avoids turning `visible_signature_layout.py` into a backend-shaped module before the architecture documentation defines the target ownership model.
   Date/Author: 2026-05-01 / Codex
 
 ## Outcomes & Retrospective
@@ -445,6 +457,102 @@ Remaining private-helper usage after this pass:
 
 The next slice should not move more test expectations by default. It should decide the architectural end state for Issue #48: either move the remaining layout-policy implementation itself from `phase3_signing_backend.py` into `visible_signature_layout.py`, or explicitly document why the current public boundary over backend compatibility helpers is sufficient for now.
 
+Commit:
+
+    ad48a19b8 Move preview diagnostics onto layout boundary
+
+The layout-policy ownership decision slice chose deferred extraction.
+
+Decision:
+
+- Do not move the remaining layout helper implementation out of `phase3_signing_backend.py` as part of Issue #48.
+- Treat the current state as an intentional transitional architecture: production callers consume `VisibleSignatureLayoutEngine`, `LayoutRequest`, `SignatureLayoutPlan`, and `PyHankoSignatureAppearanceAdapter`; the engine and adapter may delegate to backend compatibility helpers internally.
+- Let the architecture-steward follow-up define the final ownership split for pure layout policy, pyHanko layout adapters, backend rendered-fit fallback, preview diagnostics, and harness evidence before moving helper implementation.
+
+Rationale:
+
+- The caller-facing boundary goal is already complete.
+- The remaining implementation is not neutral: it still uses pyHanko-shaped reservation objects, `backend_reservation`, backend text/style measurement, and rendered-fit fallback checks.
+- Extracting now would likely move backend-shaped code into `visible_signature_layout.py`, making the boundary larger but not cleaner.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py tests/unit/test_visible_signature_layout.py
+    177 passed in 24.92s
+
+    .venv/bin/pytest -q tests/unit/test_phase3_signing_backend.py::test_single_line_rendered_ink_fallback_caches_identical_checks tests/unit/test_qt_signing_shell.py::test_signing_shell_selection_updates_request tests/unit/test_signing_preview_renderer.py::test_canonical_preview_renderer_produces_raster_and_bounds
+    3 passed in 0.55s
+
+The next slice should close the documentation loop: update `docs/ARCHITECTURE.md` if needed and create a follow-up issue for post-architecture-steward layout-policy extraction rather than continuing to expand Issue #48.
+
+The documentation-closure slice succeeded.
+
+What changed:
+
+- `docs/ARCHITECTURE.md` now states that production callers must use `VisibleSignatureLayoutEngine`, `LayoutRequest`, `SignatureLayoutPlan`, and adapter APIs for visible-signature geometry.
+- The architecture doc explicitly limits direct backend-private layout helper use to compatibility wrappers, backend-specific tests, adapter parity tests, and pyHanko-rendered evidence.
+- The architecture doc records the deferred extraction debt: remaining helper implementation should move only after architecture-steward follow-up defines ownership for neutral policy, pyHanko adapters, backend rendered-fit fallback, preview diagnostics, and harness evidence.
+- GitHub issue #49, "Extract visible signature layout policy after architecture review," now tracks the deferred extraction work.
+
+What did not change:
+
+- No production visible-signature layout code moved.
+- No test expectations changed.
+- Issue #48 remains scoped to the public caller boundary and documentation of the transitional state.
+
+Verification results:
+
+    gh issue list --state open --search "layout policy extraction" --json number,title,url
+    []
+
+    gh issue create --title "Extract visible signature layout policy after architecture review" --body ...
+    https://github.com/Daekar3/FoliaSeal/issues/49
+
+    rg -n "_layout_reservation_for_template|_build_stamp_style|_build_text_box_style|_measure_text_box_dimensions" src tests
+    Confirmed remaining direct helper usage is limited to visible layout compatibility delegation, backend helper definitions/internal backend calls, backend-specific tests, adapter parity tests, preview parity tests, and phase 3 harness backend error diagnostics.
+
+    git diff --check
+    No output.
+
+    .venv/bin/ruff check src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py docs/ARCHITECTURE.md tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_visible_signature_layout.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py tests/unit/test_visible_signature_layout.py
+    177 passed in 25.34s
+
+The next slice should prepare the Issue #48 closure report and avoid further helper extraction in this issue unless a validation failure shows the public caller boundary is incomplete.
+
+The Issue #48 closure-report slice succeeded.
+
+Closure summary:
+
+- The GitHub issue requested a public visible-signature layout boundary that callers use instead of importing scattered private helpers.
+- `VisibleSignatureLayoutEngine`, `LayoutRequest`, `SignatureLayoutPlan`, and `PyHankoSignatureAppearanceAdapter` now form that boundary.
+- Backend signing, canonical preview rendering, Qt preview sizing, and harness reservation diagnostics consume the public plan boundary.
+- Broad generic reservation-policy tests have moved to `tests/unit/test_visible_signature_layout.py`.
+- Remaining backend-private helper usage is intentionally limited to compatibility delegation, backend-specific pyHanko/rendered-fit behavior, adapter parity tests, preview parity tests, and harness backend error diagnostics.
+- Layout-policy implementation extraction is explicitly deferred to GitHub issue #49 so architecture-steward work can define the final ownership split first.
+
+Final validation before closing the issue:
+
+    git diff --check
+    No output.
+
+    .venv/bin/ruff check src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py docs/ARCHITECTURE.md tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py tests/unit/test_visible_signature_layout.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py tests/unit/test_visible_signature_layout.py
+    177 passed in 25.34s
+
+Recommendation after closure:
+
+- Do not automatically execute issue #49 next.
+- If the next goal is broader architectural improvement through `$improve-codebase-architecture`, first run a fresh architecture-discovery pass and compare issue #49 against other coupling clusters.
+- Treat issue #49 as a strong candidate, not the default next slice, because extracting the remaining visible-signature policy before the next architecture pass may prematurely lock in module boundaries.
+
 ## Context and Orientation
 
 This repository is a Python package under `src/foliaseal`. The visible-signature layout code currently lives mainly in `src/foliaseal/application/phase3_signing_backend.py`. That module signs PDFs through pyHanko, a PDF signing library, and also contains private helper functions that measure text, decide how much room the text and stamp image should receive, and validate whether a selected rectangle can contain the requested visible signature.
@@ -455,40 +563,40 @@ The new module `src/foliaseal/application/visible_signature_layout.py` will defi
 
 The first slice did not delete or move existing helpers. Instead, `VisibleSignatureLayoutEngine` delegates to the current helper path so the new tests describe existing behavior. Later slices migrated backend signing, canonical preview rendering, and Qt preview sizing to consume the plan. The remaining work is to reduce private-helper test coupling and then, in a later larger slice, consider moving policy itself out of `phase3_signing_backend.py`.
 
-At the time of this revision, the boundary, adapter, backend migration, canonical preview migration, Qt preview migration, two private-helper cleanup passes, and preview diagnostics cleanup are complete. The remaining Issue #48 work should be done in narrow follow-up slices. The immediate next slice should decide the architectural end state for the remaining backend delegation in `VisibleSignatureLayoutEngine`, not move more test expectations by default.
+At the time of this revision, the boundary, adapter, backend migration, canonical preview migration, Qt preview migration, two private-helper cleanup passes, preview diagnostics cleanup, the layout-policy ownership decision, documentation closure, and closure report are complete. Future policy extraction belongs to GitHub issue #49 after the next architecture-discovery or architecture-steward pass, not to more Issue #48 cleanup.
 
 The CI dependency gap is also closed: GitHub's default `pip install -e .[dev]` path now installs PySide6 for the QtPdf-backed preview and rendered-ink tests. Do not spend the next slice changing Qt test skips or CI commands unless a new CI failure shows PySide6 installation itself is not viable.
 
 ## Plan of Work
 
-The next implementation slice is "layout policy ownership decision."
+The next implementation slice is a new architecture-discovery pass, not more Issue #48 implementation.
 
-Start by classifying the remaining production and test imports of these private helpers:
+Start by classifying the remaining production and test imports of these private helpers only to confirm no caller-facing regression has been introduced:
 
     _layout_reservation_for_template
     _build_stamp_style
     _build_text_box_style
     _measure_text_box_dimensions
 
-Use `rg` to find them in `src/foliaseal/application/visible_signature_layout.py`, `src/foliaseal/application/phase3_signing_backend.py`, `tests/unit/test_phase3_signing_backend.py`, `tests/unit/test_signing_preview_renderer.py`, `tests/unit/test_visible_signature_layout.py`, and `src/foliaseal/presentation/qt/phase3_harness.py`. For each remaining production or test call site, choose one of three outcomes:
+Use `rg` to find them in `src/foliaseal/application/visible_signature_layout.py`, `src/foliaseal/application/phase3_signing_backend.py`, `tests/unit/test_phase3_signing_backend.py`, `tests/unit/test_signing_preview_renderer.py`, `tests/unit/test_visible_signature_layout.py`, and `src/foliaseal/presentation/qt/phase3_harness.py`. For this closure slice, do not move the helpers. Instead, record why each remaining category is intentionally allowed:
 
-1. Move the behavior expectation to `tests/unit/test_visible_signature_layout.py` by asserting on `SignatureLayoutPlan`, `LayoutRuleSpec`, `HorizontalInkReservation`, or `PyHankoSignatureAppearanceAdapter` output.
-2. Keep the test in `tests/unit/test_phase3_signing_backend.py` only if it protects backend-only behavior such as pyHanko font creation, final stamp rendering details, fallback rendered-fit checks, certificate loading, timestamping, or signed PDF output.
-3. Delete or demote the test if it duplicates a stronger public-boundary test and does not protect backend-only behavior.
+1. `visible_signature_layout.py` may import backend helpers internally as compatibility delegates.
+2. `phase3_signing_backend.py` may retain compatibility helper definitions and backend-specific pyHanko/rendered-fit behavior.
+3. Tests may import backend helpers only for backend-specific coverage or adapter equivalence.
+4. Harness evidence may import backend helpers only for backend error diagnostics or pyHanko-rendered evidence.
 
 Do not change visible-signature layout policy in this slice. If a test fails because the public boundary does not expose a value currently asserted through a private helper, add the smallest neutral field or test helper around existing `SignatureLayoutPlan` data only if it improves the public boundary. Do not add new production behavior just to preserve a private-helper assertion.
 
-Use the cleanup passes as the baseline: broad overwide-text, text-priority, template-area allocation, optical alignment, compact vertical clearances, border-aware insets, horizontal edge-invariant expectations, and preview structural line measurements already live behind the public boundary. The next pass should focus on the remaining architectural question: whether `VisibleSignatureLayoutEngine` should continue delegating to backend-private helpers or whether those helpers should move under the visible layout boundary now.
+Use the cleanup passes as the baseline: broad overwide-text, text-priority, template-area allocation, optical alignment, compact vertical clearances, border-aware insets, horizontal edge-invariant expectations, preview structural line measurements, and production caller migrations already live behind the public boundary. The next pass should not alter production behavior.
 
 Execute the next pass in this order:
 
-1. Inspect the helper ladder around `_layout_reservation_for_template()`, `_apply_horizontal_single_line_ink_text_alignment()`, `_horizontal_single_line_background_text_width()`, `_ensure_layout_can_fit()`, `_build_text_box_style()`, and `_measure_text_box_dimensions()`.
-2. Decide whether moving these helpers into `visible_signature_layout.py` is a low-risk mechanical move or a larger policy migration. If it is low-risk, move one cohesive group with compatibility wrappers left in `phase3_signing_backend.py`.
-3. If moving is larger than one safe slice, document the transitional architecture explicitly: production callers must use `VisibleSignatureLayoutEngine`, while the engine may delegate to backend compatibility helpers until a later policy-extraction issue.
-4. Do not change visible-signature layout behavior in this slice. Any helper move must keep existing public-boundary, backend, preview, Qt, and harness tests green.
-5. Update this ExecPlan with the architectural decision, exact call sites changed or intentionally left, and validation commands.
+1. Use `$improve-codebase-architecture` to explore the current repo state organically.
+2. Compare issue #49 against newly discovered candidates instead of assuming it is next.
+3. Pick the highest-value architecture candidate and create or update a refactor RFC.
+4. If issue #49 wins, start by designing the target ownership split before moving helper implementation.
 
-If the cleanup reveals harness code that can be trivially switched from private helper calls to `VisibleSignatureLayoutEngine.plan()` without changing the output shape, make that replacement in the same slice. Otherwise, record the harness private-helper usage as intentionally deferred.
+Do not change helper implementation as part of Issue #48. Extraction belongs to GitHub issue #49 only if it remains the chosen architecture candidate after discovery.
 
 Historical completed work is retained below for context.
 
@@ -542,28 +650,23 @@ Create or update these files:
     src/foliaseal/application/__init__.py
     tests/unit/test_visible_signature_layout.py
 
-For the next preview-diagnostics and backend-test-ownership slice, create or update these files only as needed:
+For the completed layout-policy ownership decision and documentation-closure slices, create or update these files only as needed:
 
     docs/ExecPlans/visible_signature_layout_engine_execplan.md
-    tests/unit/test_phase3_signing_backend.py
-    tests/unit/test_signing_preview_renderer.py
-    src/foliaseal/application/signing_preview_renderer.py
+    docs/ARCHITECTURE.md
     src/foliaseal/application/visible_signature_layout.py
+    src/foliaseal/application/phase3_signing_backend.py
+    src/foliaseal/application/__init__.py
+    tests/unit/test_visible_signature_layout.py
+    tests/unit/test_phase3_signing_backend.py
 
 Start with this inventory command:
 
     rg -n "_layout_reservation_for_template|_build_stamp_style|_build_text_box_style|_measure_text_box_dimensions" tests src/foliaseal/presentation/qt/phase3_harness.py src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/visible_signature_layout.py
 
-For the next layout-policy ownership decision slice, inspect the helper ladder first:
-
-    sed -n '560,1220p' src/foliaseal/application/phase3_signing_backend.py
-    sed -n '180,330p' src/foliaseal/application/visible_signature_layout.py
-
-Then inspect remaining direct helper usage:
+The layout-policy ownership decision has already been made: defer extraction to GitHub issue #49. For Issue #48 closure, inspect remaining direct helper usage only to verify the documented allowed categories:
 
     rg -n "_layout_reservation_for_template|_build_stamp_style|_build_text_box_style|_measure_text_box_dimensions" src tests
-
-If the helper move is small and mechanical, move one cohesive layout-policy group into `visible_signature_layout.py` and leave compatibility wrappers in `phase3_signing_backend.py`. If it is not small, do not force it; document the transitional architecture and create or update the next Issue #48 follow-up around policy extraction.
 
 Then run focused validation:
 
@@ -643,6 +746,17 @@ The next layout-policy ownership decision slice is accepted when all of the foll
 - if helpers do not move, production caller rules are explicit: callers use `VisibleSignatureLayoutEngine`, and direct backend-private helper use is limited to backend tests, pyHanko evidence, or compatibility wrappers;
 - focused ruff and pytest validation passes.
 
+The documentation-closure slice is accepted when all of the following are true:
+
+- `docs/ARCHITECTURE.md` records the transitional visible-signature layout architecture and the allowed categories for direct backend-private helper usage;
+- a follow-up GitHub issue tracks post-architecture-steward layout-policy extraction;
+- this ExecPlan records the architecture documentation update, follow-up issue number, and validation results;
+- no production helper implementation is moved as part of Issue #48.
+
+The Issue #48 closure-report slice is accepted when the report confirms that production callers use the public layout boundary, remaining private-helper usage matches documented allowed categories, validation passes, and future extraction is explicitly assigned to issue #49.
+
+The next architecture-discovery pass is accepted when it presents ranked deepening opportunities, compares issue #49 against them, and asks which candidate to explore before proposing interfaces.
+
 The behavior to observe is internal but demonstrable: `pytest -q tests/unit/test_visible_signature_layout.py` should pass, and the tests should show that the new plan boundary can represent current visible-signature layout behavior.
 
 ## Idempotence and Recovery
@@ -708,3 +822,9 @@ Revision note: Updated 2026-04-30 by Codex after executing the second private-he
 Revision note: Updated 2026-05-01 by Codex after fixing GitHub CI dependency coverage with `PySide6>=6.7` in the `dev` extra; recorded the dependency-root-cause analysis, affected-suite validation, and clarified that the next Issue #48 slice should stay focused on preview diagnostics and backend test ownership.
 
 Revision note: Updated 2026-05-01 by Codex after executing the preview diagnostics and backend test ownership slice; moved structural line measurement to `PyHankoTextMeasurer`, renamed remaining generic-sounding backend reservation tests, and scoped the next slice to the layout-policy ownership decision.
+
+Revision note: Updated 2026-05-01 by Codex after committing the preview diagnostics cleanup as `ad48a19b8`; clarified the next slice should first decide whether to extract layout policy now or explicitly defer extraction behind the public boundary.
+
+Revision note: Updated 2026-05-01 by Codex after accepting deferred extraction, documenting the transitional architecture in `docs/ARCHITECTURE.md`, and creating GitHub issue #49 for post-architecture-steward layout-policy extraction.
+
+Revision note: Updated 2026-05-01 by Codex after preparing the Issue #48 closure report and recommending a fresh architecture-discovery pass before deciding whether issue #49 should be next.

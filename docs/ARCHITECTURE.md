@@ -25,7 +25,7 @@ This document governs the repository architecture: Python package layout, applic
 | Keep orchestration in the application layer and concrete adapters in infra/presentation. | `SignPdfUseCase` depends on protocols while `phase3_signing_backend.py`, `infra/render`, `infra/tsa`, and Qt widgets provide concrete behavior. | Confirmed by code |
 | Treat CLI arguments, JSON schemas, profile storage, and failure codes as contracts. | These are surfaced to users, tests, harnesses, or persisted files. | Confirmed by code/tests |
 | Use bundled font assets as the visible-signature typography source of truth. | `signature_font_registry.py`, README text, and signing/preview tests enforce bundled font behavior. | Confirmed by code/docs/tests |
-| Keep visible-signature layout policy behind the application layout boundary. | `visible_signature_layout.py` exposes `VisibleSignatureLayoutEngine`, `LayoutRequest`, and `SignatureLayoutPlan`; backend, canonical preview, and Qt preview now consume that plan. | Confirmed by code |
+| Keep visible-signature layout policy behind the application layout boundary. | `visible_signature_layout.py` exposes `VisibleSignatureLayoutEngine`, `LayoutRequest`, and `SignatureLayoutPlan`; backend, canonical preview, Qt preview, and harness diagnostics consume that plan. Some implementation still delegates to backend compatibility helpers as transitional debt. | Confirmed by code/debt |
 | Prefer late imports for optional GUI/runtime dependencies. | Qt widgets and render backend load PySide6 dynamically and report diagnostics when unavailable. | Confirmed by code |
 | Generated harness outputs should not be committed unless intentionally curated as fixtures. | `.gitignore` excludes run outputs while durable manifests/fixtures remain trackable. | Confirmed by code |
 
@@ -84,7 +84,7 @@ This document governs the repository architecture: Python package layout, applic
 - Key collaborators: `SignPdfUseCase`, `visible_signature_layout.py`, bundled fonts, `infra.tsa`, `infra.certification`.
 - Main entry points: `build_phase3_signing_executor()`, `Phase3SigningExecutor.execute()`.
 - Important types/classes/functions: `RoundedBorderTextStampStyle`, `PyHankoPdfSigner.sign()`, `_visible_signature_fit_issues()`, `_build_stamp_text()`.
-- Known constraints: This module is currently large and contains both concrete adapter logic and many private layout helpers. Recent layout work introduced `VisibleSignatureLayoutEngine`, but some helper policy still lives here.
+- Known constraints: This module is currently large and contains both concrete adapter logic and many private layout helpers. Recent layout work introduced `VisibleSignatureLayoutEngine`, but some helper policy still lives here as compatibility delegation. New production callers should not import those backend-private layout helpers directly.
 - Status: Confirmed by code and tests; helper concentration is marked as debt.
 
 ### Visible signature layout boundary
@@ -93,10 +93,10 @@ This document governs the repository architecture: Python package layout, applic
 - Responsibility: Provide a public application-layer boundary for visible signature geometry planning.
 - Owns: `LayoutRequest`, `SignatureLayoutPlan`, typed text/image/ink metrics, layout fit issues, and adapter ports for text measurement, image probing, and horizontal rendered-ink measurement.
 - Does not own: Qt widget sizing details, persisted profile JSON, pyHanko signing pipeline.
-- Key collaborators: `phase3_signing_backend.py`, `signing_preview_renderer.py`, `presentation/qt/signing_shell.py`.
+- Key collaborators: `phase3_signing_backend.py`, `signing_preview_renderer.py`, `presentation/qt/signing_shell.py`, `presentation/qt/phase3_harness.py`.
 - Main entry points: `VisibleSignatureLayoutEngine.plan()`, `VisibleSignatureLayoutEngine.validate()`, `PyHankoSignatureAppearanceAdapter.build_stamp_style()`.
 - Important types/classes/functions: `TextMeasurer`, `StampImageProbe`, `HorizontalInkMeasurer`, `PyHankoTextMeasurer`, `PillowStampImageProbe`.
-- Known constraints: The first implementation delegates some work to backend-private helpers and carries `backend_reservation` as an opaque payload for parity. That is transitional.
+- Known constraints: The current implementation intentionally delegates some layout policy to backend-private compatibility helpers and carries `backend_reservation` as an opaque payload for pyHanko parity. Production callers should use `VisibleSignatureLayoutEngine`, `LayoutRequest`, `SignatureLayoutPlan`, and adapter APIs; direct backend-private helper use is limited to backend compatibility wrappers, backend-specific tests, adapter parity tests, and pyHanko-rendered evidence. Moving the remaining helper implementation out of `phase3_signing_backend.py` is deferred until the architecture-steward follow-up defines a cleaner split between neutral policy, pyHanko adapters, backend rendered-fit fallback, preview diagnostics, and harness evidence.
 - Status: Confirmed by code and tests.
 
 ### Signing draft workflow and preview rendering
@@ -178,7 +178,7 @@ This document governs the repository architecture: Python package layout, applic
 - Location: `pyproject.toml`, `foliaseal.spec`, `scripts/build_pyinstaller.sh`, `src/foliaseal/build/pyinstaller_support.py`
 - Responsibility: Python package metadata, console script registration, package data, and PyInstaller one-dir build.
 - Owns: `foliaseal` console script, dependencies, package-data declaration for fonts.
-- Known constraints: Runtime dependencies in `pyproject.toml` are `pyHanko[opentype]` and Pillow; dev extras include PyInstaller, pytest, and ruff. PySide6 is loaded dynamically but is not declared in runtime dependencies.
+- Known constraints: Runtime dependencies in `pyproject.toml` are `pyHanko[opentype]` and Pillow; dev extras include PyInstaller, PySide6, pytest, and ruff. PySide6 is loaded dynamically and remains outside runtime dependencies, but the default dev/test path installs it for QtPdf-backed preview tests.
 - Status: Confirmed by code; PySide6 packaging/dependency contract needs review.
 
 ## 5. Object model / domain model
