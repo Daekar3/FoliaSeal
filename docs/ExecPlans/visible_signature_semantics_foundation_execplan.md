@@ -17,15 +17,19 @@ After this slice, FoliaSeal will have a new application-layer module that can an
 ## Progress
 
 - [x] (2026-05-01T18:19Z) Created this ExecPlan from GitHub issue #50 and split the overall work into five independently verifiable plans.
-- [ ] Add the new visible-signature semantics module with public data types, ports, and a behavior-preserving resolver.
-- [ ] Add deterministic boundary tests covering field resolution, signing-time formatting, text composition, metadata derivation, certificate fallback, and fit-validator propagation.
-- [ ] Export the new boundary from `src/foliaseal/application/__init__.py`.
-- [ ] Run focused validation and record results here.
+- [x] (2026-05-01T18:36Z) Added `src/foliaseal/application/visible_signature_semantics.py` with public data types, ports, default no-op/local adapters, and a behavior-preserving resolver.
+- [x] (2026-05-01T18:36Z) Added deterministic boundary tests covering preview field resolution, certificate fallback, signing-time formatting, single-line/multi-line/wrapped-block text composition, percent escaping, metadata derivation, final-signing fallback behavior, and fit-validator propagation.
+- [x] (2026-05-01T18:36Z) Exported the new boundary from `src/foliaseal/application/__init__.py`.
+- [x] (2026-05-01T18:36Z) Ran focused validation and adjacent workflow/preview/backend validation successfully.
+- [ ] Next slice: execute `docs/ExecPlans/visible_signature_semantics_workflow_migration_execplan.md` to move `SigningDraftWorkflow` onto the new boundary.
 
 ## Surprises & Discoveries
 
 - Observation: No implementation work has started.
   Evidence: this plan was created before code edits for issue #50.
+
+- Observation: `SignatureAppearance` shows `SIGNING_TIME` by default.
+  Evidence: the first `test_visible_signature_semantics.py` run failed two tests because default appearances included the fixed signing time in `detail_text` and fit-validator `stamp_text`. The tests were corrected to hide signing time where they were only asserting certificate-field behavior.
 
 ## Decision Log
 
@@ -39,7 +43,34 @@ After this slice, FoliaSeal will have a new application-layer module that can an
 
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, summarize the new module, tests, exports, and any behavior gaps intentionally deferred to later plans.
+The foundation slice succeeded.
+
+What changed:
+
+- Added `src/foliaseal/application/visible_signature_semantics.py`.
+- Added `CertificateFieldReader`, `SigningClock`, and `VisibleSignatureFitValidator` ports so tests and later production adapters can provide certificate values, timestamps, and fit issues without coupling the core semantic resolver to local files, Qt, pyHanko signing, PDF rendering, or image loading.
+- Added `VisibleSignatureSemanticsService.resolve()` to produce resolved fields, `detail_text`, escaped `stamp_text`, metadata values for reason/location/contact info, fit issues, and a readiness boolean.
+- Added default `UnavailableCertificateFieldReader`, `SystemSigningClock`, and `NoopVisibleSignatureFitValidator` adapters for additive use before production migration.
+- Added `tests/unit/test_visible_signature_semantics.py` with in-memory fake ports.
+- Exported the public boundary from `src/foliaseal/application/__init__.py`.
+
+What did not change:
+
+- `SigningDraftWorkflow.preview()` still uses the existing workflow/backend helper path.
+- `signing_preview_renderer.py` still has its existing `_preview_stamp_text()` path.
+- `phase3_signing_backend.py` still owns final signing stamp text and metadata helpers.
+- No production caller was migrated in this slice.
+
+Verification results:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_semantics.py src/foliaseal/application/__init__.py tests/unit/test_visible_signature_semantics.py
+    All checks passed!
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_semantics.py
+    5 passed in 0.21s
+
+    .venv/bin/pytest -q tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py
+    157 passed in 27.84s
 
 ## Context and Orientation
 
