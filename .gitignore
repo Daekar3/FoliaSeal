@@ -20,4 +20,5 @@ artifacts/signed_preview_parity_matrix_run*/
 artifacts/signed_fit_rejection_matrix_run*/
 artifacts/signed_preview_parity_post_semantics_run*/
 artifacts/signed_fit_rejection_post_semantics_run*/
+artifacts/preview_matrix_post_semantics_*/
 artifacts/papyrus_font_review*/

@@ -12,7 +12,7 @@ After the automated signed-output parity baselines are green, perform a short hu
 
 - [x] (2026-05-02T03:14Z) Created this ExecPlan as the follow-on to the post-semantics signed parity rebaseline.
 - [x] (2026-05-02T03:39Z) Waited for `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md` to complete with green parity and rejection matrices.
-- [ ] Wait for `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md` to complete with green or classified full preview matrices.
+- [x] (2026-05-02T04:15Z) Waited for `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md` to complete with classified full preview matrices.
 - [ ] Select three successful parity cases and one rejection case from the current manifests.
 - [ ] Run the live Phase 3 signing harness for those tracer-bullet cases and capture artifacts.
 - [ ] Review preview images, analysis preview images, signed crops, side-by-side comparisons, and structured snapshots.
@@ -32,6 +32,9 @@ After the automated signed-output parity baselines are green, perform a short hu
 
 - Observation: the signed-output prerequisite is now green after refreshing stale manifest specimens.
   Evidence: `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md` records `artifacts/signed_preview_parity_post_semantics_run2/summary.json` with `18` successful signings and `artifacts/signed_fit_rejection_post_semantics_run3/summary.json` with `3` matched intentional rejections.
+
+- Observation: the full preview-matrix prerequisite is now classified, not perfectly green.
+  Evidence: `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md` records all `3384` preview scenarios completing with zero error scenarios, while single-line matrices retain classified signable clipping/overlap diagnostics for follow-up build/layout work.
 
 ## Decision Log
 
