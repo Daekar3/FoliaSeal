@@ -20,8 +20,11 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [x] (2026-05-02T16:51Z) Second slice: added `CanonicalPreviewLayout` and `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()`.
 - [x] (2026-05-02T16:51Z) Second slice: moved canonical preview construction and horizontal preview stamp suppression behind the layout service contract.
 - [x] (2026-05-02T16:51Z) Second slice: ran focused and adjacent validation successfully.
-- [ ] Second slice: commit the canonical preview facade migration.
-- [ ] Later slice: replace Qt shell and Phase 3 harness `backend_reservation` dereferences with neutral plan fields or diagnostic snapshots.
+- [x] (2026-05-02T16:52Z) Second slice: committed the canonical preview facade migration as `d75bcebfe Move canonical preview layout behind service`.
+- [x] (2026-05-02T16:55Z) Third slice: replaced Qt shell preview reservation reads with neutral preview geometry.
+- [x] (2026-05-02T16:55Z) Third slice: replaced Phase 3 harness backend reservation dimension/content-layout reads with `SignatureLayoutPlan` fields and `LayoutRuleSpec` snapshots.
+- [x] (2026-05-02T16:55Z) Third slice: ran focused and adjacent validation successfully.
+- [ ] Third slice: commit the presentation neutral-geometry migration.
 - [ ] Later slice: move private layout policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
 
 ## Surprises & Discoveries
@@ -38,6 +41,12 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - Observation: canonical preview still needs a temporary reservation compatibility payload for optional text-only and stamp-only layer rendering.
   Evidence: `_render_optional_preview_bounds()` uses the full layout reservation's text and stamp area dimensions. The second slice moved preview style construction into `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()` while returning `reservation` and `reserved_background_layout` until a later neutral-geometry slice replaces those reads.
 
+- Observation: Qt preview sizing did not need the backend reservation payload.
+  Evidence: `_preview_layout_reservation()` was only used by `tests/unit/test_qt_signing_shell.py` to compute expected text/stamp area dimensions. The production code already used `_QtPreviewLayoutGeometry.from_plan()`, so the private helper could be removed and the test could assert against neutral geometry.
+
+- Observation: Phase 3 harness reservation snapshots can avoid dereferencing `layout_plan.backend_reservation` for their fit-gate dimensions and content layout.
+  Evidence: `_snapshot_backend_reservation()` only needed dimensions already exposed on `SignatureLayoutPlan` and a content layout snapshot already exposed as `layout_plan.text_layout`.
+
 ## Decision Log
 
 - Decision: make the first issue #49 slice a service-facade introduction, not the full helper extraction.
@@ -50,6 +59,10 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Decision: keep canonical preview layer-rendering compatibility fields on `CanonicalPreviewLayout` for this slice.
   Rationale: removing `backend_reservation` from preview rendering also requires replacing optional layer reserved-width/height reads with neutral plan data. Keeping the compatibility payload allows the style assembly and stamp-suppression decision to move first without changing preview pixels.
+  Date/Author: 2026-05-02 / Codex
+
+- Decision: keep the Phase 3 evidence field names `backend_reservation_snapshot` and `backend_reservation_error` for this slice.
+  Rationale: renaming evidence fields would churn the QA evidence contract and fixtures. The implementation now uses neutral layout-plan data for dimensions/content layout, while preserving the external evidence shape for compatibility.
   Date/Author: 2026-05-02 / Codex
 
 ## Outcomes & Retrospective
@@ -82,7 +95,7 @@ Validation:
     .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py
     50 passed in 14.70s.
 
-The second slice is complete pending commit.
+The second slice is complete and committed.
 
 What changed:
 
@@ -108,6 +121,25 @@ Validation so far:
 
     .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
     59 passed in 3.69s.
+
+The third slice is complete pending commit.
+
+What changed:
+
+- Removed `_preview_layout_reservation()` from the Qt signing shell and updated the Qt test to use `_preview_layout_geometry()`.
+- Changed Phase 3 harness backend reservation snapshots to take fit-gate dimensions and content layout from `SignatureLayoutPlan` neutral fields.
+- Extended `_snapshot_layout_rule()` so it can snapshot both pyHanko layout rules and public `LayoutRuleSpec` values.
+
+Validation:
+
+    .venv/bin/ruff check src/foliaseal/presentation/qt/signing_shell.py src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_qt_signing_shell.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    59 passed in 3.41s.
+
+    .venv/bin/pytest -q tests/unit/test_phase3_harness.py
+    95 passed, 1 warning in 1.43s.
 
 ## Context and Orientation
 

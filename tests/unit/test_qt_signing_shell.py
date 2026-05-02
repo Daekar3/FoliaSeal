@@ -2424,21 +2424,22 @@ def test_signing_shell_multi_line_horizontal_preview_uses_reserved_text_height(
         preview,
         container=widget.properties_panel.preview_controls.container,
     )
-    reservation = signing_shell_module._preview_layout_reservation(
+    geometry = signing_shell_module._preview_layout_geometry(
         preview,
         stamp_text=detail,
         stamp_aspect_ratio=signing_shell_module._raw_pixmap_aspect_ratio(
             _FakePixmap("/tmp/stamp.png")
         ),
     )
+    assert geometry is not None
     scale = signing_shell_module._preview_display_scale(
         preview,
         available_width_px=available_width,
     )
-    expected_text_width = max(1, int(round(reservation.text_area_width_pt * scale)))
-    expected_text_height = max(1, int(round(reservation.text_area_height_pt * scale)))
-    expected_stamp_width = max(1, int(round(reservation.stamp_area_width_pt * scale)))
-    expected_stamp_height = max(1, int(round(reservation.stamp_area_height_pt * scale)))
+    expected_text_width = max(1, int(round(geometry.text_area_width_pt * scale)))
+    expected_text_height = max(1, int(round(geometry.text_area_height_pt * scale)))
+    expected_stamp_width = max(1, int(round(geometry.stamp_area_width_pt * scale)))
+    expected_stamp_height = max(1, int(round(geometry.stamp_area_height_pt * scale)))
 
     assert widget.properties_panel.preview_controls.multi_content_container.fixed_size == (
         expected_text_width,

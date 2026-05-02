@@ -778,24 +778,6 @@ def _preview_layout_geometry(
     return _QtPreviewLayoutGeometry.from_plan(plan)
 
 
-def _preview_layout_reservation(
-    preview: SigningDraftPreview,
-    *,
-    detail_text: str | None = None,
-    stamp_text: str | None = None,
-    stamp_aspect_ratio: float | None = None,
-):
-    plan = _preview_layout_plan(
-        preview,
-        detail_text=detail_text,
-        stamp_text=stamp_text,
-        stamp_aspect_ratio=stamp_aspect_ratio,
-    )
-    if plan is None:
-        return None
-    return plan.backend_reservation
-
-
 def _preview_layout_plan(
     preview: SigningDraftPreview,
     *,

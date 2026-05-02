@@ -2393,9 +2393,8 @@ def _reconstruct_text_box_bounds_px(
             image_stamp_path=image_stamp_path,
         )
     )
-    reservation = layout_plan.backend_reservation
     return _layout_rule_bounds_px(
-        reservation.inner_content_layout,
+        layout_plan.text_layout,
         reserved_width_pt=layout_plan.text_box.width_pt,
         reserved_height_pt=layout_plan.text_box.height_pt,
         width_px=container_bounds_px["width"],
@@ -5566,11 +5565,10 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
                 image_stamp_path=appearance.image_stamp_path,
             )
         )
-        layout_reservation = layout_plan.backend_reservation
         text_box_width = layout_plan.text_box.width_pt
         text_box_height = layout_plan.text_box.height_pt
-        fit_gate_width_limit = layout_reservation.text_area_width_pt + 1
-        fit_gate_height_limit = layout_reservation.text_area_height_pt
+        fit_gate_width_limit = layout_plan.text_area_width_pt + 1
+        fit_gate_height_limit = layout_plan.text_area_height_pt
         fit_gate_passed = not layout_plan.fit_issues
         if layout_plan.fit_issues:
             snapshot["error"] = layout_plan.fit_issues[0].message
@@ -5591,18 +5589,18 @@ def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | N
                 "stamp_background_present": stamp_background is not None,
                 "measured_text_box_width_pt": text_box_width,
                 "measured_text_box_height_pt": text_box_height,
-                "reserved_primary_extent_pt": layout_reservation.reserved_primary_extent_pt,
-                "stamp_area_width_pt": layout_reservation.stamp_area_width_pt,
-                "stamp_area_height_pt": layout_reservation.stamp_area_height_pt,
-                "text_area_width_pt": layout_reservation.text_area_width_pt,
-                "text_area_height_pt": layout_reservation.text_area_height_pt,
+                "reserved_primary_extent_pt": layout_plan.reserved_primary_extent_pt,
+                "stamp_area_width_pt": layout_plan.stamp_area_width_pt,
+                "stamp_area_height_pt": layout_plan.stamp_area_height_pt,
+                "text_area_width_pt": layout_plan.text_area_width_pt,
+                "text_area_height_pt": layout_plan.text_area_height_pt,
                 "fit_gate_width_limit_pt": fit_gate_width_limit,
                 "fit_gate_height_limit_pt": fit_gate_height_limit,
                 "fit_gate_passed": fit_gate_passed,
                 "text_style": _snapshot_text_style(appearance.text_style),
                 "box_style": _snapshot_box_style(appearance.box_style),
                 "background_layout": _snapshot_layout_rule(background_layout),
-                "content_layout": _snapshot_layout_rule(layout_reservation.inner_content_layout),
+                "content_layout": _snapshot_layout_rule(layout_plan.text_layout),
             }
         )
     except Exception as exc:
@@ -5641,17 +5639,30 @@ def _backend_reservation_error(request: SigningRequest) -> str | None:
 def _snapshot_layout_rule(layout_rule) -> dict[str, Any] | None:
     if layout_rule is None:
         return None
+    x_align = getattr(layout_rule, "x_align")
+    y_align = getattr(layout_rule, "y_align")
+    scaling = getattr(
+        layout_rule,
+        "inner_content_scaling",
+        getattr(layout_rule, "scaling", None),
+    )
+    margins = getattr(layout_rule, "margins")
     return {
-        "x_align": layout_rule.x_align.name.lower(),
-        "y_align": layout_rule.y_align.name.lower(),
-        "inner_content_scaling": layout_rule.inner_content_scaling.name.lower(),
+        "x_align": _layout_value_name(x_align),
+        "y_align": _layout_value_name(y_align),
+        "inner_content_scaling": _layout_value_name(scaling),
         "margins": {
-            "left": layout_rule.margins.left,
-            "right": layout_rule.margins.right,
-            "top": layout_rule.margins.top,
-            "bottom": layout_rule.margins.bottom,
+            "left": margins.left,
+            "right": margins.right,
+            "top": margins.top,
+            "bottom": margins.bottom,
         },
     }
+
+
+def _layout_value_name(value: Any) -> str:
+    name = getattr(value, "name", value)
+    return str(name).lower()
 
 
 def _snapshot_signing_appearance(appearance) -> dict[str, Any]:
