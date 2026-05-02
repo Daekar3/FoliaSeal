@@ -40,7 +40,6 @@ from foliaseal.application.horizontal_signature_reservation import (
 )
 from foliaseal.application.sign_pdf_use_case import (
     SigningBackendAppearance,
-    SigningBackendFieldBinding,
     SigningBackendRequest,
     SignPdfUseCase,
 )
@@ -74,7 +73,6 @@ from foliaseal.domain.errors import (
 from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureFieldKey,
-    SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -611,15 +609,6 @@ class _SignatureLayoutReservation:
     inner_content_layout: SimpleBoxLayoutRule
 
 
-@dataclass(frozen=True)
-class VisibleSignatureTextLayout:
-    """Composed visible-signature text shared by preview and backend fit checks."""
-
-    title_text: str
-    detail_text: str
-    stamp_text: str
-
-
 def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
     # Preserve the user's selected half-point font sizes in backend measurement.
     # Rounding 8.5pt up to 9pt creates avoidable preview/backend drift in narrow
@@ -636,41 +625,6 @@ def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
             margins=Margins.uniform(0),
             inner_content_scaling=InnerScaling.NO_SCALING,
         ),
-    )
-
-
-def _compose_visible_signature_text_layout(
-    *,
-    signer_label_prefix: str,
-    layout_template: SignatureLayoutTemplate,
-    body_fragments: list[str],
-) -> VisibleSignatureTextLayout:
-    title_text = signer_label_prefix.strip()
-    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        detail_text = " | ".join(body_fragments)
-    elif layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
-        if not body_fragments:
-            detail_text = ""
-        elif len(body_fragments) <= 2:
-            detail_text = "\n".join(body_fragments)
-        else:
-            detail_text = "\n".join(
-                [
-                    body_fragments[0],
-                    body_fragments[1],
-                    " ".join(body_fragments[2:]),
-                ]
-            )
-    else:
-        detail_text = "\n".join(body_fragments)
-    if title_text and detail_text:
-        stamp_text = f"{title_text}\n{detail_text}"
-    else:
-        stamp_text = title_text or detail_text
-    return VisibleSignatureTextLayout(
-        title_text=title_text,
-        detail_text=detail_text,
-        stamp_text=_escape_percent(stamp_text),
     )
 
 
@@ -1976,57 +1930,6 @@ def _solid_background_for_color(color_hex: str) -> PdfImage:
     return PdfImage(image, writer=None)
 
 
-def _resolve_visible_field_text(
-    field_key: SignatureFieldKey,
-    binding: SigningBackendFieldBinding,
-    *,
-    signer: SimpleSigner,
-    appearance: SigningBackendAppearance,
-    signing_time: datetime,
-) -> str:
-    if binding.source == SignatureFieldSource.OVERRIDE:
-        return binding.override_text or ""
-    if binding.source == SignatureFieldSource.HIDDEN:
-        return ""
-    if field_key == SignatureFieldKey.SIGNING_TIME:
-        return _format_signing_time(signing_time, appearance.datetime_format)
-
-    subject = signer.signing_cert.subject.native
-    if field_key == SignatureFieldKey.DISTINGUISHED_NAME:
-        dn_parts = [
-            value
-            for value in (
-                _subject_value(subject, "common_name"),
-                _subject_value(subject, "email_address"),
-                (
-                    _subject_value(subject, "title")
-                    or _subject_value(subject, "organizational_unit_name")
-                ),
-                _subject_value(subject, "organization_name"),
-                _derived_location(subject),
-            )
-            if value
-        ]
-        return ", ".join(dn_parts)
-    if field_key == SignatureFieldKey.COMMON_NAME:
-        return _subject_value(subject, "common_name") or signer.subject_name
-    if field_key == SignatureFieldKey.EMAIL:
-        return _subject_value(subject, "email_address") or ""
-    if field_key == SignatureFieldKey.TITLE:
-        return str(
-            _subject_value(subject, "title")
-            or _subject_value(subject, "organizational_unit_name")
-            or ""
-        )
-    if field_key == SignatureFieldKey.COMPANY:
-        return _subject_value(subject, "organization_name") or ""
-    if field_key == SignatureFieldKey.REASON:
-        return ""
-    if field_key == SignatureFieldKey.LOCATION:
-        return _derived_location(subject)
-    return binding.display_label or _field_label(field_key)
-
-
 def _subject_value(subject: dict[str, object], key: str) -> str | None:
     value = subject.get(key)
     if value is None:
@@ -2125,10 +2028,6 @@ def _reserved_space(container_length: int, content_length: int, gap: int) -> int
     return max(0, min(desired, upper_bound))
 
 
-def _should_render_field(binding: SigningBackendFieldBinding) -> bool:
-    return binding.show_in_visible_appearance and binding.source != SignatureFieldSource.HIDDEN
-
-
 def _signature_name_for_metadata(
     request: SigningBackendRequest,
     signer: SimpleSigner,
@@ -2138,45 +2037,11 @@ def _signature_name_for_metadata(
     return signer.subject_name
 
 
-def _visible_reason(appearance: SigningBackendAppearance, signer: SimpleSigner) -> str | None:
-    return _resolve_visible_signature_semantics(
-        certificate_path="",
-        passphrase="",
-        appearance=appearance,
-        signer=signer,
-        signing_time=_current_signing_time(appearance.timezone_display_mode),
-    ).text.metadata_reason
-
-
-def _visible_location(appearance: SigningBackendAppearance, signer: SimpleSigner) -> str | None:
-    return _resolve_visible_signature_semantics(
-        certificate_path="",
-        passphrase="",
-        appearance=appearance,
-        signer=signer,
-        signing_time=_current_signing_time(appearance.timezone_display_mode),
-    ).text.metadata_location
-
-
-def _visible_email(appearance: SigningBackendAppearance, signer: SimpleSigner) -> str | None:
-    return _resolve_visible_signature_semantics(
-        certificate_path="",
-        passphrase="",
-        appearance=appearance,
-        signer=signer,
-        signing_time=_current_signing_time(appearance.timezone_display_mode),
-    ).text.metadata_contact_info
-
-
 def _current_signing_time(timezone_mode: SignatureTimezoneDisplayMode) -> datetime:
     timestamp = datetime.now(UTC)
     if timezone_mode is SignatureTimezoneDisplayMode.LOCAL:
         timestamp = timestamp.astimezone()
     return timestamp
-
-
-def _format_signing_time(signing_time: datetime, datetime_format: str) -> str:
-    return signing_time.strftime(datetime_format)
 
 
 def _rect_to_box(signature_rect) -> tuple[int, int, int, int]:
@@ -2217,24 +2082,6 @@ def _font_factory_for_family(
 def _hex_to_rgb(color_hex: str) -> tuple[float, float, float]:
     normalized = color_hex.strip().lstrip("#")
     return tuple(int(normalized[index : index + 2], 16) / 255.0 for index in (0, 2, 4))  # type: ignore[return-value]
-
-
-def _escape_percent(value: str) -> str:
-    return value.replace("%", "%%")
-
-
-def _field_label(field_key: SignatureFieldKey) -> str:
-    labels = {
-        SignatureFieldKey.DISTINGUISHED_NAME: "Distinguished name",
-        SignatureFieldKey.COMMON_NAME: "Common name",
-        SignatureFieldKey.EMAIL: "Email",
-        SignatureFieldKey.SIGNING_TIME: "Signing time",
-        SignatureFieldKey.REASON: "Reason",
-        SignatureFieldKey.LOCATION: "Location",
-        SignatureFieldKey.TITLE: "Title",
-        SignatureFieldKey.COMPANY: "Company",
-    }
-    return labels[field_key]
 
 
 def _read_pdf_version_from_bytes(output_bytes: bytes) -> str | None:
@@ -2289,13 +2136,3 @@ def _is_pkcs12_container(path: Path) -> bool:
     except Exception:
         return False
     return True
-
-
-def _binding_for_field(
-    appearance: SigningBackendAppearance,
-    field_key: SignatureFieldKey,
-) -> SigningBackendFieldBinding | None:
-    for binding in appearance.field_bindings:
-        if binding.field_key == field_key:
-            return binding
-    return None

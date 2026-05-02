@@ -18,7 +18,7 @@ After this slice, final PDF signing will consume the same visible-signature sema
 - [x] (2026-05-01T19:14Z) Preserved existing signing output behavior and failure-code mapping.
 - [x] (2026-05-01T19:14Z) Ran backend, preview, and sign-use-case validation and recorded results here.
 - [x] (2026-05-01T21:40Z) Commit this backend migration slice.
-- [ ] Begin the cleanup plan.
+- [x] (2026-05-01T21:43Z) Began the cleanup plan.
 
 ## Surprises & Discoveries
 

@@ -80,20 +80,32 @@ This document governs the repository architecture: Python package layout, applic
 - Location: `src/foliaseal/application/phase3_signing_backend.py`
 - Responsibility: Concrete pyHanko signing, verification, certificate loading, visible signature style construction, fit validation, and timestamp integration.
 - Owns: `PyHankoPdfSigner`, `PyHankoPdfInspector`, `PyHankoCertificateLoader`, `PyHankoSignatureVerifier`, `Phase3SigningExecutor`, rounded visible signature stamp style, backend-only rendered-fit fallbacks.
-- Does not own: Qt widgets, persisted profile schemas, high-level request/failure orchestration.
-- Key collaborators: `SignPdfUseCase`, `visible_signature_layout.py`, bundled fonts, `infra.tsa`, `infra.certification`.
+- Does not own: Qt widgets, persisted profile schemas, high-level request/failure orchestration, visible-signature text/metadata semantics.
+- Key collaborators: `SignPdfUseCase`, `visible_signature_semantics.py`, `visible_signature_layout.py`, bundled fonts, `infra.tsa`, `infra.certification`.
 - Main entry points: `build_phase3_signing_executor()`, `Phase3SigningExecutor.execute()`.
 - Important types/classes/functions: `RoundedBorderTextStampStyle`, `PyHankoPdfSigner.sign()`, `_visible_signature_fit_issues()`, `_build_stamp_text()`.
-- Known constraints: This module is currently large and contains both concrete adapter logic and many private layout helpers. Recent layout work introduced `VisibleSignatureLayoutEngine`, but some helper policy still lives here as compatibility delegation. New production callers should not import those backend-private layout helpers directly.
+- Known constraints: This module is currently large and contains both concrete adapter logic and many private layout helpers. Recent layout work introduced `VisibleSignatureLayoutEngine`, and visible text/metadata now comes from `VisibleSignatureSemanticsService`. Some layout helper policy still lives here as compatibility delegation. New production callers should not import those backend-private layout helpers directly. `_build_stamp_text()` remains as a private compatibility wrapper for backend tests and harness diagnostics.
 - Status: Confirmed by code and tests; helper concentration is marked as debt.
+
+### Visible signature semantics boundary
+
+- Location: `src/foliaseal/application/visible_signature_semantics.py`
+- Responsibility: Resolve meaning-level visible signature state: field values, certificate fallback behavior, signing-time text, detail text, escaped stamp text, metadata reason/location/contact info, and semantic fit issue aggregation.
+- Owns: `VisibleSignatureSemanticsService`, `VisibleSignatureSemanticsRequest`, `VisibleSignatureSemantics`, `VisibleSignatureText`, certificate reader, signing clock, and fit-validator ports.
+- Does not own: Qt controls, PDF signing, pyHanko stamp style construction, raster/canonical rendering, or layout geometry policy.
+- Key collaborators: `signing_draft_workflow.py`, `signing_preview_renderer.py`, `phase3_signing_backend.py`, `visible_signature_layout.py`.
+- Main entry points: `VisibleSignatureSemanticsService.resolve()`.
+- Important types/classes/functions: `CertificateFieldValues`, `VisibleSignatureField`, `VisibleSignatureText`, `VisibleSignatureFitRequest`, `VisibleSignatureSemanticsMode`.
+- Known constraints: Final signing uses a backend-local pyHanko adapter to translate `SimpleSigner.signing_cert.subject.native` into the semantics field map. The boundary itself intentionally has no pyHanko imports.
+- Status: Confirmed by code and tests.
 
 ### Visible signature layout boundary
 
 - Location: `src/foliaseal/application/visible_signature_layout.py`
 - Responsibility: Provide a public application-layer boundary for visible signature geometry planning.
 - Owns: `LayoutRequest`, `SignatureLayoutPlan`, typed text/image/ink metrics, layout fit issues, and adapter ports for text measurement, image probing, and horizontal rendered-ink measurement.
-- Does not own: Qt widget sizing details, persisted profile JSON, pyHanko signing pipeline.
-- Key collaborators: `phase3_signing_backend.py`, `signing_preview_renderer.py`, `presentation/qt/signing_shell.py`, `presentation/qt/phase3_harness.py`.
+- Does not own: visible-signature field/text semantics, Qt widget sizing details, persisted profile JSON, pyHanko signing pipeline.
+- Key collaborators: `visible_signature_semantics.py`, `phase3_signing_backend.py`, `signing_preview_renderer.py`, `presentation/qt/signing_shell.py`, `presentation/qt/phase3_harness.py`.
 - Main entry points: `VisibleSignatureLayoutEngine.plan()`, `VisibleSignatureLayoutEngine.validate()`, `PyHankoSignatureAppearanceAdapter.build_stamp_style()`.
 - Important types/classes/functions: `TextMeasurer`, `StampImageProbe`, `HorizontalInkMeasurer`, `PyHankoTextMeasurer`, `PillowStampImageProbe`.
 - Known constraints: The current implementation intentionally delegates some layout policy to backend-private compatibility helpers and carries `backend_reservation` as an opaque payload for pyHanko parity. Production callers should use `VisibleSignatureLayoutEngine`, `LayoutRequest`, `SignatureLayoutPlan`, and adapter APIs; direct backend-private helper use is limited to backend compatibility wrappers, backend-specific tests, adapter parity tests, and pyHanko-rendered evidence. Moving the remaining helper implementation out of `phase3_signing_backend.py` is deferred until the architecture-steward follow-up defines a cleaner split between neutral policy, pyHanko adapters, backend rendered-fit fallback, preview diagnostics, and harness evidence.
@@ -104,10 +116,10 @@ This document governs the repository architecture: Python package layout, applic
 - Location: `src/foliaseal/application/signing_draft_workflow.py`, `src/foliaseal/application/signing_preview_renderer.py`
 - Responsibility: Normalize in-session signing draft state, validate it for submit, and render deterministic textual/canonical preview snapshots.
 - Owns: `SigningDraftWorkflow`, `SigningDraftPreview`, draft validation issues, preview/request parity checks, canonical preview rendering.
-- Does not own: Qt controls, pyHanko signing execution, persisted profile store.
-- Key collaborators: domain models, coordinate transforms, visible signature layout engine, signing backend for canonical pyHanko style.
+- Does not own: visible-signature text/metadata semantics, Qt controls, pyHanko signing execution, persisted profile store.
+- Key collaborators: domain models, coordinate transforms, visible signature semantics service, visible signature layout engine, signing backend for canonical pyHanko style.
 - Main entry points: `SigningDraftWorkflow.preview()`, `SigningDraftWorkflow.to_signing_request()`, `render_signing_preview()`, `render_canonical_signature_preview()`, `compare_preview_to_request()`.
-- Known constraints: Certificate preview values are read from PKCS#12 when available; the workflow also imports `SignaturePreset` from infra config, so the application layer currently knows a persistence DTO.
+- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read from PKCS#12 when available; the workflow also imports `SignaturePreset` from infra config, so the application layer currently knows a persistence DTO.
 - Status: Confirmed by code; infra DTO dependency is debt/needs review.
 
 ### Viewer workflow and coordinate geometry
@@ -194,7 +206,8 @@ This document governs the repository architecture: Python package layout, applic
 | `TimestampTrustPolicy` | `domain/models.py` | Runtime timestamp trust validation inputs. | system store flag, CA bundle path, revocation mode. | Converted from config `TrustProfile`. |
 | `SigningBackendRequest` | `application/sign_pdf_use_case.py` | Backend-facing normalized signing payload. | public signing fields plus `SigningBackendAppearance`. | Created by `from_signing_request()`. |
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, rect, appearance, placement context. | Produces preview and final `SigningRequest`. |
-| `SigningDraftPreview` | `application/signing_draft_workflow.py` | UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, issues, can_submit. | Used by Qt and preview renderer. |
+| `SigningDraftPreview` | `application/signing_draft_workflow.py` | UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, stamp text, issues, can_submit. | Used by Qt and preview renderer. |
+| `VisibleSignatureSemantics` | `application/visible_signature_semantics.py` | Resolved visible-signature meaning-level payload. | resolved fields, title/detail/stamp text, metadata reason/location/contact info, fit issues, readiness. | Shared source for workflow preview, canonical preview text, backend signing text, and metadata. |
 | `SignatureLayoutPlan` | `application/visible_signature_layout.py` | Canonical visible-signature geometry result. | text/stamp area dimensions, layout rules, fit issues, optional ink reservation. | Boundary for backend/canonical/Qt preview geometry. |
 | `ViewerSession` | `application/viewer_session.py` | Viewer page/zoom state. | page count, current page, zoom. | Clamps zoom via `ViewerZoomLimits`. |
 | `ViewerRenderSnapshot` | `application/viewer_workflow.py` | Current rendered page state for interactions. | page index, zoom, pan, page box, rotation, image size, mapping readiness. | Required for selection mapping. |
@@ -359,6 +372,7 @@ This document governs the repository architecture: Python package layout, applic
 |---|---|---|---|
 | Signing backend ports | `application/sign_pdf_use_case.py` | Swap PDF inspector, certificate loader, signer, verifier, certification inspector in tests or future adapters. | Must return domain `SigningOutput` / `VerificationSummary` and preserve failure-code mapping. |
 | Render backend protocol | `infra/render/base.py` | Replace QtPdf renderer with another renderer. | Must provide page geometry and RGBA render bytes. |
+| Visible-signature semantics ports | `application/visible_signature_semantics.py` | Inject certificate field reading, signing clock, and fit validation. | Must keep preview and final-signing text/metadata behavior aligned. |
 | Visible-signature layout ports | `application/visible_signature_layout.py` | Inject text measurement, image probing, and horizontal ink measurement. | Must preserve `SignatureLayoutPlan` semantics and fit-issue reporting. |
 | Timestamp factory | `phase3_signing_backend.py`, `infra/tsa/pyhanko_adapter.py` | Use dummy TSA in tests/matrices or HTTP TSA in real signing. | Production URLs must validate as HTTP(S). |
 | Profile storage root | `SignaturePresetCatalogStore.default(app_name=...)` | Test/custom app-name storage location. | Default follows XDG data home. |
@@ -373,7 +387,8 @@ Tests live under `tests/unit/` with support builders in `tests/support/`. The su
 |---|---|---|---|
 | Domain/config validation | `test_signature_appearance_models.py`, `test_config_schemas.py`, `test_signature_preset_storage.py` | Dataclass invariants and persisted JSON shape. | Add/update schema tests for persisted fields. |
 | Signing use case | `test_sign_pdf_use_case.py` | Failure-code mapping, timestamp policy, certification restriction, atomic writes. | Preserve stable failure codes and output metadata. |
-| pyHanko signing backend | `test_phase3_signing_backend.py` | Real signing, timestamping, visible signature layout, private helper behavior. | Run focused backend tests for signing/layout changes. |
+| pyHanko signing backend | `test_phase3_signing_backend.py` | Real signing, timestamping, visible signature layout, semantics adapter behavior, private layout helper behavior. | Run focused backend tests for signing/layout changes. |
+| Visible semantics boundary | `test_visible_signature_semantics.py` | Visible field resolution, certificate fallback, signing-time text, escaped stamp text, metadata, and fit-validator propagation. | Add boundary tests for text/metadata behavior before changing workflow, preview, or backend signing. |
 | Visible layout boundary | `test_visible_signature_layout.py` | `SignatureLayoutPlan` and adapter parity. | Add boundary tests before relying on private helper changes. |
 | Preview rendering | `test_signing_preview_renderer.py` | Textual/canonical preview snapshots and preview/request parity. | Run with backend/layout tests for visible-signature changes. |
 | Qt shell/viewer | `test_qt_signing_shell.py`, `test_qt_viewer_widget.py`, `test_qt_render_backend.py` | Widget behavior through fakes, selection geometry, render diagnostics. | Use fakes; avoid requiring a live GUI unless intentionally running harnesses. |
@@ -392,7 +407,7 @@ Default local validation from README:
 |---|---|---|---|
 | `phase3_signing_backend.py` mixes concrete pyHanko adapter code with many private visible-signature layout helpers. | Harder to navigate and test at a single public boundary. | `VisibleSignatureLayoutEngine` wraps/migrates parts of layout behavior while preserving parity. | Move policy behind the layout boundary and reduce private-helper test reliance after coverage is equivalent. |
 | `signing_shell.py` is a large module containing widget composition, profile handling, preview sizing, and workflow orchestration. | Changes risk broad review scope and can hide UI/domain coupling. | Tests use fakes and helper-level coverage. | Split only when clear ownership boundaries emerge, likely panel/profile/preview adapter components. |
-| Application layer imports some infra DTOs and concrete backend helpers. | Layer boundary is not perfectly clean. | Keep imports narrow while migrations are in progress. | Move shared DTOs/interfaces upward or add adapter methods when it reduces coupling. |
+| Application layer imports some infra DTOs and concrete backend helpers. | Layer boundary is not perfectly clean. | Semantics decisions now live behind `VisibleSignatureSemanticsService`; remaining imports are primarily layout/backend compatibility and profile DTOs. | Move shared DTOs/interfaces upward or add adapter methods when it reduces coupling. |
 | `SignatureLayoutPlan.backend_reservation` carries an opaque backend object. | Public layout boundary is not fully neutral. | Preserve pyHanko parity during migration. | Replace with neutral data once backend/private helpers are no longer required. |
 | PySide6 is dynamically imported but not listed in `pyproject.toml` runtime dependencies. | A fresh install may run CLI helpers but fail GUI/harness commands without extra packages. | Runtime diagnostics report unavailable Qt bindings. | Decide whether PySide6 belongs in optional extras or documented system setup only. |
 | `foliaseal.spec` does not visibly use `collect_runtime_assets()`. | PyInstaller hidden-import behavior may diverge between helper tests and real spec. | `foliaseal.spec` independently collects FoliaSeal submodules. | Wire the helper into the spec or delete the unused helper path after review. |

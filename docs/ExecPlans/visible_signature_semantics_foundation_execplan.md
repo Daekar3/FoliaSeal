@@ -21,7 +21,7 @@ After this slice, FoliaSeal will have a new application-layer module that can an
 - [x] (2026-05-01T18:36Z) Added deterministic boundary tests covering preview field resolution, certificate fallback, signing-time formatting, single-line/multi-line/wrapped-block text composition, percent escaping, metadata derivation, final-signing fallback behavior, and fit-validator propagation.
 - [x] (2026-05-01T18:36Z) Exported the new boundary from `src/foliaseal/application/__init__.py`.
 - [x] (2026-05-01T18:36Z) Ran focused validation and adjacent workflow/preview/backend validation successfully.
-- [ ] Next slice: execute `docs/ExecPlans/visible_signature_semantics_workflow_migration_execplan.md` to move `SigningDraftWorkflow` onto the new boundary.
+- [x] (2026-05-01T21:43Z) Next slice executed: `docs/ExecPlans/visible_signature_semantics_workflow_migration_execplan.md` moved `SigningDraftWorkflow` onto the new boundary.
 
 ## Surprises & Discoveries
 

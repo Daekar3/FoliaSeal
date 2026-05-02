@@ -16,7 +16,7 @@ After this slice, the live signing draft workflow will use the new visible-signa
 - [x] (2026-05-01T18:40Z) Preserved existing public methods and `SigningDraftPreview` shape for Qt callers.
 - [x] (2026-05-01T18:40Z) Removed now-unused workflow text-composition helpers that imported backend-private `_compose_visible_signature_text_layout()`.
 - [x] (2026-05-01T18:40Z) Ran workflow, preview, Qt shell, and semantics validation successfully.
-- [ ] Next slice: execute `docs/ExecPlans/visible_signature_semantics_preview_migration_execplan.md` so canonical preview stops composing stamp text independently.
+- [x] (2026-05-01T21:43Z) Next slice executed: `docs/ExecPlans/visible_signature_semantics_preview_migration_execplan.md` stopped canonical preview from composing stamp text independently.
 
 ## Surprises & Discoveries
 

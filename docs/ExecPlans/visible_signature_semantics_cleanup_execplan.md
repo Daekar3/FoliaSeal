@@ -11,15 +11,23 @@ After this slice, issue #50 can close cleanly. The repository should have one vi
 ## Progress
 
 - [x] (2026-05-01T18:19Z) Created this ExecPlan as the fifth and final issue #50 slice.
-- [ ] Confirm plans 1 through 4 are complete and committed.
-- [ ] Remove or demote redundant private-helper tests after equivalent boundary coverage exists.
-- [ ] Update architecture and ExecPlan documentation with final ownership and remaining debt.
-- [ ] Run full focused validation and prepare the GitHub issue #50 closure report.
+- [x] (2026-05-01T21:43Z) Confirmed plans 1 through 4 are complete and committed: `3e0686e24`, `2ed5a99f7`, `928c4fcd3`, and `9eaf1af86`.
+- [x] (2026-05-01T21:43Z) Removed obsolete backend-private semantic helper code after production callers moved to `VisibleSignatureSemanticsService`.
+- [x] (2026-05-01T21:43Z) Retained private wrapper tests where they still protect harness diagnostics or backend compatibility around `_build_stamp_text()`.
+- [x] (2026-05-01T21:43Z) Updated architecture and ExecPlan documentation with final ownership and remaining debt.
+- [x] (2026-05-01T21:43Z) Ran full focused and broader validation and prepared the GitHub issue #50 closure report.
+- [x] (2026-05-01T21:43Z) Closed GitHub issue #50: https://github.com/Daekar3/FoliaSeal/issues/50.
 
 ## Surprises & Discoveries
 
-- Observation: No cleanup work has started.
-  Evidence: this plan was created before code edits for the cleanup slice.
+- Observation: `_build_stamp_text()` remains useful as a compatibility wrapper even though it no longer owns semantic composition.
+  Evidence: `presentation/qt/phase3_harness.py` and backend tests use it to obtain backend-resolved stamp text for diagnostics and layout assertions. The wrapper delegates to `_resolve_visible_signature_semantics()`.
+
+- Observation: The old backend text layout helper and metadata helpers could be deleted.
+  Evidence: after backend migration, `_compose_visible_signature_text_layout`, `VisibleSignatureTextLayout`, `_resolve_visible_field_text`, `_visible_reason`, `_visible_location`, `_visible_email`, and `_binding_for_field` had no production call sites.
+
+- Observation: Remaining preview `_preview_stamp_text()` helpers are presentation compatibility, not semantic ownership.
+  Evidence: `signing_preview_renderer.py` and `signing_shell.py` first prefer `SigningDraftPreview.stamp_text`; fallback composition only supports direct/test-constructed previews without the semantic field.
 
 ## Decision Log
 
@@ -33,7 +41,35 @@ After this slice, issue #50 can close cleanly. The repository should have one vi
 
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, include the final GitHub issue URL, validation results, and any follow-up issues created for remaining debt.
+Issue #50 is complete and closed: https://github.com/Daekar3/FoliaSeal/issues/50.
+
+Final ownership is documented in `docs/ARCHITECTURE.md`: `visible_signature_semantics.py` owns visible fields, certificate fallback semantics, signing-time text, detail text, escaped stamp text, metadata text, and semantic fit issue aggregation. `visible_signature_layout.py` owns geometry and fit planning. `signing_preview_renderer.py` renders textual/canonical previews from resolved preview data. `phase3_signing_backend.py` owns concrete pyHanko signing, stamp style construction, PDF output, timestamping, and verification.
+
+Production callers now consume the semantics boundary:
+
+- `SigningDraftWorkflow.preview()` resolves fields, detail text, stamp text, and visible-fit issues through `VisibleSignatureSemanticsService`.
+- Canonical preview rendering consumes `SigningDraftPreview.stamp_text`.
+- `PyHankoPdfSigner.sign()` resolves final-signing semantics once and uses that payload for fit validation, visible stamp text, and PDF metadata.
+
+Private helpers remaining:
+
+- `_build_stamp_text()` remains as a backend compatibility wrapper used by tests and harness diagnostics.
+- `_semantic_preview_stamp_text()` and Qt `_preview_stamp_text()` remain as compatibility fallbacks for direct `SigningDraftPreview` construction; normal workflow previews provide `stamp_text`.
+- Layout-heavy backend helpers remain under issue #49 / later architectural work because they protect pyHanko geometry and rendered-ink behavior, not semantic text ownership.
+
+Validation completed:
+
+    .venv/bin/ruff check src/foliaseal/application/signing_draft_workflow.py src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/visible_signature_semantics.py tests/unit/test_visible_signature_semantics.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_semantics.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py
+    165 passed in 27.30s.
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    59 passed in 3.78s.
+
+    .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_phase3_harness.py
+    116 passed, 1 warning in 1.39s.
 
 ## Context and Orientation
 

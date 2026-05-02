@@ -18,7 +18,7 @@ After this slice, canonical preview rendering will no longer reconstruct visible
 - [x] (2026-05-01T18:44Z) Preserved preview/output parity tests and canonical preview geometry behavior.
 - [x] (2026-05-01T18:44Z) Ran focused preview, layout, workflow, Qt shell, and harness validation and recorded results here.
 - [x] (2026-05-01T19:09Z) Commit this preview migration slice.
-- [ ] Begin the backend signing migration plan.
+- [x] (2026-05-01T21:43Z) Began and completed the backend signing migration plan.
 
 ## Surprises & Discoveries
 
