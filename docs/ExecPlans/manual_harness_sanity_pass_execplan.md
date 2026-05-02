@@ -69,6 +69,8 @@ Follow-up is now represented by `docs/ExecPlans/cap9_single_line_validation_hone
 
 The child plan completed on 2026-05-02. The cap 9-like condition is now represented by `test_single_line_rendered_ink_fallback_rejects_border_flush_text`, and backend validation rejects horizontal single-line rendered text that is flush with the visible border.
 
+Issue #47 close-out is now tracked by `docs/ExecPlans/issue47_manual_harness_acceptance_closeout_execplan.md`. Focused verification passed for the manual cap 4-8 backend ladder, canonical preview replay, cap 9 validation-honesty regression, and signed parity manifest coverage. This supports closing Issue #47 without adding a new layout behavior change.
+
 ## Context and Orientation
 
 The live Qt signing harness is the path closest to user behavior. It wires together `SigningDraftWorkflow`, the Qt signing shell, preview rendering, request construction, backend signing, and artifact capture. It lives primarily in `src/foliaseal/presentation/qt/phase3_harness.py` and `src/foliaseal/presentation/qt/signing_shell.py`.
@@ -170,3 +172,5 @@ Revision note: Created 2026-05-02 by Codex to capture the manual GUI sanity pass
 Revision note: Updated 2026-05-02 by Codex to link the cap 9 validation-honesty child plan after the user reported severe border clipping in cap 9.
 
 Revision note: Updated 2026-05-02 by Codex after the child plan completed the regression and validation fix for cap 9-like border clipping.
+
+Revision note: Updated 2026-05-02 by Codex to link the Issue #47 close-out plan and focused verification result.
