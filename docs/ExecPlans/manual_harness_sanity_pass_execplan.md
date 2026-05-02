@@ -11,7 +11,7 @@ After the automated signed-output parity baselines are green, perform a short hu
 ## Progress
 
 - [x] (2026-05-02T03:14Z) Created this ExecPlan as the follow-on to the post-semantics signed parity rebaseline.
-- [ ] Wait for `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md` to complete with green parity and rejection matrices.
+- [x] (2026-05-02T03:39Z) Waited for `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md` to complete with green parity and rejection matrices.
 - [ ] Wait for `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md` to complete with green or classified full preview matrices.
 - [ ] Select three successful parity cases and one rejection case from the current manifests.
 - [ ] Run the live Phase 3 signing harness for those tracer-bullet cases and capture artifacts.
@@ -29,6 +29,9 @@ After the automated signed-output parity baselines are green, perform a short hu
 
 - Observation: this manual pass should also wait for the broad preview matrix rebaseline.
   Evidence: the full preview manifests cover `3384` scenarios across baseline and stress cases and can reveal preview-only drift that the smaller signed parity suite does not exercise.
+
+- Observation: the signed-output prerequisite is now green after refreshing stale manifest specimens.
+  Evidence: `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md` records `artifacts/signed_preview_parity_post_semantics_run2/summary.json` with `18` successful signings and `artifacts/signed_fit_rejection_post_semantics_run3/summary.json` with `3` matched intentional rejections.
 
 ## Decision Log
 

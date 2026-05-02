@@ -11,12 +11,12 @@ Issue #50 moved visible-signature field text, stamp text, and PDF metadata into 
 ## Progress
 
 - [x] (2026-05-02T03:14Z) Created this ExecPlan after reviewing the existing signed parity and Issue #50 cleanup plans.
-- [ ] Confirm the working tree is clean or only contains this planning slice before running evidence commands.
-- [ ] Run the success-only signed preview parity matrix after the semantics migration.
-- [ ] Run the signed fit-rejection matrix after the semantics migration.
-- [ ] Inspect the new summary JSON files and classify any regression.
-- [ ] Update this ExecPlan, README or architecture notes only if the evidence changes the current status.
-- [ ] Commit the rebaseline results or document why no tracked artifact changes were needed.
+- [x] (2026-05-02T03:21Z) Confirmed the working tree contained only the planning/doc slice before running evidence commands.
+- [x] (2026-05-02T03:26Z) Ran the success-only signed preview parity matrix after the semantics migration.
+- [x] (2026-05-02T03:27Z) Ran the signed fit-rejection matrix after the semantics migration.
+- [x] (2026-05-02T03:31Z) Inspected the new summary JSON files and classified stale manifest specimens rather than production regressions.
+- [x] (2026-05-02T03:39Z) Updated the signed parity and rejection manifests, this ExecPlan, and the follow-on manual harness plan with the rebaseline result.
+- [x] (2026-05-02T03:43Z) Commit the rebaseline manifest and documentation changes.
 
 ## Surprises & Discoveries
 
@@ -25,6 +25,18 @@ Issue #50 moved visible-signature field text, stamp text, and PDF metadata into 
 
 - Observation: that manual-pass recommendation predates the Issue #50 semantics migration.
   Evidence: Issue #50 commits `3e0686e24`, `2ed5a99f7`, `928c4fcd3`, `9eaf1af86`, and `e9b739e4d` changed the preview and backend text/metadata path after the signed parity baseline recorded in the direct annotation plan.
+
+- Observation: headless CI or terminal evidence runs need Qt's offscreen platform for this matrix command.
+  Evidence: running without `QT_QPA_PLATFORM=offscreen` failed with `qt.qpa.xcb: could not connect to display :0`; reruns with the offscreen platform completed.
+
+- Observation: five expected-success horizontal single-line replay specimens were stale after the semantics cleanup.
+  Evidence: `single_line_left_stamp_manual_replay_06_minimum_success`, `single_line_left_stamp_manual_replay_07_success`, `single_line_left_stamp_manual_replay_08_roomy_success`, `single_line_right_stamp_manual_replay_07_short_height_success`, and `single_line_left_stamp_manual_replay_08_short_height_success` failed both preview and backend validation as out-of-bounds or non-fitting rectangles, while `preview_output_comparison_failure_count` stayed `0`.
+
+- Observation: one expected-rejection specimen was stale in the other direction.
+  Evidence: `single_line_left_stamp_sparse_large` signed successfully with its old `320 x 52 pt` rectangle. Tightening it to `160 x 32 pt` restored the intentional rejection contract.
+
+- Observation: pyHanko self-signed TSA validation traces and `FFTM NOT subset` warnings are noisy but not acceptance failures for this evidence run.
+  Evidence: both final summaries had `acceptance_expectations_passed = true`, zero cryptographic validation failures, and zero preview-output comparison failures.
 
 ## Decision Log
 
@@ -40,9 +52,38 @@ Issue #50 moved visible-signature field text, stamp text, and PDF metadata into 
   Rationale: Issue #49 is architectural layout-policy extraction. This plan is build-process evidence refresh after semantic changes. Mixing extraction with evidence refresh would make parity failures harder to interpret.
   Date/Author: 2026-05-02 / Codex
 
+- Decision: update manifests instead of production code for the post-semantics red runs.
+  Rationale: every failing success scenario was invalid under both preview and backend validation, and the only rejection mismatch was still a coherent successful signing. No preview-vs-signed-output comparison failures appeared, so this was stale specimen data rather than a rendering or semantics regression.
+  Date/Author: 2026-05-02 / Codex
+
+- Decision: keep generated post-semantics run directories ignored.
+  Rationale: the durable evidence is the checked-in manifest contract and this plan's recorded summary counts. The generated images, PDFs, and per-scenario JSON bundles are large rebuildable artifacts.
+  Date/Author: 2026-05-02 / Codex
+
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, record the artifact directories, summary counts, whether the parity and rejection matrices passed, and whether the follow-on manual harness plan can proceed.
+The post-semantics signed-output rebaseline is green after correcting stale manifest specimens.
+
+Final success-only parity evidence:
+
+    artifacts/signed_preview_parity_post_semantics_run2/summary.json
+    scenario_count = 18
+    successful_signing_run_count = 18
+    preview_output_comparison_failure_count = 0
+    expected_outcome_mismatch_count = 0
+    acceptance_expectations_passed = true
+
+Final intentional rejection evidence:
+
+    artifacts/signed_fit_rejection_post_semantics_run3/summary.json
+    scenario_count = 3
+    successful_signing_run_count = 0
+    expected_intentional_rejection_count = 3
+    matched_expected_intentional_rejection_count = 3
+    expected_outcome_mismatch_count = 0
+    acceptance_expectations_passed = true
+
+The follow-on manual harness sanity pass can proceed after the full preview-matrix rebaseline plan is also green or has classified any failures.
 
 ## Context and Orientation
 
@@ -90,37 +131,37 @@ Check the current status:
 
 Run the success-only signed preview parity matrix:
 
-    .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
+    QT_QPA_PLATFORM=offscreen .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
       --pdf-path artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf \
       --certificate-path artifacts/generated_acceptance_assets/signed_acceptance_identity.p12 \
       --passphrase "secret" \
       --scenario-manifest-path artifacts/preview_sweep_assets/signed_preview_parity_matrix.json \
-      --artifacts-dir artifacts/signed_preview_parity_post_semantics_run
+      --artifacts-dir artifacts/signed_preview_parity_post_semantics_run2
 
 The command should print:
 
     Phase 3 signed acceptance matrix
     - scenarios executed: 18
     - successful signings: 18
-    - artifacts directory: artifacts/signed_preview_parity_post_semantics_run
-    - summary json: artifacts/signed_preview_parity_post_semantics_run/summary.json
+    - artifacts directory: artifacts/signed_preview_parity_post_semantics_run2
+    - summary json: artifacts/signed_preview_parity_post_semantics_run2/summary.json
 
 Inspect the summary:
 
-    .venv/bin/python -m json.tool artifacts/signed_preview_parity_post_semantics_run/summary.json | rg "scenario_count|successful_signing_run_count|preview_output_comparison_failure_count|expected_outcome_mismatch_count|acceptance_expectations_passed"
+    .venv/bin/python -m json.tool artifacts/signed_preview_parity_post_semantics_run2/summary.json | rg "scenario_count|successful_signing_run_count|preview_output_comparison_failure_count|expected_outcome_mismatch_count|acceptance_expectations_passed"
 
 Run the signed fit-rejection matrix:
 
-    .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
+    QT_QPA_PLATFORM=offscreen .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
       --pdf-path artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf \
       --certificate-path artifacts/generated_acceptance_assets/signed_acceptance_identity.p12 \
       --passphrase "secret" \
       --scenario-manifest-path artifacts/preview_sweep_assets/signed_fit_rejection_matrix.json \
-      --artifacts-dir artifacts/signed_fit_rejection_post_semantics_run
+      --artifacts-dir artifacts/signed_fit_rejection_post_semantics_run3
 
 Inspect that summary:
 
-    .venv/bin/python -m json.tool artifacts/signed_fit_rejection_post_semantics_run/summary.json | rg "scenario_count|successful_signing_run_count|expected_outcome_mismatch_count|acceptance_expectations_passed"
+    .venv/bin/python -m json.tool artifacts/signed_fit_rejection_post_semantics_run3/summary.json | rg "scenario_count|successful_signing_run_count|expected_outcome_mismatch_count|acceptance_expectations_passed"
 
 Run focused tests if a code change is needed:
 

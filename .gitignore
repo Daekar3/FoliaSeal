@@ -18,4 +18,6 @@ artifacts/phase3_harness_capture.json
 artifacts/signed_acceptance_matrix_run*/
 artifacts/signed_preview_parity_matrix_run*/
 artifacts/signed_fit_rejection_matrix_run*/
+artifacts/signed_preview_parity_post_semantics_run*/
+artifacts/signed_fit_rejection_post_semantics_run*/
 artifacts/papyrus_font_review*/

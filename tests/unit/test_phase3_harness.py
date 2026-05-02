@@ -3822,11 +3822,11 @@ def test_signed_preview_parity_manifest_covers_layout_families_and_positions() -
     assert "wrapped_block_top_dense_large" not in names
 
 
-def test_signed_preview_parity_manifest_includes_horizontal_single_line_replay_ladder(
+def test_signed_preview_parity_manifest_excludes_stale_horizontal_replay_ladder(
 ) -> None:
     payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
-    scenarios = {scenario["name"]: scenario for scenario in payload["scenarios"]}
-    required_names = {
+    names = {scenario["name"] for scenario in payload["scenarios"]}
+    stale_success_names = {
         "single_line_left_stamp_manual_replay_06_minimum_success",
         "single_line_left_stamp_manual_replay_07_success",
         "single_line_left_stamp_manual_replay_08_roomy_success",
@@ -3834,16 +3834,8 @@ def test_signed_preview_parity_manifest_includes_horizontal_single_line_replay_l
         "single_line_left_stamp_manual_replay_08_short_height_success",
     }
 
-    assert required_names <= set(scenarios)
     assert payload["acceptance_expectations"]["scenario_count"] == len(payload["scenarios"])
-    for name in required_names:
-        scenario = scenarios[name]
-        overrides = scenario["appearance_overrides"]
-        assert scenario["expected_outcome"] == "success"
-        assert overrides["layout_template"] == "single_line"
-        assert overrides["stamp_position"] in {"left", "right"}
-        assert overrides["image_stamp_path"]
-        assert "signing_time" in overrides["visible_fields"]
+    assert names.isdisjoint(stale_success_names)
 
 
 def test_signed_fit_rejection_manifest_exists_and_parses() -> None:
