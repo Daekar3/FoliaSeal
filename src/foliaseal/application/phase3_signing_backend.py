@@ -54,9 +54,10 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
     LayoutRequest,
-    PyHankoSignatureAppearanceAdapter,
     RectBounds,
     VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutService,
 )
 from foliaseal.application.visible_signature_semantics import (
     CertificateFieldValues,
@@ -542,14 +543,14 @@ def _build_stamp_style(
     ):
         raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
 
-    return PyHankoSignatureAppearanceAdapter().build_stamp_style(
+    return VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
         appearance=appearance,
         stamp_text=stamp_text,
         stamp_background=stamp_background,
         signature_rect=signature_rect,
-        layout_plan=layout_plan,
-        allow_fit_issues=True,
-    )
+        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+    ).stamp_style
 
 
 @dataclass(frozen=True)

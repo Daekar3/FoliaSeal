@@ -13,10 +13,13 @@ from foliaseal.application.visible_signature_layout import (
     ImageMetrics,
     LayoutRequest,
     PyHankoSignatureAppearanceAdapter,
+    PyHankoVisibleSignatureStyle,
     RectBounds,
     SignatureLayoutPlan,
     TextMetrics,
     VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutService,
 )
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -713,6 +716,54 @@ def test_pyhanko_adapter_matches_existing_stamp_style_with_injected_horizontal_i
 
     assert layout_plan.ink_reservation is not None
     assert _style_snapshot(actual_style) == _style_snapshot(expected_style)
+
+
+def test_layout_service_builds_backend_signing_style_from_public_facade(tmp_path) -> None:
+    stamp_path = _write_stamp(tmp_path)
+    appearance = _backend_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        image_stamp_path=stamp_path,
+        show_border=True,
+    )
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=320.0,
+        height_pt=120.0,
+    )
+    stamp_text = "Digitally signed by\nMorgan Ellery\nFoliaSeal"
+
+    expected_plan = VisibleSignatureLayoutEngine().plan(
+        _layout_request(
+            signature_rect=signature_rect,
+            appearance=appearance,
+            stamp_text=stamp_text,
+        )
+    )
+    expected_style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        layout_plan=expected_plan,
+    )
+
+    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(),
+    )
+
+    assert isinstance(service_result, PyHankoVisibleSignatureStyle)
+    assert service_result.layout_plan == expected_plan
+    assert service_result.fit_issues == ()
+    assert service_result.content_layout is service_result.stamp_style.inner_content_layout
+    assert service_result.background_layout is service_result.stamp_style.background_layout
+    assert _style_snapshot(service_result.stamp_style) == _style_snapshot(expected_style)
 
 
 def _backend_appearance(
