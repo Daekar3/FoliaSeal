@@ -3668,6 +3668,87 @@ def test_single_line_rendered_ink_fallback_caches_identical_checks(
     assert render_calls == [247.294]
 
 
+def test_single_line_rendered_ink_fallback_rejects_border_flush_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+    stamp_path = tmp_path / "stamp.png"
+    current_png = tmp_path / "current.png"
+    Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
+    Image.new("RGBA", (300, 90), color=(255, 255, 255, 255)).save(current_png, format="PNG")
+
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
+            show_field_names=False,
+            datetime_format="%Y-%m-%d %H:%M",
+            image_stamp_path=str(stamp_path),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.5,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+            box_style=SignatureBoxStyle(
+                show_border=True,
+                border_color_hex="#000000",
+                border_width_pt=1.0,
+                background_color_hex="#FFFFFF",
+            ),
+        )
+    )
+
+    def _fake_render(preview, **_kwargs):
+        return type(
+            "_Snapshot",
+            (),
+            {
+                "image_path": str(current_png),
+                "width_px": 300,
+                "height_px": 90,
+                "text_area_bounds_px": {"x": 40, "y": 24, "width": 254, "height": 20},
+                "stamp_area_bounds_px": {"x": 4, "y": 4, "width": 30, "height": 82},
+                "text_bounds_px": {"x": 40, "y": 28, "width": 254, "height": 18},
+                "stamp_bounds_px": {"x": 4, "y": 35, "width": 28, "height": 7},
+            },
+        )()
+
+    monkeypatch.setattr(
+        "foliaseal.application.signing_preview_renderer.render_canonical_signature_preview",
+        _fake_render,
+    )
+    text_only_bounds = iter(
+        (
+            {"x": 0, "y": 28, "width": 220, "height": 17},
+            {"x": 50, "y": 28, "width": 220, "height": 17},
+        )
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.phase3_signing_backend._single_line_text_only_ink_bounds",
+        lambda **kwargs: next(text_only_bounds),
+    )
+
+    assert not _single_line_rendered_ink_fits_reservation(
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=35.0,
+            bottom_pt=428.0,
+            width_pt=273.61,
+            height_pt=42.60,
+        ),
+        signature_appearance=appearance,
+        stamp_text=(
+            "Digitally signed by\n"
+            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+        ),
+    )
+
+
 def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
     monkeypatch,
     tmp_path: Path,

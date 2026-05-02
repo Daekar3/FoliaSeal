@@ -13,11 +13,10 @@ After the automated signed-output parity baselines are green, perform a short hu
 - [x] (2026-05-02T03:14Z) Created this ExecPlan as the follow-on to the post-semantics signed parity rebaseline.
 - [x] (2026-05-02T03:39Z) Waited for `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md` to complete with green parity and rejection matrices.
 - [x] (2026-05-02T04:15Z) Waited for `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md` to complete with classified full preview matrices.
-- [ ] Select three successful parity cases and one rejection case from the current manifests.
-- [ ] Run the live Phase 3 signing harness for those tracer-bullet cases and capture artifacts.
-- [ ] Review preview images, analysis preview images, signed crops, side-by-side comparisons, and structured snapshots.
-- [ ] Classify any discrepancy as GUI composition defect, artifact-analysis defect, real rendering defect, or no defect.
-- [ ] Record the artifact paths and review result here.
+- [x] (2026-05-02T04:31Z) Reviewed the current manual cap set, including preview validation and visual signed-PDF parity.
+- [x] (2026-05-02T04:31Z) Classified cap 9 as a validation defect: the preview severely cut off characters at the border but did not show red validation.
+- [x] (2026-05-02T04:31Z) Recorded that the other previews behaved as expected and the actual signed PDFs looked visually acceptable, within the precision available for manual review.
+- [x] (2026-05-02T04:18Z) Created `docs/ExecPlans/cap9_single_line_validation_honesty_execplan.md` as the follow-up build/layout fix plan for the cap 9 validation miss.
 
 ## Surprises & Discoveries
 
@@ -36,6 +35,12 @@ After the automated signed-output parity baselines are green, perform a short hu
 - Observation: the full preview-matrix prerequisite is now classified, not perfectly green.
   Evidence: `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md` records all `3384` preview scenarios completing with zero error scenarios, while single-line matrices retain classified signable clipping/overlap diagnostics for follow-up build/layout work.
 
+- Observation: cap 9 is a manual validation-honesty miss.
+  Evidence: user manual review on 2026-05-02 reported that cap 9 should have red validation because characters were severely cut off by the border.
+
+- Observation: the remaining manual previews and signed PDFs were visually acceptable.
+  Evidence: user manual review on 2026-05-02 reported that all other previews behaved as expected and that the actual signed PDFs looked pretty good, with the caveat that the review was visual rather than a precise output-parity measurement.
+
 ## Decision Log
 
 - Decision: keep manual harness sanity in its own ExecPlan.
@@ -50,9 +55,19 @@ After the automated signed-output parity baselines are green, perform a short hu
   Rationale: if manual review finds a concrete layout defect, that defect should become a targeted fix. Layout-policy extraction should wait until current build evidence is stable.
   Date/Author: 2026-05-02 / Codex
 
+- Decision: treat cap 9 as a real validation defect, not as an acceptable manual-review limitation.
+  Rationale: if preview text is visibly cut off by the border, the user needs red validation before signing. This is directly aligned with the single-line clipping/overlap diagnostics classified by the preview-matrix rebaseline.
+  Date/Author: 2026-05-02 / Codex
+
 ## Outcomes & Retrospective
 
-No implementation outcome yet. At completion, record which cases were reviewed, where the artifacts live, whether the live preview and signed PDF looked aligned, and whether any follow-up issue or ExecPlan is needed.
+The manual pass found one concrete follow-up: cap 9 should fail validation because the preview visibly cuts characters off at the border. Other reviewed previews behaved as expected, and the signed PDFs looked visually aligned with the previews within the available manual-review precision.
+
+This plan is not fully closed until the cap 9 validation miss is represented in the next build/layout fix plan. The next slice should tighten validation/fit detection for the single-line border-clipping case before declaring preview behavior fully resolved.
+
+Follow-up is now represented by `docs/ExecPlans/cap9_single_line_validation_honesty_execplan.md`. That child plan owns the regression test and code change for rejecting cap 9-like single-line border clipping.
+
+The child plan completed on 2026-05-02. The cap 9-like condition is now represented by `test_single_line_rendered_ink_fallback_rejects_border_flush_text`, and backend validation rejects horizontal single-line rendered text that is flush with the visible border.
 
 ## Context and Orientation
 
@@ -151,3 +166,7 @@ That evidence is useful context but should not substitute for the post-Issue-50 
 Use the existing Qt harness and signed acceptance harness in `src/foliaseal/presentation/qt/phase3_harness.py`; do not create another evidence format. The harness depends on the current architecture: `visible_signature_semantics.py` owns text/metadata semantics, `visible_signature_layout.py` owns geometry planning, `signing_preview_renderer.py` owns canonical preview rendering, `signing_shell.py` owns live Qt composition, and `phase3_signing_backend.py` owns pyHanko signing.
 
 Revision note: Created 2026-05-02 by Codex to capture the manual GUI sanity pass as a separate, gated follow-on to automated post-semantics signed parity rebaseline.
+
+Revision note: Updated 2026-05-02 by Codex to link the cap 9 validation-honesty child plan after the user reported severe border clipping in cap 9.
+
+Revision note: Updated 2026-05-02 by Codex after the child plan completed the regression and validation fix for cap 9-like border clipping.

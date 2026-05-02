@@ -1509,6 +1509,13 @@ def _single_line_rendered_ink_fits_reservation(
         )
         if text_bounds is None:
             return False
+        if not _horizontal_single_line_text_ink_inside_border(
+            text_bounds=text_bounds,
+            preview_width_px=snapshot.width_px,
+            preview_height_px=snapshot.height_px,
+            signature_appearance=signature_appearance,
+        ):
+            return False
         enforce_reference_ink_preservation = (
             signature_appearance.image_stamp_path is not None
             and signature_appearance.stamp_position
@@ -1674,6 +1681,32 @@ def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:
         and first["y"] < second["y"] + second["height"]
         and second["y"] < first["y"] + first["height"]
     )
+
+
+def _horizontal_single_line_text_ink_inside_border(
+    *,
+    text_bounds: dict[str, int],
+    preview_width_px: int,
+    preview_height_px: int,
+    signature_appearance: SigningBackendAppearance,
+) -> bool:
+    if (
+        signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE
+        or signature_appearance.image_stamp_path is None
+        or signature_appearance.stamp_position
+        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        return True
+    guard_px = _border_safe_inset(signature_appearance.box_style)
+    if guard_px <= 0:
+        return True
+    container = {
+        "x": guard_px,
+        "y": guard_px,
+        "width": max(0, preview_width_px - guard_px * 2),
+        "height": max(0, preview_height_px - guard_px * 2),
+    }
+    return _rect_inside_container(text_bounds, container)
 
 
 def _single_line_rendered_ink_fit_cache_key(
