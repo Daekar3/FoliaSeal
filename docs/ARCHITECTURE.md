@@ -45,7 +45,7 @@ This document governs the repository architecture: Python package layout, applic
 | `tests/fixtures/` | Durable fixture data. | Includes Phase 3 manual replay JSON. |
 | `artifacts/` | Manual QA evidence, manifests, and durable acceptance assets. | Run-output directories/files are mostly ignored by `.gitignore`. |
 | `docs/ExecPlans/` | Living implementation plans and notes. | Formerly `.agent/`; now documentation-owned. |
-| `docs/PLANS.md` | ExecPlan authoring/execution contract. | Referenced by `Agents.md`. |
+| `.agents/skills/write-execplan/PLANS.md` | ExecPlan authoring/execution contract. | Referenced by `Agents.md` and the `$write-execplan` skill. |
 | `Agents.md` | Agent operating instructions for this repository. | Requires architecture doc updates for architecture-affecting changes. |
 | `scripts/` | Local helper scripts. | Includes PyInstaller build and preview stress manifest generation. |
 

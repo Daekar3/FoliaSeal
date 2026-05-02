@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `docs/PLANS.md`. It records the plan for implementing GitHub issue #48, "RFC: Deepen visible signature layout engine boundary."
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. It records the plan for implementing GitHub issue #48, "RFC: Deepen visible signature layout engine boundary."
 
 ## Purpose / Big Picture
 
@@ -811,7 +811,7 @@ Revision note: Updated 2026-04-29 by Codex after migrating canonical preview lay
 
 Revision note: Updated 2026-04-29 by Codex after migrating Qt preview sizing onto a local geometry adapter derived from `SignatureLayoutPlan`; recorded no-I/O stamp probing and focused verification output.
 
-Revision note: Updated 2026-04-30 by Codex after reviewing Issue #48 against the current repo; converted the next step into a private-helper coverage cleanup and boundary-hardening slice, updated the plan path to `docs/PLANS.md`, and recorded current focused validation results.
+Revision note: Updated 2026-04-30 by Codex after reviewing Issue #48 against the current repo; converted the next step into a private-helper coverage cleanup and boundary-hardening slice, updated the plan path to `.agents/skills/write-execplan/PLANS.md`, and recorded current focused validation results.
 
 Revision note: Updated 2026-04-30 by Codex after executing the first private-helper coverage cleanup pass; moved representative generic reservation expectations behind the visible layout boundary, deleted duplicated backend-private tests, and scoped the next cleanup pass to remaining generic reservation details and harness diagnostics.
 

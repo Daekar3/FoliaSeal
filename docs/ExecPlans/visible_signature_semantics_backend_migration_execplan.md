@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `docs/PLANS.md`. It is plan 4 of 5 for GitHub issue #50, "RFC: Deepen visible signature draft semantics boundary." It depends on the foundation, workflow migration, and preview migration plans.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. It is plan 4 of 5 for GitHub issue #50, "RFC: Deepen visible signature draft semantics boundary." It depends on the foundation, workflow migration, and preview migration plans.
 
 ## Purpose / Big Picture
 

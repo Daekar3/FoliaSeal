@@ -139,7 +139,7 @@ You are producing plain text that will later be styled by the CLI. Follow these 
 
 # ExecPlans
 
-When writing complex features or significant refactors, use an ExecPlan (as described in docs/PLANS.md) from design to implementation.
+When writing complex features or significant refactors, use an ExecPlan (as described in .agents/skills/write-execplan/PLANS.md) from design to implementation.
 
 # Other Guidlines
 
