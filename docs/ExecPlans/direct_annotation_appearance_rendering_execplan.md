@@ -931,6 +931,16 @@ GUI path, because the automated parity and rejection baselines are now strong
 enough to support a focused human visual check rather than broad exploratory
 testing.
 
+Revision note, 2026-05-02: Issue #50 later moved visible-signature semantics
+into `VisibleSignatureSemanticsService`, including preview and backend stamp
+text/metadata resolution. Before executing the manual harness sanity pass below,
+first execute `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md`
+and `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md`. If
+those automated post-semantics rebaselines are green, continue with
+`docs/ExecPlans/manual_harness_sanity_pass_execplan.md`. This preserves the
+intent of the manual pass while accounting for the newer architecture changes
+and the large preview artifact battery.
+
 ### Next Slice: Manual Harness Sanity Pass and Artifact Review
 
 #### Goal
