@@ -31,7 +31,10 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [x] (2026-05-02T17:00Z) Fourth slice: committed the canonical preview neutral-layout migration as `db62463be Use neutral layout data for preview bounds`.
 - [x] (2026-05-02T17:25Z) Fifth slice: moved pyHanko adapter inner-content layout construction from `backend_reservation` to neutral `LayoutRuleSpec`.
 - [x] (2026-05-02T17:25Z) Fifth slice: ran focused and adjacent validation successfully.
-- [ ] Fifth slice: commit the neutral pyHanko layout adapter migration.
+- [x] (2026-05-02T17:26Z) Fifth slice: committed the neutral pyHanko layout adapter migration as `d0a906866 Build pyHanko layout from neutral spec`.
+- [x] (2026-05-02T19:21Z) Sixth slice: moved backend rendered-fit fallback from `_SignatureLayoutReservation` to `SignatureLayoutPlan`.
+- [x] (2026-05-02T19:21Z) Sixth slice: ran focused and adjacent validation successfully.
+- [ ] Sixth slice: commit the backend rendered-fit neutral-plan migration.
 - [ ] Later slice: move private layout policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
 
 ## Surprises & Discoveries
@@ -60,6 +63,9 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - Observation: pyHanko stamp-style construction can use neutral layout specs for its inner content layout.
   Evidence: `PyHankoSignatureAppearanceAdapter.build_stamp_style()` only needed `layout_plan.backend_reservation.inner_content_layout`; the same alignment, scaling, and margins are already exposed through `layout_plan.text_layout`.
 
+- Observation: the backend rendered-fit fallback can use neutral layout-plan dimensions.
+  Evidence: `_horizontal_multi_line_rendered_layout_fits_reservation()` used `_SignatureLayoutReservation` only for text-box and text-area dimensions. The same values are exposed through `SignatureLayoutPlan.text_box` and `SignatureLayoutPlan.text_area_*`.
+
 ## Decision Log
 
 - Decision: make the first issue #49 slice a service-facade introduction, not the full helper extraction.
@@ -84,6 +90,10 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Decision: convert `LayoutRuleSpec` to pyHanko layout rules inside the layout module adapter.
   Rationale: adapter callers should not need backend reservation objects to build pyHanko styles. A local conversion keeps pyHanko integration behind the adapter while preserving the neutral plan as the public contract.
+  Date/Author: 2026-05-02 / Codex
+
+- Decision: keep the backend fallback function in `phase3_signing_backend.py` while changing its input contract.
+  Rationale: the fallback still performs backend-specific rendered checks and cleanup. Moving it wholesale into the layout module would mix signing/rendered-output concerns into the neutral policy boundary. Accepting `SignatureLayoutPlan` removes the reservation dependency without changing ownership prematurely.
   Date/Author: 2026-05-02 / Codex
 
 ## Outcomes & Retrospective
@@ -187,7 +197,7 @@ Validation:
     .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
     59 passed in 3.47s.
 
-The fifth slice is complete pending commit.
+The fifth slice is complete and committed.
 
 What changed:
 
@@ -210,6 +220,30 @@ Validation:
 
     .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
     59 passed in 3.31s.
+
+The sixth slice is complete pending commit.
+
+What changed:
+
+- Changed `_horizontal_multi_line_rendered_layout_fits_reservation()` to accept `SignatureLayoutPlan`.
+- Changed backend `_build_stamp_style()` to pass the neutral plan to the rendered-fit fallback instead of `layout_plan.backend_reservation`.
+
+Validation:
+
+    .venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/visible_signature_layout.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_phase3_signing_backend.py
+    100 passed in 12.51s.
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_signing_preview_renderer.py
+    84 passed in 14.90s.
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    59 passed in 3.37s.
+
+    .venv/bin/pytest -q tests/unit/test_phase3_harness.py
+    95 passed, 1 warning in 1.43s.
 
 ## Context and Orientation
 

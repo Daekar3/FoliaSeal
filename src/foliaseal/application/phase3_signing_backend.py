@@ -55,6 +55,7 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     LayoutRequest,
     RectBounds,
+    SignatureLayoutPlan,
     VisibleSignatureLayoutEngine,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
@@ -538,7 +539,7 @@ def _build_stamp_style(
             signature_rect=signature_rect,
             signature_appearance=appearance,
             stamp_text=stamp_text,
-            layout_reservation=layout_plan.backend_reservation,
+            layout_plan=layout_plan,
         )
     ):
         raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
@@ -1600,7 +1601,7 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
     signature_rect: SignatureRect,
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
-    layout_reservation: _SignatureLayoutReservation,
+    layout_plan: SignatureLayoutPlan,
 ) -> bool:
     if (
         signature_appearance.layout_template != SignatureLayoutTemplate.MULTI_LINE
@@ -1610,12 +1611,8 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
     ):
         return False
 
-    width_overflow = layout_reservation.text_box_width_pt - (
-        layout_reservation.text_area_width_pt + 1
-    )
-    height_overflow = (
-        layout_reservation.text_box_height_pt - layout_reservation.text_area_height_pt
-    )
+    width_overflow = layout_plan.text_box.width_pt - (layout_plan.text_area_width_pt + 1)
+    height_overflow = layout_plan.text_box.height_pt - layout_plan.text_area_height_pt
     if width_overflow > 0 or height_overflow <= 0 or height_overflow > 6:
         return False
 
