@@ -8,6 +8,7 @@ from PIL import Image
 
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.visible_signature_layout import (
+    CanonicalPreviewLayout,
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
     ImageMetrics,
@@ -51,7 +52,8 @@ class FakeStampImageProbe:
     metrics: ImageMetrics | None = ImageMetrics(width_px=400, height_px=100, aspect_ratio=4.0)
 
     def inspect(self, image_stamp_path: str | None) -> ImageMetrics | None:
-        del image_stamp_path
+        if image_stamp_path is None:
+            return None
         return self.metrics
 
 
@@ -764,6 +766,91 @@ def test_layout_service_builds_backend_signing_style_from_public_facade(tmp_path
     assert service_result.content_layout is service_result.stamp_style.inner_content_layout
     assert service_result.background_layout is service_result.stamp_style.background_layout
     assert _style_snapshot(service_result.stamp_style) == _style_snapshot(expected_style)
+
+
+def test_layout_service_builds_canonical_preview_style_from_public_facade(tmp_path) -> None:
+    stamp_path = _write_stamp(tmp_path)
+    appearance = _backend_appearance(
+        layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        image_stamp_path=stamp_path,
+        show_border=True,
+    )
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=320.0,
+        height_pt=120.0,
+    )
+    stamp_text = "Digitally signed by\nMorgan Ellery\nFoliaSeal"
+    expected_plan = VisibleSignatureLayoutEngine().plan(
+        _layout_request(
+            signature_rect=signature_rect,
+            appearance=appearance,
+            stamp_text=stamp_text,
+        )
+    )
+    expected_style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        layout_plan=expected_plan,
+        allow_fit_issues=True,
+    )
+
+    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_canonical_preview(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+    )
+
+    assert isinstance(service_result, CanonicalPreviewLayout)
+    assert service_result.layout_plan == expected_plan
+    assert service_result.stamp_suppressed is False
+    assert service_result.content_layout is service_result.style.inner_content_layout
+    assert (
+        service_result.reserved_background_layout
+        == expected_plan.backend_reservation.background_layout
+    )
+    assert _style_snapshot(service_result.style) == _style_snapshot(expected_style)
+
+
+def test_layout_service_suppresses_collapsed_horizontal_preview_stamp() -> None:
+    appearance = _backend_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path="stamp.png",
+        show_border=True,
+    )
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=100.0,
+        height_pt=32.0,
+    )
+
+    service_result = VisibleSignatureLayoutService(
+        text_measurer=FakeTextMeasurer(width_pt=200, height_pt=16),
+        image_probe=FakeStampImageProbe(
+            ImageMetrics(width_px=400, height_px=100, aspect_ratio=4.0)
+        ),
+    ).pyhanko_style_for_canonical_preview(
+        appearance=appearance,
+        stamp_text="Digitally signed by Morgan Ellery",
+        stamp_background=object(),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+    )
+
+    assert service_result.stamp_suppressed is True
+    assert service_result.style.background is None
+    assert service_result.layout_plan.has_visible_stamp_image is False
+    assert service_result.layout_plan.stamp_area_width_pt == 0
 
 
 def _backend_appearance(

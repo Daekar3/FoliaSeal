@@ -16,8 +16,11 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [x] (2026-05-02T16:35Z) First slice: added `VisibleSignatureLayoutService`, `VisibleSignatureLayoutInput`, `VisibleSignatureLayoutOptions`, and `PyHankoVisibleSignatureStyle` with boundary tests.
 - [x] (2026-05-02T16:35Z) First slice: migrated backend `_build_stamp_style()` to use the service facade while preserving rendered-fit fallback behavior.
 - [x] (2026-05-02T16:35Z) First slice: ran focused ruff and pytest validation successfully.
-- [ ] First slice: commit the service-facade migration.
-- [ ] Later slice: move canonical preview construction to `pyhanko_style_for_canonical_preview()` and keep preview-only stamp suppression behind the service contract.
+- [x] (2026-05-02T16:40Z) First slice: committed the service-facade migration as `c9ec21ca9 Add visible signature layout service facade`.
+- [x] (2026-05-02T16:51Z) Second slice: added `CanonicalPreviewLayout` and `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()`.
+- [x] (2026-05-02T16:51Z) Second slice: moved canonical preview construction and horizontal preview stamp suppression behind the layout service contract.
+- [x] (2026-05-02T16:51Z) Second slice: ran focused and adjacent validation successfully.
+- [ ] Second slice: commit the canonical preview facade migration.
 - [ ] Later slice: replace Qt shell and Phase 3 harness `backend_reservation` dereferences with neutral plan fields or diagnostic snapshots.
 - [ ] Later slice: move private layout policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
 
@@ -32,6 +35,9 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - Observation: backend stamp-style construction can move behind the service facade without moving the backend rendered-fit fallback.
   Evidence: `tests/unit/test_phase3_signing_backend.py` passed after `_build_stamp_style()` switched to `VisibleSignatureLayoutService.pyhanko_style_for_signing()`.
 
+- Observation: canonical preview still needs a temporary reservation compatibility payload for optional text-only and stamp-only layer rendering.
+  Evidence: `_render_optional_preview_bounds()` uses the full layout reservation's text and stamp area dimensions. The second slice moved preview style construction into `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()` while returning `reservation` and `reserved_background_layout` until a later neutral-geometry slice replaces those reads.
+
 ## Decision Log
 
 - Decision: make the first issue #49 slice a service-facade introduction, not the full helper extraction.
@@ -42,9 +48,13 @@ The first slice is intentionally additive and behavior-preserving. It introduces
   Rationale: the fallback is backend-specific and already depends on signed-output raster behavior. Moving it before the service boundary has parity tests would increase behavior risk.
   Date/Author: 2026-05-02 / Codex
 
+- Decision: keep canonical preview layer-rendering compatibility fields on `CanonicalPreviewLayout` for this slice.
+  Rationale: removing `backend_reservation` from preview rendering also requires replacing optional layer reserved-width/height reads with neutral plan data. Keeping the compatibility payload allows the style assembly and stamp-suppression decision to move first without changing preview pixels.
+  Date/Author: 2026-05-02 / Codex
+
 ## Outcomes & Retrospective
 
-The first slice is complete pending commit.
+The first slice is complete and committed.
 
 What changed:
 
@@ -71,6 +81,33 @@ Validation:
 
     .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py
     50 passed in 14.70s.
+
+The second slice is complete pending commit.
+
+What changed:
+
+- Added `CanonicalPreviewLayout` as the layout-service result for canonical preview style construction.
+- Added `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()`.
+- Moved canonical preview style construction and horizontal single-line preview stamp suppression out of `signing_preview_renderer.py`.
+- Kept the existing reservation compatibility payload on the preview result so optional layer rendering remains behavior-preserving.
+- Updated `docs/ARCHITECTURE.md` to document the canonical-preview service facade.
+
+Validation so far:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/signing_preview_renderer.py src/foliaseal/application/__init__.py tests/unit/test_visible_signature_layout.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py
+    34 passed in 0.37s.
+
+    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py
+    50 passed in 15.19s.
+
+    .venv/bin/pytest -q tests/unit/test_phase3_signing_backend.py
+    100 passed in 12.56s.
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    59 passed in 3.69s.
 
 ## Context and Orientation
 

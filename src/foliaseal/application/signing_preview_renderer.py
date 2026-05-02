@@ -32,19 +32,16 @@ from foliaseal.application.signing_draft_workflow import (
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
-    LayoutRequest,
-    PyHankoSignatureAppearanceAdapter,
     PyHankoTextMeasurer,
     RectBounds,
-    VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutService,
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldKey,
     SignatureFieldSource,
-    SignatureLayoutTemplate,
     SignatureRect,
-    SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
@@ -888,62 +885,31 @@ def _canonical_preview_layout(
     )
     stamp_text = _semantic_preview_stamp_text(preview) if include_text else " "
     stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
-    layout_engine = VisibleSignatureLayoutEngine(
+    service_layout = VisibleSignatureLayoutService.production().pyhanko_style_for_canonical_preview(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=stamp_background,
+        signature_rect=preview.signature_rect,
+        options=VisibleSignatureLayoutOptions(
+            include_text=include_text,
+            include_stamp=include_stamp,
+            include_border=include_border,
+            include_background=include_stamp,
+            allow_fit_issues=True,
+            horizontal_ink_policy="auto" if use_horizontal_ink_reservation else "disabled",
+        ),
         ink_measurer=(
             _PreviewHorizontalInkMeasurer(preview)
             if use_horizontal_ink_reservation
             else None
-        )
-    )
-    layout_request = LayoutRequest(
-        signature_rect=preview.signature_rect,
-        layout_template=preview.layout_template,
-        stamp_position=preview.stamp_position,
-        text_style=preview.text_style,
-        box_style=preview.box_style,
-        stamp_text=stamp_text,
-        image_stamp_path=appearance.image_stamp_path,
-        use_horizontal_ink_reservation=use_horizontal_ink_reservation,
-    )
-    layout_plan = layout_engine.plan(layout_request)
-    stamp_suppressed = False
-    if (
-        include_stamp
-        and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and preview.stamp_position
-        in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-        and layout_plan.text_area_width_pt * 2 < layout_plan.text_box.width_pt
-    ):
-        stamp_suppressed = True
-        stamp_background = None
-        layout_plan = layout_engine.plan(
-            LayoutRequest(
-                signature_rect=preview.signature_rect,
-                layout_template=preview.layout_template,
-                stamp_position=preview.stamp_position,
-                text_style=preview.text_style,
-                box_style=preview.box_style,
-                stamp_text=stamp_text,
-                image_stamp_path=None,
-                use_horizontal_ink_reservation=False,
-            )
-        )
-    style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
-        appearance=appearance,
-        stamp_text=stamp_text,
-        stamp_background=stamp_background if include_stamp else None,
-        signature_rect=preview.signature_rect,
-        layout_plan=layout_plan,
-        include_border=include_text and include_border,
-        include_background=include_stamp and not stamp_suppressed,
-        allow_fit_issues=True,
+        ),
     )
     return _CanonicalPreviewLayout(
-        style=style,
-        background_layout=style.background_layout,
-        inner_content_layout=layout_plan.backend_reservation.inner_content_layout,
-        reserved_background_layout=layout_plan.backend_reservation.background_layout,
-        reservation=layout_plan.backend_reservation,
+        style=service_layout.style,
+        background_layout=service_layout.background_layout,
+        inner_content_layout=service_layout.content_layout,
+        reserved_background_layout=service_layout.reserved_background_layout,
+        reservation=service_layout.reservation,
     )
 
 

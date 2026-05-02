@@ -37,6 +37,7 @@ from foliaseal.application.signing_preview_renderer import (
 from foliaseal.application.viewer_session import ViewerSession, ViewerZoomLimits
 from foliaseal.application.viewer_workflow import ViewerRenderSnapshot, ViewerWorkflow
 from foliaseal.application.visible_signature_layout import (
+    CanonicalPreviewLayout,
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
     HorizontalInkMeasurer,
@@ -85,6 +86,7 @@ __all__ = [
     "ViewerWorkflow",
     "ViewerZoomLimits",
     "CanonicalSignaturePreviewSnapshot",
+    "CanonicalPreviewLayout",
     "CertificateFieldReader",
     "CertificateFieldValues",
     "HorizontalSingleLineInkReservation",

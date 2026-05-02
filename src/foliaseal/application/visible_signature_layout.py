@@ -193,6 +193,20 @@ class PyHankoVisibleSignatureStyle:
     fit_issues: tuple[VisibleSignatureFitIssue, ...]
 
 
+@dataclass(frozen=True)
+class CanonicalPreviewLayout:
+    """Canonical preview style bundle built by the layout service."""
+
+    style: object
+    background_layout: object
+    content_layout: object
+    reserved_background_layout: object
+    reservation: object
+    layout_plan: SignatureLayoutPlan
+    stamp_suppressed: bool
+    fit_issues: tuple[VisibleSignatureFitIssue, ...]
+
+
 class TextMeasurer(Protocol):
     """Port for measuring visible-signature text."""
 
@@ -501,6 +515,101 @@ class VisibleSignatureLayoutService:
             background_layout=stamp_style.background_layout,
             layout_plan=layout_plan,
             fit_issues=layout_plan.fit_issues,
+        )
+
+    def pyhanko_style_for_canonical_preview(
+        self,
+        *,
+        appearance: SigningBackendAppearance,
+        stamp_text: str,
+        stamp_background: object | None,
+        signature_rect: SignatureRect,
+        options: VisibleSignatureLayoutOptions | None = None,
+        ink_measurer: HorizontalInkMeasurer | None = None,
+    ) -> CanonicalPreviewLayout:
+        """Build a canonical preview style through the layout service boundary."""
+
+        options = options or VisibleSignatureLayoutOptions(allow_fit_issues=True)
+        layout_plan = self._plan_for_appearance(
+            appearance=appearance,
+            stamp_text=stamp_text if options.include_text else " ",
+            signature_rect=signature_rect,
+            include_stamp=options.include_stamp,
+            use_horizontal_ink_reservation=options.horizontal_ink_policy != "disabled",
+            ink_measurer=ink_measurer,
+        )
+        stamp_suppressed = False
+        if (
+            options.include_stamp
+            and appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and appearance.stamp_position
+            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+            and layout_plan.text_area_width_pt * 2 < layout_plan.text_box.width_pt
+        ):
+            stamp_suppressed = True
+            layout_plan = self._plan_for_appearance(
+                appearance=appearance,
+                stamp_text=stamp_text if options.include_text else " ",
+                signature_rect=signature_rect,
+                include_stamp=False,
+                use_horizontal_ink_reservation=False,
+                ink_measurer=ink_measurer,
+            )
+
+        style = PyHankoSignatureAppearanceAdapter().build_stamp_style(
+            appearance=appearance,
+            stamp_text=stamp_text if options.include_text else " ",
+            stamp_background=(
+                stamp_background
+                if options.include_stamp
+                and options.include_background
+                and not stamp_suppressed
+                else None
+            ),
+            signature_rect=signature_rect,
+            layout_plan=layout_plan,
+            allow_fit_issues=options.allow_fit_issues,
+            include_border=options.include_text and options.include_border,
+            include_background=(
+                options.include_stamp and options.include_background and not stamp_suppressed
+            ),
+        )
+        return CanonicalPreviewLayout(
+            style=style,
+            background_layout=style.background_layout,
+            content_layout=style.inner_content_layout,
+            reserved_background_layout=layout_plan.backend_reservation.background_layout,
+            reservation=layout_plan.backend_reservation,
+            layout_plan=layout_plan,
+            stamp_suppressed=stamp_suppressed,
+            fit_issues=layout_plan.fit_issues,
+        )
+
+    def _plan_for_appearance(
+        self,
+        *,
+        appearance: SigningBackendAppearance,
+        stamp_text: str,
+        signature_rect: SignatureRect,
+        include_stamp: bool,
+        use_horizontal_ink_reservation: bool,
+        ink_measurer: HorizontalInkMeasurer | None,
+    ) -> SignatureLayoutPlan:
+        return VisibleSignatureLayoutEngine(
+            text_measurer=self.text_measurer,
+            image_probe=self.image_probe,
+            ink_measurer=ink_measurer or self.ink_measurer,
+        ).plan(
+            LayoutRequest(
+                signature_rect=signature_rect,
+                layout_template=appearance.layout_template,
+                stamp_position=appearance.stamp_position,
+                text_style=appearance.text_style,
+                box_style=appearance.box_style,
+                stamp_text=stamp_text,
+                image_stamp_path=appearance.image_stamp_path if include_stamp else None,
+                use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+            )
         )
 
 
