@@ -665,7 +665,7 @@ class PyHankoSignatureAppearanceAdapter:
             background_layout=background_layout,
             background_opacity=1.0,
             text_box_style=text_box_style,
-            inner_content_layout=layout_plan.backend_reservation.inner_content_layout,
+            inner_content_layout=_pyhanko_layout_rule_from_spec(layout_plan.text_layout),
             stamp_text=stamp_text,
             timestamp_format=appearance.datetime_format,
         )
@@ -697,6 +697,27 @@ def _layout_rule_spec(rule: object) -> LayoutRuleSpec:
             bottom=int(round(getattr(margins, "bottom", 0))),
         ),
         scaling=_enum_name(getattr(rule, "inner_content_scaling")),
+    )
+
+
+def _pyhanko_layout_rule_from_spec(spec: LayoutRuleSpec) -> object:
+    from pyhanko.pdf_utils.layout import (
+        AxisAlignment,
+        InnerScaling,
+        Margins,
+        SimpleBoxLayoutRule,
+    )
+
+    return SimpleBoxLayoutRule(
+        x_align=AxisAlignment[spec.x_align],
+        y_align=AxisAlignment[spec.y_align],
+        margins=Margins(
+            left=spec.margins.left,
+            right=spec.margins.right,
+            top=spec.margins.top,
+            bottom=spec.margins.bottom,
+        ),
+        inner_content_scaling=InnerScaling[spec.scaling],
     )
 
 
