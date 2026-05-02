@@ -24,7 +24,11 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [x] (2026-05-02T16:55Z) Third slice: replaced Qt shell preview reservation reads with neutral preview geometry.
 - [x] (2026-05-02T16:55Z) Third slice: replaced Phase 3 harness backend reservation dimension/content-layout reads with `SignatureLayoutPlan` fields and `LayoutRuleSpec` snapshots.
 - [x] (2026-05-02T16:55Z) Third slice: ran focused and adjacent validation successfully.
-- [ ] Third slice: commit the presentation neutral-geometry migration.
+- [x] (2026-05-02T16:56Z) Third slice: committed the presentation neutral-geometry migration as `20bc6b8cb Use neutral layout geometry in presentation`.
+- [x] (2026-05-02T16:59Z) Fourth slice: removed canonical preview optional-layer rendering reads from the backend reservation payload.
+- [x] (2026-05-02T16:59Z) Fourth slice: removed `reservation` and `reserved_background_layout` from the public `CanonicalPreviewLayout` facade result.
+- [x] (2026-05-02T16:59Z) Fourth slice: ran focused and adjacent validation successfully.
+- [ ] Fourth slice: commit the canonical preview neutral-layout migration.
 - [ ] Later slice: move private layout policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
 
 ## Surprises & Discoveries
@@ -47,6 +51,9 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - Observation: Phase 3 harness reservation snapshots can avoid dereferencing `layout_plan.backend_reservation` for their fit-gate dimensions and content layout.
   Evidence: `_snapshot_backend_reservation()` only needed dimensions already exposed on `SignatureLayoutPlan` and a content layout snapshot already exposed as `layout_plan.text_layout`.
 
+- Observation: canonical preview bounds reconstruction can use neutral layout data.
+  Evidence: `render_canonical_signature_preview()` needed the reservation object only for text-box, text-area, and stamp-area dimensions plus the reserved stamp layout. These are available as `SignatureLayoutPlan.text_box`, area fields, `text_layout`, and `stamp_layout`.
+
 ## Decision Log
 
 - Decision: make the first issue #49 slice a service-facade introduction, not the full helper extraction.
@@ -63,6 +70,10 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Decision: keep the Phase 3 evidence field names `backend_reservation_snapshot` and `backend_reservation_error` for this slice.
   Rationale: renaming evidence fields would churn the QA evidence contract and fixtures. The implementation now uses neutral layout-plan data for dimensions/content layout, while preserving the external evidence shape for compatibility.
+  Date/Author: 2026-05-02 / Codex
+
+- Decision: remove preview reservation compatibility fields before extracting backend helper implementation.
+  Rationale: `CanonicalPreviewLayout` no longer needs to expose `reservation` or `reserved_background_layout` once preview bounds use `layout_plan` fields. Removing those payloads narrows the public surface before the larger backend-private helper move.
   Date/Author: 2026-05-02 / Codex
 
 ## Outcomes & Retrospective
@@ -122,7 +133,7 @@ Validation so far:
     .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
     59 passed in 3.69s.
 
-The third slice is complete pending commit.
+The third slice is complete and committed.
 
 What changed:
 
@@ -140,6 +151,31 @@ Validation:
 
     .venv/bin/pytest -q tests/unit/test_phase3_harness.py
     95 passed, 1 warning in 1.43s.
+
+The fourth slice is complete pending commit.
+
+What changed:
+
+- Changed canonical preview appearance bounds to use `layout_plan.text_layout`, `layout_plan.stamp_layout`, `layout_plan.text_box`, and neutral area dimensions.
+- Removed `reservation` and `reserved_background_layout` from `CanonicalPreviewLayout`.
+- Updated the visible layout boundary test to assert canonical preview facade parity without relying on the backend reservation payload.
+
+Validation:
+
+    .venv/bin/ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/signing_preview_renderer.py tests/unit/test_visible_signature_layout.py
+    All checks passed.
+
+    .venv/bin/pytest -q tests/unit/test_visible_signature_layout.py
+    34 passed in 0.36s.
+
+    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py
+    50 passed in 14.35s.
+
+    .venv/bin/pytest -q tests/unit/test_phase3_signing_backend.py
+    100 passed in 12.25s.
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    59 passed in 3.47s.
 
 ## Context and Orientation
 

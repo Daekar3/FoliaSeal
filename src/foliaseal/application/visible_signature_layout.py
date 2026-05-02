@@ -200,8 +200,6 @@ class CanonicalPreviewLayout:
     style: object
     background_layout: object
     content_layout: object
-    reserved_background_layout: object
-    reservation: object
     layout_plan: SignatureLayoutPlan
     stamp_suppressed: bool
     fit_issues: tuple[VisibleSignatureFitIssue, ...]
@@ -578,8 +576,6 @@ class VisibleSignatureLayoutService:
             style=style,
             background_layout=style.background_layout,
             content_layout=style.inner_content_layout,
-            reserved_background_layout=layout_plan.backend_reservation.background_layout,
-            reservation=layout_plan.backend_reservation,
             layout_plan=layout_plan,
             stamp_suppressed=stamp_suppressed,
             fit_issues=layout_plan.fit_issues,

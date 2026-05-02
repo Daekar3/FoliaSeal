@@ -812,10 +812,6 @@ def test_layout_service_builds_canonical_preview_style_from_public_facade(tmp_pa
     assert service_result.layout_plan == expected_plan
     assert service_result.stamp_suppressed is False
     assert service_result.content_layout is service_result.style.inner_content_layout
-    assert (
-        service_result.reserved_background_layout
-        == expected_plan.backend_reservation.background_layout
-    )
     assert _style_snapshot(service_result.style) == _style_snapshot(expected_style)
 
 

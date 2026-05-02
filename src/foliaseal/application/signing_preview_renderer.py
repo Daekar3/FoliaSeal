@@ -34,6 +34,7 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     PyHankoTextMeasurer,
     RectBounds,
+    SignatureLayoutPlan,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
 )
@@ -367,9 +368,9 @@ def render_canonical_signature_preview(
         "height": full_render[2],
     }
     text_box_bounds_px = _layout_rule_bounds_px(
-        full_layout.inner_content_layout,
-        reserved_width_pt=full_layout.reservation.text_box_width_pt,
-        reserved_height_pt=full_layout.reservation.text_box_height_pt,
+        full_layout.layout_plan.text_layout,
+        reserved_width_pt=full_layout.layout_plan.text_box.width_pt,
+        reserved_height_pt=full_layout.layout_plan.text_box.height_pt,
         width_px=full_render[1],
         height_px=full_render[2],
         container_width_pt=preview.signature_rect.width_pt,
@@ -399,9 +400,9 @@ def render_canonical_signature_preview(
         width_px=full_render[1],
         height_px=full_render[2],
         text_area_bounds_px=_layout_rule_bounds_px(
-            full_layout.inner_content_layout,
-            reserved_width_pt=full_layout.reservation.text_area_width_pt,
-            reserved_height_pt=full_layout.reservation.text_area_height_pt,
+            full_layout.layout_plan.text_layout,
+            reserved_width_pt=full_layout.layout_plan.text_area_width_pt,
+            reserved_height_pt=full_layout.layout_plan.text_area_height_pt,
             width_px=full_render[1],
             height_px=full_render[2],
             container_width_pt=preview.signature_rect.width_pt,
@@ -412,9 +413,9 @@ def render_canonical_signature_preview(
             None
             if not preview.image_stamp_path
             else _layout_rule_bounds_px(
-                full_layout.reserved_background_layout,
-                reserved_width_pt=full_layout.reservation.stamp_area_width_pt,
-                reserved_height_pt=full_layout.reservation.stamp_area_height_pt,
+                full_layout.layout_plan.stamp_layout,
+                reserved_width_pt=full_layout.layout_plan.stamp_area_width_pt,
+                reserved_height_pt=full_layout.layout_plan.stamp_area_height_pt,
                 width_px=full_render[1],
                 height_px=full_render[2],
                 container_width_pt=preview.signature_rect.width_pt,
@@ -852,8 +853,7 @@ class _CanonicalPreviewLayout:
     style: TextStampStyle
     background_layout: Any
     inner_content_layout: Any
-    reserved_background_layout: Any
-    reservation: Any
+    layout_plan: SignatureLayoutPlan
 
 
 def _canonical_preview_layout(
@@ -908,8 +908,7 @@ def _canonical_preview_layout(
         style=service_layout.style,
         background_layout=service_layout.background_layout,
         inner_content_layout=service_layout.content_layout,
-        reserved_background_layout=service_layout.reserved_background_layout,
-        reservation=service_layout.reservation,
+        layout_plan=service_layout.layout_plan,
     )
 
 
