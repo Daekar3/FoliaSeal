@@ -86,6 +86,10 @@ It is acceptable—-and often encouraged—-to include explicit prototyping mile
 
 Prefer additive code changes followed by subtractions that keep tests passing. Parallel implementations (e.g., keeping an adapter alongside an older path during migration) are fine when they reduce risk or enable tests to continue passing during a large migration. Describe how to validate both paths and how to retire one safely with tests. When working with multiple new libraries or feature areas, consider creating spikes that evaluate the feasibility of these features _independently_ of one another, proving that the external library performs as expected and implements the features we need in isolation.
 
+# Parent and Child ExecPlans
+
+When contemplating how to tackle large tasks, consider creating child ExecPlans so that work can be effectively delegated to subagents in parallel.  Determine the dependencies which must be in place before work can begin on each child ExecPlan and enumerate them in the `## Child ExecPlan Dependencies` section.
+
 ## Skeleton of a Good ExecPlan
 
     # <Short, action-oriented description>
@@ -97,6 +101,10 @@ Prefer additive code changes followed by subtractions that keep tests passing. P
     ## Purpose / Big Picture
 
     Explain in a few sentences what someone gains after this change and how they can see it working. State the user-visible behavior you will enable.
+
+    ## Child ExecPlan Dependencies
+
+    Use a list with checkboxes to define what other ExecPlans or milestones must be completed before work can begin on each child of this ExecPlan.  When a prequisite task is completed, check the box.  This section must always reflect the actual current state of the work.
 
     ## Progress
 

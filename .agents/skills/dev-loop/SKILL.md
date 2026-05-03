@@ -12,7 +12,10 @@ Determine the next logical step or slice of the task or project to work on. This
 Use the $write-execplan skill to create an execution plan for the identified task or project slice.
 
 ## Execute the Plan
-Follow the steps outlined in the ExecPlan to work through the development loop. This may involve writing code, testing, debugging, and iterating as needed to complete the task or project slice.  Make sure you remember that the ExecPlan is a living document and may need to be updated as you progress. Use the $tdd skill where appropriate.
+Follow the steps outlined in the ExecPlan to work through the development loop. This may involve writing code, testing, debugging, assigning subagents to child ExecPlans, and iterating as needed to complete the task or project slice.  Make sure you remember that the ExecPlan is a living document and may need to be updated as you progress. Use the $tdd skill where appropriate.  
+
+### Follow Up with Subagents
+If you assigned any subagents to child ExecPlans, make sure to follow up with them to check on their progress, provide any necessary guidance or support, and ensure that their work is aligned with the requirements of their assigned ExecPlan. Subagents often require active management to keep them on task and ensure they haven't stopped working. 
 
 ## Write a Git Commit
 Once the ExecPlan has been executed and the task or project slice is complete, use the $write-git-commit skill to create a Git commit that documents the changes made during the implementation of the task or project slice.
