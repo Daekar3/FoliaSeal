@@ -36,8 +36,8 @@ This is not certificate creation, import, export, backup, deletion, or credentia
 - Observation: `SigningDraftWorkflow` already records `selected_certificate_configuration_id`, but there is no method that applies a resolved `CertificateConfiguration` and clears certificate-preview cache state.
   Evidence: `src/foliaseal/application/signing_draft_workflow.py` includes `selected_certificate_configuration_id`, while certificate path/passphrase updates currently happen only through construction or raw field mutation.
 
-- Observation: The architecture document still identifies certificate configuration UI wiring as pending.
-  Evidence: `docs/ARCHITECTURE.md` says certificate configuration persistence is not wired into the Qt shell yet and recommends refactoring draft workflow and shell certificate selection to use `CertificateConfiguration` references.
+- Observation: At the start of this slice, the architecture document still identified certificate configuration UI wiring as pending.
+  Evidence: before this slice's architecture update, `docs/ARCHITECTURE.md` said certificate configuration persistence was not wired into the Qt shell yet and recommended refactoring draft workflow and shell certificate selection to use `CertificateConfiguration` references.
 
 - Observation: Focused validation is green after the selector implementation.
   Evidence: `.venv/bin/pytest -q tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py tests/unit/test_certificate_storage.py tests/unit/test_signing_material_resolver.py` reported `85 passed in 4.26s`, and `.venv/bin/ruff check .` reported `All checks passed!`.
