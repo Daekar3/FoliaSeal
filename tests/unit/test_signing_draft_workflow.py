@@ -15,6 +15,7 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftValidationError,
     SigningDraftWorkflow,
 )
+from foliaseal.application.signing_material_resolver import SigningMaterial
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldBinding,
@@ -28,6 +29,7 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
 )
 from foliaseal.infra.config.schemas import ResolvedSignaturePreset
+from tests.support.phase3_builders import build_certificate_configuration
 
 
 def _appearance() -> SignatureAppearance:
@@ -254,6 +256,53 @@ def test_workflow_uses_injected_certificate_preview_reader(tmp_path: Path) -> No
     assert reader.calls == [(str(tmp_path / "missing-cert.p12"), "secret")]
     assert preview.fields[1].text == "Injected Signer"
     assert preview.fields[2].text == "injected@example.com"
+
+
+def test_workflow_applies_resolved_certificate_configuration(tmp_path: Path) -> None:
+    reader = FakeCertificatePreviewReader()
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "old-cert.p12"),
+        passphrase="old-secret",
+        tsa_url="https://tsa.example.com",
+        certificate_preview_reader=reader,
+    )
+    workflow.set_signature_appearance(
+        SignatureAppearance(
+            common_name=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+        )
+    )
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=220.0,
+            height_pt=80.0,
+        )
+    )
+    workflow.preview()
+    assert reader.calls == [(str(tmp_path / "old-cert.p12"), "old-secret")]
+
+    workflow.apply_certificate_configuration(
+        build_certificate_configuration(
+            certificate_configuration_id="cert-config-board",
+        ),
+        SigningMaterial(
+            certificate_path=str(tmp_path / "managed" / "board.p12"),
+            passphrase="typed-secret",
+            certificate_alias="board-cert",
+        ),
+    )
+    request = workflow.build_signing_request()
+    workflow.preview()
+
+    assert workflow.selected_certificate_configuration_id == "cert-config-board"
+    assert request.certificate_path == str(tmp_path / "managed" / "board.p12")
+    assert request.passphrase == "typed-secret"
+    assert request.certificate_alias == "board-cert"
+    assert reader.calls[-1] == (str(tmp_path / "managed" / "board.p12"), "typed-secret")
 
 
 def test_workflow_blocks_compact_rectangles_that_backend_will_reject(

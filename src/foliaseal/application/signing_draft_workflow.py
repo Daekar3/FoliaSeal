@@ -19,6 +19,7 @@ from foliaseal.application.coordinate_transform import (
     validate_pdf_rect_within_page,
     view_rect_to_pdf_rect,
 )
+from foliaseal.application.signing_material_resolver import SigningMaterial
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
@@ -33,7 +34,7 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
-from foliaseal.infra.config.schemas import ResolvedSignaturePreset
+from foliaseal.infra.config.schemas import CertificateConfiguration, ResolvedSignaturePreset
 
 
 class SigningDraftValidationError(ValueError):
@@ -330,6 +331,21 @@ class SigningDraftWorkflow:
         )
         self.selected_appearance_profile_id = preset.preset.appearance_profile_id
         self.selected_placement_profile_id = preset.preset.placement_profile_id
+
+    def apply_certificate_configuration(
+        self,
+        configuration: CertificateConfiguration,
+        signing_material: SigningMaterial,
+    ) -> None:
+        """Apply a resolved certificate configuration to the current draft."""
+        self.selected_certificate_configuration_id = (
+            configuration.certificate_configuration_id
+        )
+        self.certificate_path = signing_material.certificate_path
+        self.passphrase = signing_material.passphrase
+        self.certificate_alias = signing_material.certificate_alias
+        self._certificate_preview_values = None
+        self._certificate_preview_available = False
 
     def capture_signature_preset(
         self,

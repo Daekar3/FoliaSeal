@@ -28,6 +28,11 @@ from foliaseal.application.signature_font_registry import (
     resolve_signature_font_face,
     validate_signature_font_request,
 )
+from foliaseal.application.signing_material_resolver import (
+    CertificateSecretProvider,
+    CertificateSigningMaterialResolver,
+    SigningMaterialResolutionError,
+)
 from foliaseal.application.signing_preview_renderer import (
     CanonicalSignaturePreviewSnapshot,
     render_canonical_signature_preview,
@@ -53,8 +58,13 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import ResolvedSignaturePreset, SignaturePresetCatalog
+from foliaseal.infra.config.schemas import (
+    CertificateCatalog,
+    ResolvedSignaturePreset,
+    SignaturePresetCatalog,
+)
 from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
@@ -70,6 +80,7 @@ SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
 )
 
 PROFILE_PLACEHOLDER = "Current draft"
+CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Current certificate"
 _PREVIEW_FONTS_REGISTERED = False
 
 
@@ -117,6 +128,16 @@ class ProfileControls:
     profile_name: Any
     save_button: Any
     delete_button: Any
+
+
+@dataclass(frozen=True)
+class CertificateConfigurationControls:
+    """Controls used to choose a saved certificate configuration."""
+
+    container: Any
+    configuration_combo: Any
+    password_input: Any
+    apply_button: Any
 
 
 class SigningRequestExecutor(Protocol):
@@ -1146,6 +1167,9 @@ class SignaturePropertiesPanel:
         *,
         bindings: QtSigningWidgetBindings,
         workflow: SigningDraftWorkflow,
+        certificate_catalog: CertificateCatalog | None = None,
+        certificate_catalog_store: CertificateCatalogStore | None = None,
+        certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         on_change: Callable[[], None] | None = None,
@@ -1155,6 +1179,19 @@ class SignaturePropertiesPanel:
         self._bindings = bindings
         _ensure_preview_fonts_registered()
         self._workflow = workflow
+        self._certificate_catalog_store = certificate_catalog_store
+        if certificate_catalog is not None:
+            self._certificate_catalog = certificate_catalog
+        elif certificate_catalog_store is not None:
+            self._certificate_catalog = certificate_catalog_store.load_catalog()
+        else:
+            self._certificate_catalog = CertificateCatalog(schema_version=1)
+        resolver_store = certificate_catalog_store or CertificateCatalogStore.default()
+        self._certificate_material_resolver = CertificateSigningMaterialResolver(
+            managed_certificate_dir=resolver_store.managed_certificate_dir,
+            secret_provider=certificate_secret_provider,
+        )
+        self._selected_certificate_configuration_name: str | None = None
         self._profile_catalog_store = preset_catalog_store
         if preset_catalog is not None:
             self._profile_catalog = preset_catalog
@@ -1176,6 +1213,7 @@ class SignaturePropertiesPanel:
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
 
+        self._certificate_controls = self._build_certificate_configuration_controls()
         self._profile_controls = self._build_profile_controls()
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
@@ -1186,6 +1224,7 @@ class SignaturePropertiesPanel:
         if hasattr(self._validation_label, "setWordWrap"):
             self._validation_label.setWordWrap(True)
 
+        self._layout.addWidget(self._certificate_controls.container)
         self._layout.addWidget(self._profile_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
@@ -1241,6 +1280,7 @@ class SignaturePropertiesPanel:
     def load_from_workflow(self) -> None:
         self._suspend_updates = True
         try:
+            self._load_certificate_configuration_controls()
             self._load_profile_controls()
             self._load_placement_controls()
             self._load_appearance_controls()
@@ -1483,6 +1523,69 @@ class SignaturePropertiesPanel:
             self._suspend_updates = False
         self._notify_change()
         return updated_catalog
+
+    def apply_selected_certificate_configuration(self) -> bool:
+        selected_name = _combo_text(self._certificate_controls.configuration_combo)
+        if (
+            selected_name == CERTIFICATE_CONFIGURATION_PLACEHOLDER
+            or not selected_name.strip()
+        ):
+            self._show_certificate_configuration_error(
+                "Select a certificate configuration before applying it."
+            )
+            return False
+
+        try:
+            configuration = self._certificate_catalog.configuration_named(selected_name)
+            signing_material = self._certificate_material_resolver.resolve(
+                self._certificate_catalog,
+                configuration,
+                passphrase=_text(self._certificate_controls.password_input) or None,
+            )
+        except (KeyError, SigningMaterialResolutionError, ValueError) as exc:
+            self._selected_certificate_configuration_name = None
+            self._show_certificate_configuration_error(str(exc))
+            return False
+
+        self._workflow.apply_certificate_configuration(configuration, signing_material)
+        self._selected_certificate_configuration_name = configuration.display_name
+        self._suspend_updates = True
+        try:
+            self._reload_certificate_configuration_controls(
+                selected_name=configuration.display_name
+            )
+        finally:
+            self._suspend_updates = False
+        self.refresh_preview()
+        self._notify_change()
+        return True
+
+    def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Certificate configuration")
+        layout = bindings.q_form_layout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        configuration_combo = bindings.q_combo_box()
+        password_input = bindings.q_line_edit()
+        password_input.setPlaceholderText("Certificate password if not saved")
+        apply_button = bindings.q_push_button("Apply certificate")
+
+        layout.addRow("Saved certificate", configuration_combo)
+        layout.addRow("Password", password_input)
+        layout.addRow("", apply_button)
+
+        apply_button.clicked.connect(  # type: ignore[attr-defined]
+            self.apply_selected_certificate_configuration
+        )
+
+        return CertificateConfigurationControls(
+            container=container,
+            configuration_combo=configuration_combo,
+            password_input=password_input,
+            apply_button=apply_button,
+        )
 
     def _build_placement_controls(self) -> PlacementControls:
         bindings = self._bindings
@@ -1826,6 +1929,51 @@ class SignaturePropertiesPanel:
             appearance.box_style.background_color_hex,
         )
         self._sync_font_style_control_availability()
+
+    def _reload_certificate_configuration_controls(
+        self,
+        *,
+        selected_name: str | None = None,
+    ) -> None:
+        configuration_combo = self._certificate_controls.configuration_combo
+        clear = getattr(configuration_combo, "clear", None)
+        if callable(clear):
+            clear()
+        elif hasattr(configuration_combo, "_items"):
+            configuration_combo._items = []  # type: ignore[attr-defined]
+            configuration_combo._current = ""  # type: ignore[attr-defined]
+
+        names = tuple(
+            configuration.display_name
+            for configuration in self._certificate_catalog.certificate_configurations
+        )
+        configuration_combo.addItem(CERTIFICATE_CONFIGURATION_PLACEHOLDER)
+        configuration_combo.addItems(names)
+
+        current_name = selected_name if selected_name in names else None
+        if current_name is None and self._workflow.selected_certificate_configuration_id:
+            try:
+                selected_configuration = self._certificate_catalog.configuration_by_id(
+                    self._workflow.selected_certificate_configuration_id
+                )
+            except KeyError:
+                selected_configuration = None
+            if selected_configuration is not None:
+                current_name = selected_configuration.display_name
+
+        _set_combo_text(
+            configuration_combo,
+            current_name or CERTIFICATE_CONFIGURATION_PLACEHOLDER,
+        )
+        _set_widget_visible(
+            self._certificate_controls.container,
+            bool(names) or self._certificate_catalog_store is not None,
+        )
+
+    def _load_certificate_configuration_controls(self) -> None:
+        self._reload_certificate_configuration_controls(
+            selected_name=self._selected_certificate_configuration_name
+        )
 
     def _reload_profile_controls(self, *, selected_name: str | None = None) -> None:
         profile_combo = self._profile_controls.profile_combo
@@ -2575,6 +2723,12 @@ class SignaturePropertiesPanel:
             return
         self._emit_error(message)
 
+    def _show_certificate_configuration_error(self, message: str) -> None:
+        self._emit_error(message)
+        warning = getattr(self._bindings.q_message_box, "warning", None)
+        if callable(warning):
+            warning(self.widget, "Certificate configuration error", message)
+
     def _heading(self, text: str) -> Any:
         label = self._bindings.q_label(text)
         if hasattr(label, "setStyleSheet"):
@@ -2631,6 +2785,9 @@ class SigningWorkspaceWidget:
         bindings: QtSigningWidgetBindings,
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
+        certificate_catalog: CertificateCatalog | None = None,
+        certificate_catalog_store: CertificateCatalogStore | None = None,
+        certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
@@ -2664,6 +2821,9 @@ class SigningWorkspaceWidget:
         self.properties_panel = SignaturePropertiesPanel(
             bindings=bindings,
             workflow=signing_workflow,
+            certificate_catalog=certificate_catalog,
+            certificate_catalog_store=certificate_catalog_store,
+            certificate_secret_provider=certificate_secret_provider,
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
             on_change=self._handle_panel_change,
@@ -2872,6 +3032,9 @@ class SigningShellAdapter:
         *,
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
+        certificate_catalog: CertificateCatalog | None = None,
+        certificate_catalog_store: CertificateCatalogStore | None = None,
+        certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
@@ -2883,6 +3046,9 @@ class SigningShellAdapter:
             bindings=self._bindings,
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
+            certificate_catalog=certificate_catalog,
+            certificate_catalog_store=certificate_catalog_store,
+            certificate_secret_provider=certificate_secret_provider,
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
             sign_executor=sign_executor,
@@ -2926,6 +3092,9 @@ def build_qt_signing_shell(
     *,
     viewer_workflow: ViewerWorkflow,
     signing_workflow: SigningDraftWorkflow,
+    certificate_catalog: CertificateCatalog | None = None,
+    certificate_catalog_store: CertificateCatalogStore | None = None,
+    certificate_secret_provider: CertificateSecretProvider | None = None,
     preset_catalog: SignaturePresetCatalog | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
@@ -2939,6 +3108,9 @@ def build_qt_signing_shell(
     return adapter.create(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
+        certificate_catalog=certificate_catalog,
+        certificate_catalog_store=certificate_catalog_store,
+        certificate_secret_provider=certificate_secret_provider,
         preset_catalog=preset_catalog,
         preset_catalog_store=preset_catalog_store,
         sign_executor=sign_executor,

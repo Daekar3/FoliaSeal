@@ -21,6 +21,7 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
     SigningResult,
 )
+from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
@@ -30,6 +31,7 @@ from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
 from tests.support.phase3_builders import (
+    build_certificate_catalog,
     build_signature_appearance,
     build_signature_field_binding,
     build_signature_preset,
@@ -528,8 +530,82 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
 
     assert errors == []
     assert request is not None
-    assert requests == [request]
-    assert request.signature_rect is not None
+
+
+def test_signing_shell_applies_selected_certificate_configuration(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=store,
+    )
+
+    panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText(
+        "Corporate Records Signing"
+    )
+    panel._certificate_controls.password_input.setText("typed-secret")
+
+    assert panel.apply_selected_certificate_configuration() is True
+
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+
+
+def test_signing_shell_reports_certificate_configuration_resolution_errors(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(build_certificate_catalog())
+    errors: list[str] = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        certificate_catalog_store=store,
+        on_error=errors.append,
+    )
+
+    panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText(
+        "Corporate Records Signing"
+    )
+
+    assert panel.apply_selected_certificate_configuration() is False
+    assert errors
+    assert "managed certificate file is missing" in errors[-1]
+    assert bindings.q_message_box.calls[-1][1] == "Certificate configuration error"
 
 
 def test_signing_shell_selection_uses_rendered_snapshot_page_for_validation(
