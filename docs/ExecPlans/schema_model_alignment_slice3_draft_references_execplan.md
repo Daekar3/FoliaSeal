@@ -24,7 +24,7 @@ The user-visible behavior should remain the same: saved signature setup entries 
 - [x] (2026-05-06 22:36Z) Moved shell calls from old profile-oriented workflow methods to canonical methods while preserving compatibility aliases for harness/test call sites not migrated in this slice.
 - [x] (2026-05-06 22:38Z) Updated architecture and parent ExecPlan documentation.
 - [x] (2026-05-06 22:40Z) Ran focused validation, lint, and the full test suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-06 22:41Z) Committed the completed slice as `87509136b refactor: add draft reusable object references`.
 
 ## Surprises & Discoveries
 
@@ -129,3 +129,5 @@ Expected new or changed interfaces:
 No new third-party dependency is needed.
 
 Revision note: updated on 2026-05-06 after implementation to record the draft reference fields, canonical workflow methods, certificate preview reader seam, and focused validation evidence.
+
+Revision note: updated on 2026-05-06 after commit to record commit `87509136b` in the progress checklist.
