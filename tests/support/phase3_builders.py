@@ -22,6 +22,10 @@ from foliaseal.domain.models import (
 )
 from foliaseal.infra.config.schemas import (
     AppearanceProfile,
+    CertificateCatalog,
+    CertificateConfiguration,
+    ManagedCertificate,
+    ManagedCertificateSubjectSummary,
     PlacementProfile,
     ResolvedSignaturePreset,
     SignaturePreset,
@@ -252,6 +256,76 @@ def build_placement_profile(
             width_pt=220.0,
             height_pt=80.0,
             anchor=SignatureAnchor.BOTTOM_RIGHT,
+        ),
+    )
+
+
+def build_managed_certificate(
+    *,
+    schema_version: int = 1,
+    managed_certificate_id: str = "managed-cert-default",
+    display_name: str = "Board Secretary 2026",
+    storage_filename: str = "cert_default.p12",
+    source_kind: str = "created",
+    created_at: str = "2026-05-06T00:00:00Z",
+    subject_summary: ManagedCertificateSubjectSummary | None = None,
+) -> ManagedCertificate:
+    """Build a canonical managed certificate record."""
+    return ManagedCertificate(
+        schema_version=schema_version,
+        managed_certificate_id=managed_certificate_id,
+        display_name=display_name,
+        storage_filename=storage_filename,
+        source_kind=source_kind,
+        created_at=created_at,
+        subject_summary=subject_summary
+        or ManagedCertificateSubjectSummary(
+            common_name="Morgan Ellery",
+            email="morgan@example.com",
+            title="Board Secretary",
+            company="Northwind Ledger Holdings",
+        ),
+    )
+
+
+def build_certificate_configuration(
+    *,
+    schema_version: int = 1,
+    certificate_configuration_id: str = "cert-config-default",
+    display_name: str = "Corporate Records Signing",
+    managed_certificate_id: str = "managed-cert-default",
+    save_password: bool = False,
+    password_secret_ref: str | None = None,
+    notes: str | None = "Default signing identity",
+) -> CertificateConfiguration:
+    """Build a canonical certificate configuration."""
+    return CertificateConfiguration(
+        schema_version=schema_version,
+        certificate_configuration_id=certificate_configuration_id,
+        display_name=display_name,
+        managed_certificate_id=managed_certificate_id,
+        save_password=save_password,
+        password_secret_ref=password_secret_ref,
+        notes=notes,
+    )
+
+
+def build_certificate_catalog(
+    *,
+    schema_version: int = 1,
+    managed_certificates: tuple[ManagedCertificate, ...] | None = None,
+    certificate_configurations: tuple[CertificateConfiguration, ...] | None = None,
+) -> CertificateCatalog:
+    """Build a canonical certificate catalog."""
+    managed_certificate = build_managed_certificate()
+    return CertificateCatalog(
+        schema_version=schema_version,
+        managed_certificates=managed_certificates or (managed_certificate,),
+        certificate_configurations=certificate_configurations
+        or (
+            build_certificate_configuration(
+                managed_certificate_id=managed_certificate.managed_certificate_id,
+            ),
         ),
     )
 

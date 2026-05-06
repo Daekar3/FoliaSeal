@@ -19,7 +19,8 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] (2026-05-06 00:00Z) Audited `docs/SCHEMAS.md`, `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`, `src/foliaseal/application/signing_draft_workflow.py`, `src/foliaseal/domain/models.py`, and the profile-handling portions of `src/foliaseal/presentation/qt/signing_shell.py`.
 - [x] (2026-05-06 00:07Z) Identified the highest-leverage drift: the current `SignaturePreset` persistence model is actually a named appearance-plus-placement profile, certificate usage is still direct path/passphrase state, and global app settings do not exist as a first-class persisted object.
 - [x] (2026-05-06 00:55Z) Implemented Slice 1: split the current monolithic reusable-profile persistence into canonical `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset` catalog/storage behavior. Details live in `docs/ExecPlans/schema_model_alignment_slice1_profiles_execplan.md`.
-- [ ] Implement Slice 2: add `ManagedCertificate` and `CertificateConfiguration` persistence plus a signing-material resolver that converts a selected configuration into runtime signing inputs.
+- [x] (2026-05-06 22:24Z) Created child ExecPlan for Slice 2 at `docs/ExecPlans/schema_model_alignment_slice2_certificates_execplan.md`.
+- [x] (2026-05-06 22:31Z) Implemented Slice 2: added `ManagedCertificate` and `CertificateConfiguration` persistence plus a signing-material resolver that converts a selected configuration into runtime signing inputs.
 - [ ] Implement Slice 3: refactor `SigningDraftWorkflow` and the Qt shell so ephemeral draft state references reusable objects instead of embedding persistence-shaped data directly.
 - [ ] Implement Slice 4: add `AppSettings` persistence and move open/save directory defaults into that store.
 - [ ] Reconcile `docs/ARCHITECTURE.md` with the implementation after each slice lands.
@@ -47,6 +48,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - Observation: Slice 1 validation is locally clean for focused tests and lint, while the full suite has unrelated artifact-manifest failures.
   Evidence: focused schema/storage/workflow/shell tests reported `92 passed`, `ruff check .` passed, and full `pytest -q` reported four failures in `tests/unit/test_phase3_harness.py` manifest expectation tests.
 
+- Observation: Slice 2 can be additive because Slice 1 already added `certificate_configuration_id` to the reference-only `SignaturePreset` shape.
+  Evidence: `SignaturePreset` in `src/foliaseal/infra/config/schemas.py` now stores optional `certificate_configuration_id`, `appearance_profile_id`, and `placement_profile_id` references.
+
 ## Decision Log
 
 - Decision: treat the current schema drift as an architecture problem, not just a naming cleanup.
@@ -65,9 +69,19 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
   Rationale: the repo already has substantial tests and harness flows around the current shell. An additive migration path keeps the reviewable slice narrow and observable.
   Date/Author: 2026-05-06 / Codex
 
+- Decision: implement certificate persistence and resolution as a separate catalog/store rather than adding certificate arrays to the profile catalog.
+  Rationale: managed certificate files and certificate configurations have distinct lifecycle rules from appearance, placement, and preset objects. Keeping them separate makes deletion/export/backup work easier to reason about in later slices.
+  Date/Author: 2026-05-06 / Codex
+
+- Decision: use a resolver-side secret-provider protocol for saved certificate passwords.
+  Rationale: `docs/SCHEMAS.md` forbids plain-text password storage in ordinary config JSON. The protocol lets tests use an in-memory provider while a later GUI slice can add a real OS credential-store adapter.
+  Date/Author: 2026-05-06 / Codex
+
 ## Outcomes & Retrospective
 
-At plan creation time, the main outcome is clarity rather than code. The repository now has a concrete, implementation-oriented path from the canonical schema docs to actual refactor slices. The remaining work is entirely implementation. The biggest lesson from the audit is that the drift is not localized: persistence, workflow state, and UI labels all currently reinforce the same outdated object model, so the refactor must be staged but deliberate.
+At plan creation time, the main outcome was clarity rather than code. Slice 1 then split profile persistence into `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset`. Slice 2 added the certificate side of the canonical object model with `ManagedCertificate`, `CertificateConfiguration`, `CertificateCatalog`, `CertificateCatalogStore`, and `CertificateSigningMaterialResolver`.
+
+The remaining work is still implementation-heavy: draft workflow and Qt shell state need to consume these canonical objects, and app settings still need a first-class store. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforce old object ownership, so the refactor must stay staged but deliberate.
 
 ## Context and Orientation
 

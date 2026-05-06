@@ -165,13 +165,13 @@ The canonical repository document split is:
 
 ### Configuration and reusable signing-object persistence
 
-- Location: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`
+- Location: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`, `src/foliaseal/infra/config/certificate_storage.py`, `src/foliaseal/application/signing_material_resolver.py`
 - Responsibility: Serialize, deserialize, validate, load, and save trust/timestamp configuration plus reusable signing-object catalogs.
-- Owns: `TrustProfile`, `TimestampPolicy`, `AppearanceProfile`, `PlacementProfile`, reference-only `SignaturePreset`, `ResolvedSignaturePreset`, `SignaturePresetCatalog`, `SignaturePresetCatalogStore`.
+- Owns: `TrustProfile`, `TimestampPolicy`, `ManagedCertificate`, `CertificateConfiguration`, `CertificateCatalog`, `CertificateCatalogStore`, `SigningMaterial`, `CertificateSigningMaterialResolver`, `AppearanceProfile`, `PlacementProfile`, reference-only `SignaturePreset`, `ResolvedSignaturePreset`, `SignaturePresetCatalog`, `SignaturePresetCatalogStore`.
 - Does not own: UI controls or runtime signing flow.
-- Key collaborators: domain models, Qt signing shell.
-- Main entry points: `AppearanceProfile.from_dict()`, `PlacementProfile.from_dict()`, `SignaturePreset.from_dict()`, `SignaturePresetCatalog.from_dict()`, `SignaturePresetCatalog.resolve_preset()`, `SignaturePresetCatalogStore.load_catalog()`, `save_catalog()`, `save_profile()`, `delete_profile()`.
-- Known constraints: The store still uses the historical user-visible `Signature Profiles/profiles.json` path, but the JSON shape now separates `appearance_profiles`, `placement_profiles`, and `signature_presets`. Compatibility helper methods such as `profile_names()` and `profile_named()` remain for the current Qt shell and harness while later schema-alignment slices continue.
+- Key collaborators: domain models, Qt signing shell, future credential-store adapter.
+- Main entry points: `ManagedCertificate.from_dict()`, `CertificateConfiguration.from_dict()`, `CertificateCatalog.from_dict()`, `CertificateCatalogStore.load_catalog()`, `CertificateSigningMaterialResolver.resolve_by_configuration_id()`, `AppearanceProfile.from_dict()`, `PlacementProfile.from_dict()`, `SignaturePreset.from_dict()`, `SignaturePresetCatalog.from_dict()`, `SignaturePresetCatalog.resolve_preset()`, `SignaturePresetCatalogStore.load_catalog()`, `save_catalog()`, `save_profile()`, `delete_profile()`.
+- Known constraints: The profile store still uses the historical user-visible `Signature Profiles/profiles.json` path, but the JSON shape now separates `appearance_profiles`, `placement_profiles`, and `signature_presets`. Certificate configuration storage uses `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/certificates.json` plus a `Managed/` directory for app-owned PKCS#12 files. Passwords are not stored in ordinary JSON; saved-password lookup is a resolver protocol seam with no concrete OS credential adapter yet. Compatibility helper methods such as `profile_names()` and `profile_named()` remain for the current Qt shell and harness while later schema-alignment slices continue.
 - Status: Confirmed by code and tests.
 
 ### Timestamping, trust, and certification infrastructure
@@ -222,6 +222,8 @@ The canonical repository document split is:
 | `AppearanceProfile` | `infra/config/schemas.py` | Persisted signing-specific visible appearance. | stable id, display name, `SignatureAppearance`. | Canonical reusable appearance object. |
 | `PlacementProfile` | `infra/config/schemas.py` | Persisted reusable placement defaults. | stable id, display name, current-page rect, numeric fine-tuning flag. | Converted to current shell width/height defaults when resolved. |
 | `SignaturePreset` / `ResolvedSignaturePreset` / `SignaturePresetCatalog` | `infra/config/schemas.py` | Persisted reference-only preset plus resolved view for current UI/harness consumers. | preset id, display name, optional referenced object ids. | `SignaturePreset` stores references only; resolved objects expose appearance/placement for transitional call sites. |
+| `ManagedCertificate` / `CertificateConfiguration` / `CertificateCatalog` | `infra/config/schemas.py` | Persist managed certificate file records and user-facing certificate selections. | managed certificate id, display name, storage filename, subject summary; configuration id, managed certificate id, save-password flag, password secret reference. | Passwords are referenced by secret id only, never stored in config JSON. |
+| `SigningMaterial` / `CertificateSigningMaterialResolver` | `application/signing_material_resolver.py` | Convert a selected certificate configuration into runtime signing inputs. | certificate path, passphrase, optional alias. | Uses explicit passphrase or a `CertificateSecretProvider`; reports helpful missing-file/secret errors. |
 | `RenderPageRequest` / `RenderPageResult` | `infra/render/base.py` | Render backend request/result. | document path, page index, zoom; width/height/RGBA bytes. | Backend protocol contract. |
 | `Phase3HarnessCapture` | `presentation/qt/phase3_harness.py` | Structured acceptance harness result. | preview/request/signing/evidence fields. | JSON output is validated by evidence contract. |
 
@@ -277,6 +279,18 @@ The canonical repository document split is:
 - Validation: `SignaturePresetCatalog.from_dict()` and nested schema constructors reject malformed shape/types/duplicates.
 - Error behavior: missing or blank file loads as empty catalog; invalid JSON raises `ConfigValidationError`.
 - Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`.
+
+### Certificate catalog JSON contract
+
+- Producer: `CertificateCatalogStore.save_catalog()`.
+- Consumer: future certificate-management UI, signing-material resolver, and future launches.
+- Stability: Persisted file contract.
+- Storage path: `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/certificates.json`.
+- Managed files path: `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/Managed/`.
+- Format: JSON object with `schema_version`, `managed_certificates`, and `certificate_configurations`. `CertificateConfiguration` entries reference managed certificates by id and may reference saved passwords by secret id only.
+- Validation: `CertificateCatalog.from_dict()` and nested schema constructors reject malformed shape/types, duplicate ids, duplicate configuration names, path-like storage filenames, and saved-password configurations without a secret reference.
+- Error behavior: missing or blank file loads as an empty catalog; invalid JSON raises `ConfigValidationError`; resolver failures raise `SigningMaterialResolutionError` with user-actionable messages.
+- Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/certificate_storage.py`, `src/foliaseal/application/signing_material_resolver.py`.
 
 ### Timestamp and trust contract
 
@@ -359,6 +373,7 @@ The canonical repository document split is:
 | Input PDF | User CLI/GUI path | rendered for viewer; signed by pyHanko; inspected for certification/version | Original file remains at user path | PDF | Signing output must not target same resolved path. |
 | Signed PDF output | pyHanko backend bytes | atomic temp-file replace | User-provided output path | PDF | `SigningResult` reports PDF version, signature subfilter, timestamp metadata. |
 | PKCS#12 certificate | User path/passphrase | validated/loaded by pyHanko/cryptography | Not persisted by app | PKCS#12 | Passphrase can appear in CLI history for harness commands; README warns about this. |
+| Managed certificate configuration | Certificate management workflow or tests | managed certificate record + certificate configuration -> resolver -> runtime signing material | XDG data dir under `FoliaSeal/Certificates/certificates.json`; PKCS#12 files under `FoliaSeal/Certificates/Managed/` | `CertificateCatalog` JSON plus PKCS#12 files | JSON stores secret references only; no plain certificate passwords. UI integration is pending. |
 | Reusable signing profiles | Qt shell/user input | domain appearance/placement -> split config schema -> JSON | XDG data dir under `FoliaSeal/Signature Profiles/profiles.json` | `SignaturePresetCatalog` JSON with appearance, placement, and preset lists | Missing/blank catalog becomes empty. |
 | Trust profile/timestamp policy | Config schema callers | JSON dicts <-> dataclasses -> runtime trust policy | Needs review | JSON schema in `infra/config/schemas.py` | Storage location outside profile catalog is not yet clearly documented in code. |
 | Viewer render buffers | Render backend | PDF page -> RGBA bytes | Memory; optional render cache | `RenderPageResult` | Cache is in-memory LRU keyed by path/page/zoom. |
@@ -384,6 +399,7 @@ The canonical repository document split is:
 | Render backend protocol | `infra/render/base.py` | Replace QtPdf renderer with another renderer. | Must provide page geometry and RGBA render bytes. |
 | Visible-signature semantics ports | `application/visible_signature_semantics.py` | Inject certificate field reading, signing clock, and fit validation. | Must keep preview and final-signing text/metadata behavior aligned. |
 | Visible-signature layout ports | `application/visible_signature_layout.py` | Inject text measurement, image probing, and horizontal ink measurement. | Must preserve `SignatureLayoutPlan` semantics and fit-issue reporting. |
+| Certificate secret provider | `application/signing_material_resolver.py` | Resolve saved certificate passwords from a future OS credential store adapter. | Must not store plain passwords in ordinary config JSON; resolver must allow explicit passphrase fallback. |
 | Timestamp factory | `phase3_signing_backend.py`, `infra/tsa/pyhanko_adapter.py` | Use dummy TSA in tests/matrices or HTTP TSA in real signing. | Production URLs must validate as HTTP(S). |
 | Profile storage root | `SignaturePresetCatalogStore.default(app_name=...)` | Test/custom app-name storage location. | Default follows XDG data home. |
 | Qt binding loaders | `presentation/qt/*` | Test with fake widgets or run with real PySide6. | Dynamic imports should fail with explicit unavailable errors/diagnostics. |
@@ -395,7 +411,7 @@ Tests live under `tests/unit/` with support builders in `tests/support/`. The su
 
 | Test area | Location | What it protects | Expected when changing |
 |---|---|---|---|
-| Domain/config validation | `test_signature_appearance_models.py`, `test_config_schemas.py`, `test_signature_preset_storage.py` | Dataclass invariants and persisted JSON shape. | Add/update schema tests for persisted fields. |
+| Domain/config validation | `test_signature_appearance_models.py`, `test_config_schemas.py`, `test_signature_preset_storage.py`, `test_certificate_storage.py`, `test_signing_material_resolver.py` | Dataclass invariants, persisted JSON shape, and certificate-configuration resolution. | Add/update schema tests for persisted fields. |
 | Signing use case | `test_sign_pdf_use_case.py` | Failure-code mapping, timestamp policy, certification restriction, atomic writes. | Preserve stable failure codes and output metadata. |
 | pyHanko signing backend | `test_phase3_signing_backend.py` | Real signing, timestamping, visible signature layout, semantics adapter behavior, private layout helper behavior. | Run focused backend tests for signing/layout changes. |
 | Visible semantics boundary | `test_visible_signature_semantics.py` | Visible field resolution, certificate fallback, signing-time text, escaped stamp text, metadata, and fit-validator propagation. | Add boundary tests for text/metadata behavior before changing workflow, preview, or backend signing. |
@@ -417,7 +433,8 @@ Default local validation from README:
 |---|---|---|---|
 | `phase3_signing_backend.py` mixes concrete pyHanko adapter code with many private visible-signature layout helpers. | Harder to navigate and test at a single public boundary. | `VisibleSignatureLayoutEngine` wraps/migrates parts of layout behavior while preserving parity. | Move policy behind the layout boundary and reduce private-helper test reliance after coverage is equivalent. |
 | `signing_shell.py` is a large module containing widget composition, profile handling, preview sizing, and workflow orchestration. | Changes risk broad review scope and can hide UI/domain coupling. | Tests use fakes and helper-level coverage. | Split only when clear ownership boundaries emerge, likely panel/profile/preview adapter components. |
-| Application layer imports some infra DTOs and concrete backend helpers. | Layer boundary is not perfectly clean. | Semantics decisions now live behind `VisibleSignatureSemanticsService`; remaining imports are primarily layout/backend compatibility and profile DTOs. | Move shared DTOs/interfaces upward or add adapter methods when it reduces coupling. |
+| Application layer imports some infra DTOs and concrete backend helpers. | Layer boundary is not perfectly clean. | Semantics decisions now live behind `VisibleSignatureSemanticsService`; remaining imports are primarily layout/backend compatibility, profile DTOs, and certificate config DTOs. | Move shared DTOs/interfaces upward or add adapter methods when it reduces coupling. |
+| Certificate configuration persistence is not wired into the Qt shell yet. | The canonical object exists, but users still interact with raw certificate path/passphrase fields in the current GUI. | `CertificateSigningMaterialResolver` provides the seam for the next UI/workflow slice. | Refactor draft workflow and shell certificate selection to use `CertificateConfiguration` references. |
 | `SignatureLayoutPlan.backend_reservation` carries an opaque backend object. | Public layout boundary is not fully neutral. | Preserve pyHanko parity during migration. | Replace with neutral data once backend/private helpers are no longer required. |
 | PySide6 is dynamically imported but not listed in `pyproject.toml` runtime dependencies. | A fresh install may run CLI helpers but fail GUI/harness commands without extra packages. | Runtime diagnostics report unavailable Qt bindings. | Decide whether PySide6 belongs in optional extras or documented system setup only. |
 | `foliaseal.spec` does not visibly use `collect_runtime_assets()`. | PyInstaller hidden-import behavior may diverge between helper tests and real spec. | `foliaseal.spec` independently collects FoliaSeal submodules. | Wire the helper into the spec or delete the unused helper path after review. |
@@ -430,12 +447,13 @@ Default local validation from README:
 | Should `application` be strictly independent from `infra`? | Current imports include infra config DTOs and backend helper dependencies. | A: enforce strict dependency direction; B: allow pragmatic exceptions. | Prefer A for new work, retire existing exceptions gradually. |
 | What is the public stability level of CLI harness commands? | They are documented and tested, but some are engineering acceptance tools. | A: stable developer contract; B: internal tool contract. | Treat command names/required args as stable unless a migration note is added. |
 | Should PySide6 be an optional package extra? | GUI and render backend require it dynamically, but package metadata omits it. | A: add `gui` extra; B: document external install only. | Add a `gui` extra if packaging work resumes. |
-| Where should trust/timestamp policy config be persisted outside tests? | Schemas exist, but only signature profile storage has an obvious store. | A: add a store; B: keep CLI/request-only for now. | Needs maintainer decision before documenting as settled. |
+| Where should trust/timestamp policy config be persisted outside tests? | Schemas exist, but signature profile and certificate stores are the only obvious stores. | A: add a store; B: keep CLI/request-only for now. | Needs maintainer decision before documenting as settled. |
 | How much of `phase3_harness.py` should become reusable analysis library code? | The file owns many PDF/render/diagnostic helpers. | A: keep as harness-local; B: extract evidence analyzers. | Keep local until reuse pressure is concrete. |
 
 ## 14. Change log
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-06 | Added certificate catalog and signing-material resolver architecture. | Reflected schema model alignment Slice 2 implementation. |
 | 2026-04-30 | Replaced skeleton with first-pass architecture map. | Documented current repository structure, contracts, flows, persistence, tests, debts, and open questions from code inspection. |
 | 2026-04-30 | Created architecture document skeleton. | Establish canonical architecture documentation path referenced by agent instructions. |

@@ -3,7 +3,11 @@ import pytest
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.schemas import (
     AppearanceProfile,
+    CertificateCatalog,
+    CertificateConfiguration,
     ConfigValidationError,
+    ManagedCertificate,
+    ManagedCertificateSubjectSummary,
     PlacementProfile,
     SignaturePreset,
     SignaturePresetCatalog,
@@ -12,6 +16,9 @@ from foliaseal.infra.config.schemas import (
 )
 from tests.support.phase3_builders import (
     build_appearance_profile,
+    build_certificate_catalog,
+    build_certificate_configuration,
+    build_managed_certificate,
     build_placement_profile,
     build_reference_signature_preset,
     build_signature_appearance,
@@ -63,6 +70,96 @@ def test_timestamp_policy_round_trip() -> None:
     reconstructed = TimestampPolicy.from_dict(payload)
 
     assert reconstructed == original
+
+
+def test_managed_certificate_round_trip() -> None:
+    original = build_managed_certificate()
+
+    payload = original.to_dict()
+    reconstructed = ManagedCertificate.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["managed_certificate_id"] == "managed-cert-default"
+    assert payload["storage_filename"] == "cert_default.p12"
+    assert payload["subject_summary"]["common_name"] == "Morgan Ellery"
+
+
+def test_managed_certificate_subject_summary_round_trip_allows_missing_fields() -> None:
+    original = ManagedCertificateSubjectSummary(
+        common_name="Morgan Ellery",
+        email=None,
+        title=None,
+        company="Northwind Ledger Holdings",
+    )
+
+    payload = original.to_dict()
+    reconstructed = ManagedCertificateSubjectSummary.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["email"] is None
+    assert payload["title"] is None
+
+
+def test_managed_certificate_rejects_path_like_storage_filename() -> None:
+    with pytest.raises(ConfigValidationError, match="storage_filename"):
+        build_managed_certificate(storage_filename="../secret.p12")
+
+
+def test_certificate_configuration_round_trip_without_plain_password() -> None:
+    original = build_certificate_configuration(
+        save_password=True,
+        password_secret_ref="secret://foliaseal/cert-config-default",
+    )
+
+    payload = original.to_dict()
+    reconstructed = CertificateConfiguration.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["save_password"] is True
+    assert payload["password_secret_ref"] == "secret://foliaseal/cert-config-default"
+    assert "password" not in payload
+    assert "passphrase" not in payload
+
+
+def test_certificate_configuration_rejects_saved_password_without_secret_ref() -> None:
+    with pytest.raises(ConfigValidationError, match="password_secret_ref"):
+        build_certificate_configuration(save_password=True, password_secret_ref=None)
+
+
+def test_certificate_catalog_round_trip_and_lookup() -> None:
+    original = build_certificate_catalog()
+
+    payload = original.to_dict()
+    reconstructed = CertificateCatalog.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["managed_certificates"][0]["display_name"] == "Board Secretary 2026"
+    assert payload["certificate_configurations"][0]["display_name"] == (
+        "Corporate Records Signing"
+    )
+    configuration = reconstructed.configuration_named("Corporate Records Signing")
+    assert configuration.managed_certificate_id == "managed-cert-default"
+    assert reconstructed.managed_certificate_by_id("managed-cert-default").storage_filename == (
+        "cert_default.p12"
+    )
+
+
+def test_certificate_catalog_rejects_duplicate_configuration_names() -> None:
+    with pytest.raises(ConfigValidationError, match="duplicate names"):
+        CertificateCatalog(
+            schema_version=1,
+            managed_certificates=(build_managed_certificate(),),
+            certificate_configurations=(
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-a",
+                    display_name="Corporate Records Signing",
+                ),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-b",
+                    display_name="Corporate Records Signing",
+                ),
+            ),
+        )
 
 
 def test_appearance_profile_round_trip() -> None:
