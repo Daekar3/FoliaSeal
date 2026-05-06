@@ -127,7 +127,7 @@ The canonical repository document split is:
 - Does not own: visible-signature text/metadata semantics, Qt controls, pyHanko signing execution, persisted profile store.
 - Key collaborators: domain models, coordinate transforms, visible signature semantics service, visible signature layout engine, signing backend for canonical pyHanko style.
 - Main entry points: `SigningDraftWorkflow.preview()`, `SigningDraftWorkflow.to_signing_request()`, `render_signing_preview()`, `render_canonical_signature_preview()`, `compare_preview_to_request()`.
-- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read from PKCS#12 when available; the workflow also imports `SignaturePreset` from infra config, so the application layer currently knows a persistence DTO.
+- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read from PKCS#12 when available; the workflow also imports `ResolvedSignaturePreset` from infra config, so the application layer still knows a transitional persistence DTO.
 - Status: Confirmed by code; infra DTO dependency is debt/needs review.
 
 ### Viewer workflow and coordinate geometry
@@ -273,7 +273,7 @@ The canonical repository document split is:
 - Consumer: Qt signing shell/profile controls and future launches.
 - Stability: Persisted file contract.
 - Storage path: `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Signature Profiles/profiles.json`.
-- Format: JSON object with `schema_version` and `profiles`; profiles include `schema_version`, `name`, `appearance`, and optional `placement_defaults`.
+- Format: JSON object with `schema_version`, `appearance_profiles`, `placement_profiles`, and `signature_presets`. `SignaturePreset` entries are reference-only and point to appearance/placement profile ids.
 - Validation: `SignaturePresetCatalog.from_dict()` and nested schema constructors reject malformed shape/types/duplicates.
 - Error behavior: missing or blank file loads as empty catalog; invalid JSON raises `ConfigValidationError`.
 - Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`.
@@ -341,7 +341,7 @@ The canonical repository document split is:
 
 1. Qt shell loads `SignaturePresetCatalogStore.default()`.
 2. `load_catalog()` returns empty catalog if no file exists.
-3. Saving creates or replaces a `SignaturePreset` in `SignaturePresetCatalog`.
+3. Saving creates or replaces a resolved preset, which stores separate `AppearanceProfile`, optional `PlacementProfile`, and reference-only `SignaturePreset` entries in `SignaturePresetCatalog`.
 4. Store writes indented sorted JSON to a `.tmp` file and replaces `profiles.json`.
 5. Delete rewrites the catalog without the named profile.
 
@@ -359,7 +359,7 @@ The canonical repository document split is:
 | Input PDF | User CLI/GUI path | rendered for viewer; signed by pyHanko; inspected for certification/version | Original file remains at user path | PDF | Signing output must not target same resolved path. |
 | Signed PDF output | pyHanko backend bytes | atomic temp-file replace | User-provided output path | PDF | `SigningResult` reports PDF version, signature subfilter, timestamp metadata. |
 | PKCS#12 certificate | User path/passphrase | validated/loaded by pyHanko/cryptography | Not persisted by app | PKCS#12 | Passphrase can appear in CLI history for harness commands; README warns about this. |
-| Signature profiles | Qt shell/user input | domain appearance -> config schema -> JSON | XDG data dir under `FoliaSeal/Signature Profiles/profiles.json` | `SignaturePresetCatalog` JSON | Missing/blank catalog becomes empty. |
+| Reusable signing profiles | Qt shell/user input | domain appearance/placement -> split config schema -> JSON | XDG data dir under `FoliaSeal/Signature Profiles/profiles.json` | `SignaturePresetCatalog` JSON with appearance, placement, and preset lists | Missing/blank catalog becomes empty. |
 | Trust profile/timestamp policy | Config schema callers | JSON dicts <-> dataclasses -> runtime trust policy | Needs review | JSON schema in `infra/config/schemas.py` | Storage location outside profile catalog is not yet clearly documented in code. |
 | Viewer render buffers | Render backend | PDF page -> RGBA bytes | Memory; optional render cache | `RenderPageResult` | Cache is in-memory LRU keyed by path/page/zoom. |
 | Preview artifacts | Qt harness/matrix | widget/canonical preview capture, overlays, diagnostics | `artifacts/` run directories | PNG/JSON/markdown | Generated run outputs are mostly ignored. |
