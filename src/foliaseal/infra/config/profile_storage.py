@@ -1,4 +1,4 @@
-"""Persistent storage helpers for named signature appearance profiles."""
+"""Persistent storage helpers for reusable signature preset catalogs."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ PROFILE_CATALOG_FILENAME = "profiles.json"
 
 
 def default_signature_profiles_directory(app_name: str = "FoliaSeal") -> Path:
-    """Return the default user-visible storage directory for signature profiles."""
+    """Return the historical user-visible storage directory for signature presets."""
     data_home = os.environ.get("XDG_DATA_HOME")
     base_dir = Path(data_home) if data_home else Path.home() / ".local" / "share"
     return base_dir / app_name / PROFILE_DIRECTORY_NAME
@@ -26,7 +26,7 @@ def default_signature_profiles_directory(app_name: str = "FoliaSeal") -> Path:
 
 @dataclass(frozen=True)
 class SignaturePresetCatalogStore:
-    """Read/write helper for the named profile catalog on disk."""
+    """Read/write helper for the signature preset catalog on disk."""
 
     storage_dir: Path
     catalog_filename: str = PROFILE_CATALOG_FILENAME
@@ -43,7 +43,7 @@ class SignaturePresetCatalogStore:
 
     @classmethod
     def default(cls, app_name: str = "FoliaSeal") -> SignaturePresetCatalogStore:
-        """Build a store rooted in the standard user-visible profile directory."""
+        """Build a store rooted in the standard user-visible preset directory."""
         return cls(storage_dir=default_signature_profiles_directory(app_name=app_name))
 
     def load_catalog(self) -> SignaturePresetCatalog:
@@ -60,10 +60,10 @@ class SignaturePresetCatalogStore:
             payload = json.loads(payload_text)
         except json.JSONDecodeError as exc:
             raise ConfigValidationError(
-                f"Profile catalog at '{path}' is not valid JSON."
+                f"Signature preset catalog at '{path}' is not valid JSON."
             ) from exc
         if not isinstance(payload, dict):
-            raise ConfigValidationError("Profile catalog must be a JSON object.")
+            raise ConfigValidationError("Signature preset catalog must be a JSON object.")
         return SignaturePresetCatalog.from_dict(payload)
 
     def save_catalog(self, catalog: SignaturePresetCatalog) -> None:
@@ -76,16 +76,24 @@ class SignaturePresetCatalogStore:
         temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
         temp_path.replace(self.catalog_path)
 
-    def save_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
-        """Upsert a profile and persist the resulting catalog."""
-        if not isinstance(profile, ResolvedSignaturePreset):
-            raise ConfigValidationError("profile must be a ResolvedSignaturePreset value.")
-        catalog = self.load_catalog().upsert_profile(profile)
+    def save_preset(self, preset: ResolvedSignaturePreset) -> SignaturePresetCatalog:
+        """Upsert a resolved signature preset and persist the resulting catalog."""
+        if not isinstance(preset, ResolvedSignaturePreset):
+            raise ConfigValidationError("preset must be a ResolvedSignaturePreset value.")
+        catalog = self.load_catalog().upsert_preset(preset)
         self.save_catalog(catalog)
         return catalog
 
-    def delete_profile(self, name: str) -> SignaturePresetCatalog:
-        """Remove a profile by name and persist the resulting catalog."""
-        catalog = self.load_catalog().remove_profile(name)
+    def delete_preset(self, name: str) -> SignaturePresetCatalog:
+        """Remove a signature preset by name and persist the resulting catalog."""
+        catalog = self.load_catalog().remove_preset(name)
         self.save_catalog(catalog)
         return catalog
+
+    def save_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.save_preset(profile)
+
+    def delete_profile(self, name: str) -> SignaturePresetCatalog:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.delete_preset(name)

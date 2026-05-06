@@ -479,19 +479,6 @@ def test_workflow_can_capture_and_apply_signature_setup(tmp_path: Path) -> None:
     assert workflow.selected_placement_profile_id == "placement-team-standard"
 
 
-def test_workflow_keeps_compatibility_aliases_for_profile_methods(tmp_path: Path) -> None:
-    workflow = _workflow(tmp_path)
-    appearance = _appearance()
-    workflow.set_signature_appearance(appearance)
-
-    captured = workflow.capture_signature_preset("Team Standard")
-    workflow.clear_signature_appearance()
-    workflow.apply_signature_preset(captured)
-
-    assert workflow.current_signature_appearance == appearance
-    assert workflow.selected_signature_preset_id == "preset-team-standard"
-
-
 def test_workflow_captures_placement_defaults_from_current_rectangle(
     tmp_path: Path,
 ) -> None:

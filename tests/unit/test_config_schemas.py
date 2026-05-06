@@ -251,8 +251,8 @@ def test_signature_preset_catalog_round_trip() -> None:
     reconstructed = SignaturePresetCatalog.from_dict(payload)
 
     assert reconstructed == original
-    assert original.profile_names() == ("Default", "Compact")
-    assert original.profile_named("Compact").name == "Compact"
+    assert original.preset_names() == ("Default", "Compact")
+    assert original.preset_named("Compact").name == "Compact"
     assert payload["signature_presets"][0]["display_name"] == "Default"
     assert payload["appearance_profiles"][0]["display_name"] == "Default"
     assert payload["placement_profiles"][0]["display_name"] == "Default"
@@ -267,11 +267,11 @@ def test_signature_preset_catalog_upserts_by_name() -> None:
         ),
     )
 
-    updated = original.upsert_profile(replacement)
+    updated = original.upsert_preset(replacement)
 
-    assert updated.profile_names() == ("Default",)
-    assert updated.profile_named("Default").appearance == replacement.appearance
-    assert updated.profile_names() == ("Default",)
+    assert updated.preset_names() == ("Default",)
+    assert updated.preset_named("Default").appearance == replacement.appearance
+    assert updated.preset_names() == ("Default",)
 
 
 def test_signature_preset_catalog_removes_by_name() -> None:
@@ -282,9 +282,9 @@ def test_signature_preset_catalog_removes_by_name() -> None:
         )
     )
 
-    updated = original.remove_profile("Default")
+    updated = original.remove_preset("Default")
 
-    assert updated.profile_names() == ("Compact",)
+    assert updated.preset_names() == ("Compact",)
 
 
 def test_signature_preset_catalog_rejects_duplicate_names() -> None:

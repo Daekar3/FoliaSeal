@@ -1223,17 +1223,25 @@ class SignaturePresetCatalog:
             "signature_presets": [preset.to_dict() for preset in self.signature_presets],
         }
 
-    def profile_names(self) -> tuple[str, ...]:
+    def preset_names(self) -> tuple[str, ...]:
         """Return preset display names in stable dropdown order."""
         return tuple(preset.display_name for preset in self.signature_presets)
 
-    def profile_named(self, name: str) -> ResolvedSignaturePreset:
+    def preset_named(self, name: str) -> ResolvedSignaturePreset:
         """Return a resolved preset by its user-visible name."""
         normalized_name = _require_non_empty_str_value(name, "name")
         for preset in self.signature_presets:
             if preset.display_name == normalized_name:
                 return self.resolve_preset(preset)
         raise KeyError(normalized_name)
+
+    def profile_names(self) -> tuple[str, ...]:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.preset_names()
+
+    def profile_named(self, name: str) -> ResolvedSignaturePreset:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.preset_named(name)
 
     def appearance_profile_named(self, name: str) -> AppearanceProfile:
         """Return an appearance profile by display name."""
@@ -1277,43 +1285,47 @@ class SignaturePresetCatalog:
                 return profile
         raise KeyError(profile_id)
 
-    def upsert_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
+    def upsert_preset(self, preset: ResolvedSignaturePreset) -> SignaturePresetCatalog:
         """Return a new catalog with a resolved preset inserted or replaced by name."""
-        if not isinstance(profile, ResolvedSignaturePreset):
-            raise ConfigValidationError("profile must be a ResolvedSignaturePreset value.")
+        if not isinstance(preset, ResolvedSignaturePreset):
+            raise ConfigValidationError("preset must be a ResolvedSignaturePreset value.")
         appearance_profiles = list(self.appearance_profiles)
         placement_profiles = list(self.placement_profiles)
         signature_presets = list(self.signature_presets)
 
-        if profile.appearance_profile is not None:
+        if preset.appearance_profile is not None:
             appearance_profiles = self._upsert_by_id(
                 appearance_profiles,
-                profile.appearance_profile,
+                preset.appearance_profile,
                 "appearance_profile_id",
             )
-        if profile.placement_profile is not None:
+        if preset.placement_profile is not None:
             placement_profiles = self._upsert_by_id(
                 placement_profiles,
-                profile.placement_profile,
+                preset.placement_profile,
                 "placement_profile_id",
             )
 
         replaced = False
         updated_presets: list[SignaturePreset] = []
         for existing in signature_presets:
-            if existing.display_name == profile.name:
-                updated_presets.append(profile.preset)
+            if existing.display_name == preset.name:
+                updated_presets.append(preset.preset)
                 replaced = True
             else:
                 updated_presets.append(existing)
         if not replaced:
-            updated_presets.append(profile.preset)
+            updated_presets.append(preset.preset)
         return SignaturePresetCatalog(
             schema_version=self.schema_version,
             appearance_profiles=tuple(appearance_profiles),
             placement_profiles=tuple(placement_profiles),
             signature_presets=tuple(updated_presets),
         )
+
+    def upsert_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.upsert_preset(profile)
 
     @staticmethod
     def _upsert_by_id(values: list[Any], replacement: Any, id_field_name: str) -> list[Any]:
@@ -1330,7 +1342,7 @@ class SignaturePresetCatalog:
             updated.append(replacement)
         return updated
 
-    def remove_profile(self, name: str) -> SignaturePresetCatalog:
+    def remove_preset(self, name: str) -> SignaturePresetCatalog:
         """Return a new catalog without the named preset."""
         normalized_name = _require_non_empty_str_value(name, "name")
         preset_to_remove: SignaturePreset | None = None
@@ -1370,3 +1382,7 @@ class SignaturePresetCatalog:
             placement_profiles=placement_profiles,
             signature_presets=tuple(updated_presets),
         )
+
+    def remove_profile(self, name: str) -> SignaturePresetCatalog:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.remove_preset(name)

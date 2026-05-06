@@ -28,7 +28,7 @@ def test_signature_preset_catalog_store_loads_empty_when_missing(tmp_path: Path)
     catalog = store.load_catalog()
 
     assert catalog.schema_version == 1
-    assert catalog.profile_names() == ()
+    assert catalog.preset_names() == ()
 
 
 def test_signature_preset_catalog_store_saves_and_reloads_human_readable_json(
@@ -50,23 +50,23 @@ def test_signature_preset_catalog_store_saves_and_reloads_human_readable_json(
     reloaded = store.load_catalog()
 
     assert reloaded == original
-    assert reloaded.profile_names() == ("Default", "Compact")
+    assert reloaded.preset_names() == ("Default", "Compact")
 
 
-def test_signature_preset_catalog_store_upserts_and_deletes_profiles(tmp_path: Path) -> None:
+def test_signature_preset_catalog_store_deletes_presets(tmp_path: Path) -> None:
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
     original = build_signature_preset_catalog()
     store.save_catalog(original)
 
-    removed = store.delete_profile("Compact")
+    removed = store.delete_preset("Compact")
 
-    assert removed.profile_names() == ("Default",)
-    assert store.load_catalog().profile_names() == ("Default",)
+    assert removed.preset_names() == ("Default",)
+    assert store.load_catalog().preset_names() == ("Default",)
 
-    removed = store.delete_profile("Default")
+    removed = store.delete_preset("Default")
 
-    assert removed.profile_names() == ()
-    assert store.load_catalog().profile_names() == ()
+    assert removed.preset_names() == ()
+    assert store.load_catalog().preset_names() == ()
 
 
 def test_signature_preset_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:

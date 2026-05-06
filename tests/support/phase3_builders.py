@@ -199,7 +199,7 @@ def build_signature_preset_catalog(
             ),
         ),
     ):
-        catalog = catalog.upsert_profile(profile)
+        catalog = catalog.upsert_preset(profile)
     return catalog
 
 

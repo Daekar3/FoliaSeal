@@ -35,7 +35,7 @@ def test_phase3_builders_produce_consistent_valid_contracts(tmp_path: Path) -> N
         width_pt=220.0,
         height_pt=80.0,
     )
-    assert catalog.profile_names() == ("default",)
+    assert catalog.preset_names() == ("default",)
     assert request.signature_rect == rect
     assert request.signature_appearance == appearance
 

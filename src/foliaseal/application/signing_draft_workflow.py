@@ -303,7 +303,9 @@ class SigningDraftWorkflow:
     ) -> ResolvedSignaturePreset:
         """Capture the current setup as a resolved reusable signature preset."""
         if self.signature_appearance is None:
-            raise ValueError("A signature appearance must exist before saving a profile.")
+            raise ValueError(
+                "A signature appearance must exist before saving a signature preset."
+            )
 
         effective_placement_defaults = placement_defaults
         if effective_placement_defaults is None:
@@ -346,24 +348,6 @@ class SigningDraftWorkflow:
         self.certificate_alias = signing_material.certificate_alias
         self._certificate_preview_values = None
         self._certificate_preview_available = False
-
-    def capture_signature_preset(
-        self,
-        name: str,
-        *,
-        schema_version: int = 1,
-        placement_defaults: SignaturePlacementDefaults | None = None,
-    ) -> ResolvedSignaturePreset:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.capture_current_signature_setup(
-            name,
-            schema_version=schema_version,
-            placement_defaults=placement_defaults,
-        )
-
-    def apply_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
-        """Compatibility alias for older profile-oriented call sites."""
-        self.apply_resolved_signature_preset(preset)
 
     def validation_issues(self) -> tuple[SigningDraftValidationIssue, ...]:
         """Return blocking and non-blocking problems for the current draft."""

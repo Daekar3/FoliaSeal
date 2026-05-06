@@ -1859,7 +1859,7 @@ def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
     assert font_combo._items.count("Custom Font") == 1
 
 
-def test_signing_shell_named_profile_save_and_reload_round_trip(
+def test_signing_shell_signature_preset_save_and_reload_round_trip(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1883,17 +1883,17 @@ def test_signing_shell_named_profile_save_and_reload_round_trip(
     )
 
     panel = widget.properties_panel
-    panel._profile_controls.profile_name.setText("My Profile")
+    panel._signature_preset_controls.preset_name.setText("My Preset")
     panel._appearance_controls.signer_label_prefix.setText("Signed by Me")
     panel._appearance_controls.show_field_names.setChecked(True)
     panel._placement_controls.width_spin.setValue(144.0)
     panel._placement_controls.height_spin.setValue(36.0)
-    panel._profile_controls.save_button.click()
+    panel._signature_preset_controls.save_button.click()
 
-    assert panel._profile_catalog.profile_names()[-1] == "My Profile"
-    assert panel._profile_controls.profile_combo.currentText() == "My Profile"
-    assert panel._profile_controls.profile_name.text() == "My Profile"
-    assert panel._profile_catalog.profile_named("My Profile").placement_defaults == (
+    assert panel._preset_catalog.preset_names()[-1] == "My Preset"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "My Preset"
+    assert panel._signature_preset_controls.preset_name.text() == "My Preset"
+    assert panel._preset_catalog.preset_named("My Preset").placement_defaults == (
         SignaturePlacementDefaults(
             width_pt=144.0,
             height_pt=36.0,
@@ -1901,9 +1901,12 @@ def test_signing_shell_named_profile_save_and_reload_round_trip(
     )
 
     panel._appearance_controls.signer_label_prefix.setText("Temporary Draft")
-    assert panel._profile_controls.profile_combo.currentText() == "Current draft"
+    assert (
+        panel._signature_preset_controls.preset_combo.currentText()
+        == "Current signature setup"
+    )
 
-    panel._profile_controls.profile_combo.setCurrentText("My Profile")
+    panel._signature_preset_controls.preset_combo.setCurrentText("My Preset")
 
     assert panel._appearance_controls.signer_label_prefix.text() == "Signed by Me"
     assert panel._appearance_controls.show_field_names.isChecked() is True
@@ -1917,12 +1920,19 @@ def test_signing_shell_named_profile_save_and_reload_round_trip(
     )
     relaunch_panel = relaunch_widget.properties_panel
 
-    assert relaunch_panel._profile_catalog.profile_names() == ("Default", "Compact", "My Profile")
-    assert relaunch_panel._profile_controls.profile_combo.findText("My Profile") != -1
-    assert relaunch_panel._profile_controls.profile_combo.currentText() == "Current draft"
+    assert relaunch_panel._preset_catalog.preset_names() == (
+        "Default",
+        "Compact",
+        "My Preset",
+    )
+    assert relaunch_panel._signature_preset_controls.preset_combo.findText("My Preset") != -1
+    assert (
+        relaunch_panel._signature_preset_controls.preset_combo.currentText()
+        == "Current signature setup"
+    )
 
 
-def test_signing_shell_named_profile_save_without_name_reports_error(
+def test_signing_shell_signature_preset_save_without_name_reports_error(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1947,20 +1957,20 @@ def test_signing_shell_named_profile_save_without_name_reports_error(
     )
 
     panel = widget.properties_panel
-    panel._profile_controls.profile_name.setText("")
+    panel._signature_preset_controls.preset_name.setText("")
 
-    result = panel.save_current_profile()
+    result = panel.save_current_signature_preset()
 
     assert result is None
     assert errors == []
-    assert store.load_catalog().profile_names() == ()
+    assert store.load_catalog().preset_names() == ()
     assert fake_bindings.q_message_box.calls[-1][1:] == (
-        "Profile error",
-        "Profile name is required before saving.",
+        "Signature preset error",
+        "Preset name is required before saving.",
     )
 
 
-def test_signing_shell_named_profile_selection_restores_placement_defaults_without_forcing_rect(
+def test_signing_shell_signature_preset_selection_restores_placement_defaults_without_forcing_rect(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -1991,15 +2001,15 @@ def test_signing_shell_named_profile_selection_restores_placement_defaults_witho
     panel = widget.properties_panel
     assert widget._signing_workspace._draft_workflow.signature_rect is None
 
-    panel._profile_controls.profile_combo.setCurrentText("Compact")
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
 
-    assert panel._profile_controls.profile_name.text() == "Compact"
+    assert panel._signature_preset_controls.preset_name.text() == "Compact"
     assert panel._placement_controls.width_spin.value() == 144.0
     assert panel._placement_controls.height_spin.value() == 36.0
     assert widget._signing_workspace._draft_workflow.signature_rect is None
 
 
-def test_signing_shell_named_profile_delete_can_be_canceled_and_keeps_profile(
+def test_signing_shell_signature_preset_delete_can_be_canceled_and_keeps_preset(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2024,18 +2034,18 @@ def test_signing_shell_named_profile_delete_can_be_canceled_and_keeps_profile(
     )
 
     panel = widget.properties_panel
-    panel._profile_controls.profile_combo.setCurrentText("Compact")
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
     fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.No
 
-    result = panel.delete_current_profile()
+    result = panel.delete_current_signature_preset()
 
     assert result is None
-    assert store.load_catalog().profile_names() == ("Default", "Compact")
-    assert panel._profile_controls.profile_combo.currentText() == "Compact"
-    assert panel._profile_catalog.profile_names() == ("Default", "Compact")
+    assert store.load_catalog().preset_names() == ("Default", "Compact")
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
+    assert panel._preset_catalog.preset_names() == ("Default", "Compact")
 
 
-def test_signing_shell_named_profile_delete_requires_confirmation_and_refreshes_catalog(
+def test_signing_shell_signature_preset_delete_requires_confirmation_and_refreshes_catalog(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2060,17 +2070,20 @@ def test_signing_shell_named_profile_delete_requires_confirmation_and_refreshes_
     )
 
     panel = widget.properties_panel
-    panel._profile_controls.profile_combo.setCurrentText("Compact")
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
     fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.Yes
 
-    result = panel.delete_current_profile()
+    result = panel.delete_current_signature_preset()
 
     assert result is not None
-    assert result.profile_names() == ("Default",)
-    assert store.load_catalog().profile_names() == ("Default",)
-    assert panel._profile_controls.profile_combo.currentText() == "Current draft"
-    assert panel._profile_catalog.profile_names() == ("Default",)
-    assert panel._profile_controls.profile_combo.findText("Compact") == -1
+    assert result.preset_names() == ("Default",)
+    assert store.load_catalog().preset_names() == ("Default",)
+    assert (
+        panel._signature_preset_controls.preset_combo.currentText()
+        == "Current signature setup"
+    )
+    assert panel._preset_catalog.preset_names() == ("Default",)
+    assert panel._signature_preset_controls.preset_combo.findText("Compact") == -1
 
     relaunched_widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
@@ -2079,11 +2092,11 @@ def test_signing_shell_named_profile_delete_requires_confirmation_and_refreshes_
     )
     relaunched_panel = relaunched_widget.properties_panel
 
-    assert relaunched_panel._profile_catalog.profile_names() == ("Default",)
-    assert relaunched_panel._profile_controls.profile_combo.findText("Compact") == -1
+    assert relaunched_panel._preset_catalog.preset_names() == ("Default",)
+    assert relaunched_panel._signature_preset_controls.preset_combo.findText("Compact") == -1
 
 
-def test_signing_shell_named_profile_overwrite_requires_confirmation(
+def test_signing_shell_signature_preset_overwrite_requires_confirmation(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2111,24 +2124,24 @@ def test_signing_shell_named_profile_overwrite_requires_confirmation(
 
     panel = widget.properties_panel
     panel._appearance_controls.signer_label_prefix.setText("Signed by Current Draft")
-    panel._profile_controls.profile_name.setText("Team Standard")
+    panel._signature_preset_controls.preset_name.setText("Team Standard")
 
     fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.No
-    result = panel.save_current_profile()
+    result = panel.save_current_signature_preset()
 
     assert result is None
     assert fake_bindings.q_message_box.calls
-    assert panel._profile_catalog.profile_named("Team Standard").appearance == existing.appearance
+    assert panel._preset_catalog.preset_named("Team Standard").appearance == existing.appearance
 
     fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.Yes
-    result = panel.save_current_profile()
+    result = panel.save_current_signature_preset()
 
     assert result is not None
     assert result.name == "Team Standard"
-    assert panel._profile_catalog.profile_named("Team Standard").appearance.signer_label_prefix == (
+    assert panel._preset_catalog.preset_named("Team Standard").appearance.signer_label_prefix == (
         "Signed by Current Draft"
     )
-    assert panel._profile_controls.profile_combo.currentText() == "Team Standard"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Team Standard"
 
 
 def test_signing_shell_warning_only_issue_keeps_readiness_enabled(

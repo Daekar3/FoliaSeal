@@ -79,7 +79,7 @@ SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
     SignatureFieldKey.LOCATION,
 )
 
-PROFILE_PLACEHOLDER = "Current draft"
+SIGNATURE_PRESET_PLACEHOLDER = "Current signature setup"
 CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Current certificate"
 _PREVIEW_FONTS_REGISTERED = False
 
@@ -120,12 +120,12 @@ class FieldControls:
 
 
 @dataclass(frozen=True)
-class ProfileControls:
-    """Controls used to manage named appearance profiles."""
+class SignaturePresetControls:
+    """Controls used to manage reusable signature presets."""
 
     container: Any
-    profile_combo: Any
-    profile_name: Any
+    preset_combo: Any
+    preset_name: Any
     save_button: Any
     delete_button: Any
 
@@ -1192,16 +1192,16 @@ class SignaturePropertiesPanel:
             secret_provider=certificate_secret_provider,
         )
         self._selected_certificate_configuration_name: str | None = None
-        self._profile_catalog_store = preset_catalog_store
+        self._preset_catalog_store = preset_catalog_store
         if preset_catalog is not None:
-            self._profile_catalog = preset_catalog
+            self._preset_catalog = preset_catalog
         elif preset_catalog_store is not None:
-            self._profile_catalog = preset_catalog_store.load_catalog()
+            self._preset_catalog = preset_catalog_store.load_catalog()
         else:
-            self._profile_catalog = SignaturePresetCatalog(
+            self._preset_catalog = SignaturePresetCatalog(
                 schema_version=1,
             )
-        self._selected_profile_name: str | None = None
+        self._selected_signature_preset_name: str | None = None
         self._on_change = on_change
         self._on_page_change = on_page_change
         self._on_error = on_error
@@ -1214,7 +1214,8 @@ class SignaturePropertiesPanel:
         self._layout.setContentsMargins(8, 8, 8, 8)
 
         self._certificate_controls = self._build_certificate_configuration_controls()
-        self._profile_controls = self._build_profile_controls()
+        self._signature_preset_controls = self._build_signature_preset_controls()
+        self._profile_controls = self._signature_preset_controls
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
@@ -1225,7 +1226,7 @@ class SignaturePropertiesPanel:
             self._validation_label.setWordWrap(True)
 
         self._layout.addWidget(self._certificate_controls.container)
-        self._layout.addWidget(self._profile_controls.container)
+        self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
         self._layout.addWidget(self._appearance_controls.show_field_names)
@@ -1281,7 +1282,7 @@ class SignaturePropertiesPanel:
         self._suspend_updates = True
         try:
             self._load_certificate_configuration_controls()
-            self._load_profile_controls()
+            self._load_signature_preset_controls()
             self._load_placement_controls()
             self._load_appearance_controls()
             self._load_field_controls()
@@ -1439,23 +1440,23 @@ class SignaturePropertiesPanel:
 
     def set_signature_appearance(self, signature_appearance: SignatureAppearance | None) -> None:
         self._workflow.set_signature_appearance(signature_appearance)
-        self._selected_profile_name = None
+        self._selected_signature_preset_name = None
         self.load_from_workflow()
         self._notify_change()
 
-    def save_current_profile(self) -> ResolvedSignaturePreset | None:
-        name = _text(self._profile_controls.profile_name).strip()
+    def save_current_signature_preset(self) -> ResolvedSignaturePreset | None:
+        name = _text(self._signature_preset_controls.preset_name).strip()
         if not name:
-            self._show_profile_error("Profile name is required before saving.")
+            self._show_signature_preset_error("Preset name is required before saving.")
             return None
 
         try:
             preset = self._workflow.capture_current_signature_setup(name)
         except ValueError as exc:
-            self._show_profile_error(str(exc))
+            self._show_signature_preset_error(str(exc))
             return None
         try:
-            existing = self._profile_catalog.profile_named(name)
+            existing = self._preset_catalog.preset_named(name)
         except KeyError:
             existing = None
 
@@ -1467,35 +1468,37 @@ class SignaturePropertiesPanel:
                 yes_value = getattr(standard_button, "Yes", None)
             result = message_box.question(
                 self.widget,
-                "Overwrite profile?",
-                f"Profile '{name}' already exists. Overwrite it?",
+                "Overwrite signature preset?",
+                f"Signature preset '{name}' already exists. Overwrite it?",
             )
             if result != yes_value:
                 return None
 
-        self._profile_catalog = self._profile_catalog.upsert_profile(preset)
-        if self._profile_catalog_store is not None:
-            self._profile_catalog_store.save_profile(preset)
-        self._selected_profile_name = preset.name
+        self._preset_catalog = self._preset_catalog.upsert_preset(preset)
+        if self._preset_catalog_store is not None:
+            self._preset_catalog_store.save_preset(preset)
+        self._selected_signature_preset_name = preset.name
         self._suspend_updates = True
         try:
-            self._reload_profile_controls(selected_name=preset.name)
+            self._reload_signature_preset_controls(selected_name=preset.name)
         finally:
             self._suspend_updates = False
         self.load_from_workflow()
         self._notify_change()
         return preset
 
-    def delete_current_profile(self) -> SignaturePresetCatalog | None:
-        selected_name = _combo_text(self._profile_controls.profile_combo)
-        if selected_name == PROFILE_PLACEHOLDER or not selected_name.strip():
-            self._show_profile_error("Select a saved profile before deleting it.")
+    def delete_current_signature_preset(self) -> SignaturePresetCatalog | None:
+        selected_name = _combo_text(self._signature_preset_controls.preset_combo)
+        if selected_name == SIGNATURE_PRESET_PLACEHOLDER or not selected_name.strip():
+            self._show_signature_preset_error("Select a signature preset before deleting it.")
             return None
 
         try:
-            self._profile_catalog.profile_named(selected_name)
+            self._preset_catalog.preset_named(selected_name)
         except KeyError:
-            self._show_profile_error(f"Profile '{selected_name}' is not available.")
+            self._show_signature_preset_error(
+                f"Signature preset '{selected_name}' is not available."
+            )
             return None
 
         message_box = self._bindings.q_message_box
@@ -1505,24 +1508,32 @@ class SignaturePropertiesPanel:
             yes_value = getattr(standard_button, "Yes", None)
         result = message_box.question(
             self.widget,
-            "Delete profile?",
-            f"Delete profile '{selected_name}'?",
+            "Delete signature preset?",
+            f"Delete signature preset '{selected_name}'?",
         )
         if result != yes_value:
             return None
 
-        updated_catalog = self._profile_catalog.remove_profile(selected_name)
-        self._profile_catalog = updated_catalog
-        if self._profile_catalog_store is not None:
-            self._profile_catalog_store.delete_profile(selected_name)
-        self._selected_profile_name = None
+        updated_catalog = self._preset_catalog.remove_preset(selected_name)
+        self._preset_catalog = updated_catalog
+        if self._preset_catalog_store is not None:
+            self._preset_catalog_store.delete_preset(selected_name)
+        self._selected_signature_preset_name = None
         self._suspend_updates = True
         try:
-            self._reload_profile_controls(selected_name=None)
+            self._reload_signature_preset_controls(selected_name=None)
         finally:
             self._suspend_updates = False
         self._notify_change()
         return updated_catalog
+
+    def save_current_profile(self) -> ResolvedSignaturePreset | None:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.save_current_signature_preset()
+
+    def delete_current_profile(self) -> SignaturePresetCatalog | None:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.delete_current_signature_preset()
 
     def apply_selected_certificate_configuration(self) -> bool:
         selected_name = _combo_text(self._certificate_controls.configuration_combo)
@@ -1628,41 +1639,48 @@ class SignaturePropertiesPanel:
             height_spin=height_spin,
         )
 
-    def _build_profile_controls(self) -> ProfileControls:
+    def _build_signature_preset_controls(self) -> SignaturePresetControls:
         bindings = self._bindings
-        container = bindings.q_group_box("Named profiles")
+        container = bindings.q_group_box("Signature presets")
         layout = bindings.q_form_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        profile_combo = bindings.q_combo_box()
-        profile_name = bindings.q_line_edit()
-        profile_name.setPlaceholderText("Enter a profile name")
-        save_button = bindings.q_push_button("Save profile")
-        delete_button = bindings.q_push_button("Delete profile")
+        preset_combo = bindings.q_combo_box()
+        preset_name = bindings.q_line_edit()
+        preset_name.setPlaceholderText("Enter a preset name")
+        save_button = bindings.q_push_button("Save preset")
+        delete_button = bindings.q_push_button("Delete preset")
 
-        layout.addRow("Saved profile", profile_combo)
-        layout.addRow("Profile name", profile_name)
+        layout.addRow("Saved preset", preset_combo)
+        layout.addRow("Preset name", preset_name)
         layout.addRow("", _compose_row(bindings, save_button, delete_button))
 
-        profile_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
-            lambda _text: self._on_profile_selected()
+        preset_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
+            lambda _text: self._on_signature_preset_selected()
         )
-        index_changed = getattr(profile_combo, "currentIndexChanged", None)
+        index_changed = getattr(preset_combo, "currentIndexChanged", None)
         if hasattr(index_changed, "connect"):
             index_changed.connect(  # type: ignore[attr-defined]
-                lambda _index: self._on_profile_selected()
+                lambda _index: self._on_signature_preset_selected()
             )
-        save_button.clicked.connect(self.save_current_profile)  # type: ignore[attr-defined]
-        delete_button.clicked.connect(self.delete_current_profile)  # type: ignore[attr-defined]
+        save_button.clicked.connect(  # type: ignore[attr-defined]
+            self.save_current_signature_preset
+        )
+        delete_button.clicked.connect(  # type: ignore[attr-defined]
+            self.delete_current_signature_preset
+        )
 
-        return ProfileControls(
+        controls = SignaturePresetControls(
             container=container,
-            profile_combo=profile_combo,
-            profile_name=profile_name,
+            preset_combo=preset_combo,
+            preset_name=preset_name,
             save_button=save_button,
             delete_button=delete_button,
         )
+        object.__setattr__(controls, "profile_combo", preset_combo)
+        object.__setattr__(controls, "profile_name", preset_name)
+        return controls
 
     def _build_appearance_controls(self) -> Any:
         bindings = self._bindings
@@ -1975,29 +1993,34 @@ class SignaturePropertiesPanel:
             selected_name=self._selected_certificate_configuration_name
         )
 
-    def _reload_profile_controls(self, *, selected_name: str | None = None) -> None:
-        profile_combo = self._profile_controls.profile_combo
-        clear = getattr(profile_combo, "clear", None)
+    def _reload_signature_preset_controls(
+        self,
+        *,
+        selected_name: str | None = None,
+    ) -> None:
+        preset_combo = self._signature_preset_controls.preset_combo
+        clear = getattr(preset_combo, "clear", None)
         if callable(clear):
             clear()
-        elif hasattr(profile_combo, "_items"):
-            profile_combo._items = []  # type: ignore[attr-defined]
-            profile_combo._current = ""  # type: ignore[attr-defined]
+        elif hasattr(preset_combo, "_items"):
+            preset_combo._items = []  # type: ignore[attr-defined]
+            preset_combo._current = ""  # type: ignore[attr-defined]
 
-        profile_combo.addItem(PROFILE_PLACEHOLDER)
-        profile_combo.addItems(self._profile_catalog.profile_names())
-        current_name = (
-            selected_name if selected_name in self._profile_catalog.profile_names() else None
-        )
-        _set_combo_text(profile_combo, current_name or PROFILE_PLACEHOLDER)
+        preset_combo.addItem(SIGNATURE_PRESET_PLACEHOLDER)
+        preset_names = self._preset_catalog.preset_names()
+        preset_combo.addItems(preset_names)
+        current_name = selected_name if selected_name in preset_names else None
+        _set_combo_text(preset_combo, current_name or SIGNATURE_PRESET_PLACEHOLDER)
         if current_name is None:
-            if not _text(self._profile_controls.profile_name).strip():
-                _set_text(self._profile_controls.profile_name, "")
+            if not _text(self._signature_preset_controls.preset_name).strip():
+                _set_text(self._signature_preset_controls.preset_name, "")
         else:
-            _set_text(self._profile_controls.profile_name, current_name)
+            _set_text(self._signature_preset_controls.preset_name, current_name)
 
-    def _load_profile_controls(self) -> None:
-        self._reload_profile_controls(selected_name=self._selected_profile_name)
+    def _load_signature_preset_controls(self) -> None:
+        self._reload_signature_preset_controls(
+            selected_name=self._selected_signature_preset_name
+        )
 
     def _load_field_controls(self) -> None:
         appearance = self._workflow.signature_appearance or SignatureAppearance()
@@ -2070,35 +2093,39 @@ class SignaturePropertiesPanel:
             override_text=override_text,
         )
 
-    def _on_profile_selected(self) -> None:
+    def _on_signature_preset_selected(self) -> None:
         if self._suspend_updates:
             return
-        selected_name = _combo_text(self._profile_controls.profile_combo)
-        if selected_name == PROFILE_PLACEHOLDER or not selected_name.strip():
-            self._selected_profile_name = None
+        selected_name = _combo_text(self._signature_preset_controls.preset_combo)
+        if selected_name == SIGNATURE_PRESET_PLACEHOLDER or not selected_name.strip():
+            self._selected_signature_preset_name = None
             self._notify_change()
             return
         try:
-            preset = self._profile_catalog.profile_named(selected_name)
+            preset = self._preset_catalog.preset_named(selected_name)
         except KeyError:
-            self._selected_profile_name = None
+            self._selected_signature_preset_name = None
             self._notify_change()
             return
 
-        self._selected_profile_name = preset.name
+        self._selected_signature_preset_name = preset.name
         self._workflow.apply_resolved_signature_preset(preset)
         self.load_from_workflow()
         self._notify_change()
 
-    def _mark_profile_dirty(self) -> None:
-        if self._selected_profile_name is None:
+    def _mark_signature_preset_dirty(self) -> None:
+        if self._selected_signature_preset_name is None:
             return
-        self._selected_profile_name = None
+        self._selected_signature_preset_name = None
         self._suspend_updates = True
         try:
-            self._reload_profile_controls(selected_name=None)
+            self._reload_signature_preset_controls(selected_name=None)
         finally:
             self._suspend_updates = False
+
+    def _mark_profile_dirty(self) -> None:
+        """Compatibility alias for older profile-oriented internal call sites."""
+        self._mark_signature_preset_dirty()
 
     def _build_rect_from_controls(self) -> SignatureRect:
         return SignatureRect(
@@ -2716,12 +2743,16 @@ class SignaturePropertiesPanel:
         if self._on_error is not None:
             self._on_error(message)
 
-    def _show_profile_error(self, message: str) -> None:
+    def _show_signature_preset_error(self, message: str) -> None:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
-            warning(self.widget, "Profile error", message)
+            warning(self.widget, "Signature preset error", message)
             return
         self._emit_error(message)
+
+    def _show_profile_error(self, message: str) -> None:
+        """Compatibility alias for older profile-oriented call sites."""
+        self._show_signature_preset_error(message)
 
     def _show_certificate_configuration_error(self, message: str) -> None:
         self._emit_error(message)

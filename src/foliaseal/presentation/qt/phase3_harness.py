@@ -2599,7 +2599,7 @@ def _apply_preview_matrix_scenario_to_workflow(
     if profile_name is not None:
         if not isinstance(profile_name, str) or not profile_name.strip():
             raise ValueError("Scenario 'profile_name' must be a non-empty string.")
-        preset = catalog.profile_named(profile_name)
+        preset = catalog.preset_named(profile_name)
         base_appearance = preset.appearance
     else:
         base_appearance = workflow.current_signature_appearance or SignatureAppearance()
@@ -2982,7 +2982,7 @@ def _apply_preview_matrix_scenario(
     if profile_name is not None:
         if not isinstance(profile_name, str) or not profile_name.strip():
             raise ValueError("Scenario 'profile_name' must be a non-empty string.")
-        preset = catalog.profile_named(profile_name)
+        preset = catalog.preset_named(profile_name)
         base_appearance = preset.appearance
     else:
         base_appearance = (

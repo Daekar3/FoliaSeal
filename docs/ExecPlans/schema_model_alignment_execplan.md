@@ -25,7 +25,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] (2026-05-06 22:42Z) Implemented Slice 3A: added draft selected-object reference fields, canonical signature setup apply/capture methods, and an injected certificate-preview reader seam.
 - [x] (2026-05-06 23:16Z) Created child ExecPlan for Slice 3B at `docs/ExecPlans/schema_model_alignment_slice3b_certificate_selection_execplan.md`.
 - [x] (2026-05-06 23:27Z) Implemented Slice 3B: wired existing certificate configurations into the Qt signing shell and draft workflow.
-- [ ] Continue Slice 3: reduce remaining profile-terminology compatibility aliases.
+- [x] (2026-05-06 23:02Z) Created child ExecPlan for Slice 3C at `docs/ExecPlans/schema_model_alignment_slice3c_preset_terminology_execplan.md`.
+- [x] (2026-05-06 23:02Z) Implemented Slice 3C: moved primary signature preset catalog/store/shell/test code to preset-oriented names and removed draft workflow profile aliases.
+- [ ] Continue Slice 3: audit whether remaining profile compatibility wrappers can be removed after external callers are checked.
 - [ ] Implement Slice 4: add `AppSettings` persistence and move open/save directory defaults into that store.
 - [ ] Reconcile `docs/ARCHITECTURE.md` with the implementation after each slice lands.
 
@@ -61,6 +63,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - Observation: Certificate selection can be wired without implementing certificate management UI.
   Evidence: Slice 3B passes a `CertificateCatalogStore` into `build_qt_signing_shell()`, resolves a selected `CertificateConfiguration` through `CertificateSigningMaterialResolver`, and applies the resulting runtime material to `SigningDraftWorkflow`.
 
+- Observation: The main preset terminology drift is now compatibility-only rather than primary shell behavior.
+  Evidence: Slice 3C moved the Qt shell to "Signature presets" wording and canonical methods such as `preset_names()`, `preset_named()`, `upsert_preset()`, `save_preset()`, and `delete_preset()`.
+
 ## Decision Log
 
 - Decision: treat the current schema drift as an architecture problem, not just a naming cleanup.
@@ -95,7 +100,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 At plan creation time, the main outcome was clarity rather than code. Slice 1 then split profile persistence into `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset`. Slice 2 added the certificate side of the canonical object model with `ManagedCertificate`, `CertificateConfiguration`, `CertificateCatalog`, `CertificateCatalogStore`, and `CertificateSigningMaterialResolver`.
 
-Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. The remaining work is still implementation-heavy: profile terminology needs cleanup, full certificate management UI is pending, and app settings still need a first-class store. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforce old object ownership, so the refactor must stay staged but deliberate.
+Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. The remaining work is still implementation-heavy: full certificate management UI is pending, old profile compatibility wrappers need eventual removal after external callers are audited, and app settings still need a first-class store. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
 
 ## Context and Orientation
 
