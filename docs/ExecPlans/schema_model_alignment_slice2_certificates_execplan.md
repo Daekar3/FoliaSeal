@@ -23,7 +23,7 @@ The user-visible workflow is not complete certificate management yet. The observ
 - [x] (2026-05-06 22:29Z) Implemented signing-material resolver with a secret-store seam and helpful failure behavior.
 - [x] (2026-05-06 22:30Z) Updated architecture and parent ExecPlan documentation.
 - [x] (2026-05-06 22:32Z) Ran focused validation, lint, and the full test suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-06 22:33Z) Committed the completed slice as `9a384d760 feat: add certificate configuration persistence`.
 
 ## Surprises & Discoveries
 
@@ -127,3 +127,5 @@ Expected new interfaces:
 No new third-party dependency is justified in this slice. A real OS credential store adapter can be added later behind the `CertificateSecretProvider` protocol.
 
 Revision note: updated on 2026-05-06 after implementation to record the certificate catalog, signing-material resolver, documentation updates, and successful validation evidence.
+
+Revision note: updated on 2026-05-06 after commit to record commit `9a384d760` in the progress checklist.
