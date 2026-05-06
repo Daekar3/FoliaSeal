@@ -3,7 +3,7 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -98,7 +98,7 @@ empty title line.
 
 ## Concrete Steps
 
-From the repository root `/home/daekar/SignPDF/Scratch`:
+From the repository root `/home/daekar/FoliaSeal`:
 
 1. Edit `src/foliaseal/presentation/qt/signing_shell.py` to make horizontal `single_line` preview
    wrapping and `preview_text()` reflect the active stamp position.

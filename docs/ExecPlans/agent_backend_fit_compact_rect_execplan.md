@@ -3,7 +3,7 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md` and the repo `Agents.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md` and the repo `Agents.md`.
 
 ## Purpose / Big Picture
 
@@ -126,7 +126,7 @@ Third, add focused tests. At minimum there should be:
 
 ## Concrete Steps
 
-Work from `/home/daekar/SignPDF/Scratch`.
+Work from `/home/daekar/FoliaSeal`.
 
 1. Update `src/foliaseal/application/phase3_signing_backend.py`.
 2. Extend `tests/unit/test_phase3_signing_backend.py` with focused compact-rectangle coverage.

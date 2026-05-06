@@ -17,8 +17,8 @@ The goal of Phase 3 is to deliver the first end-user signing workflow on top of 
 
 Primary requirements source:
 
-- `FR-3`, `FR-3A`, `FR-3B` in `docs/pdf_signing_app_feasibility.md`
-- Phase 3 milestone and exit criteria in `docs/pdf_signing_app_feasibility.md`
+- V1 signing workflow, review workflow, and anti-goals in `docs/SPEC.md`
+- Canonical reusable-object vocabulary in `docs/SCHEMAS.md`
 
 Current implementation baseline:
 
@@ -255,7 +255,7 @@ Historical note:
   - overwrite confirmation,
   - delete with confirmation.
 - Remaining profile portability/completion work now belongs to the smaller post-Phase-3 roadmap
-  slices in `docs/pdf_signing_app_feasibility.md`, not a monolithic old “Phase 4” bucket.
+  slices in `docs/SPEC.md`, not a monolithic old “Phase 4” bucket.
 
 It is acceptable in Phase 3 to support:
 
@@ -3135,7 +3135,7 @@ Review scope:
 
 - `README.md`
 - `Agents.md`
-- `docs/pdf_signing_app_feasibility.md`
+- `docs/SPEC.md`
 - `docs/ExecPlans/phase3_parallel_plan.md`
 - `artifacts/phase3_fr3b_acceptance_checklist.md`
 - `artifacts/phase3_fr3b_acceptance_results.md`
@@ -3166,7 +3166,7 @@ Review scope:
 
 - `README.md`
 - `Agents.md`
-- `docs/pdf_signing_app_feasibility.md`
+- `docs/SPEC.md`
 - `docs/ExecPlans/phase3_parallel_plan.md`
 - `artifacts/phase3_fr3b_acceptance_checklist.md`
 - `artifacts/phase3_fr3b_acceptance_results.md`
@@ -3268,7 +3268,7 @@ Use this template for:
 Copy and adapt the following:
 
 ```text
-Use /home/daekar/SignPDF/Scratch/docs/ExecPlans/phase3_parallel_plan.md as the shared coordination document. This is a review-only task.
+Use /home/daekar/FoliaSeal/docs/ExecPlans/phase3_parallel_plan.md as the shared coordination document. This is a review-only task.
 
 Review scope:
 - <list the exact workstreams, files, or follow-up patches>

@@ -2,7 +2,7 @@
 
 ## Summary
 
-The remaining backend gap is certification-constraint enforcement. Trust/timestamp hardening is already in place and tracked in `.agent/tsa_trust_hardening_execplan.md`; this slice focuses on DocMDP / permissions handling, operation classification, and release-readiness evidence.
+The remaining backend gap is certification-constraint enforcement. Trust/timestamp hardening is already in place and tracked in `docs/ExecPlans/tsa_trust_hardening_execplan.md`; this slice focuses on DocMDP / permissions handling, operation classification, and release-readiness evidence.
 
 This ExecPlan is the source of truth for:
 

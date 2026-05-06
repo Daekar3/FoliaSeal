@@ -85,7 +85,7 @@ Keep `render_signing_preview()` textual summary behavior stable. If it needs the
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inspect preview text call sites:
 

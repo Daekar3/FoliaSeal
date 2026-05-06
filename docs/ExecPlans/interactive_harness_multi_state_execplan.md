@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`. The goal is to let one interactive Phase 3 harness session preserve several configuration snapshots without reintroducing a separate validation model or a second batch-runner concept.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. The goal is to let one interactive Phase 3 harness session preserve several configuration snapshots without reintroducing a separate validation model or a second batch-runner concept.
 
 ## Purpose / Big Picture
 
@@ -12,7 +12,7 @@ The user-visible outcome is straightforward. The interactive harness keeps its e
 
 ## Progress
 
-- [x] (2026-04-05 23:47Z) Re-read `.agent/PLANS.md`, inspected the current interactive harness path, and confirmed the existing GUI run writes exactly one final capture after `app.exec()` returns.
+- [x] (2026-04-05 23:47Z) Re-read `.agents/skills/write-execplan/PLANS.md`, inspected the current interactive harness path, and confirmed the existing GUI run writes exactly one final capture after `app.exec()` returns.
 - [x] (2026-04-05 23:50Z) Wrote this ExecPlan and fixed the scope around a minimal slice: explicit manual state capture in the interactive harness, not automatic capture on every control change.
 - [x] (2026-04-05 23:59Z) Implemented manual multi-state capture storage in `src/foliaseal/presentation/qt/phase3_harness.py`, including the `Capture State` toolbar action, the additive `captured_states` payload, and concise terminal summary output.
 - [x] (2026-04-06 00:02Z) Added tests for the new history payload and helper functions in `tests/unit/test_phase3_harness.py`.
@@ -63,7 +63,7 @@ What did not change:
 
 Verification results:
 
-- `.venv/bin/ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py .agent/interactive_harness_multi_state_execplan.md`
+- `.venv/bin/ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py docs/ExecPlans/interactive_harness_multi_state_execplan.md`
 - `.venv/bin/pytest -q tests/unit/test_phase3_harness.py tests/unit/test_qt_signing_shell.py tests/unit/test_signing_preview_renderer.py`
 
 Observed outcome:
@@ -104,7 +104,7 @@ Finally, add tests in `tests/unit/test_phase3_harness.py` for the additive schem
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inspect the current interactive harness capture path before editing:
 

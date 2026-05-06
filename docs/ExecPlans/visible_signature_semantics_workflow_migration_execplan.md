@@ -90,7 +90,7 @@ Do not update `signing_preview_renderer.py` or `phase3_signing_backend.py` in th
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Confirm foundation files exist:
 

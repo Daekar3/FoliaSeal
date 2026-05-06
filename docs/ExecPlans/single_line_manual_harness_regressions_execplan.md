@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -90,7 +90,7 @@ Finally, revisit the backend fit logic with the same manual field set. Use a sma
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Run the focused preview tests while iterating:
 

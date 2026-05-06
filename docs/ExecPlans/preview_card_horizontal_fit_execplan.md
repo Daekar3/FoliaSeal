@@ -3,7 +3,7 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -93,7 +93,7 @@ the stamp.
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`:
+From `/home/daekar/FoliaSeal`:
 
 1. Edit `src/foliaseal/presentation/qt/signing_shell.py` and `tests/unit/test_qt_signing_shell.py`.
 2. Edit `src/foliaseal/application/phase3_signing_backend.py` and `tests/unit/test_phase3_signing_backend.py`.

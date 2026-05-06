@@ -123,7 +123,7 @@ If both matrices pass, update this plan with the artifact directories and mark t
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Check the current status:
 

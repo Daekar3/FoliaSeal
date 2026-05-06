@@ -5,7 +5,7 @@ Owner: Codex
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This plan must be maintained in accordance with `.agent/PLANS.md`.
+This plan must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Goal
 
@@ -42,7 +42,7 @@ The reopened geometry slice succeeded. Preview card size no longer outruns text 
 
 - `src/foliaseal/presentation/qt/signing_shell.py`
 - `tests/unit/test_qt_signing_shell.py`
-- optional diagnostic notes in `.agent/`
+- optional diagnostic notes in `docs/ExecPlans/`
 
 ## Steps
 

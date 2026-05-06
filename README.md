@@ -2,10 +2,17 @@
 
 Foundations for a Linux desktop PDF signing app.
 
+Canonical repository documents:
+
+- Product requirements and anti-goals: [docs/SPEC.md](/home/daekar/FoliaSeal/docs/SPEC.md)
+- Canonical persistent object model: [docs/SCHEMAS.md](/home/daekar/FoliaSeal/docs/SCHEMAS.md)
+- Current codebase structure and implementation status: [docs/ARCHITECTURE.md](/home/daekar/FoliaSeal/docs/ARCHITECTURE.md)
+
 ## What is included
 - package skeleton with architecture-aligned module boundaries (`presentation`, `application`, `domain`, `infra`)
 - `DocumentOperation` domain contract and operation registry with capability enable/disable flags
-- initial config schemas for trust profile, timestamp policy, and signature presets
+- initial config/profile schemas and legacy persistence contracts that still need alignment with
+  the canonical object model in `docs/SCHEMAS.md`
 - Phase 1 headless signing orchestration (`SignPdfUseCase`) with:
   - compatibility policy enforcement for PDF `1.4` to `2.0`
   - strict PDF version parsing (rejects invalid/non-finite version strings)
@@ -91,19 +98,18 @@ Not yet production-ready:
 Roadmap note:
 
 - The original Phase 3 scope turned out to bundle several independent failure modes.
-- The remaining roadmap is now split into smaller post-Phase-3 slices in
-  [docs/pdf_signing_app_feasibility.md](/home/daekar/SignPDF/Scratch/docs/pdf_signing_app_feasibility.md),
-  including:
+- The remaining roadmap is now constrained by the canonical product docs in
+  [docs/SPEC.md](/home/daekar/FoliaSeal/docs/SPEC.md) and
+  [docs/SCHEMAS.md](/home/daekar/FoliaSeal/docs/SCHEMAS.md), including:
   - preview/output parity and rectangle-aware preview,
-  - TSA-backed timestamping,
-  - trust hardening,
-  - certification hardening,
   - remaining profile portability work,
   - packaging and full release validation.
+- Backend-oriented timestamp/trust/certification hardening still exists as engineering follow-up,
+  but it is not part of the primary V1 GUI path described in `docs/SPEC.md`.
 - Trust hardening is tracked in
-  [.agent/tsa_trust_hardening_execplan.md](/home/daekar/SignPDF/Scratch/.agent/tsa_trust_hardening_execplan.md);
+  [docs/ExecPlans/tsa_trust_hardening_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/tsa_trust_hardening_execplan.md);
   certification hardening is tracked in
-  [.agent/certification_hardening_execplan.md](/home/daekar/SignPDF/Scratch/.agent/certification_hardening_execplan.md).
+  [docs/ExecPlans/certification_hardening_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/certification_hardening_execplan.md).
 - The current visible-signature contract is text-first: honor the selected text size in points,
   reserve text space first, let the image stamp shrink aggressively inside the remaining room, and
   fail honestly only when the chosen rectangle cannot support that result.
@@ -154,8 +160,8 @@ This produces:
 
 Phase 2 evidence commands and prior runtime notes are still available in:
 
-- [phase2_manual_qa_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md)
-- [phase2_runtime_evidence.md](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md)
+- [phase2_manual_qa_results.md](/home/daekar/FoliaSeal/artifacts/phase2_manual_qa_results.md)
+- [phase2_runtime_evidence.md](/home/daekar/FoliaSeal/artifacts/phase2_runtime_evidence.md)
 
 For lower-level viewer regression checks, you can still run:
 
@@ -220,7 +226,7 @@ What it does:
 - can capture signed-output render evidence when a signing run succeeds, including a rendered crop of the signed annotation region and preview-vs-output comparison metadata
 - classifies the run as `engineering_run` or `gate_candidate` and records the automated gate verdict
 - validates the capture for internal evidence consistency before writing the artifacts
-- writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
+- writes a results file seeded from the Phase 3 checklist at [`artifacts/phase3_fr3b_acceptance_results.md`](/home/daekar/FoliaSeal/artifacts/phase3_fr3b_acceptance_results.md)
 - automatically checks the acceptance items that can be observed directly from the harness
 
 The summary JSON keeps the existing top-level final-state fields and now also includes a
@@ -428,8 +434,8 @@ What still remains manual:
 
 See also:
 
-- [phase3_fr3b_acceptance_checklist.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_checklist.md)
-- [phase3_fr3b_acceptance_results.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_fr3b_acceptance_results.md)
-- [phase3_handoff_2026-04-03.md](/home/daekar/SignPDF/Scratch/artifacts/phase3_handoff_2026-04-03.md)
-- [docs/ExecPlans/phase3_parallel_plan.md](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase3_parallel_plan.md)
-- [phase3_preview_matrix_template.json](/home/daekar/SignPDF/Scratch/artifacts/phase3_preview_matrix_template.json)
+- [phase3_fr3b_acceptance_checklist.md](/home/daekar/FoliaSeal/artifacts/phase3_fr3b_acceptance_checklist.md)
+- [phase3_fr3b_acceptance_results.md](/home/daekar/FoliaSeal/artifacts/phase3_fr3b_acceptance_results.md)
+- [phase3_handoff_2026-04-03.md](/home/daekar/FoliaSeal/artifacts/phase3_handoff_2026-04-03.md)
+- [docs/ExecPlans/phase3_parallel_plan.md](/home/daekar/FoliaSeal/docs/ExecPlans/phase3_parallel_plan.md)
+- [phase3_preview_matrix_template.json](/home/daekar/FoliaSeal/artifacts/phase3_preview_matrix_template.json)

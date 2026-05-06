@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This plan must be maintained in accordance with [`.agent/PLANS.md`](/home/daekar/SignPDF/Scratch/.agent/PLANS.md).
+This plan must be maintained in accordance with [`.agents/skills/write-execplan/PLANS.md`](/home/daekar/FoliaSeal/.agents/skills/write-execplan/PLANS.md).
 
 ## Purpose / Big Picture
 
@@ -12,7 +12,7 @@ The user-visible outcome is straightforward. Running the preview matrix commands
 
 ## Progress
 
-- [x] (2026-04-05 22:42Z) Re-read `.agent/PLANS.md`, the current preview-matrix workflow in `README.md`, and the existing `single_line` sweep assets to reuse the same manifest format and evidence model.
+- [x] (2026-04-05 22:42Z) Re-read `.agents/skills/write-execplan/PLANS.md`, the current preview-matrix workflow in `README.md`, and the existing `single_line` sweep assets to reuse the same manifest format and evidence model.
 - [x] (2026-04-05 22:49Z) Created this ExecPlan with scope limited to unattended coverage and any tightly related remediation needed to make `multi_line` and `wrapped_block` preview sweeps useful.
 - [x] (2026-04-05 22:55Z) Generated checked-in full-matrix manifests for `multi_line` and `wrapped_block` under `artifacts/preview_sweep_assets/`, with 288 deterministic scenarios per layout family.
 - [x] (2026-04-05 23:03Z) Ran unattended preview matrices for both layout families and captured their summaries under `artifacts/preview_sweep_runs/`.
@@ -162,7 +162,7 @@ Finally, add or adjust focused tests only where the new matrices expose a real c
 
 ## Concrete Steps
 
-All commands below run from the repository root: `/home/daekar/SignPDF/Scratch`.
+All commands below run from the repository root: `/home/daekar/FoliaSeal`.
 
 1. Generate the two manifest files in a deterministic way. The command may be a repository-local Python one-off. It must overwrite:
 

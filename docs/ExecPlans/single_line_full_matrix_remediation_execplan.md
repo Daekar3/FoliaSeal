@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -156,7 +156,7 @@ Keep the change slice narrow. This plan should change reservation and preview-fi
 
 ### Milestone 1: Trace Representative Failures End to End
 
-At the end of this milestone, a novice should be able to pick one warning scenario and one clean comparison scenario and see the exact values that flow through the backend reservation, preview geometry translation, preview fit adjustment, and final content-aware warning computation. The proof is a short trace note checked into `.agent/` or captured in this ExecPlan’s `Surprises & Discoveries` section with file/function names and concrete numbers.
+At the end of this milestone, a novice should be able to pick one warning scenario and one clean comparison scenario and see the exact values that flow through the backend reservation, preview geometry translation, preview fit adjustment, and final content-aware warning computation. The proof is a short trace note checked into `docs/ExecPlans/` or captured in this ExecPlan’s `Surprises & Discoveries` section with file/function names and concrete numbers.
 
 ### Milestone 2: Fix Compact Vertical `Top/Bottom`
 
@@ -170,7 +170,7 @@ At the end of this milestone, the `left/right tight` tall-stamp warnings should 
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Regenerate the full matrix if needed:
 
@@ -247,6 +247,6 @@ Do not add new dependencies. Use the existing content-aware diagnostics in `src/
 - `src/foliaseal/application/phase3_signing_backend.py` for shared reservation semantics
 - `src/foliaseal/presentation/qt/signing_shell.py` for preview-side fit logic that must mirror those semantics
 
-If a new temporary trace helper is needed, keep it local to the touched module or a short-lived `.agent/` note. Do not expand the public CLI surface for this slice.
+If a new temporary trace helper is needed, keep it local to the touched module or a short-lived `docs/ExecPlans/` note. Do not expand the public CLI surface for this slice.
 
 Revision note: created on 2026-04-05 after running the 216-scenario full `single_line` matrix and clustering the remaining content-aware warnings by position, rectangle family, stamp asset, border weight, and text size.

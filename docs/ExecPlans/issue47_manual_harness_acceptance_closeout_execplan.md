@@ -74,7 +74,7 @@ Fourth, commit this close-out documentation slice. Do not include generated arti
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Run focused verification:
 

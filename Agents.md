@@ -149,9 +149,9 @@ This project is Linux-only for current scope (target: Linux Mint 22.3 / Ubuntu-c
 ## Scope & Delivery Guardrails (v1)
 
 ### 1) v1 Capability Allowlist (hard scope)
-Only capabilities directly in support of requirements in `docs/pdf_signing_app_feasibility.md` are in scope for v1.
+Only capabilities directly in support of requirements in `docs/SPEC.md` and `docs/SCHEMAS.md` are in scope for v1.
 
-Any capability not in direct support of the goal in `docs/pdf_signing_app_feasibility.md` is out of scope unless explicitly approved by the project owner.
+Any capability not in direct support of the goals in `docs/SPEC.md` and the canonical object model in `docs/SCHEMAS.md` is out of scope unless explicitly approved by the project owner.
 
 ---
 

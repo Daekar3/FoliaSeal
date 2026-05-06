@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`. It builds on the already completed simplification work in `.agent/preview_threshold_simplification_execplan.md` and `.agent/backend_threshold_simplification_execplan.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. It builds on the already completed simplification work in `docs/ExecPlans/preview_threshold_simplification_execplan.md` and `docs/ExecPlans/backend_threshold_simplification_execplan.md`.
 
 ## Purpose / Big Picture
 
@@ -94,7 +94,7 @@ Fourth, if the rerun reports surprising warning growth without visible geometry 
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inspect the current post-simplification matrix summary:
 

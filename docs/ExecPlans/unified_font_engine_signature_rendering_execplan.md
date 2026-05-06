@@ -91,7 +91,7 @@ Refresh:
 
 - `README.md`
 - `docs/ExecPlans/phase3_parallel_plan.md`
-- `docs/pdf_signing_app_feasibility.md`
+- `docs/SPEC.md`
 
 to describe:
 
@@ -237,7 +237,7 @@ Current status:
 ## TSA Trust Hardening Update
 
 - created a dedicated ExecPlan for the trust-hardening slice:
-  - `.agent/tsa_trust_hardening_execplan.md`
+  - `docs/ExecPlans/tsa_trust_hardening_execplan.md`
 - the trust-hardening slice now adds:
   - explicit timestamp trust-policy inputs
   - timestamp trust validation reporting separate from token presence

@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -84,7 +84,7 @@ Fourth, update this ExecPlan and any directly relevant documentation so the swee
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Generate or refresh the local sweep assets and manifest, then run the matrix:
 

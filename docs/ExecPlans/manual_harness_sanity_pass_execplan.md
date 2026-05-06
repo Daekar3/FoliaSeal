@@ -100,7 +100,7 @@ If a discrepancy is found, do not make speculative changes. Save the artifact bu
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Confirm the automated prerequisite:
 

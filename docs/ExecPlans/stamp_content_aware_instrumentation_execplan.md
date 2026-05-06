@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -12,7 +12,7 @@ The user-visible proof is simple. Run the preview matrix, open one of the genera
 
 ## Progress
 
-- [x] (2026-04-05 02:05Z) Created this ExecPlan and refreshed `.agent/PLANS.md`, `README.md`, and the existing harness docs to keep the scope aligned with the current preview-matrix workflow.
+- [x] (2026-04-05 02:05Z) Created this ExecPlan and refreshed `.agents/skills/write-execplan/PLANS.md`, `README.md`, and the existing harness docs to keep the scope aligned with the current preview-matrix workflow.
 - [x] (2026-04-05 02:18Z) Extended preview capture so stamped scenarios now write a stamp-focused debug crop with overlay rectangles for the reserved stamp band, rendered pixmap, and projected content bounds.
 - [x] (2026-04-05 02:24Z) Added alpha-aware source-image analysis and persisted the source/content bounds, rendered content bounds, and stamp-edge diagnostics into `render_capture`.
 - [x] (2026-04-05 02:31Z) Added explicit clipping and proximity flags to the summary JSON and verified them against the compact `single_bottom` script-stamp scenario.
@@ -102,7 +102,7 @@ Implement the checks in the harness summary layer, not inside the UI. Add tests 
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Run the focused harness and preview tests while building the feature:
 

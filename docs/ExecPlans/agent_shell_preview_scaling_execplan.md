@@ -3,8 +3,8 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`, the repository
-`Agents.md`, and the parent wave plan `.agent/visible_signature_output_analysis_execplan.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`, the repository
+`Agents.md`, and the parent wave plan `docs/ExecPlans/visible_signature_output_analysis_execplan.md`.
 
 ## Purpose / Big Picture
 
@@ -23,7 +23,7 @@ about whether the chosen font size and visible fields make sense.
 
 ## Progress
 
-- [x] (2026-04-01 00:12Z) Reviewed `.agent/PLANS.md`, `Agents.md`, the parent wave plan, and the
+- [x] (2026-04-01 00:12Z) Reviewed `.agents/skills/write-execplan/PLANS.md`, `Agents.md`, the parent wave plan, and the
   current preview-sizing code before making changes.
 - [x] (2026-04-01 00:15Z) Identified two concrete root causes in
   `src/foliaseal/presentation/qt/signing_shell.py`: raw PDF-point dimensions are being used as
@@ -132,7 +132,7 @@ to a useful size, and oversize content still produces visible preview text inste
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`:
+From `/home/daekar/FoliaSeal`:
 
 1. Patch the preview sizing helpers in `src/foliaseal/presentation/qt/signing_shell.py`.
 2. Patch `_update_preview_controls()` so the card is fixed-size but the inner body containers are

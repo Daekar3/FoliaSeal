@@ -3,8 +3,8 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md` and the parent wave plan
-`/.agent/visible_signature_output_analysis_execplan.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md` and the parent wave plan
+`/docs/ExecPlans/visible_signature_output_analysis_execplan.md`.
 
 ## Purpose / Big Picture
 
@@ -104,7 +104,7 @@ do not change the panel’s width-hint behavior in the fake Qt layer.
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`:
+From `/home/daekar/FoliaSeal`:
 
 1. Inspect `src/foliaseal/presentation/qt/signing_shell.py` for any preview container size or size
    policy manipulation that can cause the panel to widen.

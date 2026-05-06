@@ -3,7 +3,7 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -193,7 +193,7 @@ the stamp can grow when the text occupies less width than the current reservatio
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`:
+From `/home/daekar/FoliaSeal`:
 
 1. Inspect and patch the shell preview card/body sizing behavior in
    `src/foliaseal/presentation/qt/signing_shell.py`.
@@ -258,7 +258,7 @@ parsing rules.
 
 Any spawned agent in this wave must:
 
-- create and maintain its own ExecPlan in `.agent/`
+- create and maintain its own ExecPlan in `docs/ExecPlans/`
 - explicitly state changed files, verification, and caveats when reporting back
 - avoid plan-only responses when given an implementation brief
 

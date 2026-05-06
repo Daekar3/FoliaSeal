@@ -3,7 +3,7 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -89,7 +89,7 @@ possible.
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`:
+From `/home/daekar/FoliaSeal`:
 
 1. Inspect the current helpers:
 

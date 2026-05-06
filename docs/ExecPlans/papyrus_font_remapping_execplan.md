@@ -25,12 +25,12 @@ weight, and the existing implementation behind it is not Papyrus-like.
 
 The current mapping is explicit but wrong for the intended design direction:
 
-- [`src/foliaseal/application/signature_font_registry.py`](/home/daekar/SignPDF/Scratch/src/foliaseal/application/signature_font_registry.py)
+- [`src/foliaseal/application/signature_font_registry.py`](/home/daekar/FoliaSeal/src/foliaseal/application/signature_font_registry.py)
   maps `Fantasy` to `Noto Serif Display`
-- [`src/foliaseal/presentation/qt/signing_shell.py`](/home/daekar/SignPDF/Scratch/src/foliaseal/presentation/qt/signing_shell.py)
+- [`src/foliaseal/presentation/qt/signing_shell.py`](/home/daekar/FoliaSeal/src/foliaseal/presentation/qt/signing_shell.py)
   exposes `Fantasy` in the font-family control
-- [`tests/unit/test_qt_signing_shell.py`](/home/daekar/SignPDF/Scratch/tests/unit/test_qt_signing_shell.py)
-  and [`tests/unit/test_signature_font_registry.py`](/home/daekar/SignPDF/Scratch/tests/unit/test_signature_font_registry.py)
+- [`tests/unit/test_qt_signing_shell.py`](/home/daekar/FoliaSeal/tests/unit/test_qt_signing_shell.py)
+  and [`tests/unit/test_signature_font_registry.py`](/home/daekar/FoliaSeal/tests/unit/test_signature_font_registry.py)
   currently lock in that mapping
 - docs already describe `Fantasy -> Noto Serif Display`
 
@@ -56,29 +56,29 @@ That means:
 
 Primary implementation seam:
 
-- [`src/foliaseal/application/signature_font_registry.py`](/home/daekar/SignPDF/Scratch/src/foliaseal/application/signature_font_registry.py)
+- [`src/foliaseal/application/signature_font_registry.py`](/home/daekar/FoliaSeal/src/foliaseal/application/signature_font_registry.py)
   - `_canonical_family(...)`
   - `preview_font_family_supported(...)`
   - `_face_name_for_request(...)`
 
 Preview/UI seam:
 
-- [`src/foliaseal/presentation/qt/signing_shell.py`](/home/daekar/SignPDF/Scratch/src/foliaseal/presentation/qt/signing_shell.py)
+- [`src/foliaseal/presentation/qt/signing_shell.py`](/home/daekar/FoliaSeal/src/foliaseal/presentation/qt/signing_shell.py)
   - font-family combo options
   - preview font stack helpers
 
 Tests/docs that must be updated with the rename:
 
-- [`tests/unit/test_signature_font_registry.py`](/home/daekar/SignPDF/Scratch/tests/unit/test_signature_font_registry.py)
-- [`tests/unit/test_qt_signing_shell.py`](/home/daekar/SignPDF/Scratch/tests/unit/test_qt_signing_shell.py)
-- [`README.md`](/home/daekar/SignPDF/Scratch/README.md)
-- [`docs/pdf_signing_app_feasibility.md`](/home/daekar/SignPDF/Scratch/docs/pdf_signing_app_feasibility.md)
-- [`docs/ExecPlans/phase3_parallel_plan.md`](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase3_parallel_plan.md)
-- [`.agent/unified_font_engine_signature_rendering_execplan.md`](/home/daekar/SignPDF/Scratch/.agent/unified_font_engine_signature_rendering_execplan.md)
+- [`tests/unit/test_signature_font_registry.py`](/home/daekar/FoliaSeal/tests/unit/test_signature_font_registry.py)
+- [`tests/unit/test_qt_signing_shell.py`](/home/daekar/FoliaSeal/tests/unit/test_qt_signing_shell.py)
+- [`README.md`](/home/daekar/FoliaSeal/README.md)
+- [`docs/SPEC.md`](/home/daekar/FoliaSeal/docs/SPEC.md)
+- [`docs/ExecPlans/phase3_parallel_plan.md`](/home/daekar/FoliaSeal/docs/ExecPlans/phase3_parallel_plan.md)
+- [`docs/ExecPlans/unified_font_engine_signature_rendering_execplan.md`](/home/daekar/FoliaSeal/docs/ExecPlans/unified_font_engine_signature_rendering_execplan.md)
 
 Font asset location:
 
-- [`src/foliaseal/resources/fonts`](/home/daekar/SignPDF/Scratch/src/foliaseal/resources/fonts)
+- [`src/foliaseal/resources/fonts`](/home/daekar/FoliaSeal/src/foliaseal/resources/fonts)
 
 ## Required Changes
 

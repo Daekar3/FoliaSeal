@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -12,7 +12,7 @@ The user-visible proof is straightforward. Run the interactive harness with prev
 
 ## Progress
 
-- [x] (2026-04-04 21:02Z) Read `Agents.md`, `.agent/PLANS.md`, `src/foliaseal/presentation/qt/phase3_harness.py`, `src/foliaseal/__main__.py`, and the existing harness tests to scope the missing instrumentation surface.
+- [x] (2026-04-04 21:02Z) Read `Agents.md`, `.agents/skills/write-execplan/PLANS.md`, `src/foliaseal/presentation/qt/phase3_harness.py`, `src/foliaseal/__main__.py`, and the existing harness tests to scope the missing instrumentation surface.
 - [x] (2026-04-04 22:10Z) Implemented interactive harness preview artifact capture, widget geometry snapshots, and explicit edge-distance metrics, including preview PNG output, widget bounds, size hints, spacing, and border-to-content distance telemetry.
 - [x] (2026-04-04 22:28Z) Implemented a repeatable `phase3-signing-preview-matrix` runner with manifest-driven appearance overrides, per-scenario artifact directories, and summary JSON output.
 - [x] (2026-04-04 22:41Z) Updated `README.md`, `docs/ExecPlans/phase3_parallel_plan.md`, `artifacts/phase3_handoff_2026-04-03.md`, and the template artifacts so future contributors can run the new instrumentation without reconstructing the workflow.
@@ -66,7 +66,7 @@ Fifth, add or update tests in `tests/unit/test_phase3_harness.py` and `tests/uni
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Run the focused harness and CLI tests after implementation:
 

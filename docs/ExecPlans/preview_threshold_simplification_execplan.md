@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -10,7 +10,7 @@ The visible-signature preview should scale smoothly as the user changes the rect
 
 ## Progress
 
-- [x] (2026-04-05 14:25Z) Re-read `Agents.md`, `.agent/PLANS.md`, and the current preview/back-end layout helpers before planning.
+- [x] (2026-04-05 14:25Z) Re-read `Agents.md`, `.agents/skills/write-execplan/PLANS.md`, and the current preview/back-end layout helpers before planning.
 - [x] (2026-04-05 14:31Z) Audited threshold-driven preview logic and confirmed the main simplification targets are `src/foliaseal/presentation/qt/signing_shell.py::_preview_detail_text`, `::_single_line_vertical_separator_cap`, `::_preview_stamp_max_size`, and the vertical band fitting path in `::_update_preview_controls`.
 - [x] (2026-04-05 14:42Z) Removed the preview-only threshold branches in `src/foliaseal/presentation/qt/signing_shell.py` by deleting the local `single_line` compact wrap logic, deleting `_single_line_vertical_separator_cap()`, and replacing threshold-based preview padding and stamp gutters with continuous geometry-driven helpers.
 - [x] (2026-04-05 14:44Z) Updated the focused preview test that still asserted the deleted `6px` vertical compact padding special case.
@@ -89,7 +89,7 @@ Finally, expand the tests in `tests/unit/test_qt_signing_shell.py` so they prove
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Read and edit the preview logic:
 

@@ -11,7 +11,7 @@ This slice is not about detector tuning. It is about making the signed-output si
 Current state from:
 
 - `artifacts/signed_preview_parity_matrix_run_v4/summary.json`
-- `.agent/rendered_text_bounds_parity_execplan.md`
+- `docs/ExecPlans/rendered_text_bounds_parity_execplan.md`
 
 Observed facts:
 

@@ -108,7 +108,7 @@ Keep public `SigningBackendRequest` and `SigningBackendAppearance` stable unless
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inventory backend semantic helper usage:
 

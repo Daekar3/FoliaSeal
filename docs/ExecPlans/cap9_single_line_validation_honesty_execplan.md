@@ -72,7 +72,7 @@ Third, run focused tests covering the new regression, the existing rendered-ink 
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Add the regression test:
 

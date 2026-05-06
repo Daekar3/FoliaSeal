@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`. It records the decision to keep one authoritative backend validation gate while ruthlessly eliminating unnecessary UI-layer validation complexity.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. It records the decision to keep one authoritative backend validation gate while ruthlessly eliminating unnecessary UI-layer validation complexity.
 
 ## Purpose / Big Picture
 
@@ -85,10 +85,10 @@ What did not change:
 
 Verification results:
 
-- `ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py README.md docs/ExecPlans/phase3_parallel_plan.md Agents.md .agent/validation_architecture_simplification_execplan.md`
+- `ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py README.md docs/ExecPlans/phase3_parallel_plan.md Agents.md docs/ExecPlans/validation_architecture_simplification_execplan.md`
 - `pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py tests/unit/test_phase3_signing_backend.py`
 - `pytest -q`
-- `.venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_draft_workflow.py .agent/validation_architecture_simplification_execplan.md README.md docs/ExecPlans/phase3_parallel_plan.md Agents.md`
+- `.venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_draft_workflow.py docs/ExecPlans/validation_architecture_simplification_execplan.md README.md docs/ExecPlans/phase3_parallel_plan.md Agents.md`
 - `.venv/bin/pytest -q tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py`
 - `.venv/bin/pytest -q`
 
@@ -145,7 +145,7 @@ Fourth, update tests in `tests/unit/test_qt_signing_shell.py` and any touched ha
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Document the architectural decision:
 

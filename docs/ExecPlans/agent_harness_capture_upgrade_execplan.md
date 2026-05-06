@@ -3,8 +3,8 @@
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md` and the parent wave plan
-`.agent/visible_signature_output_analysis_execplan.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md` and the parent wave plan
+`docs/ExecPlans/visible_signature_output_analysis_execplan.md`.
 
 ## Purpose / Big Picture
 
@@ -119,7 +119,7 @@ test and lint commands.
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`:
+From `/home/daekar/FoliaSeal`:
 
 1. Edit `src/foliaseal/presentation/qt/phase3_harness.py` to add a current-draft request helper
    and to use it during capture assembly.
@@ -147,7 +147,7 @@ Acceptance is reached when the harness slice proves all of the following:
 The human-visible proof is the next harness rerun: if the UI blocks signing, the JSON should still
 show a meaningful `backend_reservation_snapshot` instead of `null`.
 
-Focused verification completed from `/home/daekar/SignPDF/Scratch`:
+Focused verification completed from `/home/daekar/FoliaSeal`:
 
     ./.venv/bin/python -m pytest -q tests/unit/test_phase3_harness.py
     7 passed in 0.44s

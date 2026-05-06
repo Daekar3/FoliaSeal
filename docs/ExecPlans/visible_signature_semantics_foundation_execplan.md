@@ -126,7 +126,7 @@ Do not change `SigningDraftWorkflow.preview()`, `signing_preview_renderer.py`, o
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inspect the current behavior before editing:
 

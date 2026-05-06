@@ -114,7 +114,7 @@ Update these five ExecPlans with outcomes, validation, and closure status. If an
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inventory semantic helper usage:
 

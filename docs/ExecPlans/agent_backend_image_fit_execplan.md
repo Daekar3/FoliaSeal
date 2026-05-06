@@ -1,12 +1,12 @@
 # Fix backend stamp image sizing for visible signatures
 
-This ExecPlan is a living document. It must be maintained in accordance with [`.agent/PLANS.md`](../.agent/PLANS.md), and it must stay self-contained so a newcomer can pick it up without any prior context.
+This ExecPlan is a living document. It must be maintained in accordance with [`.agents/skills/write-execplan/PLANS.md`](/home/daekar/FoliaSeal/.agents/skills/write-execplan/PLANS.md), and it must stay self-contained so a newcomer can pick it up without any prior context.
 
 ## Purpose / Big Picture
 
 Users need the final signed PDF to place the stamp image at a sensible size for ordinary visible-signature rectangles, especially for `single_line` layouts with `Top` and `Bottom` stamp positions. Right now the PDF output can grossly overscale the stamp image even when the preview looks more reasonable, which makes the signature box look broken or unreadable. After this fix, a user should be able to draw a normal signature rectangle, choose a stamp position, and see the signed PDF keep the stamp image inside the available stamp area while preserving the image aspect ratio and keeping the existing prefix/body behavior intact.
 
-The work in this plan focuses on `src/foliaseal/application/phase3_signing_backend.py` and `tests/unit/test_phase3_signing_backend.py`, with tightly related support tests only if they are necessary to prove the behavior. The relevant parent plan is [`.agent/visible_signature_output_analysis_execplan.md`](./visible_signature_output_analysis_execplan.md).
+The work in this plan focuses on `src/foliaseal/application/phase3_signing_backend.py` and `tests/unit/test_phase3_signing_backend.py`, with tightly related support tests only if they are necessary to prove the behavior. The relevant parent plan is [`docs/ExecPlans/visible_signature_output_analysis_execplan.md`](./visible_signature_output_analysis_execplan.md).
 
 ## Progress
 
@@ -73,7 +73,7 @@ Fourth, if the backend fix exposes a more precise helper that should be reused b
 
 ## Concrete Steps
 
-From `/home/daekar/SignPDF/Scratch`, inspect the backend image-fit code and the existing regression tests:
+From `/home/daekar/FoliaSeal`, inspect the backend image-fit code and the existing regression tests:
 
     rg -n "_background_layout_for_stamp|_build_stamp_style|_layout_reservation_for_template|_measure_text_box_dimensions|stamp_position" src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py
 

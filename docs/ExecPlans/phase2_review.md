@@ -547,8 +547,8 @@ Status after this patch: **🟡 Still in progress** (Phase 2 runtime execution e
 Status after this patch: **✅ Complete** (interactive runtime validation, timing evidence, and runtime footprint evidence are all attached and validated).
 
 Note for any future rerun of the manual validation flow: the immutable checklist template is
-[`docs/ExecPlans/phase2_manual_qa_checklist.md`](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase2_manual_qa_checklist.md), but the evidence command should consume the run-specific results file written by the harness at
-[`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
+[`docs/ExecPlans/phase2_manual_qa_checklist.md`](/home/daekar/FoliaSeal/docs/ExecPlans/phase2_manual_qa_checklist.md), but the evidence command should consume the run-specific results file written by the harness at
+[`artifacts/phase2_manual_qa_results.md`](/home/daekar/FoliaSeal/artifacts/phase2_manual_qa_results.md).
 Older review entries that point `--qa-checklist-file` at the template checklist are superseded by that newer evidence flow.
 
 ### Completed from the plan in this patch
@@ -569,8 +569,8 @@ Older review entries that point `--qa-checklist-file` at the template checklist 
   - Idle memory: `15.96 MiB`
   - Bundle size: `22.61 MiB`
 - **Step 5 (exit gate): completed.**
-  - Updated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) to `19/19` checklist checks passed with no open issues.
-  - Retained [`artifacts/phase2_harness_capture.json`](/home/daekar/SignPDF/Scratch/artifacts/phase2_harness_capture.json) and [`artifacts/phase2_evidence_command.sh`](/home/daekar/SignPDF/Scratch/artifacts/phase2_evidence_command.sh) as supporting evidence from the manual Qt session.
+  - Updated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/FoliaSeal/artifacts/phase2_runtime_evidence.md) to `19/19` checklist checks passed with no open issues.
+  - Retained [`artifacts/phase2_harness_capture.json`](/home/daekar/FoliaSeal/artifacts/phase2_harness_capture.json) and [`artifacts/phase2_evidence_command.sh`](/home/daekar/FoliaSeal/artifacts/phase2_evidence_command.sh) as supporting evidence from the manual Qt session.
 
 ### Final evidence snapshot
 
@@ -636,14 +636,14 @@ Status after this patch: **🟡 Still in progress** (interactive Qt runtime vali
 
 Historical note: this section reflects the packaging-only state before the final interactive sign-off was completed.
 The command example below is retained for historical traceability only and is superseded by the final evidence flow in
-[`docs/ExecPlans/phase2_review.md`](/home/daekar/SignPDF/Scratch/docs/ExecPlans/phase2_review.md#L545), which uses the run-specific checklist results file at
-[`artifacts/phase2_manual_qa_results.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_manual_qa_results.md).
+[`docs/ExecPlans/phase2_review.md`](/home/daekar/FoliaSeal/docs/ExecPlans/phase2_review.md#L545), which uses the run-specific checklist results file at
+[`artifacts/phase2_manual_qa_results.md`](/home/daekar/FoliaSeal/artifacts/phase2_manual_qa_results.md).
 
 ### Completed from the plan in this patch
 
 - **Step 4 (FR-16 runtime metrics): partially advanced with current packaged artifact measurements.**
   - Rebuilt the PyInstaller one-dir bundle with `./scripts/build_pyinstaller.sh`.
-  - Re-generated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) against the packaged executable using:
+  - Re-generated [`artifacts/phase2_runtime_evidence.md`](/home/daekar/FoliaSeal/artifacts/phase2_runtime_evidence.md) against the packaged executable using:
     - `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file docs/ExecPlans/phase2_manual_qa_checklist.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
     - Superseded for final sign-off by the run-specific checklist workflow:
       `.venv/bin/python -m foliaseal phase2-evidence --check-qt-runtime --qa-checklist-file artifacts/phase2_manual_qa_results.md --collect-runtime-footprint --measure-startup-command dist/foliaseal/foliaseal --startup-ready-after-seconds 0.75 --bundle-dir dist/foliaseal --write-markdown-file artifacts/phase2_runtime_evidence.md`
@@ -690,8 +690,8 @@ Status after this patch: **🟡 Still in progress** (FR-13 timing evidence is no
     - Idle memory: `15.73 MiB`
     - Bundle size: `22.61 MiB`
 - **Evidence artifacts updated.**
-  - Refreshed [`artifacts/phase2_runtime_evidence.md`](/home/daekar/SignPDF/Scratch/artifacts/phase2_runtime_evidence.md) with the measured interactive timings.
-  - Added [`artifacts/phase2_harness_capture.json`](/home/daekar/SignPDF/Scratch/artifacts/phase2_harness_capture.json) and [`artifacts/phase2_evidence_command.sh`](/home/daekar/SignPDF/Scratch/artifacts/phase2_evidence_command.sh) as reproducible outputs from the manual run.
+  - Refreshed [`artifacts/phase2_runtime_evidence.md`](/home/daekar/FoliaSeal/artifacts/phase2_runtime_evidence.md) with the measured interactive timings.
+  - Added [`artifacts/phase2_harness_capture.json`](/home/daekar/FoliaSeal/artifacts/phase2_harness_capture.json) and [`artifacts/phase2_evidence_command.sh`](/home/daekar/FoliaSeal/artifacts/phase2_evidence_command.sh) as reproducible outputs from the manual run.
 
 ### Evidence artifact snapshot (interactive harness run)
 

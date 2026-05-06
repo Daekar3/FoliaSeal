@@ -11,7 +11,7 @@ Trace exactly why the backend rejects some visible-signature layouts that look r
 
 - `src/foliaseal/application/phase3_signing_backend.py`
 - relevant unit tests in `tests/unit/test_phase3_signing_backend.py`
-- optional diagnostic notes in `.agent/`
+- optional diagnostic notes in `docs/ExecPlans/`
 
 ## Steps
 

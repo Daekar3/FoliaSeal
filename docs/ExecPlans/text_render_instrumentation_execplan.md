@@ -88,7 +88,7 @@ The harness and matrix should produce objective rendered-text evidence:
 - 2026-04-09: Added focused unit coverage for text detection, overlap diagnostics,
   debug overlay generation, and summary aggregation.
 - 2026-04-09: Verification passed:
-  - `ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py .agent/text_render_instrumentation_execplan.md`
+  - `ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py docs/ExecPlans/text_render_instrumentation_execplan.md`
   - `pytest -q tests/unit/test_phase3_harness.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py`
   - `pytest -q`
 - 2026-04-09: Unattended `multi_line` matrix rerun completed with the new diagnostics

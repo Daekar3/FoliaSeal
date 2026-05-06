@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -100,7 +100,7 @@ Extend `tests/unit/test_qt_signing_shell.py` with explicit preview-side checks t
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Inspect the current code paths before editing:
 
@@ -136,7 +136,7 @@ Expected success shape:
 
 Observed completion transcript:
 
-    .venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_phase3_signing_backend.py tests/unit/test_qt_signing_shell.py .agent/single_line_stamp_sizing_execplan.md
+    .venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_phase3_signing_backend.py tests/unit/test_qt_signing_shell.py docs/ExecPlans/single_line_stamp_sizing_execplan.md
     All checks passed!
 
     .venv/bin/pytest -q tests/unit/test_phase3_signing_backend.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_harness.py tests/unit/test_signing_preview_renderer.py

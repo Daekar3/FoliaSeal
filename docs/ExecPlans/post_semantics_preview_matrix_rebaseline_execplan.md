@@ -153,7 +153,7 @@ If all six matrices complete and their summary counts are acceptable, update thi
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Check status:
 

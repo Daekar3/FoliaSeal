@@ -641,7 +641,7 @@ After adapter equivalence is green, migrate production callers one area at a tim
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Create or update these files:
 

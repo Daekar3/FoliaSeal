@@ -839,7 +839,7 @@ Implemented in:
 - `tests/unit/test_phase3_harness.py`
 - `README.md`
 - `docs/ExecPlans/phase3_parallel_plan.md`
-- `docs/pdf_signing_app_feasibility.md`
+- `docs/SPEC.md`
 
 What landed:
 
@@ -863,7 +863,7 @@ Documentation updates:
 
 - `README.md`
 - `docs/ExecPlans/phase3_parallel_plan.md`
-- `docs/pdf_signing_app_feasibility.md`
+- `docs/SPEC.md`
 
 Those docs now state explicitly that rasterization returned only for review and
 QA instrumentation. The backend fit engine remains structural and
@@ -872,7 +872,7 @@ calculation-driven.
 Verification:
 
 - focused harness regressions: passed
-- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py README.md docs/ExecPlans/phase3_parallel_plan.md docs/pdf_signing_app_feasibility.md .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py README.md docs/ExecPlans/phase3_parallel_plan.md docs/SPEC.md docs/ExecPlans/per_signing_immutable_harness_evidence_execplan.md`
 - `pytest -q`
 - Result: `457 passed`
 
@@ -967,7 +967,7 @@ Automated guardrail added:
 Verification:
 
 - focused Qt shell regressions: passed
-- `python -m ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `python -m ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py docs/ExecPlans/per_signing_immutable_harness_evidence_execplan.md`
 - `pytest -q`
 - Result: `457 passed`
 
@@ -1050,7 +1050,7 @@ Automated guardrail added:
 Verification:
 
 - focused harness regressions: passed
-- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `python -m ruff check src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_harness.py docs/ExecPlans/per_signing_immutable_harness_evidence_execplan.md`
 - `pytest -q`
 - Result: `458 passed`
 
@@ -1202,7 +1202,7 @@ Automated coverage added:
 Verification:
 
 - focused backend regressions: passed
-- `python -m ruff check src/foliaseal/application/text_raster_analysis.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_phase3_harness.py .agent/per_signing_immutable_harness_evidence_execplan.md`
+- `python -m ruff check src/foliaseal/application/text_raster_analysis.py src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py tests/unit/test_phase3_signing_backend.py tests/unit/test_phase3_harness.py docs/ExecPlans/per_signing_immutable_harness_evidence_execplan.md`
   passed
 - `pytest -q` passed: `462 passed`
 

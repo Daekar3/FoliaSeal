@@ -17,6 +17,12 @@ FoliaSeal is a Linux-targeted desktop PDF signing application foundation. The pa
 
 This document governs the repository architecture: Python package layout, application/domain/infra/presentation boundaries, object models, file contracts, CLI contracts, rendering/signing dependencies, persistence, and tests. It does not describe a deployed service or network protocol because the current code is a local desktop application and CLI tool.
 
+The canonical repository document split is:
+
+- `docs/SPEC.md`: intended product requirements, goals, and anti-goals
+- `docs/SCHEMAS.md`: intended persistent object model and naming
+- `docs/ARCHITECTURE.md`: current code structure and implementation reality
+
 ## 2. Architectural principles
 
 | Principle | Reason | Status |
@@ -44,7 +50,9 @@ This document governs the repository architecture: Python package layout, applic
 | `tests/support/` | Test builders and certification fixtures. | Used by multiple unit suites. |
 | `tests/fixtures/` | Durable fixture data. | Includes Phase 3 manual replay JSON. |
 | `artifacts/` | Manual QA evidence, manifests, and durable acceptance assets. | Run-output directories/files are mostly ignored by `.gitignore`. |
-| `docs/ExecPlans/` | Living implementation plans and notes. | Formerly `.agent/`; now documentation-owned. |
+| `docs/SPEC.md` | Canonical product requirements and anti-goals. | Product intent; may lead current implementation. |
+| `docs/SCHEMAS.md` | Canonical persistent object model and vocabulary. | Product-facing schema target; may lead current implementation. |
+| `docs/ExecPlans/` | Living implementation plans and notes. | Formerly `docs/ExecPlans/`; now documentation-owned. |
 | `.agents/skills/write-execplan/PLANS.md` | ExecPlan authoring/execution contract. | Referenced by `Agents.md` and the `$write-execplan` skill. |
 | `Agents.md` | Agent operating instructions for this repository. | Requires architecture doc updates for architecture-affecting changes. |
 | `scripts/` | Local helper scripts. | Includes PyInstaller build and preview stress manifest generation. |

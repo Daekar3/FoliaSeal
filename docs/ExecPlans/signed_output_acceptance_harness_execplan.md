@@ -44,7 +44,7 @@ to repeatable signed-output acceptance evidence that can verify:
    - signed-output render/comparison snapshot behavior
    - evidence-contract enforcement
    - signed acceptance manifest presence/parsing
-6. Review delegated documentation updates and align README/feasibility docs with
+6. Review delegated documentation updates and align README/canonical docs with
    the new harness capabilities.
 
 ### Acceptance Criteria

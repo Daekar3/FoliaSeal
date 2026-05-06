@@ -2,7 +2,7 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-This document must be maintained in accordance with `.agent/PLANS.md`.
+This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
 
@@ -12,11 +12,11 @@ The user-visible proof is straightforward: run `foliaseal phase3-signing-harness
 
 ## Progress
 
-- [x] (2026-04-03 23:02Z) Read `.agent/PLANS.md`, `artifacts/team_assessment_2026-04-03.md`, the current harness code, and the policy/docs files that need to stay aligned.
+- [x] (2026-04-03 23:02Z) Read `.agents/skills/write-execplan/PLANS.md`, `artifacts/team_assessment_2026-04-03.md`, the current harness code, and the policy/docs files that need to stay aligned.
 - [x] (2026-04-03 23:19Z) Implemented the evidence contract validator and gate classification in application/harness code.
 - [x] (2026-04-03 23:19Z) Updated the generated Phase 3 results artifact so it records gate verdict, validation summary, and required-artifact status.
 - [x] (2026-04-03 23:19Z) Added a CLI command that validates an existing Phase 3 harness JSON capture without rerunning the GUI.
-- [x] (2026-04-03 23:19Z) Updated `README.md`, `docs/pdf_signing_app_feasibility.md`, `docs/ExecPlans/phase3_parallel_plan.md`, `artifacts/phase3_fr3b_acceptance_checklist.md`, `artifacts/phase3_fr3b_acceptance_results.md`, `Agents.md`, and `.agent/PLANS.md` so they describe one authoritative gating model.
+- [x] (2026-04-03 23:19Z) Updated `README.md`, `docs/SPEC.md`, `docs/ExecPlans/phase3_parallel_plan.md`, `artifacts/phase3_fr3b_acceptance_checklist.md`, `artifacts/phase3_fr3b_acceptance_results.md`, `Agents.md`, and `.agents/skills/write-execplan/PLANS.md` so they describe one authoritative gating model.
 - [x] (2026-04-03 23:19Z) Added regression tests for evidence validation and results rendering, then ran focused verification.
 
 ## Surprises & Discoveries
@@ -54,7 +54,7 @@ The remaining boundary is intentional. Automation can promote a run to `gate_can
 
 The interactive Phase 3 acceptance workflow lives in `src/foliaseal/presentation/qt/phase3_harness.py`. That file defines `Phase3HarnessCapture`, serializes it to JSON, and generates the Markdown worksheet seeded from `artifacts/phase3_fr3b_acceptance_checklist.md`. The command-line entry point lives in `src/foliaseal/__main__.py`, where the current `phase3-signing-harness` command launches the Qt flow.
 
-The policy source of truth for release and acceptance work is `docs/pdf_signing_app_feasibility.md`. The current Phase 3 coordination document is `docs/ExecPlans/phase3_parallel_plan.md`. The short operator-facing entry point is `README.md`. Agent execution guidance lives in `Agents.md`, and ExecPlan maintenance rules live in `.agent/PLANS.md`.
+The policy source of truth for release and acceptance work is `docs/SPEC.md`, with object-model terminology defined by `docs/SCHEMAS.md`. The current Phase 3 coordination document is `docs/ExecPlans/phase3_parallel_plan.md`. The short operator-facing entry point is `README.md`. Agent execution guidance lives in `Agents.md`, and ExecPlan maintenance rules live in `.agents/skills/write-execplan/PLANS.md`.
 
 The key missing concept is an evidence contract: a set of machine-checkable rules saying whether a harness capture is internally coherent enough to count as acceptance evidence. A gate tier then classifies the run: an engineering run is useful for debugging, a gate candidate has the required artifacts and consistent evidence, and a release-gating run is a gate candidate whose worksheet records an explicit FR-3B pass.
 
@@ -66,13 +66,13 @@ Second, extend `src/foliaseal/presentation/qt/phase3_harness.py`. `Phase3Harness
 
 Third, add a small CLI command in `src/foliaseal/__main__.py` that loads an existing Phase 3 harness JSON file and runs the validator without launching the GUI. This gives the repo a lightweight CI/review path for already-recorded artifacts.
 
-Fourth, update the long-lived guidance files so the repo has one consistent story: `docs/pdf_signing_app_feasibility.md` defines the release-gating model, `README.md` gives the short operator-facing rule, `docs/ExecPlans/phase3_parallel_plan.md` says no Phase 3 completion claim is valid without a release-gating run, the acceptance checklist/results files explicitly distinguish required-for-gate evidence from manual qualitative notes, and `Agents.md` plus `.agent/PLANS.md` define the stricter slicing policy.
+Fourth, update the long-lived guidance files so the repo has one consistent story: `docs/SPEC.md` defines the release-gating model, `README.md` gives the short operator-facing rule, `docs/ExecPlans/phase3_parallel_plan.md` says no Phase 3 completion claim is valid without a release-gating run, the acceptance checklist/results files explicitly distinguish required-for-gate evidence from manual qualitative notes, and `Agents.md` plus `.agents/skills/write-execplan/PLANS.md` define the stricter slicing policy.
 
 ## Concrete Steps
 
 Work from the repository root:
 
-    cd /home/daekar/SignPDF/Scratch
+    cd /home/daekar/FoliaSeal
 
 Implement the validator and harness wiring:
 
@@ -103,7 +103,7 @@ The new behavior is accepted when all of the following are true:
 - A capture with internally consistent success state is classified at least as a gate candidate.
 - The generated Markdown distinguishes non-gating runs from release-gating runs instead of only listing generic observations.
 - The updated docs consistently say that terminal success alone is non-gating.
-- `Agents.md` and `.agent/PLANS.md` both describe the stricter change-slicing policy in compatible language.
+- `Agents.md` and `.agents/skills/write-execplan/PLANS.md` both describe the stricter change-slicing policy in compatible language.
 
 ## Idempotence and Recovery
 
