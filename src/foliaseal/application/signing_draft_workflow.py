@@ -7,9 +7,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Self
 
-from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.x509.oid import NameOID
-
+from foliaseal.application.certificate_preview import (
+    CertificatePreviewReader,
+    Pkcs12CertificatePreviewReader,
+)
 from foliaseal.application.coordinate_transform import (
     PageBox,
     PdfRect,
@@ -138,10 +139,18 @@ class SigningDraftWorkflow:
     timestamp_required: bool = True
     trust_policy: TimestampTrustPolicy | None = None
     certificate_alias: str | None = None
+    selected_certificate_configuration_id: str | None = None
+    selected_appearance_profile_id: str | None = None
+    selected_placement_profile_id: str | None = None
+    selected_signature_preset_id: str | None = None
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
     signature_placement_defaults: SignaturePlacementDefaults | None = None
     placement_context: SignaturePlacementContext | None = None
+    certificate_preview_reader: CertificatePreviewReader = field(
+        default_factory=Pkcs12CertificatePreviewReader,
+        repr=False,
+    )
     _certificate_preview_values: dict[SignatureFieldKey, str] | None = field(
         default=None,
         init=False,
@@ -193,10 +202,14 @@ class SigningDraftWorkflow:
     def set_signature_rect(self, signature_rect: SignatureRect | None) -> None:
         """Set the PDF-space rectangle used for the visible signature."""
         self.signature_rect = signature_rect
+        self.selected_placement_profile_id = None
+        self.selected_signature_preset_id = None
 
     def clear_signature_rect(self) -> None:
         """Remove the current signature rectangle."""
         self.signature_rect = None
+        self.selected_placement_profile_id = None
+        self.selected_signature_preset_id = None
 
     def update_signature_rect(
         self,
@@ -272,19 +285,22 @@ class SigningDraftWorkflow:
     ) -> None:
         """Set the normalized visible-signature appearance."""
         self.signature_appearance = signature_appearance
+        self.selected_appearance_profile_id = None
+        self.selected_signature_preset_id = None
 
     def clear_signature_appearance(self) -> None:
         """Remove the current visible-signature appearance draft."""
         self.signature_appearance = None
+        self.selected_appearance_profile_id = None
 
-    def capture_signature_preset(
+    def capture_current_signature_setup(
         self,
         name: str,
         *,
         schema_version: int = 1,
         placement_defaults: SignaturePlacementDefaults | None = None,
     ) -> ResolvedSignaturePreset:
-        """Capture the current appearance draft as a named reusable profile."""
+        """Capture the current setup as a resolved reusable signature preset."""
         if self.signature_appearance is None:
             raise ValueError("A signature appearance must exist before saving a profile.")
 
@@ -304,10 +320,34 @@ class SigningDraftWorkflow:
             placement_defaults=effective_placement_defaults,
         )
 
-    def apply_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
-        """Load a named reusable profile into the current draft."""
+    def apply_resolved_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
+        """Apply a resolved reusable signature preset to the current draft."""
         self.signature_appearance = preset.appearance
         self.signature_placement_defaults = preset.placement_defaults
+        self.selected_signature_preset_id = preset.preset.signature_preset_id
+        self.selected_certificate_configuration_id = (
+            preset.preset.certificate_configuration_id
+        )
+        self.selected_appearance_profile_id = preset.preset.appearance_profile_id
+        self.selected_placement_profile_id = preset.preset.placement_profile_id
+
+    def capture_signature_preset(
+        self,
+        name: str,
+        *,
+        schema_version: int = 1,
+        placement_defaults: SignaturePlacementDefaults | None = None,
+    ) -> ResolvedSignaturePreset:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.capture_current_signature_setup(
+            name,
+            schema_version=schema_version,
+            placement_defaults=placement_defaults,
+        )
+
+    def apply_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
+        """Compatibility alias for older profile-oriented call sites."""
+        self.apply_resolved_signature_preset(preset)
 
     def validation_issues(self) -> tuple[SigningDraftValidationIssue, ...]:
         """Return blocking and non-blocking problems for the current draft."""
@@ -408,72 +448,13 @@ class SigningDraftWorkflow:
         if self._certificate_preview_values is not None:
             return self._certificate_preview_values
 
-        try:
-            key, certificate, _extra = pkcs12.load_key_and_certificates(
-                Path(self.certificate_path).read_bytes(),
-                self.passphrase.encode("utf-8"),
-            )
-        except Exception:
-            self._certificate_preview_values = {}
-            self._certificate_preview_available = False
-            return self._certificate_preview_values
-
-        if key is None or certificate is None:
-            self._certificate_preview_values = {}
-            self._certificate_preview_available = False
-            return self._certificate_preview_values
-
-        subject = certificate.subject
-        def _first_attr(oid: NameOID) -> str | None:
-            attributes = subject.get_attributes_for_oid(oid)
-            if not attributes:
-                return None
-            value = attributes[0].value.strip()
-            return value or None
-
-        common_name = _first_attr(NameOID.COMMON_NAME)
-        email = _first_attr(NameOID.EMAIL_ADDRESS)
-        title = _first_attr(NameOID.TITLE) or _first_attr(NameOID.ORGANIZATIONAL_UNIT_NAME)
-        company = _first_attr(NameOID.ORGANIZATION_NAME)
-        location_parts = tuple(
-            value
-            for value in (
-                _first_attr(NameOID.LOCALITY_NAME),
-                _first_attr(NameOID.STATE_OR_PROVINCE_NAME),
-                _first_attr(NameOID.COUNTRY_NAME),
-            )
-            if value
+        preview_values = self.certificate_preview_reader.read_preview_values(
+            self.certificate_path,
+            self.passphrase,
         )
-        distinguished_name_parts = tuple(
-            value
-            for value in (
-                common_name,
-                email,
-                title,
-                company,
-                *location_parts,
-            )
-            if value
-        )
-
-        values: dict[SignatureFieldKey, str] = {}
-        if distinguished_name_parts:
-            values[SignatureFieldKey.DISTINGUISHED_NAME] = ", ".join(distinguished_name_parts)
-
-        if common_name:
-            values[SignatureFieldKey.COMMON_NAME] = common_name
-        if email:
-            values[SignatureFieldKey.EMAIL] = email
-        if title:
-            values[SignatureFieldKey.TITLE] = title
-        if company:
-            values[SignatureFieldKey.COMPANY] = company
-        if location_parts:
-            values[SignatureFieldKey.LOCATION] = ", ".join(location_parts)
-
-        self._certificate_preview_values = values
-        self._certificate_preview_available = True
-        return values
+        self._certificate_preview_values = preview_values.values
+        self._certificate_preview_available = preview_values.available
+        return self._certificate_preview_values
 
     def _validate_signature_rect(self) -> tuple[SigningDraftValidationIssue, ...]:
         rect = self.signature_rect

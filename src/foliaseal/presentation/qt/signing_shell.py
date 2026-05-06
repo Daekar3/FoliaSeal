@@ -1410,7 +1410,7 @@ class SignaturePropertiesPanel:
             return None
 
         try:
-            preset = self._workflow.capture_signature_preset(name)
+            preset = self._workflow.capture_current_signature_setup(name)
         except ValueError as exc:
             self._show_profile_error(str(exc))
             return None
@@ -1938,7 +1938,7 @@ class SignaturePropertiesPanel:
             return
 
         self._selected_profile_name = preset.name
-        self._workflow.apply_signature_preset(preset)
+        self._workflow.apply_resolved_signature_preset(preset)
         self.load_from_workflow()
         self._notify_change()
 

@@ -121,13 +121,13 @@ The canonical repository document split is:
 
 ### Signing draft workflow and preview rendering
 
-- Location: `src/foliaseal/application/signing_draft_workflow.py`, `src/foliaseal/application/signing_preview_renderer.py`
+- Location: `src/foliaseal/application/signing_draft_workflow.py`, `src/foliaseal/application/certificate_preview.py`, `src/foliaseal/application/signing_preview_renderer.py`
 - Responsibility: Normalize in-session signing draft state, validate it for submit, and render deterministic textual/canonical preview snapshots.
-- Owns: `SigningDraftWorkflow`, `SigningDraftPreview`, draft validation issues, preview/request parity checks, canonical preview rendering.
+- Owns: `SigningDraftWorkflow`, selected reusable-object ids for the current draft, `CertificatePreviewReader`, `Pkcs12CertificatePreviewReader`, `SigningDraftPreview`, draft validation issues, preview/request parity checks, canonical preview rendering.
 - Does not own: visible-signature text/metadata semantics, Qt controls, pyHanko signing execution, persisted profile store.
 - Key collaborators: domain models, coordinate transforms, visible signature semantics service, visible signature layout engine, signing backend for canonical pyHanko style.
-- Main entry points: `SigningDraftWorkflow.preview()`, `SigningDraftWorkflow.to_signing_request()`, `render_signing_preview()`, `render_canonical_signature_preview()`, `compare_preview_to_request()`.
-- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read from PKCS#12 when available; the workflow also imports `ResolvedSignaturePreset` from infra config, so the application layer still knows a transitional persistence DTO.
+- Main entry points: `SigningDraftWorkflow.preview()`, `SigningDraftWorkflow.build_signing_request()`, `render_signing_preview()`, `render_canonical_signature_preview()`, `compare_preview_to_request()`.
+- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read through an injected application-layer reader, with `Pkcs12CertificatePreviewReader` as the default implementation. The workflow still imports `ResolvedSignaturePreset` from infra config and exposes profile-method compatibility aliases, so the application layer still knows a transitional persistence DTO while schema-alignment Slice 3 continues.
 - Status: Confirmed by code; infra DTO dependency is debt/needs review.
 
 ### Viewer workflow and coordinate geometry
@@ -214,6 +214,7 @@ The canonical repository document split is:
 | `TimestampTrustPolicy` | `domain/models.py` | Runtime timestamp trust validation inputs. | system store flag, CA bundle path, revocation mode. | Converted from config `TrustProfile`. |
 | `SigningBackendRequest` | `application/sign_pdf_use_case.py` | Backend-facing normalized signing payload. | public signing fields plus `SigningBackendAppearance`. | Created by `from_signing_request()`. |
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, rect, appearance, placement context. | Produces preview and final `SigningRequest`. |
+| `CertificatePreviewReader` / `Pkcs12CertificatePreviewReader` | `application/certificate_preview.py` | Extract certificate-derived visible-signature preview values. | certificate path, passphrase -> field-value map and availability flag. | Injected into draft workflow so PKCS#12 parsing is not implemented inside the draft object. |
 | `SigningDraftPreview` | `application/signing_draft_workflow.py` | UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, stamp text, issues, can_submit. | Used by Qt and preview renderer. |
 | `VisibleSignatureSemantics` | `application/visible_signature_semantics.py` | Resolved visible-signature meaning-level payload. | resolved fields, title/detail/stamp text, metadata reason/location/contact info, fit issues, readiness. | Shared source for workflow preview, canonical preview text, backend signing text, and metadata. |
 | `SignatureLayoutPlan` | `application/visible_signature_layout.py` | Canonical visible-signature geometry result. | text/stamp area dimensions, layout rules, fit issues, optional ink reservation. | Boundary for backend/canonical/Qt preview geometry. |
@@ -358,6 +359,7 @@ The canonical repository document split is:
 3. Saving creates or replaces a resolved preset, which stores separate `AppearanceProfile`, optional `PlacementProfile`, and reference-only `SignaturePreset` entries in `SignaturePresetCatalog`.
 4. Store writes indented sorted JSON to a `.tmp` file and replaces `profiles.json`.
 5. Delete rewrites the catalog without the named profile.
+6. The Qt shell now calls canonical draft methods `capture_current_signature_setup()` and `apply_resolved_signature_preset()`; older profile-oriented method names remain as compatibility aliases.
 
 ### Phase 3 evidence validation
 
@@ -435,6 +437,7 @@ Default local validation from README:
 | `signing_shell.py` is a large module containing widget composition, profile handling, preview sizing, and workflow orchestration. | Changes risk broad review scope and can hide UI/domain coupling. | Tests use fakes and helper-level coverage. | Split only when clear ownership boundaries emerge, likely panel/profile/preview adapter components. |
 | Application layer imports some infra DTOs and concrete backend helpers. | Layer boundary is not perfectly clean. | Semantics decisions now live behind `VisibleSignatureSemanticsService`; remaining imports are primarily layout/backend compatibility, profile DTOs, and certificate config DTOs. | Move shared DTOs/interfaces upward or add adapter methods when it reduces coupling. |
 | Certificate configuration persistence is not wired into the Qt shell yet. | The canonical object exists, but users still interact with raw certificate path/passphrase fields in the current GUI. | `CertificateSigningMaterialResolver` provides the seam for the next UI/workflow slice. | Refactor draft workflow and shell certificate selection to use `CertificateConfiguration` references. |
+| Profile terminology remains in parts of the Qt shell and compatibility API. | The schema model is now more canonical than some UI/control names. | Canonical workflow methods exist while compatibility aliases keep broad tests stable. | Rename UI and remove aliases after certificate/settings integration reduces churn. |
 | `SignatureLayoutPlan.backend_reservation` carries an opaque backend object. | Public layout boundary is not fully neutral. | Preserve pyHanko parity during migration. | Replace with neutral data once backend/private helpers are no longer required. |
 | PySide6 is dynamically imported but not listed in `pyproject.toml` runtime dependencies. | A fresh install may run CLI helpers but fail GUI/harness commands without extra packages. | Runtime diagnostics report unavailable Qt bindings. | Decide whether PySide6 belongs in optional extras or documented system setup only. |
 | `foliaseal.spec` does not visibly use `collect_runtime_assets()`. | PyInstaller hidden-import behavior may diverge between helper tests and real spec. | `foliaseal.spec` independently collects FoliaSeal submodules. | Wire the helper into the spec or delete the unused helper path after review. |
@@ -454,6 +457,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-06 | Added draft reusable-object references and certificate preview reader seam. | Reflected schema model alignment Slice 3A implementation. |
 | 2026-05-06 | Added certificate catalog and signing-material resolver architecture. | Reflected schema model alignment Slice 2 implementation. |
 | 2026-04-30 | Replaced skeleton with first-pass architecture map. | Documented current repository structure, contracts, flows, persistence, tests, debts, and open questions from code inspection. |
 | 2026-04-30 | Created architecture document skeleton. | Establish canonical architecture documentation path referenced by agent instructions. |

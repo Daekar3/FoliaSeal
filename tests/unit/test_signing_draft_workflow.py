@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
+from foliaseal.application.certificate_preview import CertificatePreviewValues
 from foliaseal.application.coordinate_transform import PageBox, ViewRect, ViewTransform
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
@@ -17,6 +18,7 @@ from foliaseal.application.signing_draft_workflow import (
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldBinding,
+    SignatureFieldKey,
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
@@ -201,6 +203,59 @@ def test_workflow_preview_uses_certificate_values_when_pkcs12_is_readable(tmp_pa
     assert preview.fields[7].text == "Wytheville, Virginia, US"
 
 
+class FakeCertificatePreviewReader:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def read_preview_values(
+        self,
+        certificate_path: str,
+        passphrase: str,
+    ) -> CertificatePreviewValues:
+        self.calls.append((certificate_path, passphrase))
+        return CertificatePreviewValues(
+            available=True,
+            values={
+                SignatureFieldKey.COMMON_NAME: "Injected Signer",
+                SignatureFieldKey.EMAIL: "injected@example.com",
+            },
+        )
+
+
+def test_workflow_uses_injected_certificate_preview_reader(tmp_path: Path) -> None:
+    reader = FakeCertificatePreviewReader()
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "missing-cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        certificate_preview_reader=reader,
+    )
+    workflow.set_signature_appearance(
+        SignatureAppearance(
+            common_name=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+            email=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+            signing_time=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+        )
+    )
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=220.0,
+            height_pt=80.0,
+        )
+    )
+
+    preview = workflow.preview()
+
+    assert reader.calls == [(str(tmp_path / "missing-cert.p12"), "secret")]
+    assert preview.fields[1].text == "Injected Signer"
+    assert preview.fields[2].text == "injected@example.com"
+
+
 def test_workflow_blocks_compact_rectangles_that_backend_will_reject(
     tmp_path: Path,
 ) -> None:
@@ -345,7 +400,7 @@ def test_workflow_reports_missing_draft_components_as_validation_issues(
     }
 
 
-def test_workflow_can_capture_and_apply_named_profile(tmp_path: Path) -> None:
+def test_workflow_can_capture_and_apply_signature_setup(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
     appearance = _appearance()
     placement_defaults = SignaturePlacementDefaults(
@@ -355,7 +410,7 @@ def test_workflow_can_capture_and_apply_named_profile(tmp_path: Path) -> None:
     workflow.set_signature_appearance(appearance)
     workflow.signature_placement_defaults = placement_defaults
 
-    captured = workflow.capture_signature_preset("Team Standard")
+    captured = workflow.capture_current_signature_setup("Team Standard")
 
     assert isinstance(captured, ResolvedSignaturePreset)
     assert captured.name == "Team Standard"
@@ -366,10 +421,26 @@ def test_workflow_can_capture_and_apply_named_profile(tmp_path: Path) -> None:
 
     workflow.clear_signature_appearance()
     workflow.signature_placement_defaults = None
-    workflow.apply_signature_preset(captured)
+    workflow.apply_resolved_signature_preset(captured)
 
     assert workflow.current_signature_appearance == appearance
     assert workflow.signature_placement_defaults == placement_defaults
+    assert workflow.selected_signature_preset_id == "preset-team-standard"
+    assert workflow.selected_appearance_profile_id == "appearance-team-standard"
+    assert workflow.selected_placement_profile_id == "placement-team-standard"
+
+
+def test_workflow_keeps_compatibility_aliases_for_profile_methods(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = _appearance()
+    workflow.set_signature_appearance(appearance)
+
+    captured = workflow.capture_signature_preset("Team Standard")
+    workflow.clear_signature_appearance()
+    workflow.apply_signature_preset(captured)
+
+    assert workflow.current_signature_appearance == appearance
+    assert workflow.selected_signature_preset_id == "preset-team-standard"
 
 
 def test_workflow_captures_placement_defaults_from_current_rectangle(
@@ -387,7 +458,7 @@ def test_workflow_captures_placement_defaults_from_current_rectangle(
         )
     )
 
-    captured = workflow.capture_signature_preset("Compact")
+    captured = workflow.capture_current_signature_setup("Compact")
 
     assert captured.name == "Compact"
     assert captured.placement_defaults == SignaturePlacementDefaults(
