@@ -26,6 +26,10 @@ BASE_ACCEPTANCE_PDF = Path("artifacts/generated_acceptance_assets/signed_accepta
 BASE_ACCEPTANCE_IDENTITY = Path(
     "artifacts/generated_acceptance_assets/signed_acceptance_identity.p12"
 )
+pytestmark = pytest.mark.skipif(
+    not BASE_ACCEPTANCE_PDF.exists() or not BASE_ACCEPTANCE_IDENTITY.exists(),
+    reason="local QA artifact fixtures are absent because artifacts/ is ignored",
+)
 
 
 def _build_request(input_pdf_path: Path, output_pdf_path: Path) -> SigningRequest:

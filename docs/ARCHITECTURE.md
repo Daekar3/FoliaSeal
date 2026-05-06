@@ -49,7 +49,7 @@ The canonical repository document split is:
 | `tests/unit/` | Unit and focused integration-style tests for each layer. | Heavy coverage around signing, preview, Qt shell, and layout policy. |
 | `tests/support/` | Test builders and certification fixtures. | Used by multiple unit suites. |
 | `tests/fixtures/` | Durable fixture data. | Includes Phase 3 manual replay JSON. |
-| `artifacts/` | Manual QA evidence, manifests, and durable acceptance assets. | Run-output directories/files are mostly ignored by `.gitignore`. |
+| `artifacts/` | Local manual QA evidence, manifests, generated runs, and acceptance fixture workspace. | The whole tree is ignored by `.gitignore`; artifact-backed tests skip when local fixtures are absent. Promote small durable fixtures to `tests/fixtures/` only when they must be clone-stable. |
 | `docs/SPEC.md` | Canonical product requirements and anti-goals. | Product intent; may lead current implementation. |
 | `docs/SCHEMAS.md` | Canonical persistent object model and vocabulary. | Product-facing schema target; may lead current implementation. |
 | `docs/ExecPlans/` | Living implementation plans and notes. | Formerly `docs/ExecPlans/`; now documentation-owned. |
@@ -362,7 +362,7 @@ The canonical repository document split is:
 | Reusable signing profiles | Qt shell/user input | domain appearance/placement -> split config schema -> JSON | XDG data dir under `FoliaSeal/Signature Profiles/profiles.json` | `SignaturePresetCatalog` JSON with appearance, placement, and preset lists | Missing/blank catalog becomes empty. |
 | Trust profile/timestamp policy | Config schema callers | JSON dicts <-> dataclasses -> runtime trust policy | Needs review | JSON schema in `infra/config/schemas.py` | Storage location outside profile catalog is not yet clearly documented in code. |
 | Viewer render buffers | Render backend | PDF page -> RGBA bytes | Memory; optional render cache | `RenderPageResult` | Cache is in-memory LRU keyed by path/page/zoom. |
-| Preview artifacts | Qt harness/matrix | widget/canonical preview capture, overlays, diagnostics | `artifacts/` run directories | PNG/JSON/markdown | Generated run outputs are mostly ignored. |
+| Preview artifacts | Qt harness/matrix | widget/canonical preview capture, overlays, diagnostics | `artifacts/` run directories | PNG/JSON/markdown | Generated run outputs and local QA fixture workspaces are ignored. |
 | Bundled fonts | Package resources | resolved by font registry and backend/preview | `src/foliaseal/resources/fonts/` in package data | TTF files | User-facing families map to bundled font faces. |
 
 ## 9. Dependency rules

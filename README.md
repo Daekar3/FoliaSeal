@@ -89,8 +89,8 @@ Not yet production-ready:
 
 - automated preview/output parity is green for the current signed fixture matrices, but still needs
   representative manual gate-candidate review against real PDFs
-- broad matrix status should be taken from the current checked-in summaries rather than from stale
-  narrative notes here
+- broad matrix status should be taken from current local run summaries or intentionally curated
+  release evidence rather than from stale narrative notes here
 - transparent GIF stamp handling in final signed PDF output is not trustworthy yet; PNG remains the safer image-stamp format
 - TSA-backed timestamping and timestamp-required signing flows
 - final end-to-end FR-3B acceptance validation
@@ -123,7 +123,8 @@ Roadmap note:
   - preview matrices cover layout geometry and content-density regression safety,
   - signed-output acceptance covers cryptographic validity and preview/output parity on the actual
     signed PDF.
-- The broad preview-matrix status must be read from the latest checked-in summary artifacts.
+- The broad preview-matrix status must be read from the latest local run summaries or intentionally
+  curated release evidence.
   Font-engine and layout-contract revisions can legitimately move both baseline and stress results,
   so this README should not be treated as the live matrix scoreboard.
 - The evidence-contract/gate machinery now exists, but it is an engineering validation layer rather
@@ -324,7 +325,7 @@ How to interpret it:
 
 Use the interactive harness when you want to manipulate the GUI manually. Use the preview matrix when you want a deterministic sweep across saved images, border widths, and rectangle aspect ratios.
 
-Current interpretation of the checked-in preview-matrix summaries:
+Current interpretation of the preview-matrix summaries:
 
 - treat `signable_*` counts as the true green-path regression signal
 - treat `rejected_*` counts as negative-test coverage for cases the validator is already blocking
@@ -355,7 +356,8 @@ immediately exposed remaining green-path text-fit problems under realistic conte
 is an expected and useful result of the stronger methodology, not a reason to ignore the stress
 suite.
 
-The repo now includes two distinct fixture families:
+The local QA workflow uses two distinct fixture families under `artifacts/`. These paths are
+conventional local workspace paths, not guaranteed tracked repository inputs:
 
 - `artifacts/preview_sweep_assets/` for preview/layout work, including `sweep_fixture.pdf`,
   `test_identity.p12`, the three transparent stamp images, and the baseline/stress preview
@@ -365,15 +367,17 @@ The repo now includes two distinct fixture families:
 
 Artifact hygiene:
 
-- keep durable inputs in git, including fixture PDFs, stamp images, test identities, and scenario
-  manifests
+- keep `artifacts/` out of ordinary source control; the tree is ignored so fresh clones do not
+  download historical preview runs or large fixture workspaces
+- keep durable fixture inputs locally or in external/CI artifact storage unless there is an explicit
+  small-file reason to promote a fixture into `tests/fixtures/`
 - keep small curated evidence documents in git when they are intentionally part of project status,
   such as acceptance worksheets or handoff notes
 - keep generated run output out of git by default, including per-scenario PNGs, debug overlays,
   signed PDFs, comparison crops, and repeated matrix run directories
-- generated output directories are ignored in `.gitignore`; if a file was already tracked before
-  the ignore rule existed, remove it from tracking with `git rm --cached` rather than deleting the
-  local file
+- the whole `artifacts/` tree is ignored in `.gitignore`; if a file was already tracked before the
+  ignore rule existed, remove it from tracking with `git rm --cached` rather than deleting the local
+  file
 - if a generated artifact is needed for a specific review, prefer sharing the run directory outside
   source control or committing only a small summary with an explicit rationale
 
@@ -387,7 +391,7 @@ current layout families:
 - `multi_line_full_matrix_stress.json`
 - `wrapped_block_full_matrix_stress.json`
 
-Those checked-in manifests demonstrate three practical sweep controls that matter for layout triage:
+Those local manifests demonstrate three practical sweep controls that matter for layout triage:
 
 - `visible_fields` to constrain which derived fields participate in a compact preview scenario
 - explicit text-size variation scenarios so preview regressions can be checked at more than one
@@ -397,9 +401,9 @@ Those checked-in manifests demonstrate three practical sweep controls that matte
 
 Status note:
 
-- the checked-in baseline `single_line`, `multi_line`, and `wrapped_block` matrices are currently
+- the local baseline `single_line`, `multi_line`, and `wrapped_block` matrices are currently
   green in automation
-- the checked-in stress matrices are intentionally not green yet; they are currently exposing
+- the local stress matrices are intentionally not green yet; they are currently exposing
   remaining green-path clipping regressions under realistic content pressure
 - preview typography semantics are layout-invariant: the selected point size means the same thing in
   `single_line`, `multi_line`, and `wrapped_block`; layout mode may change reservation geometry,
