@@ -26,7 +26,7 @@ The user-visible behavior should remain equivalent: saved reusable signing setup
 - [x] (2026-05-06 23:01Z) Removed no-longer-used draft workflow compatibility aliases for old profile method names.
 - [x] (2026-05-06 23:03Z) Updated architecture and parent/child ExecPlan documentation.
 - [x] (2026-05-06 23:04Z) Ran focused validation, lint, and the full test suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-06 23:05Z) Committed the completed slice as `8c2064c95 refactor: rename signature preset terminology`.
 
 ## Surprises & Discoveries
 
@@ -142,3 +142,5 @@ No new third-party dependencies are needed.
 Revision note: created on 2026-05-06 to keep schema-alignment Slice 3C focused on preset terminology and compatibility-alias reduction.
 
 Revision note: updated on 2026-05-06 after implementation to record canonical preset APIs, Qt shell terminology changes, alias removal in the draft workflow, documentation updates, and validation evidence.
+
+Revision note: updated on 2026-05-06 after commit to record commit `8c2064c95` in the progress checklist.

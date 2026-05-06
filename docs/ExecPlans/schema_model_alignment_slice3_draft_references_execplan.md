@@ -28,8 +28,8 @@ The user-visible behavior should remain the same: saved signature setup entries 
 
 ## Surprises & Discoveries
 
-- Observation: The Qt shell already persists canonical `SignaturePreset` objects after Slice 1, but the method names and UI labels still say "profile".
-  Evidence: before this slice, `SignaturePropertiesPanel.save_current_profile()` called `SigningDraftWorkflow.capture_signature_preset()` and `SignaturePresetCatalog.upsert_profile()`. This slice moved the workflow call to `capture_current_signature_setup()`, while catalog compatibility methods and UI labels still use profile terminology.
+- Observation: At the time of Slice 3A, the Qt shell already persisted canonical `SignaturePreset` objects after Slice 1, but the method names and UI labels still said "profile".
+  Evidence: before this slice, `SignaturePropertiesPanel.save_current_profile()` called `SigningDraftWorkflow.capture_signature_preset()` and `SignaturePresetCatalog.upsert_profile()`. Slice 3A moved the workflow call to `capture_current_signature_setup()`, and Slice 3C later moved primary shell/catalog/store terminology to signature presets.
 
 - Observation: The draft owns a PKCS#12 parsing method directly.
   Evidence: `SigningDraftWorkflow._certificate_values_for_preview()` reads `Path(self.certificate_path).read_bytes()` and calls `pkcs12.load_key_and_certificates(...)`.
@@ -58,7 +58,7 @@ The user-visible behavior should remain the same: saved signature setup entries 
 
 Implemented Slice 3A. `SigningDraftWorkflow` now has selected reusable-object id fields, canonical `capture_current_signature_setup()` and `apply_resolved_signature_preset()` methods, and compatibility aliases for old profile-oriented call sites. Certificate preview extraction moved to `src/foliaseal/application/certificate_preview.py`, where `Pkcs12CertificatePreviewReader` owns PKCS#12 parsing and the draft calls an injected `CertificatePreviewReader`.
 
-The Qt shell save/select code now calls the canonical workflow methods, while the UI still says "Named profiles" and the catalog compatibility methods still use profile terminology. That remaining terminology cleanup is intentionally deferred until certificate configuration UI integration is ready.
+The Qt shell save/select code now calls the canonical workflow methods. At the time this Slice 3A plan closed, the UI still said "Named profiles" and the catalog compatibility methods still used profile terminology. That remaining terminology cleanup was intentionally deferred, then completed in Slice 3C after certificate configuration UI integration.
 
 ## Context and Orientation
 
@@ -72,9 +72,9 @@ First, add or update tests in `tests/unit/test_signing_draft_workflow.py` to req
 
 Second, add an application-layer certificate preview service, likely in a new `src/foliaseal/application/certificate_preview.py` module. It should define a small result dataclass, a protocol, and the existing PKCS#12 implementation moved out of `SigningDraftWorkflow`. The workflow should call the injected reader and cache its result as it does today.
 
-Third, update `SigningDraftWorkflow` with canonical selection fields: `selected_certificate_configuration_id`, `selected_appearance_profile_id`, `selected_placement_profile_id`, and `selected_signature_preset_id`. Add canonical methods such as `capture_current_signature_setup()` and `apply_resolved_signature_preset()`. Keep `capture_signature_preset()` and `apply_signature_preset()` as compatibility wrappers that delegate to the canonical methods.
+Third, update `SigningDraftWorkflow` with canonical selection fields: `selected_certificate_configuration_id`, `selected_appearance_profile_id`, `selected_placement_profile_id`, and `selected_signature_preset_id`. Add canonical methods such as `capture_current_signature_setup()` and `apply_resolved_signature_preset()`. At the time of Slice 3A, `capture_signature_preset()` and `apply_signature_preset()` remained as compatibility wrappers; Slice 3C later removed them after call sites moved to canonical names.
 
-Fourth, update `src/foliaseal/presentation/qt/signing_shell.py` so save/select code calls the canonical methods. The UI label can remain "Named profiles" in this slice if changing the user-facing wording would expand test churn; the architecture docs should record that UI terminology remains transitional.
+Fourth, update `src/foliaseal/presentation/qt/signing_shell.py` so save/select code calls the canonical methods. The UI label remained "Named profiles" in Slice 3A to avoid widening test churn; Slice 3C later renamed it to "Signature presets".
 
 Fifth, update `docs/ARCHITECTURE.md` and the parent schema alignment ExecPlan to record Slice 3A completion and remaining Slice 3 work.
 
