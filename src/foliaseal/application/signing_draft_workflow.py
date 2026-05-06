@@ -32,7 +32,7 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
-from foliaseal.infra.config.schemas import SignaturePreset
+from foliaseal.infra.config.schemas import ResolvedSignaturePreset
 
 
 class SigningDraftValidationError(ValueError):
@@ -283,7 +283,7 @@ class SigningDraftWorkflow:
         *,
         schema_version: int = 1,
         placement_defaults: SignaturePlacementDefaults | None = None,
-    ) -> SignaturePreset:
+    ) -> ResolvedSignaturePreset:
         """Capture the current appearance draft as a named reusable profile."""
         if self.signature_appearance is None:
             raise ValueError("A signature appearance must exist before saving a profile.")
@@ -297,14 +297,14 @@ class SigningDraftWorkflow:
                 height_pt=self.signature_rect.height_pt,
             )
 
-        return SignaturePreset(
+        return ResolvedSignaturePreset.from_parts(
             schema_version=schema_version,
             name=name,
             appearance=self.signature_appearance,
             placement_defaults=effective_placement_defaults,
         )
 
-    def apply_signature_preset(self, preset: SignaturePreset) -> None:
+    def apply_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
         """Load a named reusable profile into the current draft."""
         self.signature_appearance = preset.appearance
         self.signature_placement_defaults = preset.placement_defaults

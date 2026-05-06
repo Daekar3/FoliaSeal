@@ -25,7 +25,7 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
-from foliaseal.infra.config.schemas import SignaturePreset
+from foliaseal.infra.config.schemas import ResolvedSignaturePreset
 
 
 def _appearance() -> SignatureAppearance:
@@ -357,12 +357,12 @@ def test_workflow_can_capture_and_apply_named_profile(tmp_path: Path) -> None:
 
     captured = workflow.capture_signature_preset("Team Standard")
 
-    assert captured == SignaturePreset(
-        schema_version=1,
-        name="Team Standard",
-        appearance=appearance,
-        placement_defaults=placement_defaults,
-    )
+    assert isinstance(captured, ResolvedSignaturePreset)
+    assert captured.name == "Team Standard"
+    assert captured.appearance == appearance
+    assert captured.placement_defaults == placement_defaults
+    assert captured.preset.appearance_profile_id == "appearance-team-standard"
+    assert captured.preset.placement_profile_id == "placement-team-standard"
 
     workflow.clear_signature_appearance()
     workflow.signature_placement_defaults = None

@@ -18,7 +18,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 - [x] (2026-05-06 00:00Z) Audited `docs/SCHEMAS.md`, `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`, `src/foliaseal/application/signing_draft_workflow.py`, `src/foliaseal/domain/models.py`, and the profile-handling portions of `src/foliaseal/presentation/qt/signing_shell.py`.
 - [x] (2026-05-06 00:07Z) Identified the highest-leverage drift: the current `SignaturePreset` persistence model is actually a named appearance-plus-placement profile, certificate usage is still direct path/passphrase state, and global app settings do not exist as a first-class persisted object.
-- [ ] Implement Slice 1: split the current monolithic reusable-profile persistence into canonical `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset` catalogs plus stores.
+- [x] (2026-05-06 00:55Z) Implemented Slice 1: split the current monolithic reusable-profile persistence into canonical `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset` catalog/storage behavior. Details live in `docs/ExecPlans/schema_model_alignment_slice1_profiles_execplan.md`.
 - [ ] Implement Slice 2: add `ManagedCertificate` and `CertificateConfiguration` persistence plus a signing-material resolver that converts a selected configuration into runtime signing inputs.
 - [ ] Implement Slice 3: refactor `SigningDraftWorkflow` and the Qt shell so ephemeral draft state references reusable objects instead of embedding persistence-shaped data directly.
 - [ ] Implement Slice 4: add `AppSettings` persistence and move open/save directory defaults into that store.
@@ -43,6 +43,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 - Observation: there is no first-class persisted `AppSettings` object at all.
   Evidence: `src/foliaseal/infra/config/profile_storage.py` only defines profile-catalog storage rooted at `Signature Profiles`, and repository search finds no `AppSettings` or default output-directory persistence type.
+
+- Observation: Slice 1 validation is locally clean for focused tests and lint, while the full suite has unrelated artifact-manifest failures.
+  Evidence: focused schema/storage/workflow/shell tests reported `92 passed`, `ruff check .` passed, and full `pytest -q` reported four failures in `tests/unit/test_phase3_harness.py` manifest expectation tests.
 
 ## Decision Log
 

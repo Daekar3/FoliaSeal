@@ -163,15 +163,15 @@ The canonical repository document split is:
 - Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file.
 - Status: Confirmed by code and tests; size/concentration is debt/needs review.
 
-### Configuration and profile persistence
+### Configuration and reusable signing-object persistence
 
 - Location: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`
-- Responsibility: Serialize, deserialize, validate, load, and save trust/timestamp/profile configuration.
-- Owns: `TrustProfile`, `TimestampPolicy`, `SignaturePreset`, `SignaturePresetCatalog`, `SignaturePresetCatalogStore`.
+- Responsibility: Serialize, deserialize, validate, load, and save trust/timestamp configuration plus reusable signing-object catalogs.
+- Owns: `TrustProfile`, `TimestampPolicy`, `AppearanceProfile`, `PlacementProfile`, reference-only `SignaturePreset`, `ResolvedSignaturePreset`, `SignaturePresetCatalog`, `SignaturePresetCatalogStore`.
 - Does not own: UI controls or runtime signing flow.
 - Key collaborators: domain models, Qt signing shell.
-- Main entry points: `SignaturePresetCatalog.from_dict()`, `SignaturePreset.to_dict()`, `SignaturePresetCatalogStore.load_catalog()`, `save_catalog()`, `save_profile()`, `delete_profile()`.
-- Known constraints: Profiles are stored as human-readable JSON at `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Signature Profiles/profiles.json`.
+- Main entry points: `AppearanceProfile.from_dict()`, `PlacementProfile.from_dict()`, `SignaturePreset.from_dict()`, `SignaturePresetCatalog.from_dict()`, `SignaturePresetCatalog.resolve_preset()`, `SignaturePresetCatalogStore.load_catalog()`, `save_catalog()`, `save_profile()`, `delete_profile()`.
+- Known constraints: The store still uses the historical user-visible `Signature Profiles/profiles.json` path, but the JSON shape now separates `appearance_profiles`, `placement_profiles`, and `signature_presets`. Compatibility helper methods such as `profile_names()` and `profile_named()` remain for the current Qt shell and harness while later schema-alignment slices continue.
 - Status: Confirmed by code and tests.
 
 ### Timestamping, trust, and certification infrastructure
@@ -219,7 +219,9 @@ The canonical repository document split is:
 | `SignatureLayoutPlan` | `application/visible_signature_layout.py` | Canonical visible-signature geometry result. | text/stamp area dimensions, layout rules, fit issues, optional ink reservation. | Boundary for backend/canonical/Qt preview geometry. |
 | `ViewerSession` | `application/viewer_session.py` | Viewer page/zoom state. | page count, current page, zoom. | Clamps zoom via `ViewerZoomLimits`. |
 | `ViewerRenderSnapshot` | `application/viewer_workflow.py` | Current rendered page state for interactions. | page index, zoom, pan, page box, rotation, image size, mapping readiness. | Required for selection mapping. |
-| `SignaturePreset` / `SignaturePresetCatalog` | `infra/config/schemas.py` | Persisted named visible-signature profiles. | schema version, name, appearance, placement defaults. | Serialized to JSON. |
+| `AppearanceProfile` | `infra/config/schemas.py` | Persisted signing-specific visible appearance. | stable id, display name, `SignatureAppearance`. | Canonical reusable appearance object. |
+| `PlacementProfile` | `infra/config/schemas.py` | Persisted reusable placement defaults. | stable id, display name, current-page rect, numeric fine-tuning flag. | Converted to current shell width/height defaults when resolved. |
+| `SignaturePreset` / `ResolvedSignaturePreset` / `SignaturePresetCatalog` | `infra/config/schemas.py` | Persisted reference-only preset plus resolved view for current UI/harness consumers. | preset id, display name, optional referenced object ids. | `SignaturePreset` stores references only; resolved objects expose appearance/placement for transitional call sites. |
 | `RenderPageRequest` / `RenderPageResult` | `infra/render/base.py` | Render backend request/result. | document path, page index, zoom; width/height/RGBA bytes. | Backend protocol contract. |
 | `Phase3HarnessCapture` | `presentation/qt/phase3_harness.py` | Structured acceptance harness result. | preview/request/signing/evidence fields. | JSON output is validated by evidence contract. |
 

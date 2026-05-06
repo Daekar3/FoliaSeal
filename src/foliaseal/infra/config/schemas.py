@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any
@@ -93,6 +94,19 @@ def _require_non_empty_str_value(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ConfigValidationError(f"Field '{field}' must be a non-empty str.")
     return value
+
+
+def _require_optional_non_empty_str_value(value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    return _require_non_empty_str_value(value, field)
+
+
+def _stable_id(prefix: str, display_name: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", display_name.strip().lower()).strip("-")
+    if not normalized:
+        normalized = "unnamed"
+    return f"{prefix}-{normalized}"
 
 
 def _optional_str(payload: dict[str, Any], field: str) -> str | None:
@@ -336,13 +350,47 @@ class TimestampPolicy:
 
 
 @dataclass(frozen=True)
-class SignaturePreset:
-    """Reusable visible signature appearance profile."""
+class PlacementProfileRect:
+    """PDF-space rectangle data persisted in a placement profile."""
+
+    left_pt: float
+    bottom_pt: float
+    width_pt: float
+    height_pt: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "left_pt", _require_float(asdict(self), "left_pt"))
+        object.__setattr__(self, "bottom_pt", _require_float(asdict(self), "bottom_pt"))
+        object.__setattr__(self, "width_pt", _require_float(asdict(self), "width_pt"))
+        object.__setattr__(self, "height_pt", _require_float(asdict(self), "height_pt"))
+        if self.width_pt <= 0:
+            raise ConfigValidationError("Field 'width_pt' must be positive.")
+        if self.height_pt <= 0:
+            raise ConfigValidationError("Field 'height_pt' must be positive.")
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> PlacementProfileRect:
+        """Build from persisted mapping."""
+        return cls(
+            left_pt=_require_float(payload, "left_pt"),
+            bottom_pt=_require_float(payload, "bottom_pt"),
+            width_pt=_require_float(payload, "width_pt"),
+            height_pt=_require_float(payload, "height_pt"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a persisted mapping."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class AppearanceProfile:
+    """Reusable visible-signature appearance profile."""
 
     schema_version: int
-    name: str
+    appearance_profile_id: str
+    display_name: str
     appearance: SignatureAppearance
-    placement_defaults: SignaturePlacementDefaults | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -350,15 +398,185 @@ class SignaturePreset:
             "schema_version",
             _require_int_value(self.schema_version, "schema_version"),
         )
-        object.__setattr__(self, "name", _require_non_empty_str_value(self.name, "name"))
+        object.__setattr__(
+            self,
+            "appearance_profile_id",
+            _require_non_empty_str_value(self.appearance_profile_id, "appearance_profile_id"),
+        )
+        object.__setattr__(
+            self,
+            "display_name",
+            _require_non_empty_str_value(self.display_name, "display_name"),
+        )
         if not isinstance(self.appearance, SignatureAppearance):
             raise ConfigValidationError("Field 'appearance' must be a SignatureAppearance.")
-        if self.placement_defaults is not None and not isinstance(
-            self.placement_defaults,
-            SignaturePlacementDefaults,
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> AppearanceProfile:
+        """Build from persisted mapping."""
+        return cls(
+            schema_version=_require_int(payload, "schema_version"),
+            appearance_profile_id=_require_non_empty_str(payload, "appearance_profile_id"),
+            display_name=_require_non_empty_str(payload, "display_name"),
+            appearance=_deserialize_appearance(_require_mapping(payload, "appearance")),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a persisted mapping."""
+        return {
+            "schema_version": self.schema_version,
+            "appearance_profile_id": self.appearance_profile_id,
+            "display_name": self.display_name,
+            "appearance": _serialize_appearance(self.appearance),
+        }
+
+    @property
+    def name(self) -> str:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.display_name
+
+
+@dataclass(frozen=True)
+class PlacementProfile:
+    """Reusable visible-signature placement profile."""
+
+    schema_version: int
+    placement_profile_id: str
+    display_name: str
+    page_selection_mode: str
+    rect: PlacementProfileRect
+    numeric_fine_tuning_enabled: bool = True
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "schema_version",
+            _require_int_value(self.schema_version, "schema_version"),
+        )
+        object.__setattr__(
+            self,
+            "placement_profile_id",
+            _require_non_empty_str_value(self.placement_profile_id, "placement_profile_id"),
+        )
+        object.__setattr__(
+            self,
+            "display_name",
+            _require_non_empty_str_value(self.display_name, "display_name"),
+        )
+        object.__setattr__(
+            self,
+            "page_selection_mode",
+            _require_non_empty_str_value(self.page_selection_mode, "page_selection_mode"),
+        )
+        if not isinstance(self.rect, PlacementProfileRect):
+            raise ConfigValidationError("Field 'rect' must be a PlacementProfileRect.")
+        object.__setattr__(
+            self,
+            "numeric_fine_tuning_enabled",
+            _require_bool(asdict(self), "numeric_fine_tuning_enabled"),
+        )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> PlacementProfile:
+        """Build from persisted mapping."""
+        return cls(
+            schema_version=_require_int(payload, "schema_version"),
+            placement_profile_id=_require_non_empty_str(payload, "placement_profile_id"),
+            display_name=_require_non_empty_str(payload, "display_name"),
+            page_selection_mode=_require_non_empty_str(payload, "page_selection_mode"),
+            rect=PlacementProfileRect.from_dict(_require_mapping(payload, "rect")),
+            numeric_fine_tuning_enabled=_require_bool(
+                payload,
+                "numeric_fine_tuning_enabled",
+            ),
+        )
+
+    @classmethod
+    def from_defaults(
+        cls,
+        *,
+        display_name: str,
+        placement_defaults: SignaturePlacementDefaults,
+        schema_version: int = 1,
+        placement_profile_id: str | None = None,
+    ) -> PlacementProfile:
+        """Build a placement profile from the old width/height default shape."""
+        return cls(
+            schema_version=schema_version,
+            placement_profile_id=placement_profile_id
+            or _stable_id("placement", display_name),
+            display_name=display_name,
+            page_selection_mode="current_page",
+            rect=PlacementProfileRect(
+                left_pt=0.0,
+                bottom_pt=0.0,
+                width_pt=placement_defaults.width_pt,
+                height_pt=placement_defaults.height_pt,
+            ),
+            numeric_fine_tuning_enabled=True,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a persisted mapping."""
+        return {
+            "schema_version": self.schema_version,
+            "placement_profile_id": self.placement_profile_id,
+            "display_name": self.display_name,
+            "page_selection_mode": self.page_selection_mode,
+            "rect": self.rect.to_dict(),
+            "numeric_fine_tuning_enabled": self.numeric_fine_tuning_enabled,
+        }
+
+    @property
+    def name(self) -> str:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.display_name
+
+    @property
+    def placement_defaults(self) -> SignaturePlacementDefaults:
+        """Return the width/height defaults expected by the current Qt shell."""
+        return SignaturePlacementDefaults(
+            width_pt=self.rect.width_pt,
+            height_pt=self.rect.height_pt,
+        )
+
+
+@dataclass(frozen=True)
+class SignaturePreset:
+    """Reference-only reusable signature preset."""
+
+    schema_version: int
+    signature_preset_id: str
+    display_name: str
+    certificate_configuration_id: str | None = None
+    appearance_profile_id: str | None = None
+    placement_profile_id: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "schema_version",
+            _require_int_value(self.schema_version, "schema_version"),
+        )
+        object.__setattr__(
+            self,
+            "signature_preset_id",
+            _require_non_empty_str_value(self.signature_preset_id, "signature_preset_id"),
+        )
+        object.__setattr__(
+            self,
+            "display_name",
+            _require_non_empty_str_value(self.display_name, "display_name"),
+        )
+        for field_name in (
+            "certificate_configuration_id",
+            "appearance_profile_id",
+            "placement_profile_id",
         ):
-            raise ConfigValidationError(
-                "Field 'placement_defaults' must be a SignaturePlacementDefaults value or None."
+            object.__setattr__(
+                self,
+                field_name,
+                _require_optional_non_empty_str_value(getattr(self, field_name), field_name),
             )
 
     @classmethod
@@ -366,29 +584,124 @@ class SignaturePreset:
         """Build from persisted mapping."""
         return cls(
             schema_version=_require_int(payload, "schema_version"),
-            name=_require_non_empty_str(payload, "name"),
-            appearance=_deserialize_appearance(_require_mapping(payload, "appearance")),
-            placement_defaults=_deserialize_placement_defaults(
-                _optional_mapping(payload, "placement_defaults")
+            signature_preset_id=_require_non_empty_str(payload, "signature_preset_id"),
+            display_name=_require_non_empty_str(payload, "display_name"),
+            certificate_configuration_id=_optional_non_empty_str(
+                payload,
+                "certificate_configuration_id",
             ),
+            appearance_profile_id=_optional_non_empty_str(payload, "appearance_profile_id"),
+            placement_profile_id=_optional_non_empty_str(payload, "placement_profile_id"),
+        )
+
+    @classmethod
+    def from_profile_parts(
+        cls,
+        *,
+        display_name: str,
+        appearance_profile_id: str,
+        placement_profile_id: str | None = None,
+        schema_version: int = 1,
+        signature_preset_id: str | None = None,
+    ) -> SignaturePreset:
+        """Build a preset for the current combined save/select UI."""
+        return cls(
+            schema_version=schema_version,
+            signature_preset_id=signature_preset_id or _stable_id("preset", display_name),
+            display_name=display_name,
+            appearance_profile_id=appearance_profile_id,
+            placement_profile_id=placement_profile_id,
         )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a persisted mapping."""
         return {
             "schema_version": self.schema_version,
-            "name": self.name,
-            "appearance": _serialize_appearance(self.appearance),
-            "placement_defaults": _serialize_placement_defaults(self.placement_defaults),
+            "signature_preset_id": self.signature_preset_id,
+            "display_name": self.display_name,
+            "certificate_configuration_id": self.certificate_configuration_id,
+            "appearance_profile_id": self.appearance_profile_id,
+            "placement_profile_id": self.placement_profile_id,
         }
+
+    @property
+    def name(self) -> str:
+        """Compatibility alias for older profile-oriented call sites."""
+        return self.display_name
+
+
+@dataclass(frozen=True)
+class ResolvedSignaturePreset:
+    """Resolved preset data used by current shell and harness call sites."""
+
+    preset: SignaturePreset
+    appearance_profile: AppearanceProfile | None
+    placement_profile: PlacementProfile | None = None
+
+    @property
+    def name(self) -> str:
+        return self.preset.display_name
+
+    @property
+    def appearance(self) -> SignatureAppearance:
+        if self.appearance_profile is None:
+            raise ConfigValidationError(
+                f"Signature preset '{self.name}' does not reference an appearance profile."
+            )
+        return self.appearance_profile.appearance
+
+    @property
+    def placement_defaults(self) -> SignaturePlacementDefaults | None:
+        if self.placement_profile is None:
+            return None
+        return self.placement_profile.placement_defaults
+
+    @classmethod
+    def from_parts(
+        cls,
+        *,
+        name: str,
+        appearance: SignatureAppearance,
+        placement_defaults: SignaturePlacementDefaults | None = None,
+        schema_version: int = 1,
+    ) -> ResolvedSignaturePreset:
+        appearance_profile = AppearanceProfile(
+            schema_version=schema_version,
+            appearance_profile_id=_stable_id("appearance", name),
+            display_name=name,
+            appearance=appearance,
+        )
+        placement_profile = (
+            PlacementProfile.from_defaults(
+                schema_version=schema_version,
+                display_name=name,
+                placement_defaults=placement_defaults,
+            )
+            if placement_defaults is not None
+            else None
+        )
+        return cls(
+            preset=SignaturePreset.from_profile_parts(
+                schema_version=schema_version,
+                display_name=name,
+                appearance_profile_id=appearance_profile.appearance_profile_id,
+                placement_profile_id=(
+                    placement_profile.placement_profile_id if placement_profile else None
+                ),
+            ),
+            appearance_profile=appearance_profile,
+            placement_profile=placement_profile,
+        )
 
 
 @dataclass(frozen=True)
 class SignaturePresetCatalog:
-    """Ordered collection of named signature profiles for dropdown selection."""
+    """Catalog of canonical reusable signing objects."""
 
     schema_version: int
-    profiles: tuple[SignaturePreset, ...]
+    appearance_profiles: tuple[AppearanceProfile, ...] = ()
+    placement_profiles: tuple[PlacementProfile, ...] = ()
+    signature_presets: tuple[SignaturePreset, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -396,82 +709,253 @@ class SignaturePresetCatalog:
             "schema_version",
             _require_int_value(self.schema_version, "schema_version"),
         )
-        if not isinstance(self.profiles, tuple):
-            raise ConfigValidationError("Field 'profiles' must be a tuple.")
-        seen_names: set[str] = set()
-        normalized_profiles: list[SignaturePreset] = []
-        for profile in self.profiles:
-            if not isinstance(profile, SignaturePreset):
+        self._validate_object_tuple(
+            self.appearance_profiles,
+            AppearanceProfile,
+            "appearance_profiles",
+            "appearance_profile_id",
+        )
+        self._validate_object_tuple(
+            self.placement_profiles,
+            PlacementProfile,
+            "placement_profiles",
+            "placement_profile_id",
+        )
+        self._validate_object_tuple(
+            self.signature_presets,
+            SignaturePreset,
+            "signature_presets",
+            "signature_preset_id",
+        )
+        seen_preset_names: set[str] = set()
+        for preset in self.signature_presets:
+            if preset.display_name in seen_preset_names:
                 raise ConfigValidationError(
-                    "Field 'profiles' must contain SignaturePreset values only."
+                    "Field 'signature_presets' must not contain duplicate names."
                 )
-            if profile.name in seen_names:
-                raise ConfigValidationError("Field 'profiles' must not contain duplicate names.")
-            seen_names.add(profile.name)
-            normalized_profiles.append(profile)
-        object.__setattr__(self, "profiles", tuple(normalized_profiles))
+            seen_preset_names.add(preset.display_name)
+
+    @staticmethod
+    def _validate_object_tuple(
+        values: tuple[Any, ...],
+        expected_type: type,
+        field_name: str,
+        id_field_name: str,
+    ) -> None:
+        if not isinstance(values, tuple):
+            raise ConfigValidationError(f"Field '{field_name}' must be a tuple.")
+        seen_ids: set[str] = set()
+        for value in values:
+            if not isinstance(value, expected_type):
+                raise ConfigValidationError(
+                    f"Field '{field_name}' must contain {expected_type.__name__} values only."
+                )
+            object_id = getattr(value, id_field_name)
+            if object_id in seen_ids:
+                raise ConfigValidationError(
+                    f"Field '{field_name}' must not contain duplicate ids."
+                )
+            seen_ids.add(object_id)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> SignaturePresetCatalog:
         """Build from persisted mapping."""
-        raw_profiles = _require_value(payload, "profiles")
-        if not isinstance(raw_profiles, list):
-            raise ConfigValidationError("Field 'profiles' must be a list.")
-        profiles: list[SignaturePreset] = []
-        for entry in raw_profiles:
+        raw_appearance_profiles = _require_value(payload, "appearance_profiles")
+        raw_placement_profiles = _require_value(payload, "placement_profiles")
+        raw_signature_presets = _require_value(payload, "signature_presets")
+        for field_name, raw_entries in (
+            ("appearance_profiles", raw_appearance_profiles),
+            ("placement_profiles", raw_placement_profiles),
+            ("signature_presets", raw_signature_presets),
+        ):
+            if not isinstance(raw_entries, list):
+                raise ConfigValidationError(f"Field '{field_name}' must be a list.")
+
+        appearance_profiles: list[AppearanceProfile] = []
+        for entry in raw_appearance_profiles:
             if not isinstance(entry, dict):
-                raise ConfigValidationError("Field 'profiles' must contain objects only.")
-            profiles.append(SignaturePreset.from_dict(entry))
+                raise ConfigValidationError(
+                    "Field 'appearance_profiles' must contain objects only."
+                )
+            appearance_profiles.append(AppearanceProfile.from_dict(entry))
+        placement_profiles: list[PlacementProfile] = []
+        for entry in raw_placement_profiles:
+            if not isinstance(entry, dict):
+                raise ConfigValidationError(
+                    "Field 'placement_profiles' must contain objects only."
+                )
+            placement_profiles.append(PlacementProfile.from_dict(entry))
+        signature_presets: list[SignaturePreset] = []
+        for entry in raw_signature_presets:
+            if not isinstance(entry, dict):
+                raise ConfigValidationError(
+                    "Field 'signature_presets' must contain objects only."
+                )
+            signature_presets.append(SignaturePreset.from_dict(entry))
         return cls(
             schema_version=_require_int(payload, "schema_version"),
-            profiles=tuple(profiles),
+            appearance_profiles=tuple(appearance_profiles),
+            placement_profiles=tuple(placement_profiles),
+            signature_presets=tuple(signature_presets),
         )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a persisted mapping."""
         return {
             "schema_version": self.schema_version,
-            "profiles": [profile.to_dict() for profile in self.profiles],
+            "appearance_profiles": [
+                profile.to_dict() for profile in self.appearance_profiles
+            ],
+            "placement_profiles": [
+                profile.to_dict() for profile in self.placement_profiles
+            ],
+            "signature_presets": [preset.to_dict() for preset in self.signature_presets],
         }
 
     def profile_names(self) -> tuple[str, ...]:
-        """Return the profile names in stable dropdown order."""
-        return tuple(profile.name for profile in self.profiles)
+        """Return preset display names in stable dropdown order."""
+        return tuple(preset.display_name for preset in self.signature_presets)
 
-    def profile_named(self, name: str) -> SignaturePreset:
-        """Return a profile by its user-visible name."""
+    def profile_named(self, name: str) -> ResolvedSignaturePreset:
+        """Return a resolved preset by its user-visible name."""
         normalized_name = _require_non_empty_str_value(name, "name")
-        for profile in self.profiles:
-            if profile.name == normalized_name:
+        for preset in self.signature_presets:
+            if preset.display_name == normalized_name:
+                return self.resolve_preset(preset)
+        raise KeyError(normalized_name)
+
+    def appearance_profile_named(self, name: str) -> AppearanceProfile:
+        """Return an appearance profile by display name."""
+        normalized_name = _require_non_empty_str_value(name, "name")
+        for profile in self.appearance_profiles:
+            if profile.display_name == normalized_name:
                 return profile
         raise KeyError(normalized_name)
 
-    def upsert_profile(self, profile: SignaturePreset) -> SignaturePresetCatalog:
-        """Return a new catalog with the profile inserted or replaced by name."""
-        if not isinstance(profile, SignaturePreset):
-            raise ConfigValidationError("profile must be a SignaturePreset value.")
-        updated: list[SignaturePreset] = []
-        replaced = False
-        for existing in self.profiles:
-            if existing.name == profile.name:
-                updated.append(profile)
-                replaced = True
-            else:
-                updated.append(existing)
-        if not replaced:
-            updated.append(profile)
-        return SignaturePresetCatalog(
-            schema_version=self.schema_version,
-            profiles=tuple(updated),
+    def placement_profile_named(self, name: str) -> PlacementProfile:
+        """Return a placement profile by display name."""
+        normalized_name = _require_non_empty_str_value(name, "name")
+        for profile in self.placement_profiles:
+            if profile.display_name == normalized_name:
+                return profile
+        raise KeyError(normalized_name)
+
+    def resolve_preset(self, preset: SignaturePreset) -> ResolvedSignaturePreset:
+        """Resolve a reference-only preset to the objects it points at."""
+        appearance_profile = None
+        if preset.appearance_profile_id is not None:
+            appearance_profile = self._appearance_profile_by_id(preset.appearance_profile_id)
+        placement_profile = None
+        if preset.placement_profile_id is not None:
+            placement_profile = self._placement_profile_by_id(preset.placement_profile_id)
+        return ResolvedSignaturePreset(
+            preset=preset,
+            appearance_profile=appearance_profile,
+            placement_profile=placement_profile,
         )
 
-    def remove_profile(self, name: str) -> SignaturePresetCatalog:
-        """Return a new catalog without the named profile."""
-        normalized_name = _require_non_empty_str_value(name, "name")
-        updated = [profile for profile in self.profiles if profile.name != normalized_name]
-        if len(updated) == len(self.profiles):
-            raise KeyError(normalized_name)
+    def _appearance_profile_by_id(self, profile_id: str) -> AppearanceProfile:
+        for profile in self.appearance_profiles:
+            if profile.appearance_profile_id == profile_id:
+                return profile
+        raise KeyError(profile_id)
+
+    def _placement_profile_by_id(self, profile_id: str) -> PlacementProfile:
+        for profile in self.placement_profiles:
+            if profile.placement_profile_id == profile_id:
+                return profile
+        raise KeyError(profile_id)
+
+    def upsert_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
+        """Return a new catalog with a resolved preset inserted or replaced by name."""
+        if not isinstance(profile, ResolvedSignaturePreset):
+            raise ConfigValidationError("profile must be a ResolvedSignaturePreset value.")
+        appearance_profiles = list(self.appearance_profiles)
+        placement_profiles = list(self.placement_profiles)
+        signature_presets = list(self.signature_presets)
+
+        if profile.appearance_profile is not None:
+            appearance_profiles = self._upsert_by_id(
+                appearance_profiles,
+                profile.appearance_profile,
+                "appearance_profile_id",
+            )
+        if profile.placement_profile is not None:
+            placement_profiles = self._upsert_by_id(
+                placement_profiles,
+                profile.placement_profile,
+                "placement_profile_id",
+            )
+
+        replaced = False
+        updated_presets: list[SignaturePreset] = []
+        for existing in signature_presets:
+            if existing.display_name == profile.name:
+                updated_presets.append(profile.preset)
+                replaced = True
+            else:
+                updated_presets.append(existing)
+        if not replaced:
+            updated_presets.append(profile.preset)
         return SignaturePresetCatalog(
             schema_version=self.schema_version,
-            profiles=tuple(updated),
+            appearance_profiles=tuple(appearance_profiles),
+            placement_profiles=tuple(placement_profiles),
+            signature_presets=tuple(updated_presets),
+        )
+
+    @staticmethod
+    def _upsert_by_id(values: list[Any], replacement: Any, id_field_name: str) -> list[Any]:
+        updated: list[Any] = []
+        replaced = False
+        replacement_id = getattr(replacement, id_field_name)
+        for value in values:
+            if getattr(value, id_field_name) == replacement_id:
+                updated.append(replacement)
+                replaced = True
+            else:
+                updated.append(value)
+        if not replaced:
+            updated.append(replacement)
+        return updated
+
+    def remove_profile(self, name: str) -> SignaturePresetCatalog:
+        """Return a new catalog without the named preset."""
+        normalized_name = _require_non_empty_str_value(name, "name")
+        preset_to_remove: SignaturePreset | None = None
+        updated_presets: list[SignaturePreset] = []
+        for preset in self.signature_presets:
+            if preset.display_name == normalized_name:
+                preset_to_remove = preset
+            else:
+                updated_presets.append(preset)
+        if preset_to_remove is None:
+            raise KeyError(normalized_name)
+        referenced_appearance_ids = {
+            preset.appearance_profile_id
+            for preset in updated_presets
+            if preset.appearance_profile_id is not None
+        }
+        referenced_placement_ids = {
+            preset.placement_profile_id
+            for preset in updated_presets
+            if preset.placement_profile_id is not None
+        }
+        appearance_profiles = tuple(
+            profile
+            for profile in self.appearance_profiles
+            if profile.appearance_profile_id in referenced_appearance_ids
+            or profile.appearance_profile_id != preset_to_remove.appearance_profile_id
+        )
+        placement_profiles = tuple(
+            profile
+            for profile in self.placement_profiles
+            if profile.placement_profile_id in referenced_placement_ids
+            or profile.placement_profile_id != preset_to_remove.placement_profile_id
+        )
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            appearance_profiles=appearance_profiles,
+            placement_profiles=placement_profiles,
+            signature_presets=tuple(updated_presets),
         )

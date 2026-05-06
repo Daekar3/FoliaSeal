@@ -2,13 +2,18 @@ import pytest
 
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.schemas import (
+    AppearanceProfile,
     ConfigValidationError,
+    PlacementProfile,
     SignaturePreset,
     SignaturePresetCatalog,
     TimestampPolicy,
     TrustProfile,
 )
 from tests.support.phase3_builders import (
+    build_appearance_profile,
+    build_placement_profile,
+    build_reference_signature_preset,
     build_signature_appearance,
     build_signature_preset,
     build_signature_preset_catalog,
@@ -60,59 +65,86 @@ def test_timestamp_policy_round_trip() -> None:
     assert reconstructed == original
 
 
-def test_signature_preset_round_trip() -> None:
-    original = build_signature_preset()
+def test_appearance_profile_round_trip() -> None:
+    original = build_appearance_profile()
 
     payload = original.to_dict()
-    reconstructed = SignaturePreset.from_dict(payload)
+    reconstructed = AppearanceProfile.from_dict(payload)
 
     assert reconstructed == original
     assert payload["appearance"]["layout_template"] == "multi_line"
     assert payload["appearance"]["stamp_position"] == "left"
     assert payload["appearance"]["show_field_names"] is False
-    assert payload["placement_defaults"]["anchor"] == "bottom_right"
 
 
-def test_signature_preset_round_trip_allows_blank_signer_label_prefix() -> None:
-    original = build_signature_preset(
+def test_appearance_profile_round_trip_allows_blank_signer_label_prefix() -> None:
+    original = build_appearance_profile(
         appearance=build_signature_appearance(signer_label_prefix=""),
     )
 
     payload = original.to_dict()
-    reconstructed = SignaturePreset.from_dict(payload)
+    reconstructed = AppearanceProfile.from_dict(payload)
 
     assert reconstructed == original
     assert payload["appearance"]["signer_label_prefix"] == ""
 
 
-def test_signature_preset_round_trip_allows_stamp_position_variants() -> None:
-    original = build_signature_preset(
+def test_appearance_profile_round_trip_allows_stamp_position_variants() -> None:
+    original = build_appearance_profile(
         appearance=build_signature_appearance(stamp_position=SignatureStampPosition.RIGHT)
     )
 
     payload = original.to_dict()
-    reconstructed = SignaturePreset.from_dict(payload)
+    reconstructed = AppearanceProfile.from_dict(payload)
 
     assert reconstructed == original
     assert payload["appearance"]["stamp_position"] == "right"
 
 
-def test_signature_preset_from_dict_defaults_missing_stamp_position_to_top() -> None:
-    payload = build_signature_preset().to_dict()
+def test_appearance_profile_from_dict_defaults_missing_stamp_position_to_top() -> None:
+    payload = build_appearance_profile().to_dict()
     payload["appearance"].pop("stamp_position")
 
-    reconstructed = SignaturePreset.from_dict(payload)
+    reconstructed = AppearanceProfile.from_dict(payload)
 
     assert reconstructed.appearance.stamp_position == SignatureStampPosition.TOP
 
 
-def test_signature_preset_rejects_blank_name() -> None:
-    with pytest.raises(ConfigValidationError, match="Field 'name' must be a non-empty str"):
-        SignaturePreset(
+def test_appearance_profile_rejects_blank_display_name() -> None:
+    with pytest.raises(
+        ConfigValidationError,
+        match="Field 'display_name' must be a non-empty str",
+    ):
+        AppearanceProfile(
             schema_version=1,
-            name=" ",
+            appearance_profile_id="appearance-empty",
+            display_name=" ",
             appearance=build_signature_appearance(),
         )
+
+
+def test_placement_profile_round_trip() -> None:
+    original = build_placement_profile()
+
+    payload = original.to_dict()
+    reconstructed = PlacementProfile.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["rect"]["width_pt"] == 220.0
+    assert payload["rect"]["height_pt"] == 80.0
+
+
+def test_signature_preset_round_trip_is_reference_only() -> None:
+    original = build_reference_signature_preset()
+
+    payload = original.to_dict()
+    reconstructed = SignaturePreset.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload["appearance_profile_id"] == "appearance-default"
+    assert payload["placement_profile_id"] == "placement-default"
+    assert "appearance" not in payload
+    assert "placement_defaults" not in payload
 
 
 def test_signature_preset_catalog_round_trip() -> None:
@@ -124,14 +156,13 @@ def test_signature_preset_catalog_round_trip() -> None:
     assert reconstructed == original
     assert original.profile_names() == ("Default", "Compact")
     assert original.profile_named("Compact").name == "Compact"
-    assert payload["profiles"][0]["name"] == "Default"
+    assert payload["signature_presets"][0]["display_name"] == "Default"
+    assert payload["appearance_profiles"][0]["display_name"] == "Default"
+    assert payload["placement_profiles"][0]["display_name"] == "Default"
 
 
 def test_signature_preset_catalog_upserts_by_name() -> None:
-    original = SignaturePresetCatalog(
-        schema_version=1,
-        profiles=(build_signature_preset(name="Default"),),
-    )
+    original = build_signature_preset_catalog(profiles=(build_signature_preset(name="Default"),))
     replacement = build_signature_preset(
         name="Default",
         appearance=build_signature_appearance(
@@ -141,17 +172,17 @@ def test_signature_preset_catalog_upserts_by_name() -> None:
 
     updated = original.upsert_profile(replacement)
 
-    assert updated.profiles == (replacement,)
+    assert updated.profile_names() == ("Default",)
+    assert updated.profile_named("Default").appearance == replacement.appearance
     assert updated.profile_names() == ("Default",)
 
 
 def test_signature_preset_catalog_removes_by_name() -> None:
-    original = SignaturePresetCatalog(
-        schema_version=1,
+    original = build_signature_preset_catalog(
         profiles=(
             build_signature_preset(name="Default"),
             build_signature_preset(name="Compact"),
-        ),
+        )
     )
 
     updated = original.remove_profile("Default")
@@ -163,9 +194,15 @@ def test_signature_preset_catalog_rejects_duplicate_names() -> None:
     with pytest.raises(ConfigValidationError, match="must not contain duplicate names"):
         SignaturePresetCatalog(
             schema_version=1,
-            profiles=(
-                build_signature_preset(name="Default"),
-                build_signature_preset(name="Default"),
+            signature_presets=(
+                build_reference_signature_preset(
+                    signature_preset_id="preset-default-1",
+                    display_name="Default",
+                ),
+                build_reference_signature_preset(
+                    signature_preset_id="preset-default-2",
+                    display_name="Default",
+                ),
             ),
         )
 

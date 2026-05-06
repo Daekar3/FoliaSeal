@@ -20,7 +20,13 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
-from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
+from foliaseal.infra.config.schemas import (
+    AppearanceProfile,
+    PlacementProfile,
+    ResolvedSignaturePreset,
+    SignaturePreset,
+    SignaturePresetCatalog,
+)
 
 
 def build_signature_rect(
@@ -157,9 +163,9 @@ def build_signature_preset(
     name: str = "default",
     appearance: SignatureAppearance | None = None,
     placement_defaults: SignaturePlacementDefaults | None = None,
-) -> SignaturePreset:
-    """Build a representative signature preset with nested appearance data."""
-    return SignaturePreset(
+) -> ResolvedSignaturePreset:
+    """Build a representative resolved signature preset for shell tests."""
+    return ResolvedSignaturePreset.from_parts(
         schema_version=schema_version,
         name=name,
         appearance=appearance or build_signature_appearance(),
@@ -175,21 +181,77 @@ def build_signature_preset(
 def build_signature_preset_catalog(
     *,
     schema_version: int = 1,
-    profiles: tuple[SignaturePreset, ...] | None = None,
+    profiles: tuple[ResolvedSignaturePreset, ...] | None = None,
 ) -> SignaturePresetCatalog:
     """Build a representative named profile catalog."""
-    return SignaturePresetCatalog(
-        schema_version=schema_version,
-        profiles=profiles
-        or (
-            build_signature_preset(name="Default"),
-            build_signature_preset(
-                name="Compact",
-                appearance=build_signature_appearance(
-                    signer_label_prefix="Signed by",
-                    show_field_names=False,
-                ),
+    catalog = SignaturePresetCatalog(schema_version=schema_version)
+    for profile in profiles or (
+        build_signature_preset(name="Default"),
+        build_signature_preset(
+            name="Compact",
+            appearance=build_signature_appearance(
+                signer_label_prefix="Signed by",
+                show_field_names=False,
             ),
+        ),
+    ):
+        catalog = catalog.upsert_profile(profile)
+    return catalog
+
+
+def build_reference_signature_preset(
+    *,
+    schema_version: int = 1,
+    signature_preset_id: str = "preset-default",
+    display_name: str = "Default",
+    certificate_configuration_id: str | None = None,
+    appearance_profile_id: str | None = "appearance-default",
+    placement_profile_id: str | None = "placement-default",
+) -> SignaturePreset:
+    """Build a canonical reference-only signature preset."""
+    return SignaturePreset(
+        schema_version=schema_version,
+        signature_preset_id=signature_preset_id,
+        display_name=display_name,
+        certificate_configuration_id=certificate_configuration_id,
+        appearance_profile_id=appearance_profile_id,
+        placement_profile_id=placement_profile_id,
+    )
+
+
+def build_appearance_profile(
+    *,
+    schema_version: int = 1,
+    appearance_profile_id: str = "appearance-default",
+    display_name: str = "Default",
+    appearance: SignatureAppearance | None = None,
+) -> AppearanceProfile:
+    """Build a canonical appearance profile."""
+    return AppearanceProfile(
+        schema_version=schema_version,
+        appearance_profile_id=appearance_profile_id,
+        display_name=display_name,
+        appearance=appearance or build_signature_appearance(),
+    )
+
+
+def build_placement_profile(
+    *,
+    schema_version: int = 1,
+    placement_profile_id: str = "placement-default",
+    display_name: str = "Default",
+    placement_defaults: SignaturePlacementDefaults | None = None,
+) -> PlacementProfile:
+    """Build a canonical placement profile from width/height defaults."""
+    return PlacementProfile.from_defaults(
+        schema_version=schema_version,
+        placement_profile_id=placement_profile_id,
+        display_name=display_name,
+        placement_defaults=placement_defaults
+        or SignaturePlacementDefaults(
+            width_pt=220.0,
+            height_pt=80.0,
+            anchor=SignatureAnchor.BOTTOM_RIGHT,
         ),
     )
 

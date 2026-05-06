@@ -54,7 +54,7 @@ from foliaseal.domain.models import (
     SigningResult,
 )
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import SignaturePreset, SignaturePresetCatalog
+from foliaseal.infra.config.schemas import ResolvedSignaturePreset, SignaturePresetCatalog
 from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
@@ -1163,7 +1163,6 @@ class SignaturePropertiesPanel:
         else:
             self._profile_catalog = SignaturePresetCatalog(
                 schema_version=1,
-                profiles=(),
             )
         self._selected_profile_name: str | None = None
         self._on_change = on_change
@@ -1404,7 +1403,7 @@ class SignaturePropertiesPanel:
         self.load_from_workflow()
         self._notify_change()
 
-    def save_current_profile(self) -> SignaturePreset | None:
+    def save_current_profile(self) -> ResolvedSignaturePreset | None:
         name = _text(self._profile_controls.profile_name).strip()
         if not name:
             self._show_profile_error("Profile name is required before saving.")

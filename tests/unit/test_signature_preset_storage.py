@@ -42,7 +42,9 @@ def test_signature_preset_catalog_store_saves_and_reloads_human_readable_json(
     payload_text = store.catalog_path.read_text(encoding="utf-8")
     assert store.catalog_path.parent.name == PROFILE_DIRECTORY_NAME
     assert payload_text.startswith("{\n")
-    assert '  "profiles": [' in payload_text
+    assert '  "appearance_profiles": [' in payload_text
+    assert '  "placement_profiles": [' in payload_text
+    assert '  "signature_presets": [' in payload_text
     assert payload_text.endswith("\n")
 
     reloaded = store.load_catalog()

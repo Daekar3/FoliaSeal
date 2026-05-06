@@ -9,7 +9,7 @@ from pathlib import Path
 
 from foliaseal.infra.config.schemas import (
     ConfigValidationError,
-    SignaturePreset,
+    ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
 
@@ -50,11 +50,11 @@ class SignaturePresetCatalogStore:
         """Load the catalog from disk, or return an empty catalog if missing."""
         path = self.catalog_path
         if not path.exists():
-            return SignaturePresetCatalog(schema_version=1, profiles=())
+            return SignaturePresetCatalog(schema_version=1)
 
         payload_text = path.read_text(encoding="utf-8")
         if not payload_text.strip():
-            return SignaturePresetCatalog(schema_version=1, profiles=())
+            return SignaturePresetCatalog(schema_version=1)
 
         try:
             payload = json.loads(payload_text)
@@ -76,10 +76,10 @@ class SignaturePresetCatalogStore:
         temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
         temp_path.replace(self.catalog_path)
 
-    def save_profile(self, profile: SignaturePreset) -> SignaturePresetCatalog:
+    def save_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
         """Upsert a profile and persist the resulting catalog."""
-        if not isinstance(profile, SignaturePreset):
-            raise ConfigValidationError("profile must be a SignaturePreset value.")
+        if not isinstance(profile, ResolvedSignaturePreset):
+            raise ConfigValidationError("profile must be a ResolvedSignaturePreset value.")
         catalog = self.load_catalog().upsert_profile(profile)
         self.save_catalog(catalog)
         return catalog
