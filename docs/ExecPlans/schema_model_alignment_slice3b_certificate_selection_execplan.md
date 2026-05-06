@@ -26,7 +26,7 @@ This is not certificate creation, import, export, backup, deletion, or credentia
 - [x] (2026-05-06 23:28Z) Updated architecture and parent/child ExecPlan documentation.
 - [x] (2026-05-06 23:26Z) Ran focused validation and lint successfully.
 - [x] (2026-05-06 23:31Z) Ran the full test suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-06 23:33Z) Committed the completed slice as `47a51f0bf feat: wire certificate configuration selection`.
 
 ## Surprises & Discoveries
 
@@ -140,3 +140,5 @@ No new third-party dependencies are needed.
 Revision note: created on 2026-05-06 to keep schema-alignment Slice 3B focused on certificate-configuration selection and runtime material resolution.
 
 Revision note: updated on 2026-05-06 after implementation to record the draft method, Qt selector, focused tests, architecture update, and validation evidence.
+
+Revision note: updated on 2026-05-06 after commit to record commit `47a51f0bf` in the progress checklist.
