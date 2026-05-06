@@ -8,9 +8,9 @@ __pycache__/
 build/
 dist/
 
-# Generated harness and matrix output. Durable fixtures and manifests under
-# artifacts/preview_sweep_assets/ and artifacts/generated_acceptance_assets/
-# remain trackable.
+# Generated harness and matrix output live under artifacts/. Keep that tree as
+# a local workspace so large evidence outputs do not get committed again.
+artifacts/
 artifacts/preview_sweep_runs/
 artifacts/phase3_harness_capture_artifacts/
 artifacts/phase3_fr3b_acceptance_results.md
