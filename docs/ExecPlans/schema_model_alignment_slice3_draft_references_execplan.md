@@ -29,7 +29,7 @@ The user-visible behavior should remain the same: saved signature setup entries 
 ## Surprises & Discoveries
 
 - Observation: The Qt shell already persists canonical `SignaturePreset` objects after Slice 1, but the method names and UI labels still say "profile".
-  Evidence: `SignaturePropertiesPanel.save_current_profile()` calls `SigningDraftWorkflow.capture_signature_preset()` and `SignaturePresetCatalog.upsert_profile()`.
+  Evidence: before this slice, `SignaturePropertiesPanel.save_current_profile()` called `SigningDraftWorkflow.capture_signature_preset()` and `SignaturePresetCatalog.upsert_profile()`. This slice moved the workflow call to `capture_current_signature_setup()`, while catalog compatibility methods and UI labels still use profile terminology.
 
 - Observation: The draft owns a PKCS#12 parsing method directly.
   Evidence: `SigningDraftWorkflow._certificate_values_for_preview()` reads `Path(self.certificate_path).read_bytes()` and calls `pkcs12.load_key_and_certificates(...)`.

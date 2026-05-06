@@ -36,7 +36,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
   Evidence: `src/foliaseal/infra/config/schemas.py` defines `SignaturePreset(schema_version, name, appearance, placement_defaults)` and `SignaturePresetCatalog(profiles=...)`.
 
 - Observation: the current Qt "Named profiles" UI is wired straight to that non-canonical preset model, so the wrong vocabulary is not isolated to storage code.
-  Evidence: `src/foliaseal/presentation/qt/signing_shell.py` builds a "Named profiles" group, saves via `SigningDraftWorkflow.capture_signature_preset()`, and applies via `SigningDraftWorkflow.apply_signature_preset()`.
+  Evidence: before Slice 3A, `src/foliaseal/presentation/qt/signing_shell.py` built a "Named profiles" group, saved via `SigningDraftWorkflow.capture_signature_preset()`, and applied via `SigningDraftWorkflow.apply_signature_preset()`. Slice 3A moved those shell calls to canonical method names, but the UI label and some compatibility aliases remain.
 
 - Observation: certificate handling is still raw runtime state, not reusable product objects.
   Evidence: `src/foliaseal/application/signing_draft_workflow.py` stores `certificate_path`, `passphrase`, `tsa_url`, and `timestamp_required` directly on the workflow, while `src/foliaseal/domain/models.py` requires `SigningRequest(certificate_path, passphrase, tsa_url, ...)`.
