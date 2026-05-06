@@ -22,7 +22,7 @@ This work matters because the schema model alignment work needs a trustworthy gr
 - [x] (2026-05-06 10:36Z) Updated artifact-dependent tests so they skip cleanly when ignored local fixtures are absent and validate current local manifest content when fixtures are present.
 - [x] (2026-05-06 10:38Z) Updated stale README, architecture, and artifact hygiene documentation that still described artifact fixtures as checked in.
 - [x] (2026-05-06 10:39Z) Ran focused tests, the full unit suite, and lint successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-06 10:40Z) Committed the completed slice as `24b02c8ff test: reconcile optional artifact fixtures`.
 
 ## Surprises & Discoveries
 
@@ -144,3 +144,5 @@ Key evidence before changes:
 Use only `pytest`, `pathlib.Path`, and existing test helpers in this slice. Do not change runtime production interfaces unless validation proves the optional fixture behavior belongs in production code. The expected repository interfaces after this slice are the existing constants in `src/foliaseal/application/qa_signed_acceptance_assets.py` and optional test helper functions in the test modules.
 
 Revision note: updated on 2026-05-06 after implementation to record the optional artifact fixture test behavior, documentation corrections, and successful validation results.
+
+Revision note: updated on 2026-05-06 after commit to record commit `24b02c8ff` in the progress checklist.
