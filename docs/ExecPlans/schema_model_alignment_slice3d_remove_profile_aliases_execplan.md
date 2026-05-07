@@ -24,7 +24,7 @@ The user-visible signing behavior should not change. The shell should still save
 - [x] (2026-05-07 04:10Z) Updated architecture and parent/child ExecPlan documentation.
 - [x] (2026-05-07 04:08Z) Ran focused validation and lint successfully.
 - [x] (2026-05-07 04:12Z) Ran the full test suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-07 04:13Z) Committed the completed slice as `7931bfddc refactor: remove signature preset profile aliases`.
 
 ## Surprises & Discoveries
 
@@ -128,3 +128,5 @@ No new third-party dependencies are needed.
 Revision note: created on 2026-05-07 to remove obsolete profile aliases left after Slice 3C's preset terminology migration.
 
 Revision note: updated on 2026-05-07 after implementation to record removed compatibility aliases, documentation updates, and focused validation evidence.
+
+Revision note: updated on 2026-05-07 after commit to record commit `7931bfddc` in the progress checklist.
