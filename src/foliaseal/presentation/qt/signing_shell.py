@@ -1215,7 +1215,6 @@ class SignaturePropertiesPanel:
 
         self._certificate_controls = self._build_certificate_configuration_controls()
         self._signature_preset_controls = self._build_signature_preset_controls()
-        self._profile_controls = self._signature_preset_controls
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
@@ -1526,14 +1525,6 @@ class SignaturePropertiesPanel:
             self._suspend_updates = False
         self._notify_change()
         return updated_catalog
-
-    def save_current_profile(self) -> ResolvedSignaturePreset | None:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.save_current_signature_preset()
-
-    def delete_current_profile(self) -> SignaturePresetCatalog | None:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.delete_current_signature_preset()
 
     def apply_selected_certificate_configuration(self) -> bool:
         selected_name = _combo_text(self._certificate_controls.configuration_combo)
@@ -2122,10 +2113,6 @@ class SignaturePropertiesPanel:
             self._reload_signature_preset_controls(selected_name=None)
         finally:
             self._suspend_updates = False
-
-    def _mark_profile_dirty(self) -> None:
-        """Compatibility alias for older profile-oriented internal call sites."""
-        self._mark_signature_preset_dirty()
 
     def _build_rect_from_controls(self) -> SignatureRect:
         return SignatureRect(
@@ -2750,10 +2737,6 @@ class SignaturePropertiesPanel:
             return
         self._emit_error(message)
 
-    def _show_profile_error(self, message: str) -> None:
-        """Compatibility alias for older profile-oriented call sites."""
-        self._show_signature_preset_error(message)
-
     def _show_certificate_configuration_error(self, message: str) -> None:
         self._emit_error(message)
         warning = getattr(self._bindings.q_message_box, "warning", None)
@@ -2780,28 +2763,28 @@ class SignaturePropertiesPanel:
     def _on_any_control_changed(self, *_args: object) -> None:
         if self._suspend_updates:
             return
-        self._mark_profile_dirty()
+        self._mark_signature_preset_dirty()
         self.apply_changes()
 
     def _on_field_changed(self, field_key: SignatureFieldKey) -> None:
         if self._suspend_updates:
             return
         self._sync_field_control_state(field_key)
-        self._mark_profile_dirty()
+        self._mark_signature_preset_dirty()
         self.apply_changes()
 
     def _on_field_source_changed(self, field_key: SignatureFieldKey) -> None:
         if self._suspend_updates:
             return
         self._sync_field_control_state(field_key)
-        self._mark_profile_dirty()
+        self._mark_signature_preset_dirty()
         self.apply_changes()
 
     def _on_placement_changed(self, *_args: object) -> None:
         if self._suspend_updates:
             return
         self._placement_initialized = True
-        self._mark_profile_dirty()
+        self._mark_signature_preset_dirty()
         self.apply_changes()
         if self._on_page_change is not None:
             self._on_page_change(int(_spin_value(self._placement_controls.page_spin)))

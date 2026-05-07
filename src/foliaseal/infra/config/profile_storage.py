@@ -89,11 +89,3 @@ class SignaturePresetCatalogStore:
         catalog = self.load_catalog().remove_preset(name)
         self.save_catalog(catalog)
         return catalog
-
-    def save_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.save_preset(profile)
-
-    def delete_profile(self, name: str) -> SignaturePresetCatalog:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.delete_preset(name)

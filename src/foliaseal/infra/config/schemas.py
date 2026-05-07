@@ -1235,14 +1235,6 @@ class SignaturePresetCatalog:
                 return self.resolve_preset(preset)
         raise KeyError(normalized_name)
 
-    def profile_names(self) -> tuple[str, ...]:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.preset_names()
-
-    def profile_named(self, name: str) -> ResolvedSignaturePreset:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.preset_named(name)
-
     def appearance_profile_named(self, name: str) -> AppearanceProfile:
         """Return an appearance profile by display name."""
         normalized_name = _require_non_empty_str_value(name, "name")
@@ -1323,10 +1315,6 @@ class SignaturePresetCatalog:
             signature_presets=tuple(updated_presets),
         )
 
-    def upsert_profile(self, profile: ResolvedSignaturePreset) -> SignaturePresetCatalog:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.upsert_preset(profile)
-
     @staticmethod
     def _upsert_by_id(values: list[Any], replacement: Any, id_field_name: str) -> list[Any]:
         updated: list[Any] = []
@@ -1382,7 +1370,3 @@ class SignaturePresetCatalog:
             placement_profiles=placement_profiles,
             signature_presets=tuple(updated_presets),
         )
-
-    def remove_profile(self, name: str) -> SignaturePresetCatalog:
-        """Compatibility alias for older profile-oriented call sites."""
-        return self.remove_preset(name)
