@@ -975,10 +975,12 @@ def test_app_frame_settings_dialog_refreshes_loaded_shell_settings(
     bindings = _fake_bindings()
     shell = _FakeShell()
     seen_settings = []
+    output_dialog_defaults = []
 
     class _Workspace:
         def _handle_app_settings_change(self, settings):
             seen_settings.append(settings)
+            output_dialog_defaults.append(settings.default_output_directory)
 
     shell._signing_workspace = _Workspace()
     frame = FoliaSealAppFrame(
@@ -999,6 +1001,7 @@ def test_app_frame_settings_dialog_refreshes_loaded_shell_settings(
 
     assert shell.app_settings == saved
     assert seen_settings == [saved]
+    assert output_dialog_defaults == [str(tmp_path / "updated-output")]
 
 
 def test_app_frame_reports_open_errors(tmp_path: Path) -> None:

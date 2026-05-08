@@ -104,7 +104,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - Observation: the missing top-level app boundary can be added without rewriting the signing shell.
   Evidence: Slice 4C added `src/foliaseal/presentation/qt/app_frame.py`, which creates a `QMainWindow`, owns File/Open and Settings menu actions, and delegates document-specific signing UI to `build_qt_signing_shell()`.
 
-- Observation: after Slice 4D, default-directory editing exists in both the app-frame Settings dialog and the signing shell settings group.
+- Observation: after Slice 4D and before Slice 4E, default-directory editing existed in both the app-frame Settings dialog and the signing shell settings group.
   Evidence: Slice 4D updates `src/foliaseal/presentation/qt/app_frame.py` while Slice 4B settings controls remain in `src/foliaseal/presentation/qt/signing_shell.py`.
 
 ## Decision Log
