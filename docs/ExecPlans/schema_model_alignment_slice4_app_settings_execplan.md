@@ -24,7 +24,7 @@ This slice deliberately stops at persistence. It does not yet wire Qt file-open/
 - [x] (2026-05-07 04:24Z) Updated architecture and parent/child ExecPlan documentation.
 - [x] (2026-05-07 04:23Z) Ran focused validation and lint successfully.
 - [x] (2026-05-07 04:26Z) Ran the full test suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-07 04:28Z) Committed the completed slice as `64a47d9e4 feat: add app settings persistence`.
 
 ## Surprises & Discoveries
 
@@ -129,3 +129,5 @@ No new third-party dependencies are needed.
 Revision note: created on 2026-05-07 to add first-class AppSettings persistence as schema-alignment Slice 4.
 
 Revision note: updated on 2026-05-07 after implementation to record the AppSettings schema, AppSettingsStore, architecture updates, and focused validation evidence.
+
+Revision note: updated on 2026-05-07 after commit to record commit `64a47d9e4` in the progress checklist.
