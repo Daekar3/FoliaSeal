@@ -1,5 +1,10 @@
 """Qt presentation adapters for interactive viewer workflows."""
 
+from .app_frame import (
+    QtAppFrameAdapter,
+    QtAppFrameBindingsUnavailable,
+    build_qt_app_frame,
+)
 from .phase2_harness import (
     HarnessCapture,
     build_phase2_evidence_command,
@@ -27,10 +32,13 @@ __all__ = [
     "HarnessCapture",
     "Phase3HarnessCapture",
     "PdfViewerWidgetAdapter",
+    "QtAppFrameAdapter",
+    "QtAppFrameBindingsUnavailable",
     "QtSigningBindingsUnavailable",
     "QtViewerBindingsUnavailable",
     "SigningShellAdapter",
     "build_qt_pdf_viewer_widget",
+    "build_qt_app_frame",
     "build_qt_signing_shell",
     "build_phase2_evidence_command",
     "build_phase3_checklist_results_markdown",

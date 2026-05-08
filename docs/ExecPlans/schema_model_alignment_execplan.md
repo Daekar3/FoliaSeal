@@ -20,6 +20,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] Slice 3D remove profile aliases: `docs/ExecPlans/schema_model_alignment_slice3d_remove_profile_aliases_execplan.md`.
 - [x] Slice 4 persistence: `docs/ExecPlans/schema_model_alignment_slice4_app_settings_execplan.md`.
 - [x] Slice 4B Qt integration: `docs/ExecPlans/schema_model_alignment_slice4b_app_settings_qt_integration_execplan.md`.
+- [x] Slice 4C app frame Open-file integration: `docs/ExecPlans/schema_model_alignment_slice4c_app_frame_open_file_execplan.md`.
 
 ## Progress
 
@@ -41,7 +42,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] (2026-05-07 04:33Z) Created child ExecPlan for Slice 4B at `docs/ExecPlans/schema_model_alignment_slice4b_app_settings_qt_integration_execplan.md`.
 - [x] (2026-05-07 04:45Z) Implemented Slice 4B: wired `AppSettings` into the Qt signing shell, added settings controls, and added a save-output file dialog rooted at the configured default output directory.
 - [x] (2026-05-07 04:47Z) Reconciled `docs/ARCHITECTURE.md` with Slice 4B.
-- [ ] Implement application-frame Settings menu and standard Open-file action when the shell grows beyond the current widget-only construction.
+- [x] (2026-05-07 05:03Z) Created child ExecPlan for Slice 4C at `docs/ExecPlans/schema_model_alignment_slice4c_app_frame_open_file_execplan.md`.
+- [x] (2026-05-07 05:17Z) Implemented Slice 4C: added a Qt app-frame wrapper with File/Open and Settings menu actions, settings-backed Open-file defaults, and shell creation for selected PDFs.
+- [ ] Replace the app-frame informational Settings action with a dedicated settings dialog.
 
 ## Surprises & Discoveries
 
@@ -87,6 +90,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - Observation: the current Qt shell cannot honestly expose a standard menu bar yet because it is a composite widget.
   Evidence: `build_qt_signing_shell()` returns a `SigningWorkspaceWidget` container, and Slice 4B added settings controls plus `QFileDialog.getSaveFileName()` integration without introducing `QMainWindow`.
 
+- Observation: the missing top-level app boundary can be added without rewriting the signing shell.
+  Evidence: Slice 4C added `src/foliaseal/presentation/qt/app_frame.py`, which creates a `QMainWindow`, owns File/Open and Settings menu actions, and delegates document-specific signing UI to `build_qt_signing_shell()`.
+
 ## Decision Log
 
 - Decision: treat the current schema drift as an architecture problem, not just a naming cleanup.
@@ -121,11 +127,15 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
   Rationale: the current shell has no application-frame abstraction. Settings controls and the save-output dialog deliver the default-directory behavior now, while the standard menu/Open-file layer remains a separate application-shell concern.
   Date/Author: 2026-05-07 / Codex
 
+- Decision: keep the Slice 4C Settings menu action informational until a dedicated settings dialog slice.
+  Rationale: default-directory editing already exists in the signing shell controls. A real app-wide settings dialog should be built deliberately rather than duplicating storage controls in a rushed menu action.
+  Date/Author: 2026-05-07 / Codex
+
 ## Outcomes & Retrospective
 
 At plan creation time, the main outcome was clarity rather than code. Slice 1 then split profile persistence into `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset`. Slice 2 added the certificate side of the canonical object model with `ManagedCertificate`, `CertificateConfiguration`, `CertificateCatalog`, `CertificateCatalogStore`, and `CertificateSigningMaterialResolver`.
 
-Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. Slice 3D removed obsolete signature-preset profile compatibility wrappers from source code. Slice 4 added first-class `AppSettings` schema and storage. Slice 4B wired those settings into the Qt signing shell and save-output dialog defaults. The remaining work is still implementation-heavy: full certificate management UI is pending, and the final application-frame Settings menu/Open-file flow must still be built. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
+Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. Slice 3D removed obsolete signature-preset profile compatibility wrappers from source code. Slice 4 added first-class `AppSettings` schema and storage. Slice 4B wired those settings into the Qt signing shell and save-output dialog defaults. Slice 4C added the first top-level Qt app frame with File/Open and Settings menu actions. The remaining work is still implementation-heavy: full certificate management UI is pending, and the app-frame Settings action should become a real settings dialog. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
 
 ## Context and Orientation
 
