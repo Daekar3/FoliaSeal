@@ -253,7 +253,7 @@ If any answer is “No”, stop and request owner approval or mark as deferred.
 When practical and unlikely to cause problems, develop work plans such that they are parallelizable and can be assigned to multiple agents working at the same time.  If you are going to be spawning agents, create agent briefs with specific scope, ownership, goals, and deliverables.
 
 ### Agent Lifecycle
-If an agent is unlikely to be used again in such a fashion that their existing context is beneficial - if their feature is confirmed complete by a review and no bug fixing is expected, for instance - they will be closed down at the completion of their task to free up agent slots.
+If an agent has completed their task and you don't need to ask them questions, close them down to free up agent slots.
 
 ### Agent Reporting Requirements
 Spawned agents must report back proactively instead of waiting to be polled.

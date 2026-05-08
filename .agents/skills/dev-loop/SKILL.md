@@ -5,8 +5,11 @@ description: Work through a development loop to complete a slice of a task or pr
 
 # Dev Loop (DevLoop) Process
 
+## Subagents
+Subagents will be used when executing a dev-loop.  All subagents will be GPT-5.4-Mini with High effort unless otherwise specified by the user.
+
 ## Identify the Task or Project
-Determine the next logical step or slice of the task or project to work on. This could be a specific feature, bug fix, or portion of a larger task or project.  Sometimes the user will specify what to work on, but if not, use your judgment to identify the most appropriate next step.
+Determine the next logical step or slice of the task or project to work on. This could be a specific feature, bug fix, or portion of a larger task or project.  Sometimes the user will specify what to work on, but if not, use your judgment to identify the most appropriate next step.  Spawn a subagent to review relevant sections of the codebase to gather information and context that will inform the development loop.  This subagent should report back with a summary of their findings, including any relevant code snippets, architectural considerations, and potential challenges or areas of complexity that may need to be addressed during the development loop.
 
 ## Write an ExecPlan
 Use the $write-execplan skill to create an execution plan for the identified task or project slice.
@@ -21,7 +24,7 @@ If you assigned any subagents to child ExecPlans, make sure to follow up with th
 Once the ExecPlan has been executed and the task or project slice is complete, use the $write-git-commit skill to create a Git commit that documents the changes made during the implementation of the task or project slice.
 
 ## Review Compliance with Requirements
-After committing your first pass, review `docs/ARCHITECTURE.md` and any other specifications or requirements in `docs/` to ensure that your implementation aligns with the overall architecture and requirements of the project. If there are any discrepancies or areas for improvement, use $write-execplan to create a new child ExecPlan to address these issues, implement the plan in accordance with `## Execute the Plan` above, write a git commit in accordance with `## Write a Git Commit` above, and repeat the development loop as needed until the implementation is compliant with the requirements.
+After committing your first pass, spawn two (2) subagents to review `docs/ARCHITECTURE.md` and any other specifications or requirements in `docs/` to ensure that the implementation from this slice aligns with the overall architecture and requirements of the project. If there are any discrepancies or areas for improvement, use $write-execplan to create a new child ExecPlan to address these issues, implement the plan in accordance with `## Execute the Plan` above, write a git commit in accordance with `## Write a Git Commit` above, and repeat the development loop as needed until the slice implementation is compliant with the requirements.
 
 ## Update Documentation
 If there are any relevant updates to documentation that need to be made as a result of the changes implemented during the development loop, update them. This review must include updating README files, architecture documentation using the $architecture-steward skill, and any other relevant documentation in the `docs/` directory.
