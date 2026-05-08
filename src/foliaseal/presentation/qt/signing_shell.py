@@ -58,10 +58,13 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
+    AppSettings,
     CertificateCatalog,
+    ConfigValidationError,
     ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
@@ -102,6 +105,7 @@ class QtSigningWidgetBindings:
     q_line_edit: type[Any]
     q_check_box: type[Any]
     q_combo_box: type[Any]
+    q_file_dialog: Any
     q_message_box: type[Any]
     q_pixmap: type[Any]
     q_double_spin_box: type[Any]
@@ -138,6 +142,16 @@ class CertificateConfigurationControls:
     configuration_combo: Any
     password_input: Any
     apply_button: Any
+
+
+@dataclass(frozen=True)
+class AppSettingsControls:
+    """Controls used to edit app-wide defaults from the signing shell."""
+
+    container: Any
+    default_output_directory: Any
+    default_open_directory: Any
+    save_button: Any
 
 
 class SigningRequestExecutor(Protocol):
@@ -1172,6 +1186,9 @@ class SignaturePropertiesPanel:
         certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
+        app_settings: AppSettings | None = None,
+        app_settings_store: AppSettingsStore | None = None,
+        on_app_settings_change: Callable[[AppSettings], None] | None = None,
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
         on_error: Callable[[str], None] | None = None,
@@ -1202,6 +1219,9 @@ class SignaturePropertiesPanel:
                 schema_version=1,
             )
         self._selected_signature_preset_name: str | None = None
+        self._app_settings = app_settings or AppSettings.default()
+        self._app_settings_store = app_settings_store
+        self._on_app_settings_change = on_app_settings_change
         self._on_change = on_change
         self._on_page_change = on_page_change
         self._on_error = on_error
@@ -1215,6 +1235,7 @@ class SignaturePropertiesPanel:
 
         self._certificate_controls = self._build_certificate_configuration_controls()
         self._signature_preset_controls = self._build_signature_preset_controls()
+        self._app_settings_controls = self._build_app_settings_controls()
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
@@ -1226,6 +1247,7 @@ class SignaturePropertiesPanel:
 
         self._layout.addWidget(self._certificate_controls.container)
         self._layout.addWidget(self._signature_preset_controls.container)
+        self._layout.addWidget(self._app_settings_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._heading("Visible Fields"))
         self._layout.addWidget(self._appearance_controls.show_field_names)
@@ -1282,6 +1304,7 @@ class SignaturePropertiesPanel:
         try:
             self._load_certificate_configuration_controls()
             self._load_signature_preset_controls()
+            self._load_app_settings_controls()
             self._load_placement_controls()
             self._load_appearance_controls()
             self._load_field_controls()
@@ -1561,6 +1584,65 @@ class SignaturePropertiesPanel:
         self.refresh_preview()
         self._notify_change()
         return True
+
+    def save_app_settings(self) -> AppSettings | None:
+        try:
+            settings = AppSettings(
+                schema_version=self._app_settings.schema_version,
+                default_output_directory=_text(
+                    self._app_settings_controls.default_output_directory
+                ).strip(),
+                default_open_directory=_text(
+                    self._app_settings_controls.default_open_directory
+                ).strip(),
+                linux_packaging_channel=self._app_settings.linux_packaging_channel,
+                ui=dict(self._app_settings.ui),
+            )
+        except (ConfigValidationError, ValueError) as exc:
+            self._show_app_settings_error(str(exc))
+            return None
+
+        if self._app_settings_store is not None:
+            try:
+                self._app_settings_store.save_settings(settings)
+            except (ConfigValidationError, OSError) as exc:
+                self._show_app_settings_error(str(exc))
+                return None
+
+        self._app_settings = settings
+        if self._on_app_settings_change is not None:
+            self._on_app_settings_change(settings)
+        return settings
+
+    @property
+    def app_settings(self) -> AppSettings:
+        return self._app_settings
+
+    def _build_app_settings_controls(self) -> AppSettingsControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Settings")
+        layout = bindings.q_form_layout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        default_output_directory = bindings.q_line_edit()
+        default_output_directory.setPlaceholderText("Default signed-PDF output folder")
+        default_open_directory = bindings.q_line_edit()
+        default_open_directory.setPlaceholderText("Default PDF open folder")
+        save_button = bindings.q_push_button("Save settings")
+
+        layout.addRow("Output folder", default_output_directory)
+        layout.addRow("Open folder", default_open_directory)
+        layout.addRow("", save_button)
+
+        save_button.clicked.connect(self.save_app_settings)  # type: ignore[attr-defined]
+
+        return AppSettingsControls(
+            container=container,
+            default_output_directory=default_output_directory,
+            default_open_directory=default_open_directory,
+            save_button=save_button,
+        )
 
     def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
         bindings = self._bindings
@@ -2011,6 +2093,16 @@ class SignaturePropertiesPanel:
     def _load_signature_preset_controls(self) -> None:
         self._reload_signature_preset_controls(
             selected_name=self._selected_signature_preset_name
+        )
+
+    def _load_app_settings_controls(self) -> None:
+        _set_text(
+            self._app_settings_controls.default_output_directory,
+            self._app_settings.default_output_directory,
+        )
+        _set_text(
+            self._app_settings_controls.default_open_directory,
+            self._app_settings.default_open_directory,
         )
 
     def _load_field_controls(self) -> None:
@@ -2743,6 +2835,12 @@ class SignaturePropertiesPanel:
         if callable(warning):
             warning(self.widget, "Certificate configuration error", message)
 
+    def _show_app_settings_error(self, message: str) -> None:
+        self._emit_error(message)
+        warning = getattr(self._bindings.q_message_box, "warning", None)
+        if callable(warning):
+            warning(self.widget, "Settings error", message)
+
     def _heading(self, text: str) -> Any:
         label = self._bindings.q_label(text)
         if hasattr(label, "setStyleSheet"):
@@ -2804,6 +2902,8 @@ class SigningWorkspaceWidget:
         certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
+        app_settings: AppSettings | None = None,
+        app_settings_store: AppSettingsStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
@@ -2816,6 +2916,13 @@ class SigningWorkspaceWidget:
         self._on_sign_request = on_sign_request
         self._on_error = on_error
         self._on_status_change = on_status_change
+        self._app_settings_store = app_settings_store
+        if app_settings is not None:
+            self._app_settings = app_settings
+        elif app_settings_store is not None:
+            self._app_settings = app_settings_store.load_settings()
+        else:
+            self._app_settings = AppSettings.default()
         self._last_signing_result: SigningResult | None = None
         self.widget = bindings.q_widget()
         self._layout = bindings.q_vbox_layout(self.widget)
@@ -2840,6 +2947,9 @@ class SigningWorkspaceWidget:
             certificate_secret_provider=certificate_secret_provider,
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
+            app_settings=self._app_settings,
+            app_settings_store=app_settings_store,
+            on_app_settings_change=self._handle_app_settings_change,
             on_change=self._handle_panel_change,
             on_page_change=self._handle_page_change,
             on_error=self._emit_error,
@@ -2859,18 +2969,26 @@ class SigningWorkspaceWidget:
         if hasattr(self._result_label, "setStyleSheet"):
             self._result_label.setStyleSheet("color: #444;")
 
+        self._choose_output_button = bindings.q_push_button("Choose output...")
+        self._choose_output_button.clicked.connect(  # type: ignore[attr-defined]
+            self.choose_output_pdf_path
+        )
         self._main_row.addWidget(self._viewer_widget, 3)
         self._main_row.addWidget(self._properties_scroll, 2)
         self._layout.addLayout(self._main_row)
+        self._layout.addWidget(self._choose_output_button)
         self._layout.addWidget(self._sign_button)
         self._layout.addWidget(self._result_label)
 
         self.widget.properties_panel = self.properties_panel  # type: ignore[attr-defined]
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
+        self.widget.choose_output_button = self._choose_output_button  # type: ignore[attr-defined]
+        self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
+        self.widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
         self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
         self.widget._signing_workspace = self  # type: ignore[attr-defined]
 
@@ -2884,6 +3002,10 @@ class SigningWorkspaceWidget:
     @property
     def viewer_widget(self) -> Any:
         return self._viewer_widget
+
+    @property
+    def app_settings(self) -> AppSettings:
+        return self._app_settings
 
     def refresh_viewer(self) -> None:
         self._viewer_widget.refresh()
@@ -2937,6 +3059,26 @@ class SigningWorkspaceWidget:
         self._set_sign_result_text("")
         return request
 
+    def choose_output_pdf_path(self) -> str | None:
+        initial_path = self._default_output_dialog_path()
+        selected = self._bindings.q_file_dialog.getSaveFileName(
+            self.widget,
+            "Save signed PDF",
+            str(initial_path),
+            "PDF files (*.pdf)",
+        )
+        if isinstance(selected, tuple):
+            selected_path = str(selected[0])
+        else:
+            selected_path = str(selected)
+        selected_path = selected_path.strip()
+        if not selected_path:
+            return None
+        self._draft_workflow.output_pdf_path = selected_path
+        self._set_sign_result_text(f"Output will be saved to: {selected_path}")
+        self._refresh_sign_button_state()
+        return selected_path
+
     @property
     def last_signing_result(self) -> SigningResult | None:
         """Return the most recent signing result, if a real executor ran."""
@@ -2978,6 +3120,10 @@ class SigningWorkspaceWidget:
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
 
+    def _handle_app_settings_change(self, settings: AppSettings) -> None:
+        self._app_settings = settings
+        self.widget.app_settings = settings  # type: ignore[attr-defined]
+
     def _handle_page_change(self, page_number: int) -> None:
         target_index = max(page_number - 1, 0)
         try:
@@ -3016,6 +3162,15 @@ class SigningWorkspaceWidget:
     def _refresh_sign_button_state(self) -> None:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
 
+    def _default_output_dialog_path(self) -> Path:
+        current_output = Path(self._draft_workflow.output_pdf_path)
+        if current_output.name:
+            filename = current_output.name
+        else:
+            input_path = Path(self._draft_workflow.input_pdf_path)
+            filename = f"{input_path.stem or 'signed'}-signed.pdf"
+        return Path(self._app_settings.default_output_directory) / filename
+
     def _emit_error(self, message: str) -> None:
         self._set_sign_result_text(message, success=False)
         if self._on_error is not None:
@@ -3051,6 +3206,8 @@ class SigningShellAdapter:
         certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
+        app_settings: AppSettings | None = None,
+        app_settings_store: AppSettingsStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
@@ -3065,6 +3222,8 @@ class SigningShellAdapter:
             certificate_secret_provider=certificate_secret_provider,
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
+            app_settings=app_settings,
+            app_settings_store=app_settings_store,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
             on_error=on_error,
@@ -3093,6 +3252,7 @@ class SigningShellAdapter:
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
             q_check_box=getattr(qt_widgets, "QCheckBox"),
             q_combo_box=getattr(qt_widgets, "QComboBox"),
+            q_file_dialog=getattr(qt_widgets, "QFileDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),
             q_pixmap=getattr(qt_gui, "QPixmap"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
@@ -3111,6 +3271,8 @@ def build_qt_signing_shell(
     certificate_secret_provider: CertificateSecretProvider | None = None,
     preset_catalog: SignaturePresetCatalog | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
+    app_settings: AppSettings | None = None,
+    app_settings_store: AppSettingsStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
@@ -3127,6 +3289,8 @@ def build_qt_signing_shell(
         certificate_secret_provider=certificate_secret_provider,
         preset_catalog=preset_catalog,
         preset_catalog_store=preset_catalog_store,
+        app_settings=app_settings,
+        app_settings_store=app_settings_store,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         on_error=on_error,

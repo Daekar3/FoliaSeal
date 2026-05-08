@@ -21,11 +21,13 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
     SigningResult,
 )
+from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
 )
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
@@ -318,6 +320,16 @@ class _FakeMessageBox:
         return self.Yes
 
 
+class _FakeFileDialog:
+    def __init__(self) -> None:
+        self.save_calls = []
+        self.next_save_file_name = ""
+
+    def getSaveFileName(self, parent, title, directory, file_filter):  # noqa: N802
+        self.save_calls.append((parent, title, directory, file_filter))
+        return (self.next_save_file_name, file_filter)
+
+
 class _FakeSpinBox(_FakeWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -473,6 +485,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_line_edit=_FakeLineEdit,
         q_check_box=_FakeCheckBox,
         q_combo_box=_FakeComboBox,
+        q_file_dialog=_FakeFileDialog(),
         q_message_box=_FakeMessageBox(),
         q_double_spin_box=_FakeDoubleSpinBox,
         q_spin_box=_FakeSpinBox,
@@ -500,6 +513,93 @@ def _viewer_workflow() -> ViewerWorkflow:
         render_backend=_FakeRenderBackend(),
         session=ViewerSession(page_count=3),
     )
+
+
+def test_signing_shell_saves_app_settings_from_controls(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    settings_store = AppSettingsStore(
+        storage_dir=tmp_path / "config",
+        default_home_directory=tmp_path / "home",
+    )
+    output_dir = tmp_path / "signed-output"
+    open_dir = tmp_path / "source-pdfs"
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        app_settings_store=settings_store,
+    )
+
+    controls = widget.properties_panel._app_settings_controls
+    controls.default_output_directory.setText(str(output_dir))
+    controls.default_open_directory.setText(str(open_dir))
+    saved = widget.properties_panel.save_app_settings()
+
+    assert saved == AppSettings(
+        schema_version=1,
+        default_output_directory=str(output_dir),
+        default_open_directory=str(open_dir),
+        linux_packaging_channel="primary",
+        ui={},
+    )
+    assert settings_store.load_settings() == saved
+    assert widget.app_settings == saved
+
+
+def test_signing_shell_output_dialog_uses_app_settings_default_directory(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    default_output_dir = tmp_path / "chosen-default"
+    selected_path = default_output_dir / "signed.pdf"
+    bindings.q_file_dialog.next_save_file_name = str(selected_path)
+    workflow = _workflow(tmp_path)
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(default_output_dir),
+            default_open_directory=str(tmp_path / "open"),
+            linux_packaging_channel="unknown",
+            ui={},
+        ),
+    )
+
+    result = widget.choose_output_pdf_path()
+
+    assert result == str(selected_path)
+    assert workflow.output_pdf_path == str(selected_path)
+    assert bindings.q_file_dialog.save_calls == [
+        (
+            widget,
+            "Save signed PDF",
+            str(default_output_dir / "output.pdf"),
+            "PDF files (*.pdf)",
+        )
+    ]
 
 
 def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) -> None:

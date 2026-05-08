@@ -171,7 +171,7 @@ The canonical repository document split is:
 - Does not own: UI controls or runtime signing flow.
 - Key collaborators: domain models, Qt signing shell, future credential-store adapter.
 - Main entry points: `AppSettings.default()`, `AppSettings.from_dict()`, `AppSettingsStore.load_settings()`, `AppSettingsStore.save_settings()`, `ManagedCertificate.from_dict()`, `CertificateConfiguration.from_dict()`, `CertificateCatalog.from_dict()`, `CertificateCatalogStore.load_catalog()`, `CertificateSigningMaterialResolver.resolve_by_configuration_id()`, `AppearanceProfile.from_dict()`, `PlacementProfile.from_dict()`, `SignaturePreset.from_dict()`, `SignaturePresetCatalog.from_dict()`, `SignaturePresetCatalog.resolve_preset()`, `SignaturePresetCatalog.preset_names()`, `SignaturePresetCatalog.preset_named()`, `SignaturePresetCatalog.upsert_preset()`, `SignaturePresetCatalog.remove_preset()`, `SignaturePresetCatalogStore.load_catalog()`, `save_catalog()`, `save_preset()`, `delete_preset()`.
-- Known constraints: App settings storage uses `${XDG_CONFIG_HOME:-~/.config}/FoliaSeal/settings.json` and returns home-directory defaults when missing or blank. The profile store still uses the historical user-visible `Signature Profiles/profiles.json` path, but the JSON shape now separates `appearance_profiles`, `placement_profiles`, and `signature_presets`. Certificate configuration storage uses `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/certificates.json` plus a `Managed/` directory for app-owned PKCS#12 files. Passwords are not stored in ordinary JSON; saved-password lookup is a resolver protocol seam with no concrete OS credential adapter yet. Obsolete signature-preset compatibility wrappers such as `profile_names()`, `profile_named()`, `save_profile()`, and `delete_profile()` have been removed; `appearance_profile_named()` and `placement_profile_named()` remain because they address canonical profile objects.
+- Known constraints: App settings storage uses `${XDG_CONFIG_HOME:-~/.config}/FoliaSeal/settings.json` and returns home-directory defaults when missing or blank. The Qt signing shell can edit/save default directories and uses the default output directory for its save-output file dialog, but the final application-frame Settings menu and standard Open-file action are still pending. The profile store still uses the historical user-visible `Signature Profiles/profiles.json` path, but the JSON shape now separates `appearance_profiles`, `placement_profiles`, and `signature_presets`. Certificate configuration storage uses `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/certificates.json` plus a `Managed/` directory for app-owned PKCS#12 files. Passwords are not stored in ordinary JSON; saved-password lookup is a resolver protocol seam with no concrete OS credential adapter yet. Obsolete signature-preset compatibility wrappers such as `profile_names()`, `profile_named()`, `save_profile()`, and `delete_profile()` have been removed; `appearance_profile_named()` and `placement_profile_named()` remain because they address canonical profile objects.
 - Status: Confirmed by code and tests.
 
 ### Timestamping, trust, and certification infrastructure
@@ -296,7 +296,7 @@ The canonical repository document split is:
 ### App settings JSON contract
 
 - Producer: `AppSettingsStore.save_settings()`.
-- Consumer: future Qt Settings menu and file-dialog default directory behavior.
+- Consumer: Qt signing shell settings controls and save-output file-dialog default directory behavior; future application-frame Settings menu and Open-file behavior.
 - Stability: Persisted file contract.
 - Storage path: `${XDG_CONFIG_HOME:-~/.config}/FoliaSeal/settings.json`.
 - Format: JSON object with `schema_version`, `default_output_directory`, `default_open_directory`, `linux_packaging_channel`, and `ui`.
@@ -349,11 +349,20 @@ The canonical repository document split is:
 
 1. `build_qt_signing_shell()` constructs a `SigningShellAdapter`.
 2. The shell creates a viewer workflow and signing draft workflow.
-3. User interactions update `SigningDraftWorkflow` state through placement and appearance controls.
-4. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
-5. On sign, the workflow converts the draft into `SigningRequest`.
-6. The injected signing executor runs and returns a `SigningResult`.
-7. The shell displays success/failure state and harnesses can capture structured evidence.
+3. Optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace; otherwise home-directory defaults are used.
+4. User interactions update `SigningDraftWorkflow` state through placement and appearance controls.
+5. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
+6. On sign, the workflow converts the draft into `SigningRequest`.
+7. The injected signing executor runs and returns a `SigningResult`.
+8. The shell displays success/failure state and harnesses can capture structured evidence.
+
+### Qt output path selection
+
+1. The signing shell receives settings from an explicit `AppSettings`, an `AppSettingsStore`, or `AppSettings.default()`.
+2. The Settings controls can update default open/output directories and persist them through `AppSettingsStore.save_settings()`.
+3. `choose_output_pdf_path()` opens `QFileDialog.getSaveFileName()` with the initial path rooted at `AppSettings.default_output_directory`.
+4. When the user selects a file, the shell writes the chosen path to `SigningDraftWorkflow.output_pdf_path` before signing.
+5. Empty dialog results leave the current output path unchanged.
 
 ### Viewer selection to PDF rectangle
 
@@ -396,7 +405,7 @@ The canonical repository document split is:
 | Signed PDF output | pyHanko backend bytes | atomic temp-file replace | User-provided output path | PDF | `SigningResult` reports PDF version, signature subfilter, timestamp metadata. |
 | PKCS#12 certificate | User path/passphrase | validated/loaded by pyHanko/cryptography | Not persisted by app | PKCS#12 | Passphrase can appear in CLI history for harness commands; README warns about this. |
 | Managed certificate configuration | Certificate management workflow, tests, or Qt shell selection | managed certificate record + certificate configuration -> resolver -> runtime signing material -> signing draft | XDG data dir under `FoliaSeal/Certificates/certificates.json`; PKCS#12 files under `FoliaSeal/Certificates/Managed/` | `CertificateCatalog` JSON plus PKCS#12 files | JSON stores secret references only; no plain certificate passwords. Qt can select existing configurations; full certificate management UI is pending. |
-| App settings | Settings store callers and future Qt Settings menu | user preferences -> settings schema -> JSON | XDG config dir under `FoliaSeal/settings.json` | `AppSettings` JSON | Missing/blank settings load home-directory defaults; Qt menu/file-dialog integration is pending. |
+| App settings | Settings store callers, Qt signing shell settings controls, output file dialog | user preferences -> settings schema -> JSON -> shell defaults | XDG config dir under `FoliaSeal/settings.json` | `AppSettings` JSON | Missing/blank settings load home-directory defaults; application-frame Settings menu and Open-file integration are pending. |
 | Reusable signature presets | Qt shell/user input | domain appearance/placement -> split config schema -> JSON | XDG data dir under historical `FoliaSeal/Signature Profiles/profiles.json` path | `SignaturePresetCatalog` JSON with appearance, placement, and preset lists | Missing/blank catalog becomes empty; obsolete profile-named preset methods have been removed. |
 | Trust profile/timestamp policy | Config schema callers | JSON dicts <-> dataclasses -> runtime trust policy | Needs review | JSON schema in `infra/config/schemas.py` | Storage location outside profile catalog is not yet clearly documented in code. |
 | Viewer render buffers | Render backend | PDF page -> RGBA bytes | Memory; optional render cache | `RenderPageResult` | Cache is in-memory LRU keyed by path/page/zoom. |
@@ -484,6 +493,7 @@ Default local validation from README:
 | 2026-05-06 | Renamed primary signature preset APIs and Qt shell wording away from generic profile terminology. | Reflected schema model alignment Slice 3C implementation. |
 | 2026-05-07 | Removed obsolete profile compatibility wrappers for signature preset operations. | Reflected schema model alignment Slice 3D implementation. |
 | 2026-05-07 | Added first-class AppSettings schema and storage. | Reflected schema model alignment Slice 4 persistence implementation; Qt Settings menu integration remains pending. |
+| 2026-05-07 | Wired AppSettings into the Qt signing shell. | Documented settings controls and save-output dialog default-directory behavior; true application-frame menu/Open-file integration remains pending. |
 | 2026-05-06 | Added certificate catalog and signing-material resolver architecture. | Reflected schema model alignment Slice 2 implementation. |
 | 2026-04-30 | Replaced skeleton with first-pass architecture map. | Documented current repository structure, contracts, flows, persistence, tests, debts, and open questions from code inspection. |
 | 2026-04-30 | Created architecture document skeleton. | Establish canonical architecture documentation path referenced by agent instructions. |
