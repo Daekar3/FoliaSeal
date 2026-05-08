@@ -72,6 +72,63 @@ class _FakeLabel:
         self.word_wrap = bool(value)
 
 
+class _FakeDialog:
+    Accepted = 1
+    Rejected = 0
+
+    def __init__(self, parent=None) -> None:
+        self.parent = parent
+        self.title = ""
+        self.result = self.Rejected
+        self.layout = None
+
+    def setWindowTitle(self, title):  # noqa: N802
+        self.title = title
+
+    def setLayout(self, layout):  # noqa: N802
+        self.layout = layout
+
+    def exec(self):
+        return self.result
+
+    def accept(self) -> None:
+        self.result = self.Accepted
+
+    def reject(self) -> None:
+        self.result = self.Rejected
+
+
+class _FakeFormLayout:
+    def __init__(self, parent=None) -> None:
+        self.parent = parent
+        self.rows = []
+        if parent is not None and hasattr(parent, "setLayout"):
+            parent.setLayout(self)
+
+    def addRow(self, *args):  # noqa: N802
+        self.rows.append(args)
+
+
+class _FakeLineEdit:
+    def __init__(self, text="") -> None:
+        self._text = text
+
+    def setText(self, text):  # noqa: N802
+        self._text = text
+
+    def text(self):
+        return self._text
+
+
+class _FakePushButton:
+    def __init__(self, text="") -> None:
+        self.text = text
+        self.clicked = _FakeSignal()
+
+    def click(self) -> None:
+        self.clicked.emit()
+
+
 class _FakeFileDialog:
     def __init__(self) -> None:
         self.open_calls = []
@@ -123,7 +180,11 @@ def _fake_bindings() -> QtAppFrameBindings:
     _FakeQPdfDocument.load_calls = []
     return QtAppFrameBindings(
         q_main_window=_FakeMainWindow,
+        q_dialog=_FakeDialog,
+        q_form_layout=_FakeFormLayout,
         q_label=_FakeLabel,
+        q_line_edit=_FakeLineEdit,
+        q_push_button=_FakePushButton,
         q_file_dialog=file_dialog,
         q_message_box=message_box,
         q_action=_FakeAction,
@@ -201,8 +262,80 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
 
     frame.window.menu_bar.menus[1].actions[0].trigger()
 
-    assert bindings.q_message_box.information_calls
-    assert "Default open folder" in bindings.q_message_box.information_calls[0][2]
+    assert frame.window.settings_dialog.controls.dialog.title == "Application settings"
+    assert (
+        frame.window.settings_dialog.controls.default_open_directory.text()
+        == str(tmp_path / "source")
+    )
+
+
+def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    settings_store = AppSettingsStore(storage_dir=tmp_path / "config")
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=settings_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+    next_open_dir = tmp_path / "next-source"
+    next_output_dir = tmp_path / "next-signed"
+
+    frame.show_app_settings()
+    dialog = frame.window.settings_dialog
+    dialog.controls.default_open_directory.setText(str(next_open_dir))
+    dialog.controls.default_output_directory.setText(str(next_output_dir))
+    saved = dialog.save()
+    frame.show_app_settings()
+
+    assert saved == AppSettings(
+        schema_version=1,
+        default_open_directory=str(next_open_dir),
+        default_output_directory=str(next_output_dir),
+        linux_packaging_channel="unknown",
+        ui={},
+    )
+    assert settings_store.load_settings() == saved
+    assert frame.app_settings == saved
+    assert frame.window.app_settings == saved
+    bindings.q_file_dialog.next_open_file_name = ""
+    frame.choose_open_pdf()
+    assert bindings.q_file_dialog.open_calls[-1][2] == str(next_open_dir)
+
+
+def test_app_frame_settings_dialog_refreshes_loaded_shell_settings(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    seen_settings = []
+
+    class _Workspace:
+        def _handle_app_settings_change(self, settings):
+            seen_settings.append(settings)
+
+    shell._signing_workspace = _Workspace()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.show_app_settings()
+    dialog = frame.window.settings_dialog
+    dialog.controls.default_open_directory.setText(str(tmp_path / "updated-open"))
+    dialog.controls.default_output_directory.setText(str(tmp_path / "updated-output"))
+    saved = dialog.save()
+    frame.show_app_settings()
+
+    assert shell.app_settings == saved
+    assert seen_settings == [saved]
 
 
 def test_app_frame_reports_open_errors(tmp_path: Path) -> None:
