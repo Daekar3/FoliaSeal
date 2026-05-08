@@ -3,6 +3,7 @@ import pytest
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.schemas import (
     AppearanceProfile,
+    AppSettings,
     CertificateCatalog,
     CertificateConfiguration,
     ConfigValidationError,
@@ -70,6 +71,57 @@ def test_timestamp_policy_round_trip() -> None:
     reconstructed = TimestampPolicy.from_dict(payload)
 
     assert reconstructed == original
+
+
+def test_app_settings_defaults_to_home_directories(tmp_path) -> None:
+    settings = AppSettings.default(home_directory=tmp_path)
+
+    assert settings.schema_version == 1
+    assert settings.default_output_directory == str(tmp_path)
+    assert settings.default_open_directory == str(tmp_path)
+    assert settings.linux_packaging_channel == "primary"
+    assert settings.ui == {}
+
+
+def test_app_settings_round_trip_preserves_ui_mapping() -> None:
+    original = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"last_window_layout": "compact"},
+    )
+
+    payload = original.to_dict()
+    reconstructed = AppSettings.from_dict(payload)
+
+    assert reconstructed == original
+    assert payload == {
+        "schema_version": 1,
+        "default_output_directory": "/home/user/out",
+        "default_open_directory": "/home/user/in",
+        "linux_packaging_channel": "primary",
+        "ui": {"last_window_layout": "compact"},
+    }
+
+
+def test_app_settings_rejects_blank_directories() -> None:
+    with pytest.raises(ConfigValidationError, match="default_output_directory"):
+        AppSettings(
+            schema_version=1,
+            default_output_directory=" ",
+            default_open_directory="/home/user",
+            linux_packaging_channel="primary",
+            ui={},
+        )
+
+
+def test_app_settings_rejects_non_mapping_ui() -> None:
+    payload = AppSettings.default(home_directory="/home/user").to_dict()
+    payload["ui"] = "not-an-object"
+
+    with pytest.raises(ConfigValidationError, match="ui"):
+        AppSettings.from_dict(payload)
 
 
 def test_managed_certificate_round_trip() -> None:

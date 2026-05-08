@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from foliaseal.domain.models import (
@@ -125,6 +126,10 @@ def _optional_non_empty_str(payload: dict[str, Any], field: str) -> str | None:
     if not value.strip():
         raise ConfigValidationError(f"Field '{field}' must be a non-empty str when present.")
     return value
+
+
+def _copy_mapping(value: dict[str, Any]) -> dict[str, Any]:
+    return dict(value)
 
 
 def _enum_from_str(value: str, field: str, enum_cls: type[Enum]) -> Enum:
@@ -347,6 +352,94 @@ class TimestampPolicy:
     def to_dict(self) -> dict[str, Any]:
         """Convert to a persisted mapping."""
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class AppSettings:
+    """Global application settings that are not reusable signing objects."""
+
+    schema_version: int
+    default_output_directory: str
+    default_open_directory: str
+    linux_packaging_channel: str
+    ui: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "schema_version",
+            _require_int_value(self.schema_version, "schema_version"),
+        )
+        object.__setattr__(
+            self,
+            "default_output_directory",
+            _require_non_empty_str_value(
+                self.default_output_directory,
+                "default_output_directory",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "default_open_directory",
+            _require_non_empty_str_value(
+                self.default_open_directory,
+                "default_open_directory",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "linux_packaging_channel",
+            _require_non_empty_str_value(
+                self.linux_packaging_channel,
+                "linux_packaging_channel",
+            ),
+        )
+        if not isinstance(self.ui, dict):
+            raise ConfigValidationError("Field 'ui' must be an object.")
+        object.__setattr__(self, "ui", _copy_mapping(self.ui))
+
+    @classmethod
+    def default(cls, home_directory: Path | str | None = None) -> AppSettings:
+        """Build default settings with open/output directories rooted at home."""
+        home = Path.home() if home_directory is None else Path(home_directory)
+        return cls(
+            schema_version=1,
+            default_output_directory=str(home),
+            default_open_directory=str(home),
+            linux_packaging_channel="primary",
+            ui={},
+        )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> AppSettings:
+        """Build from persisted mapping."""
+        ui_payload = _require_mapping(payload, "ui")
+        return cls(
+            schema_version=_require_int(payload, "schema_version"),
+            default_output_directory=_require_non_empty_str(
+                payload,
+                "default_output_directory",
+            ),
+            default_open_directory=_require_non_empty_str(
+                payload,
+                "default_open_directory",
+            ),
+            linux_packaging_channel=_require_non_empty_str(
+                payload,
+                "linux_packaging_channel",
+            ),
+            ui=_copy_mapping(ui_payload),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a persisted mapping."""
+        return {
+            "schema_version": self.schema_version,
+            "default_output_directory": self.default_output_directory,
+            "default_open_directory": self.default_open_directory,
+            "linux_packaging_channel": self.linux_packaging_channel,
+            "ui": _copy_mapping(self.ui),
+        }
 
 
 @dataclass(frozen=True)

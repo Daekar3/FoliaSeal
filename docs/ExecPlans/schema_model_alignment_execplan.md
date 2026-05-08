@@ -29,7 +29,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] (2026-05-06 23:02Z) Implemented Slice 3C: moved primary signature preset catalog/store/shell/test code to preset-oriented names and removed draft workflow profile aliases.
 - [x] (2026-05-07 04:00Z) Created child ExecPlan for Slice 3D at `docs/ExecPlans/schema_model_alignment_slice3d_remove_profile_aliases_execplan.md`.
 - [x] (2026-05-07 04:10Z) Implemented Slice 3D: removed obsolete signature-preset profile compatibility wrappers from catalog, store, and shell code.
-- [ ] Implement Slice 4: add `AppSettings` persistence and move open/save directory defaults into that store.
+- [x] (2026-05-07 04:16Z) Created child ExecPlan for Slice 4 at `docs/ExecPlans/schema_model_alignment_slice4_app_settings_execplan.md`.
+- [x] (2026-05-07 04:24Z) Implemented Slice 4 persistence: added `AppSettings` schema and `AppSettingsStore`.
+- [ ] Continue Slice 4 UI integration: wire `AppSettings` into the Qt Settings menu and file-dialog default directories.
 - [ ] Reconcile `docs/ARCHITECTURE.md` with the implementation after each slice lands.
 
 ## Surprises & Discoveries
@@ -49,8 +51,8 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - Observation: the workflow currently reads PKCS#12 data directly for preview semantics, which makes certificate preview behavior depend on local file access from the draft object itself.
   Evidence: `SigningDraftWorkflow._certificate_values_for_preview()` in `src/foliaseal/application/signing_draft_workflow.py` calls `pkcs12.load_key_and_certificates(Path(self.certificate_path).read_bytes(), self.passphrase.encode(...))`.
 
-- Observation: there is no first-class persisted `AppSettings` object at all.
-  Evidence: `src/foliaseal/infra/config/profile_storage.py` only defines profile-catalog storage rooted at `Signature Profiles`, and repository search finds no `AppSettings` or default output-directory persistence type.
+- Observation: before Slice 4, there was no first-class persisted `AppSettings` object at all.
+  Evidence: prior to Slice 4, `src/foliaseal/infra/config/profile_storage.py` only defined profile-catalog storage rooted at `Signature Profiles`, and repository search found no `AppSettings` or default output-directory persistence type.
 
 - Observation: Slice 1 validation is locally clean for focused tests and lint, while the full suite has unrelated artifact-manifest failures.
   Evidence: focused schema/storage/workflow/shell tests reported `92 passed`, `ruff check .` passed, and full `pytest -q` reported four failures in `tests/unit/test_phase3_harness.py` manifest expectation tests.
@@ -69,6 +71,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 - Observation: Remaining signature-preset profile compatibility wrappers could be removed safely after in-repo callers moved to canonical names.
   Evidence: Slice 3D removed `profile_names()`, `profile_named()`, `upsert_profile()`, `remove_profile()`, `save_profile()`, `delete_profile()`, `save_current_profile()`, and `delete_current_profile()` from source code while focused validation stayed green.
+
+- Observation: AppSettings can be added as a persistence-only slice before Qt menu/file-dialog integration.
+  Evidence: Slice 4 adds `AppSettings` and `AppSettingsStore` with home-directory defaults, while `docs/SPEC.md` still requires explicit save dialogs for signed output.
 
 ## Decision Log
 
@@ -104,7 +109,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 At plan creation time, the main outcome was clarity rather than code. Slice 1 then split profile persistence into `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset`. Slice 2 added the certificate side of the canonical object model with `ManagedCertificate`, `CertificateConfiguration`, `CertificateCatalog`, `CertificateCatalogStore`, and `CertificateSigningMaterialResolver`.
 
-Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. Slice 3D removed obsolete signature-preset profile compatibility wrappers from source code. The remaining work is still implementation-heavy: full certificate management UI is pending, and app settings still need a first-class store. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
+Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. Slice 3D removed obsolete signature-preset profile compatibility wrappers from source code. Slice 4 added first-class `AppSettings` schema and storage. The remaining work is still implementation-heavy: full certificate management UI is pending, and Qt settings/file-dialog integration must consume `AppSettings`. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
 
 ## Context and Orientation
 
