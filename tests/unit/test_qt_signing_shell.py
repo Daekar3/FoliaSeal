@@ -21,7 +21,6 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
     SigningResult,
 )
-from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
@@ -515,47 +514,6 @@ def _viewer_workflow() -> ViewerWorkflow:
     )
 
 
-def test_signing_shell_saves_app_settings_from_controls(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    bindings = _fake_bindings()
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: bindings,
-    )
-    settings_store = AppSettingsStore(
-        storage_dir=tmp_path / "config",
-        default_home_directory=tmp_path / "home",
-    )
-    output_dir = tmp_path / "signed-output"
-    open_dir = tmp_path / "source-pdfs"
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-        app_settings_store=settings_store,
-    )
-
-    controls = widget.properties_panel._app_settings_controls
-    controls.default_output_directory.setText(str(output_dir))
-    controls.default_open_directory.setText(str(open_dir))
-    saved = widget.properties_panel.save_app_settings()
-
-    assert saved == AppSettings(
-        schema_version=1,
-        default_output_directory=str(output_dir),
-        default_open_directory=str(open_dir),
-        linux_packaging_channel="primary",
-        ui={},
-    )
-    assert settings_store.load_settings() == saved
-    assert widget.app_settings == saved
-
-
 def test_signing_shell_output_dialog_uses_app_settings_default_directory(
     monkeypatch,
     tmp_path: Path,
@@ -600,6 +558,7 @@ def test_signing_shell_output_dialog_uses_app_settings_default_directory(
             "PDF files (*.pdf)",
         )
     ]
+    assert not hasattr(widget.properties_panel, "_app_settings_controls")
 
 
 def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) -> None:
