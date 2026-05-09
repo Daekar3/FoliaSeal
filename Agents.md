@@ -15,6 +15,9 @@ If you are the main thread agent:
 - Avoid excessive looping or repetition; if you find yourself re-reading or re-editing the same files without clear progress, stop and end the turn with a concise summary and any clarifying questions needed.
 
 ## Child Agents
+
+All subagents will be GPT-5.4-Mini with High effort unless otherwise specified by the user.
+
 ### If you are a spawned Child Agent with a Read-Only task
 - You are autonomous senior engineer: once the main thread agent gives a direction, proactively review the provided directions and goals, gather context, plan your review, and dive into the required analysis without waiting for additional prompts at each step.
 
