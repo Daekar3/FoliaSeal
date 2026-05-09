@@ -283,15 +283,15 @@ The canonical repository document split is:
 
 ### Certificate catalog JSON contract
 
-- Producer: `CertificateCatalogStore.save_catalog()`.
-- Consumer: future certificate-management UI, signing-material resolver, and future launches.
+- Producer: `CertificateCatalogStore.save_catalog()` and `CertificateImportService.import_pkcs12()` through the app-frame import dialog.
+- Consumer: Qt app-frame certificate import, signing-material resolver, Qt signing shell certificate selector, and future launches.
 - Stability: Persisted file contract.
 - Storage path: `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/certificates.json`.
 - Managed files path: `${XDG_DATA_HOME:-~/.local/share}/FoliaSeal/Certificates/Managed/`.
 - Format: JSON object with `schema_version`, `managed_certificates`, and `certificate_configurations`. `CertificateConfiguration` entries reference managed certificates by id and may reference saved passwords by secret id only.
 - Validation: `CertificateCatalog.from_dict()` and nested schema constructors reject malformed shape/types, duplicate ids, duplicate configuration names, path-like storage filenames, and saved-password configurations without a secret reference.
-- Error behavior: missing or blank file loads as an empty catalog; invalid JSON raises `ConfigValidationError`; resolver failures raise `SigningMaterialResolutionError` with user-actionable messages.
-- Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/certificate_storage.py`, `src/foliaseal/application/signing_material_resolver.py`.
+- Error behavior: missing or blank file loads as an empty catalog; invalid JSON raises `ConfigValidationError`; import failures raise `CertificateImportError`; resolver failures raise `SigningMaterialResolutionError` with user-actionable messages.
+- Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/certificate_storage.py`, `src/foliaseal/application/certificate_import.py`, `src/foliaseal/application/signing_material_resolver.py`, `src/foliaseal/presentation/qt/app_frame.py`.
 
 ### App settings JSON contract
 
@@ -348,13 +348,14 @@ The canonical repository document split is:
 ### Qt application frame and file opening
 
 1. `build_qt_app_frame()` constructs a `QtAppFrameAdapter`.
-2. `FoliaSealAppFrame` creates a `QMainWindow` and installs File/Open plus Settings/Application settings menu actions.
+2. `FoliaSealAppFrame` creates a `QMainWindow` and installs File/Open, Settings/Application settings, and Settings/Import certificate menu actions.
 3. File/Open calls `QFileDialog.getOpenFileName()` with `AppSettings.default_open_directory`.
 4. The selected PDF is loaded through `QPdfDocument` to determine page count.
 5. The frame creates `ViewerWorkflow`, `ViewerSession`, and `SigningDraftWorkflow`; the draft output path defaults to `AppSettings.default_output_directory / "<input-stem>-signed.pdf"`.
 6. The frame builds the existing Qt signing shell and sets it as the central widget.
 7. Settings/Application settings opens an editable dialog for default open and output directories, saves through `AppSettingsStore`, and refreshes the frame/current shell settings.
-8. Open failures are reported through the frame warning/error callback path.
+8. Settings/Import certificate opens a PKCS#12 import dialog, calls `CertificateImportService.import_pkcs12()`, and refreshes the loaded signing shell certificate selector if one is open.
+9. Open and import failures are reported through the frame warning/error callback path.
 
 ### Qt signing workflow
 

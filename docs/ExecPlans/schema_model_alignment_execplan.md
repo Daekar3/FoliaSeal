@@ -65,11 +65,11 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - Observation: early schema drift included a Qt "Named profiles" UI wired straight to the non-canonical preset model, so the wrong vocabulary was not isolated to storage code.
   Evidence: before Slice 3A, `src/foliaseal/presentation/qt/signing_shell.py` built a "Named profiles" group, saved via `SigningDraftWorkflow.capture_signature_preset()`, and applied via `SigningDraftWorkflow.apply_signature_preset()`. Slice 3A moved those shell calls to canonical workflow method names, and Slice 3C later renamed the shell and primary catalog/store methods to signature preset terminology.
 
-- Observation: certificate handling is still raw runtime state, not reusable product objects.
-  Evidence: `src/foliaseal/application/signing_draft_workflow.py` stores `certificate_path`, `passphrase`, `tsa_url`, and `timestamp_required` directly on the workflow, while `src/foliaseal/domain/models.py` requires `SigningRequest(certificate_path, passphrase, tsa_url, ...)`.
+- Observation: certificate handling now has persisted reusable catalog objects and first-pass import, but the runtime signing request still resolves to a concrete certificate path and passphrase before signing.
+  Evidence: `src/foliaseal/infra/config/schemas.py` defines `ManagedCertificate`, `CertificateConfiguration`, and `CertificateCatalog`; `src/foliaseal/application/certificate_import.py` imports PKCS#12 files into managed storage; `src/foliaseal/application/signing_material_resolver.py` resolves saved configurations into runtime signing material; `src/foliaseal/domain/models.py` still signs through `SigningRequest(certificate_path, passphrase, tsa_url, ...)`.
 
-- Observation: the workflow currently reads PKCS#12 data directly for preview semantics, which makes certificate preview behavior depend on local file access from the draft object itself.
-  Evidence: `SigningDraftWorkflow._certificate_values_for_preview()` in `src/foliaseal/application/signing_draft_workflow.py` calls `pkcs12.load_key_and_certificates(Path(self.certificate_path).read_bytes(), self.passphrase.encode(...))`.
+- Observation: certificate preview is no longer hard-wired to direct PKCS#12 reads from the draft workflow, but it still depends on certificate file access through an injected preview reader.
+  Evidence: `SigningDraftWorkflow._certificate_values_for_preview()` in `src/foliaseal/application/signing_draft_workflow.py` delegates to `CertificatePreviewReader`, whose default implementation is `Pkcs12CertificatePreviewReader` in `src/foliaseal/application/certificate_preview.py`.
 
 - Observation: before Slice 4, there was no first-class persisted `AppSettings` object at all.
   Evidence: prior to Slice 4, `src/foliaseal/infra/config/profile_storage.py` only defined profile-catalog storage rooted at `Signature Profiles`, and repository search found no `AppSettings` or default output-directory persistence type.

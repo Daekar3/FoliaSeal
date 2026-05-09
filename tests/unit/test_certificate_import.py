@@ -21,7 +21,7 @@ from foliaseal.infra.config.schemas import ConfigValidationError
 def _write_test_pkcs12(
     path: Path,
     *,
-    passphrase: str,
+    passphrase: str | None,
     common_name: str = "Alice Example",
 ) -> None:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -53,8 +53,10 @@ def _write_test_pkcs12(
             key=key,
             cert=certificate,
             cas=None,
-            encryption_algorithm=serialization.BestAvailableEncryption(
-                passphrase.encode("utf-8")
+            encryption_algorithm=(
+                serialization.BestAvailableEncryption(passphrase.encode("utf-8"))
+                if passphrase is not None
+                else serialization.NoEncryption()
             ),
         )
     )
@@ -121,6 +123,24 @@ def test_certificate_import_rejects_wrong_password_without_copying(
             source_path=source,
             display_name="Alice Signing",
             passphrase="wrong",
+        )
+
+    assert store.load_catalog().certificate_configurations == ()
+    assert not store.managed_certificate_dir.exists()
+
+
+def test_certificate_import_rejects_blank_password_without_copying(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.p12"
+    _write_test_pkcs12(source, passphrase=None)
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+
+    with pytest.raises(CertificateImportError, match="password-protected"):
+        _service(store).import_pkcs12(
+            source_path=source,
+            display_name="Alice Signing",
+            passphrase="",
         )
 
     assert store.load_catalog().certificate_configurations == ()

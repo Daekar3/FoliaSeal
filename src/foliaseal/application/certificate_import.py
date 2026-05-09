@@ -116,6 +116,10 @@ class CertificateImportService:
         )
 
     def _load_pkcs12(self, source: Path, passphrase: str) -> tuple[object, object]:
+        if not passphrase:
+            raise CertificateImportError(
+                "Certificate import requires a password-protected PKCS#12 file."
+            )
         passphrase_bytes = passphrase.encode("utf-8") if passphrase else None
         try:
             key, certificate, _extra = pkcs12.load_key_and_certificates(
