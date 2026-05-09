@@ -21,12 +21,12 @@ This matters because `docs/SPEC.md` calls for standard desktop settings/preferen
 - [x] (2026-05-09T03:25Z) Updated focused Qt shell tests so output-dialog/default-settings behavior remains covered without side-panel settings controls.
 - [x] (2026-05-09T03:25Z) Updated architecture and parent ExecPlan documentation to mark the duplicate-controls debt resolved.
 - [x] (2026-05-09T12:58Z) Created a local `.venv`, installed `.[dev]`, and ran focused tests, Ruff, and the full unit suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-09T12:58Z) Committed the completed slice as `08feda1 Remove duplicate shell settings controls`.
 
 ## Surprises & Discoveries
 
-- Observation: the duplicate controls are isolated to `SignaturePropertiesPanel`.
-  Evidence: `src/foliaseal/presentation/qt/signing_shell.py` defines `AppSettingsControls`, builds `_app_settings_controls`, inserts its container into the properties panel, implements `save_app_settings()`, and loads control values in `_load_app_settings_controls()`.
+- Observation: before this slice, the duplicate controls were isolated to `SignaturePropertiesPanel`.
+  Evidence: pre-change `src/foliaseal/presentation/qt/signing_shell.py` defined `AppSettingsControls`, built `_app_settings_controls`, inserted its container into the properties panel, implemented `save_app_settings()`, and loaded control values in `_load_app_settings_controls()`. Commit `08feda1` removed those editor-only symbols.
 
 - Observation: the app-frame settings dialog already propagates saved settings into an open shell without requiring the shell to own editing controls.
   Evidence: `tests/unit/test_qt_app_frame.py::test_app_frame_settings_dialog_refreshes_loaded_shell_settings` verifies the app frame calls the loaded shell's app-settings update path after saving the dialog.
@@ -40,8 +40,8 @@ This matters because `docs/SPEC.md` calls for standard desktop settings/preferen
   Rationale: `AppSettings` are app-wide preferences and the app-frame dialog is now the established top-level settings surface. A second editor in the document-specific shell creates conflicting ownership without adding a V1 capability.
   Date/Author: 2026-05-09 / Codex
 
-- Decision: keep `app_settings`, `app_settings_store`, and `on_app_settings_change` constructor flow where needed for compatibility and settings consumption, but remove UI-driven saving from `SignaturePropertiesPanel`.
-  Rationale: `SigningWorkspaceWidget` still needs an `AppSettings` value for output path defaults, and tests/fakes rely on the current construction seam. The behavior to remove is side-panel editing, not settings propagation.
+- Decision: keep `app_settings` / `app_settings_store` flow on `SigningWorkspaceWidget` where needed for compatibility and settings consumption, but remove UI-driven saving from `SignaturePropertiesPanel`.
+  Rationale: `SigningWorkspaceWidget` still needs an `AppSettings` value for output path defaults, while the app frame remains responsible for propagating saved settings into an open shell. The behavior to remove is side-panel editing, not settings consumption.
   Date/Author: 2026-05-09 / Codex
 
 ## Outcomes & Retrospective
@@ -54,15 +54,15 @@ FoliaSeal is a Qt desktop PDF signing application. The app frame is the top-leve
 
 `AppSettings` is the persisted app-wide preferences object defined in `src/foliaseal/infra/config/schemas.py` and stored by `src/foliaseal/infra/config/app_settings_storage.py`. Its default directory fields are not part of a signature appearance, placement, certificate, or signature preset.
 
-The current drift is that `SignaturePropertiesPanel` in `signing_shell.py` still builds a `Settings` group with default open/output directory line edits and a `Save settings` button. That was useful before the app frame existed, but Slice 4D added an editable app-frame settings dialog. This slice removes the older side-panel editor while keeping settings values available to the shell.
+Before this slice, `SignaturePropertiesPanel` in `signing_shell.py` built a `Settings` group with default open/output directory line edits and a `Save settings` button. That was useful before the app frame existed, but Slice 4D added an editable app-frame settings dialog. Commit `08feda1` removed the older side-panel editor while keeping settings values available to the shell.
 
 ## Plan of Work
 
-Edit `src/foliaseal/presentation/qt/signing_shell.py` first. Remove the `AppSettingsControls` dataclass, the `_app_settings_controls` instance creation, the layout insertion of its container, `save_app_settings()`, `_build_app_settings_controls()`, `_load_app_settings_controls()`, and the call to `_load_app_settings_controls()` from `load_from_workflow()`. Keep the `AppSettings` import and `self._app_settings` field because `SigningWorkspaceWidget._default_output_dialog_path()` uses it. Keep `_handle_app_settings_change()` so `FoliaSealAppFrame` can refresh an already-open shell.
+Edit `src/foliaseal/presentation/qt/signing_shell.py` first. Remove the `AppSettingsControls` dataclass, the `_app_settings_controls` instance creation, the layout insertion of its container, `save_app_settings()`, `_build_app_settings_controls()`, `_load_app_settings_controls()`, and the call to `_load_app_settings_controls()` from `load_from_workflow()`. Keep the `AppSettings` import and `SigningWorkspaceWidget._app_settings` field because `SigningWorkspaceWidget._default_output_dialog_path()` uses it. Keep `SigningWorkspaceWidget._handle_app_settings_change()` so `FoliaSealAppFrame` can refresh an already-open shell. Commit `08feda1` implemented these edits.
 
-Then update `tests/unit/test_qt_signing_shell.py`. Remove the test that mutates `widget.properties_panel._app_settings_controls` and calls `save_app_settings()`. Keep or adjust the output-dialog test so it proves the shell still honors an injected `AppSettings.default_output_directory`.
+Then update `tests/unit/test_qt_signing_shell.py`. Remove the test that mutates `widget.properties_panel._app_settings_controls` and calls `save_app_settings()`. Keep or adjust the output-dialog test so it proves the shell still honors an injected `AppSettings.default_output_directory`. Commit `08feda1` removed the editor test and extended the output-dialog test with an assertion that the private settings-controls attribute is absent.
 
-Update `docs/ARCHITECTURE.md` using the architecture-steward rule. The Qt presentation known constraints should no longer say the signing shell contains duplicate default-directory controls. The known architectural debt table should remove the duplicate-controls debt row or revise it as resolved in the change log. Update `docs/ExecPlans/schema_model_alignment_execplan.md` so the remaining unchecked item is marked complete and the retrospective says the duplicate controls were removed in Slice 4E.
+Update `docs/ARCHITECTURE.md` using the architecture-steward rule. The Qt presentation known constraints should no longer say the signing shell contains duplicate default-directory controls. The known architectural debt table should remove the duplicate-controls debt row or revise it as resolved in the change log. Update `docs/ExecPlans/schema_model_alignment_execplan.md` so the remaining unchecked item is marked complete and the retrospective says the duplicate controls were removed in Slice 4E. Commit `08feda1` completed those documentation updates.
 
 ## Concrete Steps
 
