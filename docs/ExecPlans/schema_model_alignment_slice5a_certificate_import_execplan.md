@@ -22,7 +22,7 @@ This is the smallest useful first step toward full certificate management. It de
 - [x] (2026-05-09T13:37Z) Added an app-frame certificate import menu/dialog and loaded-shell refresh behavior with focused tests.
 - [x] (2026-05-09T13:39Z) Updated architecture and schema-alignment ExecPlan documentation.
 - [x] (2026-05-09T13:42Z) Ran focused tests, Ruff, and the full unit suite successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-09T13:47Z) Committed the completed slice as `135372c Add PKCS12 certificate import flow`.
 
 ## Surprises & Discoveries
 
