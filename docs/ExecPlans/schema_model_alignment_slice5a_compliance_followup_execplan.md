@@ -20,7 +20,7 @@ This follow-up closes compliance findings from the Slice 5A review. After this c
 - [x] (2026-05-09T14:07Z) Updated architecture and parent schema-alignment plan wording for certificate import/current certificate state.
 - [x] (2026-05-09T14:08Z) Ran focused tests successfully: `108 passed`.
 - [x] (2026-05-09T14:13Z) Ran Ruff and the full unit suite successfully.
-- [ ] Commit the compliance follow-up.
+- [x] (2026-05-09T14:15Z) Committed the compliance follow-up as `8f805d5 Follow up certificate import compliance`.
 
 ## Surprises & Discoveries
 
