@@ -1567,6 +1567,15 @@ class SignaturePropertiesPanel:
         self._notify_change()
         return True
 
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
+        """Reload certificate configurations from storage and refresh the selector."""
+        if self._certificate_catalog_store is not None:
+            self._certificate_catalog = self._certificate_catalog_store.load_catalog()
+        self._reload_certificate_configuration_controls(
+            selected_name=self._selected_certificate_configuration_name
+        )
+        return self._certificate_catalog
+
     @property
     def app_settings(self) -> AppSettings:
         return self._app_settings
@@ -2898,6 +2907,9 @@ class SigningWorkspaceWidget:
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
+        self.widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
+            self.refresh_certificate_configurations
+        )
         self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
         self.widget._signing_workspace = self  # type: ignore[attr-defined]
 
@@ -3032,6 +3044,12 @@ class SigningWorkspaceWidget:
     def _handle_app_settings_change(self, settings: AppSettings) -> None:
         self._app_settings = settings
         self.widget.app_settings = settings  # type: ignore[attr-defined]
+
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
+        """Reload certificate configurations from storage and refresh shell controls."""
+        catalog = self.properties_panel.refresh_certificate_configurations()
+        self._refresh_sign_button_state()
+        return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
         target_index = max(page_number - 1, 0)

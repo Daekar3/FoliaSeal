@@ -1,9 +1,11 @@
 from pathlib import Path
 
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt import app_frame as app_frame_module
 from foliaseal.presentation.qt.app_frame import FoliaSealAppFrame, QtAppFrameBindings
+from tests.unit.test_certificate_import import _write_test_pkcs12
 
 
 class _FakeSignal:
@@ -169,7 +171,11 @@ class _FakeQPdfDocument:
 
 
 class _FakeShell:
-    pass
+    def __init__(self) -> None:
+        self.refresh_certificate_configurations_calls = 0
+
+    def refresh_certificate_configurations(self) -> None:
+        self.refresh_certificate_configurations_calls += 1
 
 
 def _fake_bindings() -> QtAppFrameBindings:
@@ -258,7 +264,10 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
 
     assert [menu.title for menu in frame.window.menu_bar.menus] == ["File", "Settings"]
     assert frame.window.menu_bar.menus[0].actions[0].text == "Open file"
-    assert frame.window.menu_bar.menus[1].actions[0].text == "Application settings"
+    assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
+        "Application settings",
+        "Import certificate...",
+    ]
 
     frame.window.menu_bar.menus[1].actions[0].trigger()
 
@@ -266,6 +275,83 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert (
         frame.window.settings_dialog.controls.default_open_directory.text()
         == str(tmp_path / "source")
+    )
+
+
+def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    source = tmp_path / "alice.p12"
+    _write_test_pkcs12(source, passphrase="secret", common_name="Alice Example")
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.window.menu_bar.menus[1].actions[1].trigger()
+    dialog = frame.window.certificate_import_dialog
+    dialog.controls.certificate_path.setText(str(source))
+    dialog.controls.display_name.setText("Alice Signing")
+    dialog.controls.passphrase.setText("secret")
+    result = dialog.import_certificate()
+
+    assert result is not None
+    catalog = certificate_store.load_catalog()
+    configuration = catalog.configuration_named("Alice Signing")
+    managed_certificate = catalog.managed_certificate_by_id(
+        configuration.managed_certificate_id
+    )
+    assert managed_certificate.subject_summary.common_name == "Alice Example"
+    managed_file = certificate_store.managed_certificate_dir / (
+        managed_certificate.storage_filename
+    )
+    assert managed_file.exists()
+    assert configuration.save_password is False
+    assert configuration.password_secret_ref is None
+    assert shell.refresh_certificate_configurations_calls == 1
+    assert bindings.q_message_box.information_calls[-1][1] == "Certificate imported"
+
+
+def test_app_frame_certificate_import_choose_button_prefills_path_and_name(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    source = tmp_path / "board-secretary.pfx"
+    bindings.q_file_dialog.next_open_file_name = str(source)
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(
+            storage_dir=tmp_path / "Certificates"
+        ),
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_import()
+    selected = frame.window.certificate_import_dialog.choose_certificate_file()
+
+    assert selected == str(source)
+    assert frame.window.certificate_import_dialog.controls.certificate_path.text() == (
+        str(source)
+    )
+    assert frame.window.certificate_import_dialog.controls.display_name.text() == (
+        "board-secretary"
+    )
+    assert bindings.q_file_dialog.open_calls[-1] == (
+        frame.window.certificate_import_dialog.controls.dialog,
+        "Import certificate",
+        "",
+        "PKCS#12 files (*.p12 *.pfx);;All files (*)",
     )
 
 

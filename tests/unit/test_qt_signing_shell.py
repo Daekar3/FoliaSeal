@@ -26,7 +26,7 @@ from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
 )
-from foliaseal.infra.config.schemas import AppSettings
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
@@ -665,6 +665,45 @@ def test_signing_shell_reports_certificate_configuration_resolution_errors(
     assert errors
     assert "managed certificate file is missing" in errors[-1]
     assert bindings.q_message_box.calls[-1][1] == "Certificate configuration error"
+
+
+def test_signing_shell_refreshes_certificate_configurations_from_store(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(CertificateCatalog(schema_version=1))
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        certificate_catalog_store=store,
+    )
+
+    panel = widget.properties_panel
+    assert panel._certificate_controls.configuration_combo.findText(
+        "Corporate Records Signing"
+    ) == -1
+
+    store.save_catalog(build_certificate_catalog())
+    catalog = widget.refresh_certificate_configurations()
+
+    assert catalog.configuration_named("Corporate Records Signing")
+    assert (
+        panel._certificate_controls.configuration_combo.findText(
+            "Corporate Records Signing"
+        )
+        >= 0
+    )
 
 
 def test_signing_shell_selection_uses_rendered_snapshot_page_for_validation(

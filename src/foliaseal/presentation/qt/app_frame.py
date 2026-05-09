@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application import CertificateImportService, SigningDraftWorkflow
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
@@ -51,6 +51,19 @@ class AppSettingsDialogControls:
     default_open_directory: Any
     default_output_directory: Any
     save_button: Any
+    cancel_button: Any
+
+
+@dataclass(frozen=True)
+class CertificateImportDialogControls:
+    """Controls used by the certificate import dialog."""
+
+    dialog: Any
+    certificate_path: Any
+    display_name: Any
+    passphrase: Any
+    choose_button: Any
+    import_button: Any
     cancel_button: Any
 
 
@@ -157,6 +170,130 @@ class AppSettingsDialog:
             warning(self.controls.dialog, "Settings error", message)
 
 
+class CertificateImportDialog:
+    """Small dialog for importing an existing PKCS#12 certificate."""
+
+    def __init__(
+        self,
+        *,
+        bindings: QtAppFrameBindings,
+        parent: Any,
+        import_service: CertificateImportService,
+        on_import: Callable[[], None] | None = None,
+    ) -> None:
+        self._bindings = bindings
+        self._import_service = import_service
+        self._on_import = on_import
+        self.import_result = None
+        self.controls = self._build_controls(parent=parent)
+
+    def exec(self) -> Any | None:
+        dialog_exec = getattr(self.controls.dialog, "exec", None)
+        if callable(dialog_exec):
+            result = dialog_exec()
+            if result != self._accepted_dialog_code():
+                return None
+        return self.import_result
+
+    def choose_certificate_file(self) -> str | None:
+        selected = self._bindings.q_file_dialog.getOpenFileName(
+            self.controls.dialog,
+            "Import certificate",
+            "",
+            "PKCS#12 files (*.p12 *.pfx);;All files (*)",
+        )
+        selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
+        if not selected_path:
+            return None
+        self.controls.certificate_path.setText(selected_path)
+        if not self.controls.display_name.text().strip():
+            self.controls.display_name.setText(Path(selected_path).stem)
+        return selected_path
+
+    def import_certificate(self) -> Any | None:
+        source_path = self.controls.certificate_path.text().strip()
+        display_name = self.controls.display_name.text().strip() or Path(source_path).stem
+        passphrase = self.controls.passphrase.text()
+        try:
+            result = self._import_service.import_pkcs12(
+                source_path=source_path,
+                display_name=display_name,
+                passphrase=passphrase,
+            )
+        except Exception as exc:
+            self._show_error(str(exc))
+            return None
+
+        self.import_result = result
+        if self._on_import is not None:
+            self._on_import()
+        information = getattr(self._bindings.q_message_box, "information", None)
+        if callable(information):
+            information(
+                self.controls.dialog,
+                "Certificate imported",
+                f"Imported certificate configuration '{display_name}'.",
+            )
+        accept = getattr(self.controls.dialog, "accept", None)
+        if callable(accept):
+            accept()
+        return result
+
+    def cancel(self) -> None:
+        reject = getattr(self.controls.dialog, "reject", None)
+        if callable(reject):
+            reject()
+
+    def _build_controls(self, *, parent: Any) -> CertificateImportDialogControls:
+        dialog = self._bindings.q_dialog(parent)
+        if hasattr(dialog, "setWindowTitle"):
+            dialog.setWindowTitle("Import certificate")
+        layout = self._bindings.q_form_layout(dialog)
+
+        certificate_path = self._bindings.q_line_edit("")
+        display_name = self._bindings.q_line_edit("")
+        passphrase = self._bindings.q_line_edit("")
+        choose_button = self._bindings.q_push_button("Choose...")
+        import_button = self._bindings.q_push_button("Import")
+        cancel_button = self._bindings.q_push_button("Cancel")
+
+        layout.addRow("PKCS#12 file", certificate_path)
+        layout.addRow("", choose_button)
+        layout.addRow("Display name", display_name)
+        layout.addRow("Password", passphrase)
+        layout.addRow("", import_button)
+        layout.addRow("", cancel_button)
+
+        choose_button.clicked.connect(self.choose_certificate_file)  # type: ignore[attr-defined]
+        import_button.clicked.connect(self.import_certificate)  # type: ignore[attr-defined]
+        cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
+
+        return CertificateImportDialogControls(
+            dialog=dialog,
+            certificate_path=certificate_path,
+            display_name=display_name,
+            passphrase=passphrase,
+            choose_button=choose_button,
+            import_button=import_button,
+            cancel_button=cancel_button,
+        )
+
+    def _accepted_dialog_code(self) -> Any:
+        accepted = getattr(self._bindings.q_dialog, "Accepted", None)
+        if accepted is not None:
+            return accepted
+        dialog_code = getattr(self._bindings.q_dialog, "DialogCode", None)
+        accepted = getattr(dialog_code, "Accepted", None)
+        if accepted is not None:
+            return accepted
+        return 1
+
+    def _show_error(self, message: str) -> None:
+        warning = getattr(self._bindings.q_message_box, "warning", None)
+        if callable(warning):
+            warning(self.controls.dialog, "Certificate import error", message)
+
+
 class FoliaSealAppFrame:
     """Application frame that owns top-level menus and document opening."""
 
@@ -178,7 +315,9 @@ class FoliaSealAppFrame:
         self._bindings = bindings
         self._app_settings_store = app_settings_store or AppSettingsStore.default()
         self._app_settings = app_settings or self._app_settings_store.load_settings()
-        self._certificate_catalog_store = certificate_catalog_store
+        self._certificate_catalog_store = certificate_catalog_store or (
+            CertificateCatalogStore.default()
+        )
         self._preset_catalog_store = preset_catalog_store
         self._sign_executor = sign_executor
         self._shell_builder = shell_builder
@@ -190,6 +329,7 @@ class FoliaSealAppFrame:
         self._current_viewer_workflow: ViewerWorkflow | None = None
         self._current_signing_workflow: SigningDraftWorkflow | None = None
         self._settings_dialog: AppSettingsDialog | None = None
+        self._certificate_import_dialog: CertificateImportDialog | None = None
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
@@ -199,6 +339,7 @@ class FoliaSealAppFrame:
         self.window.open_file = self.choose_open_pdf  # type: ignore[attr-defined]
         self.window.open_pdf_path = self.open_pdf_path  # type: ignore[attr-defined]
         self.window.show_app_settings = self.show_app_settings  # type: ignore[attr-defined]
+        self.window.show_certificate_import = self.show_certificate_import  # type: ignore[attr-defined]
         self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.window.current_shell = None  # type: ignore[attr-defined]
         self.window.current_viewer_workflow = None  # type: ignore[attr-defined]
@@ -295,6 +436,19 @@ class FoliaSealAppFrame:
         self._apply_app_settings(settings)
         return settings
 
+    def show_certificate_import(self) -> Any | None:
+        dialog = CertificateImportDialog(
+            bindings=self._bindings,
+            parent=self.window,
+            import_service=CertificateImportService(
+                store=self._certificate_catalog_store
+            ),
+            on_import=self._refresh_shell_certificate_configurations,
+        )
+        self._certificate_import_dialog = dialog
+        self.window.certificate_import_dialog = dialog  # type: ignore[attr-defined]
+        return dialog.exec()
+
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
         file_menu = menu_bar.addMenu("File")
@@ -302,6 +456,9 @@ class FoliaSealAppFrame:
         settings_menu = menu_bar.addMenu("Settings")
         settings_menu.addAction(
             self._action("Application settings", self.show_app_settings)
+        )
+        settings_menu.addAction(
+            self._action("Import certificate...", self.show_certificate_import)
         )
 
     def _action(self, text: str, callback: Callable[[], Any]) -> Any:
@@ -345,6 +502,19 @@ class FoliaSealAppFrame:
         update_settings = getattr(workspace, "_handle_app_settings_change", None)
         if callable(update_settings):
             update_settings(settings)
+
+    def _refresh_shell_certificate_configurations(self) -> None:
+        shell = self._current_shell
+        if shell is None:
+            return
+        refresh = getattr(shell, "refresh_certificate_configurations", None)
+        if callable(refresh):
+            refresh()
+            return
+        workspace = getattr(shell, "_signing_workspace", None)
+        refresh = getattr(workspace, "refresh_certificate_configurations", None)
+        if callable(refresh):
+            refresh()
 
 
 class QtAppFrameAdapter:

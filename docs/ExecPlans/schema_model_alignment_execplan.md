@@ -23,6 +23,7 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] Slice 4C app frame Open-file integration: `docs/ExecPlans/schema_model_alignment_slice4c_app_frame_open_file_execplan.md`.
 - [x] Slice 4D app settings dialog: `docs/ExecPlans/schema_model_alignment_slice4d_app_settings_dialog_execplan.md`.
 - [x] Slice 4E remove signing shell settings controls: `docs/ExecPlans/schema_model_alignment_slice4e_remove_shell_settings_execplan.md`.
+- [x] Slice 5A certificate import: `docs/ExecPlans/schema_model_alignment_slice5a_certificate_import_execplan.md`.
 
 ## Progress
 
@@ -50,6 +51,8 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 - [x] (2026-05-07 05:34Z) Implemented Slice 4D: replaced the informational Settings action with an editable app-wide settings dialog.
 - [x] (2026-05-09 03:25Z) Created child ExecPlan for Slice 4E at `docs/ExecPlans/schema_model_alignment_slice4e_remove_shell_settings_execplan.md`.
 - [x] (2026-05-09 03:25Z) Decided to remove the duplicate signing-shell settings group now that the app-frame settings dialog owns default-directory editing.
+- [x] (2026-05-09 13:29Z) Created child ExecPlan for Slice 5A at `docs/ExecPlans/schema_model_alignment_slice5a_certificate_import_execplan.md`.
+- [x] (2026-05-09 13:29Z) Implemented Slice 5A: added application-layer PKCS#12 import, app-frame certificate import dialog, and loaded-shell certificate selector refresh.
 
 ## Surprises & Discoveries
 
@@ -82,6 +85,9 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 - Observation: Certificate selection can be wired without implementing certificate management UI.
   Evidence: Slice 3B passes a `CertificateCatalogStore` into `build_qt_signing_shell()`, resolves a selected `CertificateConfiguration` through `CertificateSigningMaterialResolver`, and applies the resulting runtime material to `SigningDraftWorkflow`.
+
+- Observation: the first certificate-management UI slice can be limited to importing existing PKCS#12 files.
+  Evidence: `CertificateCatalogStore` already owns catalog persistence and managed file directories, and `SigningWorkspaceWidget.refresh_certificate_configurations()` can refresh a loaded shell after app-frame import without moving certificate management into the signing properties panel.
 
 - Observation: The main preset terminology drift is now compatibility-only rather than primary shell behavior.
   Evidence: Slice 3C moved the Qt shell to "Signature presets" wording and canonical methods such as `preset_names()`, `preset_named()`, `upsert_preset()`, `save_preset()`, and `delete_preset()`.
@@ -151,11 +157,11 @@ The user-visible outcome is not a new button by itself. The payoff is that the n
 
 At plan creation time, the main outcome was clarity rather than code. Slice 1 then split profile persistence into `AppearanceProfile`, `PlacementProfile`, and reference-only `SignaturePreset`. Slice 2 added the certificate side of the canonical object model with `ManagedCertificate`, `CertificateConfiguration`, `CertificateCatalog`, `CertificateCatalogStore`, and `CertificateSigningMaterialResolver`.
 
-Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. Slice 3D removed obsolete signature-preset profile compatibility wrappers from source code. Slice 4 added first-class `AppSettings` schema and storage. Slice 4B wired those settings into the Qt signing shell and save-output dialog defaults. Slice 4C added the first top-level Qt app frame with File/Open and Settings menu actions. Slice 4D made the app-frame Settings action an editable settings dialog. Slice 4E removed the duplicate signing-shell settings group so the app-frame dialog is the single default-directory editing surface and the signing shell remains a settings consumer. The remaining work is still implementation-heavy: full certificate management UI is pending. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
+Slice 3A then moved the draft workflow toward canonical reusable-object references by adding selected object ids, canonical signature setup methods, and an injected certificate-preview reader. Slice 3B wired existing certificate configurations into the Qt shell so selected configurations now resolve to runtime signing material and update the draft workflow. Slice 3C moved primary signature preset APIs and Qt shell wording away from generic profile terminology. Slice 3D removed obsolete signature-preset profile compatibility wrappers from source code. Slice 4 added first-class `AppSettings` schema and storage. Slice 4B wired those settings into the Qt signing shell and save-output dialog defaults. Slice 4C added the first top-level Qt app frame with File/Open and Settings menu actions. Slice 4D made the app-frame Settings action an editable settings dialog. Slice 4E removed the duplicate signing-shell settings group so the app-frame dialog is the single default-directory editing surface and the signing shell remains a settings consumer. Slice 5A added first-pass PKCS#12 certificate import through the app frame, with managed file copying, catalog records, and loaded-shell refresh. The remaining work is still implementation-heavy: certificate creation, export/backup, deletion, and secure password storage are pending. The biggest lesson from the audit remains that the drift is not localized: persistence, workflow state, and UI labels all currently reinforced old object ownership, so the refactor must stay staged but deliberate.
 
 ## Context and Orientation
 
-The current persistence layer for reusable signing objects lives in `src/foliaseal/infra/config/schemas.py` and `src/foliaseal/infra/config/profile_storage.py`. Those files presently define three concepts: `TrustProfile`, `TimestampPolicy`, and `SignaturePresetCatalog`. The important fact is that `SignaturePreset` in the current code does not mean what `SignaturePreset` means in `docs/SCHEMAS.md`. Today it means "a saved visible-signature appearance plus optional placement defaults." In the canonical model it means "a lightweight composition object that references a `CertificateConfiguration`, an `AppearanceProfile`, and a `PlacementProfile`."
+The current persistence layer for reusable signing objects lives in `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/profile_storage.py`, `src/foliaseal/infra/config/certificate_storage.py`, and `src/foliaseal/infra/config/app_settings_storage.py`. The implementation now has split `AppearanceProfile`, `PlacementProfile`, reference-only `SignaturePreset`, `ManagedCertificate`, `CertificateConfiguration`, and `AppSettings` objects. The historical `profile_storage.py` module name and `Signature Profiles/profiles.json` path remain as naming drift, but the main persisted object shapes now follow `docs/SCHEMAS.md`.
 
 The application draft model lives in `src/foliaseal/application/signing_draft_workflow.py`. A "draft" here means the mutable in-memory state for one currently open signing session. That file currently owns both ephemeral choices, such as the active rectangle and current preview state, and long-lived object concerns, such as the capture and application of reusable named profiles. It also stores raw signing inputs such as `certificate_path`, `passphrase`, `tsa_url`, and `timestamp_required`.
 

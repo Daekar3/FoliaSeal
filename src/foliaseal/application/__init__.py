@@ -1,5 +1,10 @@
 """Application layer helpers for orchestration and viewer workflows."""
 
+from foliaseal.application.certificate_import import (
+    CertificateImportError,
+    CertificateImportResult,
+    CertificateImportService,
+)
 from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     HorizontalSingleLineRenderedReference,
@@ -87,6 +92,9 @@ __all__ = [
     "ViewerZoomLimits",
     "CanonicalSignaturePreviewSnapshot",
     "CanonicalPreviewLayout",
+    "CertificateImportError",
+    "CertificateImportResult",
+    "CertificateImportService",
     "CertificateFieldReader",
     "CertificateFieldValues",
     "HorizontalSingleLineInkReservation",
