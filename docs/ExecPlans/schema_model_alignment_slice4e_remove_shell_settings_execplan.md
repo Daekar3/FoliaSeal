@@ -6,7 +6,7 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-After this slice, app-wide default directory editing lives in one expected place: the top-level Qt app-frame `Settings > Application settings` dialog. The signing shell still consumes `AppSettings` so its save-output chooser starts in the configured default output directory, and an already-open shell still receives refreshed settings when the app-frame dialog saves. What disappears is the duplicate `Settings` group inside the signing properties panel, which currently lets users edit the same defaults from a document-specific side panel.
+After this slice, app-wide default directory editing lives in one expected place: the top-level Qt app-frame `Settings > Application settings` dialog. The signing shell still consumes `AppSettings` so its save-output chooser starts in the configured default output directory, and an already-open shell still receives refreshed settings when the app-frame dialog saves. What disappeared is the duplicate `Settings` group inside the signing properties panel, which used to let users edit the same defaults from a document-specific side panel.
 
 This matters because `docs/SPEC.md` calls for standard desktop settings/preferences behavior, and `docs/SCHEMAS.md` defines `AppSettings` as environment-level preferences rather than reusable signing behavior. Removing the duplicate side-panel editor keeps the signing shell focused on document signing while preserving the settings behavior added in Slice 4B through Slice 4D.
 

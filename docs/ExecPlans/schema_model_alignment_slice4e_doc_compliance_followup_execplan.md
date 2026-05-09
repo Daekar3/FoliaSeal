@@ -18,12 +18,23 @@ After this follow-up, the Slice 4E ExecPlan will describe the repository as it e
 - [x] (2026-05-09T13:03Z) Created this follow-up ExecPlan from the second compliance review finding.
 - [x] (2026-05-09T13:03Z) Rewrote stale Slice 4E wording so observations and context distinguish pre-change evidence from current state.
 - [x] (2026-05-09T13:03Z) Ran a focused documentation consistency search and confirmed remaining removed-symbol matches are historical evidence, removal instructions, or validation search terms.
-- [ ] Commit the documentation compliance follow-up.
+- [x] (2026-05-09T13:03Z) Committed the documentation compliance follow-up as `fd0f5bc Clarify slice 4E plan state`.
+- [x] (2026-05-09T13:03Z) Addressed re-review finding that the Slice 4E purpose still said the removed panel editor "currently" lets users edit defaults.
+- [x] (2026-05-09T13:03Z) Received explicit user approval to update frozen `docs/SCHEMAS.md` and replaced the stale implementation-drift wording.
 
 ## Surprises & Discoveries
 
 - Observation: the first Slice 4E commit correctly removed the settings editor from code, but the new plan still contained present-tense pre-change wording.
   Evidence: the compliance review reported that `docs/ExecPlans/schema_model_alignment_slice4e_remove_shell_settings_execplan.md` said `signing_shell.py` still defines `AppSettingsControls`, `_app_settings_controls`, `save_app_settings()`, and `_load_app_settings_controls()` even though those names no longer exist in `src/foliaseal/presentation/qt/signing_shell.py`.
+
+- Observation: the second compliance review found one additional stale word in the Slice 4E purpose statement.
+  Evidence: `docs/ExecPlans/schema_model_alignment_slice4e_remove_shell_settings_execplan.md` said the removed side-panel `Settings` group "currently lets users edit" app defaults after commit `08feda1` had already removed it.
+
+- Observation: a compliance review also identified stale implementation-drift wording in frozen `docs/SCHEMAS.md`.
+  Evidence: `docs/SCHEMAS.md` says the current code still has a `SignaturePreset` schema that behaves like an appearance-profile store, while current `src/foliaseal/infra/config/schemas.py` has reference-only `SignaturePreset` plus split appearance and placement profile catalogs.
+
+- Observation: the user explicitly approved the proposed `docs/SCHEMAS.md` wording before the file was edited.
+  Evidence: user message: "THe proposed changes to SCHEMAS.md are approved. Make that specific change."
 
 ## Decision Log
 
@@ -31,9 +42,17 @@ After this follow-up, the Slice 4E ExecPlan will describe the repository as it e
   Rationale: the compliance issue is documentation-only and does not indicate product/spec/schema mismatch. The correct fix is to make the living ExecPlan accurately describe before/after state.
   Date/Author: 2026-05-09 / Codex
 
+- Decision: do not edit `docs/SCHEMAS.md` without explicit user permission.
+  Rationale: `docs/SCHEMAS.md` has a Document Governance section that says no changes may be made without explicit user permission. The stale drift wording is real, but the file is frozen.
+  Date/Author: 2026-05-09 / Codex
+
+- Decision: update only the `Current Implementation Drift` section of `docs/SCHEMAS.md`.
+  Rationale: the user approved the specific proposed language, and the compliance issue was limited to that stale drift section.
+  Date/Author: 2026-05-09 / Codex
+
 ## Outcomes & Retrospective
 
-At creation time, this follow-up was expected to be documentation-only. It met that scope: the Slice 4E plan now describes pre-change evidence as pre-change evidence, records commit `08feda1` as the implementation, and no longer claims removed panel settings controls exist in current code.
+At creation time, this follow-up was expected to be documentation-only. It met that scope: the Slice 4E plan now describes pre-change evidence as pre-change evidence, records commit `08feda1` as the implementation, no longer claims removed panel settings controls exist in current code, and the frozen `docs/SCHEMAS.md` drift section was updated after explicit user approval.
 
 ## Context and Orientation
 
@@ -80,3 +99,7 @@ Validation transcript:
 Revision note: Created 2026-05-09 by Codex to address compliance-review documentation staleness after Slice 4E implementation.
 
 Revision note: Updated 2026-05-09 by Codex after fixing the stale Slice 4E plan wording and running the focused consistency search.
+
+Revision note: Updated 2026-05-09 by Codex after the re-review found one remaining stale "currently" phrase and a frozen `docs/SCHEMAS.md` drift note that requires explicit user permission before editing.
+
+Revision note: Updated 2026-05-09 by Codex after the user explicitly approved the proposed `docs/SCHEMAS.md` replacement text and the stale drift section was updated.

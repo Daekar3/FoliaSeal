@@ -327,10 +327,17 @@ Ephemeral draft state may include:
 
 ## Current Implementation Drift
 
-The current codebase still uses older naming and storage concepts in some places, including:
+The current codebase has moved most persisted reusable signing objects toward this canonical model:
 
-- an existing `SignaturePreset` schema that behaves more like an appearance-profile store
-- older profile-storage terminology that predates the canonical split between
-  `CertificateConfiguration`, `AppearanceProfile`, `PlacementProfile`, and `SignaturePreset`
+- `SignaturePreset` is now a reference-only composition object.
+- reusable appearance and placement data are split into `AppearanceProfile` and `PlacementProfile`.
+- certificate identity data is represented through `ManagedCertificate` and `CertificateConfiguration`.
+- `AppSettings` exists as a first-class app-wide preferences object.
 
-Those differences are implementation drift, not the intended long-term product vocabulary.
+Some older implementation vocabulary remains, including:
+
+- the historical `profile_storage.py` module name
+- the historical user-visible storage path `Signature Profiles/profiles.json`
+- some older "profile" terminology in internal documentation and migration history
+
+Those remaining differences are implementation drift, not the intended long-term product vocabulary.
