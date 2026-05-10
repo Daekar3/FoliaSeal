@@ -281,6 +281,69 @@ def test_certificate_catalog_store_deletes_missing_managed_certificate_file(
     ) == ("managed-cert-default",)
 
 
+def test_certificate_catalog_store_exports_managed_certificate_file(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    source = store.managed_certificate_dir / "cert_default.p12"
+    destination = tmp_path / "backup" / "board-secretary.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    store.save_catalog(build_certificate_catalog())
+
+    exported = store.export_managed_certificate_by_id(
+        "managed-cert-default",
+        destination,
+    )
+
+    assert exported == destination
+    assert destination.read_bytes() == b"managed-pkcs12"
+    assert source.read_bytes() == b"managed-pkcs12"
+    assert store.load_catalog() == build_certificate_catalog()
+
+
+def test_certificate_catalog_store_export_overwrites_destination(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    source = store.managed_certificate_dir / "cert_default.p12"
+    destination = tmp_path / "backup.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"current-managed-pkcs12")
+    destination.write_bytes(b"old-backup")
+    store.save_catalog(build_certificate_catalog())
+
+    store.export_managed_certificate_by_id("managed-cert-default", destination)
+
+    assert destination.read_bytes() == b"current-managed-pkcs12"
+
+
+def test_certificate_catalog_store_export_rejects_missing_source(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    store.save_catalog(build_certificate_catalog())
+
+    with pytest.raises(FileNotFoundError, match="Managed certificate file is missing"):
+        store.export_managed_certificate_by_id(
+            "managed-cert-default",
+            tmp_path / "backup.p12",
+        )
+
+
+def test_certificate_catalog_store_export_rejects_same_source_destination(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    source = store.managed_certificate_dir / "cert_default.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    store.save_catalog(build_certificate_catalog())
+
+    with pytest.raises(ConfigValidationError, match="different"):
+        store.export_managed_certificate_by_id("managed-cert-default", source)
+
+
 def test_certificate_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
     store.catalog_path.parent.mkdir(parents=True, exist_ok=True)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -133,3 +134,25 @@ class CertificateCatalogStore:
         if managed_file.exists():
             managed_file.unlink()
         return updated_catalog
+
+    def export_managed_certificate_by_id(
+        self,
+        certificate_id: str,
+        destination_path: str | Path,
+    ) -> Path:
+        """Copy a managed certificate file to a user-selected destination path."""
+        catalog = self.load_catalog()
+        certificate = catalog.managed_certificate_by_id(certificate_id)
+        source_path = self.managed_certificate_dir / certificate.storage_filename
+        if not source_path.exists():
+            raise FileNotFoundError(f"Managed certificate file is missing: {source_path}")
+        if isinstance(destination_path, str) and not destination_path.strip():
+            raise ConfigValidationError("destination_path must be a non-empty path.")
+        destination = Path(destination_path)
+        if source_path.resolve() == destination.resolve():
+            raise ConfigValidationError(
+                "Export destination must be different from the managed certificate file."
+            )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, destination)
+        return destination

@@ -173,11 +173,17 @@ class _FakePushButton:
 class _FakeFileDialog:
     def __init__(self) -> None:
         self.open_calls = []
+        self.save_calls = []
         self.next_open_file_name = ""
+        self.next_save_file_name = ""
 
     def getOpenFileName(self, parent, title, directory, file_filter):  # noqa: N802
         self.open_calls.append((parent, title, directory, file_filter))
         return (self.next_open_file_name, file_filter)
+
+    def getSaveFileName(self, parent, title, directory, file_filter):  # noqa: N802
+        self.save_calls.append((parent, title, directory, file_filter))
+        return (self.next_save_file_name, file_filter)
 
 
 class _FakeMessageBox:
@@ -550,6 +556,75 @@ def test_app_frame_certificate_management_dialog_deletes_unreferenced_certificat
     )
 
 
+def test_app_frame_certificate_management_dialog_exports_selected_certificate(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    source = certificate_store.managed_certificate_dir / "cert_default.p12"
+    destination = tmp_path / "backup" / "board-secretary.p12"
+    certificate_store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    certificate_store.save_catalog(build_certificate_catalog())
+    bindings.q_file_dialog.next_save_file_name = str(destination)
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    exported = dialog.export_selected_managed_certificate()
+
+    assert exported == destination
+    assert destination.read_bytes() == b"managed-pkcs12"
+    assert shell.refresh_certificate_configurations_calls == 0
+    assert bindings.q_file_dialog.save_calls[-1] == (
+        dialog.controls.dialog,
+        "Export managed certificate",
+        "cert_default.p12",
+        "PKCS#12 files (*.p12 *.pfx);;All files (*)",
+    )
+    assert bindings.q_message_box.information_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration",
+        f"Managed certificate exported to {destination}.",
+    )
+
+
+def test_app_frame_certificate_management_dialog_export_cancel_does_nothing(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    source = certificate_store.managed_certificate_dir / "cert_default.p12"
+    certificate_store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    certificate_store.save_catalog(build_certificate_catalog())
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    exported = dialog.export_selected_managed_certificate()
+
+    assert exported is None
+    assert bindings.q_file_dialog.save_calls
+    assert bindings.q_message_box.information_calls == []
+
+
 def test_app_frame_certificate_management_dialog_handles_empty_catalog(
     tmp_path: Path,
 ) -> None:
@@ -569,12 +644,14 @@ def test_app_frame_certificate_management_dialog_handles_empty_catalog(
     dialog = frame.window.certificate_management_dialog
     saved = dialog.save_selected_configuration()
     deleted = dialog.delete_selected_configuration()
+    exported = dialog.export_selected_managed_certificate()
     certificate_deleted = dialog.delete_selected_managed_certificate()
 
     assert saved is None
     assert deleted is False
+    assert exported is None
     assert certificate_deleted is False
-    assert bindings.q_message_box.warning_calls[-3:] == [
+    assert bindings.q_message_box.warning_calls[-4:] == [
         (
             dialog.controls.dialog,
             "Certificate configuration error",
@@ -584,6 +661,11 @@ def test_app_frame_certificate_management_dialog_handles_empty_catalog(
             dialog.controls.dialog,
             "Certificate configuration error",
             "Select a certificate configuration to delete.",
+        ),
+        (
+            dialog.controls.dialog,
+            "Certificate configuration error",
+            "Select a managed certificate to export.",
         ),
         (
             dialog.controls.dialog,

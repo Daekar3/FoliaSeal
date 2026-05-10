@@ -84,6 +84,7 @@ class CertificateConfigurationManagementDialogControls:
     managed_certificate_selector: Any
     save_button: Any
     delete_button: Any
+    export_certificate_button: Any
     delete_certificate_button: Any
     cancel_button: Any
 
@@ -449,6 +450,38 @@ class CertificateConfigurationManagementDialog:
         self._show_information("Managed certificate deleted.")
         return True
 
+    def export_selected_managed_certificate(self) -> Path | None:
+        certificate_id = self._selected_managed_certificate_id()
+        if certificate_id is None:
+            self._show_error("Select a managed certificate to export.")
+            return None
+        certificate = self._managed_certificates_by_id.get(certificate_id)
+        if certificate is None:
+            self._show_error("Select a managed certificate to export.")
+            self.reload_configurations()
+            return None
+        selected = self._bindings.q_file_dialog.getSaveFileName(
+            self.controls.dialog,
+            "Export managed certificate",
+            certificate.storage_filename,
+            "PKCS#12 files (*.p12 *.pfx);;All files (*)",
+        )
+        selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
+        if not selected_path:
+            return None
+        try:
+            exported_path = self._catalog_store.export_managed_certificate_by_id(
+                certificate_id,
+                selected_path,
+            )
+        except (ConfigValidationError, FileNotFoundError, KeyError, OSError, ValueError) as exc:
+            self._show_error(str(exc))
+            self.reload_configurations()
+            return None
+
+        self._show_information(f"Managed certificate exported to {exported_path}.")
+        return exported_path
+
     def cancel(self) -> None:
         reject = getattr(self.controls.dialog, "reject", None)
         if callable(reject):
@@ -470,6 +503,7 @@ class CertificateConfigurationManagementDialog:
         managed_certificate_selector = self._bindings.q_combo_box()
         save_button = self._bindings.q_push_button("Save")
         delete_button = self._bindings.q_push_button("Delete")
+        export_certificate_button = self._bindings.q_push_button("Export certificate")
         delete_certificate_button = self._bindings.q_push_button("Delete certificate")
         cancel_button = self._bindings.q_push_button("Cancel")
 
@@ -479,6 +513,7 @@ class CertificateConfigurationManagementDialog:
         layout.addRow("Managed certificate", managed_certificate_selector)
         layout.addRow("", save_button)
         layout.addRow("", delete_button)
+        layout.addRow("", export_certificate_button)
         layout.addRow("", delete_certificate_button)
         layout.addRow("", cancel_button)
 
@@ -487,6 +522,7 @@ class CertificateConfigurationManagementDialog:
             index_changed.connect(self.load_selected_configuration)
         save_button.clicked.connect(self.save_selected_configuration)  # type: ignore[attr-defined]
         delete_button.clicked.connect(self.delete_selected_configuration)  # type: ignore[attr-defined]
+        export_certificate_button.clicked.connect(self.export_selected_managed_certificate)  # type: ignore[attr-defined]
         delete_certificate_button.clicked.connect(self.delete_selected_managed_certificate)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
 
@@ -498,6 +534,7 @@ class CertificateConfigurationManagementDialog:
             managed_certificate_selector=managed_certificate_selector,
             save_button=save_button,
             delete_button=delete_button,
+            export_certificate_button=export_certificate_button,
             delete_certificate_button=delete_certificate_button,
             cancel_button=cancel_button,
         )
