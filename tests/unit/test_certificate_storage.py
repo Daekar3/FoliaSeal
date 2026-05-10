@@ -203,6 +203,84 @@ def test_certificate_catalog_store_rename_rejects_duplicate_display_name(
         )
 
 
+def test_certificate_catalog_store_deletes_unreferenced_managed_certificate_file(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    default_file = store.managed_certificate_dir / "cert_default.p12"
+    alt_file = store.managed_certificate_dir / "cert_alt.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    default_file.write_bytes(b"default-pkcs12")
+    alt_file.write_bytes(b"alt-pkcs12")
+    store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            )
+        )
+    )
+
+    updated = store.delete_managed_certificate_by_id("managed-cert-alt")
+
+    assert tuple(
+        certificate.managed_certificate_id
+        for certificate in updated.managed_certificates
+    ) == ("managed-cert-default",)
+    assert default_file.exists()
+    assert not alt_file.exists()
+    assert tuple(
+        certificate.managed_certificate_id
+        for certificate in store.load_catalog().managed_certificates
+    ) == ("managed-cert-default",)
+
+
+def test_certificate_catalog_store_blocks_referenced_managed_certificate_delete(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    managed_file = store.managed_certificate_dir / "cert_default.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    managed_file.write_bytes(b"default-pkcs12")
+    original = build_certificate_catalog()
+    store.save_catalog(original)
+
+    with pytest.raises(ConfigValidationError, match="delete the configuration first"):
+        store.delete_managed_certificate_by_id("managed-cert-default")
+
+    assert managed_file.exists()
+    assert store.load_catalog() == original
+
+
+def test_certificate_catalog_store_deletes_missing_managed_certificate_file(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            )
+        )
+    )
+
+    updated = store.delete_managed_certificate_by_id("managed-cert-alt")
+
+    assert tuple(
+        certificate.managed_certificate_id
+        for certificate in updated.managed_certificates
+    ) == ("managed-cert-default",)
+
+
 def test_certificate_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
     store.catalog_path.parent.mkdir(parents=True, exist_ok=True)

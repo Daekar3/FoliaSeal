@@ -122,3 +122,14 @@ class CertificateCatalogStore:
         catalog = self.load_catalog().remove_configuration_by_id(configuration_id)
         self.save_catalog(catalog)
         return catalog
+
+    def delete_managed_certificate_by_id(self, certificate_id: str) -> CertificateCatalog:
+        """Remove an unreferenced managed certificate record and file."""
+        catalog = self.load_catalog()
+        certificate = catalog.managed_certificate_by_id(certificate_id)
+        updated_catalog = catalog.remove_managed_certificate_by_id(certificate_id)
+        self.save_catalog(updated_catalog)
+        managed_file = self.managed_certificate_dir / certificate.storage_filename
+        if managed_file.exists():
+            managed_file.unlink()
+        return updated_catalog

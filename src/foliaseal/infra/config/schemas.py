@@ -807,6 +807,31 @@ class CertificateCatalog:
             certificate_configurations=self.certificate_configurations,
         )
 
+    def remove_managed_certificate_by_id(self, certificate_id: str) -> CertificateCatalog:
+        """Return a catalog without an unreferenced managed certificate."""
+        normalized_id = _require_non_empty_str_value(
+            certificate_id,
+            "managed_certificate_id",
+        )
+        for configuration in self.certificate_configurations:
+            if configuration.managed_certificate_id == normalized_id:
+                raise ConfigValidationError(
+                    "Managed certificate is still used by a certificate configuration; "
+                    "delete the configuration first."
+                )
+        updated_certificates = tuple(
+            certificate
+            for certificate in self.managed_certificates
+            if certificate.managed_certificate_id != normalized_id
+        )
+        if len(updated_certificates) == len(self.managed_certificates):
+            raise KeyError(normalized_id)
+        return CertificateCatalog(
+            schema_version=self.schema_version,
+            managed_certificates=updated_certificates,
+            certificate_configurations=self.certificate_configurations,
+        )
+
     def upsert_configuration(
         self,
         configuration: CertificateConfiguration,

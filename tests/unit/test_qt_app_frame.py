@@ -383,6 +383,9 @@ def test_app_frame_certificate_management_dialog_saves_and_refreshes_loaded_shel
     assert dialog.controls.configuration_selector.items == [
         ("Corporate Records Signing", "cert-config-default")
     ]
+    assert dialog.controls.managed_certificate_selector.items == [
+        ("Board Secretary 2026", "managed-cert-default")
+    ]
     assert dialog.controls.display_name.text() == "Corporate Records Signing"
     assert dialog.controls.notes.text() == "Default signing identity"
     dialog.controls.display_name.setText("Board Records Signing")
@@ -456,6 +459,97 @@ def test_app_frame_certificate_management_dialog_deletes_configuration_only(
     assert shell.refresh_certificate_configurations_calls == 1
 
 
+def test_app_frame_certificate_management_dialog_blocks_referenced_certificate_delete(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    managed_file = certificate_store.managed_certificate_dir / "cert_default.p12"
+    certificate_store.managed_certificate_dir.mkdir(parents=True)
+    managed_file.write_bytes(b"default-pkcs12")
+    certificate_store.save_catalog(build_certificate_catalog())
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_managed_certificate()
+
+    assert deleted is False
+    assert managed_file.exists()
+    assert certificate_store.load_catalog().managed_certificate_by_id(
+        "managed-cert-default"
+    )
+    assert bindings.q_message_box.warning_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration error",
+        "Managed certificate is still used by a certificate configuration; "
+        "delete the configuration first.",
+    )
+
+
+def test_app_frame_certificate_management_dialog_deletes_unreferenced_certificate(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    default_file = certificate_store.managed_certificate_dir / "cert_default.p12"
+    alt_file = certificate_store.managed_certificate_dir / "cert_alt.p12"
+    certificate_store.managed_certificate_dir.mkdir(parents=True)
+    default_file.write_bytes(b"default-pkcs12")
+    alt_file.write_bytes(b"alt-pkcs12")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            )
+        )
+    )
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    dialog.controls.managed_certificate_selector.setCurrentIndex(1)
+    deleted = dialog.delete_selected_managed_certificate()
+
+    catalog = certificate_store.load_catalog()
+    assert deleted is True
+    assert default_file.exists()
+    assert not alt_file.exists()
+    assert tuple(
+        certificate.managed_certificate_id for certificate in catalog.managed_certificates
+    ) == ("managed-cert-default",)
+    assert dialog.controls.managed_certificate_selector.items == [
+        ("Board Secretary 2026", "managed-cert-default")
+    ]
+    assert shell.refresh_certificate_configurations_calls == 1
+    assert bindings.q_message_box.information_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration",
+        "Managed certificate deleted.",
+    )
+
+
 def test_app_frame_certificate_management_dialog_handles_empty_catalog(
     tmp_path: Path,
 ) -> None:
@@ -475,10 +569,12 @@ def test_app_frame_certificate_management_dialog_handles_empty_catalog(
     dialog = frame.window.certificate_management_dialog
     saved = dialog.save_selected_configuration()
     deleted = dialog.delete_selected_configuration()
+    certificate_deleted = dialog.delete_selected_managed_certificate()
 
     assert saved is None
     assert deleted is False
-    assert bindings.q_message_box.warning_calls[-2:] == [
+    assert certificate_deleted is False
+    assert bindings.q_message_box.warning_calls[-3:] == [
         (
             dialog.controls.dialog,
             "Certificate configuration error",
@@ -488,6 +584,11 @@ def test_app_frame_certificate_management_dialog_handles_empty_catalog(
             dialog.controls.dialog,
             "Certificate configuration error",
             "Select a certificate configuration to delete.",
+        ),
+        (
+            dialog.controls.dialog,
+            "Certificate configuration error",
+            "Select a managed certificate to delete.",
         ),
     ]
 

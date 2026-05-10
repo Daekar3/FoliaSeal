@@ -240,6 +240,35 @@ def test_certificate_catalog_rejects_duplicate_managed_certificate_references() 
         )
 
 
+def test_certificate_catalog_removes_unreferenced_managed_certificate() -> None:
+    catalog = build_certificate_catalog(
+        managed_certificates=(
+            build_managed_certificate(),
+            build_managed_certificate(
+                managed_certificate_id="managed-cert-alt",
+                display_name="Alternate Signing Certificate",
+                storage_filename="cert_alt.p12",
+            ),
+        )
+    )
+
+    updated = catalog.remove_managed_certificate_by_id("managed-cert-alt")
+
+    assert tuple(
+        certificate.managed_certificate_id
+        for certificate in updated.managed_certificates
+    ) == ("managed-cert-default",)
+    with pytest.raises(KeyError):
+        catalog.remove_managed_certificate_by_id("missing-cert")
+
+
+def test_certificate_catalog_blocks_referenced_managed_certificate_removal() -> None:
+    catalog = build_certificate_catalog()
+
+    with pytest.raises(ConfigValidationError, match="delete the configuration first"):
+        catalog.remove_managed_certificate_by_id("managed-cert-default")
+
+
 def test_appearance_profile_round_trip() -> None:
     original = build_appearance_profile()
 

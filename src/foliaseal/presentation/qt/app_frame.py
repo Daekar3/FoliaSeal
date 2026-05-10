@@ -19,6 +19,7 @@ from foliaseal.infra.config.schemas import (
     AppSettings,
     CertificateConfiguration,
     ConfigValidationError,
+    ManagedCertificate,
 )
 from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.presentation.qt.signing_shell import (
@@ -80,8 +81,10 @@ class CertificateConfigurationManagementDialogControls:
     configuration_selector: Any
     display_name: Any
     notes: Any
+    managed_certificate_selector: Any
     save_button: Any
     delete_button: Any
+    delete_certificate_button: Any
     cancel_button: Any
 
 
@@ -327,6 +330,7 @@ class CertificateConfigurationManagementDialog:
         self._catalog_store = catalog_store
         self._on_change = on_change
         self._configurations_by_id: dict[str, CertificateConfiguration] = {}
+        self._managed_certificates_by_id: dict[str, ManagedCertificate] = {}
         self.controls = self._build_controls(parent=parent)
         self.reload_configurations()
 
@@ -339,9 +343,14 @@ class CertificateConfigurationManagementDialog:
     def reload_configurations(self) -> None:
         catalog = self._catalog_store.load_catalog()
         configurations = catalog.certificate_configurations
+        managed_certificates = catalog.managed_certificates
         self._configurations_by_id = {
             configuration.certificate_configuration_id: configuration
             for configuration in configurations
+        }
+        self._managed_certificates_by_id = {
+            certificate.managed_certificate_id: certificate
+            for certificate in managed_certificates
         }
         selector = self.controls.configuration_selector
         clear = getattr(selector, "clear", None)
@@ -351,6 +360,15 @@ class CertificateConfigurationManagementDialog:
             self._add_selector_item(
                 configuration.display_name,
                 configuration.certificate_configuration_id,
+            )
+        certificate_selector = self.controls.managed_certificate_selector
+        clear_certificates = getattr(certificate_selector, "clear", None)
+        if callable(clear_certificates):
+            clear_certificates()
+        for certificate in managed_certificates:
+            self._add_certificate_selector_item(
+                certificate.display_name,
+                certificate.managed_certificate_id,
             )
         self.load_selected_configuration()
 
@@ -414,6 +432,23 @@ class CertificateConfigurationManagementDialog:
         self._show_information("Certificate configuration deleted.")
         return True
 
+    def delete_selected_managed_certificate(self) -> bool:
+        certificate_id = self._selected_managed_certificate_id()
+        if certificate_id is None:
+            self._show_error("Select a managed certificate to delete.")
+            return False
+        try:
+            self._catalog_store.delete_managed_certificate_by_id(certificate_id)
+        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            self._show_error(str(exc))
+            self.reload_configurations()
+            return False
+
+        self.reload_configurations()
+        self._emit_changed()
+        self._show_information("Managed certificate deleted.")
+        return True
+
     def cancel(self) -> None:
         reject = getattr(self.controls.dialog, "reject", None)
         if callable(reject):
@@ -432,15 +467,19 @@ class CertificateConfigurationManagementDialog:
         configuration_selector = self._bindings.q_combo_box()
         display_name = self._bindings.q_line_edit("")
         notes = self._bindings.q_line_edit("")
+        managed_certificate_selector = self._bindings.q_combo_box()
         save_button = self._bindings.q_push_button("Save")
         delete_button = self._bindings.q_push_button("Delete")
+        delete_certificate_button = self._bindings.q_push_button("Delete certificate")
         cancel_button = self._bindings.q_push_button("Cancel")
 
         layout.addRow("Configuration", configuration_selector)
         layout.addRow("Display name", display_name)
         layout.addRow("Notes", notes)
+        layout.addRow("Managed certificate", managed_certificate_selector)
         layout.addRow("", save_button)
         layout.addRow("", delete_button)
+        layout.addRow("", delete_certificate_button)
         layout.addRow("", cancel_button)
 
         index_changed = getattr(configuration_selector, "currentIndexChanged", None)
@@ -448,6 +487,7 @@ class CertificateConfigurationManagementDialog:
             index_changed.connect(self.load_selected_configuration)
         save_button.clicked.connect(self.save_selected_configuration)  # type: ignore[attr-defined]
         delete_button.clicked.connect(self.delete_selected_configuration)  # type: ignore[attr-defined]
+        delete_certificate_button.clicked.connect(self.delete_selected_managed_certificate)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
 
         return CertificateConfigurationManagementDialogControls(
@@ -455,8 +495,10 @@ class CertificateConfigurationManagementDialog:
             configuration_selector=configuration_selector,
             display_name=display_name,
             notes=notes,
+            managed_certificate_selector=managed_certificate_selector,
             save_button=save_button,
             delete_button=delete_button,
+            delete_certificate_button=delete_certificate_button,
             cancel_button=cancel_button,
         )
 
@@ -465,8 +507,26 @@ class CertificateConfigurationManagementDialog:
         if callable(add_item):
             add_item(text, configuration_id)
 
+    def _add_certificate_selector_item(self, text: str, certificate_id: str) -> None:
+        add_item = getattr(self.controls.managed_certificate_selector, "addItem", None)
+        if callable(add_item):
+            add_item(text, certificate_id)
+
     def _selected_configuration_id(self) -> str | None:
         selector = self.controls.configuration_selector
+        current_data = getattr(selector, "currentData", None)
+        if callable(current_data):
+            selected = current_data()
+            return str(selected) if selected else None
+        current_index = getattr(selector, "currentIndex", None)
+        item_data = getattr(selector, "itemData", None)
+        if callable(current_index) and callable(item_data):
+            selected = item_data(current_index())
+            return str(selected) if selected else None
+        return None
+
+    def _selected_managed_certificate_id(self) -> str | None:
+        selector = self.controls.managed_certificate_selector
         current_data = getattr(selector, "currentData", None)
         if callable(current_data):
             selected = current_data()
