@@ -8,6 +8,7 @@ from foliaseal.presentation.qt.app_frame import FoliaSealAppFrame, QtAppFrameBin
 from tests.support.phase3_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
+    build_managed_certificate,
 )
 from tests.unit.test_certificate_import import _write_test_pkcs12
 
@@ -379,6 +380,11 @@ def test_app_frame_certificate_management_dialog_saves_and_refreshes_loaded_shel
 
     frame.window.menu_bar.menus[1].actions[2].trigger()
     dialog = frame.window.certificate_management_dialog
+    assert dialog.controls.configuration_selector.items == [
+        ("Corporate Records Signing", "cert-config-default")
+    ]
+    assert dialog.controls.display_name.text() == "Corporate Records Signing"
+    assert dialog.controls.notes.text() == "Default signing identity"
     dialog.controls.display_name.setText("Board Records Signing")
     dialog.controls.notes.setText("Used for board packets.")
     saved = dialog.save_selected_configuration()
@@ -405,11 +411,20 @@ def test_app_frame_certificate_management_dialog_deletes_configuration_only(
     certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
     certificate_store.save_catalog(
         build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            ),
             certificate_configurations=(
                 build_certificate_configuration(),
                 build_certificate_configuration(
                     certificate_configuration_id="cert-config-alt",
                     display_name="Alternate Signing",
+                    managed_certificate_id="managed-cert-alt",
                 ),
             )
         )
@@ -433,7 +448,7 @@ def test_app_frame_certificate_management_dialog_deletes_configuration_only(
     assert deleted is True
     assert tuple(
         certificate.managed_certificate_id for certificate in catalog.managed_certificates
-    ) == ("managed-cert-default",)
+    ) == ("managed-cert-default", "managed-cert-alt")
     assert tuple(
         configuration.certificate_configuration_id
         for configuration in catalog.certificate_configurations

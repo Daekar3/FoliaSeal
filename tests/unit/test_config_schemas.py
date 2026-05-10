@@ -200,7 +200,14 @@ def test_certificate_catalog_rejects_duplicate_configuration_names() -> None:
     with pytest.raises(ConfigValidationError, match="duplicate names"):
         CertificateCatalog(
             schema_version=1,
-            managed_certificates=(build_managed_certificate(),),
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            ),
             certificate_configurations=(
                 build_certificate_configuration(
                     certificate_configuration_id="cert-config-a",
@@ -209,6 +216,25 @@ def test_certificate_catalog_rejects_duplicate_configuration_names() -> None:
                 build_certificate_configuration(
                     certificate_configuration_id="cert-config-b",
                     display_name="Corporate Records Signing",
+                    managed_certificate_id="managed-cert-alt",
+                ),
+            ),
+        )
+
+
+def test_certificate_catalog_rejects_duplicate_managed_certificate_references() -> None:
+    with pytest.raises(ConfigValidationError, match="duplicate managed certificate"):
+        CertificateCatalog(
+            schema_version=1,
+            managed_certificates=(build_managed_certificate(),),
+            certificate_configurations=(
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-a",
+                    display_name="Corporate Records Signing",
+                ),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-b",
+                    display_name="Alternate Signing",
                 ),
             ),
         )

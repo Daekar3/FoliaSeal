@@ -11,6 +11,7 @@ from foliaseal.infra.config.schemas import ConfigValidationError
 from tests.support.phase3_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
+    build_managed_certificate,
 )
 
 
@@ -68,12 +69,24 @@ def test_certificate_catalog_store_saves_human_readable_json_without_password(
 
 def test_certificate_catalog_store_upserts_and_deletes_configurations(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
-    store.save_catalog(build_certificate_catalog())
+    store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            )
+        )
+    )
 
     updated = store.save_configuration(
         build_certificate_configuration(
             certificate_configuration_id="cert-config-alt",
             display_name="Alternate Signing",
+            managed_certificate_id="managed-cert-alt",
         )
     )
 
@@ -84,7 +97,7 @@ def test_certificate_catalog_store_upserts_and_deletes_configurations(tmp_path: 
         "Alternate Signing",
     )
     assert store.load_catalog().configuration_named("Alternate Signing").managed_certificate_id == (
-        "managed-cert-default"
+        "managed-cert-alt"
     )
 
     removed = store.delete_configuration("Corporate Records Signing")
@@ -99,11 +112,20 @@ def test_certificate_catalog_store_deletes_configuration_by_id_only(
 ) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
     original = build_certificate_catalog(
+        managed_certificates=(
+            build_managed_certificate(),
+            build_managed_certificate(
+                managed_certificate_id="managed-cert-alt",
+                display_name="Alternate Signing Certificate",
+                storage_filename="cert_alt.p12",
+            ),
+        ),
         certificate_configurations=(
             build_certificate_configuration(),
             build_certificate_configuration(
                 certificate_configuration_id="cert-config-alt",
                 display_name="Alternate Signing",
+                managed_certificate_id="managed-cert-alt",
             ),
         )
     )
@@ -114,7 +136,7 @@ def test_certificate_catalog_store_deletes_configuration_by_id_only(
     assert tuple(
         certificate.managed_certificate_id
         for certificate in removed.managed_certificates
-    ) == ("managed-cert-default",)
+    ) == ("managed-cert-default", "managed-cert-alt")
     assert tuple(
         configuration.certificate_configuration_id
         for configuration in removed.certificate_configurations
@@ -144,6 +166,41 @@ def test_certificate_catalog_store_rename_preserves_configuration_id(
     assert updated.configuration_by_id("cert-config-default").notes == (
         "Used for board packets."
     )
+
+
+def test_certificate_catalog_store_rename_rejects_duplicate_display_name(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            ),
+            certificate_configurations=(
+                build_certificate_configuration(),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-alt",
+                    display_name="Alternate Signing",
+                    managed_certificate_id="managed-cert-alt",
+                ),
+            ),
+        )
+    )
+
+    with pytest.raises(ConfigValidationError, match="duplicate names"):
+        store.save_configuration(
+            build_certificate_configuration(
+                certificate_configuration_id="cert-config-alt",
+                display_name="Corporate Records Signing",
+                managed_certificate_id="managed-cert-alt",
+            )
+        )
 
 
 def test_certificate_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:

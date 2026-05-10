@@ -23,6 +23,7 @@ This is a deliberately narrow step toward full V1 certificate management. It doe
 - [x] (2026-05-09T15:39Z) Added focused unit tests for storage and app-frame behavior.
 - [x] (2026-05-09T15:50Z) Ran focused tests, Ruff, and the full unit suite successfully.
 - [x] (2026-05-09T15:52Z) Updated architecture documentation for the app-frame management action and stable-id delete contract.
+- [x] (2026-05-09T16:04Z) Completed two post-commit architecture/compliance reviews; added follow-up tests for dialog loading and duplicate display-name rejection, and enforced the frozen schema rule that one managed certificate has at most one V1 configuration.
 
 ## Surprises & Discoveries
 
@@ -34,6 +35,9 @@ This is a deliberately narrow step toward full V1 certificate management. It doe
 
 - Observation: Adding `QComboBox` to the app-frame dynamic binding contract required updating every test fake that constructs `QtAppFrameBindings`.
   Evidence: Ruff and focused tests passed after `tests/unit/test_qt_app_frame.py` added `_FakeComboBox` and supplied `q_combo_box`.
+
+- Observation: The initial implementation allowed two `CertificateConfiguration` entries to reference one `ManagedCertificate`, which conflicts with the frozen schema rule that V1 has one primary configuration per managed certificate.
+  Evidence: Compliance review cited `docs/SCHEMAS.md` and `CertificateCatalog.__post_init__`; the follow-up adds duplicate managed-certificate-reference validation and a focused schema test.
 
 ## Decision Log
 
@@ -54,6 +58,8 @@ This is a deliberately narrow step toward full V1 certificate management. It doe
 This slice added a focused first-pass management flow for `CertificateConfiguration` records. Users can open the app-frame management dialog, rename a configuration, edit its notes, or delete the configuration record. The delete path targets `certificate_configuration_id` and preserves `ManagedCertificate` records and files. The loaded signing shell refresh hook is reused after save and delete, so already open documents can see catalog changes without reopening.
 
 Remaining gaps are intentionally unchanged: no self-signed certificate creation, no export/backup, no managed certificate file deletion, and no saved-password credential-store adapter.
+
+Post-commit compliance review found no architecture boundary issue in the UI/storage flow, but identified missing test evidence for dialog loading and duplicate-name rejection plus a model invariant gap for duplicate managed-certificate references. The follow-up closes those items with tests and schema validation.
 
 ## Context and Orientation
 
@@ -86,6 +92,12 @@ Focused tests while developing:
     .venv/bin/python -m pytest -q tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame.py
 
     18 passed in 2.60s
+
+Compliance follow-up focused tests:
+
+    .venv/bin/python -m pytest -q tests/unit/test_config_schemas.py tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame.py
+
+    48 passed in 2.66s
 
 Before committing:
 
@@ -124,6 +136,16 @@ Validation transcript:
     .venv/bin/python -m pytest -q
     590 passed, 23 skipped, 1 warning in 245.85s (0:04:05)
 
+Compliance follow-up transcript:
+
+    .venv/bin/python -m pytest -q tests/unit/test_config_schemas.py tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame.py
+    48 passed in 2.66s
+
+    .venv/bin/python -m ruff check .
+    All checks passed!
+
 Revision note: Created 2026-05-09 by Codex to implement the next schema-alignment certificate-management slice after PKCS#12 import.
 
 Revision note: Updated 2026-05-09 by Codex after implementing stable-id delete, app-frame configuration management, architecture docs, and validation.
+
+Revision note: Updated 2026-05-09 by Codex after post-commit compliance reviews identified missing test coverage and the duplicate managed-certificate-reference invariant.

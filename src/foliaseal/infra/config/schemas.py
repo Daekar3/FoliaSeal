@@ -677,12 +677,19 @@ class CertificateCatalog:
             "certificate_configuration_id",
         )
         seen_names: set[str] = set()
+        seen_managed_certificate_ids: set[str] = set()
         for configuration in self.certificate_configurations:
             if configuration.display_name in seen_names:
                 raise ConfigValidationError(
                     "Field 'certificate_configurations' must not contain duplicate names."
                 )
             seen_names.add(configuration.display_name)
+            if configuration.managed_certificate_id in seen_managed_certificate_ids:
+                raise ConfigValidationError(
+                    "Field 'certificate_configurations' must not contain duplicate "
+                    "managed certificate references."
+                )
+            seen_managed_certificate_ids.add(configuration.managed_certificate_id)
 
     @staticmethod
     def _validate_object_tuple(
