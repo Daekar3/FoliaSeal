@@ -24,6 +24,7 @@ This is a narrow V1 certificate-management slice. It deliberately does not creat
 - [x] (2026-05-10T23:02Z) Added focused storage and app-frame tests for successful export, overwrite behavior, missing source handling, and cancel/no-selection behavior.
 - [x] (2026-05-10T23:05Z) Updated architecture and schema-alignment roadmap documentation for managed certificate export.
 - [x] (2026-05-10T23:12Z) Ran focused tests, Ruff, and the full unit suite successfully.
+- [x] (2026-05-10T23:18Z) Completed post-commit compliance review and added a safety follow-up that rejects managed-storage destinations and symlink destinations.
 
 ## Surprises & Discoveries
 
@@ -35,6 +36,9 @@ This is a narrow V1 certificate-management slice. It deliberately does not creat
 
 - Observation: The app-frame fake file dialog only modeled open-file selection before this slice.
   Evidence: `tests/unit/test_qt_app_frame.py` needed fake `getSaveFileName()` support to test the export path.
+
+- Observation: Exact same-path rejection was not enough to protect the non-mutating export contract.
+  Evidence: Compliance review identified that exporting onto another file under `Certificates/Managed/` or through a symlink destination could overwrite app-owned PKCS#12 data. The follow-up rejects destinations inside managed storage and rejects symbolic-link destinations before copying.
 
 ## Decision Log
 
@@ -52,7 +56,7 @@ This is a narrow V1 certificate-management slice. It deliberately does not creat
 
 ## Outcomes & Retrospective
 
-This slice added a focused export path that copies selected managed PKCS#12 bytes to a user-chosen path while leaving all catalog and signing state unchanged. The app-frame management dialog now has an export action, the store handles overwrite and missing-source behavior, and tests cover cancel/no-selection behavior at the UI boundary.
+This slice added a focused export path that copies selected managed PKCS#12 bytes to a user-chosen path while leaving all catalog and signing state unchanged. The app-frame management dialog now has an export action, the store handles overwrite and missing-source behavior, and tests cover cancel/no-selection behavior at the UI boundary. A compliance follow-up tightened destination safety so export cannot overwrite files inside FoliaSeal managed certificate storage and cannot write through a symbolic-link destination.
 
 ## Context and Orientation
 
@@ -83,6 +87,12 @@ Focused tests while developing:
     .venv/bin/python -m pytest -q tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame.py
 
     30 passed in 2.85s
+
+Compliance follow-up focused tests:
+
+    .venv/bin/python -m pytest -q tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame.py
+
+    32 passed in 1.69s
 
 Before committing:
 
@@ -121,6 +131,16 @@ Validation transcript:
     .venv/bin/python -m pytest -q
     605 passed, 23 skipped, 1 warning in 243.26s (0:04:03)
 
+Compliance follow-up transcript:
+
+    .venv/bin/python -m pytest -q tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame.py
+    32 passed in 1.69s
+
+    .venv/bin/python -m ruff check .
+    All checks passed!
+
 Revision note: Created 2026-05-10 by Codex to implement a managed-certificate export/backup slice after import, configuration management, and deletion.
 
 Revision note: Updated 2026-05-10 by Codex after implementing store export, app-frame export UI, docs, and validation.
+
+Revision note: Updated 2026-05-10 by Codex after compliance review identified destination-safety gaps around managed-storage destinations and symbolic-link destinations.

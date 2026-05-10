@@ -149,9 +149,20 @@ class CertificateCatalogStore:
         if isinstance(destination_path, str) and not destination_path.strip():
             raise ConfigValidationError("destination_path must be a non-empty path.")
         destination = Path(destination_path)
-        if source_path.resolve() == destination.resolve():
+        destination_resolved = destination.resolve()
+        managed_dir_resolved = self.managed_certificate_dir.resolve()
+        if source_path.resolve() == destination_resolved:
             raise ConfigValidationError(
                 "Export destination must be different from the managed certificate file."
+            )
+        if destination.exists() and destination.is_symlink():
+            raise ConfigValidationError("Export destination must not be a symbolic link.")
+        if (
+            destination_resolved == managed_dir_resolved
+            or managed_dir_resolved in destination_resolved.parents
+        ):
+            raise ConfigValidationError(
+                "Export destination must be outside FoliaSeal managed certificate storage."
             )
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, destination)

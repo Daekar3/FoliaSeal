@@ -344,6 +344,45 @@ def test_certificate_catalog_store_export_rejects_same_source_destination(
         store.export_managed_certificate_by_id("managed-cert-default", source)
 
 
+def test_certificate_catalog_store_export_rejects_managed_storage_destination(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    source = store.managed_certificate_dir / "cert_default.p12"
+    other_managed_file = store.managed_certificate_dir / "other_backup.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    other_managed_file.write_bytes(b"other-managed-pkcs12")
+    store.save_catalog(build_certificate_catalog())
+
+    with pytest.raises(ConfigValidationError, match="outside FoliaSeal managed"):
+        store.export_managed_certificate_by_id(
+            "managed-cert-default",
+            other_managed_file,
+        )
+
+    assert other_managed_file.read_bytes() == b"other-managed-pkcs12"
+
+
+def test_certificate_catalog_store_export_rejects_symlink_destination(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    source = store.managed_certificate_dir / "cert_default.p12"
+    target = store.managed_certificate_dir / "other_managed.p12"
+    symlink = tmp_path / "backup-link.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    target.write_bytes(b"other-managed-pkcs12")
+    symlink.symlink_to(target)
+    store.save_catalog(build_certificate_catalog())
+
+    with pytest.raises(ConfigValidationError, match="symbolic link"):
+        store.export_managed_certificate_by_id("managed-cert-default", symlink)
+
+    assert target.read_bytes() == b"other-managed-pkcs12"
+
+
 def test_certificate_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
     store.catalog_path.parent.mkdir(parents=True, exist_ok=True)
