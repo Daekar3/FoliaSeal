@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +15,11 @@ from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import AppSettings, ConfigValidationError
+from foliaseal.infra.config.schemas import (
+    AppSettings,
+    CertificateConfiguration,
+    ConfigValidationError,
+)
 from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
@@ -36,6 +40,7 @@ class QtAppFrameBindings:
     q_form_layout: type[Any]
     q_label: type[Any]
     q_line_edit: type[Any]
+    q_combo_box: type[Any]
     q_push_button: type[Any]
     q_file_dialog: Any
     q_message_box: Any
@@ -64,6 +69,19 @@ class CertificateImportDialogControls:
     passphrase: Any
     choose_button: Any
     import_button: Any
+    cancel_button: Any
+
+
+@dataclass(frozen=True)
+class CertificateConfigurationManagementDialogControls:
+    """Controls used by the certificate-configuration management dialog."""
+
+    dialog: Any
+    configuration_selector: Any
+    display_name: Any
+    notes: Any
+    save_button: Any
+    delete_button: Any
     cancel_button: Any
 
 
@@ -294,6 +312,203 @@ class CertificateImportDialog:
             warning(self.controls.dialog, "Certificate import error", message)
 
 
+class CertificateConfigurationManagementDialog:
+    """Small dialog for renaming, annotating, and deleting configurations."""
+
+    def __init__(
+        self,
+        *,
+        bindings: QtAppFrameBindings,
+        parent: Any,
+        catalog_store: CertificateCatalogStore,
+        on_change: Callable[[], None] | None = None,
+    ) -> None:
+        self._bindings = bindings
+        self._catalog_store = catalog_store
+        self._on_change = on_change
+        self._configurations_by_id: dict[str, CertificateConfiguration] = {}
+        self.controls = self._build_controls(parent=parent)
+        self.reload_configurations()
+
+    def exec(self) -> Any | None:
+        dialog_exec = getattr(self.controls.dialog, "exec", None)
+        if callable(dialog_exec):
+            return dialog_exec()
+        return None
+
+    def reload_configurations(self) -> None:
+        catalog = self._catalog_store.load_catalog()
+        configurations = catalog.certificate_configurations
+        self._configurations_by_id = {
+            configuration.certificate_configuration_id: configuration
+            for configuration in configurations
+        }
+        selector = self.controls.configuration_selector
+        clear = getattr(selector, "clear", None)
+        if callable(clear):
+            clear()
+        for configuration in configurations:
+            self._add_selector_item(
+                configuration.display_name,
+                configuration.certificate_configuration_id,
+            )
+        self.load_selected_configuration()
+
+    def load_selected_configuration(self, *_args: Any) -> CertificateConfiguration | None:
+        configuration_id = self._selected_configuration_id()
+        configuration = (
+            self._configurations_by_id.get(configuration_id)
+            if configuration_id is not None
+            else None
+        )
+        if configuration is None:
+            self.controls.display_name.setText("")
+            self.controls.notes.setText("")
+            return None
+        self.controls.display_name.setText(configuration.display_name)
+        self.controls.notes.setText(configuration.notes or "")
+        return configuration
+
+    def save_selected_configuration(self) -> CertificateConfiguration | None:
+        configuration_id = self._selected_configuration_id()
+        configuration = (
+            self._configurations_by_id.get(configuration_id)
+            if configuration_id is not None
+            else None
+        )
+        if configuration is None:
+            self._show_error("Select a certificate configuration to save.")
+            return None
+        updated = replace(
+            configuration,
+            display_name=self.controls.display_name.text().strip(),
+            notes=self.controls.notes.text().strip() or None,
+        )
+        try:
+            self._catalog_store.save_configuration(updated)
+        except (ConfigValidationError, OSError, ValueError) as exc:
+            self._show_error(str(exc))
+            return None
+
+        self.reload_configurations()
+        self._select_configuration(updated.certificate_configuration_id)
+        self.load_selected_configuration()
+        self._emit_changed()
+        self._show_information("Certificate configuration saved.")
+        return updated
+
+    def delete_selected_configuration(self) -> bool:
+        configuration_id = self._selected_configuration_id()
+        if configuration_id is None:
+            self._show_error("Select a certificate configuration to delete.")
+            return False
+        try:
+            self._catalog_store.delete_configuration_by_id(configuration_id)
+        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            self._show_error(str(exc))
+            self.reload_configurations()
+            return False
+
+        self.reload_configurations()
+        self._emit_changed()
+        self._show_information("Certificate configuration deleted.")
+        return True
+
+    def cancel(self) -> None:
+        reject = getattr(self.controls.dialog, "reject", None)
+        if callable(reject):
+            reject()
+
+    def _build_controls(
+        self,
+        *,
+        parent: Any,
+    ) -> CertificateConfigurationManagementDialogControls:
+        dialog = self._bindings.q_dialog(parent)
+        if hasattr(dialog, "setWindowTitle"):
+            dialog.setWindowTitle("Manage certificate configurations")
+        layout = self._bindings.q_form_layout(dialog)
+
+        configuration_selector = self._bindings.q_combo_box()
+        display_name = self._bindings.q_line_edit("")
+        notes = self._bindings.q_line_edit("")
+        save_button = self._bindings.q_push_button("Save")
+        delete_button = self._bindings.q_push_button("Delete")
+        cancel_button = self._bindings.q_push_button("Cancel")
+
+        layout.addRow("Configuration", configuration_selector)
+        layout.addRow("Display name", display_name)
+        layout.addRow("Notes", notes)
+        layout.addRow("", save_button)
+        layout.addRow("", delete_button)
+        layout.addRow("", cancel_button)
+
+        index_changed = getattr(configuration_selector, "currentIndexChanged", None)
+        if hasattr(index_changed, "connect"):
+            index_changed.connect(self.load_selected_configuration)
+        save_button.clicked.connect(self.save_selected_configuration)  # type: ignore[attr-defined]
+        delete_button.clicked.connect(self.delete_selected_configuration)  # type: ignore[attr-defined]
+        cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
+
+        return CertificateConfigurationManagementDialogControls(
+            dialog=dialog,
+            configuration_selector=configuration_selector,
+            display_name=display_name,
+            notes=notes,
+            save_button=save_button,
+            delete_button=delete_button,
+            cancel_button=cancel_button,
+        )
+
+    def _add_selector_item(self, text: str, configuration_id: str) -> None:
+        add_item = getattr(self.controls.configuration_selector, "addItem", None)
+        if callable(add_item):
+            add_item(text, configuration_id)
+
+    def _selected_configuration_id(self) -> str | None:
+        selector = self.controls.configuration_selector
+        current_data = getattr(selector, "currentData", None)
+        if callable(current_data):
+            selected = current_data()
+            return str(selected) if selected else None
+        current_index = getattr(selector, "currentIndex", None)
+        item_data = getattr(selector, "itemData", None)
+        if callable(current_index) and callable(item_data):
+            selected = item_data(current_index())
+            return str(selected) if selected else None
+        return None
+
+    def _select_configuration(self, configuration_id: str) -> None:
+        selector = self.controls.configuration_selector
+        count = getattr(selector, "count", None)
+        item_data = getattr(selector, "itemData", None)
+        set_current_index = getattr(selector, "setCurrentIndex", None)
+        if not (callable(count) and callable(item_data) and callable(set_current_index)):
+            return
+        for index in range(count()):
+            if item_data(index) == configuration_id:
+                set_current_index(index)
+                return
+
+    def _emit_changed(self) -> None:
+        if self._on_change is not None:
+            self._on_change()
+
+    def _show_error(self, message: str) -> None:
+        warning = getattr(self._bindings.q_message_box, "warning", None)
+        if callable(warning):
+            warning(self.controls.dialog, "Certificate configuration error", message)
+
+    def _show_information(self, message: str) -> None:
+        information = getattr(self._bindings.q_message_box, "information", None)
+        if callable(information):
+            information(
+                self.controls.dialog,
+                "Certificate configuration",
+                message,
+            )
+
+
 class FoliaSealAppFrame:
     """Application frame that owns top-level menus and document opening."""
 
@@ -330,6 +545,9 @@ class FoliaSealAppFrame:
         self._current_signing_workflow: SigningDraftWorkflow | None = None
         self._settings_dialog: AppSettingsDialog | None = None
         self._certificate_import_dialog: CertificateImportDialog | None = None
+        self._certificate_management_dialog: (
+            CertificateConfigurationManagementDialog | None
+        ) = None
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
@@ -340,6 +558,7 @@ class FoliaSealAppFrame:
         self.window.open_pdf_path = self.open_pdf_path  # type: ignore[attr-defined]
         self.window.show_app_settings = self.show_app_settings  # type: ignore[attr-defined]
         self.window.show_certificate_import = self.show_certificate_import  # type: ignore[attr-defined]
+        self.window.show_certificate_management = self.show_certificate_management  # type: ignore[attr-defined]
         self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.window.current_shell = None  # type: ignore[attr-defined]
         self.window.current_viewer_workflow = None  # type: ignore[attr-defined]
@@ -449,6 +668,17 @@ class FoliaSealAppFrame:
         self.window.certificate_import_dialog = dialog  # type: ignore[attr-defined]
         return dialog.exec()
 
+    def show_certificate_management(self) -> Any | None:
+        dialog = CertificateConfigurationManagementDialog(
+            bindings=self._bindings,
+            parent=self.window,
+            catalog_store=self._certificate_catalog_store,
+            on_change=self._refresh_shell_certificate_configurations,
+        )
+        self._certificate_management_dialog = dialog
+        self.window.certificate_management_dialog = dialog  # type: ignore[attr-defined]
+        return dialog.exec()
+
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
         file_menu = menu_bar.addMenu("File")
@@ -459,6 +689,12 @@ class FoliaSealAppFrame:
         )
         settings_menu.addAction(
             self._action("Import certificate...", self.show_certificate_import)
+        )
+        settings_menu.addAction(
+            self._action(
+                "Manage certificate configurations...",
+                self.show_certificate_management,
+            )
         )
 
     def _action(self, text: str, callback: Callable[[], Any]) -> Any:
@@ -564,6 +800,7 @@ class QtAppFrameAdapter:
             q_form_layout=getattr(qt_widgets, "QFormLayout"),
             q_label=getattr(qt_widgets, "QLabel"),
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
+            q_combo_box=getattr(qt_widgets, "QComboBox"),
             q_push_button=getattr(qt_widgets, "QPushButton"),
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),

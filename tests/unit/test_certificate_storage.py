@@ -94,6 +94,58 @@ def test_certificate_catalog_store_upserts_and_deletes_configurations(tmp_path: 
     ) == ("Alternate Signing",)
 
 
+def test_certificate_catalog_store_deletes_configuration_by_id_only(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    original = build_certificate_catalog(
+        certificate_configurations=(
+            build_certificate_configuration(),
+            build_certificate_configuration(
+                certificate_configuration_id="cert-config-alt",
+                display_name="Alternate Signing",
+            ),
+        )
+    )
+    store.save_catalog(original)
+
+    removed = store.delete_configuration_by_id("cert-config-default")
+
+    assert tuple(
+        certificate.managed_certificate_id
+        for certificate in removed.managed_certificates
+    ) == ("managed-cert-default",)
+    assert tuple(
+        configuration.certificate_configuration_id
+        for configuration in removed.certificate_configurations
+    ) == ("cert-config-alt",)
+    with pytest.raises(KeyError):
+        store.delete_configuration_by_id("missing-config")
+
+
+def test_certificate_catalog_store_rename_preserves_configuration_id(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    store.save_catalog(build_certificate_catalog())
+    configuration = store.load_catalog().configuration_named("Corporate Records Signing")
+    renamed = build_certificate_configuration(
+        certificate_configuration_id=configuration.certificate_configuration_id,
+        managed_certificate_id=configuration.managed_certificate_id,
+        display_name="Board Records Signing",
+        notes="Used for board packets.",
+    )
+
+    updated = store.save_configuration(renamed)
+
+    assert updated.configuration_by_id("cert-config-default").display_name == (
+        "Board Records Signing"
+    )
+    assert updated.configuration_by_id("cert-config-default").notes == (
+        "Used for board packets."
+    )
+
+
 def test_certificate_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
     store.catalog_path.parent.mkdir(parents=True, exist_ok=True)

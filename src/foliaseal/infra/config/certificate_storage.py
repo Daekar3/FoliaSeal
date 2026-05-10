@@ -116,3 +116,9 @@ class CertificateCatalogStore:
         catalog = self.load_catalog().remove_configuration(name)
         self.save_catalog(catalog)
         return catalog
+
+    def delete_configuration_by_id(self, configuration_id: str) -> CertificateCatalog:
+        """Remove a certificate configuration by stable id and persist the catalog."""
+        catalog = self.load_catalog().remove_configuration_by_id(configuration_id)
+        self.save_catalog(catalog)
+        return catalog

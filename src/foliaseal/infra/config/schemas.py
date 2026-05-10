@@ -852,6 +852,25 @@ class CertificateCatalog:
             certificate_configurations=updated_configurations,
         )
 
+    def remove_configuration_by_id(self, configuration_id: str) -> CertificateCatalog:
+        """Return a catalog without the certificate configuration with the given id."""
+        normalized_id = _require_non_empty_str_value(
+            configuration_id,
+            "certificate_configuration_id",
+        )
+        updated_configurations = tuple(
+            configuration
+            for configuration in self.certificate_configurations
+            if configuration.certificate_configuration_id != normalized_id
+        )
+        if len(updated_configurations) == len(self.certificate_configurations):
+            raise KeyError(normalized_id)
+        return CertificateCatalog(
+            schema_version=self.schema_version,
+            managed_certificates=self.managed_certificates,
+            certificate_configurations=updated_configurations,
+        )
+
 
 @dataclass(frozen=True)
 class PlacementProfileRect:

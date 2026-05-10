@@ -5,6 +5,10 @@ from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt import app_frame as app_frame_module
 from foliaseal.presentation.qt.app_frame import FoliaSealAppFrame, QtAppFrameBindings
+from tests.support.phase3_builders import (
+    build_certificate_catalog,
+    build_certificate_configuration,
+)
 from tests.unit.test_certificate_import import _write_test_pkcs12
 
 
@@ -122,6 +126,40 @@ class _FakeLineEdit:
         return self._text
 
 
+class _FakeComboBox:
+    def __init__(self) -> None:
+        self.items = []
+        self.current_index = -1
+        self.currentIndexChanged = _FakeSignal()
+
+    def addItem(self, text, user_data=None):  # noqa: N802
+        self.items.append((text, user_data))
+        if self.current_index < 0:
+            self.current_index = 0
+
+    def clear(self) -> None:
+        self.items = []
+        self.current_index = -1
+
+    def currentData(self):  # noqa: N802
+        if self.current_index < 0:
+            return None
+        return self.items[self.current_index][1]
+
+    def currentIndex(self):  # noqa: N802
+        return self.current_index
+
+    def setCurrentIndex(self, index):  # noqa: N802
+        self.current_index = index
+        self.currentIndexChanged.emit()
+
+    def itemData(self, index):  # noqa: N802
+        return self.items[index][1]
+
+    def count(self):
+        return len(self.items)
+
+
 class _FakePushButton:
     def __init__(self, text="") -> None:
         self.text = text
@@ -190,6 +228,7 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_form_layout=_FakeFormLayout,
         q_label=_FakeLabel,
         q_line_edit=_FakeLineEdit,
+        q_combo_box=_FakeComboBox,
         q_push_button=_FakePushButton,
         q_file_dialog=file_dialog,
         q_message_box=message_box,
@@ -267,6 +306,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
         "Application settings",
         "Import certificate...",
+        "Manage certificate configurations...",
     ]
 
     frame.window.menu_bar.menus[1].actions[0].trigger()
@@ -318,6 +358,123 @@ def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
     assert configuration.password_secret_ref is None
     assert shell.refresh_certificate_configurations_calls == 1
     assert bindings.q_message_box.information_calls[-1][1] == "Certificate imported"
+
+
+def test_app_frame_certificate_management_dialog_saves_and_refreshes_loaded_shell(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(build_certificate_catalog())
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.window.menu_bar.menus[1].actions[2].trigger()
+    dialog = frame.window.certificate_management_dialog
+    dialog.controls.display_name.setText("Board Records Signing")
+    dialog.controls.notes.setText("Used for board packets.")
+    saved = dialog.save_selected_configuration()
+
+    assert saved.display_name == "Board Records Signing"
+    assert saved.notes == "Used for board packets."
+    reloaded = certificate_store.load_catalog().configuration_by_id(
+        "cert-config-default"
+    )
+    assert reloaded.display_name == "Board Records Signing"
+    assert reloaded.notes == "Used for board packets."
+    assert shell.refresh_certificate_configurations_calls == 1
+    assert bindings.q_message_box.information_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration",
+        "Certificate configuration saved.",
+    )
+
+
+def test_app_frame_certificate_management_dialog_deletes_configuration_only(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            certificate_configurations=(
+                build_certificate_configuration(),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-alt",
+                    display_name="Alternate Signing",
+                ),
+            )
+        )
+    )
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_configuration()
+
+    catalog = certificate_store.load_catalog()
+    assert deleted is True
+    assert tuple(
+        certificate.managed_certificate_id for certificate in catalog.managed_certificates
+    ) == ("managed-cert-default",)
+    assert tuple(
+        configuration.certificate_configuration_id
+        for configuration in catalog.certificate_configurations
+    ) == ("cert-config-alt",)
+    assert shell.refresh_certificate_configurations_calls == 1
+
+
+def test_app_frame_certificate_management_dialog_handles_empty_catalog(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(
+            storage_dir=tmp_path / "Certificates"
+        ),
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    saved = dialog.save_selected_configuration()
+    deleted = dialog.delete_selected_configuration()
+
+    assert saved is None
+    assert deleted is False
+    assert bindings.q_message_box.warning_calls[-2:] == [
+        (
+            dialog.controls.dialog,
+            "Certificate configuration error",
+            "Select a certificate configuration to save.",
+        ),
+        (
+            dialog.controls.dialog,
+            "Certificate configuration error",
+            "Select a certificate configuration to delete.",
+        ),
+    ]
 
 
 def test_app_frame_certificate_import_choose_button_prefills_path_and_name(
