@@ -15,7 +15,7 @@ from foliaseal.application.certificate_import import (
     CertificateImportService,
 )
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import ConfigValidationError
+from foliaseal.infra.config.schemas import CertificateCatalog, ConfigValidationError
 
 
 def _write_test_pkcs12(
@@ -62,12 +62,37 @@ def _write_test_pkcs12(
     )
 
 
-def _service(store: CertificateCatalogStore) -> CertificateImportService:
+class _FakeSecretStore:
+    def __init__(self, *, available: bool = True) -> None:
+        self.available = available
+        self.secrets: dict[str, str] = {}
+        self.deleted: list[str] = []
+
+    def is_available(self) -> bool:
+        return self.available
+
+    def secret_ref_for_configuration(self, configuration_id: str) -> str:
+        return f"secret://test/{configuration_id}"
+
+    def set_secret(self, secret_ref: str, secret: str) -> None:
+        self.secrets[secret_ref] = secret
+
+    def delete_secret(self, secret_ref: str) -> None:
+        self.deleted.append(secret_ref)
+        self.secrets.pop(secret_ref, None)
+
+
+def _service(
+    store: CertificateCatalogStore,
+    *,
+    secret_store: _FakeSecretStore | None = None,
+) -> CertificateImportService:
     ids = iter(("managed-cert-imported", "cert-config-imported"))
     return CertificateImportService(
         store=store,
         id_factory=lambda: next(ids),
         clock=lambda: datetime(2026, 5, 9, 13, 29, tzinfo=UTC),
+        secret_store=secret_store,
     )
 
 
@@ -109,6 +134,77 @@ def test_certificate_import_copies_pkcs12_and_persists_catalog(
     assert reloaded.configuration_named("Alice Signing").certificate_configuration_id == (
         "cert-config-imported"
     )
+
+
+def test_certificate_import_can_save_password_in_secret_store(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.p12"
+    passphrase = "correct horse"
+    _write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore()
+
+    result = _service(store, secret_store=secret_store).import_pkcs12(
+        source_path=source,
+        display_name="Alice Signing",
+        passphrase=passphrase,
+        save_password=True,
+    )
+
+    configuration = result.certificate_configuration
+    assert configuration.save_password is True
+    assert configuration.password_secret_ref == "secret://test/cert-config-imported"
+    assert secret_store.secrets == {
+        "secret://test/cert-config-imported": passphrase,
+    }
+    assert passphrase not in store.catalog_path.read_text(encoding="utf-8")
+
+
+def test_certificate_import_rejects_saved_password_when_store_unavailable(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.p12"
+    _write_test_pkcs12(source, passphrase="secret")
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore(available=False)
+
+    with pytest.raises(ConfigValidationError, match="not available"):
+        _service(store, secret_store=secret_store).import_pkcs12(
+            source_path=source,
+            display_name="Alice Signing",
+            passphrase="secret",
+            save_password=True,
+        )
+
+    assert store.load_catalog().certificate_configurations == ()
+    assert not store.managed_certificate_dir.exists()
+    assert secret_store.secrets == {}
+
+
+def test_certificate_import_removes_saved_password_when_catalog_save_fails(
+    tmp_path: Path,
+) -> None:
+    class _FailingSaveStore(CertificateCatalogStore):
+        def save_catalog(self, catalog: CertificateCatalog) -> None:
+            raise OSError("disk full")
+
+    source = tmp_path / "source.p12"
+    _write_test_pkcs12(source, passphrase="secret")
+    store = _FailingSaveStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore()
+
+    with pytest.raises(OSError, match="disk full"):
+        _service(store, secret_store=secret_store).import_pkcs12(
+            source_path=source,
+            display_name="Alice Signing",
+            passphrase="secret",
+            save_password=True,
+        )
+
+    assert not (store.managed_certificate_dir / "cert_managed-cert-imported.p12").exists()
+    assert secret_store.deleted == ["secret://test/cert-config-imported"]
+    assert secret_store.secrets == {}
 
 
 def test_certificate_import_rejects_wrong_password_without_copying(

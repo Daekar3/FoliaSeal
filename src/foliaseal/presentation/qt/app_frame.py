@@ -22,6 +22,10 @@ from foliaseal.infra.config.schemas import (
     ManagedCertificate,
 )
 from foliaseal.infra.render import QtPdfRenderBackend
+from foliaseal.infra.secret_storage import (
+    SecretStorageError,
+    SecretToolCertificateSecretStore,
+)
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
     build_qt_signing_shell,
@@ -41,6 +45,7 @@ class QtAppFrameBindings:
     q_form_layout: type[Any]
     q_label: type[Any]
     q_line_edit: type[Any]
+    q_check_box: type[Any]
     q_combo_box: type[Any]
     q_push_button: type[Any]
     q_file_dialog: Any
@@ -68,6 +73,7 @@ class CertificateImportDialogControls:
     certificate_path: Any
     display_name: Any
     passphrase: Any
+    save_password: Any
     choose_button: Any
     import_button: Any
     cancel_button: Any
@@ -236,11 +242,13 @@ class CertificateImportDialog:
         source_path = self.controls.certificate_path.text().strip()
         display_name = self.controls.display_name.text().strip() or Path(source_path).stem
         passphrase = self.controls.passphrase.text()
+        save_password = bool(self.controls.save_password.isChecked())
         try:
             result = self._import_service.import_pkcs12(
                 source_path=source_path,
                 display_name=display_name,
                 passphrase=passphrase,
+                save_password=save_password,
             )
         except Exception as exc:
             self._show_error(str(exc))
@@ -275,6 +283,7 @@ class CertificateImportDialog:
         certificate_path = self._bindings.q_line_edit("")
         display_name = self._bindings.q_line_edit("")
         passphrase = self._bindings.q_line_edit("")
+        save_password = self._bindings.q_check_box("Save password securely")
         choose_button = self._bindings.q_push_button("Choose...")
         import_button = self._bindings.q_push_button("Import")
         cancel_button = self._bindings.q_push_button("Cancel")
@@ -283,6 +292,7 @@ class CertificateImportDialog:
         layout.addRow("", choose_button)
         layout.addRow("Display name", display_name)
         layout.addRow("Password", passphrase)
+        layout.addRow("", save_password)
         layout.addRow("", import_button)
         layout.addRow("", cancel_button)
 
@@ -295,6 +305,7 @@ class CertificateImportDialog:
             certificate_path=certificate_path,
             display_name=display_name,
             passphrase=passphrase,
+            save_password=save_password,
             choose_button=choose_button,
             import_button=import_button,
             cancel_button=cancel_button,
@@ -325,10 +336,12 @@ class CertificateConfigurationManagementDialog:
         bindings: QtAppFrameBindings,
         parent: Any,
         catalog_store: CertificateCatalogStore,
+        secret_store: Any | None = None,
         on_change: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
         self._catalog_store = catalog_store
+        self._secret_store = secret_store
         self._on_change = on_change
         self._configurations_by_id: dict[str, CertificateConfiguration] = {}
         self._managed_certificates_by_id: dict[str, ManagedCertificate] = {}
@@ -421,6 +434,23 @@ class CertificateConfigurationManagementDialog:
         if configuration_id is None:
             self._show_error("Select a certificate configuration to delete.")
             return False
+        configuration = self._configurations_by_id.get(configuration_id)
+        if configuration is None:
+            self._show_error("Select a certificate configuration to delete.")
+            self.reload_configurations()
+            return False
+        if configuration.password_secret_ref is not None:
+            if self._secret_store is None or not self._secret_store.is_available():
+                self._show_error(
+                    "Saved password storage is not available. "
+                    "The certificate configuration was not deleted."
+                )
+                return False
+            try:
+                self._secret_store.delete_secret(configuration.password_secret_ref)
+            except (SecretStorageError, OSError, ValueError) as exc:
+                self._show_error(str(exc))
+                return False
         try:
             self._catalog_store.delete_configuration_by_id(configuration_id)
         except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
@@ -616,6 +646,7 @@ class FoliaSealAppFrame:
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         certificate_catalog_store: CertificateCatalogStore | None = None,
+        certificate_secret_provider: Any | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         shell_builder: Callable[..., Any] = build_qt_signing_shell,
@@ -629,6 +660,9 @@ class FoliaSealAppFrame:
         self._app_settings = app_settings or self._app_settings_store.load_settings()
         self._certificate_catalog_store = certificate_catalog_store or (
             CertificateCatalogStore.default()
+        )
+        self._certificate_secret_provider = (
+            certificate_secret_provider or SecretToolCertificateSecretStore()
         )
         self._preset_catalog_store = preset_catalog_store
         self._sign_executor = sign_executor
@@ -715,6 +749,7 @@ class FoliaSealAppFrame:
                 viewer_workflow=viewer_workflow,
                 signing_workflow=signing_workflow,
                 certificate_catalog_store=self._certificate_catalog_store,
+                certificate_secret_provider=self._certificate_secret_provider,
                 preset_catalog_store=self._preset_catalog_store,
                 app_settings=self._app_settings,
                 app_settings_store=self._app_settings_store,
@@ -757,7 +792,8 @@ class FoliaSealAppFrame:
             bindings=self._bindings,
             parent=self.window,
             import_service=CertificateImportService(
-                store=self._certificate_catalog_store
+                store=self._certificate_catalog_store,
+                secret_store=self._certificate_secret_provider,
             ),
             on_import=self._refresh_shell_certificate_configurations,
         )
@@ -770,6 +806,7 @@ class FoliaSealAppFrame:
             bindings=self._bindings,
             parent=self.window,
             catalog_store=self._certificate_catalog_store,
+            secret_store=self._certificate_secret_provider,
             on_change=self._refresh_shell_certificate_configurations,
         )
         self._certificate_management_dialog = dialog
@@ -862,6 +899,7 @@ class QtAppFrameAdapter:
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         certificate_catalog_store: CertificateCatalogStore | None = None,
+        certificate_secret_provider: Any | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
@@ -873,6 +911,7 @@ class QtAppFrameAdapter:
             app_settings=app_settings,
             app_settings_store=app_settings_store,
             certificate_catalog_store=certificate_catalog_store,
+            certificate_secret_provider=certificate_secret_provider,
             preset_catalog_store=preset_catalog_store,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
@@ -897,6 +936,7 @@ class QtAppFrameAdapter:
             q_form_layout=getattr(qt_widgets, "QFormLayout"),
             q_label=getattr(qt_widgets, "QLabel"),
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
+            q_check_box=getattr(qt_widgets, "QCheckBox"),
             q_combo_box=getattr(qt_widgets, "QComboBox"),
             q_push_button=getattr(qt_widgets, "QPushButton"),
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
@@ -911,6 +951,7 @@ def build_qt_app_frame(
     app_settings: AppSettings | None = None,
     app_settings_store: AppSettingsStore | None = None,
     certificate_catalog_store: CertificateCatalogStore | None = None,
+    certificate_secret_provider: Any | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
@@ -924,6 +965,7 @@ def build_qt_app_frame(
         app_settings=app_settings,
         app_settings_store=app_settings_store,
         certificate_catalog_store=certificate_catalog_store,
+        certificate_secret_provider=certificate_secret_provider,
         preset_catalog_store=preset_catalog_store,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,

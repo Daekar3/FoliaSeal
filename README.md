@@ -211,6 +211,11 @@ want to exercise a production endpoint. Trust-anchor validation is tracked separ
 certificate CLI arguments are meant for local development/manual QA; avoid using a production
 identity in shell history if that is a concern in your environment.
 
+The Qt app can import PKCS#12 certificates into FoliaSeal-managed storage. On Linux desktops with
+libsecret's `secret-tool` available, the import dialog can save the certificate password in the
+desktop Secret Service; the certificate catalog stores only an opaque secret reference, not the
+password value.
+
 Typography note for harness/manual QA:
 
 - visible-signature preview, fit validation, and final signed output now share bundled OpenType font

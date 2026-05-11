@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 from cryptography.hazmat.primitives.serialization import pkcs12
@@ -26,6 +27,22 @@ class CertificateImportError(ValueError):
     """Raised when a PKCS#12 certificate cannot be imported."""
 
 
+class CertificateSecretStore(Protocol):
+    """Store saved certificate passwords outside ordinary configuration JSON."""
+
+    def is_available(self) -> bool:
+        """Return whether secure password storage is available."""
+
+    def secret_ref_for_configuration(self, configuration_id: str) -> str:
+        """Return the secret reference for a certificate configuration id."""
+
+    def set_secret(self, secret_ref: str, secret: str) -> None:
+        """Store a certificate password."""
+
+    def delete_secret(self, secret_ref: str) -> None:
+        """Delete a stored certificate password."""
+
+
 @dataclass(frozen=True)
 class CertificateImportResult:
     """Result of importing one managed certificate configuration."""
@@ -43,6 +60,7 @@ class CertificateImportService:
     store: CertificateCatalogStore
     id_factory: Callable[[], str] | None = None
     clock: Callable[[], datetime] | None = None
+    secret_store: CertificateSecretStore | None = None
 
     def import_pkcs12(
         self,
@@ -50,6 +68,7 @@ class CertificateImportService:
         source_path: str | Path,
         display_name: str,
         passphrase: str = "",
+        save_password: bool = False,
     ) -> CertificateImportResult:
         """Copy a PKCS#12 file into managed storage and create catalog records."""
         source = Path(source_path)
@@ -72,6 +91,17 @@ class CertificateImportService:
         key, certificate = self._load_pkcs12(source, passphrase)
         managed_certificate_id = self._new_id()
         configuration_id = self._new_id()
+        password_secret_ref: str | None = None
+        if save_password:
+            if self.secret_store is None or not self.secret_store.is_available():
+                raise ConfigValidationError(
+                    "Saved password storage is not available. Leave password saving "
+                    "disabled or configure secure storage."
+                )
+            password_secret_ref = self.secret_store.secret_ref_for_configuration(
+                configuration_id
+            )
+            self.secret_store.set_secret(password_secret_ref, passphrase)
         storage_filename = f"cert_{managed_certificate_id}.p12"
         managed_path = self.store.managed_certificate_dir / storage_filename
         created_at = self._now_iso()
@@ -90,8 +120,8 @@ class CertificateImportService:
             certificate_configuration_id=configuration_id,
             display_name=normalized_name,
             managed_certificate_id=managed_certificate_id,
-            save_password=False,
-            password_secret_ref=None,
+            save_password=save_password,
+            password_secret_ref=password_secret_ref,
             notes="Imported PKCS#12 certificate",
         )
 
@@ -106,6 +136,11 @@ class CertificateImportService:
         except Exception:
             if managed_path.exists():
                 managed_path.unlink()
+            if password_secret_ref is not None and self.secret_store is not None:
+                try:
+                    self.secret_store.delete_secret(password_secret_ref)
+                except Exception:
+                    pass
             raise
 
         return CertificateImportResult(

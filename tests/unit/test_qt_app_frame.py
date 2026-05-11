@@ -127,6 +127,18 @@ class _FakeLineEdit:
         return self._text
 
 
+class _FakeCheckBox:
+    def __init__(self, text="") -> None:
+        self.text = text
+        self._checked = False
+
+    def setChecked(self, checked):  # noqa: N802
+        self._checked = bool(checked)
+
+    def isChecked(self):  # noqa: N802
+        return self._checked
+
+
 class _FakeComboBox:
     def __init__(self) -> None:
         self.items = []
@@ -223,6 +235,29 @@ class _FakeShell:
         self.refresh_certificate_configurations_calls += 1
 
 
+class _FakeSecretStore:
+    def __init__(self, *, available: bool = True) -> None:
+        self.available = available
+        self.secrets: dict[str, str] = {}
+        self.deleted: list[str] = []
+
+    def is_available(self) -> bool:
+        return self.available
+
+    def secret_ref_for_configuration(self, configuration_id: str) -> str:
+        return f"secret://test/{configuration_id}"
+
+    def set_secret(self, secret_ref: str, secret: str) -> None:
+        self.secrets[secret_ref] = secret
+
+    def get_secret(self, secret_ref: str) -> str | None:
+        return self.secrets.get(secret_ref)
+
+    def delete_secret(self, secret_ref: str) -> None:
+        self.deleted.append(secret_ref)
+        self.secrets.pop(secret_ref, None)
+
+
 def _fake_bindings() -> QtAppFrameBindings:
     file_dialog = _FakeFileDialog()
     message_box = _FakeMessageBox()
@@ -235,6 +270,7 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_form_layout=_FakeFormLayout,
         q_label=_FakeLabel,
         q_line_edit=_FakeLineEdit,
+        q_check_box=_FakeCheckBox,
         q_combo_box=_FakeComboBox,
         q_push_button=_FakePushButton,
         q_file_dialog=file_dialog,
@@ -266,11 +302,13 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
     def shell_builder(**kwargs):
         shell_calls.append(kwargs)
         return shell
+    secret_store = _FakeSecretStore()
 
     frame = FoliaSealAppFrame(
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_secret_provider=secret_store,
         shell_builder=shell_builder,
         render_backend_factory=lambda: object(),
     )
@@ -296,6 +334,7 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
         tmp_path / "signed" / "contract-signed.pdf"
     )
     assert shell_calls[0]["app_settings"] == _settings(tmp_path)
+    assert shell_calls[0]["certificate_secret_provider"] is secret_store
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:
@@ -330,7 +369,8 @@ def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
 ) -> None:
     bindings = _fake_bindings()
     source = tmp_path / "alice.p12"
-    _write_test_pkcs12(source, passphrase="secret", common_name="Alice Example")
+    passphrase = "correct horse"
+    _write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
     certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
     shell = _FakeShell()
     frame = FoliaSealAppFrame(
@@ -347,7 +387,7 @@ def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
     dialog = frame.window.certificate_import_dialog
     dialog.controls.certificate_path.setText(str(source))
     dialog.controls.display_name.setText("Alice Signing")
-    dialog.controls.passphrase.setText("secret")
+    dialog.controls.passphrase.setText(passphrase)
     result = dialog.import_certificate()
 
     assert result is not None
@@ -365,6 +405,45 @@ def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
     assert configuration.password_secret_ref is None
     assert shell.refresh_certificate_configurations_calls == 1
     assert bindings.q_message_box.information_calls[-1][1] == "Certificate imported"
+
+
+def test_app_frame_certificate_import_dialog_saves_password_outside_catalog(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    source = tmp_path / "alice.p12"
+    passphrase = "correct horse"
+    _write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_import()
+    dialog = frame.window.certificate_import_dialog
+    dialog.controls.certificate_path.setText(str(source))
+    dialog.controls.display_name.setText("Alice Signing")
+    dialog.controls.passphrase.setText(passphrase)
+    dialog.controls.save_password.setChecked(True)
+    result = dialog.import_certificate()
+
+    assert result is not None
+    configuration = certificate_store.load_catalog().configuration_named(
+        "Alice Signing"
+    )
+    assert configuration.save_password is True
+    assert configuration.password_secret_ref == "secret://test/" + (
+        configuration.certificate_configuration_id
+    )
+    assert secret_store.secrets[configuration.password_secret_ref] == passphrase
+    assert passphrase not in certificate_store.catalog_path.read_text(encoding="utf-8")
 
 
 def test_app_frame_certificate_management_dialog_saves_and_refreshes_loaded_shell(
@@ -463,6 +542,104 @@ def test_app_frame_certificate_management_dialog_deletes_configuration_only(
         for configuration in catalog.certificate_configurations
     ) == ("cert-config-alt",)
     assert shell.refresh_certificate_configurations_calls == 1
+
+
+def test_app_frame_certificate_management_dialog_deletes_saved_password_first(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(
+                build_managed_certificate(),
+                build_managed_certificate(
+                    managed_certificate_id="managed-cert-alt",
+                    display_name="Alternate Signing Certificate",
+                    storage_filename="cert_alt.p12",
+                ),
+            ),
+            certificate_configurations=(
+                build_certificate_configuration(
+                    save_password=True,
+                    password_secret_ref="secret://test/cert-config-default",
+                ),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-alt",
+                    display_name="Alternate Signing",
+                    managed_certificate_id="managed-cert-alt",
+                ),
+            )
+        )
+    )
+    secret_store = _FakeSecretStore()
+    secret_store.secrets["secret://test/cert-config-default"] = "secret"
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_configuration()
+
+    catalog = certificate_store.load_catalog()
+    assert deleted is True
+    assert secret_store.deleted == ["secret://test/cert-config-default"]
+    assert "secret://test/cert-config-default" not in secret_store.secrets
+    assert tuple(
+        configuration.certificate_configuration_id
+        for configuration in catalog.certificate_configurations
+    ) == ("cert-config-alt",)
+    assert shell.refresh_certificate_configurations_calls == 1
+
+
+def test_app_frame_certificate_management_dialog_keeps_config_if_secret_unavailable(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            certificate_configurations=(
+                build_certificate_configuration(
+                    save_password=True,
+                    password_secret_ref="secret://test/cert-config-default",
+                ),
+            )
+        )
+    )
+    secret_store = _FakeSecretStore(available=False)
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_configuration()
+
+    assert deleted is False
+    assert certificate_store.load_catalog().configuration_by_id("cert-config-default")
+    assert secret_store.deleted == []
+    assert bindings.q_message_box.warning_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration error",
+        "Saved password storage is not available. "
+        "The certificate configuration was not deleted.",
+    )
 
 
 def test_app_frame_certificate_management_dialog_blocks_referenced_certificate_delete(
