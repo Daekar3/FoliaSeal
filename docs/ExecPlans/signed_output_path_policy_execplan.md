@@ -25,7 +25,8 @@ In this plan, "path policy" means the rule for turning an input PDF path, defaul
 - [x] (2026-05-13T11:02Z) Migrated the Qt app frame and signing shell to use the helper.
 - [x] (2026-05-13T11:03Z) Updated architecture documentation to describe the shared path policy and reduced Qt ownership.
 - [x] (2026-05-13T11:07Z) Ran full validation successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-13T11:11Z) Committed the implementation slice as `dbb2c48 Add signed output path policy slice`.
+- [x] (2026-05-13T11:11Z) Addressed compliance-review follow-up by closing this ExecPlan and updating stale orientation language.
 
 ## Surprises & Discoveries
 
@@ -44,6 +45,9 @@ In this plan, "path policy" means the rule for turning an input PDF path, defaul
 - Observation: Full validation passed.
   Evidence: `.venv/bin/python -m ruff check .` reported all checks passed. `.venv/bin/python -m pytest -q` reported 646 passed, 23 skipped, 1 warning in 241.68s.
 
+- Observation: Compliance review found no code-level issue and only stale ExecPlan closure language.
+  Evidence: One reviewer reported the slice clean. The other reported that this ExecPlan still marked the slice incomplete and described the old path computation as current.
+
 ## Decision Log
 
 - Decision: Extract a small function rather than a service class.
@@ -60,17 +64,17 @@ In this plan, "path policy" means the rule for turning an input PDF path, defaul
 
 ## Outcomes & Retrospective
 
-This slice is in progress. It will be complete when both Qt callers use a shared application helper, the helper has direct tests for the default and fallback cases, architecture docs are updated, and focused plus full validation pass.
+This slice is complete. Both Qt callers use the shared `suggest_signed_output_path()` application helper, direct helper tests cover default, existing-filename, and fallback cases, architecture docs describe the ownership split, and focused plus full validation passed.
 
 ## Context and Orientation
 
-The repository root is `/home/daekar/FoliaSeal`. The Qt app frame lives in `src/foliaseal/presentation/qt/app_frame.py`. It owns the top-level File/Open menu. When a PDF is opened, `FoliaSealAppFrame.open_pdf_path()` creates a `ViewerWorkflow` and a `SigningDraftWorkflow`. The draft's `output_pdf_path` is currently seeded by combining `AppSettings.default_output_directory` with the input PDF stem plus `-signed.pdf`.
+The repository root is `/home/daekar/FoliaSeal`. The Qt app frame lives in `src/foliaseal/presentation/qt/app_frame.py`. It owns the top-level File/Open menu. When a PDF is opened, `FoliaSealAppFrame.open_pdf_path()` creates a `ViewerWorkflow` and a `SigningDraftWorkflow`. The draft's `output_pdf_path` is seeded by calling `suggest_signed_output_path()` with `AppSettings.default_output_directory` and the opened PDF path.
 
 The Qt signing shell lives in `src/foliaseal/presentation/qt/signing_shell.py`. Its `SigningWorkspaceWidget.choose_output_pdf_path()` opens the "Save signed PDF" dialog. That method calls `_default_output_dialog_path()`, which starts the dialog in the configured default output directory. If the draft already has an output filename, the shell reuses that filename; otherwise it derives a filename from the input PDF stem and falls back to `signed-signed.pdf` when no stem exists.
 
-The application package lives in `src/foliaseal/application/`. This package already owns workflow helpers such as `SigningDraftWorkflow`, preview rendering, certificate lifecycle coordination, and viewer workflow. This slice should add a new helper module, likely `src/foliaseal/application/output_path_policy.py`, with a pure function named `suggest_signed_output_path()`.
+The application package lives in `src/foliaseal/application/`. This package already owns workflow helpers such as `SigningDraftWorkflow`, preview rendering, certificate lifecycle coordination, and viewer workflow. This slice added `src/foliaseal/application/output_path_policy.py`, with a pure function named `suggest_signed_output_path()`.
 
-The existing tests are in `tests/unit/test_qt_app_frame.py` and `tests/unit/test_qt_signing_shell.py`. This slice should add direct tests for the new helper, likely in `tests/unit/test_output_path_policy.py`, while keeping Qt tests focused on whether their dialogs and draft wiring still use the same suggested path.
+The existing Qt tests are in `tests/unit/test_qt_app_frame.py` and `tests/unit/test_qt_signing_shell.py`. This slice added direct tests for the helper in `tests/unit/test_output_path_policy.py`, while keeping Qt tests focused on whether their dialogs and draft wiring still use the same suggested path.
 
 ## Plan of Work
 
