@@ -27,7 +27,7 @@ In this plan, "completion surface" means the small area below the signing contro
 - [x] (2026-05-13T11:23Z) Wired the app frame to pass `open_pdf_path` as the shell reopen callback.
 - [x] (2026-05-13T11:23Z) Updated architecture documentation for the completion surface and reopen flow.
 - [x] (2026-05-13T11:28Z) Ran focused and full validation successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-13T11:28Z) Committed the completed slice as `05ddd24 Add post-sign completion surface`.
 
 ## Surprises & Discoveries
 
@@ -62,7 +62,7 @@ In this plan, "completion surface" means the small area below the signing contro
 
 ## Outcomes & Retrospective
 
-This slice is in progress. It will be complete when successful signing displays a multi-line completion summary, an `Open signed PDF` action is available only after a successful sign, clicking that action calls the injected reopen callback with the signed output path, architecture docs describe the flow, and focused plus full validation pass.
+This slice is complete. Successful signing displays a multi-line completion summary, an `Open signed PDF` action is available after a successful sign when a reopen callback is present, clicking that action calls the injected reopen callback with the signed output path, architecture docs describe the flow, and focused plus full validation passed before commit.
 
 ## Context and Orientation
 
@@ -119,7 +119,7 @@ The changes are additive and behavior-preserving for the backend. If the UI wiri
 
 ## Artifacts and Notes
 
-No generated artifacts are expected. The important evidence will be focused test output, full validation output, and the final commit hash.
+No generated artifacts were expected or produced. The important evidence is the focused test output, full validation output, and commit `05ddd24 Add post-sign completion surface`.
 
 ## Interfaces and Dependencies
 
@@ -138,3 +138,5 @@ Update the Qt shell construction path to accept:
 This callback should be passed from `FoliaSealAppFrame.open_pdf_path()` to `build_qt_signing_shell()` as `self.open_pdf_path`.
 
 Revision note: Created 2026-05-13 by Codex after the functional-sprint recommendation to advance the SPEC.md V1 signing completion, reopen, and verification requirements.
+
+Revision note: Updated 2026-05-13 by Codex after committing the completed slice and correcting the plan's completion state during compliance review.
