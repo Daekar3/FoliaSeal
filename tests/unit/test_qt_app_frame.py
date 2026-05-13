@@ -236,8 +236,14 @@ class _FakeShell:
 
 
 class _FakeSecretStore:
-    def __init__(self, *, available: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        available: bool = True,
+        fail_set: bool = False,
+    ) -> None:
         self.available = available
+        self.fail_set = fail_set
         self.secrets: dict[str, str] = {}
         self.deleted: list[str] = []
 
@@ -248,6 +254,8 @@ class _FakeSecretStore:
         return f"secret://test/{configuration_id}"
 
     def set_secret(self, secret_ref: str, secret: str) -> None:
+        if self.fail_set:
+            raise OSError("secure storage restore failed")
         self.secrets[secret_ref] = secret
 
     def get_secret(self, secret_ref: str) -> str | None:
@@ -688,6 +696,92 @@ def test_app_frame_certificate_management_dialog_restores_secret_if_delete_persi
         "Certificate configuration error",
         "disk full",
     )
+
+
+def test_app_frame_certificate_management_dialog_reports_secret_restore_failure(
+    tmp_path: Path,
+) -> None:
+    class _FailingDeleteStore(CertificateCatalogStore):
+        def delete_configuration_by_id(self, configuration_id: str):
+            raise OSError("disk full")
+
+    bindings = _fake_bindings()
+    certificate_store = _FailingDeleteStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            certificate_configurations=(
+                build_certificate_configuration(
+                    save_password=True,
+                    password_secret_ref="secret://test/cert-config-default",
+                ),
+            )
+        )
+    )
+    secret_store = _FakeSecretStore(fail_set=True)
+    secret_store.secrets["secret://test/cert-config-default"] = "secret"
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_configuration()
+
+    assert deleted is False
+    assert certificate_store.load_catalog().configuration_by_id("cert-config-default")
+    assert secret_store.deleted == ["secret://test/cert-config-default"]
+    assert "secret://test/cert-config-default" not in secret_store.secrets
+    assert shell.refresh_certificate_configurations_calls == 0
+    assert bindings.q_message_box.warning_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration error",
+        "disk full The saved password could not be restored: "
+        "secure storage restore failed",
+    )
+
+
+def test_app_frame_certificate_management_dialog_deletes_config_if_secret_already_missing(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            certificate_configurations=(
+                build_certificate_configuration(
+                    save_password=True,
+                    password_secret_ref="secret://test/cert-config-default",
+                ),
+            )
+        )
+    )
+    secret_store = _FakeSecretStore()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_configuration()
+
+    assert deleted is True
+    assert secret_store.deleted == ["secret://test/cert-config-default"]
+    assert certificate_store.load_catalog().certificate_configurations == ()
+    assert shell.refresh_certificate_configurations_calls == 0
 
 
 def test_app_frame_certificate_management_dialog_blocks_referenced_certificate_delete(

@@ -23,7 +23,12 @@ This is a narrow compliance fix. It does not add new password-management UI, cro
 - [x] (2026-05-13T01:04Z) Updated the implementation so those regression tests pass while preserving existing saved-password behavior.
 - [x] (2026-05-13T01:05Z) Focused validation passed: `.venv/bin/python -m pytest -q tests/unit/test_secret_storage.py tests/unit/test_signing_material_resolver.py tests/unit/test_certificate_import.py tests/unit/test_qt_app_frame.py` (`40 passed in 6.09s`).
 - [x] (2026-05-13T01:14Z) Full validation passed: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`623 passed, 23 skipped, 1 warning in 218.20s`).
-- [ ] Commit the compliance follow-up.
+- [x] (2026-05-13T01:16Z) Committed the compliance follow-up as `e88ae16 Harden saved certificate password handling`.
+- [x] (2026-05-13T01:27Z) Re-review found three follow-up issues: import cleanup failures were explicit only by the original exception, delete restore failures were swallowed, and configurations with already-missing saved secrets became undeletable.
+- [x] (2026-05-13T01:30Z) Added regression tests and implementation changes for those re-review findings.
+- [x] (2026-05-13T01:31Z) Focused validation passed after the re-review fixes: `.venv/bin/python -m pytest -q tests/unit/test_secret_storage.py tests/unit/test_signing_material_resolver.py tests/unit/test_certificate_import.py tests/unit/test_qt_app_frame.py` (`43 passed in 5.49s`).
+- [x] (2026-05-13T01:42Z) Full validation passed after the re-review fixes: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`626 passed, 23 skipped, 1 warning in 220.95s`).
+- [ ] Commit the re-review compliance fixes.
 
 ## Surprises & Discoveries
 
@@ -32,6 +37,12 @@ This is a narrow compliance fix. It does not add new password-management UI, cro
 
 - Observation: One reviewer also found that `SecretToolCertificateSecretStore.get_secret()` treated every nonzero `secret-tool lookup` exit as a missing secret.
   Evidence: `src/foliaseal/infra/secret_storage.py` returned `None` for any lookup return code other than zero, so backend or Secret Service failures were indistinguishable from a legitimate missing secret.
+
+- Observation: Re-review found that rollback operations can fail because the same secure storage dependency being cleaned up may be unavailable or read-only.
+  Evidence: Import cleanup calls `delete_secret()` after a post-secret-write failure, and delete rollback calls `set_secret()` after a catalog persistence failure. The updated behavior reports those cleanup failures explicitly instead of silently treating rollback as successful.
+
+- Observation: A saved-password configuration may point at a secret that has already been removed outside FoliaSeal.
+  Evidence: The Secret Service adapter treats missing secrets as idempotent for deletion, so the app-frame delete path now allows deleting that stale configuration instead of blocking it.
 
 ## Decision Log
 
@@ -43,9 +54,17 @@ This is a narrow compliance fix. It does not add new password-management UI, cro
   Rationale: The adapter already treats `secret-tool clear` code `1` as an idempotent missing-secret result. Lookup should keep missing secrets distinct from operational failures so the resolver and GUI can show the correct kind of action.
   Date/Author: 2026-05-13 / Codex
 
+- Decision: Surface rollback-operation failures instead of swallowing them.
+  Rationale: If the secure store cannot delete a newly written secret after import failure or cannot restore a deleted secret after catalog persistence failure, the program cannot truthfully claim full recovery. The next-best compliant behavior is to make that state visible immediately so the user can repair secure storage or remove the saved secret manually.
+  Date/Author: 2026-05-13 / Codex
+
+- Decision: Allow deletion of a configuration whose saved secret is already missing.
+  Rationale: A missing secret means the configuration is already stale. Blocking deletion traps the user in the broken state; treating missing secret deletion as idempotent matches the `secret-tool clear` adapter behavior.
+  Date/Author: 2026-05-13 / Codex
+
 ## Outcomes & Retrospective
 
-This follow-up is in progress. Focused tests cover the reviewed failure paths, Ruff passes, and the full unit suite passes. It will be complete when the compliance follow-up is committed.
+This follow-up remains open after re-review. The first compliance follow-up was committed as `e88ae16 Harden saved certificate password handling`; re-review then found additional edge cases around rollback failure reporting and already-missing saved secrets. Focused tests, Ruff, and the full unit suite now pass for those edge cases. The remaining work is to commit the re-review fixes and complete a final compliance re-review.
 
 ## Context and Orientation
 
@@ -59,7 +78,7 @@ The certificate-management UI lives in `src/foliaseal/presentation/qt/app_frame.
 
 First, add regression coverage in `tests/unit/test_certificate_import.py` proving that if `CertificateImportService.import_pkcs12()` writes a secret and then fails while preparing the certificate storage directories, it deletes the just-written secret and does not leave a managed PKCS#12 file.
 
-Second, add regression coverage in `tests/unit/test_qt_app_frame.py` proving that if configuration deletion removes the saved secret and then catalog persistence fails, the dialog restores the saved secret, leaves the configuration in place, reports the persistence error, and does not emit a certificate-catalog change notification.
+Second, add regression coverage in `tests/unit/test_qt_app_frame.py` proving that if configuration deletion removes the saved secret and then catalog persistence fails, the dialog restores the saved secret, leaves the configuration in place, reports the persistence error, and does not emit a certificate-catalog change notification. Also cover the two re-review edge cases: if restore itself fails, the dialog reports the restore failure explicitly, and if the saved secret is already missing before deletion, deletion still removes the stale configuration.
 
 Third, add regression coverage in `tests/unit/test_secret_storage.py` and `tests/unit/test_signing_material_resolver.py` proving that `secret-tool lookup` return code `1` still means "missing secret", while another nonzero return code raises `SecretStorageError` and is converted by the resolver into `SigningMaterialResolutionError`.
 
@@ -82,13 +101,13 @@ Before committing, run:
 
 ## Validation and Acceptance
 
-This follow-up is accepted when the new tests demonstrate that import cleans up a saved secret after directory-preparation failure, configuration deletion restores a saved secret after catalog persistence failure, lookup return code `1` remains a missing secret, and other lookup failures become storage-resolution failures. Existing happy-path saved-password import, signing, and deletion tests must continue to pass.
+This follow-up is accepted when the new tests demonstrate that import cleans up a saved secret after directory-preparation failure, import reports secure-storage cleanup failure if cleanup itself fails, configuration deletion restores a saved secret after catalog persistence failure, configuration deletion reports restore failure if restore itself fails, stale configurations whose saved secret is already missing remain deletable, lookup return code `1` remains a missing secret, and other lookup failures become storage-resolution failures. Existing happy-path saved-password import, signing, and deletion tests must continue to pass.
 
 No generated harness artifacts are expected.
 
 ## Idempotence and Recovery
 
-The changes are additive and testable. The import cleanup path may be retried safely because it removes the copied managed file and saved secret before re-raising the original failure. The delete rollback path may also be retried safely because it restores the secret value if the catalog entry remains due to persistence failure.
+The changes are additive and testable. The import cleanup path may be retried safely when secure storage cleanup succeeds because it removes the copied managed file and saved secret before re-raising the original failure. If secure storage cleanup fails, the import reports that failure explicitly so the user can remove the saved secret before retrying. The delete rollback path may be retried safely when restore succeeds because it restores the secret value if the catalog entry remains due to persistence failure. If restore fails, the dialog reports that failure explicitly so the user knows the saved-password configuration remains but its secret could not be restored.
 
 Do not edit `docs/SPEC.md` or `docs/SCHEMAS.md` without explicit user approval.
 
@@ -101,3 +120,9 @@ Revision note: Created 2026-05-13 by Codex to address compliance-review findings
 Revision note: Updated 2026-05-13 by Codex after adding rollback and lookup-failure regression tests and passing focused validation.
 
 Revision note: Updated 2026-05-13 by Codex after Ruff and full unit validation passed.
+
+Revision note: Updated 2026-05-13 by Codex after committing the compliance follow-up.
+
+Revision note: Updated 2026-05-13 by Codex after compliance re-review found rollback failure-reporting gaps and an already-missing saved-secret deletion edge case.
+
+Revision note: Updated 2026-05-13 by Codex after Ruff and full unit validation passed for the re-review fixes.

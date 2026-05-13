@@ -451,12 +451,6 @@ class CertificateConfigurationManagementDialog:
                 saved_secret = self._secret_store.get_secret(
                     configuration.password_secret_ref
                 )
-                if saved_secret is None:
-                    self._show_error(
-                        "The saved certificate password could not be found. "
-                        "The certificate configuration was not deleted."
-                    )
-                    return False
                 self._secret_store.delete_secret(configuration.password_secret_ref)
             except (SecretStorageError, OSError, ValueError) as exc:
                 self._show_error(str(exc))
@@ -474,8 +468,13 @@ class CertificateConfigurationManagementDialog:
                         configuration.password_secret_ref,
                         saved_secret,
                     )
-                except (SecretStorageError, OSError, ValueError):
-                    pass
+                except (SecretStorageError, OSError, ValueError) as restore_exc:
+                    self._show_error(
+                        f"{exc} The saved password could not be restored: "
+                        f"{restore_exc}"
+                    )
+                    self.reload_configurations()
+                    return False
             self._show_error(str(exc))
             self.reload_configurations()
             return False

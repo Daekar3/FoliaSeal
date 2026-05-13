@@ -63,8 +63,14 @@ def _write_test_pkcs12(
 
 
 class _FakeSecretStore:
-    def __init__(self, *, available: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        available: bool = True,
+        fail_delete: bool = False,
+    ) -> None:
         self.available = available
+        self.fail_delete = fail_delete
         self.secrets: dict[str, str] = {}
         self.deleted: list[str] = []
 
@@ -78,6 +84,8 @@ class _FakeSecretStore:
         self.secrets[secret_ref] = secret
 
     def delete_secret(self, secret_ref: str) -> None:
+        if self.fail_delete:
+            raise OSError("secure storage cleanup failed")
         self.deleted.append(secret_ref)
         self.secrets.pop(secret_ref, None)
 
@@ -227,6 +235,29 @@ def test_certificate_import_removes_saved_password_when_storage_dir_creation_fai
 
     assert secret_store.deleted == ["secret://test/cert-config-imported"]
     assert secret_store.secrets == {}
+
+
+def test_certificate_import_reports_saved_password_cleanup_failure(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.p12"
+    _write_test_pkcs12(source, passphrase="secret")
+    blocked_storage_dir = tmp_path / "Certificates"
+    blocked_storage_dir.write_text("not a directory", encoding="utf-8")
+    store = CertificateCatalogStore(storage_dir=blocked_storage_dir)
+    secret_store = _FakeSecretStore(fail_delete=True)
+
+    with pytest.raises(CertificateImportError, match="could not be removed"):
+        _service(store, secret_store=secret_store).import_pkcs12(
+            source_path=source,
+            display_name="Alice Signing",
+            passphrase="secret",
+            save_password=True,
+        )
+
+    assert secret_store.secrets == {
+        "secret://test/cert-config-imported": "secret",
+    }
 
 
 def test_certificate_import_rejects_wrong_password_without_copying(

@@ -144,8 +144,12 @@ class CertificateImportService:
             if password_secret_ref is not None and self.secret_store is not None:
                 try:
                     self.secret_store.delete_secret(password_secret_ref)
-                except Exception:
-                    pass
+                except Exception as cleanup_exc:
+                    raise CertificateImportError(
+                        "Certificate import failed after saving the password, and "
+                        "the saved password could not be removed from secure storage. "
+                        "Delete the saved password from secure storage before retrying."
+                    ) from cleanup_exc
             raise
 
         return CertificateImportResult(
