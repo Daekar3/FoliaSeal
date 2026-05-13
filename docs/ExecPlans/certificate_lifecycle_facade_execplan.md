@@ -24,14 +24,16 @@ This slice introduces one deeper application boundary, `CertificateLifecycleServ
 - [x] (2026-05-13T10:44Z) Migrated `src/foliaseal/presentation/qt/app_frame.py` certificate dialogs and app-frame wiring to use the lifecycle facade.
 - [x] (2026-05-13T10:44Z) Updated architecture documentation to describe the lifecycle facade and reduced app-frame ownership.
 - [x] (2026-05-13T10:48Z) Ran focused and full validation successfully.
-- [ ] Commit the completed slice.
+- [x] (2026-05-13T10:54Z) Committed the initial slice as `793b395 Add certificate lifecycle facade`.
+- [x] (2026-05-13T10:54Z) Addressed compliance-review follow-up by closing plan wording, updating the remaining architecture debt reference, and removing duplicate saved-secret rollback coverage from Qt widget tests.
+- [x] (2026-05-13T10:54Z) Re-ran follow-up validation successfully.
 
 ## Surprises & Discoveries
 
 - Observation: The create and import services already share most of the same policy shape.
   Evidence: Both `CertificateCreationService.create_self_signed_certificate()` and `CertificateImportService.import_pkcs12()` normalize display names, reject duplicates, create managed certificate/configuration records, optionally save a password secret, write a managed file, save the catalog, and perform rollback cleanup.
 
-- Observation: Configuration deletion policy is currently in the Qt management dialog.
+- Observation: Configuration deletion policy was in the Qt management dialog before this slice.
   Evidence: `CertificateConfigurationManagementDialog.delete_selected_configuration()` reads and deletes saved secrets, restores a secret if catalog deletion fails, emits errors, and only then refreshes the shell.
 
 - Observation: Focused lifecycle and app-frame tests passed after moving the certificate policy boundary.
@@ -39,6 +41,12 @@ This slice introduces one deeper application boundary, `CertificateLifecycleServ
 
 - Observation: Full validation passed.
   Evidence: `.venv/bin/python -m ruff check .` reported all checks passed. `.venv/bin/python -m pytest -q` reported 648 passed, 23 skipped, 1 warning in 231.27s.
+
+- Observation: Compliance review found only documentation/test-scope drift after the initial implementation commit.
+  Evidence: One reviewer found the ExecPlan still read as in-progress; the other found one remaining architecture debt line that still attributed saved-password cleanup to the app frame and noted duplicate Qt widget coverage for saved-secret rollback already covered by lifecycle tests.
+
+- Observation: Follow-up validation passed after addressing compliance-review drift.
+  Evidence: `.venv/bin/python -m ruff check .` reported all checks passed. `.venv/bin/python -m pytest -q tests/unit/test_certificate_lifecycle.py tests/unit/test_qt_app_frame.py` reported 29 passed.
 
 ## Decision Log
 
@@ -56,7 +64,7 @@ This slice introduces one deeper application boundary, `CertificateLifecycleServ
 
 ## Outcomes & Retrospective
 
-This slice is in progress. It will be complete when certificate operations are available through one application-layer facade, Qt dialogs call that facade rather than owning persistence policy directly, focused boundary tests pass, architecture docs are updated, and the full suite passes.
+This slice is complete. Certificate operations are available through `CertificateLifecycleService`, Qt dialogs call that facade rather than owning persistence policy directly, focused lifecycle boundary tests cover saved-secret cleanup/restore behavior, architecture docs describe the new ownership, and focused plus full validation passed.
 
 ## Context and Orientation
 
@@ -68,7 +76,7 @@ The existing import service lives in `src/foliaseal/application/certificate_impo
 
 The catalog store lives in `src/foliaseal/infra/config/certificate_storage.py`. It loads and saves the catalog, deletes configurations, deletes unreferenced managed certificate files, and exports managed certificate files to user-selected destinations. It now removes `certificates.json.tmp` if atomic replace fails.
 
-The Qt app frame lives in `src/foliaseal/presentation/qt/app_frame.py`. It currently builds certificate create/import/manage dialogs, constructs creation/import services directly, calls catalog-store methods directly for rename/delete/export, performs saved-secret cleanup/restore for configuration deletion, and refreshes the signing shell after successful catalog changes.
+The Qt app frame lives in `src/foliaseal/presentation/qt/app_frame.py`. Before this slice, it built certificate create/import/manage dialogs, constructed creation/import services directly, called catalog-store methods directly for rename/delete/export, performed saved-secret cleanup/restore for configuration deletion, and refreshed the signing shell after successful catalog changes. After this slice, it delegates certificate lifecycle operations to `CertificateLifecycleService` and only handles dialog state, messages, and shell refresh reaction.
 
 ## Plan of Work
 
