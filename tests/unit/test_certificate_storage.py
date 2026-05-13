@@ -67,6 +67,27 @@ def test_certificate_catalog_store_saves_human_readable_json_without_password(
     assert reloaded == original
 
 
+def test_certificate_catalog_store_removes_temp_file_when_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    original_replace = Path.replace
+
+    def fail_catalog_replace(path: Path, target: Path) -> Path:
+        if path.name == "certificates.json.tmp":
+            raise OSError("replace failed")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", fail_catalog_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        store.save_catalog(build_certificate_catalog())
+
+    assert not store.catalog_path.exists()
+    assert not store.catalog_path.with_name("certificates.json.tmp").exists()
+
+
 def test_certificate_catalog_store_upserts_and_deletes_configurations(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
     store.save_catalog(

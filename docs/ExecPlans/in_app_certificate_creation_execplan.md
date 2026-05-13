@@ -33,7 +33,12 @@ This is a first in-app creation slice, not a general certificate-authoring produ
 - [x] (2026-05-13T01:58Z) Updated rollback cleanup to attempt file and secret cleanup independently and added regression coverage for cleanup failure and whitespace-only passwords.
 - [x] (2026-05-13T01:59Z) Focused validation passed for the compliance follow-up: `.venv/bin/python -m pytest -q tests/unit/test_certificate_creation.py tests/unit/test_qt_app_frame.py tests/unit/test_certificate_storage.py` (`49 passed in 3.21s`).
 - [x] (2026-05-13T02:03Z) Full validation passed for the compliance follow-up: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`637 passed, 23 skipped, 1 warning in 195.31s`).
-- [ ] Commit the compliance follow-up.
+- [x] (2026-05-13T02:04Z) Committed the compliance follow-up as `3630924 Fix certificate creation rollback cleanup`.
+- [x] (2026-05-13T02:07Z) Compliance re-review found that failed catalog atomic replace could leave `certificates.json.tmp` behind.
+- [x] (2026-05-13T02:08Z) Updated `CertificateCatalogStore.save_catalog()` to remove the temp file if the replace fails and added regression coverage.
+- [x] (2026-05-13T02:09Z) Focused validation passed for the catalog temp-file follow-up: `.venv/bin/python -m pytest -q tests/unit/test_certificate_creation.py tests/unit/test_qt_app_frame.py tests/unit/test_certificate_storage.py` (`50 passed in 3.45s`).
+- [x] (2026-05-13T02:12Z) Full validation passed for the catalog temp-file follow-up: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`638 passed, 23 skipped, 1 warning in 151.46s`).
+- [ ] Commit the catalog temp-file follow-up.
 
 ## Surprises & Discoveries
 
@@ -48,6 +53,9 @@ This is a first in-app creation slice, not a general certificate-authoring produ
 
 - Observation: Rollback cleanup must not be ordered so one cleanup failure prevents another cleanup attempt.
   Evidence: The first compliance review found `managed_path.unlink()` ran before `delete_secret()`, so a file cleanup failure could skip saved-secret cleanup entirely.
+
+- Observation: The certificate catalog store can leave a temp file if its atomic replace fails.
+  Evidence: Compliance re-review forced `Path.replace()` to fail and observed `certificates.json.tmp` remaining in the certificate storage directory.
 
 ## Decision Log
 
@@ -67,9 +75,13 @@ This is a first in-app creation slice, not a general certificate-authoring produ
   Rationale: A local file cleanup failure and a secure-store cleanup failure are independent. Attempting both gives the app the best chance of leaving no orphaned state, and an explicit combined error is more accurate than silently losing one cleanup attempt.
   Date/Author: 2026-05-13 / Codex
 
+- Decision: Clean failed certificate catalog temp files at the catalog store boundary.
+  Rationale: `CertificateCatalogStore.save_catalog()` owns the `certificates.json.tmp` write-and-replace protocol. Removing failed temp files there fixes creation rollback and prevents the same artifact from affecting import, delete, and future catalog writes.
+  Date/Author: 2026-05-13 / Codex
+
 ## Outcomes & Retrospective
 
-This slice is in compliance follow-up after the first implementation commit `fa98f0b Add in-app certificate creation flow`. The service and Qt app-frame flow are implemented, docs describe the new state, focused tests pass, and full validation passes. Compliance review identified a rollback cleanup ordering issue and a whitespace-password validation gap; those fixes are implemented locally and validation passes. The remaining work is to commit the follow-up and re-review compliance.
+This slice is in a second compliance follow-up after the first implementation commit `fa98f0b Add in-app certificate creation flow`. The service and Qt app-frame flow are implemented, docs describe the new state, focused tests pass, and full validation passes. Compliance review identified a rollback cleanup ordering issue and a whitespace-password validation gap; those fixes are committed as `3630924 Fix certificate creation rollback cleanup`. Re-review then identified a catalog temp-file artifact if atomic replace fails; that fix is implemented locally and validation passes. The remaining work is to commit and re-review the catalog temp-file follow-up.
 
 ## Context and Orientation
 
@@ -128,7 +140,7 @@ No generated harness artifacts are expected.
 
 ## Idempotence and Recovery
 
-Creation with a unique display name is repeatable and produces a new managed certificate id and configuration id each time. Duplicate display names should fail before writing files or secrets. If any step fails after writing the managed PKCS#12 file, attempt to delete that file before re-raising. If any step fails after saving a password secret, attempt to delete the secret before re-raising. File cleanup and secret cleanup must both be attempted even if one cleanup operation fails. If any cleanup operation fails, report that rollback cleanup was incomplete and include the failed cleanup operation in the error.
+Creation with a unique display name is repeatable and produces a new managed certificate id and configuration id each time. Duplicate display names should fail before writing files or secrets. If any step fails after writing the managed PKCS#12 file, attempt to delete that file before re-raising. If any step fails after saving a password secret, attempt to delete the secret before re-raising. File cleanup and secret cleanup must both be attempted even if one cleanup operation fails. If any cleanup operation fails, report that rollback cleanup was incomplete and include the failed cleanup operation in the error. If the catalog store writes `certificates.json.tmp` and cannot replace the real catalog, it must remove that temp file before re-raising.
 
 The app should leave existing certificates and configurations untouched on failure. The new service should use temporary local variables and only persist the updated catalog after both the file and optional secret have been prepared.
 
@@ -149,3 +161,9 @@ Revision note: Updated 2026-05-13 by Codex after committing the completed implem
 Revision note: Updated 2026-05-13 by Codex after compliance review found rollback cleanup ordering and whitespace-password validation gaps.
 
 Revision note: Updated 2026-05-13 by Codex after focused and full validation passed for the compliance follow-up.
+
+Revision note: Updated 2026-05-13 by Codex after committing the compliance follow-up.
+
+Revision note: Updated 2026-05-13 by Codex after compliance re-review found a stale catalog temp-file artifact on atomic replace failure.
+
+Revision note: Updated 2026-05-13 by Codex after focused and full validation passed for the catalog temp-file follow-up.

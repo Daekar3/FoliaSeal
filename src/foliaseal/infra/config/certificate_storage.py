@@ -88,8 +88,13 @@ class CertificateCatalogStore:
         self.managed_certificate_dir.mkdir(parents=True, exist_ok=True)
         payload_text = json.dumps(catalog.to_dict(), indent=2, sort_keys=True)
         temp_path = self.catalog_path.with_name(f"{self.catalog_path.name}.tmp")
-        temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
-        temp_path.replace(self.catalog_path)
+        try:
+            temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
+            temp_path.replace(self.catalog_path)
+        except Exception:
+            if temp_path.exists():
+                temp_path.unlink()
+            raise
 
     def save_managed_certificate(self, certificate: ManagedCertificate) -> CertificateCatalog:
         """Upsert a managed certificate record and persist the resulting catalog."""
