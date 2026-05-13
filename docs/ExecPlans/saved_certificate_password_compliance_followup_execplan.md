@@ -28,7 +28,8 @@ This is a narrow compliance fix. It does not add new password-management UI, cro
 - [x] (2026-05-13T01:30Z) Added regression tests and implementation changes for those re-review findings.
 - [x] (2026-05-13T01:31Z) Focused validation passed after the re-review fixes: `.venv/bin/python -m pytest -q tests/unit/test_secret_storage.py tests/unit/test_signing_material_resolver.py tests/unit/test_certificate_import.py tests/unit/test_qt_app_frame.py` (`43 passed in 5.49s`).
 - [x] (2026-05-13T01:42Z) Full validation passed after the re-review fixes: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`626 passed, 23 skipped, 1 warning in 220.95s`).
-- [ ] Commit the re-review compliance fixes.
+- [x] (2026-05-13T01:45Z) Committed the re-review compliance fixes as `e78b6ed Handle saved certificate rollback edge cases`.
+- [x] (2026-05-13T01:46Z) Final compliance re-review passed with two independent reviewers reporting no code or documentation findings.
 
 ## Surprises & Discoveries
 
@@ -64,7 +65,7 @@ This is a narrow compliance fix. It does not add new password-management UI, cro
 
 ## Outcomes & Retrospective
 
-This follow-up remains open after re-review. The first compliance follow-up was committed as `e88ae16 Harden saved certificate password handling`; re-review then found additional edge cases around rollback failure reporting and already-missing saved secrets. Focused tests, Ruff, and the full unit suite now pass for those edge cases. The remaining work is to commit the re-review fixes and complete a final compliance re-review.
+This follow-up is complete. The first compliance follow-up was committed as `e88ae16 Harden saved certificate password handling`; re-review then found additional edge cases around rollback failure reporting and already-missing saved secrets. The re-review compliance fixes are committed as `e78b6ed Handle saved certificate rollback edge cases`. Final compliance re-review passed with two independent reviewers reporting no remaining code or documentation findings.
 
 ## Context and Orientation
 
@@ -126,3 +127,7 @@ Revision note: Updated 2026-05-13 by Codex after committing the compliance follo
 Revision note: Updated 2026-05-13 by Codex after compliance re-review found rollback failure-reporting gaps and an already-missing saved-secret deletion edge case.
 
 Revision note: Updated 2026-05-13 by Codex after Ruff and full unit validation passed for the re-review fixes.
+
+Revision note: Updated 2026-05-13 by Codex after committing the re-review compliance fixes.
+
+Revision note: Updated 2026-05-13 by Codex after final compliance re-review passed and the follow-up was closed.
