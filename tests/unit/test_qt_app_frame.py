@@ -359,6 +359,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert frame.window.menu_bar.menus[0].actions[0].text == "Open file"
     assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
         "Application settings",
+        "Create certificate...",
         "Import certificate...",
         "Manage certificate configurations...",
     ]
@@ -370,6 +371,110 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         frame.window.settings_dialog.controls.default_open_directory.text()
         == str(tmp_path / "source")
     )
+
+
+def test_app_frame_certificate_creation_dialog_creates_and_refreshes_loaded_shell(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    frame.window.menu_bar.menus[1].actions[1].trigger()
+    dialog = frame.window.certificate_creation_dialog
+    dialog.controls.display_name.setText("Alice Signing")
+    dialog.controls.passphrase.setText("correct horse")
+    result = dialog.create_certificate()
+
+    assert result is not None
+    catalog = certificate_store.load_catalog()
+    configuration = catalog.configuration_named("Alice Signing")
+    managed_certificate = catalog.managed_certificate_by_id(
+        configuration.managed_certificate_id
+    )
+    assert managed_certificate.source_kind == "created"
+    assert managed_certificate.subject_summary.common_name == "Alice Signing"
+    assert (
+        certificate_store.managed_certificate_dir / managed_certificate.storage_filename
+    ).exists()
+    assert configuration.save_password is False
+    assert configuration.password_secret_ref is None
+    assert shell.refresh_certificate_configurations_calls == 1
+    assert bindings.q_message_box.information_calls[-1][1] == "Certificate created"
+
+
+def test_app_frame_certificate_creation_dialog_saves_password_outside_catalog(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_creation()
+    dialog = frame.window.certificate_creation_dialog
+    dialog.controls.display_name.setText("Alice Signing")
+    dialog.controls.passphrase.setText("correct horse")
+    dialog.controls.save_password.setChecked(True)
+    result = dialog.create_certificate()
+
+    assert result is not None
+    configuration = certificate_store.load_catalog().configuration_named(
+        "Alice Signing"
+    )
+    assert configuration.save_password is True
+    assert configuration.password_secret_ref == "secret://test/" + (
+        configuration.certificate_configuration_id
+    )
+    assert secret_store.secrets[configuration.password_secret_ref] == "correct horse"
+    assert "correct horse" not in certificate_store.catalog_path.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_app_frame_certificate_creation_dialog_reports_secure_storage_unavailable(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore(available=False)
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: _FakeShell(),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_creation()
+    dialog = frame.window.certificate_creation_dialog
+    dialog.controls.display_name.setText("Alice Signing")
+    dialog.controls.passphrase.setText("correct horse")
+    dialog.controls.save_password.setChecked(True)
+    result = dialog.create_certificate()
+
+    assert result is None
+    assert certificate_store.load_catalog().certificate_configurations == ()
+    assert bindings.q_message_box.warning_calls[-1][1] == "Certificate creation error"
 
 
 def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
@@ -391,7 +496,7 @@ def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
 
-    frame.window.menu_bar.menus[1].actions[1].trigger()
+    frame.window.menu_bar.menus[1].actions[2].trigger()
     dialog = frame.window.certificate_import_dialog
     dialog.controls.certificate_path.setText(str(source))
     dialog.controls.display_name.setText("Alice Signing")
@@ -471,7 +576,7 @@ def test_app_frame_certificate_management_dialog_saves_and_refreshes_loaded_shel
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
 
-    frame.window.menu_bar.menus[1].actions[2].trigger()
+    frame.window.menu_bar.menus[1].actions[3].trigger()
     dialog = frame.window.certificate_management_dialog
     assert dialog.controls.configuration_selector.items == [
         ("Corporate Records Signing", "cert-config-default")

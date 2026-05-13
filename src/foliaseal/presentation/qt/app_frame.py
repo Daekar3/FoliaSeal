@@ -8,7 +8,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from foliaseal.application import CertificateImportService, SigningDraftWorkflow
+from foliaseal.application import (
+    CertificateCreationService,
+    CertificateImportService,
+    SigningDraftWorkflow,
+)
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
@@ -76,6 +80,18 @@ class CertificateImportDialogControls:
     save_password: Any
     choose_button: Any
     import_button: Any
+    cancel_button: Any
+
+
+@dataclass(frozen=True)
+class CertificateCreationDialogControls:
+    """Controls used by the certificate creation dialog."""
+
+    dialog: Any
+    display_name: Any
+    passphrase: Any
+    save_password: Any
+    create_button: Any
     cancel_button: Any
 
 
@@ -325,6 +341,110 @@ class CertificateImportDialog:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.controls.dialog, "Certificate import error", message)
+
+
+class CertificateCreationDialog:
+    """Small dialog for creating a self-signed managed certificate."""
+
+    def __init__(
+        self,
+        *,
+        bindings: QtAppFrameBindings,
+        parent: Any,
+        creation_service: CertificateCreationService,
+        on_create: Callable[[], None] | None = None,
+    ) -> None:
+        self._bindings = bindings
+        self._creation_service = creation_service
+        self._on_create = on_create
+        self.creation_result = None
+        self.controls = self._build_controls(parent=parent)
+
+    def exec(self) -> Any | None:
+        dialog_exec = getattr(self.controls.dialog, "exec", None)
+        if callable(dialog_exec):
+            result = dialog_exec()
+            if result != self._accepted_dialog_code():
+                return None
+        return self.creation_result
+
+    def create_certificate(self) -> Any | None:
+        display_name = self.controls.display_name.text().strip()
+        passphrase = self.controls.passphrase.text()
+        save_password = bool(self.controls.save_password.isChecked())
+        try:
+            result = self._creation_service.create_self_signed_certificate(
+                display_name=display_name,
+                passphrase=passphrase,
+                save_password=save_password,
+            )
+        except Exception as exc:
+            self._show_error(str(exc))
+            return None
+
+        self.creation_result = result
+        if self._on_create is not None:
+            self._on_create()
+        information = getattr(self._bindings.q_message_box, "information", None)
+        if callable(information):
+            information(
+                self.controls.dialog,
+                "Certificate created",
+                f"Created certificate configuration '{display_name}'.",
+            )
+        accept = getattr(self.controls.dialog, "accept", None)
+        if callable(accept):
+            accept()
+        return result
+
+    def cancel(self) -> None:
+        reject = getattr(self.controls.dialog, "reject", None)
+        if callable(reject):
+            reject()
+
+    def _build_controls(self, *, parent: Any) -> CertificateCreationDialogControls:
+        dialog = self._bindings.q_dialog(parent)
+        if hasattr(dialog, "setWindowTitle"):
+            dialog.setWindowTitle("Create certificate")
+        layout = self._bindings.q_form_layout(dialog)
+
+        display_name = self._bindings.q_line_edit("")
+        passphrase = self._bindings.q_line_edit("")
+        save_password = self._bindings.q_check_box("Save password securely")
+        create_button = self._bindings.q_push_button("Create")
+        cancel_button = self._bindings.q_push_button("Cancel")
+
+        layout.addRow("Display name", display_name)
+        layout.addRow("Password", passphrase)
+        layout.addRow("", save_password)
+        layout.addRow(create_button, cancel_button)
+
+        create_button.clicked.connect(self.create_certificate)  # type: ignore[attr-defined]
+        cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
+
+        return CertificateCreationDialogControls(
+            dialog=dialog,
+            display_name=display_name,
+            passphrase=passphrase,
+            save_password=save_password,
+            create_button=create_button,
+            cancel_button=cancel_button,
+        )
+
+    def _accepted_dialog_code(self) -> Any:
+        accepted = getattr(self._bindings.q_dialog, "Accepted", None)
+        if accepted is not None:
+            return accepted
+        dialog_code = getattr(self._bindings.q_dialog, "DialogCode", None)
+        accepted = getattr(dialog_code, "Accepted", None)
+        if accepted is not None:
+            return accepted
+        return 1
+
+    def _show_error(self, message: str) -> None:
+        warning = getattr(self._bindings.q_message_box, "warning", None)
+        if callable(warning):
+            warning(self.controls.dialog, "Certificate creation error", message)
 
 
 class CertificateConfigurationManagementDialog:
@@ -709,6 +829,7 @@ class FoliaSealAppFrame:
         self.window.open_file = self.choose_open_pdf  # type: ignore[attr-defined]
         self.window.open_pdf_path = self.open_pdf_path  # type: ignore[attr-defined]
         self.window.show_app_settings = self.show_app_settings  # type: ignore[attr-defined]
+        self.window.show_certificate_creation = self.show_certificate_creation  # type: ignore[attr-defined]
         self.window.show_certificate_import = self.show_certificate_import  # type: ignore[attr-defined]
         self.window.show_certificate_management = self.show_certificate_management  # type: ignore[attr-defined]
         self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
@@ -822,6 +943,20 @@ class FoliaSealAppFrame:
         self.window.certificate_import_dialog = dialog  # type: ignore[attr-defined]
         return dialog.exec()
 
+    def show_certificate_creation(self) -> Any | None:
+        dialog = CertificateCreationDialog(
+            bindings=self._bindings,
+            parent=self.window,
+            creation_service=CertificateCreationService(
+                store=self._certificate_catalog_store,
+                secret_store=self._certificate_secret_provider,
+            ),
+            on_create=self._refresh_shell_certificate_configurations,
+        )
+        self._certificate_creation_dialog = dialog
+        self.window.certificate_creation_dialog = dialog  # type: ignore[attr-defined]
+        return dialog.exec()
+
     def show_certificate_management(self) -> Any | None:
         dialog = CertificateConfigurationManagementDialog(
             bindings=self._bindings,
@@ -841,6 +976,9 @@ class FoliaSealAppFrame:
         settings_menu = menu_bar.addMenu("Settings")
         settings_menu.addAction(
             self._action("Application settings", self.show_app_settings)
+        )
+        settings_menu.addAction(
+            self._action("Create certificate...", self.show_certificate_creation)
         )
         settings_menu.addAction(
             self._action("Import certificate...", self.show_certificate_import)

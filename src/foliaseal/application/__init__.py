@@ -1,5 +1,10 @@
 """Application layer helpers for orchestration and viewer workflows."""
 
+from foliaseal.application.certificate_creation import (
+    CertificateCreationError,
+    CertificateCreationResult,
+    CertificateCreationService,
+)
 from foliaseal.application.certificate_import import (
     CertificateImportError,
     CertificateImportResult,
@@ -92,6 +97,9 @@ __all__ = [
     "ViewerZoomLimits",
     "CanonicalSignaturePreviewSnapshot",
     "CanonicalPreviewLayout",
+    "CertificateCreationError",
+    "CertificateCreationResult",
+    "CertificateCreationService",
     "CertificateImportError",
     "CertificateImportResult",
     "CertificateImportService",
