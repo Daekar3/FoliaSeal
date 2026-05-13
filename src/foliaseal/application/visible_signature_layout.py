@@ -247,6 +247,65 @@ class PyHankoTextMeasurer:
         )
 
 
+def structural_line_bounds(
+    *,
+    text: str,
+    text_fragments: tuple[str, ...],
+    text_style: SignatureTextStyle,
+    text_bounds: RectBounds,
+    text_measurer: TextMeasurer | None = None,
+) -> tuple[RectBounds, ...]:
+    """Return structural line boxes using the shared pyHanko text-height contract."""
+
+    visible_fragments = tuple(fragment for fragment in text_fragments if fragment.strip())
+    if not visible_fragments or text_bounds.width <= 0 or text_bounds.height <= 0:
+        return ()
+
+    measurer = text_measurer or PyHankoTextMeasurer()
+    full_metrics = measurer.measure(text, text_style)
+    if full_metrics.width_pt <= 0 or full_metrics.height_pt <= 0:
+        return ()
+
+    fragment_metrics = tuple(
+        measurer.measure(fragment, text_style) for fragment in visible_fragments
+    )
+    max_fragment_width = max((metrics.width_pt for metrics in fragment_metrics), default=0)
+    if max_fragment_width <= 0:
+        return ()
+
+    structural_height = max(text_bounds.height, int(round(full_metrics.height_pt)))
+    base_line_height, extra_px = divmod(structural_height, len(visible_fragments))
+    remaining_height = structural_height
+    current_y = text_bounds.y
+    line_bounds: list[RectBounds] = []
+    for index, metrics in enumerate(fragment_metrics):
+        remaining_line_count = len(fragment_metrics) - index
+        if index == len(fragment_metrics) - 1:
+            line_height = max(1, remaining_height)
+        else:
+            desired_height = max(1, base_line_height + (1 if index < extra_px else 0))
+            available_for_this_line = max(1, remaining_height - (remaining_line_count - 1))
+            line_height = min(desired_height, available_for_this_line)
+        line_width = max(
+            1,
+            min(
+                text_bounds.width,
+                int(round(text_bounds.width * (metrics.width_pt / max_fragment_width))),
+            ),
+        )
+        line_bounds.append(
+            RectBounds(
+                x=text_bounds.x,
+                y=current_y,
+                width=line_width,
+                height=line_height,
+            )
+        )
+        current_y += line_height
+        remaining_height -= line_height
+    return tuple(line_bounds)
+
+
 class PillowStampImageProbe:
     """Production stamp image probe backed by Pillow."""
 

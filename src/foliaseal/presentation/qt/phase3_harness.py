@@ -2147,6 +2147,7 @@ def _preview_appearance_snapshot_from_capture(
     line_bounds = tuple(render_capture.get("text_rendered_line_bounds_px", ()))
     if not line_bounds:
         line_bounds = _structural_line_bounds_px(
+            text="\n".join(text_fragments),
             text_fragments=text_fragments,
             text_style=text_style,
             text_bounds_px=text_bounds,
@@ -2275,6 +2276,7 @@ def _signed_output_appearance_snapshot(
         container_bounds_px=container_bounds,
     )
     structural_line_bounds = _structural_line_bounds_px(
+        text="\n".join(text_fragments),
         text_fragments=text_fragments,
         text_style=text_style,
         text_bounds_px=reconstructed_text_box_bounds or text_bounds_px,

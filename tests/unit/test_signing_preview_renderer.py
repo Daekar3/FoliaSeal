@@ -26,6 +26,12 @@ from foliaseal.application.signing_preview_renderer import (
     compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
 )
+from foliaseal.application.visible_signature_layout import (
+    PyHankoTextMeasurer,
+    RectBounds,
+    TextMetrics,
+    structural_line_bounds,
+)
 from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureFieldSource,
@@ -76,6 +82,80 @@ def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:
         and first["y"] < second["y"] + second["height"]
         and second["y"] < first["y"] + first["height"]
     )
+
+
+class _FakeTextMeasurer:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def measure(self, text: str, text_style: SignatureTextStyle) -> TextMetrics:
+        _ = text_style
+        self.calls.append(text)
+        if "\n" in text:
+            return TextMetrics(width_pt=90, height_pt=31, line_count=3)
+        return TextMetrics(width_pt=max(1, len(text) * 5), height_pt=9, line_count=1)
+
+
+def test_structural_line_bounds_use_full_stacked_text_height_contract() -> None:
+    measurer = _FakeTextMeasurer()
+
+    line_bounds = structural_line_bounds(
+        text="A\nLonger line\nB",
+        text_fragments=("A", "Longer line", "B"),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+        text_bounds=RectBounds(x=5, y=7, width=90, height=31),
+        text_measurer=measurer,
+    )
+
+    assert measurer.calls[0] == "A\nLonger line\nB"
+    assert tuple(bound.height for bound in line_bounds) == (11, 10, 10)
+    assert sum(bound.height for bound in line_bounds) == 31
+    assert tuple(bound.y for bound in line_bounds) == (7, 18, 28)
+    assert line_bounds[1].width == 90
+    assert line_bounds[0].width < line_bounds[1].width
+
+
+def test_canonical_preview_line_bounds_preserve_backend_text_height_contract(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    text_style = SignatureTextStyle(
+        font_family="Serif",
+        font_size_pt=8.5,
+        bold=False,
+        italic=False,
+        text_color_hex="#000000",
+    )
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            show_field_names=False,
+            text_style=text_style,
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=320.0, height_pt=42.0))
+    preview = workflow.preview()
+
+    snapshot = render_canonical_signature_preview(preview, zoom=2.0)
+
+    assert snapshot is not None
+    assert snapshot.appearance_snapshot is not None
+    line_bounds = snapshot.appearance_snapshot.line_bounds_px
+    assert line_bounds
+    full_text = "\n".join(_canonical_preview_text_fragments(preview))
+    measured = PyHankoTextMeasurer().measure(full_text, text_style)
+    scale_y = snapshot.height_px / preview.signature_rect.height_pt
+    structural_height = max(bound["y"] + bound["height"] for bound in line_bounds) - min(
+        bound["y"] for bound in line_bounds
+    )
+
+    assert structural_height >= int(round(measured.height_pt * scale_y))
 
 
 def _render_text_only_bounds_for_preview(

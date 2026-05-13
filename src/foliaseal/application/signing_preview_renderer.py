@@ -32,11 +32,11 @@ from foliaseal.application.signing_draft_workflow import (
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
-    PyHankoTextMeasurer,
     RectBounds,
     SignatureLayoutPlan,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
+    structural_line_bounds,
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -380,6 +380,7 @@ def render_canonical_signature_preview(
     border_style = _appearance_border_style(preview=preview, include_border=include_border)
     border_bounds_px = container_bounds_px if border_style is not None else None
     line_bounds_px = _structural_line_bounds_px(
+        text=_semantic_preview_stamp_text(preview),
         text_fragments=tuple(_canonical_preview_text_fragments(preview)),
         text_style=preview.text_style,
         text_bounds_px=text_box_bounds_px,
@@ -702,62 +703,22 @@ def _normalize_text_fragment(fragment: str) -> str:
 
 def _structural_line_bounds_px(
     *,
+    text: str,
     text_fragments: tuple[str, ...],
     text_style: SignatureTextStyle | None,
     text_bounds_px: dict[str, int] | None,
 ) -> tuple[dict[str, int], ...]:
     if text_style is None or text_bounds_px is None or not text_fragments:
         return ()
-    text_measurer = PyHankoTextMeasurer()
-    line_metrics: list[tuple[int, int]] = []
-    max_line_width = 0
-    total_line_height = 0
-    for fragment in text_fragments:
-        metrics = text_measurer.measure(fragment, text_style)
-        line_width = metrics.width_pt
-        line_height = metrics.height_pt
-        line_width = max(1, int(line_width))
-        line_height = max(1, int(line_height))
-        line_metrics.append((line_width, line_height))
-        max_line_width = max(max_line_width, line_width)
-        total_line_height += line_height
-    if max_line_width <= 0 or total_line_height <= 0:
-        return ()
-
-    remaining_height = max(1, int(text_bounds_px["height"]))
-    current_y = int(text_bounds_px["y"])
-    line_bounds: list[dict[str, int]] = []
-    for index, (line_width, line_height) in enumerate(line_metrics):
-        remaining_line_count = len(line_metrics) - index
-        if index == len(line_metrics) - 1:
-            scaled_height = remaining_height
-        else:
-            scaled_height = max(
-                1,
-                int(round(text_bounds_px["height"] * (line_height / total_line_height))),
-            )
-            scaled_height = min(
-                scaled_height,
-                remaining_height - max(0, remaining_line_count - 1),
-            )
-        scaled_width = max(
-            1,
-            min(
-                int(text_bounds_px["width"]),
-                int(round(text_bounds_px["width"] * (line_width / max_line_width))),
-            ),
+    return tuple(
+        bounds.as_dict()
+        for bounds in structural_line_bounds(
+            text=text,
+            text_fragments=text_fragments,
+            text_style=text_style,
+            text_bounds=_rect_bounds_from_mapping(text_bounds_px),
         )
-        line_bounds.append(
-            {
-                "x": int(text_bounds_px["x"]),
-                "y": current_y,
-                "width": scaled_width,
-                "height": scaled_height,
-            }
-        )
-        current_y += scaled_height
-        remaining_height -= scaled_height
-    return tuple(line_bounds)
+    )
 
 
 def _union_rectangles(
