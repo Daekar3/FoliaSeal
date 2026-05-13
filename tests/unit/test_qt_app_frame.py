@@ -642,6 +642,54 @@ def test_app_frame_certificate_management_dialog_keeps_config_if_secret_unavaila
     )
 
 
+def test_app_frame_certificate_management_dialog_restores_secret_if_delete_persist_fails(
+    tmp_path: Path,
+) -> None:
+    class _FailingDeleteStore(CertificateCatalogStore):
+        def delete_configuration_by_id(self, configuration_id: str):
+            raise OSError("disk full")
+
+    bindings = _fake_bindings()
+    certificate_store = _FailingDeleteStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            certificate_configurations=(
+                build_certificate_configuration(
+                    save_password=True,
+                    password_secret_ref="secret://test/cert-config-default",
+                ),
+            )
+        )
+    )
+    secret_store = _FakeSecretStore()
+    secret_store.secrets["secret://test/cert-config-default"] = "secret"
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        certificate_secret_provider=secret_store,
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_certificate_management()
+    dialog = frame.window.certificate_management_dialog
+    deleted = dialog.delete_selected_configuration()
+
+    assert deleted is False
+    assert certificate_store.load_catalog().configuration_by_id("cert-config-default")
+    assert secret_store.deleted == ["secret://test/cert-config-default"]
+    assert secret_store.secrets["secret://test/cert-config-default"] == "secret"
+    assert shell.refresh_certificate_configurations_calls == 0
+    assert bindings.q_message_box.warning_calls[-1] == (
+        dialog.controls.dialog,
+        "Certificate configuration error",
+        "disk full",
+    )
+
+
 def test_app_frame_certificate_management_dialog_blocks_referenced_certificate_delete(
     tmp_path: Path,
 ) -> None:

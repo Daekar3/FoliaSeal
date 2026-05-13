@@ -131,7 +131,13 @@ class CertificateSigningMaterialResolver:
                 "Saved password storage is not available. Enter the certificate password "
                 "manually or edit the certificate configuration."
             )
-        secret = self.secret_provider.get_secret(configuration.password_secret_ref)
+        try:
+            secret = self.secret_provider.get_secret(configuration.password_secret_ref)
+        except Exception as exc:
+            raise SigningMaterialResolutionError(
+                "Saved password storage could not read the certificate password. "
+                "Enter the password manually or try again after fixing secure storage."
+            ) from exc
         if secret is None:
             raise SigningMaterialResolutionError(
                 "The saved certificate password could not be found. Enter the password "

@@ -93,6 +93,19 @@ def test_secret_tool_store_reads_password_and_treats_missing_secret_as_none() ->
     ) is None
 
 
+def test_secret_tool_store_raises_when_lookup_operation_fails() -> None:
+    runner = _Runner(returncode=2, stderr="service unavailable")
+    store = SecretToolCertificateSecretStore(
+        runner=runner,
+        availability_checker=lambda: True,
+    )
+
+    with pytest.raises(SecretStorageError, match="service unavailable"):
+        store.get_secret(
+            "secret-tool://foliaseal/certificate-password/cert-config-default"
+        )
+
+
 def test_secret_tool_store_deletes_password() -> None:
     runner = _Runner()
     store = SecretToolCertificateSecretStore(

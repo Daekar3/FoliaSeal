@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -92,16 +92,6 @@ class CertificateImportService:
         managed_certificate_id = self._new_id()
         configuration_id = self._new_id()
         password_secret_ref: str | None = None
-        if save_password:
-            if self.secret_store is None or not self.secret_store.is_available():
-                raise ConfigValidationError(
-                    "Saved password storage is not available. Leave password saving "
-                    "disabled or configure secure storage."
-                )
-            password_secret_ref = self.secret_store.secret_ref_for_configuration(
-                configuration_id
-            )
-            self.secret_store.set_secret(password_secret_ref, passphrase)
         storage_filename = f"cert_{managed_certificate_id}.p12"
         managed_path = self.store.managed_certificate_dir / storage_filename
         created_at = self._now_iso()
@@ -120,14 +110,29 @@ class CertificateImportService:
             certificate_configuration_id=configuration_id,
             display_name=normalized_name,
             managed_certificate_id=managed_certificate_id,
-            save_password=save_password,
-            password_secret_ref=password_secret_ref,
+            save_password=False,
+            password_secret_ref=None,
             notes="Imported PKCS#12 certificate",
         )
 
-        self.store.storage_dir.mkdir(parents=True, exist_ok=True)
-        self.store.managed_certificate_dir.mkdir(parents=True, exist_ok=True)
         try:
+            if save_password:
+                if self.secret_store is None or not self.secret_store.is_available():
+                    raise ConfigValidationError(
+                        "Saved password storage is not available. Leave password saving "
+                        "disabled or configure secure storage."
+                    )
+                password_secret_ref = self.secret_store.secret_ref_for_configuration(
+                    configuration_id
+                )
+                self.secret_store.set_secret(password_secret_ref, passphrase)
+                configuration = replace(
+                    configuration,
+                    save_password=True,
+                    password_secret_ref=password_secret_ref,
+                )
+            self.store.storage_dir.mkdir(parents=True, exist_ok=True)
+            self.store.managed_certificate_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, managed_path)
             updated_catalog = catalog.upsert_managed_certificate(
                 managed_certificate

@@ -207,6 +207,28 @@ def test_certificate_import_removes_saved_password_when_catalog_save_fails(
     assert secret_store.secrets == {}
 
 
+def test_certificate_import_removes_saved_password_when_storage_dir_creation_fails(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.p12"
+    _write_test_pkcs12(source, passphrase="secret")
+    blocked_storage_dir = tmp_path / "Certificates"
+    blocked_storage_dir.write_text("not a directory", encoding="utf-8")
+    store = CertificateCatalogStore(storage_dir=blocked_storage_dir)
+    secret_store = _FakeSecretStore()
+
+    with pytest.raises(FileExistsError):
+        _service(store, secret_store=secret_store).import_pkcs12(
+            source_path=source,
+            display_name="Alice Signing",
+            passphrase="secret",
+            save_password=True,
+        )
+
+    assert secret_store.deleted == ["secret://test/cert-config-imported"]
+    assert secret_store.secrets == {}
+
+
 def test_certificate_import_rejects_wrong_password_without_copying(
     tmp_path: Path,
 ) -> None:

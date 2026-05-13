@@ -59,8 +59,9 @@ class SecretToolCertificateSecretStore:
         result = self._run(
             [self.executable, "lookup", *self._attributes(configuration_id)],
         )
-        if result.returncode != 0:
+        if result.returncode == 1:
             return None
+        self._raise_if_failed(result, "read certificate password")
         secret = result.stdout.rstrip("\n")
         return secret or None
 

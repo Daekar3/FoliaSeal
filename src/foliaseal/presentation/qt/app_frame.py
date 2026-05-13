@@ -439,6 +439,7 @@ class CertificateConfigurationManagementDialog:
             self._show_error("Select a certificate configuration to delete.")
             self.reload_configurations()
             return False
+        saved_secret: str | None = None
         if configuration.password_secret_ref is not None:
             if self._secret_store is None or not self._secret_store.is_available():
                 self._show_error(
@@ -447,6 +448,15 @@ class CertificateConfigurationManagementDialog:
                 )
                 return False
             try:
+                saved_secret = self._secret_store.get_secret(
+                    configuration.password_secret_ref
+                )
+                if saved_secret is None:
+                    self._show_error(
+                        "The saved certificate password could not be found. "
+                        "The certificate configuration was not deleted."
+                    )
+                    return False
                 self._secret_store.delete_secret(configuration.password_secret_ref)
             except (SecretStorageError, OSError, ValueError) as exc:
                 self._show_error(str(exc))
@@ -454,6 +464,18 @@ class CertificateConfigurationManagementDialog:
         try:
             self._catalog_store.delete_configuration_by_id(configuration_id)
         except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            if (
+                configuration.password_secret_ref is not None
+                and saved_secret is not None
+                and self._secret_store is not None
+            ):
+                try:
+                    self._secret_store.set_secret(
+                        configuration.password_secret_ref,
+                        saved_secret,
+                    )
+                except (SecretStorageError, OSError, ValueError):
+                    pass
             self._show_error(str(exc))
             self.reload_configurations()
             return False

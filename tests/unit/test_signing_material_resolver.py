@@ -24,6 +24,11 @@ class MemorySecretProvider:
         return self._secrets.get(secret_ref)
 
 
+class FailingSecretProvider(MemorySecretProvider):
+    def get_secret(self, secret_ref: str) -> str | None:
+        raise RuntimeError("backend failed")
+
+
 def test_resolver_uses_explicit_passphrase_for_unsaved_password(tmp_path: Path) -> None:
     cert_file = tmp_path / "managed" / "cert_default.p12"
     cert_file.parent.mkdir()
@@ -100,6 +105,29 @@ def test_resolver_fails_helpfully_when_saved_password_store_unavailable(
     )
 
     with pytest.raises(SigningMaterialResolutionError, match="Saved password storage"):
+        resolver.resolve_by_configuration_id(catalog, "cert-config-default")
+
+
+def test_resolver_fails_helpfully_when_saved_password_read_fails(
+    tmp_path: Path,
+) -> None:
+    cert_file = tmp_path / "managed" / "cert_default.p12"
+    cert_file.parent.mkdir()
+    cert_file.write_bytes(b"pkcs12-bytes")
+    catalog = build_certificate_catalog(
+        certificate_configurations=(
+            build_certificate_configuration(
+                save_password=True,
+                password_secret_ref="secret://foliaseal/cert-config-default",
+            ),
+        )
+    )
+    resolver = CertificateSigningMaterialResolver(
+        managed_certificate_dir=cert_file.parent,
+        secret_provider=FailingSecretProvider(),
+    )
+
+    with pytest.raises(SigningMaterialResolutionError, match="could not read"):
         resolver.resolve_by_configuration_id(catalog, "cert-config-default")
 
 
