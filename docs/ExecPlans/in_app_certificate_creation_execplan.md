@@ -28,7 +28,12 @@ This is a first in-app creation slice, not a general certificate-authoring produ
 - [x] (2026-05-13T01:35Z) Focused service and app-frame validation passed: `.venv/bin/python -m pytest -q tests/unit/test_certificate_creation.py tests/unit/test_qt_app_frame.py` (`30 passed in 3.03s`).
 - [x] (2026-05-13T01:39Z) Focused ExecPlan validation passed: `.venv/bin/python -m pytest -q tests/unit/test_certificate_creation.py tests/unit/test_qt_app_frame.py tests/unit/test_certificate_storage.py` (`47 passed in 3.19s`).
 - [x] (2026-05-13T01:47Z) Full validation passed: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`635 passed, 23 skipped, 1 warning in 198.76s`).
-- [ ] Commit the completed slice.
+- [x] (2026-05-13T01:49Z) Committed the completed slice as `fa98f0b Add in-app certificate creation flow`.
+- [x] (2026-05-13T01:55Z) Compliance review found that rollback cleanup could skip saved-secret deletion when file cleanup failed, and noted whitespace-only passwords were not rejected.
+- [x] (2026-05-13T01:58Z) Updated rollback cleanup to attempt file and secret cleanup independently and added regression coverage for cleanup failure and whitespace-only passwords.
+- [x] (2026-05-13T01:59Z) Focused validation passed for the compliance follow-up: `.venv/bin/python -m pytest -q tests/unit/test_certificate_creation.py tests/unit/test_qt_app_frame.py tests/unit/test_certificate_storage.py` (`49 passed in 3.21s`).
+- [x] (2026-05-13T02:03Z) Full validation passed for the compliance follow-up: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`637 passed, 23 skipped, 1 warning in 195.31s`).
+- [ ] Commit the compliance follow-up.
 
 ## Surprises & Discoveries
 
@@ -40,6 +45,9 @@ This is a first in-app creation slice, not a general certificate-authoring produ
 
 - Observation: The certificate creation service can share the same rollback pattern as import.
   Evidence: `src/foliaseal/application/certificate_creation.py` mirrors the saved-secret cleanup behavior used by `CertificateImportService` after the saved-password compliance follow-up.
+
+- Observation: Rollback cleanup must not be ordered so one cleanup failure prevents another cleanup attempt.
+  Evidence: The first compliance review found `managed_path.unlink()` ran before `delete_secret()`, so a file cleanup failure could skip saved-secret cleanup entirely.
 
 ## Decision Log
 
@@ -55,9 +63,13 @@ This is a first in-app creation slice, not a general certificate-authoring produ
   Rationale: Created and imported certificates should resolve through the same `CertificateConfiguration` and `CertificateSecretProvider` path. That keeps signing behavior uniform and avoids a second password-storage model.
   Date/Author: 2026-05-13 / Codex
 
+- Decision: Attempt every rollback cleanup operation and report incomplete cleanup explicitly.
+  Rationale: A local file cleanup failure and a secure-store cleanup failure are independent. Attempting both gives the app the best chance of leaving no orphaned state, and an explicit combined error is more accurate than silently losing one cleanup attempt.
+  Date/Author: 2026-05-13 / Codex
+
 ## Outcomes & Retrospective
 
-This slice is in progress. The service and Qt app-frame flow are implemented, docs describe the new state, focused tests pass, and full validation passes. It will be complete when the slice is committed and compliance review confirms alignment with the project docs.
+This slice is in compliance follow-up after the first implementation commit `fa98f0b Add in-app certificate creation flow`. The service and Qt app-frame flow are implemented, docs describe the new state, focused tests pass, and full validation passes. Compliance review identified a rollback cleanup ordering issue and a whitespace-password validation gap; those fixes are implemented locally and validation passes. The remaining work is to commit the follow-up and re-review compliance.
 
 ## Context and Orientation
 
@@ -116,7 +128,7 @@ No generated harness artifacts are expected.
 
 ## Idempotence and Recovery
 
-Creation with a unique display name is repeatable and produces a new managed certificate id and configuration id each time. Duplicate display names should fail before writing files or secrets. If any step fails after writing the managed PKCS#12 file, delete that file before re-raising. If any step fails after saving a password secret, delete the secret before re-raising; if secret cleanup itself fails, report that explicitly just as the saved-password compliance follow-up does for import.
+Creation with a unique display name is repeatable and produces a new managed certificate id and configuration id each time. Duplicate display names should fail before writing files or secrets. If any step fails after writing the managed PKCS#12 file, attempt to delete that file before re-raising. If any step fails after saving a password secret, attempt to delete the secret before re-raising. File cleanup and secret cleanup must both be attempted even if one cleanup operation fails. If any cleanup operation fails, report that rollback cleanup was incomplete and include the failed cleanup operation in the error.
 
 The app should leave existing certificates and configurations untouched on failure. The new service should use temporary local variables and only persist the updated catalog after both the file and optional secret have been prepared.
 
@@ -131,3 +143,9 @@ Revision note: Updated 2026-05-13 by Codex after implementing the creation servi
 Revision note: Updated 2026-05-13 by Codex after updating architecture documentation and passing the full focused validation command.
 
 Revision note: Updated 2026-05-13 by Codex after Ruff and full unit validation passed.
+
+Revision note: Updated 2026-05-13 by Codex after committing the completed implementation slice.
+
+Revision note: Updated 2026-05-13 by Codex after compliance review found rollback cleanup ordering and whitespace-password validation gaps.
+
+Revision note: Updated 2026-05-13 by Codex after focused and full validation passed for the compliance follow-up.

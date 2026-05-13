@@ -186,7 +186,7 @@ def test_certificate_creation_reports_saved_password_cleanup_failure(
     store = _FailingSaveStore(storage_dir=tmp_path / "Certificates")
     secret_store = _FakeSecretStore(fail_delete=True)
 
-    with pytest.raises(CertificateCreationError, match="could not be removed"):
+    with pytest.raises(CertificateCreationError, match="rollback cleanup was incomplete"):
         _service(store, secret_store=secret_store).create_self_signed_certificate(
             display_name="Alice Signing",
             passphrase="correct horse",
@@ -196,3 +196,46 @@ def test_certificate_creation_reports_saved_password_cleanup_failure(
     assert secret_store.secrets == {
         "secret://test/cert-config-created": "correct horse",
     }
+    assert not (store.managed_certificate_dir / "cert_managed-cert-created.p12").exists()
+
+
+def test_certificate_creation_attempts_secret_cleanup_when_file_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FailingSaveStore(CertificateCatalogStore):
+        def save_catalog(self, catalog: CertificateCatalog) -> None:
+            raise OSError("disk full")
+
+    store = _FailingSaveStore(storage_dir=tmp_path / "Certificates")
+    secret_store = _FakeSecretStore()
+    original_unlink = Path.unlink
+
+    def fail_created_certificate_unlink(path: Path) -> None:
+        if path.name == "cert_managed-cert-created.p12":
+            raise OSError("file cleanup failed")
+        original_unlink(path)
+
+    monkeypatch.setattr(Path, "unlink", fail_created_certificate_unlink)
+
+    with pytest.raises(CertificateCreationError, match="file cleanup failed"):
+        _service(store, secret_store=secret_store).create_self_signed_certificate(
+            display_name="Alice Signing",
+            passphrase="correct horse",
+            save_password=True,
+        )
+
+    assert secret_store.deleted == ["secret://test/cert-config-created"]
+    assert secret_store.secrets == {}
+
+
+def test_certificate_creation_rejects_whitespace_only_password(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+
+    with pytest.raises(CertificateCreationError, match="cannot be blank"):
+        _service(store).create_self_signed_certificate(
+            display_name="Alice Signing",
+            passphrase="   ",
+        )
+
+    assert store.load_catalog().certificate_configurations == ()

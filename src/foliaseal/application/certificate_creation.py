@@ -75,7 +75,7 @@ class CertificateCreationService:
         normalized_name = display_name.strip()
         if not normalized_name:
             raise ConfigValidationError("display_name must be a non-empty str.")
-        if not isinstance(passphrase, str) or not passphrase:
+        if not isinstance(passphrase, str) or not passphrase.strip():
             raise CertificateCreationError("Certificate password cannot be blank.")
 
         catalog = self.store.load_catalog()
@@ -156,17 +156,26 @@ class CertificateCreationService:
             ).upsert_configuration(configuration)
             self.store.save_catalog(updated_catalog)
         except Exception:
+            cleanup_errors: list[str] = []
             if managed_path.exists():
-                managed_path.unlink()
+                try:
+                    managed_path.unlink()
+                except Exception as cleanup_exc:
+                    cleanup_errors.append(
+                        f"managed certificate file could not be removed: {cleanup_exc}"
+                    )
             if password_secret_ref is not None and self.secret_store is not None:
                 try:
                     self.secret_store.delete_secret(password_secret_ref)
                 except Exception as cleanup_exc:
-                    raise CertificateCreationError(
-                        "Certificate creation failed after saving the password, and "
-                        "the saved password could not be removed from secure storage. "
-                        "Delete the saved password from secure storage before retrying."
-                    ) from cleanup_exc
+                    cleanup_errors.append(
+                        f"saved password could not be removed: {cleanup_exc}"
+                    )
+            if cleanup_errors:
+                raise CertificateCreationError(
+                    "Certificate creation failed, and rollback cleanup was incomplete: "
+                    + "; ".join(cleanup_errors)
+                )
             raise
 
         return CertificateCreationResult(
