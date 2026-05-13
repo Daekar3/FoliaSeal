@@ -10,6 +10,11 @@ from foliaseal.application.certificate_import import (
     CertificateImportResult,
     CertificateImportService,
 )
+from foliaseal.application.certificate_lifecycle import (
+    CertificateLifecycleError,
+    CertificateLifecycleResult,
+    CertificateLifecycleService,
+)
 from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     HorizontalSingleLineRenderedReference,
@@ -103,6 +108,9 @@ __all__ = [
     "CertificateImportError",
     "CertificateImportResult",
     "CertificateImportService",
+    "CertificateLifecycleError",
+    "CertificateLifecycleResult",
+    "CertificateLifecycleService",
     "CertificateFieldReader",
     "CertificateFieldValues",
     "HorizontalSingleLineInkReservation",

@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from foliaseal.application import (
-    CertificateCreationService,
-    CertificateImportService,
+    CertificateLifecycleService,
     SigningDraftWorkflow,
 )
 from foliaseal.application.viewer_session import ViewerSession
@@ -26,10 +25,7 @@ from foliaseal.infra.config.schemas import (
     ManagedCertificate,
 )
 from foliaseal.infra.render import QtPdfRenderBackend
-from foliaseal.infra.secret_storage import (
-    SecretStorageError,
-    SecretToolCertificateSecretStore,
-)
+from foliaseal.infra.secret_storage import SecretToolCertificateSecretStore
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
     build_qt_signing_shell,
@@ -222,11 +218,11 @@ class CertificateImportDialog:
         *,
         bindings: QtAppFrameBindings,
         parent: Any,
-        import_service: CertificateImportService,
+        lifecycle_service: CertificateLifecycleService,
         on_import: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
-        self._import_service = import_service
+        self._lifecycle_service = lifecycle_service
         self._on_import = on_import
         self.import_result = None
         self.controls = self._build_controls(parent=parent)
@@ -260,7 +256,7 @@ class CertificateImportDialog:
         passphrase = self.controls.passphrase.text()
         save_password = bool(self.controls.save_password.isChecked())
         try:
-            result = self._import_service.import_pkcs12(
+            result = self._lifecycle_service.import_pkcs12(
                 source_path=source_path,
                 display_name=display_name,
                 passphrase=passphrase,
@@ -271,14 +267,14 @@ class CertificateImportDialog:
             return None
 
         self.import_result = result
-        if self._on_import is not None:
+        if result.refresh_shell and self._on_import is not None:
             self._on_import()
         information = getattr(self._bindings.q_message_box, "information", None)
         if callable(information):
             information(
                 self.controls.dialog,
                 "Certificate imported",
-                f"Imported certificate configuration '{display_name}'.",
+                result.user_message,
             )
         accept = getattr(self.controls.dialog, "accept", None)
         if callable(accept):
@@ -351,11 +347,11 @@ class CertificateCreationDialog:
         *,
         bindings: QtAppFrameBindings,
         parent: Any,
-        creation_service: CertificateCreationService,
+        lifecycle_service: CertificateLifecycleService,
         on_create: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
-        self._creation_service = creation_service
+        self._lifecycle_service = lifecycle_service
         self._on_create = on_create
         self.creation_result = None
         self.controls = self._build_controls(parent=parent)
@@ -373,7 +369,7 @@ class CertificateCreationDialog:
         passphrase = self.controls.passphrase.text()
         save_password = bool(self.controls.save_password.isChecked())
         try:
-            result = self._creation_service.create_self_signed_certificate(
+            result = self._lifecycle_service.create_self_signed_certificate(
                 display_name=display_name,
                 passphrase=passphrase,
                 save_password=save_password,
@@ -383,14 +379,14 @@ class CertificateCreationDialog:
             return None
 
         self.creation_result = result
-        if self._on_create is not None:
+        if result.refresh_shell and self._on_create is not None:
             self._on_create()
         information = getattr(self._bindings.q_message_box, "information", None)
         if callable(information):
             information(
                 self.controls.dialog,
                 "Certificate created",
-                f"Created certificate configuration '{display_name}'.",
+                result.user_message,
             )
         accept = getattr(self.controls.dialog, "accept", None)
         if callable(accept):
@@ -455,13 +451,11 @@ class CertificateConfigurationManagementDialog:
         *,
         bindings: QtAppFrameBindings,
         parent: Any,
-        catalog_store: CertificateCatalogStore,
-        secret_store: Any | None = None,
+        lifecycle_service: CertificateLifecycleService,
         on_change: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
-        self._catalog_store = catalog_store
-        self._secret_store = secret_store
+        self._lifecycle_service = lifecycle_service
         self._on_change = on_change
         self._configurations_by_id: dict[str, CertificateConfiguration] = {}
         self._managed_certificates_by_id: dict[str, ManagedCertificate] = {}
@@ -475,7 +469,7 @@ class CertificateConfigurationManagementDialog:
         return None
 
     def reload_configurations(self) -> None:
-        catalog = self._catalog_store.load_catalog()
+        catalog = self._lifecycle_service.load_catalog()
         configurations = catalog.certificate_configurations
         managed_certificates = catalog.managed_certificates
         self._configurations_by_id = {
@@ -531,22 +525,25 @@ class CertificateConfigurationManagementDialog:
         if configuration is None:
             self._show_error("Select a certificate configuration to save.")
             return None
-        updated = replace(
-            configuration,
-            display_name=self.controls.display_name.text().strip(),
-            notes=self.controls.notes.text().strip() or None,
-        )
         try:
-            self._catalog_store.save_configuration(updated)
-        except (ConfigValidationError, OSError, ValueError) as exc:
+            result = self._lifecycle_service.save_configuration(
+                configuration_id=configuration.certificate_configuration_id,
+                display_name=self.controls.display_name.text(),
+                notes=self.controls.notes.text(),
+            )
+        except (Exception,) as exc:
             self._show_error(str(exc))
             return None
 
         self.reload_configurations()
+        updated = result.certificate_configuration
+        if updated is None:
+            self._show_error("Certificate configuration was not saved.")
+            return None
         self._select_configuration(updated.certificate_configuration_id)
         self.load_selected_configuration()
-        self._emit_changed()
-        self._show_information("Certificate configuration saved.")
+        self._emit_changed_if_needed(result.refresh_shell)
+        self._show_information(result.user_message)
         return updated
 
     def delete_selected_configuration(self) -> bool:
@@ -559,49 +556,16 @@ class CertificateConfigurationManagementDialog:
             self._show_error("Select a certificate configuration to delete.")
             self.reload_configurations()
             return False
-        saved_secret: str | None = None
-        if configuration.password_secret_ref is not None:
-            if self._secret_store is None or not self._secret_store.is_available():
-                self._show_error(
-                    "Saved password storage is not available. "
-                    "The certificate configuration was not deleted."
-                )
-                return False
-            try:
-                saved_secret = self._secret_store.get_secret(
-                    configuration.password_secret_ref
-                )
-                self._secret_store.delete_secret(configuration.password_secret_ref)
-            except (SecretStorageError, OSError, ValueError) as exc:
-                self._show_error(str(exc))
-                return False
         try:
-            self._catalog_store.delete_configuration_by_id(configuration_id)
-        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
-            if (
-                configuration.password_secret_ref is not None
-                and saved_secret is not None
-                and self._secret_store is not None
-            ):
-                try:
-                    self._secret_store.set_secret(
-                        configuration.password_secret_ref,
-                        saved_secret,
-                    )
-                except (SecretStorageError, OSError, ValueError) as restore_exc:
-                    self._show_error(
-                        f"{exc} The saved password could not be restored: "
-                        f"{restore_exc}"
-                    )
-                    self.reload_configurations()
-                    return False
+            result = self._lifecycle_service.delete_configuration(configuration_id)
+        except (Exception,) as exc:
             self._show_error(str(exc))
             self.reload_configurations()
             return False
 
         self.reload_configurations()
-        self._emit_changed()
-        self._show_information("Certificate configuration deleted.")
+        self._emit_changed_if_needed(result.refresh_shell)
+        self._show_information(result.user_message)
         return True
 
     def delete_selected_managed_certificate(self) -> bool:
@@ -610,15 +574,15 @@ class CertificateConfigurationManagementDialog:
             self._show_error("Select a managed certificate to delete.")
             return False
         try:
-            self._catalog_store.delete_managed_certificate_by_id(certificate_id)
-        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            result = self._lifecycle_service.delete_managed_certificate(certificate_id)
+        except (Exception,) as exc:
             self._show_error(str(exc))
             self.reload_configurations()
             return False
 
         self.reload_configurations()
-        self._emit_changed()
-        self._show_information("Managed certificate deleted.")
+        self._emit_changed_if_needed(result.refresh_shell)
+        self._show_information(result.user_message)
         return True
 
     def export_selected_managed_certificate(self) -> Path | None:
@@ -641,17 +605,18 @@ class CertificateConfigurationManagementDialog:
         if not selected_path:
             return None
         try:
-            exported_path = self._catalog_store.export_managed_certificate_by_id(
-                certificate_id,
-                selected_path,
+            result = self._lifecycle_service.export_managed_certificate(
+                certificate_id=certificate_id,
+                destination_path=selected_path,
             )
-        except (ConfigValidationError, FileNotFoundError, KeyError, OSError, ValueError) as exc:
+        except (Exception,) as exc:
             self._show_error(str(exc))
             self.reload_configurations()
             return None
 
-        self._show_information(f"Managed certificate exported to {exported_path}.")
-        return exported_path
+        self._emit_changed_if_needed(result.refresh_shell)
+        self._show_information(result.user_message)
+        return result.exported_path
 
     def cancel(self) -> None:
         reject = getattr(self.controls.dialog, "reject", None)
@@ -762,6 +727,10 @@ class CertificateConfigurationManagementDialog:
         if self._on_change is not None:
             self._on_change()
 
+    def _emit_changed_if_needed(self, refresh_shell: bool) -> None:
+        if refresh_shell:
+            self._emit_changed()
+
     def _show_error(self, message: str) -> None:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
@@ -788,6 +757,7 @@ class FoliaSealAppFrame:
         app_settings_store: AppSettingsStore | None = None,
         certificate_catalog_store: CertificateCatalogStore | None = None,
         certificate_secret_provider: Any | None = None,
+        certificate_lifecycle_service: CertificateLifecycleService | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         shell_builder: Callable[..., Any] = build_qt_signing_shell,
@@ -804,6 +774,12 @@ class FoliaSealAppFrame:
         )
         self._certificate_secret_provider = (
             certificate_secret_provider or SecretToolCertificateSecretStore()
+        )
+        self._certificate_lifecycle_service = certificate_lifecycle_service or (
+            CertificateLifecycleService(
+                store=self._certificate_catalog_store,
+                secret_store=self._certificate_secret_provider,
+            )
         )
         self._preset_catalog_store = preset_catalog_store
         self._sign_executor = sign_executor
@@ -933,10 +909,7 @@ class FoliaSealAppFrame:
         dialog = CertificateImportDialog(
             bindings=self._bindings,
             parent=self.window,
-            import_service=CertificateImportService(
-                store=self._certificate_catalog_store,
-                secret_store=self._certificate_secret_provider,
-            ),
+            lifecycle_service=self._certificate_lifecycle_service,
             on_import=self._refresh_shell_certificate_configurations,
         )
         self._certificate_import_dialog = dialog
@@ -947,10 +920,7 @@ class FoliaSealAppFrame:
         dialog = CertificateCreationDialog(
             bindings=self._bindings,
             parent=self.window,
-            creation_service=CertificateCreationService(
-                store=self._certificate_catalog_store,
-                secret_store=self._certificate_secret_provider,
-            ),
+            lifecycle_service=self._certificate_lifecycle_service,
             on_create=self._refresh_shell_certificate_configurations,
         )
         self._certificate_creation_dialog = dialog
@@ -961,8 +931,7 @@ class FoliaSealAppFrame:
         dialog = CertificateConfigurationManagementDialog(
             bindings=self._bindings,
             parent=self.window,
-            catalog_store=self._certificate_catalog_store,
-            secret_store=self._certificate_secret_provider,
+            lifecycle_service=self._certificate_lifecycle_service,
             on_change=self._refresh_shell_certificate_configurations,
         )
         self._certificate_management_dialog = dialog
