@@ -16,6 +16,7 @@ from foliaseal.application import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
+    suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
 from foliaseal.application.phase3_signing_backend import (
@@ -3090,13 +3091,11 @@ class SigningWorkspaceWidget:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
 
     def _default_output_dialog_path(self) -> Path:
-        current_output = Path(self._draft_workflow.output_pdf_path)
-        if current_output.name:
-            filename = current_output.name
-        else:
-            input_path = Path(self._draft_workflow.input_pdf_path)
-            filename = f"{input_path.stem or 'signed'}-signed.pdf"
-        return Path(self._app_settings.default_output_directory) / filename
+        return suggest_signed_output_path(
+            input_pdf_path=self._draft_workflow.input_pdf_path,
+            default_output_directory=self._app_settings.default_output_directory,
+            current_output_path=self._draft_workflow.output_pdf_path,
+        )
 
     def _emit_error(self, message: str) -> None:
         self._set_sign_result_text(message, success=False)

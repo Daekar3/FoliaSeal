@@ -11,6 +11,7 @@ from typing import Any
 from foliaseal.application import (
     CertificateLifecycleService,
     SigningDraftWorkflow,
+    suggest_signed_output_path,
 )
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -855,8 +856,12 @@ class FoliaSealAppFrame:
             signing_workflow = SigningDraftWorkflow(
                 input_pdf_path=str(source_path),
                 output_pdf_path=str(
-                    Path(self._app_settings.default_output_directory)
-                    / f"{source_path.stem}-signed.pdf"
+                    suggest_signed_output_path(
+                        input_pdf_path=source_path,
+                        default_output_directory=(
+                            self._app_settings.default_output_directory
+                        ),
+                    )
                 ),
                 certificate_path="",
                 passphrase="",

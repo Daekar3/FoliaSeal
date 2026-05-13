@@ -21,6 +21,7 @@ from foliaseal.application.horizontal_signature_reservation import (
     build_horizontal_single_line_ink_reservation,
     measure_horizontal_single_line_rendered_reference,
 )
+from foliaseal.application.output_path_policy import suggest_signed_output_path
 from foliaseal.application.performance_timing import (
     ViewerPerformanceTracker,
     ViewerTimingSnapshot,
@@ -170,4 +171,5 @@ __all__ = [
     "measure_horizontal_single_line_rendered_reference",
     "render_canonical_signature_preview",
     "render_signing_preview",
+    "suggest_signed_output_path",
 ]
