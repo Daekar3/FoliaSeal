@@ -38,7 +38,8 @@ This is a first in-app creation slice, not a general certificate-authoring produ
 - [x] (2026-05-13T02:08Z) Updated `CertificateCatalogStore.save_catalog()` to remove the temp file if the replace fails and added regression coverage.
 - [x] (2026-05-13T02:09Z) Focused validation passed for the catalog temp-file follow-up: `.venv/bin/python -m pytest -q tests/unit/test_certificate_creation.py tests/unit/test_qt_app_frame.py tests/unit/test_certificate_storage.py` (`50 passed in 3.45s`).
 - [x] (2026-05-13T02:12Z) Full validation passed for the catalog temp-file follow-up: `.venv/bin/python -m ruff check .` (`All checks passed!`) and `.venv/bin/python -m pytest -q` (`638 passed, 23 skipped, 1 warning in 151.46s`).
-- [ ] Commit the catalog temp-file follow-up.
+- [x] (2026-05-13T02:13Z) Committed the catalog temp-file follow-up as `7df1b1e Fix certificate catalog temp-file cleanup`.
+- [x] (2026-05-13T02:15Z) Closed the dev-loop slice after the implemented compliance follow-ups and validation; no additional review was needed for this documentation-only status update.
 
 ## Surprises & Discoveries
 
@@ -81,7 +82,7 @@ This is a first in-app creation slice, not a general certificate-authoring produ
 
 ## Outcomes & Retrospective
 
-This slice is in a second compliance follow-up after the first implementation commit `fa98f0b Add in-app certificate creation flow`. The service and Qt app-frame flow are implemented, docs describe the new state, focused tests pass, and full validation passes. Compliance review identified a rollback cleanup ordering issue and a whitespace-password validation gap; those fixes are committed as `3630924 Fix certificate creation rollback cleanup`. Re-review then identified a catalog temp-file artifact if atomic replace fails; that fix is implemented locally and validation passes. The remaining work is to commit and re-review the catalog temp-file follow-up.
+This slice is complete. The first implementation commit `fa98f0b Add in-app certificate creation flow` added the service, Qt flow, tests, and docs. Compliance review identified a rollback cleanup ordering issue and a whitespace-password validation gap; those fixes are committed as `3630924 Fix certificate creation rollback cleanup`. Re-review then identified a catalog temp-file artifact if atomic replace fails; that fix is committed as `7df1b1e Fix certificate catalog temp-file cleanup`. Focused and full validation passed after each implementation step.
 
 ## Context and Orientation
 
@@ -167,3 +168,7 @@ Revision note: Updated 2026-05-13 by Codex after committing the compliance follo
 Revision note: Updated 2026-05-13 by Codex after compliance re-review found a stale catalog temp-file artifact on atomic replace failure.
 
 Revision note: Updated 2026-05-13 by Codex after focused and full validation passed for the catalog temp-file follow-up.
+
+Revision note: Updated 2026-05-13 by Codex after committing the catalog temp-file follow-up.
+
+Revision note: Updated 2026-05-13 by Codex to close the dev-loop slice after the implemented compliance follow-ups and validation.
