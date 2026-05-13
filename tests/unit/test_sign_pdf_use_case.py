@@ -213,6 +213,9 @@ def test_sign_use_case_blocks_certification_restricted_inputs_before_signing(
     assert result.failure_code == FailureCode.PDF_CERTIFICATION_RESTRICTS_SIGNING
     assert result.docmdp_permission == "no_changes"
     assert result.certification_restricted is True
+    assert result.restriction_reason == (
+        "Certification-restricted PDF: DocMDP NO_CHANGES forbids signing."
+    )
     assert "forbids signing" in result.message
     assert use_case.signer.called is False
     assert use_case.certificate_loader.called is False
@@ -330,6 +333,10 @@ def test_sign_use_case_fails_when_timestamp_trust_chain_is_untrusted(
 
     assert result.success is False
     assert result.failure_code == FailureCode.TIMESTAMP_TRUST_FAILED
+    assert result.timestamp_present is True
+    assert result.timestamp_cryptographically_valid is True
+    assert result.tsa_chain_trusted is False
+    assert result.timestamp_validation_error == "The TSA certificate is untrusted."
 
 
 def test_sign_use_case_maps_timestamp_trust_material_errors(

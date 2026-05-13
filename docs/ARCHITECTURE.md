@@ -366,7 +366,9 @@ The canonical repository document split is:
 5. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
 6. On sign, the workflow converts the draft into `SigningRequest`.
 7. The injected signing executor runs and returns a `SigningResult`.
-8. The shell displays success/failure state and harnesses can capture structured evidence.
+8. On success, the shell displays a compact completion summary from `SigningResult`, including the saved output path and local verification guidance.
+9. The shell enables an explicit `Open signed PDF` action that calls the app-frame reopen callback with the signed output path.
+10. On failure, the shell displays the backend-provided plain-language reason, disables the reopen action, and harnesses can capture structured evidence.
 
 ### Qt output path selection
 

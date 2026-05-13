@@ -26,6 +26,7 @@ from foliaseal.application.performance_timing import (
     ViewerPerformanceTracker,
     ViewerTimingSnapshot,
 )
+from foliaseal.application.signing_completion import format_signing_completion_message
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
     SigningDraftPreview,
@@ -168,6 +169,7 @@ __all__ = [
     "compare_signature_appearance_snapshots",
     "compare_preview_to_request",
     "build_horizontal_single_line_ink_reservation",
+    "format_signing_completion_message",
     "measure_horizontal_single_line_rendered_reference",
     "render_canonical_signature_preview",
     "render_signing_preview",

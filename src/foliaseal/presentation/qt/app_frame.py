@@ -878,6 +878,7 @@ class FoliaSealAppFrame:
                 app_settings_store=self._app_settings_store,
                 sign_executor=self._sign_executor,
                 on_sign_request=self._on_sign_request,
+                on_open_signed_output=self.open_pdf_path,
                 on_error=self._emit_error,
                 on_status_change=self._on_status_change,
             )

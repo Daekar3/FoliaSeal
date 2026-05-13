@@ -16,6 +16,7 @@ from foliaseal.application import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
+    format_signing_completion_message,
     suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
@@ -2827,6 +2828,7 @@ class SigningWorkspaceWidget:
         app_settings_store: AppSettingsStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
+        on_open_signed_output: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> None:
@@ -2835,6 +2837,7 @@ class SigningWorkspaceWidget:
         self._draft_workflow = signing_workflow
         self._sign_executor = sign_executor
         self._on_sign_request = on_sign_request
+        self._on_open_signed_output = on_open_signed_output
         self._on_error = on_error
         self._on_status_change = on_status_change
         self._app_settings_store = app_settings_store
@@ -2845,6 +2848,7 @@ class SigningWorkspaceWidget:
         else:
             self._app_settings = AppSettings.default()
         self._last_signing_result: SigningResult | None = None
+        self._last_successful_output_path: str | None = None
         self.widget = bindings.q_widget()
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
@@ -2892,17 +2896,26 @@ class SigningWorkspaceWidget:
         self._choose_output_button.clicked.connect(  # type: ignore[attr-defined]
             self.choose_output_pdf_path
         )
+        self._open_signed_output_button = bindings.q_push_button("Open signed PDF")
+        self._open_signed_output_button.setEnabled(False)
+        self._open_signed_output_button.clicked.connect(  # type: ignore[attr-defined]
+            self.open_signed_output
+        )
         self._main_row.addWidget(self._viewer_widget, 3)
         self._main_row.addWidget(self._properties_scroll, 2)
         self._layout.addLayout(self._main_row)
         self._layout.addWidget(self._choose_output_button)
         self._layout.addWidget(self._sign_button)
+        self._layout.addWidget(self._open_signed_output_button)
         self._layout.addWidget(self._result_label)
 
         self.widget.properties_panel = self.properties_panel  # type: ignore[attr-defined]
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
         self.widget.choose_output_button = self._choose_output_button  # type: ignore[attr-defined]
+        self.widget.open_signed_output_button = (  # type: ignore[attr-defined]
+            self._open_signed_output_button
+        )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
@@ -2912,6 +2925,7 @@ class SigningWorkspaceWidget:
             self.refresh_certificate_configurations
         )
         self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
+        self.widget.open_signed_output = self.open_signed_output  # type: ignore[attr-defined]
         self.widget._signing_workspace = self  # type: ignore[attr-defined]
 
         self.refresh_viewer()
@@ -2940,6 +2954,7 @@ class SigningWorkspaceWidget:
         self.properties_panel.apply_changes()
         if not self.properties_panel.is_ready_to_sign():
             self._last_signing_result = None
+            self._set_last_successful_output_path(None)
             self._set_sign_result_text("")
             self._emit_error(self.properties_panel.validation_text())
             return None
@@ -2956,6 +2971,7 @@ class SigningWorkspaceWidget:
                     failure_code=None,
                     message=failure_message,
                 )
+                self._set_last_successful_output_path(None)
                 self._set_sign_result_text(failure_message, success=False)
                 self._emit_error(failure_message)
                 self.widget.last_signing_result = self._last_signing_result  # type: ignore[attr-defined]
@@ -2963,13 +2979,15 @@ class SigningWorkspaceWidget:
             self._last_signing_result = result
             self.widget.last_signing_result = result  # type: ignore[attr-defined]
             if result.success:
+                self._set_last_successful_output_path(request.output_pdf_path)
                 self._set_sign_result_text(
-                    f"{result.message} Output: {request.output_pdf_path}",
+                    format_signing_completion_message(result, request.output_pdf_path),
                     success=True,
                 )
                 if self._on_status_change is not None:
                     self._on_status_change("sign_success")
             else:
+                self._set_last_successful_output_path(None)
                 self._set_sign_result_text(result.message, success=False)
                 if self._on_error is not None:
                     self._on_error(result.message)
@@ -2978,8 +2996,16 @@ class SigningWorkspaceWidget:
             return request
         self._last_signing_result = None
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
+        self._set_last_successful_output_path(None)
         self._set_sign_result_text("")
         return request
+
+    def open_signed_output(self) -> str | None:
+        output_path = self._last_successful_output_path
+        if output_path is None or self._on_open_signed_output is None:
+            return None
+        self._on_open_signed_output(output_path)
+        return output_path
 
     def choose_output_pdf_path(self) -> str | None:
         initial_path = self._default_output_dialog_path()
@@ -3005,6 +3031,12 @@ class SigningWorkspaceWidget:
     def last_signing_result(self) -> SigningResult | None:
         """Return the most recent signing result, if a real executor ran."""
         return self._last_signing_result
+
+    def _set_last_successful_output_path(self, output_path: str | None) -> None:
+        self._last_successful_output_path = output_path
+        self._open_signed_output_button.setEnabled(
+            output_path is not None and self._on_open_signed_output is not None
+        )
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
@@ -3136,6 +3168,7 @@ class SigningShellAdapter:
         app_settings_store: AppSettingsStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
+        on_open_signed_output: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> Any:
@@ -3152,6 +3185,7 @@ class SigningShellAdapter:
             app_settings_store=app_settings_store,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
+            on_open_signed_output=on_open_signed_output,
             on_error=on_error,
             on_status_change=on_status_change,
         ).container
@@ -3201,6 +3235,7 @@ def build_qt_signing_shell(
     app_settings_store: AppSettingsStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
+    on_open_signed_output: Callable[[str], Any] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
 ) -> Any:
@@ -3219,6 +3254,7 @@ def build_qt_signing_shell(
         app_settings_store=app_settings_store,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
+        on_open_signed_output=on_open_signed_output,
         on_error=on_error,
         on_status_change=on_status_change,
     )

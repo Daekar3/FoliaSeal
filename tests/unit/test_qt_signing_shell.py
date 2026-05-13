@@ -763,7 +763,8 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
             message="Signing completed successfully.",
             output_pdf_version="1.7",
             signature_subfilter="adbe.pkcs7.detached",
-            timestamp_present=True,
+            timestamp_present=False,
+            standards_summary="PDF 1.7, detached signature, no timestamp.",
         )
     )
     widget = build_qt_signing_shell(
@@ -779,10 +780,96 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     assert executor.calls == [request]
     assert widget._signing_workspace.last_signing_result is not None
     assert widget._signing_workspace.last_signing_result.success is True
+    assert "Signing completed successfully." in widget.sign_result_label.text()
+    assert f"Saved to: {request.output_pdf_path}" in widget.sign_result_label.text()
     assert (
-        widget.sign_result_label.text()
-        == f"Signing completed successfully. Output: {request.output_pdf_path}"
+        "Verified locally: PDF 1.7, detached signature, no timestamp."
+        in widget.sign_result_label.text()
     )
+    assert "No timestamp token was found." in widget.sign_result_label.text()
+    assert widget.open_signed_output_button._enabled is False
+
+
+def test_signing_shell_open_signed_output_uses_success_callback(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    opened_paths = []
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+        on_open_signed_output=opened_paths.append,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    request = widget.submit_sign_request()
+    opened = widget.open_signed_output()
+
+    assert request is not None
+    assert opened == request.output_pdf_path
+    assert opened_paths == [request.output_pdf_path]
+    assert widget.open_signed_output_button._enabled is True
+
+
+def test_signing_shell_disables_open_signed_output_after_sign_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    opened_paths = []
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=False,
+            failure_code=FailureCode.POST_VERIFY_FAILED,
+            message="Post-sign verification failed.",
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+        on_open_signed_output=opened_paths.append,
+        on_error=lambda _message: None,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    request = widget.submit_sign_request()
+    opened = widget.open_signed_output()
+
+    assert request is not None
+    assert opened is None
+    assert opened_paths == []
+    assert widget.open_signed_output_button._enabled is False
 
 
 def test_signing_shell_reports_sign_failure_when_executor_returns_failure(

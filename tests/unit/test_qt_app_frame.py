@@ -343,6 +343,36 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
     )
     assert shell_calls[0]["app_settings"] == _settings(tmp_path)
     assert shell_calls[0]["certificate_secret_provider"] is secret_store
+    assert shell_calls[0]["on_open_signed_output"] == frame.open_pdf_path
+
+
+def test_app_frame_reopens_signed_output_from_shell_callback(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    opened_paths = []
+    shell_calls = []
+
+    def shell_builder(**kwargs):
+        shell_calls.append(kwargs)
+        opened_paths.append(kwargs["viewer_workflow"]._document_path)
+        return _FakeShell()
+
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_builder=shell_builder,
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    shell_callback = shell_calls[0]["on_open_signed_output"]
+
+    reopened = shell_callback(tmp_path / "signed" / "contract-signed.pdf")
+
+    assert reopened is frame.window.current_shell
+    assert opened_paths == [
+        str(tmp_path / "source" / "contract.pdf"),
+        str(tmp_path / "signed" / "contract-signed.pdf"),
+    ]
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:
