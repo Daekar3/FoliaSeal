@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -337,3 +338,42 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
         "scenario_manifest_path": "/tmp/manifest.json",
         "artifacts_dir": "/tmp/artifacts",
     }
+
+
+def test_main_phase3_signing_harness_validate_dispatches_to_contract_evaluator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text('{"contract_version": "phase3.v1"}', encoding="utf-8")
+    captured = {}
+
+    def fake_evaluate_phase3_evidence_contract(payload: dict[str, object]) -> SimpleNamespace:
+        captured["payload"] = payload
+        return SimpleNamespace(
+            acceptance_tier="full",
+            gate_verdict="pass",
+            passed=True,
+            contract_version="phase3.v1",
+            errors=(),
+            warnings=(),
+        )
+
+    monkeypatch.setattr(
+        "foliaseal.__main__.evaluate_phase3_evidence_contract",
+        fake_evaluate_phase3_evidence_contract,
+    )
+
+    __main__.main(
+        [
+            "phase3-signing-harness-validate",
+            "--summary-json-path",
+            str(summary_path),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert captured == {"payload": {"contract_version": "phase3.v1"}}
+    assert "Phase 3 evidence contract" in output
+    assert "- validation passed: yes" in output
