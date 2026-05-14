@@ -69,12 +69,16 @@ silently flattened into inline pipe-separated text when the preview says it shou
 
 ## Outcomes & Retrospective
 
-Completed as a closure slice. The backend now makes `Top` / `Bottom` follow distinct vertical
-layout paths, uses shrink-to-fit image background placement with orientation-aware margins, and
-builds visible text through shared semantics so the label prefix remains a separate line when the
-contract requires it. The added regression
+Completed as a backend-test closure slice. The backend now makes `Top` / `Bottom` follow distinct
+vertical layout paths, uses shrink-to-fit image background placement with orientation-aware margins,
+and builds visible text through shared semantics so the label prefix remains a separate line when
+the contract requires it. The added regression
 `test_single_line_top_and_bottom_use_distinct_vertical_layout_paths` directly protects the
-top/bottom collapse failure that triggered this plan.
+top/bottom collapse failure that triggered this plan at the backend layout-helper level.
+
+This closure does not include fresh user-facing harness or signed-PDF artifact evidence. The next
+harness or signed-output acceptance pass should treat the backend regression coverage as a
+precondition, not as a substitute for end-to-end visual proof.
 
 ## Context and Orientation
 
@@ -135,8 +139,9 @@ Acceptance is reached when the backend tests prove all of the following:
 - The prefix/text formatting path matches the contract exercised by the preview and final PDF.
 - Focused backend tests pass and lint is clean.
 
-The user-facing proof comes from the next harness run, but this ExecPlan is only accepted when the
-backend tests clearly cover the semantic gaps that the harness exposed.
+This backend closure is accepted when the backend tests clearly cover the semantic gaps that the
+harness exposed. User-facing proof still comes from a later harness or signed-output acceptance run
+and is not claimed by this closure commit.
 
 ## Idempotence and Recovery
 
@@ -151,6 +156,7 @@ construction to reflect the actual contract rather than weakening the contract i
   - the prefix line appeared inline and pipe-separated in the final PDF
 - This plan intentionally keeps the backend and test work together so the next harness run has a
   better chance of being meaningful.
+- No fresh harness run or signed-PDF artifact was produced in the 2026-05-14 closure slice.
 
 Validation transcript from the 2026-05-14 closure slice:
 
@@ -177,3 +183,7 @@ No new external dependencies are expected.
 Revision note: Updated 2026-05-14 by Codex after resuming the plan as a dev-loop closure slice,
 adding explicit Top/Bottom regression coverage, and recording the current backend implementation
 and validation status.
+
+Revision note: Updated 2026-05-14 by Codex after compliance review to clarify that this commit
+closes backend-test acceptance only; user-facing proof remains assigned to a later harness or
+signed-output acceptance run.
