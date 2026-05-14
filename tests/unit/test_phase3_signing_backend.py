@@ -2014,6 +2014,42 @@ def test_background_layout_for_single_line_bottom_preserves_border_facing_gap(
     assert layout.margins.bottom > reservation.background_layout.margins.bottom
 
 
+def test_single_line_top_and_bottom_use_distinct_vertical_layout_paths(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+    stamp_background = _stamp_background_for_path(str(stamp_path))
+    signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=40.0)
+    box_style = SignatureBoxStyle(
+        show_border=True,
+        border_color_hex="#000000",
+        border_width_pt=1.0,
+        background_color_hex="#FFFFFF",
+    )
+
+    top_layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=10,
+        box_style=box_style,
+    )
+    bottom_layout = _background_layout_for_stamp(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.BOTTOM,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        text_box_width=180,
+        text_box_height=10,
+        box_style=box_style,
+    )
+
+    assert top_layout.y_align != bottom_layout.y_align
+    assert top_layout.margins.top < top_layout.margins.bottom
+    assert bottom_layout.margins.bottom < bottom_layout.margins.top
+
+
 def test_build_stamp_style_uses_template_specific_layout_for_single_line(
     tmp_path: Path,
 ) -> None:

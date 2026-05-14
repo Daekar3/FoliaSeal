@@ -22,12 +22,15 @@ silently flattened into inline pipe-separated text when the preview says it shou
 ## Progress
 
 - [x] (2026-03-31 01:05Z) Created this ExecPlan and scoped the backend/layout fix wave.
-- [ ] Inspect the current backend `single_line` implementation and the visible-text formatting path.
-- [ ] Update the backend so `Top` and `Bottom` produce distinct final-PDF layouts and the stamp is
+- [x] (2026-05-14T01:05Z) Resumed the plan as a closure slice and confirmed current backend code
+  already carries orientation-aware reservations, image-background shrink-to-fit, and
+  semantics-driven visible text assembly.
+- [x] Inspect the current backend `single_line` implementation and the visible-text formatting path.
+- [x] Update the backend so `Top` and `Bottom` produce distinct final-PDF layouts and the stamp is
   constrained sensibly in ordinary rectangles.
-- [ ] Add regression tests for `Top` / `Bottom`, oversized-stamp behavior, and the prefix/layout
+- [x] Add regression tests for `Top` / `Bottom`, oversized-stamp behavior, and the prefix/layout
   formatting mismatch.
-- [ ] Run focused verification and decide whether the next harness pass is justified.
+- [x] Run focused verification and decide whether the next harness pass is justified.
 
 ## Surprises & Discoveries
 
@@ -40,6 +43,15 @@ silently flattened into inline pipe-separated text when the preview says it shou
   whether the prefix occupies its own line or collapses into inline text.
   Evidence: the user observed the signed PDF showing the prefix inline and pipe-separated instead of
   on its own line as the preview suggested.
+
+- Observation: by the time this plan was resumed on 2026-05-14, later visible-signature work had
+  already implemented most of the backend behavior this plan requested.
+  Evidence: `phase3_signing_backend.py` now routes stamp background placement through
+  `_layout_reservation_for_template()` and `_background_layout_for_stamp()`, uses
+  `InnerScaling.SHRINK_TO_FIT` for image backgrounds, and builds final stamp text through the
+  shared visible-semantics path. The backend test suite already included coverage for template
+  specific layouts, prefix newline preservation, compact text wrapping, horizontal ink reservation,
+  and border-facing stamp gaps.
 
 ## Decision Log
 
@@ -57,9 +69,12 @@ silently flattened into inline pipe-separated text when the preview says it shou
 
 ## Outcomes & Retrospective
 
-Pending. The target outcome is a backend that makes `Top` / `Bottom` materially distinct in the
-final PDF, keeps stamp sizing reasonable, and produces a visible prefix/text arrangement that
-matches the preview semantics for ordinary rectangles.
+Completed as a closure slice. The backend now makes `Top` / `Bottom` follow distinct vertical
+layout paths, uses shrink-to-fit image background placement with orientation-aware margins, and
+builds visible text through shared semantics so the label prefix remains a separate line when the
+contract requires it. The added regression
+`test_single_line_top_and_bottom_use_distinct_vertical_layout_paths` directly protects the
+top/bottom collapse failure that triggered this plan.
 
 ## Context and Orientation
 
@@ -137,6 +152,17 @@ construction to reflect the actual contract rather than weakening the contract i
 - This plan intentionally keeps the backend and test work together so the next harness run has a
   better chance of being meaningful.
 
+Validation transcript from the 2026-05-14 closure slice:
+
+    .venv/bin/python -m pytest -q tests/unit/test_phase3_signing_backend.py
+    101 passed in 82.37s (0:01:22)
+
+    .venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py
+    All checks passed!
+
+    git diff --check
+    <no output>
+
 ## Interfaces and Dependencies
 
 The key interfaces are:
@@ -148,3 +174,6 @@ The key interfaces are:
 
 No new external dependencies are expected.
 
+Revision note: Updated 2026-05-14 by Codex after resuming the plan as a dev-loop closure slice,
+adding explicit Top/Bottom regression coverage, and recording the current backend implementation
+and validation status.
