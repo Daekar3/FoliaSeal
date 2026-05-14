@@ -285,11 +285,23 @@ What signed-output acceptance should add on top:
 - cryptographic status details needed to prove the output is not only visually plausible but also actually signed correctly
 - explicit evidence that the signed annotation rect landed where requested and that preview/output parity stayed within tolerance
 
-Representative signed acceptance matrix:
+One-command signed acceptance evidence:
+
+```bash
+.venv/bin/python -m foliaseal phase3-signing-acceptance-evidence
+```
+
+This regenerates the current-code fixture PDF, test PKCS#12 identity, stamp image, and three
+scenario manifests, runs the representative acceptance, preview-parity, and fit-rejection matrices,
+then writes `artifacts/phase3_signed_acceptance_evidence_summary.md`. The command exits with an
+error if any matrix reports failed acceptance expectations, expected-outcome mismatches,
+cryptographic validation failures, preview/output comparison failures, or annotation rectangle
+mismatches.
+
+Representative per-manifest signed acceptance matrix:
 
 ```bash
 .venv/bin/python scripts/generate_signed_acceptance_assets.py
-
 .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
   --pdf-path artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf \
   --certificate-path artifacts/generated_acceptance_assets/signed_acceptance_identity.p12 \

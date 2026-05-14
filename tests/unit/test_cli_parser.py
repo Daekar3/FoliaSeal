@@ -65,3 +65,21 @@ def test_phase3_preview_matrix_parser_accepts_manifest_and_artifacts_dir() -> No
     assert args.command == "phase3-signing-preview-matrix"
     assert args.scenario_manifest_path == "artifacts/phase3_preview_matrix.json"
     assert args.artifacts_dir == "artifacts/phase3_preview_matrix"
+
+
+def test_phase3_signed_acceptance_evidence_parser_accepts_output_paths() -> None:
+    parser = _build_parser()
+
+    args = parser.parse_args(
+        [
+            "phase3-signing-acceptance-evidence",
+            "--artifacts-root",
+            "/tmp/foliaseal-evidence",
+            "--summary-markdown-path",
+            "/tmp/foliaseal-evidence/summary.md",
+        ]
+    )
+
+    assert args.command == "phase3-signing-acceptance-evidence"
+    assert args.artifacts_root == "/tmp/foliaseal-evidence"
+    assert args.summary_markdown_path == "/tmp/foliaseal-evidence/summary.md"

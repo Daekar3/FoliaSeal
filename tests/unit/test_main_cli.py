@@ -340,6 +340,56 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
     }
 
 
+def test_main_phase3_signed_acceptance_evidence_dispatches_to_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured = {}
+
+    def fake_run_signed_acceptance_evidence(
+        *,
+        artifacts_root: str,
+        summary_markdown_path: str,
+    ) -> dict[str, object]:
+        captured["artifacts_root"] = artifacts_root
+        captured["summary_markdown_path"] = summary_markdown_path
+        return {
+            "summary_markdown_path": summary_markdown_path,
+            "matrix_results": [
+                {
+                    "name": "signed_acceptance_matrix",
+                    "counters": {
+                        "scenario_count": 10,
+                        "successful_signing_run_count": 7,
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        "foliaseal.__main__.run_signed_acceptance_evidence",
+        fake_run_signed_acceptance_evidence,
+    )
+
+    __main__.main(
+        [
+            "phase3-signing-acceptance-evidence",
+            "--artifacts-root",
+            "/tmp/foliaseal-evidence",
+            "--summary-markdown-path",
+            "/tmp/foliaseal-evidence/summary.md",
+        ]
+    )
+
+    assert captured == {
+        "artifacts_root": "/tmp/foliaseal-evidence",
+        "summary_markdown_path": "/tmp/foliaseal-evidence/summary.md",
+    }
+    output = capsys.readouterr().out
+    assert "Phase 3 signed acceptance evidence" in output
+    assert "signed_acceptance_matrix: PASS (10 scenarios, 7 successful signings)" in output
+
+
 def test_main_phase3_signing_harness_validate_dispatches_to_contract_evaluator(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

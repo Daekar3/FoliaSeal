@@ -35,6 +35,10 @@ from foliaseal.presentation.qt.phase3_harness import (
     run_phase3_signed_acceptance_matrix,
     run_phase3_signing_harness,
 )
+from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
+    DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
+    run_signed_acceptance_evidence,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -311,6 +315,27 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    phase3_signed_evidence = subparsers.add_parser(
+        "phase3-signing-acceptance-evidence",
+        help="Regenerate signed acceptance assets and run all signed evidence matrices.",
+    )
+    phase3_signed_evidence.add_argument(
+        "--artifacts-root",
+        default=".",
+        help=(
+            "Repository or workspace root under which ignored artifacts should be "
+            "generated."
+        ),
+    )
+    phase3_signed_evidence.add_argument(
+        "--summary-markdown-path",
+        default=None,
+        help=(
+            "Markdown file for the concise evidence summary. Defaults to "
+            f"{DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH} under --artifacts-root."
+        ),
+    )
+
     phase3_validate = subparsers.add_parser(
         "phase3-signing-harness-validate",
         help="Validate an existing Phase 3 harness capture JSON without launching the GUI.",
@@ -478,6 +503,21 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(f"- successful signings: {summary['successful_signing_run_count']}")
         print(f"- artifacts directory: {summary['artifacts_dir']}")
         print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
+        return
+    if args.command == "phase3-signing-acceptance-evidence":
+        evidence = run_signed_acceptance_evidence(
+            artifacts_root=args.artifacts_root,
+            summary_markdown_path=args.summary_markdown_path,
+        )
+        print("Phase 3 signed acceptance evidence")
+        print(f"- summary markdown: {evidence['summary_markdown_path']}")
+        for result in evidence["matrix_results"]:
+            counters = result["counters"]
+            print(
+                f"- {result['name']}: PASS "
+                f"({counters['scenario_count']} scenarios, "
+                f"{counters['successful_signing_run_count']} successful signings)"
+            )
         return
     if args.command == "phase3-signing-harness-validate":
         _run_phase3_harness_validate(args)

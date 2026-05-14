@@ -186,9 +186,9 @@ The canonical repository document split is:
 
 ### QA and evidence machinery
 
-- Location: `src/foliaseal/application/qa_*`, `src/foliaseal/application/phase2_evidence.py`, `src/foliaseal/presentation/qt/phase*_harness.py`, `artifacts/`
-- Responsibility: Produce manual QA evidence, preview matrix outputs, signed-output acceptance artifacts, and evidence contract evaluations.
-- Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, checklist rendering.
+- Location: `src/foliaseal/application/qa_*`, `src/foliaseal/application/phase2_evidence.py`, `src/foliaseal/presentation/qt/phase*_harness.py`, `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py`, `artifacts/`
+- Responsibility: Produce manual QA evidence, preview matrix outputs, signed-output acceptance artifacts, signed acceptance evidence summaries, and evidence contract evaluations.
+- Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, checklist rendering.
 - Does not own: Core domain models or signing semantics.
 - Key collaborators: CLI entry points, Qt shell, signing backend, artifacts directory.
 - Status: Confirmed by code, README, tests, and artifacts.
@@ -235,7 +235,7 @@ The canonical repository document split is:
 - Producer: `src/foliaseal/__main__.py`
 - Consumer: Developers, manual QA, local automation.
 - Stability: Needs review. Commands are documented in README and covered by CLI tests, so treat them as user-facing.
-- Commands: default `foliaseal`, `phase2-evidence`, `phase2-viewer-harness`, `phase3-signing-harness`, `phase3-signing-preview-matrix`, `phase3-signing-acceptance-matrix`, `phase3-signing-harness-validate`.
+- Commands: default `foliaseal`, `phase2-evidence`, `phase2-viewer-harness`, `phase3-signing-harness`, `phase3-signing-preview-matrix`, `phase3-signing-acceptance-matrix`, `phase3-signing-acceptance-evidence`, `phase3-signing-harness-validate`.
 - Validation: `argparse` enforces required arguments; command handlers raise on invalid evidence captures.
 - Error behavior: Python exceptions surface for invalid harness/evidence flows unless command handlers map them.
 - Source files: `src/foliaseal/__main__.py`, tests in `tests/unit/test_cli_parser.py` and `tests/unit/test_main_cli.py`.
