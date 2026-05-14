@@ -288,6 +288,8 @@ What signed-output acceptance should add on top:
 Representative signed acceptance matrix:
 
 ```bash
+.venv/bin/python scripts/generate_signed_acceptance_assets.py
+
 .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
   --pdf-path artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf \
   --certificate-path artifacts/generated_acceptance_assets/signed_acceptance_identity.p12 \
@@ -298,6 +300,9 @@ Representative signed acceptance matrix:
 
 What it writes:
 
+- the generator command creates the local fixture PDF, test PKCS#12 identity, stamp image, and
+  scenario manifests from current source code; these inputs are intentionally ignored by git and
+  should be regenerated when fresh acceptance evidence is needed
 - a signed PDF per scenario
 - the signed page render and signed annotation crop
 - preview-vs-signed-output side-by-side comparisons
