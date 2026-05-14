@@ -29,7 +29,9 @@ This is a tooling and evidence-enablement slice. The source-controlled change is
 - [x] (2026-05-14T06:19Z) Ran the generated signed acceptance, fit-rejection, and preview-parity matrices successfully.
 - [x] (2026-05-14T06:23Z) Committed the first-pass source-controlled changes as `101d649 Generate signed acceptance assets`.
 - [x] (2026-05-14T06:31Z) Compliance review found that temporary-root generation wrote manifests pointing at the repo-root stamp image and that this plan undercounted the generated stamp image in the acceptance wording.
-- [ ] Commit the compliance follow-up that makes temporary-root manifests self-contained and clarifies the generated artifact count.
+- [x] (2026-05-14T19:18Z) Committed the compliance follow-up as `194c677 Fix generated stamp asset paths`.
+- [x] (2026-05-14T19:22Z) Post-fix compliance review found the temp-root and ExecPlan findings resolved and identified one stale README artifact-family sentence.
+- [x] (2026-05-14T19:26Z) Committed the README artifact-family cleanup as `df81768 Clarify signed acceptance artifact docs`.
 
 ## Surprises & Discoveries
 
@@ -207,3 +209,7 @@ Revision note: Created 2026-05-14 by Codex to implement current-code generation 
 Revision note: Updated 2026-05-14 by Codex after implementing the generator, running source-controlled validation, generating fresh local artifacts, and passing all three generated signed matrix manifests.
 
 Revision note: Updated 2026-05-14 by Codex after compliance review to clarify that the stamp image is a generated artifact and to make temporary-root manifest paths point at the generated temporary stamp image.
+
+Revision note: Updated 2026-05-14 by Codex after post-fix compliance review to record commit `194c677` and align README artifact-family wording with the generated stamp image.
+
+Revision note: Updated 2026-05-14 by Codex after committing the README artifact-family cleanup to close the plan progress list.

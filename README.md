@@ -373,7 +373,8 @@ conventional local workspace paths, not guaranteed tracked repository inputs:
   `test_identity.p12`, the three transparent stamp images, and the baseline/stress preview
   manifests
 - `artifacts/generated_acceptance_assets/` for end-to-end signed acceptance, including the clean
-  signing fixture PDF and the repo-local PKCS#12 identity used by the signed acceptance matrix
+  signing fixture PDF, repo-local PKCS#12 identity, and stamp image used by the signed acceptance
+  matrix
 
 Artifact hygiene:
 
