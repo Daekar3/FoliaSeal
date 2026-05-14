@@ -377,3 +377,40 @@ def test_main_phase3_signing_harness_validate_dispatches_to_contract_evaluator(
     assert captured == {"payload": {"contract_version": "phase3.v1"}}
     assert "Phase 3 evidence contract" in output
     assert "- validation passed: yes" in output
+
+
+def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text('{"contract_version": "phase3.v1"}', encoding="utf-8")
+
+    def fake_evaluate_phase3_evidence_contract(payload: dict[str, object]) -> SimpleNamespace:
+        return SimpleNamespace(
+            acceptance_tier="partial",
+            gate_verdict="fail",
+            passed=False,
+            contract_version=str(payload["contract_version"]),
+            errors=("missing required field",),
+            warnings=(),
+        )
+
+    monkeypatch.setattr(
+        "foliaseal.__main__.evaluate_phase3_evidence_contract",
+        fake_evaluate_phase3_evidence_contract,
+    )
+
+    with pytest.raises(ValueError, match="failed evidence contract validation"):
+        __main__.main(
+            [
+                "phase3-signing-harness-validate",
+                "--summary-json-path",
+                str(summary_path),
+            ]
+        )
+
+    output = capsys.readouterr().out
+    assert "- validation passed: no" in output
+    assert "- errors: ['missing required field']" in output

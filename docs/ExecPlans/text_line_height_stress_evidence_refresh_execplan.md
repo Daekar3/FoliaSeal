@@ -28,6 +28,7 @@ This slice is an evidence refresh, not a rendering behavior change. It should re
 - [x] (2026-05-14T00:00Z) Compliance review found the handoff under-specified fixture restoration, omitted the README-current `multi_line` stress rerun, missed CLI dispatch coverage, and left the single-line batch fallback too vague.
 - [x] (2026-05-14T00:05Z) Updated this plan to restore the full preview fixture family, rerun all three stress manifests that README currently records as red, include exact single-line batch output naming, and validate CLI dispatch.
 - [x] (2026-05-14T00:20Z) Tightened the single-line batch fallback to an attempt-scoped output directory and added direct CLI dispatch coverage for `phase3-signing-harness-validate`.
+- [x] (2026-05-14T00:35Z) Tightened the single-line temporary manifest directory to the same attempt scope and added negative `phase3-signing-harness-validate` CLI coverage for failed evidence contracts.
 - [ ] Restore or provide the local preview sweep fixture assets.
 - [ ] Rerun the three targeted stress matrices.
 - [ ] Update this ExecPlan, `README.md`, and, if counts change materially, `docs/ExecPlans/real_world_stress_coverage_execplan.md` and `docs/ExecPlans/stress_matrix_green_path_remediation_execplan.md`.
@@ -126,7 +127,8 @@ Run `single_line` stress:
 If the monolithic `single_line` run aborts before writing `summary.json`, generate temporary batches from the restored manifest and run them under an attempt-scoped directory:
 
     export SINGLE_LINE_BATCH_RUN=artifacts/preview_sweep_runs/single_line_full_matrix_stress_batches_$(date -u +%Y%m%dT%H%M%SZ)
-    .venv/bin/python -c 'import json; from pathlib import Path; src=Path("artifacts/preview_sweep_assets/single_line_full_matrix_stress.json"); out=Path("/tmp/foliaseal_single_line_stress_batches"); out.mkdir(parents=True, exist_ok=True); payload=json.loads(src.read_text(encoding="utf-8")); scenarios=payload["scenarios"]; size=100; [((out / f"single_line_full_matrix_stress_batch_{idx:03d}.json").write_text(json.dumps({**payload, "scenarios": scenarios[start:start+size]}, indent=2), encoding="utf-8")) for idx,start in enumerate(range(0, len(scenarios), size), 1)]'
+    export SINGLE_LINE_BATCH_MANIFESTS=/tmp/foliaseal_single_line_stress_batches_$(date -u +%Y%m%dT%H%M%SZ)
+    .venv/bin/python -c 'import json, os; from pathlib import Path; src=Path("artifacts/preview_sweep_assets/single_line_full_matrix_stress.json"); out=Path(os.environ["SINGLE_LINE_BATCH_MANIFESTS"]); out.mkdir(parents=True, exist_ok=True); payload=json.loads(src.read_text(encoding="utf-8")); scenarios=payload["scenarios"]; size=100; [((out / f"single_line_full_matrix_stress_batch_{idx:03d}.json").write_text(json.dumps({**payload, "scenarios": scenarios[start:start+size]}, indent=2), encoding="utf-8")) for idx,start in enumerate(range(0, len(scenarios), size), 1)]'
 
 Run each batch to a stable output directory:
 
@@ -134,10 +136,10 @@ Run each batch to a stable output directory:
       --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf \
       --certificate-path artifacts/preview_sweep_assets/test_identity.p12 \
       --passphrase preview-passphrase \
-      --scenario-manifest-path /tmp/foliaseal_single_line_stress_batches/single_line_full_matrix_stress_batch_001.json \
+      --scenario-manifest-path "$SINGLE_LINE_BATCH_MANIFESTS"/single_line_full_matrix_stress_batch_001.json \
       --artifacts-dir "$SINGLE_LINE_BATCH_RUN"/single_line_full_matrix_stress_batch_001
 
-Repeat for every generated `/tmp/foliaseal_single_line_stress_batches/single_line_full_matrix_stress_batch_*.json` file, incrementing the matching `"$SINGLE_LINE_BATCH_RUN"/single_line_full_matrix_stress_batch_###` output directory. Do not aggregate across sibling batch directories from prior attempts. Afterward, aggregate only the current attempt's batch summaries with:
+Repeat for every generated `"$SINGLE_LINE_BATCH_MANIFESTS"/single_line_full_matrix_stress_batch_*.json` file, incrementing the matching `"$SINGLE_LINE_BATCH_RUN"/single_line_full_matrix_stress_batch_###` output directory. Do not rerun manifests from prior attempts and do not aggregate across sibling batch directories from prior attempts. Afterward, aggregate only the current attempt's batch summaries with:
 
     .venv/bin/python -c 'import json, os; from pathlib import Path; root=Path(os.environ["SINGLE_LINE_BATCH_RUN"]); keys=("scenario_count","invalid_scenario_count","error_scenario_count","signable_text_clipping_risk_scenario_count","rejected_text_clipping_risk_scenario_count","signable_text_stamp_overlap_risk_scenario_count","signable_stamp_warning_scenario_count","stamp_edge_touch_scenario_count"); totals={key:0 for key in keys}; [totals.__setitem__(key, totals[key] + json.loads((path/"summary.json").read_text(encoding="utf-8")).get(key, 0)) for path in sorted(root.glob("single_line_full_matrix_stress_batch_*")) for key in keys]; print(json.dumps(totals, indent=2, sort_keys=True))'
 
@@ -204,6 +206,14 @@ Second compliance follow-up validation:
     .venv/bin/python -m ruff check tests/unit/test_main_cli.py
     All checks passed!
 
+Third compliance follow-up validation:
+
+    .venv/bin/python -m pytest -q tests/unit/test_main_cli.py tests/unit/test_cli_parser.py tests/unit/test_phase3_harness.py
+    102 passed, 13 skipped, 1 warning in 7.64s
+
+    .venv/bin/python -m ruff check tests/unit/test_main_cli.py
+    All checks passed!
+
 Whitespace validation:
 
     git diff --check
@@ -224,3 +234,5 @@ Revision note: Updated 2026-05-13 by Codex after confirming the matrix command f
 Revision note: Updated 2026-05-14 by Codex after compliance review to include the full fixture restore set, the README-current `multi_line` stress rerun, exact single-line batch fallback paths, and CLI dispatch validation.
 
 Revision note: Updated 2026-05-14 by Codex after the second compliance review to scope single-line batch aggregation to one attempt and add `phase3-signing-harness-validate` CLI dispatch coverage.
+
+Revision note: Updated 2026-05-14 by Codex after the final compliance review to also scope temporary single-line batch manifests to one attempt and test the validate subcommand's failure path.
