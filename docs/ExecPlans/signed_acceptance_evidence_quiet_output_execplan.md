@@ -26,7 +26,11 @@ This is a CLI usability and evidence hygiene slice. It must not weaken cryptogra
 - [x] (2026-05-14T20:42Z) Added regression tests proving benign pyHanko chatter is suppressed while nonmatching warnings still surface.
 - [x] (2026-05-14T20:43Z) Updated README and architecture docs to explain quiet evidence behavior and raw matrix diagnostics.
 - [x] (2026-05-14T20:58Z) Ran focused tests, lint, and the real evidence command successfully.
-- [ ] Commit the slice and run compliance review.
+- [x] (2026-05-14T21:01Z) Committed the first-pass quiet-output slice as `950f915 Quiet signed evidence runtime chatter`.
+- [x] (2026-05-14T21:07Z) Compliance review found the layout warning filter was broader than the README described and could hide useful layout diagnostics outside intentional rejection scenarios.
+- [x] (2026-05-14T21:14Z) Reran focused tests, lint, and the real evidence command after narrowing layout warning suppression to the fit-rejection matrix.
+- [x] (2026-05-14T21:16Z) Committed the follow-up as `05d03b8 Scope signed evidence layout warning filter`.
+- [x] (2026-05-14T21:20Z) Final compliance review found no issues with the scoped layout-warning filter, docs, or tests.
 
 ## Surprises & Discoveries
 
@@ -38,6 +42,9 @@ This is a CLI usability and evidence hygiene slice. It must not weaken cryptogra
 
 - Observation: the initial filter removed the large dummy TSA tracebacks and Qt plugin line, but the real fit-rejection matrix still emitted repeated pyHanko layout warnings for intentional validation-rejection scenarios.
   Evidence: the first real run after the initial filter printed repeated `Content box width/height ... post_margin will be ignored` messages before the final PASS summary. Adding an exact `pyhanko.pdf_utils.layout` filter removed those messages on the next real run.
+
+- Observation: layout warnings are real diagnostics and should not be suppressed for success-oriented matrices.
+  Evidence: compliance review noted pyHanko emits `post_margin will be ignored` whenever content exceeds a box. The filter is now active only while running `signed_fit_rejection_matrix`, where the corpus intentionally exercises rejection geometry.
 
 ## Decision Log
 
@@ -98,7 +105,7 @@ The change is additive and command-scoped. Rerunning the evidence command overwr
 Focused tests:
 
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/unit/test_qa_signed_acceptance_evidence.py tests/unit/test_cli_parser.py tests/unit/test_main_cli.py
-    29 passed in 1.70s
+    30 passed in 3.04s
 
 Focused lint:
 
@@ -114,6 +121,15 @@ Real one-command evidence run after filtering:
     - signed_preview_parity_matrix: PASS (18 scenarios, 18 successful signings)
     - signed_fit_rejection_matrix: PASS (3 scenarios, 0 successful signings)
 
+Real one-command evidence run after narrowing layout-warning suppression to fit-rejection only:
+
+    QT_QPA_PLATFORM=offscreen .venv/bin/python -m foliaseal phase3-signing-acceptance-evidence
+    Phase 3 signed acceptance evidence
+    - summary markdown: artifacts/phase3_signed_acceptance_evidence_summary.md
+    - signed_acceptance_matrix: PASS (10 scenarios, 7 successful signings)
+    - signed_preview_parity_matrix: PASS (18 scenarios, 18 successful signings)
+    - signed_fit_rejection_matrix: PASS (3 scenarios, 0 successful signings)
+
 ## Interfaces and Dependencies
 
 The filter code should stay in `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` because it is evidence-command policy, not core signing behavior. It depends on Python `logging`; PySide6 QtCore should be imported lazily and treated as optional so unit tests that do not load Qt remain lightweight.
@@ -121,3 +137,7 @@ The filter code should stay in `src/foliaseal/presentation/qt/phase3_signed_acce
 Revision note: Created 2026-05-14 by Codex to make the one-command signed acceptance evidence proof readable without weakening validation.
 
 Revision note: Updated 2026-05-14 by Codex after implementing scoped quieting for known dummy-TSA, Qt offscreen, and pyHanko layout chatter and validating the real evidence command.
+
+Revision note: Updated 2026-05-14 by Codex after compliance review to scope layout-warning suppression to the intentional fit-rejection matrix and clarify the docs.
+
+Revision note: Updated 2026-05-14 by Codex after final compliance review to close the completed follow-up progress item.

@@ -296,8 +296,9 @@ scenario manifests, runs the representative acceptance, preview-parity, and fit-
 then writes `artifacts/phase3_signed_acceptance_evidence_summary.md`. The command exits with an
 error if any matrix reports failed acceptance expectations, expected-outcome mismatches,
 cryptographic validation failures, preview/output comparison failures, or annotation rectangle
-mismatches. It filters known benign dummy-TSA and offscreen Qt runtime chatter; use the
-per-manifest matrix command below when raw low-level diagnostics are needed.
+mismatches. It filters known benign dummy-TSA, offscreen Qt, and intentional fit-rejection layout
+runtime chatter; use the per-manifest matrix command below when raw low-level diagnostics are
+needed.
 
 Representative per-manifest signed acceptance matrix:
 

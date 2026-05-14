@@ -188,7 +188,7 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/application/qa_*`, `src/foliaseal/application/phase2_evidence.py`, `src/foliaseal/presentation/qt/phase*_harness.py`, `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py`, `artifacts/`
 - Responsibility: Produce manual QA evidence, preview matrix outputs, signed-output acceptance artifacts, signed acceptance evidence summaries, and evidence contract evaluations.
-- Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering.
+- Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering. The evidence command suppresses known fit-rejection layout warnings only for the intentional rejection matrix; raw per-manifest matrix commands remain the diagnostic path.
 - Does not own: Core domain models or signing semantics.
 - Key collaborators: CLI entry points, Qt shell, signing backend, artifacts directory.
 - Status: Confirmed by code, README, tests, and artifacts.

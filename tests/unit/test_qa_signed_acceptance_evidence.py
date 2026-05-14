@@ -208,10 +208,11 @@ def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
         return _assets(root)
 
     def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
-        logger.warning(
-            "Content box width/height 397 is too wide for container size 170 "
-            "with margins (4, 4); post_margin will be ignored"
-        )
+        if Path(kwargs["scenario_manifest_path"]).name == "signed_fit_rejection_matrix.json":
+            logger.warning(
+                "Content box width/height 397 is too wide for container size 170 "
+                "with margins (4, 4); post_margin will be ignored"
+            )
         return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
@@ -222,6 +223,33 @@ def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
         )
 
     assert "post_margin will be ignored" not in caplog.text
+
+
+def test_run_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_matrix(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    logger = logging.getLogger(_PYHANKO_LAYOUT_LOGGER_NAME)
+
+    def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
+        return _assets(root)
+
+    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+        if Path(kwargs["scenario_manifest_path"]).name == "signed_acceptance_matrix.json":
+            logger.warning(
+                "Content box width/height 397 is too wide for container size 170 "
+                "with margins (4, 4); post_margin will be ignored"
+            )
+        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+
+    with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
+        run_signed_acceptance_evidence(
+            artifacts_root=tmp_path,
+            asset_generator=fake_asset_generator,
+            matrix_runner=fake_matrix_runner,
+        )
+
+    assert "post_margin will be ignored" in caplog.text
 
 
 def test_validate_signed_acceptance_matrix_summary_rejects_missing_counter() -> None:

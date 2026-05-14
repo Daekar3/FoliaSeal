@@ -46,6 +46,10 @@ _BENIGN_QT_OFFSCREEN_MESSAGE = "This plugin does not support propagateSizeHints(
 
 
 class _SignedEvidenceRuntimeNoiseFilter(logging.Filter):
+    def __init__(self, *, suppress_layout_warnings: bool) -> None:
+        super().__init__()
+        self._suppress_layout_warnings = suppress_layout_warnings
+
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
         if (
@@ -55,6 +59,8 @@ class _SignedEvidenceRuntimeNoiseFilter(logging.Filter):
         ):
             return False
         if (
+            self._suppress_layout_warnings
+            and
             record.name == _PYHANKO_LAYOUT_LOGGER
             and message.startswith("Content box width/height ")
             and _BENIGN_PYHANKO_LAYOUT_FRAGMENT in message
@@ -64,8 +70,10 @@ class _SignedEvidenceRuntimeNoiseFilter(logging.Filter):
 
 
 @contextmanager
-def _suppress_known_signed_evidence_runtime_chatter():
-    noise_filter = _SignedEvidenceRuntimeNoiseFilter()
+def _suppress_known_signed_evidence_runtime_chatter(*, suppress_layout_warnings: bool):
+    noise_filter = _SignedEvidenceRuntimeNoiseFilter(
+        suppress_layout_warnings=suppress_layout_warnings
+    )
     loggers = [
         logging.getLogger(_PYHANKO_DUMMY_TSA_LOGGER),
         logging.getLogger(_PYHANKO_LAYOUT_LOGGER),
@@ -279,7 +287,9 @@ def run_signed_acceptance_evidence(
     all_errors: list[str] = []
     for spec in _matrix_specs(root, assets):
         chatter_context = (
-            _suppress_known_signed_evidence_runtime_chatter()
+            _suppress_known_signed_evidence_runtime_chatter(
+                suppress_layout_warnings=spec["name"] == "signed_fit_rejection_matrix"
+            )
             if suppress_known_runtime_chatter
             else nullcontext()
         )
