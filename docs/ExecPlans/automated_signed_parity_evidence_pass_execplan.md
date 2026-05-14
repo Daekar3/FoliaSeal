@@ -26,6 +26,8 @@ This is an evidence refresh and documentation/status update. It must not change 
 - [x] (2026-05-14T01:41Z) Checked the required signed-acceptance fixture paths and confirmed they are absent.
 - [x] (2026-05-14T01:42Z) Ran the signed acceptance matrix command far enough to capture the missing-fixture failure.
 - [x] (2026-05-14T01:43Z) Updated this ExecPlan with validation transcripts and blocker status.
+- [x] (2026-05-14T01:48Z) Compliance review found that the blocker evidence did not explicitly check `signed_preview_parity_matrix.json` or `signed_fit_rejection_matrix.json`.
+- [x] (2026-05-14T01:49Z) Checked the two signed parity/rejection manifests and updated this plan so the matrix-blocker scope matches the evidence.
 
 ## Surprises & Discoveries
 
@@ -49,7 +51,7 @@ This is an evidence refresh and documentation/status update. It must not change 
 
 This evidence pass is complete. The automated source-controlled evidence pass completed successfully: CLI parser and dispatch tests, preview/request parity tests, backend signing/layout tests, Phase 3 harness/evidence tests, and artifact-gated certification tests reported `255 passed, 23 skipped, 1 warning`.
 
-The artifact-backed signed acceptance matrix did not run because the required local QA fixture `artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf` is absent. No signed PDFs, renders, crops, comparison images, or matrix summaries were produced by this pass.
+The artifact-backed signed acceptance matrix did not run because the required local QA fixture `artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf` is absent. The two signed parity/rejection manifests named by this plan are also absent. No signed PDFs, renders, crops, comparison images, or matrix summaries were produced by this pass.
 
 ## Context and Orientation
 
@@ -87,9 +89,11 @@ Check whether the matrix fixtures exist:
 
     test -f artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf
     test -f artifacts/generated_acceptance_assets/signed_acceptance_identity.p12
+    test -f artifacts/preview_sweep_assets/signed_preview_parity_matrix.json
+    test -f artifacts/preview_sweep_assets/signed_fit_rejection_matrix.json
     test -f artifacts/preview_sweep_assets/signed_acceptance_matrix.json
 
-If those files exist, run:
+If the signed acceptance PDF, PKCS#12 identity, and `signed_acceptance_matrix.json` exist, run:
 
     QT_QPA_PLATFORM=offscreen .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix \
       --pdf-path artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf \
@@ -98,7 +102,7 @@ If those files exist, run:
       --scenario-manifest-path artifacts/preview_sweep_assets/signed_acceptance_matrix.json \
       --artifacts-dir artifacts/signed_acceptance_matrix_run_automated_parity
 
-If the fixture checks fail, record the missing path and do not run the matrix with substitutes.
+If the fixture checks fail, record the missing path and do not run the matrix with substitutes. If only the signed parity or fit-rejection manifests are missing, record that the corresponding parity/rejection matrix commands remain blocked even if the representative acceptance matrix can run.
 
 ## Validation and Acceptance
 
@@ -125,6 +129,12 @@ Fixture checks:
     test -f artifacts/generated_acceptance_assets/signed_acceptance_identity.p12
     <exit code 1>
 
+    test -f artifacts/preview_sweep_assets/signed_preview_parity_matrix.json
+    <exit code 1>
+
+    test -f artifacts/preview_sweep_assets/signed_fit_rejection_matrix.json
+    <exit code 1>
+
     test -f artifacts/preview_sweep_assets/signed_acceptance_matrix.json
     <exit code 1>
 
@@ -142,3 +152,5 @@ Use the existing CLI commands and tests only. The relevant command entry points 
 Revision note: Created 2026-05-14 by Codex to run the automated parity evidence pass before asking the user to perform manual harness review.
 
 Revision note: Updated 2026-05-14 by Codex after running the source-controlled automated evidence set and confirming the signed acceptance matrix remains blocked by missing local fixture assets.
+
+Revision note: Updated 2026-05-14 by Codex after compliance review to include explicit checks for the signed preview-parity and fit-rejection manifests named in the fixture dependency list.
