@@ -67,6 +67,10 @@ def test_generate_signed_acceptance_assets_writes_parseable_pdf_identity_and_man
         assert manifest["acceptance_expectations"]["scenario_count"] == len(
             manifest["scenarios"]
         )
+        assert any(
+            scenario["appearance_overrides"]["image_stamp_path"] == str(assets.stamp_image)
+            for scenario in manifest["scenarios"]
+        )
 
 
 def test_signed_acceptance_manifest_matches_current_positive_and_negative_contract() -> None:
@@ -162,11 +166,11 @@ def test_generated_manifests_match_builder_payloads(tmp_path: Path) -> None:
     assets = generate_signed_acceptance_assets(root=tmp_path)
 
     assert _read_json(assets.signed_acceptance_manifest) == build_signed_acceptance_manifest(
-        SIGNED_ACCEPTANCE_STAMP_IMAGE
+        str(assets.stamp_image)
     )
     assert _read_json(
         assets.signed_preview_parity_manifest
-    ) == build_signed_preview_parity_manifest(SIGNED_ACCEPTANCE_STAMP_IMAGE)
+    ) == build_signed_preview_parity_manifest(str(assets.stamp_image))
     assert _read_json(assets.signed_fit_rejection_manifest) == build_signed_fit_rejection_manifest(
-        SIGNED_ACCEPTANCE_STAMP_IMAGE
+        str(assets.stamp_image)
     )

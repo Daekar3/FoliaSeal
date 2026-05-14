@@ -568,7 +568,7 @@ def generate_signed_acceptance_assets(
     acceptance_manifest = _artifact_path(root, SIGNED_ACCEPTANCE_SCENARIO_MANIFEST)
     parity_manifest = _artifact_path(root, SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST)
     rejection_manifest = _artifact_path(root, SIGNED_FIT_REJECTION_SCENARIO_MANIFEST)
-    manifest_stamp_path = str(Path(SIGNED_ACCEPTANCE_STAMP_IMAGE))
+    manifest_stamp_path = str(stamp_image)
 
     _write_pdf(fixture_pdf)
     _write_identity(identity_p12, passphrase=passphrase)

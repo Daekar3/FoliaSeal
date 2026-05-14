@@ -27,7 +27,9 @@ This is a tooling and evidence-enablement slice. The source-controlled change is
 - [x] (2026-05-14T05:50Z) Ran the generator into `artifacts/` and confirmed the existing artifact-gated harness tests now exercise the generated manifests instead of skipping them.
 - [x] (2026-05-14T06:05Z) Ran the generated representative signed acceptance matrix and fixed one generated success scenario that the current validator correctly rejected.
 - [x] (2026-05-14T06:19Z) Ran the generated signed acceptance, fit-rejection, and preview-parity matrices successfully.
-- [ ] Commit the source-controlled changes and run compliance review.
+- [x] (2026-05-14T06:23Z) Committed the first-pass source-controlled changes as `101d649 Generate signed acceptance assets`.
+- [x] (2026-05-14T06:31Z) Compliance review found that temporary-root generation wrote manifests pointing at the repo-root stamp image and that this plan undercounted the generated stamp image in the acceptance wording.
+- [ ] Commit the compliance follow-up that makes temporary-root manifests self-contained and clarifies the generated artifact count.
 
 ## Surprises & Discoveries
 
@@ -39,6 +41,9 @@ This is a tooling and evidence-enablement slice. The source-controlled change is
 
 - Observation: matrix execution is a necessary check for generator scenario geometry, not just manifest shape.
   Evidence: the first generated representative acceptance run reported `acceptance_expectations_passed: false`, `successful_signing_run_count: 6`, and `expected_outcome_mismatch_count: 1` because the extra `wrapped_block_bottom_dense_success` scenario was too dense for its rectangle. Widening and simplifying that generated success scenario produced a green retry.
+
+- Observation: tests that generate into a temporary root must also prove manifest paths stay inside that root.
+  Evidence: compliance review found that `generate_signed_acceptance_assets(root=tmp_path)` wrote the stamp PNG under `tmp_path` but still embedded `artifacts/generated_acceptance_assets/signed_acceptance_stamp.png` in the manifests. The generator now derives manifest stamp paths from the actual written stamp path.
 
 ## Decision Log
 
@@ -100,7 +105,7 @@ If the acceptance matrix passes quickly, also run the two companion manifests in
 
 ## Validation and Acceptance
 
-This slice is accepted when the generator creates all five canonical inputs from current source code, the unit tests prove those inputs are parseable and match the expected manifest contract, and the existing artifact-gated tests no longer skip when the generator has been run locally. The strongest acceptance evidence is a matrix `summary.json` reporting `acceptance_expectations_passed: true` and `expected_outcome_mismatch_count: 0` for each generated manifest that is run.
+This slice is accepted when the generator creates all five canonical matrix inputs plus the stamp image from current source code, the unit tests prove those inputs are parseable and match the expected manifest contract, and the existing artifact-gated tests no longer skip when the generator has been run locally. The strongest acceptance evidence is a matrix `summary.json` reporting `acceptance_expectations_passed: true` and `expected_outcome_mismatch_count: 0` for each generated manifest that is run.
 
 ## Idempotence and Recovery
 
@@ -200,3 +205,5 @@ Use `pyhanko.pdf_utils.writer.PdfFileWriter` or the same PDF writer already used
 Revision note: Created 2026-05-14 by Codex to implement current-code generation for ignored signed acceptance artifacts after the user rejected restoration of old artifact outputs.
 
 Revision note: Updated 2026-05-14 by Codex after implementing the generator, running source-controlled validation, generating fresh local artifacts, and passing all three generated signed matrix manifests.
+
+Revision note: Updated 2026-05-14 by Codex after compliance review to clarify that the stamp image is a generated artifact and to make temporary-root manifest paths point at the generated temporary stamp image.
