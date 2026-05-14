@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+import sys
 from collections.abc import Callable
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +34,75 @@ CRITICAL_ZERO_COUNTERS = (
 
 MatrixRunner = Callable[..., dict[str, Any]]
 AssetGenerator = Callable[..., GeneratedSignedAcceptanceAssets]
+
+_PYHANKO_DUMMY_TSA_LOGGER = "pyhanko.sign.validation.generic_cms"
+_PYHANKO_LAYOUT_LOGGER = "pyhanko.pdf_utils.layout"
+_DUMMY_TSA_SUBJECT_FRAGMENT = (
+    "Common Name: FoliaSeal TSA, Organization: FoliaSeal, Country: US"
+)
+_DUMMY_TSA_SELF_SIGNED_FRAGMENT = "The X.509 certificate provided is self-signed"
+_BENIGN_PYHANKO_LAYOUT_FRAGMENT = "post_margin will be ignored"
+_BENIGN_QT_OFFSCREEN_MESSAGE = "This plugin does not support propagateSizeHints()"
+
+
+class _SignedEvidenceRuntimeNoiseFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if (
+            "Validation error [cert context:" in message
+            and _DUMMY_TSA_SUBJECT_FRAGMENT in message
+            and _DUMMY_TSA_SELF_SIGNED_FRAGMENT in message
+        ):
+            return False
+        if (
+            record.name == _PYHANKO_LAYOUT_LOGGER
+            and message.startswith("Content box width/height ")
+            and _BENIGN_PYHANKO_LAYOUT_FRAGMENT in message
+        ):
+            return False
+        return True
+
+
+@contextmanager
+def _suppress_known_signed_evidence_runtime_chatter():
+    noise_filter = _SignedEvidenceRuntimeNoiseFilter()
+    loggers = [
+        logging.getLogger(_PYHANKO_DUMMY_TSA_LOGGER),
+        logging.getLogger(_PYHANKO_LAYOUT_LOGGER),
+    ]
+    for logger in loggers:
+        logger.addFilter(noise_filter)
+    with _suppress_known_qt_runtime_chatter():
+        try:
+            yield
+        finally:
+            for logger in loggers:
+                logger.removeFilter(noise_filter)
+
+
+@contextmanager
+def _suppress_known_qt_runtime_chatter():
+    try:
+        from PySide6 import QtCore
+    except Exception:
+        yield
+        return
+
+    previous_handler = QtCore.qInstallMessageHandler(None)
+
+    def handler(mode: Any, context: Any, message: str) -> None:
+        if message == _BENIGN_QT_OFFSCREEN_MESSAGE:
+            return
+        if previous_handler is not None:
+            previous_handler(mode, context, message)
+            return
+        print(message, file=sys.stderr)
+
+    QtCore.qInstallMessageHandler(handler)
+    try:
+        yield
+    finally:
+        QtCore.qInstallMessageHandler(previous_handler)
 
 
 def _default_summary_path(root: Path) -> Path:
@@ -190,6 +262,7 @@ def run_signed_acceptance_evidence(
     *,
     artifacts_root: str | Path = ".",
     summary_markdown_path: str | Path | None = None,
+    suppress_known_runtime_chatter: bool = True,
     asset_generator: AssetGenerator = generate_signed_acceptance_assets,
     matrix_runner: MatrixRunner = run_phase3_signed_acceptance_matrix,
 ) -> dict[str, Any]:
@@ -205,14 +278,20 @@ def run_signed_acceptance_evidence(
     matrix_results: list[dict[str, Any]] = []
     all_errors: list[str] = []
     for spec in _matrix_specs(root, assets):
+        chatter_context = (
+            _suppress_known_signed_evidence_runtime_chatter()
+            if suppress_known_runtime_chatter
+            else nullcontext()
+        )
         try:
-            summary = matrix_runner(
-                pdf_path=str(assets.fixture_pdf),
-                certificate_path=str(assets.identity_p12),
-                passphrase=passphrase,
-                scenario_manifest_path=spec["manifest_path"],
-                artifacts_dir=spec["artifacts_dir"],
-            )
+            with chatter_context:
+                summary = matrix_runner(
+                    pdf_path=str(assets.fixture_pdf),
+                    certificate_path=str(assets.identity_p12),
+                    passphrase=passphrase,
+                    scenario_manifest_path=spec["manifest_path"],
+                    artifacts_dir=spec["artifacts_dir"],
+                )
         except Exception as exc:
             row = _matrix_exception_row(spec["name"], spec["artifacts_dir"], exc)
             errors = list(row["errors"])

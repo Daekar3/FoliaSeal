@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,9 @@ from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
     run_signed_acceptance_evidence,
     validate_signed_acceptance_matrix_summary,
 )
+
+_PYHANKO_LOGGER_NAME = "pyhanko.sign.validation.generic_cms"
+_PYHANKO_LAYOUT_LOGGER_NAME = "pyhanko.pdf_utils.layout"
 
 
 def _assets(root: Path) -> GeneratedSignedAcceptanceAssets:
@@ -142,6 +146,82 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raise
         "matrix runner failed before returning a summary: Qt renderer unavailable"
         in summary_text
     )
+
+
+def test_run_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    logger = logging.getLogger(_PYHANKO_LOGGER_NAME)
+
+    def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
+        return _assets(root)
+
+    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+        logger.warning(
+            "Validation error [cert context: Common Name: FoliaSeal TSA, "
+            "Organization: FoliaSeal, Country: US]: The X.509 certificate "
+            "provided is self-signed - test"
+        )
+        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+
+    with caplog.at_level(logging.WARNING, logger=_PYHANKO_LOGGER_NAME):
+        run_signed_acceptance_evidence(
+            artifacts_root=tmp_path,
+            asset_generator=fake_asset_generator,
+            matrix_runner=fake_matrix_runner,
+        )
+
+    assert "Validation error [cert context:" not in caplog.text
+
+
+def test_run_signed_acceptance_evidence_keeps_unmatched_pyhanko_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    logger = logging.getLogger(_PYHANKO_LOGGER_NAME)
+
+    def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
+        return _assets(root)
+
+    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+        logger.warning("Validation error [cert context: Real TSA]: network timeout")
+        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+
+    with caplog.at_level(logging.WARNING, logger=_PYHANKO_LOGGER_NAME):
+        run_signed_acceptance_evidence(
+            artifacts_root=tmp_path,
+            asset_generator=fake_asset_generator,
+            matrix_runner=fake_matrix_runner,
+        )
+
+    assert "Real TSA" in caplog.text
+
+
+def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    logger = logging.getLogger(_PYHANKO_LAYOUT_LOGGER_NAME)
+
+    def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
+        return _assets(root)
+
+    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+        logger.warning(
+            "Content box width/height 397 is too wide for container size 170 "
+            "with margins (4, 4); post_margin will be ignored"
+        )
+        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+
+    with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
+        run_signed_acceptance_evidence(
+            artifacts_root=tmp_path,
+            asset_generator=fake_asset_generator,
+            matrix_runner=fake_matrix_runner,
+        )
+
+    assert "post_margin will be ignored" not in caplog.text
 
 
 def test_validate_signed_acceptance_matrix_summary_rejects_missing_counter() -> None:
