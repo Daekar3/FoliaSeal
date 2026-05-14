@@ -93,6 +93,9 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
         if call_count == 2:
             summary["preview_output_comparison_failure_count"] = 1
             summary["acceptance_expectations_passed"] = False
+            summary["acceptance_expectation_errors"] = [
+                "Expected zero preview/output comparison failures, observed 1."
+            ]
         return summary
 
     with pytest.raises(RuntimeError, match="signed_preview_parity_matrix"):
@@ -106,7 +109,39 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "Overall result: FAIL" in summary_text
     assert "expected preview_output_comparison_failure_count=0, observed 1" in summary_text
+    assert "Expected zero preview/output comparison failures, observed 1." in summary_text
     assert "Preview/output comparison failures: 1" in summary_text
+
+
+def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raises(
+    tmp_path: Path,
+) -> None:
+    call_count = 0
+
+    def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
+        return _assets(root)
+
+    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise RuntimeError("Qt renderer unavailable")
+        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+
+    with pytest.raises(RuntimeError, match="Qt renderer unavailable"):
+        run_signed_acceptance_evidence(
+            artifacts_root=tmp_path,
+            asset_generator=fake_asset_generator,
+            matrix_runner=fake_matrix_runner,
+        )
+
+    summary_path = tmp_path / "artifacts/phase3_signed_acceptance_evidence_summary.md"
+    summary_text = summary_path.read_text(encoding="utf-8")
+    assert "Overall result: FAIL" in summary_text
+    assert (
+        "matrix runner failed before returning a summary: Qt renderer unavailable"
+        in summary_text
+    )
 
 
 def test_validate_signed_acceptance_matrix_summary_rejects_missing_counter() -> None:

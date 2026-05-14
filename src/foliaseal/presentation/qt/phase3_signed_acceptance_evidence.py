@@ -76,6 +76,11 @@ def validate_signed_acceptance_matrix_summary(
     errors: list[str] = []
     if summary.get("acceptance_expectations_passed") is not True:
         errors.append(f"{name}: acceptance expectations did not pass.")
+        expectation_errors = summary.get("acceptance_expectation_errors")
+        if isinstance(expectation_errors, list):
+            for error in expectation_errors:
+                if isinstance(error, str) and error:
+                    errors.append(f"{name}: {error}")
     for key in CRITICAL_ZERO_COUNTERS:
         try:
             observed = _summary_int(summary, key)
@@ -111,6 +116,25 @@ def _matrix_summary_row(name: str, summary: dict[str, Any], errors: list[str]) -
         "artifacts_dir": artifacts_dir,
         "summary_json_path": str(Path(artifacts_dir) / "summary.json") if artifacts_dir else "",
         "counters": counters,
+    }
+
+
+def _matrix_exception_row(name: str, artifacts_dir: str, exc: Exception) -> dict[str, Any]:
+    return {
+        "name": name,
+        "passed": False,
+        "errors": [f"{name}: matrix runner failed before returning a summary: {exc}"],
+        "artifacts_dir": artifacts_dir,
+        "summary_json_path": str(Path(artifacts_dir) / "summary.json") if artifacts_dir else "",
+        "counters": {
+            "scenario_count": None,
+            "successful_signing_run_count": None,
+            "expected_outcome_mismatch_count": None,
+            "cryptographic_validation_failure_count": None,
+            "preview_output_comparison_failure_count": None,
+            "annotation_rect_mismatch_count": None,
+            "matched_expected_intentional_rejection_count": None,
+        },
     }
 
 
@@ -181,13 +205,20 @@ def run_signed_acceptance_evidence(
     matrix_results: list[dict[str, Any]] = []
     all_errors: list[str] = []
     for spec in _matrix_specs(root, assets):
-        summary = matrix_runner(
-            pdf_path=str(assets.fixture_pdf),
-            certificate_path=str(assets.identity_p12),
-            passphrase=passphrase,
-            scenario_manifest_path=spec["manifest_path"],
-            artifacts_dir=spec["artifacts_dir"],
-        )
+        try:
+            summary = matrix_runner(
+                pdf_path=str(assets.fixture_pdf),
+                certificate_path=str(assets.identity_p12),
+                passphrase=passphrase,
+                scenario_manifest_path=spec["manifest_path"],
+                artifacts_dir=spec["artifacts_dir"],
+            )
+        except Exception as exc:
+            row = _matrix_exception_row(spec["name"], spec["artifacts_dir"], exc)
+            errors = list(row["errors"])
+            all_errors.extend(errors)
+            matrix_results.append(row)
+            continue
         errors = validate_signed_acceptance_matrix_summary(
             name=spec["name"],
             summary=summary,

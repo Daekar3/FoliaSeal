@@ -26,7 +26,10 @@ This is a tooling and evidence-enablement slice. It must not change signing beha
 - [x] (2026-05-14T19:49Z) Added focused unit tests for success and failure-path summary validation plus CLI parser/dispatch coverage.
 - [x] (2026-05-14T19:51Z) Updated README and architecture docs with the one-command evidence flow.
 - [x] (2026-05-14T20:02Z) Ran source-controlled validation and the real generated evidence command successfully.
-- [ ] Commit the slice and run compliance review.
+- [x] (2026-05-14T20:07Z) Committed the first-pass slice as `b7047b1 Add signed acceptance evidence runner`.
+- [x] (2026-05-14T20:11Z) Compliance review found two actionable failure-reporting gaps: generic manifest expectation errors and no markdown artifact when a matrix raises before returning.
+- [x] (2026-05-14T20:15Z) Patched the runner to surface harness `acceptance_expectation_errors` and write failure markdown for pre-summary matrix exceptions.
+- [ ] Commit the compliance follow-up and run final validation.
 
 ## Surprises & Discoveries
 
@@ -35,6 +38,9 @@ This is a tooling and evidence-enablement slice. It must not change signing beha
 
 - Observation: the CLI contract is explicitly user-facing.
   Evidence: `docs/ARCHITECTURE.md` says `src/foliaseal/__main__.py` commands are documented in README and covered by CLI tests, so new commands need parser and dispatch coverage.
+
+- Observation: a failing evidence run still needs a local evidence note when a matrix crashes before returning a summary.
+  Evidence: compliance review identified that the first-pass runner propagated pre-summary matrix exceptions before writing markdown. The runner now records an error row for that matrix, writes a failure markdown note, and then raises `RuntimeError`.
 
 ## Decision Log
 
@@ -130,3 +136,5 @@ The evidence runner should depend on `generate_signed_acceptance_assets()` from 
 Revision note: Created 2026-05-14 by Codex to implement the one-command signed acceptance evidence runner requested after current-code artifact generation was completed.
 
 Revision note: Updated 2026-05-14 by Codex after implementing the runner, adding focused tests, updating docs, and running the real generated evidence command successfully.
+
+Revision note: Updated 2026-05-14 by Codex after compliance review to add actionable expectation errors and failure markdown for pre-summary matrix exceptions.
