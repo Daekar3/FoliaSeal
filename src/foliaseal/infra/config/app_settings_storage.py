@@ -75,8 +75,13 @@ class AppSettingsStore:
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         payload_text = json.dumps(settings.to_dict(), indent=2, sort_keys=True)
         temp_path = self.settings_path.with_name(f"{self.settings_path.name}.tmp")
-        temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
-        temp_path.replace(self.settings_path)
+        try:
+            temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
+            temp_path.replace(self.settings_path)
+        except Exception:
+            if temp_path.exists():
+                temp_path.unlink()
+            raise
 
     def _default_settings(self) -> AppSettings:
         return AppSettings.default(home_directory=self.default_home_directory)

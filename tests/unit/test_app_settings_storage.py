@@ -55,6 +55,26 @@ def test_app_settings_store_saves_and_reloads_human_readable_json(
     assert store.load_settings() == settings
 
 
+def test_app_settings_store_removes_temp_file_when_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    original_replace = Path.replace
+
+    def fail_settings_replace(path: Path, target: Path) -> Path:
+        if path.name == "settings.json.tmp":
+            raise OSError("replace failed")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", fail_settings_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        store.save_settings(AppSettings.default(home_directory=tmp_path / "home"))
+
+    assert not store.settings_path.with_name("settings.json.tmp").exists()
+
+
 def test_app_settings_store_loads_home_defaults_when_blank(tmp_path: Path) -> None:
     store = AppSettingsStore(
         storage_dir=tmp_path / "config",
