@@ -33,8 +33,9 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 - [x] (2026-05-15T10:54Z) Committed the first compliance follow-up as `04ab7cc fix: clear stale signed flow state after draft changes`.
 - [x] (2026-05-15T10:56Z) Second compliance review found the visible completion label could remain stale after draft changes, and requested direct output-path/page-change regression coverage.
 - [x] (2026-05-15T10:58Z) Cleared the visible signing result label when prior signing results are invalidated, added placement/output/page-change regression coverage, and reran focused validation, lint, and the full signing-shell unit file successfully.
-- [ ] Commit the second compliance follow-up.
-- [ ] Rerun post-commit architectural compliance review.
+- [x] (2026-05-15T10:59Z) Committed the second compliance follow-up as `461fd5b fix: clear stale signing result label`.
+- [x] (2026-05-15T11:00Z) Final post-commit compliance review found no code or governing-doc mismatch; both reviewers found only this ExecPlan closeout status was stale.
+- [x] (2026-05-15T11:01Z) Closed this ExecPlan with the final review outcome.
 
 ## Surprises & Discoveries
 
@@ -73,7 +74,7 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 
 ## Outcomes & Retrospective
 
-This plan is in progress. The first-pass implementation and first compliance follow-up were committed. A second compliance review found one remaining stale visible-label bug and two coverage gaps, which have been patched locally. Completion now requires committing the second follow-up and receiving a clean post-commit compliance review.
+This plan is complete. The staged signing-flow summary is implemented and documented, stale signed-state behavior is cleared across placement, output-path, and page-change mutations, and two independent final compliance reviewers found no remaining code or governing-doc mismatch. The only final review finding was that this living ExecPlan needed closeout after `461fd5b`.
 
 ## Context and Orientation
 
@@ -195,6 +196,11 @@ Second compliance follow-up full Qt signing shell unit file:
     .....................................................................    [100%]
     69 passed in 32.27s
 
+Final post-commit compliance review after `461fd5b`:
+
+    Reviewer 1: no code-level mismatch in signing_shell.py or unit tests; only this ExecPlan status lagged behind the committed state.
+    Reviewer 2: no behavioral regressions; placement, output-path, and page-change stale-state cases are covered; only this ExecPlan status lagged behind the committed state.
+
 ## Interfaces and Dependencies
 
 The implementation stays in `src/foliaseal/presentation/qt/signing_shell.py`. It should not change the signatures of `build_qt_signing_shell()`, `SigningWorkspaceWidget`, `SignaturePropertiesPanel`, or application-layer workflow classes. The new summary uses only existing Qt binding primitives already represented in `QtSigningWidgetBindings`.
@@ -208,3 +214,5 @@ Revision note: Updated 2026-05-15 by Codex after adding the flow summary impleme
 Revision note: Updated 2026-05-15 by Codex after compliance review identified a stale signed-stage edge case and the follow-up added edit-after-sign coverage.
 
 Revision note: Updated 2026-05-15 by Codex after second compliance review identified stale visible result text and the follow-up added placement/output/page-change coverage.
+
+Revision note: Updated 2026-05-15 by Codex after final compliance review found only ExecPlan closeout drift.
