@@ -787,6 +787,8 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
         in widget.sign_result_label.text()
     )
     assert "No timestamp token was found." in widget.sign_result_label.text()
+    assert widget.flow_stage_label.text() == "Signed"
+    assert "Open or verify the signed PDF" in widget.flow_detail_label.text()
     assert widget.open_signed_output_button._enabled is False
 
 
@@ -913,7 +915,7 @@ def test_signing_shell_reports_sign_failure_when_executor_returns_failure(
     assert widget.sign_result_label.text() == "Post-sign verification failed."
 
 
-def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path: Path) -> None:
+def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -930,7 +932,8 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
         signing_workflow=_workflow(tmp_path),
     )
 
-    assert not hasattr(widget._signing_workspace, "_flow_summary_box")
+    assert widget.flow_stage_label.text() == "Place signature"
+    assert "Drag on the page" in widget.flow_detail_label.text()
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
@@ -957,6 +960,33 @@ def test_signing_shell_uses_split_layout_without_stage_box(monkeypatch, tmp_path
         SignatureFieldKey.REASON,
         SignatureFieldKey.LOCATION,
     ]
+
+
+def test_signing_shell_flow_summary_advances_after_signature_placement(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+
+    assert widget.flow_stage_label.text() == "Confirm/sign"
+    assert "Confirm the output path" in widget.flow_detail_label.text()
+    assert widget._signing_workspace._sign_button._enabled is True
 
 
 def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Path) -> None:

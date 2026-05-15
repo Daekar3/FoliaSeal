@@ -160,7 +160,7 @@ The canonical repository document split is:
 - Does not own: Domain validation rules, headless signing failure mapping, persisted JSON schema definitions.
 - Key collaborators: `ViewerWorkflow`, `SigningDraftWorkflow`, `render_canonical_signature_preview()`, `build_phase3_signing_executor()`, profile store, certificate catalog store, signing-material resolver.
 - Main entry points: `build_qt_app_frame()`, `build_qt_pdf_viewer_widget()`, `build_qt_signing_shell()`, `run_phase2_viewer_harness()`, `run_phase3_signing_harness()`, `run_phase3_preview_matrix()`, `run_phase3_signed_acceptance_matrix()`.
-- Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `app_frame.py` owns a first-pass `QMainWindow` wrapper with File/Open, Settings/Application settings, Settings/Create certificate, Settings/Import certificate, and Settings/Manage certificate configurations actions; the settings action opens an app-wide settings dialog for default directories, while the certificate dialogs collect user input and delegate create, import, rename, delete, and export work to `CertificateLifecycleService`. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file. The shell can select and apply existing certificate configurations, including configurations that resolve saved passwords through the app-frame-provided secret provider, and can refresh its selector after lifecycle results report certificate catalog changes. The signing shell consumes `AppSettings` for output-path defaults but no longer edits app-wide directory settings directly.
+- Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `app_frame.py` owns a first-pass `QMainWindow` wrapper with File/Open, Settings/Application settings, Settings/Create certificate, Settings/Import certificate, and Settings/Manage certificate configurations actions; the settings action opens an app-wide settings dialog for default directories, while the certificate dialogs collect user input and delegate create, import, rename, delete, and export work to `CertificateLifecycleService`. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file. The workspace exposes a read-only signing-flow summary that derives `Place signature`, `Confirm/sign`, `Review preview`, or `Signed` from existing draft/readiness/result state. The shell can select and apply existing certificate configurations, including configurations that resolve saved passwords through the app-frame-provided secret provider, and can refresh its selector after lifecycle results report certificate catalog changes. The signing shell consumes `AppSettings` for output-path defaults but no longer edits app-wide directory settings directly.
 - Status: Confirmed by code and tests; size/concentration is debt/needs review.
 
 ### Configuration and reusable signing-object persistence
@@ -362,13 +362,14 @@ The canonical repository document split is:
 1. `build_qt_signing_shell()` constructs a `SigningShellAdapter`.
 2. The shell creates a viewer workflow and signing draft workflow.
 3. Optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace; otherwise home-directory defaults are used.
-4. User interactions update `SigningDraftWorkflow` state through placement and appearance controls.
-5. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
-6. On sign, the workflow converts the draft into `SigningRequest`.
-7. The injected signing executor runs and returns a `SigningResult`.
-8. On success, the shell displays a compact completion summary from `SigningResult`, including the saved output path and local verification guidance.
-9. The shell enables an explicit `Open signed PDF` action that calls the app-frame reopen callback with the signed output path.
-10. On failure, the shell displays the backend-provided plain-language reason, disables the reopen action, and harnesses can capture structured evidence.
+4. The workspace shows a read-only signing-flow summary derived from current draft/readiness/result state.
+5. User interactions update `SigningDraftWorkflow` state through placement and appearance controls.
+6. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
+7. On sign, the workflow converts the draft into `SigningRequest`.
+8. The injected signing executor runs and returns a `SigningResult`.
+9. On success, the shell displays a compact completion summary from `SigningResult`, including the saved output path and local verification guidance.
+10. The shell enables an explicit `Open signed PDF` action that calls the app-frame reopen callback with the signed output path.
+11. On failure, the shell displays the backend-provided plain-language reason, disables the reopen action, and harnesses can capture structured evidence.
 
 ### Qt output path selection
 
@@ -517,6 +518,7 @@ Default local validation from README:
 | 2026-05-10 | Added Linux Secret Service saved-password support. | Documented `secret-tool` storage, import-time password saving, signing resolver wiring, and saved-secret cleanup on configuration deletion. |
 | 2026-05-13 | Added first-pass in-app certificate creation. | Documented the self-signed PKCS#12 creation service, Settings/Create certificate flow, created managed-certificate records, and optional saved-password reuse. |
 | 2026-05-15 | Hardened AppSettings save failure cleanup. | Documented `settings.json.tmp` cleanup behavior and preservation of the original filesystem failure. |
+| 2026-05-15 | Added a state-driven signing-flow summary. | Reflected the first Brief F shell-architecture slice toward an explicitly staged V1 signing workflow. |
 | 2026-05-06 | Added certificate catalog and signing-material resolver architecture. | Reflected schema model alignment Slice 2 implementation. |
 | 2026-04-30 | Replaced skeleton with first-pass architecture map. | Documented current repository structure, contracts, flows, persistence, tests, debts, and open questions from code inspection. |
 | 2026-04-30 | Created architecture document skeleton. | Establish canonical architecture documentation path referenced by agent instructions. |

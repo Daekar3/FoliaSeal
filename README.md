@@ -59,6 +59,7 @@ Current capabilities:
   - named profile save/select workflows
   - executor-backed sign/apply behavior
 - The shell can now call an injected signing executor and surface success/failure results.
+- The shell now exposes a read-only signing-flow summary so the user can see whether the current state is placing the signature, confirming/signing, reviewing preview issues, or reviewing signed output.
 - The current concrete signing backend now produces a genuinely cryptographically signed PDF
   through `pyHanko`.
 - The key integration rule is to avoid duplicating semantics across layers.

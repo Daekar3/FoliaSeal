@@ -145,6 +145,15 @@ class CertificateConfigurationControls:
     apply_button: Any
 
 
+@dataclass(frozen=True)
+class SigningFlowSummaryControls:
+    """Read-only labels that show the current signing-flow stage."""
+
+    container: Any
+    stage_label: Any
+    detail_label: Any
+
+
 class SigningRequestExecutor(Protocol):
     """Executes a validated signing request and returns a signing result."""
 
@@ -2854,6 +2863,7 @@ class SigningWorkspaceWidget:
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
 
+        self._flow_summary_controls = self._build_flow_summary_controls()
         self._main_row = bindings.q_hbox_layout()
         self._main_row.setContentsMargins(0, 0, 0, 0)
         self._main_row.setSpacing(8)
@@ -2903,6 +2913,7 @@ class SigningWorkspaceWidget:
         )
         self._main_row.addWidget(self._viewer_widget, 3)
         self._main_row.addWidget(self._properties_scroll, 2)
+        self._layout.addWidget(self._flow_summary_controls.container)
         self._layout.addLayout(self._main_row)
         self._layout.addWidget(self._choose_output_button)
         self._layout.addWidget(self._sign_button)
@@ -2915,6 +2926,12 @@ class SigningWorkspaceWidget:
         self.widget.choose_output_button = self._choose_output_button  # type: ignore[attr-defined]
         self.widget.open_signed_output_button = (  # type: ignore[attr-defined]
             self._open_signed_output_button
+        )
+        self.widget.flow_stage_label = (  # type: ignore[attr-defined]
+            self._flow_summary_controls.stage_label
+        )
+        self.widget.flow_detail_label = (  # type: ignore[attr-defined]
+            self._flow_summary_controls.detail_label
         )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
@@ -2949,6 +2966,7 @@ class SigningWorkspaceWidget:
         self._sync_signature_overlay()
         self.properties_panel.refresh_preview()
         self._refresh_sign_button_state()
+        self._refresh_flow_summary()
 
     def submit_sign_request(self) -> SigningRequest | None:
         self.properties_panel.apply_changes()
@@ -2957,6 +2975,7 @@ class SigningWorkspaceWidget:
             self._set_last_successful_output_path(None)
             self._set_sign_result_text("")
             self._emit_error(self.properties_panel.validation_text())
+            self._refresh_flow_summary()
             return None
         request = self._draft_workflow.build_signing_request()
         if self._on_sign_request is not None:
@@ -2975,6 +2994,7 @@ class SigningWorkspaceWidget:
                 self._set_sign_result_text(failure_message, success=False)
                 self._emit_error(failure_message)
                 self.widget.last_signing_result = self._last_signing_result  # type: ignore[attr-defined]
+                self._refresh_flow_summary()
                 return request
             self._last_signing_result = result
             self.widget.last_signing_result = result  # type: ignore[attr-defined]
@@ -2993,11 +3013,13 @@ class SigningWorkspaceWidget:
                     self._on_error(result.message)
                 if self._on_status_change is not None:
                     self._on_status_change("sign_failure")
+            self._refresh_flow_summary()
             return request
         self._last_signing_result = None
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self._set_last_successful_output_path(None)
         self._set_sign_result_text("")
+        self._refresh_flow_summary()
         return request
 
     def open_signed_output(self) -> str | None:
@@ -3025,6 +3047,7 @@ class SigningWorkspaceWidget:
         self._draft_workflow.output_pdf_path = selected_path
         self._set_sign_result_text(f"Output will be saved to: {selected_path}")
         self._refresh_sign_button_state()
+        self._refresh_flow_summary()
         return selected_path
 
     @property
@@ -3061,6 +3084,7 @@ class SigningWorkspaceWidget:
         self.properties_panel.set_signature_rect(signature_rect)
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
+        self._refresh_flow_summary()
 
     def _handle_viewer_error(self, message: str) -> None:
         self._emit_error(message)
@@ -3073,6 +3097,7 @@ class SigningWorkspaceWidget:
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
+        self._refresh_flow_summary()
 
     def _handle_app_settings_change(self, settings: AppSettings) -> None:
         self._app_settings = settings
@@ -3082,6 +3107,7 @@ class SigningWorkspaceWidget:
         """Reload certificate configurations from storage and refresh shell controls."""
         catalog = self.properties_panel.refresh_certificate_configurations()
         self._refresh_sign_button_state()
+        self._refresh_flow_summary()
         return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
@@ -3095,6 +3121,7 @@ class SigningWorkspaceWidget:
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
+        self._refresh_flow_summary()
 
     def _sync_placement_context_from_viewer(self) -> None:
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
@@ -3121,6 +3148,70 @@ class SigningWorkspaceWidget:
 
     def _refresh_sign_button_state(self) -> None:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
+
+    def _build_flow_summary_controls(self) -> SigningFlowSummaryControls:
+        container = self._bindings.q_group_box("Signing flow")
+        if hasattr(container, "setStyleSheet"):
+            container.setStyleSheet(
+                "QGroupBox {"
+                " border: 1px solid #d0d7de;"
+                " border-radius: 6px;"
+                " padding: 6px;"
+                " background: #f6f8fa;"
+                "}"
+            )
+        layout = self._bindings.q_vbox_layout(container)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(3)
+        stage_label = self._bindings.q_label("")
+        detail_label = self._bindings.q_label("")
+        for label in (stage_label, detail_label):
+            if hasattr(label, "setWordWrap"):
+                label.setWordWrap(True)
+        if hasattr(stage_label, "setStyleSheet"):
+            stage_label.setStyleSheet("font-weight: 700; color: #111827;")
+        if hasattr(detail_label, "setStyleSheet"):
+            detail_label.setStyleSheet("color: #374151;")
+        layout.addWidget(stage_label)
+        layout.addWidget(detail_label)
+        return SigningFlowSummaryControls(
+            container=container,
+            stage_label=stage_label,
+            detail_label=detail_label,
+        )
+
+    def _refresh_flow_summary(self) -> None:
+        stage, detail = self._flow_summary_text()
+        self._flow_summary_controls.stage_label.setText(stage)
+        self._flow_summary_controls.detail_label.setText(detail)
+
+    def _flow_summary_text(self) -> tuple[str, str]:
+        if (
+            self._last_signing_result is not None
+            and self._last_signing_result.success
+            and self._last_successful_output_path is not None
+        ):
+            return (
+                "Signed",
+                "Open or verify the signed PDF, then add another approval signature later "
+                "if the document permits it.",
+            )
+        if self.properties_panel.is_ready_to_sign():
+            return (
+                "Confirm/sign",
+                "Confirm the output path, review readiness, then sign the PDF.",
+            )
+        if self._draft_workflow.signature_rect is None:
+            return (
+                "Place signature",
+                "Drag on the page to place the visible signature, or enter placement values.",
+            )
+        validation_text = self.properties_panel.validation_text().strip()
+        if validation_text:
+            detail = validation_text
+        else:
+            detail = "Review the on-page preview and resolve any readiness warnings."
+        return "Review preview", detail
 
     def _default_output_dialog_path(self) -> Path:
         return suggest_signed_output_path(
