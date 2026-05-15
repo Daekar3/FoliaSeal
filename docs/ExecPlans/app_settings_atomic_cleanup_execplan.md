@@ -31,8 +31,9 @@ This is a narrow behavior-hardening and schema-compliance slice. It does not cha
 - [x] (2026-05-15T10:36Z) Committed the first compliance follow-up as `8f82755 app settings: preserve original save error during cleanup`.
 - [x] (2026-05-15T10:37Z) Second compliance review found two low-severity gaps: stale ExecPlan closeout and no direct coverage for temp-write failure; an independent reviewer also found `Path.exists()` cleanup-check failures could mask the original save error.
 - [x] (2026-05-15T10:39Z) Patched cleanup to guard both `exists()` and `unlink()`, added direct write-failure and cleanup-check-failure regression coverage, and reran focused validation successfully.
-- [ ] Commit the final compliance follow-up.
-- [ ] Rerun final post-commit architectural compliance review.
+- [x] (2026-05-15T10:40Z) Committed the final behavior/test compliance follow-up as `55469a6 app settings: guard cleanup checks and cover write failures`.
+- [x] (2026-05-15T10:41Z) Final post-commit compliance review found no remaining code, architecture, or coverage issues and identified only this ExecPlan closeout as stale.
+- [x] (2026-05-15T10:42Z) Closed this ExecPlan to reflect the committed final follow-up and clean behavioral compliance review.
 
 ## Surprises & Discoveries
 
@@ -68,7 +69,7 @@ This is a narrow behavior-hardening and schema-compliance slice. It does not cha
 
 ## Outcomes & Retrospective
 
-This plan is in progress. The implementation now covers replace failure, cleanup failure, cleanup-check failure, and temp-write failure. Completion now requires committing the final compliance follow-up and receiving a clean final post-commit compliance review.
+This plan is complete. `AppSettingsStore.save_settings()` now preserves the original filesystem exception across temp-write, replace, cleanup-check, and cleanup failures, and removes `settings.json.tmp` after replace failure when cleanup is possible. The architecture document records the save-failure cleanup contract, and focused tests cover successful saves plus the failure paths identified during compliance review. The final post-commit reviewers found no remaining code, architecture, or coverage issues; their only finding was that this living ExecPlan needed the closeout recorded here.
 
 ## Context and Orientation
 
@@ -191,3 +192,5 @@ Revision note: Updated 2026-05-15 by Codex after adding the failing regression t
 Revision note: Updated 2026-05-15 by Codex after compliance review identified cleanup-failure exception masking and a missing architecture note.
 
 Revision note: Updated 2026-05-15 by Codex after final compliance review found the cleanup existence check and temp-write failure branch needed direct coverage.
+
+Revision note: Updated 2026-05-15 by Codex after final post-commit compliance review found no remaining behavioral issues and only required this ExecPlan closeout.
