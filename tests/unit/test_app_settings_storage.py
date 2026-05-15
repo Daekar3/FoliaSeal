@@ -75,6 +75,31 @@ def test_app_settings_store_removes_temp_file_when_replace_fails(
     assert not store.settings_path.with_name("settings.json.tmp").exists()
 
 
+def test_app_settings_store_preserves_original_error_when_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    original_replace = Path.replace
+    original_unlink = Path.unlink
+
+    def fail_settings_replace(path: Path, target: Path) -> Path:
+        if path.name == "settings.json.tmp":
+            raise OSError("replace failed")
+        return original_replace(path, target)
+
+    def fail_settings_unlink(path: Path) -> None:
+        if path.name == "settings.json.tmp":
+            raise OSError("cleanup failed")
+        original_unlink(path)
+
+    monkeypatch.setattr(Path, "replace", fail_settings_replace)
+    monkeypatch.setattr(Path, "unlink", fail_settings_unlink)
+
+    with pytest.raises(OSError, match="replace failed"):
+        store.save_settings(AppSettings.default(home_directory=tmp_path / "home"))
+
+
 def test_app_settings_store_loads_home_defaults_when_blank(tmp_path: Path) -> None:
     store = AppSettingsStore(
         storage_dir=tmp_path / "config",

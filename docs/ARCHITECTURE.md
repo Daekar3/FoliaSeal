@@ -301,7 +301,7 @@ The canonical repository document split is:
 - Storage path: `${XDG_CONFIG_HOME:-~/.config}/FoliaSeal/settings.json`.
 - Format: JSON object with `schema_version`, `default_output_directory`, `default_open_directory`, `linux_packaging_channel`, and `ui`.
 - Validation: `AppSettings.from_dict()` rejects malformed shape/types and blank directory strings.
-- Error behavior: missing or blank file loads home-directory defaults; invalid JSON raises `ConfigValidationError`.
+- Error behavior: missing or blank file loads home-directory defaults; invalid JSON raises `ConfigValidationError`; save failures preserve the original filesystem exception and remove `settings.json.tmp` when cleanup is possible.
 - Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/app_settings_storage.py`.
 
 ### Timestamp and trust contract
@@ -516,6 +516,7 @@ Default local validation from README:
 | 2026-05-10 | Added managed certificate export. | Documented app-frame export ownership and non-mutating managed PKCS#12 backup behavior. |
 | 2026-05-10 | Added Linux Secret Service saved-password support. | Documented `secret-tool` storage, import-time password saving, signing resolver wiring, and saved-secret cleanup on configuration deletion. |
 | 2026-05-13 | Added first-pass in-app certificate creation. | Documented the self-signed PKCS#12 creation service, Settings/Create certificate flow, created managed-certificate records, and optional saved-password reuse. |
+| 2026-05-15 | Hardened AppSettings save failure cleanup. | Documented `settings.json.tmp` cleanup behavior and preservation of the original filesystem failure. |
 | 2026-05-06 | Added certificate catalog and signing-material resolver architecture. | Reflected schema model alignment Slice 2 implementation. |
 | 2026-04-30 | Replaced skeleton with first-pass architecture map. | Documented current repository structure, contracts, flows, persistence, tests, debts, and open questions from code inspection. |
 | 2026-04-30 | Created architecture document skeleton. | Establish canonical architecture documentation path referenced by agent instructions. |

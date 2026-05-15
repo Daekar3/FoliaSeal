@@ -80,7 +80,10 @@ class AppSettingsStore:
             temp_path.replace(self.settings_path)
         except Exception:
             if temp_path.exists():
-                temp_path.unlink()
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
             raise
 
     def _default_settings(self) -> AppSettings:
