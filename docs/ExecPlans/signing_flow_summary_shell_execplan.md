@@ -27,8 +27,11 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 - [x] (2026-05-15T10:47Z) Ran focused shell and app-frame tests plus lint successfully.
 - [x] (2026-05-15T10:48Z) Updated README and architecture documentation to record the staged shell summary.
 - [x] (2026-05-15T10:49Z) Ran the full Qt signing shell unit file successfully after touching shared workspace refresh paths.
-- [ ] Commit the completed slice.
-- [ ] Run post-commit architectural compliance review.
+- [x] (2026-05-15T10:50Z) Committed the first-pass slice as `54de767 feat: add state-driven signing flow summary`.
+- [x] (2026-05-15T10:51Z) Post-commit compliance review found that the `Signed` stage could remain stale after editing a signed draft and that this plan needed progress updates.
+- [x] (2026-05-15T10:53Z) Cleared prior signing results when draft/output state changes, added edit-after-sign regression coverage, and reran focused validation successfully.
+- [ ] Commit the compliance follow-up.
+- [ ] Rerun post-commit architectural compliance review.
 
 ## Surprises & Discoveries
 
@@ -41,6 +44,9 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 - Observation: a successful signing run without an open-output callback still has a useful signed-output path for the summary.
   Evidence: `SigningWorkspaceWidget.submit_sign_request()` calls `_set_last_successful_output_path(request.output_pdf_path)` on success, while `_set_last_successful_output_path()` separately disables the `Open signed PDF` button when no callback exists.
 
+- Observation: a signed-output state is historical unless it is cleared when the active draft changes.
+  Evidence: compliance reviewers found that after a successful sign, choosing a new output path or placing a new rectangle could leave the summary at `Signed` even though the active draft needed re-signing.
+
 ## Decision Log
 
 - Decision: add a read-only workspace-level flow summary instead of reorganizing the whole properties panel in this slice.
@@ -51,9 +57,13 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
   Rationale: The governing docs ask for legible stages, not another data model. Existing state already distinguishes review/place/preview/confirm/sign outcomes well enough for this first slice.
   Date/Author: 2026-05-15 / Codex
 
+- Decision: clear previous signing results whenever the active draft or output path changes.
+  Rationale: The `Signed` stage should describe the current draft, not merely the last successful operation. Clearing the previous result keeps the summary honest without adding a parallel dirty-state model.
+  Date/Author: 2026-05-15 / Codex
+
 ## Outcomes & Retrospective
 
-This plan is in progress. Completion requires failing tests, a state-driven flow summary implementation, focused validation, commit, and post-commit compliance review.
+This plan is in progress. The first-pass implementation was committed, and compliance review found one stale-state bug. Completion now requires committing the follow-up and receiving a clean post-commit compliance review.
 
 ## Context and Orientation
 
@@ -76,7 +86,9 @@ Third, add helper methods on `SigningWorkspaceWidget`: `_build_flow_summary_cont
 
 Refresh the summary from `refresh_viewer()`, `_handle_viewer_selection()`, `_handle_panel_change()`, `choose_output_pdf_path()`, and `submit_sign_request()` after the underlying state changes. Expose `flow_stage_label` and `flow_detail_label` on `self.widget` for focused fake-Qt tests.
 
-Fourth, run focused tests and lint. Update this ExecPlan with validation transcripts and any discoveries.
+Fourth, clear prior signing results from draft/output mutation paths so a historical successful sign cannot keep the summary at `Signed` after the active draft changes. Add regression coverage for signing successfully and then changing placement.
+
+Fifth, run focused tests and lint. Update this ExecPlan with validation transcripts and any discoveries.
 
 ## Concrete Steps
 
@@ -137,6 +149,23 @@ Full Qt signing shell unit file:
     ..................................................................       [100%]
     66 passed in 26.43s
 
+Compliance follow-up focused regression and signing-output tests:
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py::test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_changes tests/unit/test_qt_signing_shell.py::test_signing_shell_executes_real_sign_flow_when_executor_is_supplied tests/unit/test_qt_signing_shell.py::test_signing_shell_open_signed_output_uses_success_callback tests/unit/test_qt_signing_shell.py::test_signing_shell_disables_open_signed_output_after_sign_failure
+    ....                                                                     [100%]
+    4 passed in 4.84s
+
+Compliance follow-up lint:
+
+    .venv/bin/python -m ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py
+    All checks passed!
+
+Compliance follow-up full Qt signing shell unit file:
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    ...................................................................      [100%]
+    67 passed in 28.06s
+
 ## Interfaces and Dependencies
 
 The implementation stays in `src/foliaseal/presentation/qt/signing_shell.py`. It should not change the signatures of `build_qt_signing_shell()`, `SigningWorkspaceWidget`, `SignaturePropertiesPanel`, or application-layer workflow classes. The new summary uses only existing Qt binding primitives already represented in `QtSigningWidgetBindings`.
@@ -146,3 +175,5 @@ The tests stay in `tests/unit/test_qt_signing_shell.py` and should use the exist
 Revision note: Created 2026-05-15 by Codex to implement the first Signing Flow UX Architecture slice from Brief F.
 
 Revision note: Updated 2026-05-15 by Codex after adding the flow summary implementation, focused tests, and durable documentation updates.
+
+Revision note: Updated 2026-05-15 by Codex after compliance review identified a stale signed-stage edge case and the follow-up added edit-after-sign coverage.

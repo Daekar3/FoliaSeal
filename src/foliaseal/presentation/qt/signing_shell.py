@@ -3045,6 +3045,7 @@ class SigningWorkspaceWidget:
         if not selected_path:
             return None
         self._draft_workflow.output_pdf_path = selected_path
+        self._clear_previous_signing_result()
         self._set_sign_result_text(f"Output will be saved to: {selected_path}")
         self._refresh_sign_button_state()
         self._refresh_flow_summary()
@@ -3060,6 +3061,13 @@ class SigningWorkspaceWidget:
         self._open_signed_output_button.setEnabled(
             output_path is not None and self._on_open_signed_output is not None
         )
+
+    def _clear_previous_signing_result(self) -> None:
+        if self._last_signing_result is None and self._last_successful_output_path is None:
+            return
+        self._last_signing_result = None
+        self.widget.last_signing_result = None  # type: ignore[attr-defined]
+        self._set_last_successful_output_path(None)
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
@@ -3081,6 +3089,7 @@ class SigningWorkspaceWidget:
         except ValueError as exc:
             self._emit_error(f"Unable to apply signature placement: {exc}")
             return
+        self._clear_previous_signing_result()
         self.properties_panel.set_signature_rect(signature_rect)
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
@@ -3094,6 +3103,7 @@ class SigningWorkspaceWidget:
             self._on_status_change(name)
 
     def _handle_panel_change(self) -> None:
+        self._clear_previous_signing_result()
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
@@ -3118,6 +3128,7 @@ class SigningWorkspaceWidget:
         except Exception as exc:
             self._emit_error(f"Unable to change PDF page: {exc}")
             return
+        self._clear_previous_signing_result()
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
