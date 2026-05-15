@@ -30,7 +30,10 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 - [x] (2026-05-15T10:50Z) Committed the first-pass slice as `54de767 feat: add state-driven signing flow summary`.
 - [x] (2026-05-15T10:51Z) Post-commit compliance review found that the `Signed` stage could remain stale after editing a signed draft and that this plan needed progress updates.
 - [x] (2026-05-15T10:53Z) Cleared prior signing results when draft/output state changes, added edit-after-sign regression coverage, and reran focused validation successfully.
-- [ ] Commit the compliance follow-up.
+- [x] (2026-05-15T10:54Z) Committed the first compliance follow-up as `04ab7cc fix: clear stale signed flow state after draft changes`.
+- [x] (2026-05-15T10:56Z) Second compliance review found the visible completion label could remain stale after draft changes, and requested direct output-path/page-change regression coverage.
+- [x] (2026-05-15T10:58Z) Cleared the visible signing result label when prior signing results are invalidated, added placement/output/page-change regression coverage, and reran focused validation, lint, and the full signing-shell unit file successfully.
+- [ ] Commit the second compliance follow-up.
 - [ ] Rerun post-commit architectural compliance review.
 
 ## Surprises & Discoveries
@@ -47,6 +50,9 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 - Observation: a signed-output state is historical unless it is cleared when the active draft changes.
   Evidence: compliance reviewers found that after a successful sign, choosing a new output path or placing a new rectangle could leave the summary at `Signed` even though the active draft needed re-signing.
 
+- Observation: the visible result label is separate from both workspace and public signing-result state.
+  Evidence: a second compliance review found that after successful signing, a placement or page change could return the summary to `Confirm/sign` while leaving the old `Signing completed successfully.` message visible.
+
 ## Decision Log
 
 - Decision: add a read-only workspace-level flow summary instead of reorganizing the whole properties panel in this slice.
@@ -61,9 +67,13 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
   Rationale: The `Signed` stage should describe the current draft, not merely the last successful operation. Clearing the previous result keeps the summary honest without adding a parallel dirty-state model.
   Date/Author: 2026-05-15 / Codex
 
+- Decision: clear the visible signing result label when a prior signing result is invalidated, while allowing output-path selection to replace it with the selected-output message.
+  Rationale: the summary, stored result, open-output state, and visible status label must describe the same current draft. Output-path selection remains a user-visible status update, so it overwrites the cleared result text immediately after invalidation.
+  Date/Author: 2026-05-15 / Codex
+
 ## Outcomes & Retrospective
 
-This plan is in progress. The first-pass implementation was committed, and compliance review found one stale-state bug. Completion now requires committing the follow-up and receiving a clean post-commit compliance review.
+This plan is in progress. The first-pass implementation and first compliance follow-up were committed. A second compliance review found one remaining stale visible-label bug and two coverage gaps, which have been patched locally. Completion now requires committing the second follow-up and receiving a clean post-commit compliance review.
 
 ## Context and Orientation
 
@@ -88,7 +98,9 @@ Refresh the summary from `refresh_viewer()`, `_handle_viewer_selection()`, `_han
 
 Fourth, clear prior signing results from draft/output mutation paths so a historical successful sign cannot keep the summary at `Signed` after the active draft changes. Add regression coverage for signing successfully and then changing placement.
 
-Fifth, run focused tests and lint. Update this ExecPlan with validation transcripts and any discoveries.
+Fifth, keep the visible signing result label aligned with that invalidation behavior. Add regression coverage for signing successfully and then changing placement, output path, and page number so the summary, stored result, open-output state, and visible result text cannot disagree.
+
+Sixth, run focused tests and lint. Update this ExecPlan with validation transcripts and any discoveries.
 
 ## Concrete Steps
 
@@ -166,6 +178,23 @@ Compliance follow-up full Qt signing shell unit file:
     ...................................................................      [100%]
     67 passed in 28.06s
 
+Second compliance follow-up focused regression and signing-output tests:
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py -k "flow_summary or executes_real_sign_flow"
+    ......                                                                   [100%]
+    6 passed, 63 deselected in 6.45s
+
+Second compliance follow-up lint:
+
+    .venv/bin/python -m ruff check src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py
+    All checks passed!
+
+Second compliance follow-up full Qt signing shell unit file:
+
+    .venv/bin/pytest -q tests/unit/test_qt_signing_shell.py
+    .....................................................................    [100%]
+    69 passed in 32.27s
+
 ## Interfaces and Dependencies
 
 The implementation stays in `src/foliaseal/presentation/qt/signing_shell.py`. It should not change the signatures of `build_qt_signing_shell()`, `SigningWorkspaceWidget`, `SignaturePropertiesPanel`, or application-layer workflow classes. The new summary uses only existing Qt binding primitives already represented in `QtSigningWidgetBindings`.
@@ -177,3 +206,5 @@ Revision note: Created 2026-05-15 by Codex to implement the first Signing Flow U
 Revision note: Updated 2026-05-15 by Codex after adding the flow summary implementation, focused tests, and durable documentation updates.
 
 Revision note: Updated 2026-05-15 by Codex after compliance review identified a stale signed-stage edge case and the follow-up added edit-after-sign coverage.
+
+Revision note: Updated 2026-05-15 by Codex after second compliance review identified stale visible result text and the follow-up added placement/output/page-change coverage.

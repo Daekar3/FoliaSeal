@@ -827,6 +827,87 @@ def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_change
     assert widget.flow_stage_label.text() == "Confirm/sign"
     assert widget._signing_workspace.last_signing_result is None
     assert widget.last_signing_result is None
+    assert widget.sign_result_label.text() == ""
+
+
+def test_signing_shell_flow_summary_replaces_signed_result_after_output_path_change(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+    )
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    widget.submit_sign_request()
+
+    selected_path = tmp_path / "changed-output.pdf"
+    bindings.q_file_dialog.next_save_file_name = str(selected_path)
+    widget.choose_output_pdf_path()
+
+    assert widget.flow_stage_label.text() == "Confirm/sign"
+    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
+    assert "Signing completed successfully." not in widget.sign_result_label.text()
+    assert widget.sign_result_label.text() == f"Output will be saved to: {selected_path}"
+
+
+def test_signing_shell_flow_summary_clears_signed_result_after_page_change(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+    )
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    widget.submit_sign_request()
+
+    widget.properties_panel._placement_controls.page_spin.setValue(2)
+
+    assert widget.flow_stage_label.text() == "Confirm/sign"
+    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
+    assert widget.sign_result_label.text() == ""
 
 
 def test_signing_shell_open_signed_output_uses_success_callback(

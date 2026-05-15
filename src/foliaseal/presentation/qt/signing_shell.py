@@ -3068,6 +3068,7 @@ class SigningWorkspaceWidget:
         self._last_signing_result = None
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self._set_last_successful_output_path(None)
+        self._set_sign_result_text("")
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
