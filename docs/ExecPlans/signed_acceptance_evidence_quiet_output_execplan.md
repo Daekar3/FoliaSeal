@@ -58,7 +58,7 @@ This is a CLI usability and evidence hygiene slice. It must not weaken cryptogra
 
 ## Outcomes & Retrospective
 
-This plan is in progress. Completion requires scoped filters, tests, documentation, validation, and compliance review.
+This plan is complete. The one-command signed acceptance evidence runner now suppresses the known benign dummy-TSA and Qt offscreen chatter on the high-level evidence path while preserving raw diagnostics in the per-manifest matrix command. The follow-up narrowed layout-warning suppression to the intentional fit-rejection matrix, focused tests and lint passed, the real evidence command reported all three matrices as `PASS`, and final compliance review found no remaining issues.
 
 ## Context and Orientation
 
@@ -141,3 +141,5 @@ Revision note: Updated 2026-05-14 by Codex after implementing scoped quieting fo
 Revision note: Updated 2026-05-14 by Codex after compliance review to scope layout-warning suppression to the intentional fit-rejection matrix and clarify the docs.
 
 Revision note: Updated 2026-05-14 by Codex after final compliance review to close the completed follow-up progress item.
+
+Revision note: Updated 2026-05-14 by Codex after resuming the interrupted dev-loop to close the completed outcomes status.

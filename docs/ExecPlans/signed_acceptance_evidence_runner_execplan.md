@@ -29,7 +29,8 @@ This is a tooling and evidence-enablement slice. It must not change signing beha
 - [x] (2026-05-14T20:07Z) Committed the first-pass slice as `b7047b1 Add signed acceptance evidence runner`.
 - [x] (2026-05-14T20:11Z) Compliance review found two actionable failure-reporting gaps: generic manifest expectation errors and no markdown artifact when a matrix raises before returning.
 - [x] (2026-05-14T20:15Z) Patched the runner to surface harness `acceptance_expectation_errors` and write failure markdown for pre-summary matrix exceptions.
-- [ ] Commit the compliance follow-up and run final validation.
+- [x] (2026-05-14T21:22Z) Committed the compliance follow-up as `b6c74d1 Harden signed evidence failure reporting`.
+- [x] (2026-05-14T21:24Z) Final validation for the runner and follow-up completed successfully.
 
 ## Surprises & Discoveries
 
@@ -54,7 +55,7 @@ This is a tooling and evidence-enablement slice. It must not change signing beha
 
 ## Outcomes & Retrospective
 
-This plan is in progress. The intended outcome is a committed one-command local evidence runner with tests and documentation.
+This plan is complete. FoliaSeal now has a committed one-command local evidence runner exposed through `foliaseal phase3-signing-acceptance-evidence` and `scripts/run_signed_acceptance_evidence.py`. The runner regenerates ignored signed acceptance assets, runs the acceptance, preview-parity, and fit-rejection matrices, writes `artifacts/phase3_signed_acceptance_evidence_summary.md`, and fails with actionable errors when summary counters, manifest expectations, or pre-summary matrix execution fail. Focused tests, lint, the real evidence command, and compliance follow-up validation passed.
 
 ## Context and Orientation
 
@@ -138,3 +139,5 @@ Revision note: Created 2026-05-14 by Codex to implement the one-command signed a
 Revision note: Updated 2026-05-14 by Codex after implementing the runner, adding focused tests, updating docs, and running the real generated evidence command successfully.
 
 Revision note: Updated 2026-05-14 by Codex after compliance review to add actionable expectation errors and failure markdown for pre-summary matrix exceptions.
+
+Revision note: Updated 2026-05-14 by Codex after resuming the interrupted dev-loop to close the completed compliance follow-up and final validation status.

@@ -14,7 +14,7 @@ This is an evidence refresh and documentation/status update. It must not change 
 
 - [x] `docs/ExecPlans/agent_backend_stamp_position_execplan.md` is closed for backend-test acceptance and explicitly defers user-facing harness or signed-output proof to a later pass.
 - [x] The current repository contains automated tests for CLI dispatch, preview/request parity, backend signing/layout, Phase 3 harness evidence contracts, and signed-output comparison helpers.
-- [ ] Local artifact fixtures are present for artifact-backed matrix commands: `artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf`, `artifacts/generated_acceptance_assets/signed_acceptance_identity.p12`, `artifacts/preview_sweep_assets/signed_preview_parity_matrix.json`, `artifacts/preview_sweep_assets/signed_fit_rejection_matrix.json`, and `artifacts/preview_sweep_assets/signed_acceptance_matrix.json`.
+- [x] Local artifact fixtures are present for artifact-backed matrix commands after later artifact-generation work: `artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf`, `artifacts/generated_acceptance_assets/signed_acceptance_identity.p12`, `artifacts/preview_sweep_assets/signed_preview_parity_matrix.json`, `artifacts/preview_sweep_assets/signed_fit_rejection_matrix.json`, and `artifacts/preview_sweep_assets/signed_acceptance_matrix.json`.
 
 ## Progress
 
@@ -28,6 +28,7 @@ This is an evidence refresh and documentation/status update. It must not change 
 - [x] (2026-05-14T01:43Z) Updated this ExecPlan with validation transcripts and blocker status.
 - [x] (2026-05-14T01:48Z) Compliance review found that the blocker evidence did not explicitly check `signed_preview_parity_matrix.json` or `signed_fit_rejection_matrix.json`.
 - [x] (2026-05-14T01:49Z) Checked the two signed parity/rejection manifests and updated this plan so the matrix-blocker scope matches the evidence.
+- [x] (2026-05-14T21:25Z) Later signed-acceptance artifact generation and evidence-runner slices superseded the missing-fixture blocker recorded by this earlier evidence pass.
 
 ## Surprises & Discoveries
 
@@ -52,6 +53,8 @@ This is an evidence refresh and documentation/status update. It must not change 
 This evidence pass is complete. The automated source-controlled evidence pass completed successfully: CLI parser and dispatch tests, preview/request parity tests, backend signing/layout tests, Phase 3 harness/evidence tests, and artifact-gated certification tests reported `255 passed, 23 skipped, 1 warning`.
 
 The artifact-backed signed acceptance matrix did not run because the required local QA fixture `artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf` is absent. The two signed parity/rejection manifests named by this plan are also absent. No signed PDFs, renders, crops, comparison images, or matrix summaries were produced by this pass.
+
+Later slices generated the ignored local QA fixtures and added `foliaseal phase3-signing-acceptance-evidence`, which now runs the three signed-output matrices and writes a concise local summary. The missing-fixture statements above remain the historical result of this earlier evidence pass, not the current workspace state after the follow-up slices.
 
 ## Context and Orientation
 
@@ -154,3 +157,5 @@ Revision note: Created 2026-05-14 by Codex to run the automated parity evidence 
 Revision note: Updated 2026-05-14 by Codex after running the source-controlled automated evidence set and confirming the signed acceptance matrix remains blocked by missing local fixture assets.
 
 Revision note: Updated 2026-05-14 by Codex after compliance review to include explicit checks for the signed preview-parity and fit-rejection manifests named in the fixture dependency list.
+
+Revision note: Updated 2026-05-14 by Codex after resuming the interrupted dev-loop to mark the historical fixture blocker as superseded by later artifact-generation and evidence-runner slices.
