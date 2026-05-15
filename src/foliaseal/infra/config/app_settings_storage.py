@@ -79,11 +79,11 @@ class AppSettingsStore:
             temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
             temp_path.replace(self.settings_path)
         except Exception:
-            if temp_path.exists():
-                try:
+            try:
+                if temp_path.exists():
                     temp_path.unlink()
-                except Exception:
-                    pass
+            except Exception:
+                pass
             raise
 
     def _default_settings(self) -> AppSettings:

@@ -100,6 +100,63 @@ def test_app_settings_store_preserves_original_error_when_cleanup_fails(
         store.save_settings(AppSettings.default(home_directory=tmp_path / "home"))
 
 
+def test_app_settings_store_preserves_original_error_when_cleanup_check_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    original_replace = Path.replace
+    original_exists = Path.exists
+
+    def fail_settings_replace(path: Path, target: Path) -> Path:
+        if path.name == "settings.json.tmp":
+            raise OSError("replace failed")
+        return original_replace(path, target)
+
+    def fail_settings_exists(path: Path) -> bool:
+        if path.name == "settings.json.tmp":
+            raise OSError("exists failed")
+        return original_exists(path)
+
+    monkeypatch.setattr(Path, "replace", fail_settings_replace)
+    monkeypatch.setattr(Path, "exists", fail_settings_exists)
+
+    with pytest.raises(OSError, match="replace failed"):
+        store.save_settings(AppSettings.default(home_directory=tmp_path / "home"))
+
+
+def test_app_settings_store_preserves_write_error_when_temp_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    original_write_text = Path.write_text
+
+    def fail_settings_write(
+        path: Path,
+        data: str,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> int:
+        if path.name == "settings.json.tmp":
+            raise OSError("write failed")
+        return original_write_text(
+            path,
+            data,
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
+
+    monkeypatch.setattr(Path, "write_text", fail_settings_write)
+
+    with pytest.raises(OSError, match="write failed"):
+        store.save_settings(AppSettings.default(home_directory=tmp_path / "home"))
+
+    assert not store.settings_path.with_name("settings.json.tmp").exists()
+
+
 def test_app_settings_store_loads_home_defaults_when_blank(tmp_path: Path) -> None:
     store = AppSettingsStore(
         storage_dir=tmp_path / "config",
