@@ -66,6 +66,7 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     AppSettings,
     CertificateCatalog,
+    CertificateConfiguration,
     ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
@@ -1555,16 +1556,26 @@ class SignaturePropertiesPanel:
 
         try:
             configuration = self._certificate_catalog.configuration_named(selected_name)
+        except KeyError as exc:
+            self._selected_certificate_configuration_name = None
+            self._show_certificate_configuration_error(str(exc))
+            return False
+        return self._apply_certificate_configuration(configuration)
+
+    def _apply_certificate_configuration(
+        self,
+        configuration: CertificateConfiguration,
+    ) -> bool:
+        try:
             signing_material = self._certificate_material_resolver.resolve(
                 self._certificate_catalog,
                 configuration,
                 passphrase=_text(self._certificate_controls.password_input) or None,
             )
-        except (KeyError, SigningMaterialResolutionError, ValueError) as exc:
+        except (SigningMaterialResolutionError, ValueError) as exc:
             self._selected_certificate_configuration_name = None
             self._show_certificate_configuration_error(str(exc))
             return False
-
         self._workflow.apply_certificate_configuration(configuration, signing_material)
         self._selected_certificate_configuration_name = configuration.display_name
         self._suspend_updates = True
@@ -2129,6 +2140,21 @@ class SignaturePropertiesPanel:
             return
 
         self._selected_signature_preset_name = preset.name
+        certificate_configuration_id = preset.preset.certificate_configuration_id
+        if certificate_configuration_id is not None:
+            try:
+                configuration = self._certificate_catalog.configuration_by_id(
+                    certificate_configuration_id
+                )
+            except KeyError as exc:
+                self._selected_signature_preset_name = None
+                self._show_certificate_configuration_error(str(exc))
+                self._notify_change()
+                return
+            if not self._apply_certificate_configuration(configuration):
+                self._selected_signature_preset_name = None
+                self._notify_change()
+                return
         self._workflow.apply_resolved_signature_preset(preset)
         self.load_from_workflow()
         self._notify_change()

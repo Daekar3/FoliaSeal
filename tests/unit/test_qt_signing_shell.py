@@ -33,6 +33,8 @@ from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
 from tests.support.phase3_builders import (
     build_certificate_catalog,
+    build_certificate_configuration,
+    build_managed_certificate,
     build_signature_appearance,
     build_signature_field_binding,
     build_signature_preset,
@@ -2368,6 +2370,86 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     assert (
         widget._signing_workspace._draft_workflow.selected_certificate_configuration_id
         == "cert-config-current"
+    )
+
+
+def test_signing_shell_signature_preset_selection_applies_certificate_material(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    default_certificate = build_managed_certificate(
+        managed_certificate_id="managed-cert-default",
+        display_name="Default Certificate",
+        storage_filename="default.p12",
+    )
+    alternate_certificate = build_managed_certificate(
+        managed_certificate_id="managed-cert-alt",
+        display_name="Alternate Certificate",
+        storage_filename="alternate.p12",
+    )
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(default_certificate, alternate_certificate),
+            certificate_configurations=(
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-default",
+                    display_name="Default Signing",
+                    managed_certificate_id="managed-cert-default",
+                ),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-alt",
+                    display_name="Alternate Signing",
+                    managed_certificate_id="managed-cert-alt",
+                ),
+            ),
+        )
+    )
+    default_path = certificate_store.managed_certificate_dir / "default.p12"
+    alternate_path = certificate_store.managed_certificate_dir / "alternate.p12"
+    default_path.write_bytes(b"default-pkcs12")
+    alternate_path.write_bytes(b"alternate-pkcs12")
+
+    preset = build_signature_preset(
+        name="Alternate Preset",
+        certificate_configuration_id="cert-config-alt",
+    )
+    workflow = _workflow(tmp_path)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=certificate_store,
+        preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
+    )
+    panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText("Default Signing")
+    panel._certificate_controls.password_input.setText("default-secret")
+
+    assert panel.apply_selected_certificate_configuration() is True
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(default_path)
+    assert workflow.passphrase == "default-secret"
+
+    panel._certificate_controls.password_input.setText("alternate-secret")
+    panel._signature_preset_controls.preset_combo.setCurrentText("Alternate Preset")
+
+    assert workflow.selected_certificate_configuration_id == "cert-config-alt"
+    assert workflow.certificate_path == str(alternate_path)
+    assert workflow.passphrase == "alternate-secret"
+    assert (
+        panel._certificate_controls.configuration_combo.currentText()
+        == "Alternate Signing"
     )
 
 

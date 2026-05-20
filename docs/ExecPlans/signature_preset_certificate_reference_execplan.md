@@ -24,7 +24,12 @@ The behavior is demonstrated by focused tests in the schema, workflow, and Qt si
 - [x] (2026-05-20 22:33Z) Implemented the minimal schema/workflow changes needed to pass the tests.
 - [x] (2026-05-20 22:34Z) Ran focused validation: `pytest tests/unit/test_config_schemas.py tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py` reported `114 passed in 9.05s`.
 - [x] (2026-05-20 22:35Z) Ran focused lint: `ruff check src/foliaseal/infra/config/schemas.py src/foliaseal/application/signing_draft_workflow.py tests/support/phase3_builders.py tests/unit/test_config_schemas.py tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py` reported `All checks passed!`.
-- [ ] Commit the slice and run compliance review.
+- [x] (2026-05-20 22:36Z) Committed the first pass as `0ef3512fb fix: preserve certificate refs in signature presets`.
+- [x] (2026-05-20 22:38Z) Ran two-agent compliance review. One reviewer found no issues; the second found that Qt preset selection restored the certificate id but did not resolve runtime signing material, and that architecture docs omitted the optional certificate reference.
+- [x] (2026-05-20 22:45Z) Added follow-up regression coverage and implementation for preset selection applying certificate material.
+- [x] (2026-05-20 22:46Z) Ran follow-up focused validation: `pytest tests/unit/test_config_schemas.py tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py` reported `115 passed in 10.76s`.
+- [x] (2026-05-20 22:46Z) Ran follow-up focused lint: `ruff check docs/ExecPlans/signature_preset_certificate_reference_execplan.md docs/ARCHITECTURE.md src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py` reported `All checks passed!`.
+- [ ] Commit the compliance follow-up and rerun compliance review.
 
 ## Surprises & Discoveries
 
@@ -33,6 +38,9 @@ The behavior is demonstrated by focused tests in the schema, workflow, and Qt si
 
 - Observation: The missing behavior is split across save and apply paths, not storage.
   Evidence: `SigningDraftWorkflow.capture_current_signature_setup()` calls `ResolvedSignaturePreset.from_parts()` without passing the active certificate id, while `apply_resolved_signature_preset()` unconditionally assigns the nullable preset field back into the workflow.
+
+- Observation: Restoring the certificate id alone is insufficient for signing.
+  Evidence: Compliance review noted that `SigningDraftWorkflow.build_signing_request()` uses `certificate_path` and `passphrase`, so Qt preset selection must also resolve the referenced certificate configuration into runtime signing material.
 
 ## Decision Log
 
@@ -44,11 +52,15 @@ The behavior is demonstrated by focused tests in the schema, workflow, and Qt si
   Rationale: `docs/SCHEMAS.md` explicitly defines partial preset load semantics this way, and it preserves compatibility with older presets that predate certificate references.
   Date/Author: 2026-05-20 / Codex
 
+- Decision: When Qt preset selection includes a certificate reference, resolve and apply the referenced certificate configuration before applying the rest of the preset.
+  Rationale: Applying the certificate through the same resolver used by the explicit Apply button keeps the signing draft's certificate path, passphrase, alias, selected id, and combo state coherent. Applying it before the visual preset keeps failure behavior safe: if certificate resolution fails, the visual preset is not partially applied.
+  Date/Author: 2026-05-20 / Codex
+
 ## Outcomes & Retrospective
 
 This plan is in progress. Expected completion means new tests prove that captured presets include the active certificate id, that partial presets without a certificate id preserve the active certificate selection, and that the Qt signing shell stores and reapplies the reference through its existing preset controls.
 
-The first implementation pass is complete and focused validation passes. The code now captures the active certificate configuration id when saving a preset, applies that id when present, and preserves the existing active certificate when a partial preset omits the field. Commit and compliance review remain.
+The first implementation pass was committed as `0ef3512fb` and focused validation passed. Compliance review found that the first pass restored the certificate id but not the runtime signing material in the Qt shell. The follow-up implementation now resolves and applies the referenced certificate configuration during preset selection, updates the architecture contract text, and passes focused validation. Follow-up commit and compliance review remain.
 
 ## Context and Orientation
 
@@ -93,6 +105,8 @@ Acceptance requires tests proving three behaviors. Saving a preset while `Signin
 
 Qt-shell acceptance requires the UI save path to store the selected certificate id in the catalog and the UI load path to leave the selected certificate intact when the preset omits the field. The focused test command must pass without failures.
 
+The compliance follow-up adds one more acceptance condition: selecting a preset with a different certificate reference must update `SigningDraftWorkflow.certificate_path` and `SigningDraftWorkflow.passphrase` to the referenced certificate configuration's resolved material, not only update `selected_certificate_configuration_id`.
+
 ## Idempotence and Recovery
 
 The implementation is additive and safe to rerun. Tests use temporary directories and fake Qt controls, so they do not mutate user configuration. If a test edit fails, revert only the files touched by this slice or adjust the tests to match the documented schema behavior. Do not change unrelated certificate lifecycle, signing backend, or packaging behavior in this slice.
@@ -120,3 +134,5 @@ Explorer-light audit summary:
 - 2026-05-20: Created plan from the governing-docs audit and explorer-light implementation review.
 - 2026-05-20: Updated progress and outcomes after adding tests, implementing the preset certificate-reference fix, and running focused pytest successfully.
 - 2026-05-20: Updated progress after focused lint passed.
+- 2026-05-20: Updated progress, discoveries, decision log, and acceptance criteria after compliance review found that preset certificate references also need to apply runtime signing material.
+- 2026-05-20: Updated progress and outcomes after the compliance follow-up implementation passed focused pytest and lint.
