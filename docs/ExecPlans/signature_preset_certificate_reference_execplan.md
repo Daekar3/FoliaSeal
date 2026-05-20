@@ -29,7 +29,8 @@ The behavior is demonstrated by focused tests in the schema, workflow, and Qt si
 - [x] (2026-05-20 22:45Z) Added follow-up regression coverage and implementation for preset selection applying certificate material.
 - [x] (2026-05-20 22:46Z) Ran follow-up focused validation: `pytest tests/unit/test_config_schemas.py tests/unit/test_signing_draft_workflow.py tests/unit/test_qt_signing_shell.py` reported `115 passed in 10.76s`.
 - [x] (2026-05-20 22:46Z) Ran follow-up focused lint: `ruff check docs/ExecPlans/signature_preset_certificate_reference_execplan.md docs/ARCHITECTURE.md src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_qt_signing_shell.py` reported `All checks passed!`.
-- [ ] Commit the compliance follow-up and rerun compliance review.
+- [x] (2026-05-20 22:47Z) Committed the compliance follow-up as `4161bb9d fix: apply preset certificate material`.
+- [x] (2026-05-20 22:50Z) Ran final two-agent compliance review. One reviewer found no issues; the other found only this ExecPlan status drift, which this closeout update resolves.
 
 ## Surprises & Discoveries
 
@@ -58,9 +59,9 @@ The behavior is demonstrated by focused tests in the schema, workflow, and Qt si
 
 ## Outcomes & Retrospective
 
-This plan is in progress. Expected completion means new tests prove that captured presets include the active certificate id, that partial presets without a certificate id preserve the active certificate selection, and that the Qt signing shell stores and reapplies the reference through its existing preset controls.
+This plan is complete. New tests prove that captured presets include the active certificate id, that partial presets without a certificate id preserve the active certificate selection, and that the Qt signing shell stores and reapplies the reference through its existing preset controls.
 
-The first implementation pass was committed as `0ef3512fb` and focused validation passed. Compliance review found that the first pass restored the certificate id but not the runtime signing material in the Qt shell. The follow-up implementation now resolves and applies the referenced certificate configuration during preset selection, updates the architecture contract text, and passes focused validation. Follow-up commit and compliance review remain.
+The first implementation pass was committed as `0ef3512fb` and focused validation passed. Compliance review found that the first pass restored the certificate id but not the runtime signing material in the Qt shell. The follow-up implementation was committed as `4161bb9d`; it resolves and applies the referenced certificate configuration during preset selection, updates the architecture contract text, and passes focused validation. Final compliance review found no remaining behavior or documentation issues for this slice after this status closeout.
 
 ## Context and Orientation
 
@@ -136,3 +137,4 @@ Explorer-light audit summary:
 - 2026-05-20: Updated progress after focused lint passed.
 - 2026-05-20: Updated progress, discoveries, decision log, and acceptance criteria after compliance review found that preset certificate references also need to apply runtime signing material.
 - 2026-05-20: Updated progress and outcomes after the compliance follow-up implementation passed focused pytest and lint.
+- 2026-05-20: Closed the plan status after committing the compliance follow-up and running final two-agent compliance review.
