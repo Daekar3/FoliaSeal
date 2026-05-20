@@ -560,7 +560,154 @@ def test_signing_shell_output_dialog_uses_app_settings_default_directory(
             "PDF files (*.pdf)",
         )
     ]
+    assert bindings.q_message_box.calls == []
     assert not hasattr(widget.properties_panel, "_app_settings_controls")
+
+
+def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_message_box.next_result = bindings.q_message_box.No
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    workflow = _workflow(tmp_path)
+    existing_output_path = tmp_path / "already-signed.pdf"
+    existing_output_path.write_bytes(b"existing signed pdf")
+    bindings.q_file_dialog.next_save_file_name = str(existing_output_path)
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        sign_executor=executor,
+    )
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    widget.submit_sign_request()
+    original_output_path = workflow.output_pdf_path
+    original_result_label = widget.sign_result_label.text()
+
+    result = widget.choose_output_pdf_path()
+
+    assert result is None
+    assert workflow.output_pdf_path == original_output_path
+    assert widget._signing_workspace.last_signing_result is not None
+    assert widget.last_signing_result is not None
+    assert widget.sign_result_label.text() == original_result_label
+    assert bindings.q_message_box.calls == [
+        (
+            widget,
+            "Overwrite signed PDF?",
+            f"Replace existing signed PDF at {existing_output_path}?",
+        )
+    ]
+
+
+def test_signing_shell_output_path_overwrite_cancel_prompts_for_current_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_message_box.next_result = bindings.q_message_box.No
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    workflow = _workflow(tmp_path)
+    current_output_path = Path(workflow.output_pdf_path)
+    current_output_path.write_bytes(b"existing signed pdf")
+    bindings.q_file_dialog.next_save_file_name = str(current_output_path)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+    )
+
+    result = widget.choose_output_pdf_path()
+
+    assert result is None
+    assert workflow.output_pdf_path == str(current_output_path)
+    assert bindings.q_message_box.calls == [
+        (
+            widget,
+            "Overwrite signed PDF?",
+            f"Replace existing signed PDF at {current_output_path}?",
+        )
+    ]
+
+
+def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_message_box.next_result = bindings.q_message_box.Yes
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    workflow = _workflow(tmp_path)
+    existing_output_path = tmp_path / "already-signed.pdf"
+    existing_output_path.write_bytes(b"existing signed pdf")
+    bindings.q_file_dialog.next_save_file_name = str(existing_output_path)
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        sign_executor=executor,
+    )
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    widget.submit_sign_request()
+
+    result = widget.choose_output_pdf_path()
+
+    assert result == str(existing_output_path)
+    assert workflow.output_pdf_path == str(existing_output_path)
+    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
+    assert widget.sign_result_label.text() == (
+        f"Output will be saved to: {existing_output_path}"
+    )
+    assert bindings.q_message_box.calls == [
+        (
+            widget,
+            "Overwrite signed PDF?",
+            f"Replace existing signed PDF at {existing_output_path}?",
+        )
+    ]
 
 
 def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) -> None:

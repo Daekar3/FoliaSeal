@@ -376,8 +376,9 @@ The canonical repository document split is:
 1. The signing shell receives settings from an explicit `AppSettings`, an `AppSettingsStore`, or `AppSettings.default()`.
 2. App-wide editing is handled by the app-frame `Settings > Application settings` dialog, which persists changes through `AppSettingsStore.save_settings()` and refreshes any loaded shell.
 3. `choose_output_pdf_path()` opens `QFileDialog.getSaveFileName()` with the initial path from `suggest_signed_output_path()`, rooted at `AppSettings.default_output_directory`.
-4. When the user selects a file, the shell writes the chosen path to `SigningDraftWorkflow.output_pdf_path` before signing.
-5. Empty dialog results leave the current output path unchanged.
+4. If the selected path already exists, the shell asks for explicit overwrite confirmation before mutating the draft path, so platforms without native save-dialog warnings still require user consent.
+5. When the user selects a non-existing file or confirms overwriting an existing file, the shell writes the chosen path to `SigningDraftWorkflow.output_pdf_path` before signing.
+6. Empty dialog results or declined overwrite confirmation leave the current output path unchanged.
 
 ### Viewer selection to PDF rectangle
 

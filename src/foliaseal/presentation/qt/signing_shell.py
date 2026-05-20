@@ -3070,12 +3070,33 @@ class SigningWorkspaceWidget:
         selected_path = selected_path.strip()
         if not selected_path:
             return None
+        if not self._confirm_output_overwrite(selected_path):
+            return None
         self._draft_workflow.output_pdf_path = selected_path
         self._clear_previous_signing_result()
         self._set_sign_result_text(f"Output will be saved to: {selected_path}")
         self._refresh_sign_button_state()
         self._refresh_flow_summary()
         return selected_path
+
+    def _confirm_output_overwrite(self, selected_path: str) -> bool:
+        selected = Path(selected_path)
+        if not selected.exists():
+            return True
+        message_box = self._bindings.q_message_box
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return False
+        yes_value = getattr(message_box, "Yes", None)
+        if yes_value is None:
+            standard_button = getattr(message_box, "StandardButton", None)
+            yes_value = getattr(standard_button, "Yes", None)
+        result = question(
+            self.widget,
+            "Overwrite signed PDF?",
+            f"Replace existing signed PDF at {selected_path}?",
+        )
+        return result == yes_value
 
     @property
     def last_signing_result(self) -> SigningResult | None:
