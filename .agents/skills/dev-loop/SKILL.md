@@ -20,14 +20,14 @@ Follow the steps outlined in the ExecPlan to work through the development loop. 
 ### Follow Up with Subagents
 If you assigned any subagents to child ExecPlans, make sure to follow up with them to check on their progress, provide any necessary guidance or support, and ensure that their work is aligned with the requirements of their assigned ExecPlan. Subagents often require active management to keep them on task and ensure they haven't stopped working. 
 
-## Write a Git Commit
-Once the ExecPlan has been executed and the task or project slice is complete, spawn a "worker-light" subagent with direction to use the $write-git-commit skill to create a Git commit that documents the changes made during the implementation of the task or project slice.
-
 ## Review Compliance with Requirements
-After your first pass is committed, spawn two (2) "explorer-light" subagents to review `docs/ARCHITECTURE.md` and any other specifications or requirements in `docs/` to ensure that the implementation from this slice aligns with the overall architecture and requirements of the project. If there are any discrepancies or areas for improvement, use $write-execplan to create a new child ExecPlan to address these issues, implement the plan in accordance with `## Execute the Plan` above, write a git commit in accordance with `## Write a Git Commit` above, and repeat the development loop as needed until the slice implementation is compliant with the requirements.
+After your first pass is implemented, spawn two (2) "explorer-light" subagents to review `docs/ARCHITECTURE.md` and any other specifications or requirements in `docs/` to ensure that the implementation from this slice aligns with the overall architecture and requirements of the project. If there are any discrepancies or areas for improvement, use $write-execplan to create a new child ExecPlan to address these issues, implement the plan in accordance with `## Execute the Plan` above, do the compliance review in accordance with `## Review Compliance with Requirements`,and repeat the development loop as needed until the slice implementation is compliant with the requirements.
 
 ## Update Documentation
 If there are any relevant updates to documentation that need to be made as a result of the changes implemented during the development loop, spawn a "worker-light" subagent to update them. This review must include updating README files, architecture documentation using the $architecture-steward skill, and any other relevant documentation in the `docs/` directory.
+
+## Write a Git Commit
+Once the ExecPlan has been executed, the task or project slice is complete, the compliance review is done, and the documentation updates are made, spawn a "worker-light" subagent with direction to use the $write-git-commit skill to create a Git commit that documents the changes made during the implementation of the task or project slice.
 
 ## Report Outcomes
 After completing the development loop, report the outcomes to the user. The report must have the sections below:
