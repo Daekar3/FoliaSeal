@@ -1156,6 +1156,7 @@ class SignaturePreset:
         display_name: str,
         appearance_profile_id: str,
         placement_profile_id: str | None = None,
+        certificate_configuration_id: str | None = None,
         schema_version: int = 1,
         signature_preset_id: str | None = None,
     ) -> SignaturePreset:
@@ -1164,6 +1165,7 @@ class SignaturePreset:
             schema_version=schema_version,
             signature_preset_id=signature_preset_id or _stable_id("preset", display_name),
             display_name=display_name,
+            certificate_configuration_id=certificate_configuration_id,
             appearance_profile_id=appearance_profile_id,
             placement_profile_id=placement_profile_id,
         )
@@ -1218,6 +1220,7 @@ class ResolvedSignaturePreset:
         name: str,
         appearance: SignatureAppearance,
         placement_defaults: SignaturePlacementDefaults | None = None,
+        certificate_configuration_id: str | None = None,
         schema_version: int = 1,
     ) -> ResolvedSignaturePreset:
         appearance_profile = AppearanceProfile(
@@ -1239,6 +1242,7 @@ class ResolvedSignaturePreset:
             preset=SignaturePreset.from_profile_parts(
                 schema_version=schema_version,
                 display_name=name,
+                certificate_configuration_id=certificate_configuration_id,
                 appearance_profile_id=appearance_profile.appearance_profile_id,
                 placement_profile_id=(
                     placement_profile.placement_profile_id if placement_profile else None

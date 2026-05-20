@@ -339,12 +339,15 @@ def test_placement_profile_round_trip() -> None:
 
 
 def test_signature_preset_round_trip_is_reference_only() -> None:
-    original = build_reference_signature_preset()
+    original = build_reference_signature_preset(
+        certificate_configuration_id="cert-config-default",
+    )
 
     payload = original.to_dict()
     reconstructed = SignaturePreset.from_dict(payload)
 
     assert reconstructed == original
+    assert payload["certificate_configuration_id"] == "cert-config-default"
     assert payload["appearance_profile_id"] == "appearance-default"
     assert payload["placement_profile_id"] == "placement-default"
     assert "appearance" not in payload

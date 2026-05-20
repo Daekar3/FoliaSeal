@@ -458,6 +458,7 @@ def test_workflow_can_capture_and_apply_signature_setup(tmp_path: Path) -> None:
     )
     workflow.set_signature_appearance(appearance)
     workflow.signature_placement_defaults = placement_defaults
+    workflow.selected_certificate_configuration_id = "cert-config-default"
 
     captured = workflow.capture_current_signature_setup("Team Standard")
 
@@ -467,16 +468,38 @@ def test_workflow_can_capture_and_apply_signature_setup(tmp_path: Path) -> None:
     assert captured.placement_defaults == placement_defaults
     assert captured.preset.appearance_profile_id == "appearance-team-standard"
     assert captured.preset.placement_profile_id == "placement-team-standard"
+    assert captured.preset.certificate_configuration_id == "cert-config-default"
 
     workflow.clear_signature_appearance()
     workflow.signature_placement_defaults = None
+    workflow.selected_certificate_configuration_id = "cert-config-old"
     workflow.apply_resolved_signature_preset(captured)
 
     assert workflow.current_signature_appearance == appearance
     assert workflow.signature_placement_defaults == placement_defaults
     assert workflow.selected_signature_preset_id == "preset-team-standard"
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.selected_appearance_profile_id == "appearance-team-standard"
     assert workflow.selected_placement_profile_id == "placement-team-standard"
+
+
+def test_workflow_preserves_certificate_selection_for_partial_preset(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.selected_certificate_configuration_id = "cert-config-current"
+    preset = ResolvedSignaturePreset.from_parts(
+        name="Visual Only",
+        appearance=_appearance(),
+        placement_defaults=SignaturePlacementDefaults(
+            width_pt=180.0,
+            height_pt=72.0,
+        ),
+    )
+
+    workflow.apply_resolved_signature_preset(preset)
+
+    assert workflow.selected_certificate_configuration_id == "cert-config-current"
 
 
 def test_workflow_captures_placement_defaults_from_current_rectangle(

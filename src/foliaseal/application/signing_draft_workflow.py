@@ -321,6 +321,7 @@ class SigningDraftWorkflow:
             name=name,
             appearance=self.signature_appearance,
             placement_defaults=effective_placement_defaults,
+            certificate_configuration_id=self.selected_certificate_configuration_id,
         )
 
     def apply_resolved_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
@@ -328,9 +329,10 @@ class SigningDraftWorkflow:
         self.signature_appearance = preset.appearance
         self.signature_placement_defaults = preset.placement_defaults
         self.selected_signature_preset_id = preset.preset.signature_preset_id
-        self.selected_certificate_configuration_id = (
-            preset.preset.certificate_configuration_id
-        )
+        if preset.preset.certificate_configuration_id is not None:
+            self.selected_certificate_configuration_id = (
+                preset.preset.certificate_configuration_id
+            )
         self.selected_appearance_profile_id = preset.preset.appearance_profile_id
         self.selected_placement_profile_id = preset.preset.placement_profile_id
 

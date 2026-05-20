@@ -2209,13 +2209,27 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
 
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
     store.save_catalog(build_signature_preset_catalog())
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_catalog = build_certificate_catalog()
+    certificate_store.save_catalog(certificate_catalog)
+    managed_cert = certificate_catalog.managed_certificates[0]
+    (certificate_store.managed_certificate_dir / managed_cert.storage_filename).write_bytes(
+        b"pkcs12-bytes"
+    )
+    workflow = _workflow(tmp_path)
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
+        signing_workflow=workflow,
+        certificate_catalog_store=certificate_store,
         preset_catalog_store=store,
     )
 
     panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText(
+        "Corporate Records Signing"
+    )
+    panel._certificate_controls.password_input.setText("typed-secret")
+    assert panel.apply_selected_certificate_configuration() is True
     panel._signature_preset_controls.preset_name.setText("My Preset")
     panel._appearance_controls.signer_label_prefix.setText("Signed by Me")
     panel._appearance_controls.show_field_names.setChecked(True)
@@ -2232,12 +2246,19 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
             height_pt=36.0,
         )
     )
+    assert (
+        store.load_catalog()
+        .preset_named("My Preset")
+        .preset.certificate_configuration_id
+        == "cert-config-default"
+    )
 
     panel._appearance_controls.signer_label_prefix.setText("Temporary Draft")
     assert (
         panel._signature_preset_controls.preset_combo.currentText()
         == "Current signature setup"
     )
+    workflow.selected_certificate_configuration_id = None
 
     panel._signature_preset_controls.preset_combo.setCurrentText("My Preset")
 
@@ -2245,6 +2266,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     assert panel._appearance_controls.show_field_names.isChecked() is True
     assert panel._placement_controls.width_spin.value() == 144.0
     assert panel._placement_controls.height_spin.value() == 36.0
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
 
     relaunch_widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
@@ -2333,6 +2355,9 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
 
     panel = widget.properties_panel
     assert widget._signing_workspace._draft_workflow.signature_rect is None
+    widget._signing_workspace._draft_workflow.selected_certificate_configuration_id = (
+        "cert-config-current"
+    )
 
     panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
 
@@ -2340,6 +2365,10 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     assert panel._placement_controls.width_spin.value() == 144.0
     assert panel._placement_controls.height_spin.value() == 36.0
     assert widget._signing_workspace._draft_workflow.signature_rect is None
+    assert (
+        widget._signing_workspace._draft_workflow.selected_certificate_configuration_id
+        == "cert-config-current"
+    )
 
 
 def test_signing_shell_signature_preset_delete_can_be_canceled_and_keeps_preset(

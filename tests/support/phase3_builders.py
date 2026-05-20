@@ -167,6 +167,7 @@ def build_signature_preset(
     name: str = "default",
     appearance: SignatureAppearance | None = None,
     placement_defaults: SignaturePlacementDefaults | None = None,
+    certificate_configuration_id: str | None = None,
 ) -> ResolvedSignaturePreset:
     """Build a representative resolved signature preset for shell tests."""
     return ResolvedSignaturePreset.from_parts(
@@ -179,6 +180,7 @@ def build_signature_preset(
             height_pt=80.0,
             anchor=SignatureAnchor.BOTTOM_RIGHT,
         ),
+        certificate_configuration_id=certificate_configuration_id,
     )
 
 
