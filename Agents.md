@@ -52,6 +52,7 @@ Use the `architecture-steward` skill when creating, auditing, or updating this d
 - Keep type safety: Changes should always pass build and type-check; avoid unnecessary casts (`as any`, `as unknown as ...`); prefer proper types and guards, and reuse existing helpers (e.g., normalizing identifiers) instead of type-asserting.
 - Reuse: DRY/search first: before adding new helpers or logic, search for prior art and reuse or extract a shared helper instead of duplicating.
 - Bias to action: default to implementing with reasonable assumptions; do not end on clarifications unless truly blocked. Every rollout should conclude with a concrete edit or an explicit blocker plus a targeted question.
+- Do not create permanent legacy compatibility layers.  Legacy code paths are complexity, and should be discarded at every possible opportunity.
 
 
 # Editing constraints
@@ -67,6 +68,7 @@ Use the `architecture-steward` skill when creating, auditing, or updating this d
 - Do not amend a commit unless explicitly requested to do so.
 - While you are working, you might notice unexpected changes that you didn't make. If this happens, STOP IMMEDIATELY and ask the user how they would like to proceed.
 - **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.
+- Never edit files marked as frozen without explicit user permission.
 
 # Exploration and reading files
 
