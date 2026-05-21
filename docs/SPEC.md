@@ -191,8 +191,10 @@ Timestamping and broad trust-policy controls should stay out of the normal V1 GU
 
 V1 is not a source-only developer tool.
 
-Packaged Linux desktop distribution is part of the product requirement. The project may target one
-primary Linux packaging/distribution mode first rather than multiple formats at once.
+Packaged Linux desktop distribution is part of the product requirement, but the current
+implementation work is limited to the PyInstaller bundle path and tested runtime-asset collection
+for bundled visible-signature fonts. The project may target one primary Linux
+packaging/distribution mode first rather than multiple formats at once.
 
 ## Reusable Object Semantics
 

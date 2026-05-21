@@ -1,16 +1,26 @@
 """PyInstaller one-dir build for the FoliaSeal development CLI."""
 
+import sys
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_submodules
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from foliaseal.build.pyinstaller_support import collect_runtime_assets  # noqa: E402
 
 hiddenimports = collect_submodules("foliaseal")
+runtime_assets = collect_runtime_assets(PROJECT_ROOT)
 
 
-a = Analysis(
+a = Analysis(  # noqa: F821
     ["src/foliaseal/__main__.py"],
     pathex=["src"],
     binaries=[],
-    datas=[],
+    datas=runtime_assets,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -19,9 +29,9 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure)  # noqa: F821
 
-exe = EXE(
+exe = EXE(  # noqa: F821
     pyz,
     a.scripts,
     [],
@@ -34,7 +44,7 @@ exe = EXE(
     exclude_binaries=True,
 )
 
-coll = COLLECT(
+coll = COLLECT(  # noqa: F821
     exe,
     a.binaries,
     a.datas,

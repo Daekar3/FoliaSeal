@@ -45,7 +45,7 @@ The canonical repository document split is:
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, Qt PDF rendering, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed. |
 | `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes. |
 | `src/foliaseal/resources/fonts/` | Bundled OpenType font assets used by preview and signing. | Package data in `pyproject.toml`. |
-| `src/foliaseal/build/` and `foliaseal.spec` | PyInstaller helper code and one-dir bundle spec. | See known debt about runtime asset helper usage. |
+| `src/foliaseal/build/` and `foliaseal.spec` | PyInstaller helper code and one-dir bundle spec. | `collect_runtime_assets()` is wired into the spec for bundled runtime assets. |
 | `tests/unit/` | Unit and focused integration-style tests for each layer. | Heavy coverage around signing, preview, Qt shell, and layout policy. |
 | `tests/support/` | Test builders and certification fixtures. | Used by multiple unit suites. |
 | `tests/fixtures/` | Durable fixture data. | Includes Phase 3 manual replay JSON. |
@@ -196,10 +196,10 @@ The canonical repository document split is:
 ### Packaging
 
 - Location: `pyproject.toml`, `foliaseal.spec`, `scripts/build_pyinstaller.sh`, `src/foliaseal/build/pyinstaller_support.py`
-- Responsibility: Python package metadata, console script registration, package data, and PyInstaller one-dir build.
-- Owns: `foliaseal` console script, dependencies, package-data declaration for fonts.
-- Known constraints: Runtime dependencies in `pyproject.toml` are `pyHanko[opentype]` and Pillow; dev extras include PyInstaller, PySide6, pytest, and ruff. PySide6 is loaded dynamically and remains outside runtime dependencies, but the default dev/test path installs it for QtPdf-backed preview tests.
-- Status: Confirmed by code; PySide6 packaging/dependency contract needs review.
+- Responsibility: Python package metadata, console script registration, package data, and PyInstaller one-dir bundle support.
+- Owns: `foliaseal` console script, dependencies, package-data declaration for fonts, and runtime-asset collection for bundled visible-signature fonts.
+- Known constraints: Runtime dependencies in `pyproject.toml` are `pyHanko[opentype]` and Pillow; dev extras include PyInstaller, PySide6, pytest, and ruff. PySide6 is loaded dynamically and remains outside runtime dependencies, but the default dev/test path installs it for QtPdf-backed preview tests. PyInstaller currently covers tested runtime-asset collection for bundled visible-signature fonts; GUI launcher and broader desktop distribution packaging remain separate open work.
+- Status: Confirmed by code and tests; PySide6 packaging/dependency contract and broader GUI launcher packaging remain open.
 
 ## 5. Object model / domain model
 
@@ -452,7 +452,7 @@ The canonical repository document split is:
 | Timestamp factory | `phase3_signing_backend.py`, `infra/tsa/pyhanko_adapter.py` | Use dummy TSA in tests/matrices or HTTP TSA in real signing. | Production URLs must validate as HTTP(S). |
 | Profile storage root | `SignaturePresetCatalogStore.default(app_name=...)` | Test/custom app-name storage location. | Default follows XDG data home. |
 | Qt binding loaders | `presentation/qt/*` | Test with fake widgets or run with real PySide6. | Dynamic imports should fail with explicit unavailable errors/diagnostics. |
-| PyInstaller support | `src/foliaseal/build/pyinstaller_support.py` | Collect hidden imports/runtime assets for bundles. | Current spec may not yet use the helper; needs review. |
+| PyInstaller support | `src/foliaseal/build/pyinstaller_support.py` | Collect runtime assets for bundles, including bundled visible-signature fonts. | The spec uses this helper and tests cover the bundled font asset list. |
 
 ## 11. Testing architecture
 
@@ -487,7 +487,7 @@ Default local validation from README:
 | Historical profile terminology remains in storage path/module names. | `profile_storage.py` and `Signature Profiles/profiles.json` may still look broader than the current `SignaturePresetCatalog` responsibility. | Public methods and shell behavior use preset-oriented names; the historical path is documented. | Consider a storage-path/module rename only if it can be done without introducing unnecessary migration code. |
 | `SignatureLayoutPlan.backend_reservation` carries an opaque backend object. | Public layout boundary is not fully neutral. | Preserve pyHanko parity during migration. | Replace with neutral data once backend/private helpers are no longer required. |
 | PySide6 is dynamically imported but not listed in `pyproject.toml` runtime dependencies. | A fresh install may run CLI helpers but fail GUI/harness commands without extra packages. | Runtime diagnostics report unavailable Qt bindings. | Decide whether PySide6 belongs in optional extras or documented system setup only. |
-| `foliaseal.spec` does not visibly use `collect_runtime_assets()`. | PyInstaller hidden-import behavior may diverge between helper tests and real spec. | `foliaseal.spec` independently collects FoliaSeal submodules. | Wire the helper into the spec or delete the unused helper path after review. |
+| PyInstaller support currently covers runtime asset collection for bundled fonts, but not a GUI launcher or broader desktop distribution packaging flow. | Helper/tests align with the spec, while a full packaged desktop app remains a separate workstream. | `foliaseal.spec` uses `collect_runtime_assets()` for the runtime font assets. | Add launcher/distribution packaging when that work starts. |
 | Checked-in artifact docs include historical status and roadmap notes. | README warns some narrative notes may be stale. | Current gate status should come from latest checked-in summaries/artifacts. | Keep live status in generated summaries or curated release notes, not scattered narratives. |
 
 ## 13. Open questions

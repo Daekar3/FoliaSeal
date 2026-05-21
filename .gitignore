@@ -6,6 +6,8 @@ __pycache__/
 .pytest_cache/
 .venv/
 build/
+!src/foliaseal/build/
+!src/foliaseal/build/**
 dist/
 
 # Generated harness and matrix output live under artifacts/. Keep that tree as
