@@ -11,7 +11,7 @@ Canonical repository documents:
 ## What is included
 - package skeleton with architecture-aligned module boundaries (`presentation`, `application`, `domain`, `infra`)
 - `DocumentOperation` domain contract and operation registry with capability enable/disable flags
-- initial config/profile schemas and legacy persistence contracts that still need alignment with
+- initial config schemas and legacy persistence contracts that still need alignment with
   the canonical object model in `docs/SCHEMAS.md`
 - Phase 1 headless signing orchestration (`SignPdfUseCase`) with:
   - compatibility policy enforcement for PDF `1.4` to `2.0`
@@ -36,13 +36,13 @@ Current capabilities:
 - `SigningDraftWorkflow` owns the in-session signing draft state for Phase 3.
   - It should track the chosen page, placement rectangle, appearance/property settings, and validation state.
   - It should not duplicate viewer coordinate math or Qt event handling.
-- Named appearance profiles are now part of the current Phase 3 shell workflow.
-  - A user can save the current appearance under a distinct user-provided name.
-  - Saved profiles can be selected from a dropdown in the shell.
+- Signature presets are now part of the current Phase 3 shell workflow.
+  - A user can save the current signature setup under a distinct user-provided name.
+  - Saved signature presets can be selected from a dropdown in the shell.
   - Saving to an existing name uses explicit overwrite confirmation.
-  - Saved profiles now persist across relaunches in the user-visible `Signature Profiles`
+  - Saved signature presets now persist across relaunches in the user-visible `Signature Profiles`
     storage area.
-  - The shell supports delete-current-profile with explicit confirmation.
+  - The shell supports deleting the selected signature preset with explicit confirmation.
 - `render_signing_preview()` should turn the normalized draft state into a deterministic text
   snapshot for logs, tests, and lower-level parity checks.
   - It should not become a second live-preview formatter alongside the Qt widget path.
@@ -56,7 +56,7 @@ Current capabilities:
 - The signing shell and harness now support meaningful manual review of:
   - placement and resize behavior
   - appearance editing and preview behavior
-  - named profile save/select workflows
+  - signature preset save/select workflows
   - executor-backed sign/apply behavior
 - The shell can now call an injected signing executor and surface success/failure results.
 - The shell now exposes a read-only signing-flow summary so the user can see whether the current state is placing the signature, confirming/signing, reviewing preview issues, or reviewing signed output.
@@ -103,7 +103,7 @@ Roadmap note:
   [docs/SPEC.md](/home/daekar/FoliaSeal/docs/SPEC.md) and
   [docs/SCHEMAS.md](/home/daekar/FoliaSeal/docs/SCHEMAS.md), including:
   - preview/output parity and rectangle-aware preview,
-  - remaining profile portability work,
+  - remaining signature preset portability work,
   - packaging and full release validation.
 - Backend-oriented timestamp/trust/certification hardening still exists as engineering follow-up,
   but it is not part of the primary V1 GUI path described in `docs/SPEC.md`.
@@ -179,7 +179,7 @@ To make Phase 3 acceptance easier, there is also an interactive signing-shell ha
 Current acceptance note:
 
 - The harness helps collect a consistent record, but it does not prove final Phase 3 readiness on its own.
-- Use it as a manual-review aid for placement, appearance behavior, named-profile workflows, signed-output evidence, and signing-flow validation.
+- Use it as a manual-review aid for placement, appearance behavior, signature-preset workflows, signed-output evidence, and signing-flow validation.
 - Harness terminal success is non-gating unless the run also produces the required evidence artifacts.
 - The harness JSON is now validated against a machine evidence contract; contradictory captures should be treated as failed gate evidence even if the GUI appeared to finish normally.
 - For the current acceptance focus and unresolved items, rely on the Phase 3 checklist and results artifacts rather than treating this README as the project status log.
