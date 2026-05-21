@@ -8,6 +8,8 @@ __pycache__/
 build/
 !src/foliaseal/build/
 !src/foliaseal/build/**
+src/foliaseal/build/__pycache__/
+src/foliaseal/build/*.pyc
 dist/
 
 # Generated harness and matrix output live under artifacts/. Keep that tree as
