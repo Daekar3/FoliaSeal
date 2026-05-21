@@ -8,6 +8,7 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
@@ -472,6 +473,16 @@ class _FakeSigningExecutor:
     def execute(self, request):
         self.calls.append(request)
         return self.result
+
+
+class _FakeDocumentReviewInspector:
+    def __init__(self, summary: DocumentReviewSummary) -> None:
+        self.summary = summary
+        self.calls = []
+
+    def inspect(self, input_pdf_path: str) -> DocumentReviewSummary:
+        self.calls.append(input_pdf_path)
+        return self.summary
 
 
 def _fake_bindings() -> QtSigningWidgetBindings:
@@ -939,6 +950,44 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     assert widget.flow_stage_label.text() == "Signed"
     assert "Open or verify the signed PDF" in widget.flow_detail_label.text()
     assert widget.open_signed_output_button._enabled is False
+
+
+def test_signing_shell_shows_document_review_summary_from_injected_inspector(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail=(
+                "Found 1 embedded signature. Latest signer: CN=Alice Example. "
+                "Latest signature verified locally."
+            ),
+            signature_count=1,
+            signer_subject="CN=Alice Example",
+            cryptographic_validation_passed=True,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    assert inspector.calls == ["/tmp/sample.pdf"]
+    assert widget.document_review_headline_label.text() == "Signature review"
+    assert "Found 1 embedded signature." in widget.document_review_detail_label.text()
+    assert "Latest signer: CN=Alice Example." in widget.document_review_detail_label.text()
 
 
 def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_changes(

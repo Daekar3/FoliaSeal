@@ -130,6 +130,17 @@ The canonical repository document split is:
 - Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read through an injected application-layer reader, with `Pkcs12CertificatePreviewReader` as the default implementation. Signed-output path suggestions are computed by application-layer path policy so the app frame and signing shell share the same default filename behavior. The workflow can apply resolved `CertificateConfiguration` material but still imports reusable-object DTOs from infra config, so the application layer still knows transitional persistence DTOs while schema-alignment work continues.
 - Status: Confirmed by code; infra DTO dependency is debt/needs review.
 
+### Document review summary
+
+- Location: `src/foliaseal/application/document_review.py`
+- Responsibility: Inspect the currently opened PDF in a read-only way and return a plain-language signature/certification review summary for the shell.
+- Owns: `DocumentReviewSummary`, `DocumentReviewInspector`, `PyHankoDocumentReviewInspector`, and summary formatting for unavailable, unsigned, signed, and certification-restricted PDFs.
+- Does not own: viewer rendering, signing execution, or any mutable document actions.
+- Key collaborators: `infra.certification.inspect_pdf_certification_reader()`, `pyHanko.pdf_utils.reader.PdfFileReader`, `pyHanko.sign.validation.validate_pdf_signature`, and `presentation/qt/signing_shell.py`.
+- Main entry points: `summarize_document_review()`, `PyHankoDocumentReviewInspector.inspect()`.
+- Known constraints: The helper must stay failure-tolerant for missing or unreadable PDFs and should only claim that signatures were verified locally, not that they are trusted by any external policy source. Certification guidance is surfaced as plain-language status, not as a write action.
+- Status: Confirmed by code and tests.
+
 ### Viewer workflow and coordinate geometry
 
 - Location: `src/foliaseal/application/viewer_session.py`, `src/foliaseal/application/viewer_workflow.py`, `src/foliaseal/application/coordinate_transform.py`
@@ -138,7 +149,7 @@ The canonical repository document split is:
 - Does not own: Qt widget event handling or concrete PDF rendering implementation.
 - Key collaborators: `infra.render.PdfRenderBackend`, Qt viewer widget, signing draft workflow.
 - Main entry points: `ViewerWorkflow.render_current_page()`, `ViewerWorkflow.selection_to_pdf_rect()`, coordinate transform functions.
-- Known constraints: `selection_to_pdf_rect()` requires a current render snapshot and authoritative coordinate mapping.
+- Known constraints: `selection_to_pdf_rect()` requires a current render snapshot and authoritative coordinate mapping. The workflow also exposes the current `document_path` so the signing shell can inspect the PDF that is open in the viewer without reaching into the widget layer.
 - Status: Confirmed by code and tests.
 
 ### Rendering infrastructure
@@ -160,7 +171,7 @@ The canonical repository document split is:
 - Does not own: Domain validation rules, headless signing failure mapping, persisted JSON schema definitions.
 - Key collaborators: `ViewerWorkflow`, `SigningDraftWorkflow`, `render_canonical_signature_preview()`, `build_phase3_signing_executor()`, profile store, certificate catalog store, signing-material resolver.
 - Main entry points: `build_qt_app_frame()`, `build_qt_pdf_viewer_widget()`, `build_qt_signing_shell()`, `run_phase2_viewer_harness()`, `run_phase3_signing_harness()`, `run_phase3_preview_matrix()`, `run_phase3_signed_acceptance_matrix()`.
-- Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `app_frame.py` owns a first-pass `QMainWindow` wrapper with File/Open, Settings/Application settings, Settings/Create certificate, Settings/Import certificate, and Settings/Manage certificate configurations actions; the settings action opens an app-wide settings dialog for default directories, while the certificate dialogs collect user input and delegate create, import, rename, delete, and export work to `CertificateLifecycleService`. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file. The workspace exposes a read-only signing-flow summary that derives `Place signature`, `Confirm/sign`, `Review preview`, or `Signed` from existing draft/readiness/result state. The shell can select and apply existing certificate configurations, including configurations that resolve saved passwords through the app-frame-provided secret provider, and can refresh its selector after lifecycle results report certificate catalog changes. The signing shell consumes `AppSettings` for output-path defaults but no longer edits app-wide directory settings directly.
+- Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `app_frame.py` owns a first-pass `QMainWindow` wrapper with File/Open, Settings/Application settings, Settings/Create certificate, Settings/Import certificate, and Settings/Manage certificate configurations actions; the settings action opens an app-wide settings dialog for default directories, while the certificate dialogs collect user input and delegate create, import, rename, delete, and export work to `CertificateLifecycleService`. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file. The workspace exposes read-only `Signing flow` and `Document review` summary cards: the first derives `Place signature`, `Confirm/sign`, `Review preview`, or `Signed` from existing draft/readiness/result state, and the second renders plain-language inspection output from the application review helper. The shell can select and apply existing certificate configurations, including configurations that resolve saved passwords through the app-frame-provided secret provider, can refresh its selector after lifecycle results report certificate catalog changes, and can refresh the document review card from the current viewer path without mutating the PDF. The signing shell consumes `AppSettings` for output-path defaults but no longer edits app-wide directory settings directly.
 - Status: Confirmed by code and tests; size/concentration is debt/needs review.
 
 ### Configuration and reusable signing-object persistence
@@ -216,6 +227,7 @@ The canonical repository document split is:
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, selected reusable-object ids, rect, appearance, placement context. | Produces preview and final `SigningRequest`; can apply resolved `CertificateConfiguration` material. |
 | `CertificatePreviewReader` / `Pkcs12CertificatePreviewReader` | `application/certificate_preview.py` | Extract certificate-derived visible-signature preview values. | certificate path, passphrase -> field-value map and availability flag. | Injected into draft workflow so PKCS#12 parsing is not implemented inside the draft object. |
 | `SigningDraftPreview` | `application/signing_draft_workflow.py` | UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, stamp text, issues, can_submit. | Used by Qt and preview renderer. |
+| `DocumentReviewSummary` | `application/document_review.py` | UI-ready read-only signature review payload. | headline, detail, signature count, signer subject, certification state, local validation result, inspection error. | Used by the Qt signing shell `Document review` card. |
 | `VisibleSignatureSemantics` | `application/visible_signature_semantics.py` | Resolved visible-signature meaning-level payload. | resolved fields, title/detail/stamp text, metadata reason/location/contact info, fit issues, readiness. | Shared source for workflow preview, canonical preview text, backend signing text, and metadata. |
 | `SignatureLayoutPlan` | `application/visible_signature_layout.py` | Canonical visible-signature geometry result. | text/stamp area dimensions, layout rules, fit issues, optional ink reservation. | Boundary for backend/canonical/Qt preview geometry. |
 | `ViewerSession` | `application/viewer_session.py` | Viewer page/zoom state. | page count, current page, zoom. | Clamps zoom via `ViewerZoomLimits`. |
@@ -361,8 +373,8 @@ The canonical repository document split is:
 
 1. `build_qt_signing_shell()` constructs a `SigningShellAdapter`.
 2. The shell creates a viewer workflow and signing draft workflow.
-3. Optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace; otherwise home-directory defaults are used.
-4. The workspace shows a read-only signing-flow summary derived from current draft/readiness/result state.
+3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
+4. The workspace shows read-only signing-flow and document-review summary cards derived from current draft/readiness/result state and the currently open PDF.
 5. User interactions update `SigningDraftWorkflow` state through placement and appearance controls.
 6. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
 7. On sign, the workflow converts the draft into `SigningRequest`.

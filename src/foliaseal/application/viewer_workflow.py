@@ -56,6 +56,10 @@ class ViewerWorkflow:
         return self._last_snapshot
 
     @property
+    def document_path(self) -> str:
+        return self._document_path
+
+    @property
     def timing_tracker(self) -> ViewerPerformanceTracker:
         return self._performance_tracker
 

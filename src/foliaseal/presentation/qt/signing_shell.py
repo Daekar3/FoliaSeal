@@ -20,6 +20,11 @@ from foliaseal.application import (
     suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
+from foliaseal.application.document_review import (
+    DocumentReviewInspector,
+    DocumentReviewSummary,
+    PyHankoDocumentReviewInspector,
+)
 from foliaseal.application.phase3_signing_backend import (
     _single_line_horizontal_stamp_vertical_inset,
     _single_line_stamp_content_inset,
@@ -152,6 +157,15 @@ class SigningFlowSummaryControls:
 
     container: Any
     stage_label: Any
+    detail_label: Any
+
+
+@dataclass(frozen=True)
+class DocumentReviewControls:
+    """Read-only labels that summarize the current PDF review state."""
+
+    container: Any
+    headline_label: Any
     detail_label: Any
 
 
@@ -2861,6 +2875,7 @@ class SigningWorkspaceWidget:
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
+        document_review_inspector: DocumentReviewInspector | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_open_signed_output: Callable[[str], Any] | None = None,
@@ -2876,6 +2891,10 @@ class SigningWorkspaceWidget:
         self._on_error = on_error
         self._on_status_change = on_status_change
         self._app_settings_store = app_settings_store
+        self._document_review_inspector = (
+            document_review_inspector or PyHankoDocumentReviewInspector()
+        )
+        self._document_review_summary: DocumentReviewSummary | None = None
         if app_settings is not None:
             self._app_settings = app_settings
         elif app_settings_store is not None:
@@ -2890,6 +2909,7 @@ class SigningWorkspaceWidget:
         self._layout.setSpacing(8)
 
         self._flow_summary_controls = self._build_flow_summary_controls()
+        self._document_review_controls = self._build_document_review_controls()
         self._main_row = bindings.q_hbox_layout()
         self._main_row.setContentsMargins(0, 0, 0, 0)
         self._main_row.setSpacing(8)
@@ -2940,6 +2960,7 @@ class SigningWorkspaceWidget:
         self._main_row.addWidget(self._viewer_widget, 3)
         self._main_row.addWidget(self._properties_scroll, 2)
         self._layout.addWidget(self._flow_summary_controls.container)
+        self._layout.addWidget(self._document_review_controls.container)
         self._layout.addLayout(self._main_row)
         self._layout.addWidget(self._choose_output_button)
         self._layout.addWidget(self._sign_button)
@@ -2959,10 +2980,17 @@ class SigningWorkspaceWidget:
         self.widget.flow_detail_label = (  # type: ignore[attr-defined]
             self._flow_summary_controls.detail_label
         )
+        self.widget.document_review_headline_label = (  # type: ignore[attr-defined]
+            self._document_review_controls.headline_label
+        )
+        self.widget.document_review_detail_label = (  # type: ignore[attr-defined]
+            self._document_review_controls.detail_label
+        )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
+        self.widget.refresh_document_review = self.refresh_document_review  # type: ignore[attr-defined]
         self.widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
         self.widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
             self.refresh_certificate_configurations
@@ -2972,6 +3000,7 @@ class SigningWorkspaceWidget:
         self.widget._signing_workspace = self  # type: ignore[attr-defined]
 
         self.refresh_viewer()
+        self.refresh_document_review()
         self._refresh_sign_button_state()
 
     @property
@@ -2993,6 +3022,13 @@ class SigningWorkspaceWidget:
         self.properties_panel.refresh_preview()
         self._refresh_sign_button_state()
         self._refresh_flow_summary()
+
+    def refresh_document_review(self) -> DocumentReviewSummary:
+        summary = self._document_review_inspector.inspect(self._viewer_workflow.document_path)
+        self._document_review_summary = summary
+        self._document_review_controls.headline_label.setText(summary.headline)
+        self._document_review_controls.detail_label.setText(summary.detail)
+        return summary
 
     def submit_sign_request(self) -> SigningRequest | None:
         self.properties_panel.apply_changes()
@@ -3239,6 +3275,37 @@ class SigningWorkspaceWidget:
             detail_label=detail_label,
         )
 
+    def _build_document_review_controls(self) -> DocumentReviewControls:
+        container = self._bindings.q_group_box("Document review")
+        if hasattr(container, "setStyleSheet"):
+            container.setStyleSheet(
+                "QGroupBox {"
+                " border: 1px solid #d0d7de;"
+                " border-radius: 6px;"
+                " padding: 6px;"
+                " background: #f6f8fa;"
+                "}"
+            )
+        layout = self._bindings.q_vbox_layout(container)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(3)
+        headline_label = self._bindings.q_label("")
+        detail_label = self._bindings.q_label("")
+        for label in (headline_label, detail_label):
+            if hasattr(label, "setWordWrap"):
+                label.setWordWrap(True)
+        if hasattr(headline_label, "setStyleSheet"):
+            headline_label.setStyleSheet("font-weight: 700; color: #111827;")
+        if hasattr(detail_label, "setStyleSheet"):
+            detail_label.setStyleSheet("color: #374151;")
+        layout.addWidget(headline_label)
+        layout.addWidget(detail_label)
+        return DocumentReviewControls(
+            container=container,
+            headline_label=headline_label,
+            detail_label=detail_label,
+        )
+
     def _refresh_flow_summary(self) -> None:
         stage, detail = self._flow_summary_text()
         self._flow_summary_controls.stage_label.setText(stage)
@@ -3316,6 +3383,7 @@ class SigningShellAdapter:
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
+        document_review_inspector: DocumentReviewInspector | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_open_signed_output: Callable[[str], Any] | None = None,
@@ -3333,6 +3401,7 @@ class SigningShellAdapter:
             preset_catalog_store=preset_catalog_store,
             app_settings=app_settings,
             app_settings_store=app_settings_store,
+            document_review_inspector=document_review_inspector,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
             on_open_signed_output=on_open_signed_output,
@@ -3383,6 +3452,7 @@ def build_qt_signing_shell(
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     app_settings: AppSettings | None = None,
     app_settings_store: AppSettingsStore | None = None,
+    document_review_inspector: DocumentReviewInspector | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_open_signed_output: Callable[[str], Any] | None = None,
@@ -3402,6 +3472,7 @@ def build_qt_signing_shell(
         preset_catalog_store=preset_catalog_store,
         app_settings=app_settings,
         app_settings_store=app_settings_store,
+        document_review_inspector=document_review_inspector,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         on_open_signed_output=on_open_signed_output,
