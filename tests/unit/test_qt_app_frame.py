@@ -30,6 +30,14 @@ class _FakeAction:
         self.text = text
         self.parent = parent
         self.triggered = _FakeSignal()
+        self.shortcut = None
+        self.enabled = True
+
+    def setShortcut(self, shortcut):  # noqa: N802
+        self.shortcut = shortcut
+
+    def setEnabled(self, enabled):  # noqa: N802
+        self.enabled = bool(enabled)
 
     def trigger(self) -> None:
         self.triggered.emit()
@@ -232,6 +240,7 @@ class _FakeShell:
         self.refresh_certificate_configurations_calls = 0
         self.applied_settings = []
         self.output_dialog_defaults = []
+        self.choose_output_pdf_path_calls = 0
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -240,6 +249,10 @@ class _FakeShell:
 
     def refresh_certificate_configurations(self) -> None:
         self.refresh_certificate_configurations_calls += 1
+
+    def choose_output_pdf_path(self):
+        self.choose_output_pdf_path_calls += 1
+        return "/tmp/signed-output.pdf"
 
 
 class _FakeSecretStore:
@@ -393,7 +406,13 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     )
 
     assert [menu.title for menu in frame.window.menu_bar.menus] == ["File", "Settings"]
-    assert frame.window.menu_bar.menus[0].actions[0].text == "Open file"
+    assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
+        "Open file",
+        "Save As...",
+    ]
+    assert frame.window.menu_bar.menus[0].actions[0].shortcut == "Ctrl+O"
+    assert frame.window.menu_bar.menus[0].actions[1].shortcut == "Ctrl+Shift+S"
+    assert frame.window.menu_bar.menus[0].actions[1].enabled is False
     assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
         "Application settings",
         "Create certificate...",
@@ -408,6 +427,32 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         frame.window.settings_dialog.controls.default_open_directory.text()
         == str(tmp_path / "source")
     )
+
+
+def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_builder=lambda **_kwargs: shell,
+        render_backend_factory=lambda: object(),
+    )
+
+    save_as_action = frame.window.menu_bar.menus[0].actions[1]
+
+    assert save_as_action.enabled is False
+
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    assert save_as_action.enabled is True
+
+    save_as_action.trigger()
+
+    assert shell.choose_output_pdf_path_calls == 1
 
 
 def test_app_frame_certificate_creation_dialog_creates_and_refreshes_loaded_shell(

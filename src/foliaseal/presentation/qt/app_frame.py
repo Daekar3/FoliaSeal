@@ -797,6 +797,8 @@ class FoliaSealAppFrame:
         self._certificate_management_dialog: (
             CertificateConfigurationManagementDialog | None
         ) = None
+        self._open_action: Any | None = None
+        self._save_as_action: Any | None = None
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
@@ -893,6 +895,7 @@ class FoliaSealAppFrame:
         self.window.current_viewer_workflow = viewer_workflow  # type: ignore[attr-defined]
         self.window.current_signing_workflow = signing_workflow  # type: ignore[attr-defined]
         self.window.setCentralWidget(shell)
+        self._set_save_as_enabled(True)
         return shell
 
     def show_app_settings(self) -> AppSettings | None:
@@ -947,7 +950,19 @@ class FoliaSealAppFrame:
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
         file_menu = menu_bar.addMenu("File")
-        file_menu.addAction(self._action("Open file", self.choose_open_pdf))
+        self._open_action = self._action(
+            "Open file",
+            self.choose_open_pdf,
+            shortcut="Ctrl+O",
+        )
+        file_menu.addAction(self._open_action)
+        self._save_as_action = self._action(
+            "Save As...",
+            self._choose_save_as,
+            shortcut="Ctrl+Shift+S",
+            enabled=False,
+        )
+        file_menu.addAction(self._save_as_action)
         settings_menu = menu_bar.addMenu("Settings")
         settings_menu.addAction(
             self._action("Application settings", self.show_app_settings)
@@ -965,18 +980,49 @@ class FoliaSealAppFrame:
             )
         )
 
-    def _action(self, text: str, callback: Callable[[], Any]) -> Any:
+    def _action(
+        self,
+        text: str,
+        callback: Callable[[], Any],
+        *,
+        shortcut: str | None = None,
+        enabled: bool = True,
+    ) -> Any:
         action = self._bindings.q_action(text, self.window)
         triggered = getattr(action, "triggered", None)
         if hasattr(triggered, "connect"):
             triggered.connect(callback)
+        set_shortcut = getattr(action, "setShortcut", None)
+        if shortcut is not None and callable(set_shortcut):
+            set_shortcut(shortcut)
+        set_enabled = getattr(action, "setEnabled", None)
+        if callable(set_enabled):
+            set_enabled(enabled)
         return action
+
+    def _choose_save_as(self) -> str | None:
+        shell = self._current_shell
+        if shell is None:
+            return None
+        choose_output = getattr(shell, "choose_output_pdf_path", None)
+        if not callable(choose_output):
+            return None
+        return choose_output()
+
+    def _set_save_as_enabled(self, enabled: bool) -> None:
+        action = self._save_as_action
+        if action is None:
+            return
+        set_enabled = getattr(action, "setEnabled", None)
+        if callable(set_enabled):
+            set_enabled(enabled)
 
     def _set_placeholder(self) -> None:
         label = self._bindings.q_label("Open a PDF to begin signing.")
         if hasattr(label, "setWordWrap"):
             label.setWordWrap(True)
         self.window.setCentralWidget(label)
+        self._set_save_as_enabled(False)
 
     def _load_page_count(self, pdf_path: Path) -> int:
         document = self._bindings.qpdf_document()
