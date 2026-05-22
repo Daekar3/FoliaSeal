@@ -26,6 +26,18 @@ from foliaseal.application.performance_timing import (
     ViewerPerformanceTracker,
     ViewerTimingSnapshot,
 )
+from foliaseal.application.signature_properties_coordinator import (
+    ApplyCertificateConfiguration,
+    ApplySignaturePreset,
+    ClearSelectedSignaturePreset,
+    DefaultSignaturePropertiesCoordinator,
+    DeletePreset,
+    RefreshCatalogs,
+    SaveCurrentPreset,
+    SignaturePropertiesCoordinator,
+    SignaturePropertiesCoordinatorError,
+    SignaturePropertiesViewState,
+)
 from foliaseal.application.signing_completion import format_signing_completion_message
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
@@ -147,6 +159,16 @@ __all__ = [
     "SigningDraftValidationIssue",
     "SigningDraftValidationSeverity",
     "SigningDraftWorkflow",
+    "ApplyCertificateConfiguration",
+    "ApplySignaturePreset",
+    "ClearSelectedSignaturePreset",
+    "DefaultSignaturePropertiesCoordinator",
+    "DeletePreset",
+    "RefreshCatalogs",
+    "SaveCurrentPreset",
+    "SignaturePropertiesCoordinator",
+    "SignaturePropertiesCoordinatorError",
+    "SignaturePropertiesViewState",
     "SigningClock",
     "StampImageProbe",
     "SystemSigningClock",

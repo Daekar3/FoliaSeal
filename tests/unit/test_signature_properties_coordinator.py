@@ -1,0 +1,368 @@
+from pathlib import Path
+
+import pytest
+
+from foliaseal.application import (
+    SigningDraftValidationIssue,
+    SigningDraftValidationSeverity,
+    SigningDraftWorkflow,
+)
+from foliaseal.application.signature_properties_coordinator import (
+    ApplyCertificateConfiguration,
+    ApplySignaturePreset,
+    DefaultSignaturePropertiesCoordinator,
+    DeletePreset,
+    RefreshCatalogs,
+    SaveCurrentPreset,
+    SignaturePropertiesCoordinatorError,
+)
+from foliaseal.domain.models import SignatureRect
+from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+from foliaseal.infra.config.profile_storage import (
+    PROFILE_DIRECTORY_NAME,
+    SignaturePresetCatalogStore,
+)
+from foliaseal.infra.config.schemas import CertificateCatalog, SignaturePresetCatalog
+from tests.support.phase3_builders import (
+    build_certificate_catalog,
+    build_certificate_configuration,
+    build_managed_certificate,
+    build_signature_appearance,
+    build_signature_preset,
+    build_signature_preset_catalog,
+)
+
+
+class _FakeSecretProvider:
+    def __init__(self, secrets: dict[str, str] | None = None, *, available: bool = True) -> None:
+        self._secrets = secrets or {}
+        self._available = available
+
+    def is_available(self) -> bool:
+        return self._available
+
+    def get_secret(self, secret_ref: str) -> str | None:
+        return self._secrets.get(secret_ref)
+
+
+def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
+    return SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=True,
+        certificate_alias="signing-cert",
+    )
+
+
+def _ready_workflow(tmp_path: Path) -> SigningDraftWorkflow:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=48.0,
+        )
+    )
+    return workflow
+
+
+def test_coordinator_load_reports_catalog_names_and_initial_readiness(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.load()
+
+    assert state.certificate_configuration_names == ("Corporate Records Signing",)
+    assert state.signature_preset_names == ("Default", "Compact")
+    assert state.selected_certificate_configuration_name is None
+    assert state.selected_signature_preset_name is None
+    assert state.ready_to_sign is False
+    assert state.validation_text == "Place a signature on the page to continue."
+
+
+def test_coordinator_load_keeps_warning_only_control_issue_ready(tmp_path: Path) -> None:
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.load(
+        control_issue=SigningDraftValidationIssue(
+            code="preview_warning",
+            message="Preview is stale but still usable.",
+            field_name="signature_appearance",
+            severity=SigningDraftValidationSeverity.WARNING,
+        )
+    )
+
+    assert state.ready_to_sign is True
+    assert state.validation_text == "Ready to sign."
+
+
+def test_coordinator_applies_certificate_configuration_and_updates_workflow(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.reconcile(
+        ApplyCertificateConfiguration(
+            selected_name="Corporate Records Signing",
+            passphrase="typed-secret",
+        )
+    )
+
+    assert state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+
+
+def test_coordinator_applies_certificate_configuration_with_saved_password(
+    tmp_path: Path,
+) -> None:
+    configuration = build_certificate_configuration(
+        save_password=True,
+        password_secret_ref="secret-ref-1",
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog(certificate_configurations=(configuration,))
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=store,
+        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.reconcile(
+        ApplyCertificateConfiguration(selected_name="Corporate Records Signing")
+    )
+
+    assert state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "stored-secret"
+
+
+def test_coordinator_apply_certificate_configuration_reports_missing_file(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(build_certificate_catalog())
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    with pytest.raises(
+        SignaturePropertiesCoordinatorError,
+        match="managed certificate file is missing",
+    ):
+        coordinator.reconcile(
+            ApplyCertificateConfiguration(
+                selected_name="Corporate Records Signing",
+                passphrase="typed-secret",
+            )
+        )
+
+
+def test_coordinator_applies_preset_without_certificate_and_preserves_active_certificate(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(
+            profiles=(
+                build_signature_preset(name="Compact"),
+            )
+        ),
+    )
+    coordinator.reconcile(
+        ApplyCertificateConfiguration(
+            selected_name="Corporate Records Signing",
+            passphrase="typed-secret",
+        )
+    )
+
+    state = coordinator.reconcile(
+        ApplySignaturePreset(
+            selected_name="Compact",
+            passphrase="should-not-be-used",
+        )
+    )
+
+    assert state.selected_signature_preset_name == "Compact"
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+
+
+def test_coordinator_applies_preset_with_certificate_material(tmp_path: Path) -> None:
+    default_certificate = build_managed_certificate(
+        managed_certificate_id="managed-cert-default",
+        display_name="Default Certificate",
+        storage_filename="default.p12",
+    )
+    alternate_certificate = build_managed_certificate(
+        managed_certificate_id="managed-cert-alt",
+        display_name="Alternate Certificate",
+        storage_filename="alternate.p12",
+    )
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(default_certificate, alternate_certificate),
+            certificate_configurations=(
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-default",
+                    display_name="Default Signing",
+                    managed_certificate_id="managed-cert-default",
+                ),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-alt",
+                    display_name="Alternate Signing",
+                    managed_certificate_id="managed-cert-alt",
+                ),
+            ),
+        )
+    )
+    default_path = certificate_store.managed_certificate_dir / "default.p12"
+    alternate_path = certificate_store.managed_certificate_dir / "alternate.p12"
+    default_path.parent.mkdir(parents=True, exist_ok=True)
+    default_path.write_bytes(b"default-pkcs12")
+    alternate_path.write_bytes(b"alternate-pkcs12")
+
+    preset = build_signature_preset(
+        name="Alternate Preset",
+        certificate_configuration_id="cert-config-alt",
+    )
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=certificate_store,
+        preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
+    )
+    coordinator.reconcile(
+        ApplyCertificateConfiguration(
+            selected_name="Default Signing",
+            passphrase="default-secret",
+        )
+    )
+
+    state = coordinator.reconcile(
+        ApplySignaturePreset(
+            selected_name="Alternate Preset",
+            passphrase="alternate-secret",
+        )
+    )
+
+    assert state.selected_signature_preset_name == "Alternate Preset"
+    assert state.selected_certificate_configuration_name == "Alternate Signing"
+    assert workflow.selected_certificate_configuration_id == "cert-config-alt"
+    assert workflow.certificate_path == str(alternate_path)
+    assert workflow.passphrase == "alternate-secret"
+
+
+def test_coordinator_save_current_preset_persists_and_selects_it(tmp_path: Path) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog_store=store,
+    )
+
+    state = coordinator.reconcile(SaveCurrentPreset(name="Team Standard"))
+
+    assert state.selected_signature_preset_name == "Team Standard"
+    assert "Team Standard" in store.load_catalog().preset_names()
+
+
+def test_coordinator_delete_preset_removes_it_and_clears_selection(tmp_path: Path) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    store.save_catalog(build_signature_preset_catalog())
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog_store=store,
+    )
+    coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+
+    state = coordinator.reconcile(DeletePreset(name="Compact"))
+
+    assert state.selected_signature_preset_name is None
+    assert state.signature_preset_names == ("Default",)
+    assert store.load_catalog().preset_names() == ("Default",)
+
+
+def test_coordinator_refresh_catalogs_drops_stale_selection(tmp_path: Path) -> None:
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    certificate_catalog = build_certificate_catalog()
+    certificate_store.save_catalog(certificate_catalog)
+    managed_cert = certificate_catalog.managed_certificates[0]
+    cert_file = certificate_store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    preset_store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    preset_store.save_catalog(build_signature_preset_catalog())
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog_store=certificate_store,
+        preset_catalog_store=preset_store,
+    )
+    coordinator.reconcile(
+        ApplyCertificateConfiguration(
+            selected_name="Corporate Records Signing",
+            passphrase="typed-secret",
+        )
+    )
+    coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+
+    certificate_store.save_catalog(CertificateCatalog(schema_version=1))
+    preset_store.save_catalog(SignaturePresetCatalog(schema_version=1))
+
+    state = coordinator.reconcile(RefreshCatalogs())
+
+    assert state.selected_certificate_configuration_name is None
+    assert state.selected_signature_preset_name is None
+    assert state.certificate_configuration_names == ()
+    assert state.signature_preset_names == ()

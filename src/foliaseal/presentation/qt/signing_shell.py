@@ -35,11 +35,18 @@ from foliaseal.application.signature_font_registry import (
     resolve_signature_font_face,
     validate_signature_font_request,
 )
-from foliaseal.application.signing_material_resolver import (
-    CertificateSecretProvider,
-    CertificateSigningMaterialResolver,
-    SigningMaterialResolutionError,
+from foliaseal.application.signature_properties_coordinator import (
+    ApplyCertificateConfiguration,
+    ApplySignaturePreset,
+    ClearSelectedSignaturePreset,
+    DefaultSignaturePropertiesCoordinator,
+    DeletePreset,
+    RefreshCatalogs,
+    SaveCurrentPreset,
+    SignaturePropertiesCoordinatorError,
+    SignaturePropertiesViewState,
 )
+from foliaseal.application.signing_material_resolver import CertificateSecretProvider
 from foliaseal.application.signing_preview_renderer import (
     CanonicalSignaturePreviewSnapshot,
     render_canonical_signature_preview,
@@ -71,7 +78,6 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     AppSettings,
     CertificateCatalog,
-    CertificateConfiguration,
     ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
@@ -1210,27 +1216,18 @@ class SignaturePropertiesPanel:
         _ensure_preview_fonts_registered()
         self._workflow = workflow
         self._certificate_catalog_store = certificate_catalog_store
-        if certificate_catalog is not None:
-            self._certificate_catalog = certificate_catalog
-        elif certificate_catalog_store is not None:
-            self._certificate_catalog = certificate_catalog_store.load_catalog()
-        else:
-            self._certificate_catalog = CertificateCatalog(schema_version=1)
-        resolver_store = certificate_catalog_store or CertificateCatalogStore.default()
-        self._certificate_material_resolver = CertificateSigningMaterialResolver(
-            managed_certificate_dir=resolver_store.managed_certificate_dir,
-            secret_provider=certificate_secret_provider,
-        )
-        self._selected_certificate_configuration_name: str | None = None
         self._preset_catalog_store = preset_catalog_store
-        if preset_catalog is not None:
-            self._preset_catalog = preset_catalog
-        elif preset_catalog_store is not None:
-            self._preset_catalog = preset_catalog_store.load_catalog()
-        else:
-            self._preset_catalog = SignaturePresetCatalog(
-                schema_version=1,
-            )
+        self._coordinator = DefaultSignaturePropertiesCoordinator(
+            workflow=workflow,
+            certificate_catalog=certificate_catalog,
+            certificate_catalog_store=certificate_catalog_store,
+            certificate_secret_provider=certificate_secret_provider,
+            preset_catalog=preset_catalog,
+            preset_catalog_store=preset_catalog_store,
+        )
+        self._certificate_catalog = self._coordinator.certificate_catalog
+        self._selected_certificate_configuration_name: str | None = None
+        self._preset_catalog = self._coordinator.preset_catalog
         self._selected_signature_preset_name: str | None = None
         self._app_settings = app_settings or AppSettings.default()
         self._on_change = on_change
@@ -1283,12 +1280,7 @@ class SignaturePropertiesPanel:
         return self._workflow.preview()
 
     def is_ready_to_sign(self) -> bool:
-        preview = self._workflow.preview()
-        if not preview.can_submit:
-            return False
-        if self._control_issue is None:
-            return True
-        return self._control_issue.severity != SigningDraftValidationSeverity.ERROR
+        return self._coordinator.load(control_issue=self._control_issue).ready_to_sign
 
     def validation_text(self) -> str:
         text = _text(self._validation_label)
@@ -1299,16 +1291,19 @@ class SignaturePropertiesPanel:
         return _preview_stamp_text(preview).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
-        preview = self._workflow.preview()
+        state = self._coordinator.load(control_issue=self._control_issue)
+        self._sync_coordinator_state(state)
+        preview = state.preview
         self._update_preview_controls(preview)
         _set_widget_width_limit(
             self._validation_label,
             _panel_available_width(self.widget),
         )
-        self._validation_label.setText(self._format_validation_text(preview))
+        self._validation_label.setText(state.validation_text)
         return preview
 
     def load_from_workflow(self) -> None:
+        self._sync_coordinator_state(self._coordinator.load(control_issue=self._control_issue))
         self._suspend_updates = True
         try:
             self._load_certificate_configuration_controls()
@@ -1470,7 +1465,12 @@ class SignaturePropertiesPanel:
 
     def set_signature_appearance(self, signature_appearance: SignatureAppearance | None) -> None:
         self._workflow.set_signature_appearance(signature_appearance)
-        self._selected_signature_preset_name = None
+        self._sync_coordinator_state(
+            self._coordinator.reconcile(
+                ClearSelectedSignaturePreset(),
+                control_issue=self._control_issue,
+            )
+        )
         self.load_from_workflow()
         self._notify_change()
 
@@ -1478,12 +1478,6 @@ class SignaturePropertiesPanel:
         name = _text(self._signature_preset_controls.preset_name).strip()
         if not name:
             self._show_signature_preset_error("Preset name is required before saving.")
-            return None
-
-        try:
-            preset = self._workflow.capture_current_signature_setup(name)
-        except ValueError as exc:
-            self._show_signature_preset_error(str(exc))
             return None
         try:
             existing = self._preset_catalog.preset_named(name)
@@ -1504,18 +1498,17 @@ class SignaturePropertiesPanel:
             if result != yes_value:
                 return None
 
-        self._preset_catalog = self._preset_catalog.upsert_preset(preset)
-        if self._preset_catalog_store is not None:
-            self._preset_catalog_store.save_preset(preset)
-        self._selected_signature_preset_name = preset.name
-        self._suspend_updates = True
         try:
-            self._reload_signature_preset_controls(selected_name=preset.name)
-        finally:
-            self._suspend_updates = False
+            self._coordinator.reconcile(
+                SaveCurrentPreset(name=name, overwrite=existing is not None),
+                control_issue=self._control_issue,
+            )
+        except SignaturePropertiesCoordinatorError as exc:
+            self._show_signature_preset_error(str(exc))
+            return None
         self.load_from_workflow()
         self._notify_change()
-        return preset
+        return self._preset_catalog.preset_named(name)
 
     def delete_current_signature_preset(self) -> SignaturePresetCatalog | None:
         selected_name = _combo_text(self._signature_preset_controls.preset_combo)
@@ -1544,16 +1537,16 @@ class SignaturePropertiesPanel:
         if result != yes_value:
             return None
 
-        updated_catalog = self._preset_catalog.remove_preset(selected_name)
-        self._preset_catalog = updated_catalog
-        if self._preset_catalog_store is not None:
-            self._preset_catalog_store.delete_preset(selected_name)
-        self._selected_signature_preset_name = None
-        self._suspend_updates = True
         try:
-            self._reload_signature_preset_controls(selected_name=None)
-        finally:
-            self._suspend_updates = False
+            self._coordinator.reconcile(
+                DeletePreset(name=selected_name),
+                control_issue=self._control_issue,
+            )
+        except SignaturePropertiesCoordinatorError as exc:
+            self._show_signature_preset_error(str(exc))
+            return None
+        updated_catalog = self._coordinator.preset_catalog
+        self.load_from_workflow()
         self._notify_change()
         return updated_catalog
 
@@ -1569,47 +1562,29 @@ class SignaturePropertiesPanel:
             return False
 
         try:
-            configuration = self._certificate_catalog.configuration_named(selected_name)
-        except KeyError as exc:
-            self._selected_certificate_configuration_name = None
+            self._coordinator.reconcile(
+                ApplyCertificateConfiguration(
+                    selected_name=selected_name,
+                    passphrase=_text(self._certificate_controls.password_input) or None,
+                ),
+                control_issue=self._control_issue,
+            )
+        except SignaturePropertiesCoordinatorError as exc:
             self._show_certificate_configuration_error(str(exc))
             return False
-        return self._apply_certificate_configuration(configuration)
-
-    def _apply_certificate_configuration(
-        self,
-        configuration: CertificateConfiguration,
-    ) -> bool:
-        try:
-            signing_material = self._certificate_material_resolver.resolve(
-                self._certificate_catalog,
-                configuration,
-                passphrase=_text(self._certificate_controls.password_input) or None,
-            )
-        except (SigningMaterialResolutionError, ValueError) as exc:
-            self._selected_certificate_configuration_name = None
-            self._show_certificate_configuration_error(str(exc))
-            return False
-        self._workflow.apply_certificate_configuration(configuration, signing_material)
-        self._selected_certificate_configuration_name = configuration.display_name
-        self._suspend_updates = True
-        try:
-            self._reload_certificate_configuration_controls(
-                selected_name=configuration.display_name
-            )
-        finally:
-            self._suspend_updates = False
-        self.refresh_preview()
+        self.load_from_workflow()
         self._notify_change()
         return True
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh the selector."""
-        if self._certificate_catalog_store is not None:
-            self._certificate_catalog = self._certificate_catalog_store.load_catalog()
-        self._reload_certificate_configuration_controls(
-            selected_name=self._selected_certificate_configuration_name
+        self._sync_coordinator_state(
+            self._coordinator.reconcile(
+                RefreshCatalogs(),
+                control_issue=self._control_issue,
+            )
         )
+        self.load_from_workflow()
         return self._certificate_catalog
 
     @property
@@ -2143,40 +2118,44 @@ class SignaturePropertiesPanel:
             return
         selected_name = _combo_text(self._signature_preset_controls.preset_combo)
         if selected_name == SIGNATURE_PRESET_PLACEHOLDER or not selected_name.strip():
-            self._selected_signature_preset_name = None
+            self._sync_coordinator_state(
+                self._coordinator.reconcile(
+                    ClearSelectedSignaturePreset(),
+                    control_issue=self._control_issue,
+                )
+            )
             self._notify_change()
             return
         try:
-            preset = self._preset_catalog.preset_named(selected_name)
-        except KeyError:
-            self._selected_signature_preset_name = None
+            self._coordinator.reconcile(
+                ApplySignaturePreset(
+                    selected_name=selected_name,
+                    passphrase=_text(self._certificate_controls.password_input) or None,
+                ),
+                control_issue=self._control_issue,
+            )
+        except SignaturePropertiesCoordinatorError as exc:
+            self._sync_coordinator_state(
+                self._coordinator.reconcile(
+                    ClearSelectedSignaturePreset(),
+                    control_issue=self._control_issue,
+                )
+            )
+            self._show_certificate_configuration_error(str(exc))
             self._notify_change()
             return
-
-        self._selected_signature_preset_name = preset.name
-        certificate_configuration_id = preset.preset.certificate_configuration_id
-        if certificate_configuration_id is not None:
-            try:
-                configuration = self._certificate_catalog.configuration_by_id(
-                    certificate_configuration_id
-                )
-            except KeyError as exc:
-                self._selected_signature_preset_name = None
-                self._show_certificate_configuration_error(str(exc))
-                self._notify_change()
-                return
-            if not self._apply_certificate_configuration(configuration):
-                self._selected_signature_preset_name = None
-                self._notify_change()
-                return
-        self._workflow.apply_resolved_signature_preset(preset)
         self.load_from_workflow()
         self._notify_change()
 
     def _mark_signature_preset_dirty(self) -> None:
         if self._selected_signature_preset_name is None:
             return
-        self._selected_signature_preset_name = None
+        self._sync_coordinator_state(
+            self._coordinator.reconcile(
+                ClearSelectedSignaturePreset(),
+                control_issue=self._control_issue,
+            )
+        )
         self._suspend_updates = True
         try:
             self._reload_signature_preset_controls(selected_name=None)
@@ -2732,29 +2711,16 @@ class SignaturePropertiesPanel:
         return pixmap
 
     def _format_validation_text(self, preview: SigningDraftPreview) -> str:
-        issues = self._validation_issues(preview)
-        blocking_issues = [
-            issue
-            for issue in issues
-            if issue.severity == SigningDraftValidationSeverity.ERROR
-        ]
-        if (
-            len(blocking_issues) == 1
-            and self._control_issue is None
-            and blocking_issues[0].code == "signature_rect_missing"
-        ):
-            return "Place a signature on the page to continue."
-        if not blocking_issues:
-            return "Ready to sign."
-        if (
-            len(blocking_issues) == 1
-            and blocking_issues[0].code == "visible_signature_layout_unavailable"
-        ):
-            return f"Will fail to sign: {blocking_issues[0].message}"
-        return "\n".join(
-            f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
-            for issue in blocking_issues
+        del preview
+        return self._coordinator.load(control_issue=self._control_issue).validation_text
+
+    def _sync_coordinator_state(self, state: SignaturePropertiesViewState) -> None:
+        self._certificate_catalog = self._coordinator.certificate_catalog
+        self._preset_catalog = self._coordinator.preset_catalog
+        self._selected_certificate_configuration_name = (
+            state.selected_certificate_configuration_name
         )
+        self._selected_signature_preset_name = state.selected_signature_preset_name
 
     def _sync_field_control_state(self, field_key: SignatureFieldKey) -> None:
         controls = self.field_controls[field_key]

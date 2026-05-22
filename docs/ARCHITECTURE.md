@@ -13,7 +13,7 @@ Status markers used in this document:
 
 ## 1. Purpose and scope
 
-FoliaSeal is a Linux-targeted desktop PDF signing application foundation. The package provides a `foliaseal` command, a Qt-based PDF viewer/signing shell, a headless PDF signing use case, named visible-signature profiles, preview and signed-output QA harnesses, and PyInstaller packaging support. This is confirmed by `README.md`, `pyproject.toml`, and `src/foliaseal/__main__.py`.
+FoliaSeal is a Linux-targeted desktop PDF signing application foundation. The package provides a `foliaseal` command, a Qt-based PDF viewer/signing shell, an application-layer signature-properties coordinator, a headless PDF signing use case, named visible-signature profiles, preview and signed-output QA harnesses, and PyInstaller packaging support. This is confirmed by `README.md`, `pyproject.toml`, and `src/foliaseal/__main__.py`.
 
 This document governs the repository architecture: Python package layout, application/domain/infra/presentation boundaries, object models, file contracts, CLI contracts, rendering/signing dependencies, persistence, and tests. It does not describe a deployed service or network protocol because the current code is a local desktop application and CLI tool.
 
@@ -32,6 +32,7 @@ The canonical repository document split is:
 | Treat CLI arguments, JSON schemas, profile storage, and failure codes as contracts. | These are surfaced to users, tests, harnesses, or persisted files. | Confirmed by code/tests |
 | Use bundled font assets as the visible-signature typography source of truth. | `signature_font_registry.py`, README text, and signing/preview tests enforce bundled font behavior. | Confirmed by code/docs/tests |
 | Keep visible-signature layout policy behind the application layout boundary. | `visible_signature_layout.py` exposes `VisibleSignatureLayoutEngine`, `LayoutRequest`, and `SignatureLayoutPlan`; backend, canonical preview, Qt preview, and harness diagnostics consume that plan. Some implementation still delegates to backend compatibility helpers as transitional debt. | Confirmed by code/debt |
+| Keep signature-properties reconciliation in the application layer. | `signature_properties_coordinator.py` owns catalog reconciliation, selection state, validation/readiness text, and workflow-backed preview state; `signing_shell.py` renders that state and keeps preview/presentation concerns local. | Confirmed by code and tests |
 | Prefer late imports for optional GUI/runtime dependencies. | Qt widgets and render backend load PySide6 dynamically and report diagnostics when unavailable. | Confirmed by code |
 | Generated harness outputs and local artifact workspaces should not be committed unless intentionally curated as clone-stable fixtures. | `.gitignore` ignores `artifacts/`; durable small fixtures belong in `tests/fixtures/` or another explicitly tracked fixture location. | Confirmed by code |
 
@@ -43,7 +44,8 @@ The canonical repository document split is:
 | `src/foliaseal/domain/` | Stable domain models, enums, protocols, and failure codes. | No Qt imports found. |
 | `src/foliaseal/application/` | Use cases, workflows, geometry, preview/render evidence logic, layout planning, and protocol boundaries. | Some transitional modules still import concrete infra helpers. |
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, Qt PDF rendering, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed. |
-| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes. |
+| `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, and catalog refresh/save/delete commands. |
+| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; the signing shell delegates certificate/preset reconciliation to the application coordinator. |
 | `src/foliaseal/resources/fonts/` | Bundled OpenType font assets used by preview and signing. | Package data in `pyproject.toml`. |
 | `src/foliaseal/build/` and `foliaseal.spec` | PyInstaller helper code and one-dir bundle spec. | `collect_runtime_assets()` is wired into the spec for bundled runtime assets. |
 | `tests/unit/` | Unit and focused integration-style tests for each layer. | Heavy coverage around signing, preview, Qt shell, and layout policy. |
@@ -130,6 +132,18 @@ The canonical repository document split is:
 - Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read through an injected application-layer reader, with `Pkcs12CertificatePreviewReader` as the default implementation. Signed-output path suggestions are computed by application-layer path policy so the app frame and signing shell share the same default filename behavior. The workflow can apply resolved `CertificateConfiguration` material but still imports reusable-object DTOs from infra config, so the application layer still knows transitional persistence DTOs while schema-alignment work continues.
 - Status: Confirmed by code; infra DTO dependency is debt/needs review.
 
+### Signature properties coordinator
+
+- Location: `src/foliaseal/application/signature_properties_coordinator.py`
+- Responsibility: Reconcile signing-shell certificate and preset selection, catalog refresh, dirty-selection clearing, validation text, readiness-to-sign, and workflow-backed preview state without involving Qt widgets.
+- Owns: `DefaultSignaturePropertiesCoordinator`, `SignaturePropertiesViewState`, command dataclasses for applying certificates/presets, saving/deleting presets, refreshing catalogs, and clearing the selected preset, plus the certificate-material resolver wiring used for selected certificate configurations.
+- Does not own: Qt control construction, preview-card rendering, canonical preview snapshot lifecycle, signature geometry rendering, or signing execution.
+- Key collaborators: `SigningDraftWorkflow`, `CertificateCatalogStore`, `SignaturePresetCatalogStore`, `CertificateSecretProvider`, `signing_shell.py`.
+- Main entry points: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.reconcile()`.
+- Important types/classes/functions: `SignaturePropertiesViewState`, `ApplyCertificateConfiguration`, `ApplySignaturePreset`, `SaveCurrentPreset`, `DeletePreset`, `RefreshCatalogs`, `ClearSelectedSignaturePreset`, `SignaturePropertiesCoordinatorError`.
+- Known constraints: The coordinator exposes display-name based state to the panel but resolves and mutates workflow ids internally. `load()` and `reconcile()` can fold an optional control issue into validation/readiness state so the panel does not duplicate formatting rules. Refreshes reconcile stale selections against current catalogs, and preset application without a certificate reference preserves the active certificate selection through `SigningDraftWorkflow`.
+- Status: Confirmed by code and tests.
+
 ### Document review summary
 
 - Location: `src/foliaseal/application/document_review.py`
@@ -171,7 +185,7 @@ The canonical repository document split is:
 - Does not own: Domain validation rules, headless signing failure mapping, persisted JSON schema definitions.
 - Key collaborators: `ViewerWorkflow`, `SigningDraftWorkflow`, `render_canonical_signature_preview()`, `build_phase3_signing_executor()`, profile store, certificate catalog store, signing-material resolver.
 - Main entry points: `build_qt_app_frame()`, `build_qt_pdf_viewer_widget()`, `build_qt_signing_shell()`, `run_phase2_viewer_harness()`, `run_phase3_signing_harness()`, `run_phase3_preview_matrix()`, `run_phase3_signed_acceptance_matrix()`.
-- Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `app_frame.py` owns a first-pass `QMainWindow` wrapper with File/Open, Settings/Application settings, Settings/Create certificate, Settings/Import certificate, and Settings/Manage certificate configurations actions; the settings action opens an app-wide settings dialog for default directories, while the certificate dialogs collect user input and delegate create, import, rename, delete, and export work to `CertificateLifecycleService`. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file. The workspace exposes read-only `Signing flow` and `Document review` summary cards: the first derives `Place signature`, `Confirm/sign`, `Review preview`, or `Signed` from existing draft/readiness/result state, and the second renders plain-language inspection output from the application review helper. The shell can select and apply existing certificate configurations, including configurations that resolve saved passwords through the app-frame-provided secret provider, can refresh its selector after lifecycle results report certificate catalog changes, and can refresh the document review card from the current viewer path without mutating the PDF. The signing shell consumes `AppSettings` for output-path defaults but no longer edits app-wide directory settings directly.
+- Known constraints: Widgets use dynamic PySide6 imports and many test doubles. `app_frame.py` owns a first-pass `QMainWindow` wrapper with File/Open, Settings/Application settings, Settings/Create certificate, Settings/Import certificate, and Settings/Manage certificate configurations actions; the settings action opens an app-wide settings dialog for default directories, while the certificate dialogs collect user input and delegate create, import, rename, delete, and export work to `CertificateLifecycleService`. `signing_shell.py` is a large module with control dataclasses, helper functions, properties panel, workspace widget, and shell adapter in one file. The workspace exposes read-only `Signing flow` and `Document review` summary cards: the first derives `Place signature`, `Confirm/sign`, `Review preview`, or `Signed` from existing draft/readiness/result state, and the second renders plain-language inspection output from the application review helper. The signature-properties panel now delegates certificate configuration application, preset apply/save/delete, catalog refresh, dirty-selection clearing, validation text, and readiness state to `signature_properties_coordinator.py`; `signing_shell.py` keeps preview controls, canonical preview rendering, preview geometry, and snapshot cleanup. The shell can select and apply existing certificate configurations, including configurations that resolve saved passwords through the app-frame-provided secret provider, can refresh its selector after lifecycle results report certificate catalog changes, and can refresh the document review card from the current viewer path without mutating the PDF. The signing shell consumes `AppSettings` for output-path defaults but no longer edits app-wide directory settings directly.
 - Status: Confirmed by code and tests; size/concentration is debt/needs review.
 
 ### Configuration and reusable signing-object persistence
@@ -227,6 +241,8 @@ The canonical repository document split is:
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, selected reusable-object ids, rect, appearance, placement context. | Produces preview and final `SigningRequest`; can apply resolved `CertificateConfiguration` material. |
 | `CertificatePreviewReader` / `Pkcs12CertificatePreviewReader` | `application/certificate_preview.py` | Extract certificate-derived visible-signature preview values. | certificate path, passphrase -> field-value map and availability flag. | Injected into draft workflow so PKCS#12 parsing is not implemented inside the draft object. |
 | `SigningDraftPreview` | `application/signing_draft_workflow.py` | UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, stamp text, issues, can_submit. | Used by Qt and preview renderer. |
+| `SignaturePropertiesViewState` | `application/signature_properties_coordinator.py` | Immutable signing-properties panel state. | selected certificate/preset display names, catalog names, validation text, readiness, preview. | Display-name boundary between Qt controls and application-layer reconciliation. |
+| `ApplyCertificateConfiguration` / `ApplySignaturePreset` / `SaveCurrentPreset` / `DeletePreset` / `RefreshCatalogs` / `ClearSelectedSignaturePreset` | `application/signature_properties_coordinator.py` | Command payloads for signing-properties reconciliation. | selected name, optional passphrase, overwrite flag. | Used by the panel to express user intent without mutating widget internals directly. |
 | `DocumentReviewSummary` | `application/document_review.py` | UI-ready read-only signature review payload. | headline, detail, signature count, signer subject, certification state, local validation result, inspection error. | Used by the Qt signing shell `Document review` card. |
 | `VisibleSignatureSemantics` | `application/visible_signature_semantics.py` | Resolved visible-signature meaning-level payload. | resolved fields, title/detail/stamp text, metadata reason/location/contact info, fit issues, readiness. | Shared source for workflow preview, canonical preview text, backend signing text, and metadata. |
 | `SignatureLayoutPlan` | `application/visible_signature_layout.py` | Canonical visible-signature geometry result. | text/stamp area dimensions, layout rules, fit issues, optional ink reservation. | Boundary for backend/canonical/Qt preview geometry. |
@@ -261,6 +277,16 @@ The canonical repository document split is:
 - Validation: domain constructors, compatibility profile, certification inspector, certificate loader, backend request normalization.
 - Error behavior: Known exceptions are mapped to stable `FailureCode` values; unknown exceptions map to `UNEXPECTED_INTERNAL_ERROR`.
 - Source files: `src/foliaseal/application/sign_pdf_use_case.py`, `src/foliaseal/domain/errors.py`.
+
+### Signature-properties coordinator contract
+
+- Producer: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.reconcile()`
+- Consumer: `SignaturePropertiesPanel`, coordinator tests, future non-Qt orchestration callers.
+- Stability: Active application boundary.
+- Backward compatibility requirements: Preserve display-name based UI state, workflow-backed selection ids, catalog refresh reconciliation, password resolution for saved certificate configurations, preset save/delete behavior, and preview/readiness values returned to the panel.
+- Validation: catalog lookups, `SigningDraftWorkflow` methods, `CertificateSigningMaterialResolver`, and `control_issue` folding into validation text.
+- Error behavior: Invalid selections or resolution failures raise `SignaturePropertiesCoordinatorError`; the panel maps those to user-visible error messages.
+- Source files: `src/foliaseal/application/signature_properties_coordinator.py`, `src/foliaseal/presentation/qt/signing_shell.py`.
 
 ### Render backend contract
 
@@ -375,7 +401,7 @@ The canonical repository document split is:
 2. The shell creates a viewer workflow and signing draft workflow.
 3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
 4. The workspace shows read-only signing-flow and document-review summary cards derived from current draft/readiness/result state and the currently open PDF.
-5. User interactions update `SigningDraftWorkflow` state through placement and appearance controls.
+5. The signature-properties panel delegates certificate configuration, signature preset, catalog refresh, dirty-selection clearing, and validation/readiness reconciliation to `DefaultSignaturePropertiesCoordinator`; placement and appearance controls still update `SigningDraftWorkflow` state directly.
 6. Preview controls render a UI preview from `SigningDraftPreview`; sizing uses `SignatureLayoutPlan`.
 7. On sign, the workflow converts the draft into `SigningRequest`.
 8. The injected signing executor runs and returns a `SigningResult`.
@@ -407,16 +433,25 @@ The canonical repository document split is:
 3. Saving creates or replaces a resolved preset, which stores separate `AppearanceProfile`, optional `PlacementProfile`, and reference-only `SignaturePreset` entries in `SignaturePresetCatalog`.
 4. Store writes indented sorted JSON to a `.tmp` file and replaces `profiles.json`.
 5. Delete rewrites the catalog without the named preset.
-6. The Qt shell calls canonical draft methods `capture_current_signature_setup()` and `apply_resolved_signature_preset()`, and uses preset-oriented catalog/store methods such as `preset_named()`, `upsert_preset()`, `save_preset()`, and `delete_preset()`.
+6. The coordinator calls canonical draft methods `capture_current_signature_setup()` and `apply_resolved_signature_preset()`, and uses preset-oriented catalog/store methods such as `preset_named()`, `upsert_preset()`, `save_preset()`, and `delete_preset()`.
 
 ### Certificate configuration selection
 
 1. `build_qt_signing_shell()` may receive a `CertificateCatalogStore`, `CertificateCatalog`, and `CertificateSecretProvider`.
-2. The signing properties panel loads certificate configuration display names into a compact selector.
-3. The user selects a saved certificate configuration and applies it with either a typed password or a saved-password provider.
+2. The coordinator loads certificate configuration display names into a compact selector state.
+3. The user selects a saved certificate configuration and the panel translates that intent into `ApplyCertificateConfiguration`.
 4. `CertificateSigningMaterialResolver` verifies the referenced managed certificate record and app-managed PKCS#12 file, then returns runtime `SigningMaterial`.
 5. `SigningDraftWorkflow.apply_certificate_configuration()` records the selected configuration id, updates runtime certificate path/passphrase/alias, clears certificate-preview cache state, and future preview/request calls use the resolved material.
 6. Resolver failures, such as a missing managed certificate file or unavailable saved password, are reported through the Qt shell error path instead of escaping as uncaught exceptions.
+
+### Signature-properties reconciliation
+
+1. `SignaturePropertiesPanel` creates `DefaultSignaturePropertiesCoordinator` with the current `SigningDraftWorkflow` plus optional catalog/store and secret-provider dependencies.
+2. `load()` seeds the combo-box selections, validation text, and ready-to-sign state from workflow/catalog state.
+3. User actions on the certificate and preset controls become coordinator commands; the panel passes any current control issue so UI validation text can include placement/appearance errors.
+4. The coordinator resolves certificate material, applies or captures presets through `SigningDraftWorkflow`, persists catalogs when stores are present, and returns a fresh immutable `SignaturePropertiesViewState`.
+5. The panel renders the returned state into controls and labels, then refreshes the existing preview card and canonical preview snapshot machinery.
+6. `ClearSelectedSignaturePreset` is used when appearance or placement edits dirty a saved preset selection without mutating the underlying workflow state.
 
 ### Phase 3 evidence validation
 
@@ -434,7 +469,7 @@ The canonical repository document split is:
 | PKCS#12 certificate | User path/passphrase | validated/loaded by pyHanko/cryptography | Not persisted by app | PKCS#12 | Passphrase can appear in CLI history for harness commands; README warns about this. |
 | Managed certificate configuration | Certificate creation service, certificate import service, app-frame certificate management dialog, tests, or Qt shell selection | created self-signed PKCS#12 or imported PKCS#12 -> managed certificate record + certificate configuration -> optional `secret-tool` password save -> optional app-frame rename/notes/delete of configuration record -> optional app-frame export of managed certificate file -> optional app-frame delete of unreferenced managed certificate/file -> resolver -> runtime signing material -> signing draft | XDG data dir under `FoliaSeal/Certificates/certificates.json`; PKCS#12 files under `FoliaSeal/Certificates/Managed/`; saved passwords in Linux Secret Service via `secret-tool` | `CertificateCatalog` JSON plus PKCS#12 files plus external secret references | JSON stores secret references only; no plain certificate passwords. Qt app frame can create basic self-signed PKCS#12 files, import existing PKCS#12 files, optionally save passwords securely when `secret-tool` is available, rename/edit notes/delete configuration records, export managed certificate files, delete unreferenced managed certificate files, and Qt shell can select existing configurations. |
 | App settings | Settings store callers, Qt app frame settings dialog, output file dialog | user preferences -> settings schema -> JSON -> app-frame and shell defaults | XDG config dir under `FoliaSeal/settings.json` | `AppSettings` JSON | Missing/blank settings load home-directory defaults; app-frame Settings dialog owns default-directory editing and loaded signing shells consume refreshed values. |
-| Reusable signature presets | Qt shell/user input | domain appearance/placement plus optional certificate configuration reference -> split config schema -> JSON | XDG data dir under historical `FoliaSeal/Signature Profiles/profiles.json` path | `SignaturePresetCatalog` JSON with appearance, placement, and preset lists | Missing/blank catalog becomes empty; obsolete profile-named preset methods have been removed; partial presets without certificate references preserve the active certificate selection. |
+| Reusable signature presets | Qt shell/user input through `DefaultSignaturePropertiesCoordinator` | display-name selection -> catalog lookup -> domain appearance/placement plus optional certificate configuration reference -> split config schema -> JSON | XDG data dir under historical `FoliaSeal/Signature Profiles/profiles.json` path | `SignaturePresetCatalog` JSON with appearance, placement, and preset lists | Missing/blank catalog becomes empty; obsolete profile-named preset methods have been removed; partial presets without certificate references preserve the active certificate selection, and the coordinator reconciles stale display-name selections on refresh. |
 | Trust profile/timestamp policy | Config schema callers | JSON dicts <-> dataclasses -> runtime trust policy | Needs review | JSON schema in `infra/config/schemas.py` | Storage location outside profile catalog is not yet clearly documented in code. |
 | Viewer render buffers | Render backend | PDF page -> RGBA bytes | Memory; optional render cache | `RenderPageResult` | Cache is in-memory LRU keyed by path/page/zoom. |
 | Preview artifacts | Qt harness/matrix | widget/canonical preview capture, overlays, diagnostics | `artifacts/` run directories | PNG/JSON/markdown | Generated run outputs and local QA fixture workspaces are ignored. |
@@ -445,9 +480,9 @@ The canonical repository document split is:
 | From | May depend on | Must not depend on | Notes |
 |---|---|---|---|
 | `domain` | Python stdlib and typing/dataclasses/enums. | `application`, `infra`, `presentation`, Qt, pyHanko. | Confirmed by current imports. |
-| `application` | `domain`, small infra protocols/adapters where currently wired, Pillow for layout image probing. | Qt presentation widgets. | Some application modules import infra DTOs or backend concrete helpers; see debt. |
+| `application` | `domain`, small infra protocols/adapters where currently wired, Pillow for layout image probing. | Qt presentation widgets. | Some application modules import infra DTOs or backend concrete helpers; see debt. `signature_properties_coordinator.py` is the application-layer boundary for signing-properties reconciliation and may depend on config stores plus the certificate-material resolver. |
 | `infra` | `domain`, application protocol DTOs where implementing adapters, external libraries such as pyHanko/PySide6/cryptography/Pillow. | Qt presentation widgets. | Rendering backend uses dynamic Qt imports. |
-| `presentation/qt` | `domain`, `application`, `infra` concrete adapters, dynamic PySide6 bindings. | Domain mutation rules duplicated outside workflows. | Qt shell should orchestrate, not reinterpret signing semantics. |
+| `presentation/qt` | `domain`, `application`, `infra` concrete adapters, dynamic PySide6 bindings. | Domain mutation rules duplicated outside workflows. | Qt shell should orchestrate, not reinterpret signing semantics; `signing_shell.py` should delegate signature-properties reconciliation to the application coordinator and keep preview rendering local. |
 | `tests` | All layers plus fakes/fixtures. | Production code depending on tests. | Tests intentionally inspect private helpers in some transitional layout areas. |
 | `docs` / `artifacts` | N/A. | Runtime imports from production code. | Artifacts are evidence, not app dependencies. |
 
@@ -478,6 +513,7 @@ Tests live under `tests/unit/` with support builders in `tests/support/`. The su
 | Visible semantics boundary | `test_visible_signature_semantics.py` | Visible field resolution, certificate fallback, signing-time text, escaped stamp text, metadata, and fit-validator propagation. | Add boundary tests for text/metadata behavior before changing workflow, preview, or backend signing. |
 | Visible layout boundary | `test_visible_signature_layout.py` | `SignatureLayoutPlan` and adapter parity. | Add boundary tests before relying on private helper changes. |
 | Preview rendering | `test_signing_preview_renderer.py` | Textual/canonical preview snapshots and preview/request parity. | Run with backend/layout tests for visible-signature changes. |
+| Signature-properties coordinator | `test_signature_properties_coordinator.py` | Certificate/preset reconciliation, catalog refresh, validation text, and readiness state without Qt. | Add or update tests here before changing panel or store behavior. |
 | Qt shell/viewer | `test_qt_signing_shell.py`, `test_qt_viewer_widget.py`, `test_qt_render_backend.py` | Widget behavior through fakes, selection geometry, render diagnostics. | Use fakes; avoid requiring a live GUI unless intentionally running harnesses. |
 | Viewer geometry/workflow | `test_coordinate_transform.py`, `test_viewer_session.py`, `test_viewer_workflow.py` | Coordinate math and page/zoom workflow. | Add cases for rotations/page boxes when geometry changes. |
 | Evidence/harnesses | `test_phase2_harness.py`, `test_phase3_harness.py`, `test_phase2_evidence.py`, `test_preview_stress_fixtures.py` | Capture JSON, checklist/evidence contract behavior, matrix diagnostics. | Keep generated outputs controlled and `.gitignore` aligned. |
@@ -493,7 +529,7 @@ Default local validation from README:
 | Issue | Impact | Current workaround | Preferred direction |
 |---|---|---|---|
 | `phase3_signing_backend.py` mixes concrete pyHanko adapter code with many private visible-signature layout helpers. | Harder to navigate and test at a single public boundary. | `VisibleSignatureLayoutEngine` wraps/migrates parts of layout behavior while preserving parity. | Move policy behind the layout boundary and reduce private-helper test reliance after coverage is equivalent. |
-| `signing_shell.py` is a large module containing widget composition, profile handling, preview sizing, and workflow orchestration. | Changes risk broad review scope and can hide UI/domain coupling. | Tests use fakes and helper-level coverage. | Split only when clear ownership boundaries emerge, likely panel/profile/preview adapter components. |
+| `signing_shell.py` is a large module containing widget composition, preview sizing, canonical preview rendering, and shell orchestration. | Changes still risk broad review scope, but the signature-properties state reconciliation path has moved out of the panel. | Tests use fakes and helper-level coverage. | Split only when clear ownership boundaries emerge, likely panel/preview adapter components. |
 | Application layer imports some infra DTOs and concrete backend helpers. | Layer boundary is not perfectly clean. | Semantics decisions now live behind `VisibleSignatureSemanticsService`; remaining imports are primarily layout/backend compatibility, profile DTOs, and certificate config DTOs. | Move shared DTOs/interfaces upward or add adapter methods when it reduces coupling. |
 | Certificate management is intentionally first-pass. | Users can create basic self-signed PKCS#12 files in-app, import existing PKCS#12 files, optionally save passwords through `secret-tool`, rename/edit notes/delete resulting certificate configurations, export/back up managed certificate files, delete unreferenced managed certificate files, and select configurations. The creation UI does not yet expose advanced subject, validity, algorithm, or CA/trust-chain controls. | Tests and lower-level stores can create catalogs; `CertificateLifecycleService` owns first-pass creation/import/configuration/export/managed-certificate deletion and saved-password cleanup, while the app frame owns dialog wiring and the shell consumes configurations through the resolver. | Add richer certificate-authoring options only when product requirements justify them, and consider cross-platform credential-store adapters if FoliaSeal expands beyond Linux Secret Service. |
 | Historical profile terminology remains in storage path/module names. | `profile_storage.py` and `Signature Profiles/profiles.json` may still look broader than the current `SignaturePresetCatalog` responsibility. | Public methods and shell behavior use preset-oriented names; the historical path is documented. | Consider a storage-path/module rename only if it can be done without introducing unnecessary migration code. |
@@ -516,6 +552,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-21 | Added the application-layer signature-properties coordinator and narrowed the Qt signing shell boundary to preview/presentation work. | Reflected the current coordinator-backed implementation. |
 | 2026-05-06 | Added draft reusable-object references and certificate preview reader seam. | Reflected schema model alignment Slice 3A implementation. |
 | 2026-05-06 | Wired existing certificate configurations into the Qt signing shell. | Reflected schema model alignment Slice 3B implementation. |
 | 2026-05-06 | Renamed primary signature preset APIs and Qt shell wording away from generic profile terminology. | Reflected schema model alignment Slice 3C implementation. |
