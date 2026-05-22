@@ -1858,14 +1858,23 @@ class SigningWorkspaceWidget:
             self._document_review_controls.detail_label
         )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
-        self.widget.signing_workflow = self._draft_workflow  # type: ignore[attr-defined]
-        self.widget.viewer_workflow = self._viewer_workflow  # type: ignore[attr-defined]
-        self.widget.sign_button = self._sign_button  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.refresh_document_review = self.refresh_document_review  # type: ignore[attr-defined]
         self.widget.apply_app_settings = self.apply_app_settings  # type: ignore[attr-defined]
+        self.widget.set_logical_page_index = self.set_logical_page_index  # type: ignore[attr-defined]
+        self.widget.logical_page_index = self.logical_page_index  # type: ignore[attr-defined]
+        self.widget.set_signature_rect = self.set_signature_rect  # type: ignore[attr-defined]
+        self.widget.signature_rect = self.signature_rect  # type: ignore[attr-defined]
+        self.widget.set_selected_certificate_configuration_id = (  # type: ignore[attr-defined]
+            self.set_selected_certificate_configuration_id
+        )
+        self.widget.selected_certificate_configuration_id = (  # type: ignore[attr-defined]
+            self.selected_certificate_configuration_id
+        )
+        self.widget.signature_appearance = self.signature_appearance  # type: ignore[attr-defined]
+        self.widget.is_sign_action_enabled = self.is_sign_action_enabled  # type: ignore[attr-defined]
         self.widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
         self.widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
             self.refresh_certificate_configurations
@@ -1908,6 +1917,60 @@ class SigningWorkspaceWidget:
         """Apply new app-level settings to the live shell state."""
         self._app_settings = settings
         self.widget.app_settings = settings  # type: ignore[attr-defined]
+
+    def set_logical_page_index(self, page_index: int) -> None:
+        """Update the logical session page without forcing a viewer rerender."""
+        self._viewer_workflow.session.jump_to_page(page_index)
+
+    def logical_page_index(self) -> int:
+        """Return the current logical viewer page index."""
+        return self._viewer_workflow.session.current_page
+
+    def set_signature_rect(
+        self,
+        *,
+        page_index: int,
+        left_pt: float,
+        bottom_pt: float,
+        width_pt: float,
+        height_pt: float,
+    ) -> SignatureRect:
+        """Apply a signature rectangle through the shell surface."""
+        signature_rect = SignatureRect(
+            page_index=page_index,
+            left_pt=left_pt,
+            bottom_pt=bottom_pt,
+            width_pt=width_pt,
+            height_pt=height_pt,
+        )
+        self.properties_panel.set_signature_rect(signature_rect)
+        return signature_rect
+
+    def signature_rect(self) -> SignatureRect | None:
+        """Return the current signature rectangle, if any."""
+        return self._draft_workflow.signature_rect
+
+    def set_selected_certificate_configuration_id(self, configuration_id: str | None) -> None:
+        """Apply a selected certificate configuration identifier to the live draft."""
+        self._draft_workflow.selected_certificate_configuration_id = configuration_id
+        self.properties_panel.load_from_workflow()
+
+    def selected_certificate_configuration_id(self) -> str | None:
+        """Return the selected certificate configuration identifier, if any."""
+        return self._draft_workflow.selected_certificate_configuration_id
+
+    def signature_appearance(self) -> SignatureAppearance | None:
+        """Return the current signature appearance."""
+        return self._draft_workflow.signature_appearance
+
+    def is_sign_action_enabled(self) -> bool:
+        """Return whether the sign action is currently enabled."""
+        is_enabled = getattr(self._sign_button, "isEnabled", None)
+        if callable(is_enabled):
+            return bool(is_enabled())
+        if hasattr(self._sign_button, "_enabled"):
+            return bool(self._sign_button._enabled)  # type: ignore[attr-defined]
+        return bool(getattr(self._sign_button, "enabled", False))
 
     def submit_sign_request(self) -> SigningRequest | None:
         self.properties_panel.apply_changes()
