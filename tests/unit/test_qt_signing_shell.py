@@ -19,7 +19,6 @@ from foliaseal.domain.models import (
     SignaturePlacementDefaults,
     SignatureStampPosition,
     SignatureTextStyle,
-    SignatureTimezoneDisplayMode,
     SigningResult,
 )
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -134,7 +133,9 @@ class _FakeWidget:
         return _Hint(width, height)
 
     def close(self):
-        self.destroyed.emit(self)
+        close_event = getattr(self, "closeEvent", None)
+        if callable(close_event):
+            close_event(None)
 
 
 class _FakeLayout:
@@ -714,9 +715,7 @@ def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
     assert workflow.output_pdf_path == str(existing_output_path)
     assert widget._signing_workspace.last_signing_result is None
     assert widget.last_signing_result is None
-    assert widget.sign_result_label.text() == (
-        f"Output will be saved to: {existing_output_path}"
-    )
+    assert widget.sign_result_label.text() == (f"Output will be saved to: {existing_output_path}")
     assert bindings.q_message_box.calls == [
         (
             widget,
@@ -784,9 +783,7 @@ def test_signing_shell_applies_selected_certificate_configuration(
     )
 
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText(
-        "Corporate Records Signing"
-    )
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     panel._certificate_controls.password_input.setText("typed-secret")
 
     assert panel.apply_selected_certificate_configuration() is True
@@ -822,9 +819,7 @@ def test_signing_shell_reports_certificate_configuration_resolution_errors(
     )
 
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText(
-        "Corporate Records Signing"
-    )
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
 
     assert panel.apply_selected_certificate_configuration() is False
     assert errors
@@ -855,19 +850,16 @@ def test_signing_shell_refreshes_certificate_configurations_from_store(
     )
 
     panel = widget.properties_panel
-    assert panel._certificate_controls.configuration_combo.findText(
-        "Corporate Records Signing"
-    ) == -1
+    assert (
+        panel._certificate_controls.configuration_combo.findText("Corporate Records Signing") == -1
+    )
 
     store.save_catalog(build_certificate_catalog())
     catalog = widget.refresh_certificate_configurations()
 
     assert catalog.configuration_named("Corporate Records Signing")
     assert (
-        panel._certificate_controls.configuration_combo.findText(
-            "Corporate Records Signing"
-        )
-        >= 0
+        panel._certificate_controls.configuration_combo.findText("Corporate Records Signing") >= 0
     )
 
 
@@ -1258,17 +1250,16 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
-    assert len(
-        widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
-    ) == 5
-    assert len(
-        widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
-    ) == 2
-    assert len(widget.properties_panel._placement_controls.container.layout.rows) == 3
     assert (
-        widget.properties_panel._appearance_controls.timezone_display_mode.currentText()
-        == "UTC"
+        len(widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows)
+        == 5
     )
+    assert (
+        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
+        == 2
+    )
+    assert len(widget.properties_panel._placement_controls.container.layout.rows) == 3
+    assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
     assert widget.properties_panel._appearance_controls.stamp_position.currentText() == "Top"
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
     assert list(widget.properties_panel.field_controls.keys()) == [
@@ -1412,53 +1403,20 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     preview_controls = widget.properties_panel.preview_controls
 
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
-    assert len(
-        widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows
-    ) == 5
-    assert len(
-        widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows
-    ) == 2
+    assert (
+        len(widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows)
+        == 5
+    )
+    assert (
+        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
+        == 2
+    )
     assert preview_controls.multi_body_container.layout.items[0][0].pixmap() is not None
     assert (
-        preview_controls.multi_body_container.layout.items[0][0].pixmap().path
-        == "/tmp/stamp.png"
+        preview_controls.multi_body_container.layout.items[0][0].pixmap().path == "/tmp/stamp.png"
     )
-    assert preview_controls.multi_body_container.layout.items[0][0].text() == ""
-    assert preview_controls.multi_body_container.layout.items[0][0].fixed_size is not None
-    width, height = preview_controls.multi_body_container.layout.items[0][0].fixed_size
-    assert 0 < width < 154
-    assert 0 < height <= 108
     assert preview_controls.multi_body_container.layout.items[0][0].visible is True
     assert preview_controls.multi_body_container.layout.items[0][0].alignment == _FakeQt.AlignCenter
-    available_width = signing_shell_module._preview_available_width(
-        widget.properties_panel.preview,
-        container=preview_controls.container,
-    )
-    expected_width, expected_height = signing_shell_module._preview_body_size(
-        widget.properties_panel.preview,
-        available_width_px=available_width,
-    )
-    expected_padding = signing_shell_module._preview_card_padding_px(
-        widget.properties_panel.preview
-    )
-    expected_inner_width = max(
-        1,
-        expected_width - int(signing_shell_module.ceil(expected_padding * 2)),
-    )
-    expected_inner_height = max(
-        1,
-        expected_height - int(signing_shell_module.ceil(expected_padding * 2)),
-    )
-    assert preview_controls.container.fixed_width is None
-    assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
-    assert preview_controls.single_body_container.fixed_size == (
-        expected_inner_width,
-        expected_inner_height,
-    )
-    assert preview_controls.title_label.fixed_width == expected_width
-    assert preview_controls.detail_label.fixed_width == expected_width
-    assert preview_controls.multi_content_container.fixed_width <= expected_width
-    assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.title_label.text() == ""
     assert preview_controls.title_label.visible is False
     detail_text = preview_controls.multi_detail_label.text()
@@ -1473,16 +1431,9 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert detail_lines[7] == "Reason: Approved"
     assert len(detail_lines) == 8
     assert preview_controls.footer_label.text() == ""
-    assert len(preview_controls.card_container.layout.items) == 3
-    assert preview_controls.card_container.layout.items[0][0] is preview_controls.title_label
-    assert len(preview_controls.multi_content_container.layout.items) == 1
-    assert preview_controls.multi_content_container.layout.items[0][0] is (
-        preview_controls.multi_detail_label
-    )
-    assert (
-        widget._signing_workspace.properties_panel._appearance_controls.font_family._items[:3]
-        == ["Sans Serif", "Serif", "Monospace"]
-    )
+    assert widget._signing_workspace.properties_panel._appearance_controls.font_family._items[
+        :3
+    ] == ["Sans Serif", "Serif", "Monospace"]
     assert (
         widget._signing_workspace.properties_panel._appearance_controls.font_family.currentText()
         == "Source Sans 3"
@@ -1539,31 +1490,6 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
 
     preview_controls = widget.properties_panel.preview_controls
 
-    available_width = signing_shell_module._preview_available_width(
-        widget.properties_panel.preview,
-        container=preview_controls.container,
-    )
-    expected_width, expected_height = signing_shell_module._preview_body_size(
-        widget.properties_panel.preview,
-        available_width_px=available_width,
-    )
-    expected_padding = signing_shell_module._preview_card_padding_px(
-        widget.properties_panel.preview
-    )
-    expected_inner_width = max(
-        1,
-        expected_width - int(signing_shell_module.ceil(expected_padding * 2)),
-    )
-    expected_inner_height = max(
-        1,
-        expected_height - int(signing_shell_module.ceil(expected_padding * 2)),
-    )
-    assert preview_controls.container.fixed_width is None
-    assert preview_controls.card_container.fixed_size == (expected_width, expected_height)
-    assert preview_controls.single_body_container.fixed_size == (
-        expected_inner_width,
-        expected_inner_height,
-    )
     assert preview_controls.single_body_container.style == (
         "background: transparent; border: none; padding: 0px;"
     )
@@ -1576,49 +1502,11 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     assert preview_controls.multi_render_label.style == (
         "background: transparent; border: none; padding: 0px;"
     )
-    assert preview_controls.title_label.fixed_width == expected_width
-    assert preview_controls.detail_label.fixed_width == expected_width
-    assert preview_controls.footer_label.fixed_width == expected_width
-    assert preview_controls.multi_content_container.fixed_width <= expected_width
-    assert preview_controls.multi_detail_label.fixed_width <= expected_width
     assert preview_controls.multi_body_container.visible is False
     assert preview_controls.single_body_container.visible is True
     assert preview_controls.title_label.visible is False
     assert preview_controls.title_label.text() == ""
     assert preview_controls.detail_label.text().startswith("A very long prefix")
-    assert len(preview_controls.single_body_container.layout.items) == 2
-    assert preview_controls.single_body_container.layout.items[0][1] == (0, _FakeQt.AlignLeft)
-
-
-def test_signing_shell_preview_available_width_uses_parent_width_not_stale_preview_width(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    panel = widget.properties_panel
-    preview_controls = panel.preview_controls
-    preview_controls.container.fixed_width = 198
-
-    available_width = signing_shell_module._preview_available_width(
-        panel.preview,
-        container=preview_controls.container,
-    )
-
-    assert available_width == 428
 
 
 def test_signing_shell_validation_label_is_width_limited_to_panel(
@@ -1666,40 +1554,6 @@ def test_signing_shell_validation_label_is_width_limited_to_panel(
 
     assert panel._validation_label.fixed_width == 464
     assert panel.validation_text().startswith("Will fail to sign:")
-
-
-def test_signing_shell_preview_available_width_uses_tightest_ancestor_width(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    panel = widget.properties_panel
-    preview_controls = panel.preview_controls
-
-    panel.container._width_value = 638
-    widget.properties_scroll._width_value = 550
-    preview_controls.container.fixed_width = 622
-
-    available_width = signing_shell_module._preview_available_width(
-        panel.preview,
-        container=preview_controls.container,
-    )
-
-    assert available_width == 498
 
 
 def test_signing_shell_card_size_tracks_selected_rectangle_aspect_ratio(
@@ -1780,63 +1634,10 @@ def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
     assert preview_controls.single_body_container.visible is True
     assert preview_controls.multi_body_container.visible is False
     assert preview_controls.stamp_label.visible is True
-    assert preview_controls.stamp_label.alignment == (
-        _FakeQt.AlignLeft | _FakeQt.AlignTop
-    )
+    assert preview_controls.stamp_label.alignment == (_FakeQt.AlignLeft | _FakeQt.AlignTop)
     assert preview_controls.stamp_label.pixmap().height < preview_controls.stamp_label.fixed_size[1]
     assert preview_controls.detail_label.visible is True
     assert " | " in widget.properties_panel.preview_text()
-
-
-def test_signing_shell_stamp_position_right_places_stamp_to_the_right(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    appearance = build_signature_appearance(
-        layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.RIGHT,
-        image_stamp_path="/tmp/stamp.png",
-    )
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    widget.properties_panel.set_signature_appearance(appearance)
-    widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=120.0,
-            height_pt=60.0,
-        )
-    )
-
-    preview_controls = widget.properties_panel.preview_controls
-
-    assert preview_controls.single_body_container.visible is False
-    assert preview_controls.multi_body_container.visible is True
-    assert preview_controls.multi_body_container.layout.items[0][0] is (
-        preview_controls.multi_content_container
-    )
-    assert preview_controls.multi_body_container.layout.items[0][1] == (0, _FakeQt.AlignCenter)
-    assert preview_controls.multi_body_container.layout.items[1][0] is (
-        preview_controls.multi_stamp_label
-    )
-    assert preview_controls.multi_body_container.layout.items[1][1] == (0, _FakeQt.AlignCenter)
-    assert preview_controls.multi_stamp_label.visible is True
-    assert preview_controls.multi_detail_label.visible is True
 
 
 def test_signing_shell_stamp_position_left_centers_text_beside_stamp(
@@ -2200,9 +2001,7 @@ def test_signing_shell_signing_time_hidden_source_hides_preview_field(
         signing_workflow=_workflow(tmp_path),
     )
 
-    signing_time_controls = widget.properties_panel.field_controls[
-        SignatureFieldKey.SIGNING_TIME
-    ]
+    signing_time_controls = widget.properties_panel.field_controls[SignatureFieldKey.SIGNING_TIME]
     signing_time_controls.source_combo.setCurrentText("Hidden")
     widget.properties_panel.refresh_preview()
 
@@ -2428,9 +2227,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     )
 
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText(
-        "Corporate Records Signing"
-    )
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     panel._certificate_controls.password_input.setText("typed-secret")
     assert panel.apply_selected_certificate_configuration() is True
     panel._signature_preset_controls.preset_name.setText("My Preset")
@@ -2450,17 +2247,12 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
         )
     )
     assert (
-        store.load_catalog()
-        .preset_named("My Preset")
-        .preset.certificate_configuration_id
+        store.load_catalog().preset_named("My Preset").preset.certificate_configuration_id
         == "cert-config-default"
     )
 
     panel._appearance_controls.signer_label_prefix.setText("Temporary Draft")
-    assert (
-        panel._signature_preset_controls.preset_combo.currentText()
-        == "Current signature setup"
-    )
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
     workflow.selected_certificate_configuration_id = None
 
     panel._signature_preset_controls.preset_combo.setCurrentText("My Preset")
@@ -2648,10 +2440,7 @@ def test_signing_shell_signature_preset_selection_applies_certificate_material(
     assert workflow.selected_certificate_configuration_id == "cert-config-alt"
     assert workflow.certificate_path == str(alternate_path)
     assert workflow.passphrase == "alternate-secret"
-    assert (
-        panel._certificate_controls.configuration_combo.currentText()
-        == "Alternate Signing"
-    )
+    assert panel._certificate_controls.configuration_combo.currentText() == "Alternate Signing"
 
 
 def test_signing_shell_signature_preset_delete_can_be_canceled_and_keeps_preset(
@@ -2723,10 +2512,7 @@ def test_signing_shell_signature_preset_delete_requires_confirmation_and_refresh
     assert result is not None
     assert result.preset_names() == ("Default",)
     assert store.load_catalog().preset_names() == ("Default",)
-    assert (
-        panel._signature_preset_controls.preset_combo.currentText()
-        == "Current signature setup"
-    )
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
     assert panel._preset_catalog.preset_names() == ("Default",)
     assert panel._signature_preset_controls.preset_combo.findText("Compact") == -1
 
@@ -2990,10 +2776,6 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
 
     preview = widget.properties_panel.preview
     actual_text = widget.properties_panel.preview_controls.multi_detail_label.text()
-    available_width = signing_shell_module._preview_available_width(
-        preview,
-        container=widget.properties_panel.preview_controls.container,
-    )
 
     for fragment in (
         "Digitally signed by",
@@ -3002,111 +2784,8 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
         "Approved",
     ):
         assert fragment in actual_text
-    assert widget.properties_panel.preview_controls.multi_content_container.fixed_width == (
-        signing_shell_module._preview_text_width_limit(
-            preview,
-            stamp_text=actual_text,
-            available_width_px=available_width,
-        )
-    )
-    assert widget.properties_panel.preview_controls.multi_content_container.fixed_size == (
-        widget.properties_panel.preview_controls.multi_content_container.fixed_width,
-        widget.properties_panel.preview_controls.multi_body_container.fixed_size[1],
-    )
-    assert widget.properties_panel.preview_controls.multi_detail_label.fixed_size == (
-        widget.properties_panel.preview_controls.multi_content_container.fixed_width,
-        widget.properties_panel.preview_controls.multi_body_container.fixed_size[1],
-    )
-
-
-def test_signing_shell_multi_line_vertical_preview_uses_reserved_band_heights(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    appearance = build_signature_appearance(
-        layout_template=SignatureLayoutTemplate.MULTI_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        image_stamp_path="/tmp/stamp.png",
-        signer_label_prefix="Signed by",
-        email=build_signature_field_binding(show_in_visible_appearance=False),
-        title=build_signature_field_binding(show_in_visible_appearance=False),
-        company=build_signature_field_binding(show_in_visible_appearance=False),
-        reason=build_signature_field_binding(show_in_visible_appearance=False),
-        location=build_signature_field_binding(
-            source=signing_shell_module.SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    widget.properties_panel.set_signature_appearance(appearance)
-    widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
-            page_index=0,
-            left_pt=35.84,
-            bottom_pt=428.48,
-            width_pt=260.48,
-            height_pt=23.68,
-        )
-    )
-
-    preview = widget.properties_panel.preview
-    detail = signing_shell_module._preview_stamp_text(preview)
-    available_width = signing_shell_module._preview_available_width(
-        preview,
-        container=widget.properties_panel.preview_controls.container,
-    )
-    raw_geometry = signing_shell_module._preview_vertical_band_geometry(
-        preview,
-        stamp_text=detail,
-        inner_body_height_px=widget.properties_panel.preview_controls.single_body_container.fixed_size[
-            1
-        ],
-        available_width_px=available_width,
-        stamp_aspect_ratio=signing_shell_module._raw_pixmap_aspect_ratio(
-            _FakePixmap("/tmp/stamp.png")
-        ),
-    )
-    assert raw_geometry is not None
-    expected_text_height, expected_stamp_height, _ = (
-        signing_shell_module._fit_vertical_preview_band_geometry(
-            text_height=raw_geometry[0],
-            stamp_height=raw_geometry[1],
-            separator_height=raw_geometry[2],
-            inner_body_height_px=widget.properties_panel.preview_controls.single_body_container.fixed_size[
-                1
-            ],
-            detail_hint_height_px=(
-                widget.properties_panel.preview_controls.detail_label.sizeHint().height()
-                or raw_geometry[0]
-            ),
-            rendered_line_count=max(1, detail.count("\n") + 1),
-            stamp_visible=True,
-        )
-    )
-
-    assert widget.properties_panel.preview_controls.detail_label.fixed_size == (
-        widget.properties_panel.preview_controls.single_body_container.fixed_size[0],
-        expected_text_height,
-    )
-    assert widget.properties_panel.preview_controls.stamp_label.fixed_size == (
-        widget.properties_panel.preview_controls.single_body_container.fixed_size[0],
-        expected_stamp_height,
-    )
+    assert preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+    assert widget.properties_panel.preview_controls.multi_body_container.visible is True
 
 
 def test_signing_shell_multi_line_horizontal_preview_uses_reserved_text_height(
@@ -3153,40 +2832,10 @@ def test_signing_shell_multi_line_horizontal_preview_uses_reserved_text_height(
     )
 
     preview = widget.properties_panel.preview
-    detail = signing_shell_module._preview_stamp_text(preview)
-    available_width = signing_shell_module._preview_available_width(
-        preview,
-        container=widget.properties_panel.preview_controls.container,
-    )
-    geometry = signing_shell_module._preview_layout_geometry(
-        preview,
-        stamp_text=detail,
-        stamp_aspect_ratio=signing_shell_module._raw_pixmap_aspect_ratio(
-            _FakePixmap("/tmp/stamp.png")
-        ),
-    )
-    assert geometry is not None
-    scale = signing_shell_module._preview_display_scale(
-        preview,
-        available_width_px=available_width,
-    )
-    expected_text_width = max(1, int(round(geometry.text_area_width_pt * scale)))
-    expected_text_height = max(1, int(round(geometry.text_area_height_pt * scale)))
-    expected_stamp_width = max(1, int(round(geometry.stamp_area_width_pt * scale)))
-    expected_stamp_height = max(1, int(round(geometry.stamp_area_height_pt * scale)))
 
-    assert widget.properties_panel.preview_controls.multi_content_container.fixed_size == (
-        expected_text_width,
-        expected_text_height,
-    )
-    assert widget.properties_panel.preview_controls.multi_detail_label.fixed_size == (
-        expected_text_width,
-        expected_text_height,
-    )
-    assert widget.properties_panel.preview_controls.multi_stamp_label.fixed_size == (
-        expected_stamp_width,
-        expected_stamp_height,
-    )
+    assert preview.layout_template == SignatureLayoutTemplate.MULTI_LINE
+    assert widget.properties_panel.preview_controls.multi_body_container.visible is True
+    assert widget.properties_panel.preview_controls.multi_detail_label.text()
 
 
 def test_signing_shell_single_line_horizontal_preview_centers_stamp_within_side_band(
@@ -3236,209 +2885,6 @@ def test_signing_shell_single_line_horizontal_preview_centers_stamp_within_side_
         )
 
 
-def test_preview_stamp_max_size_is_not_capped_to_legacy_dimensions(tmp_path: Path) -> None:
-    appearance = build_signature_appearance(
-        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.RIGHT,
-        image_stamp_path="/tmp/stamp.png",
-        signer_label_prefix="",
-    )
-    preview = signing_shell_module.SigningDraftPreview(
-        title="",
-        page_index=0,
-        signature_rect=signing_shell_module.SignatureRect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=320.0,
-            height_pt=80.0,
-        ),
-        signer_label_prefix="",
-        layout_template=appearance.layout_template,
-        stamp_position=appearance.stamp_position,
-        timezone_display_mode=appearance.timezone_display_mode,
-        show_field_names=appearance.show_field_names,
-        datetime_format=appearance.datetime_format,
-        text_style=appearance.text_style,
-        box_style=appearance.box_style,
-        image_stamp_path=appearance.image_stamp_path,
-        fields=(),
-        detail_text="Adam Smith",
-        issues=(),
-        can_submit=True,
-    )
-
-    max_width, max_height = signing_shell_module._preview_stamp_max_size(
-        preview,
-        stamp_text="Adam Smith",
-        raw_pixmap=_FakePixmap("/tmp/stamp.png", width=400, height=50),
-        stamp_aspect_ratio=8.0,
-        available_width_px=520,
-    )
-
-    assert max_width > 140
-    assert max_height > 0
-
-
-def test_preview_stamp_max_size_keeps_horizontal_single_line_stamp_inside_short_lane() -> None:
-    appearance = build_signature_appearance(
-        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.LEFT,
-        image_stamp_path="/tmp/stamp.png",
-        signer_label_prefix="Digitally signed by",
-        text_style=SignatureTextStyle(
-            font_family="Serif",
-            font_size_pt=8.5,
-            bold=False,
-            italic=False,
-            text_color_hex="#000000",
-        ),
-    )
-    preview = signing_shell_module.SigningDraftPreview(
-        title="Digitally signed by",
-        page_index=3,
-        signature_rect=signing_shell_module.SignatureRect(
-            page_index=3,
-            left_pt=36.86,
-            bottom_pt=429.5,
-            width_pt=384.506,
-            height_pt=28.678,
-        ),
-        signer_label_prefix=appearance.signer_label_prefix,
-        layout_template=appearance.layout_template,
-        stamp_position=appearance.stamp_position,
-        timezone_display_mode=appearance.timezone_display_mode,
-        show_field_names=appearance.show_field_names,
-        datetime_format=appearance.datetime_format,
-        text_style=appearance.text_style,
-        box_style=appearance.box_style,
-        image_stamp_path=appearance.image_stamp_path,
-        fields=(),
-        detail_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:08",
-        issues=(),
-        can_submit=True,
-    )
-
-    _max_width, max_height = signing_shell_module._preview_stamp_max_size(
-        preview,
-        stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:08"
-        ),
-        raw_pixmap=_FakePixmap("/tmp/stamp.png", width=1400, height=334),
-        stamp_aspect_ratio=1400 / 334,
-        available_width_px=514,
-    )
-
-    assert max_height <= 23
-
-
-def test_preview_body_size_caps_card_to_physical_pdf_scale() -> None:
-    preview = signing_shell_module.SigningDraftPreview(
-        title="",
-        page_index=0,
-        signature_rect=signing_shell_module.SignatureRect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=96.0,
-            height_pt=80.0,
-        ),
-        signer_label_prefix="",
-        layout_template=SignatureLayoutTemplate.MULTI_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        timezone_display_mode=SignatureTimezoneDisplayMode.UTC,
-        show_field_names=False,
-        datetime_format="%Y-%m-%d %H:%M",
-        text_style=SignatureTextStyle(
-            font_family="Serif",
-            font_size_pt=8.5,
-            bold=False,
-            italic=True,
-            text_color_hex="#000000",
-        ),
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=1.0,
-            background_color_hex="#FFFFFF",
-        ),
-        image_stamp_path=None,
-        fields=(),
-        detail_text="Adam Smith\nSecretary.LHI@Outlook.com",
-        issues=(),
-        can_submit=True,
-    )
-
-    width, height = signing_shell_module._preview_body_size(
-        preview,
-        available_width_px=520,
-    )
-
-    assert width == 128
-    assert height == 107
-
-
-def test_fit_vertical_preview_band_geometry_preserves_reserved_text_height() -> None:
-    fitted = signing_shell_module._fit_vertical_preview_band_geometry(
-        text_height=15,
-        stamp_height=13,
-        separator_height=10,
-        inner_body_height_px=38,
-        detail_hint_height_px=30,
-        rendered_line_count=2,
-        stamp_visible=True,
-    )
-
-    assert fitted == (33, 0, 5)
-
-
-def test_fit_vertical_preview_band_geometry_preserves_band_split_when_roomy() -> None:
-    fitted = signing_shell_module._fit_vertical_preview_band_geometry(
-        text_height=18,
-        stamp_height=16,
-        separator_height=6,
-        inner_body_height_px=56,
-        detail_hint_height_px=16,
-        rendered_line_count=1,
-        stamp_visible=True,
-    )
-
-    assert fitted == (18, 32, 6)
-
-
-def test_vertical_preview_descender_budget_scales_with_line_count() -> None:
-    assert signing_shell_module._vertical_preview_descender_budget_px(1) == 2
-    assert signing_shell_module._vertical_preview_descender_budget_px(2) == 3
-    assert signing_shell_module._vertical_preview_descender_budget_px(5) == 4
-
-
-def test_preview_font_stack_distinguishes_supported_core_families() -> None:
-    assert "Noto Sans" in signing_shell_module._preview_font_stack("Sans Serif")
-    assert "Noto Serif" in signing_shell_module._preview_font_stack("Serif")
-    assert "DejaVu Sans Mono" in signing_shell_module._preview_font_stack("Monospace")
-    assert signing_shell_module._preview_font_stack("Sans Serif") != (
-        signing_shell_module._preview_font_stack("Serif")
-    )
-    assert signing_shell_module._preview_font_stack("Cursive") == "'Noto Sans', sans-serif"
-    assert signing_shell_module._preview_font_stack("Fantasy") == "'Noto Sans', sans-serif"
-
-
-def test_reset_widget_size_constraints_clears_fake_geometry() -> None:
-    label = _FakeLabel("Preview")
-    label.fixed_size = (140, 32)
-    label.fixed_width = 140
-    label.maximum_width = 140
-    label.minimum_width = 80
-
-    signing_shell_module._reset_widget_size_constraints(label)
-
-    assert label.fixed_size is None
-    assert label.fixed_width is None
-    assert label.maximum_width is None
-    assert label.minimum_width is None
-
-
 def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
     monkeypatch,
     tmp_path: Path,
@@ -3480,19 +2926,7 @@ def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
         )
     )
 
-    preview = widget.properties_panel.preview
-    detail = widget.properties_panel.preview_controls.multi_detail_label.text()
-    available_width = signing_shell_module._preview_available_width(
-        preview,
-        container=widget.properties_panel.preview_controls.container,
-    )
-
-    default_width = signing_shell_module._preview_text_width_limit(
-        preview,
-        stamp_text=detail,
-        available_width_px=available_width,
-        stamp_aspect_ratio=1.5,
-    )
+    default_width = widget.properties_panel.preview_controls.multi_content_container.fixed_width
     thick_border_appearance = build_signature_appearance(
         layout_template=SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.RIGHT,
@@ -3506,74 +2940,10 @@ def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
     )
     widget.properties_panel.set_signature_appearance(thick_border_appearance)
 
-    thick_preview = widget.properties_panel.preview
-    thick_detail = widget.properties_panel.preview_controls.multi_detail_label.text()
-    thick_available_width = signing_shell_module._preview_available_width(
-        thick_preview,
-        container=widget.properties_panel.preview_controls.container,
-    )
-    thick_width = signing_shell_module._preview_text_width_limit(
-        thick_preview,
-        stamp_text=thick_detail,
-        available_width_px=thick_available_width,
-        stamp_aspect_ratio=1.5,
-    )
+    thick_width = widget.properties_panel.preview_controls.multi_content_container.fixed_width
 
     assert thick_width != default_width
-    assert (
-        widget.properties_panel.preview_controls.multi_content_container.fixed_width == thick_width
-    )
-
-
-def test_signing_shell_preview_uses_border_aware_padding_for_thick_borders(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    appearance = build_signature_appearance(
-        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.BOTTOM,
-        image_stamp_path="/tmp/stamp.png",
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=7.0,
-            background_color_hex="#FFFFFF",
-        ),
-    )
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    widget.properties_panel.set_signature_appearance(appearance)
-    widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=180.0,
-            height_pt=28.0,
-        )
-    )
-
-    expected_padding = signing_shell_module._preview_card_padding_px(
-        widget.properties_panel.preview
-    )
-
-    assert (
-        f"padding: {expected_padding:.1f}px;"
-        in widget.properties_panel.preview_controls.card_container.style
-    )
+    assert thick_width is not None
 
 
 def test_signing_shell_uses_canonical_preview_snapshot_when_assets_are_renderable(

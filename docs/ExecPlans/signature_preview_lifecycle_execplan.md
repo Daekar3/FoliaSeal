@@ -13,7 +13,7 @@ This slice is intentionally narrow. It extracts only the preview/canonical-rende
 ## Child ExecPlan Dependencies
 
 - [x] `docs/ExecPlans/signature_properties_coordinator_execplan.md` completed first so preview migration is not mixed with certificate/preset reconciliation work.
-- [ ] A later child ExecPlan may extract the remaining `_preview_*` geometry and sizing helpers after this lifecycle boundary exists.
+- [x] A later child ExecPlan extracted the remaining preview geometry/layout handoff into `docs/ExecPlans/signature_preview_layout_execplan.md`.
 - [ ] A later child ExecPlan may simplify `SigningWorkspaceWidget` and broader shell composition once both the state boundary and preview boundary are in place.
 
 ## Progress
@@ -56,13 +56,13 @@ This slice is intentionally narrow. It extracts only the preview/canonical-rende
 
 This slice is now implemented. Canonical preview lifecycle ownership moved into `src/foliaseal/presentation/qt/signature_preview_lifecycle.py`, which now owns canonical render invocation, `QtPdfRenderBackend` reuse, pixmap loading, snapshot replacement/cleanup, and explicit disposal of the active snapshot on widget teardown.
 
-The shell is narrower but intentionally not fully decomposed. `SignaturePropertiesPanel` still owns preview controls, preview geometry helpers, and the final UI rendering/layout handoff, but it no longer owns the stateful canonical snapshot lifecycle. That reduced white-box pressure in `tests/unit/test_qt_signing_shell.py` and moved the brittle cleanup/reuse semantics into dedicated boundary tests.
+The shell is narrower but intentionally not fully decomposed. `SignaturePropertiesPanel` no longer owns the stateful canonical snapshot lifecycle, and a later slice moved preview geometry/layout handoff into `signature_preview_layout.py`. That reduced white-box pressure in `tests/unit/test_qt_signing_shell.py` and moved the brittle cleanup/reuse semantics into dedicated boundary tests.
 
 The compliance review surfaced one real defect: closing the shell root widget did not dispose the active preview snapshot after the first refactor pass. Wiring widget-destruction cleanup and adding direct disposal tests closed that gap before commit.
 
 ## Context and Orientation
 
-The signing UI still lives in `src/foliaseal/presentation/qt/signing_shell.py`. `SignaturePropertiesPanel` still owns the preview card UI, including textual preview labels, image-stamp placement, preview geometry helpers, and the final handoff of render state into the single-line or multi-line card. The panel uses `DefaultSignaturePropertiesCoordinator` for certificate/preset reconciliation and now delegates canonical preview lifecycle work to `src/foliaseal/presentation/qt/signature_preview_lifecycle.py`.
+The signing UI still lives in `src/foliaseal/presentation/qt/signing_shell.py`. `SignaturePropertiesPanel` still owns the preview card widget tree and orchestration. The panel uses `DefaultSignaturePropertiesCoordinator` for certificate/preset reconciliation, delegates canonical preview lifecycle work to `src/foliaseal/presentation/qt/signature_preview_lifecycle.py`, and now relies on `src/foliaseal/presentation/qt/signature_preview_layout.py` for preview geometry/layout handoff.
 
 The draft state source remains `src/foliaseal/application/signing_draft_workflow.py`. The panel asks the coordinator for a `SigningDraftPreview`, then uses that preview to drive both the textual preview controls and canonical preview rendering. The canonical snapshot renderer itself is defined in `src/foliaseal/application/signing_preview_renderer.py` as `render_canonical_signature_preview()`, which returns `CanonicalSignaturePreviewSnapshot`. That snapshot points at a temporary PNG file and includes structural bounds metadata used elsewhere in tests and evidence.
 
@@ -70,11 +70,11 @@ The new lifecycle module owns a reusable `QtPdfRenderBackend` instance and the a
 
 The main lifecycle assertions now live in `tests/unit/test_signature_preview_lifecycle.py`. Those tests assert that canonical preview rendering uses `include_border=True` and `flatten_to_white=False`, that replaced snapshots are cleaned up, that repeated refreshes keep only the latest snapshot directory, that one render backend is reused across refreshes, that `dispose()` cleans up the final snapshot, and that the lifecycle falls back cleanly when canonical rendering is unavailable. `tests/unit/test_qt_signing_shell.py` now keeps thinner shell-level checks for card chrome, scaled pixmap sizing, snapshot discoverability, and root-widget teardown cleanup.
 
-The architecture document in `docs/ARCHITECTURE.md` now records the implemented split: preview lifecycle responsibilities live behind `signature_preview_lifecycle.py`, while preview geometry helpers and final UI rendering remain in `signing_shell.py`.
+The architecture document in `docs/ARCHITECTURE.md` now records the implemented split: preview lifecycle responsibilities live behind `signature_preview_lifecycle.py`, preview geometry/layout responsibilities live behind `signature_preview_layout.py`, and the shell keeps widget assembly/orchestration.
 
 ## Plan of Work
 
-This slice is complete. `src/foliaseal/presentation/qt/signature_preview_lifecycle.py` defines `CanonicalPreviewRenderState` plus `QtCanonicalPreviewLifecycle`, which owns canonical render invocation, `QtPdfRenderBackend` reuse, pixmap loading, snapshot replacement/cleanup, and explicit disposal. `SignaturePropertiesPanel` now calls that boundary, stores the current snapshot on the card container for shell compatibility, and renders the returned state into the existing preview surfaces while keeping preview geometry helpers local.
+This slice is complete. `src/foliaseal/presentation/qt/signature_preview_lifecycle.py` defines `CanonicalPreviewRenderState` plus `QtCanonicalPreviewLifecycle`, which owns canonical render invocation, `QtPdfRenderBackend` reuse, pixmap loading, snapshot replacement/cleanup, and explicit disposal. `SignaturePropertiesPanel` now calls that boundary and stores the current snapshot on the card container for shell compatibility; preview geometry/layout application now lives separately in `signature_preview_layout.py`.
 
 The tests are now split across two layers. `tests/unit/test_signature_preview_lifecycle.py` covers the lifecycle boundary directly without a full shell widget. `tests/unit/test_qt_signing_shell.py` remains a thinner shell seam that proves the lifecycle result still lands correctly in the card UI and that widget teardown triggers cleanup.
 
@@ -111,7 +111,7 @@ Focused validation for the completed slice passed with:
 
 ## Idempotence and Recovery
 
-This refactor is safe to repeat because the lifecycle extraction can be introduced additively: add the new module and tests, wire the shell to call it, then trim redundant shell tests. If the shell preview breaks during rewiring, restore the previous direct call path for canonical rendering, keep the lifecycle tests, and move one responsibility at a time into the new boundary until the tests pass again.
+This refactor is safe to repeat because the lifecycle extraction can be introduced additively: add the new module and tests, wire the shell to call it, then trim redundant shell tests. If the shell preview breaks during rewiring, restore the previous direct call path for canonical rendering, keep the lifecycle tests, and move one responsibility at a time into the new boundary until the tests pass again. Later preview-layout extraction does not change the lifecycle contract described here.
 
 If the lifecycle tests start depending on full Qt widget trees, reduce them back to binding-level fakes and move any purely widget-composition assertion to the shell smoke tests. If a snapshot cleanup failure leaves temporary directories behind during test development, delete only the test-created `foliaseal-canonical-preview-*` directories under `tmp_path` and rerun the focused tests.
 
@@ -123,8 +123,8 @@ Current lifecycle evidence:
     - QtCanonicalPreviewLifecycle owns canonical render invocation, QtPdfRenderBackend reuse, snapshot replacement/cleanup, pixmap loading, and disposal.
 
     src/foliaseal/presentation/qt/signing_shell.py
-    - refresh_preview() loads coordinator state, updates preview widgets, and invokes the lifecycle boundary through _apply_canonical_preview_render().
-    - the shell root widget and panel widget both dispose the lifecycle on destruction.
+    - refresh_preview() loads coordinator state, orchestrates preview layout planning/application, and invokes the lifecycle boundary.
+    - the shell root widget and panel widget both use close-aware cleanup so lifecycle disposal runs on normal close paths as well as destruction.
 
     tests/unit/test_signature_preview_lifecycle.py
     - pins render params, backend reuse, replacement cleanup, repeated-refresh retention, fallback for both invalid previews and unavailable Qt render backends, and dispose cleanup.
@@ -158,7 +158,7 @@ The preview-lifecycle boundary now lives in `src/foliaseal/presentation/qt/signa
 
         def dispose(self) -> None: ...
 
-The concrete implementation uses `render_canonical_signature_preview()` from `src/foliaseal/application/signing_preview_renderer.py`, holds one reusable `QtPdfRenderBackend`, loads the Qt pixmap through the existing binding object, and owns cleanup of temporary `foliaseal-canonical-preview-*` directories when replacing or disposing a snapshot. `SignaturePropertiesPanel` remains responsible for `_preview_*` geometry helpers, text/stamp placement, and choosing whether to attach the render result to the single-line or multi-line preview surface.
+The concrete implementation uses `render_canonical_signature_preview()` from `src/foliaseal/application/signing_preview_renderer.py`, holds one reusable `QtPdfRenderBackend`, loads the Qt pixmap through the existing binding object, and owns cleanup of temporary `foliaseal-canonical-preview-*` directories when replacing or disposing a snapshot. `QtSignaturePreviewLayout` now handles geometry, text/stamp placement, and choosing whether to attach the render result to the single-line or multi-line preview surface.
 
 Change note: 2026-05-22 / Codex
 
