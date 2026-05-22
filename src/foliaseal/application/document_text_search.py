@@ -95,6 +95,9 @@ class DocumentTextSearchSession:
             return None
         return self._matches[self._current_index].page_index
 
+    def current_state(self) -> DocumentTextSearchState:
+        return self._build_state()
+
     def _build_state(self) -> DocumentTextSearchState:
         if self._error_detail is not None:
             return DocumentTextSearchState(

@@ -437,6 +437,71 @@ def test_overlay_corner_handle_resizes_persistent_signature_overlay(monkeypatch)
     assert normalized.y2 > normalized.y1
 
 
+def test_text_interaction_mode_ignores_signature_overlay_resize_handles(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    errors = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_error=errors.append,
+    )
+    preview.refresh()
+    preview.set_interaction_mode("text")
+    preview.set_signature_overlay(
+        SignatureRect(
+            page_index=0,
+            left_pt=20.0,
+            bottom_pt=30.0,
+            width_pt=40.0,
+            height_pt=20.0,
+        )
+    )
+
+    view_rect = pdf_rect_to_view_rect(
+        pdf_rect=PdfRect(x1=20.0, y1=30.0, x2=60.0, y2=50.0),
+        transform=ViewTransform(zoom=1.0, pan_x=0.0, pan_y=0.0),
+        page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+        rotation=0,
+    )
+
+    preview.mousePressEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x1),
+            y=int(view_rect.y1),
+        )
+    )
+    preview.mouseMoveEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x1 + 10),
+            y=int(view_rect.y1 + 8),
+        )
+    )
+    preview.mouseReleaseEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=int(view_rect.x1 + 10),
+            y=int(view_rect.y1 + 8),
+        )
+    )
+
+    assert errors == []
+    assert len(selected) == 1
+    normalized = selected[0].normalized()
+    assert normalized.x1 == 20.0
+    assert normalized.y1 == 22.0
+    assert normalized.x2 == 30.0
+    assert normalized.y2 == 30.0
+
+
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 

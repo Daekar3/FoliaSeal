@@ -28,6 +28,11 @@ from foliaseal.application.document_text_search import (
     DocumentTextSearchSession,
     DocumentTextSearchState,
 )
+from foliaseal.application.document_text_selection import (
+    DocumentTextSelectionEngine,
+    DocumentTextSelectionSession,
+    DocumentTextSelectionState,
+)
 from foliaseal.application.signature_font_registry import (
     validate_signature_font_request,
 )
@@ -68,6 +73,7 @@ from foliaseal.infra.config.schemas import (
     SignaturePresetCatalog,
 )
 from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
+from foliaseal.infra.document_text_selection import QtPdfDocumentTextSelectionEngine
 from foliaseal.presentation.qt.signature_preview_layout import (
     QtSignaturePreviewLayout,
     _ensure_preview_fonts_registered,
@@ -170,7 +176,7 @@ class DocumentReviewControls:
 
 @dataclass(frozen=True)
 class DocumentTextControls:
-    """Read-only widgets that expose document text search and copy-current-hit."""
+    """Read-only widgets that expose document text review actions."""
 
     container: Any
     query_input: Any
@@ -178,6 +184,9 @@ class DocumentTextControls:
     previous_button: Any
     next_button: Any
     copy_button: Any
+    select_mode_checkbox: Any
+    copy_selection_button: Any
+    clear_selection_button: Any
     status_label: Any
     detail_label: Any
 
@@ -1760,6 +1769,7 @@ class SigningWorkspaceWidget:
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         document_review_inspector: DocumentReviewInspector | None = None,
+        document_text_selection_engine: DocumentTextSelectionEngine | None = None,
         document_text_search_engine: DocumentTextSearchEngine | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
@@ -1781,11 +1791,17 @@ class SigningWorkspaceWidget:
             document_review_inspector or PyHankoDocumentReviewInspector()
         )
         self._document_review_summary: DocumentReviewSummary | None = None
+        self._document_text_selection_session = DocumentTextSelectionSession(
+            input_pdf_path=viewer_workflow.document_path,
+            selection_engine=document_text_selection_engine
+            or QtPdfDocumentTextSelectionEngine(),
+        )
         self._document_text_search_session = DocumentTextSearchSession(
             input_pdf_path=viewer_workflow.document_path,
             search_engine=document_text_search_engine or QtPdfDocumentTextSearchEngine(),
         )
         self._on_copy_text = on_copy_text
+        self._document_text_selection_mode_enabled = False
         if app_settings is not None:
             self._app_settings = app_settings
         elif app_settings_store is not None:
@@ -1895,6 +1911,15 @@ class SigningWorkspaceWidget:
         )
         self.widget.document_text_next_button = self._document_text_controls.next_button  # type: ignore[attr-defined]
         self.widget.document_text_copy_button = self._document_text_controls.copy_button  # type: ignore[attr-defined]
+        self.widget.document_text_select_mode_checkbox = (  # type: ignore[attr-defined]
+            self._document_text_controls.select_mode_checkbox
+        )
+        self.widget.document_text_copy_selection_button = (  # type: ignore[attr-defined]
+            self._document_text_controls.copy_selection_button
+        )
+        self.widget.document_text_clear_selection_button = (  # type: ignore[attr-defined]
+            self._document_text_controls.clear_selection_button
+        )
         self.widget.document_text_status_label = (  # type: ignore[attr-defined]
             self._document_text_controls.status_label
         )
@@ -1912,6 +1937,11 @@ class SigningWorkspaceWidget:
         self.widget.copy_current_document_text_match = (  # type: ignore[attr-defined]
             self.copy_current_document_text_match
         )
+        self.widget.set_document_text_selection_mode = (  # type: ignore[attr-defined]
+            self.set_document_text_selection_mode
+        )
+        self.widget.copy_selected_document_text = self.copy_selected_document_text  # type: ignore[attr-defined]
+        self.widget.clear_selected_document_text = self.clear_selected_document_text  # type: ignore[attr-defined]
         self.widget.apply_app_settings = self.apply_app_settings  # type: ignore[attr-defined]
         self.widget.set_logical_page_index = self.set_logical_page_index  # type: ignore[attr-defined]
         self.widget.logical_page_index = self.logical_page_index  # type: ignore[attr-defined]
@@ -1935,6 +1965,7 @@ class SigningWorkspaceWidget:
         self.refresh_viewer()
         self.refresh_document_review()
         self._apply_document_text_state(self._document_text_search_session.search(""))
+        self._apply_document_text_selection_state(self._document_text_selection_session.clear())
         self._refresh_sign_button_state()
 
     @property
@@ -1989,6 +2020,38 @@ class SigningWorkspaceWidget:
             return None
         self._on_copy_text(copy_text)
         return copy_text
+
+    def set_document_text_selection_mode(self, enabled: bool) -> bool:
+        enabled = bool(enabled)
+        self._document_text_selection_mode_enabled = enabled
+        setter = getattr(self._viewer_widget, "set_interaction_mode", None)
+        if callable(setter):
+            setter("text" if enabled else "signature")
+        checkbox = self._document_text_controls.select_mode_checkbox
+        is_checked = getattr(checkbox, "isChecked", None)
+        if callable(is_checked) and bool(is_checked()) != enabled:
+            checkbox.setChecked(enabled)
+        if not enabled:
+            self._apply_document_text_selection_state(
+                self._document_text_selection_session.clear(),
+                update_labels=False,
+            )
+            self._clear_document_text_highlight_overlay()
+            self._apply_document_text_state(self._document_text_search_session.current_state())
+        return enabled
+
+    def copy_selected_document_text(self) -> str | None:
+        copy_text = self._document_text_selection_session.current_copy_text()
+        if copy_text is None or self._on_copy_text is None:
+            return None
+        self._on_copy_text(copy_text)
+        return copy_text
+
+    def clear_selected_document_text(self) -> DocumentTextSelectionState:
+        state = self._document_text_selection_session.clear()
+        self._apply_document_text_selection_state(state)
+        self._clear_document_text_highlight_overlay()
+        return state
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         """Apply new app-level settings to the live shell state."""
@@ -2173,6 +2236,9 @@ class SigningWorkspaceWidget:
         self._set_sign_result_text("")
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
+        if self._document_text_selection_mode_enabled:
+            self._handle_document_text_selection(pdf_rect)
+            return
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
         page_index = (
             snapshot.page_index
@@ -2197,6 +2263,29 @@ class SigningWorkspaceWidget:
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
         self._refresh_flow_summary()
+
+    def _handle_document_text_selection(self, pdf_rect: PdfRect) -> None:
+        snapshot = getattr(self._viewer_workflow, "snapshot", None)
+        page_index = (
+            snapshot.page_index
+            if snapshot is not None
+            else self._viewer_workflow.session.current_page
+        )
+        state = self._document_text_selection_session.select(
+            page_index=page_index,
+            selection_rect=pdf_rect.normalized(),
+        )
+        self._apply_document_text_selection_state(state)
+        selection = state.selection
+        if selection is None:
+            self._clear_document_text_highlight_overlay()
+            return
+        setter = getattr(self._viewer_widget, "set_text_highlight_overlay", None)
+        if callable(setter):
+            setter(
+                page_index=selection.page_index,
+                highlight_rects=selection.highlight_rects,
+            )
 
     def _handle_viewer_error(self, message: str) -> None:
         self._emit_error(message)
@@ -2341,9 +2430,14 @@ class SigningWorkspaceWidget:
         previous_button = self._bindings.q_push_button("Previous")
         next_button = self._bindings.q_push_button("Next")
         copy_button = self._bindings.q_push_button("Copy result")
+        select_mode_checkbox = self._bindings.q_check_box("Select text")
+        copy_selection_button = self._bindings.q_push_button("Copy selection")
+        clear_selection_button = self._bindings.q_push_button("Clear selection")
         previous_button.setEnabled(False)
         next_button.setEnabled(False)
         copy_button.setEnabled(False)
+        copy_selection_button.setEnabled(False)
+        clear_selection_button.setEnabled(False)
         controls_row = _compose_row(
             self._bindings,
             query_input,
@@ -2351,6 +2445,12 @@ class SigningWorkspaceWidget:
             previous_button,
             next_button,
             copy_button,
+        )
+        selection_row = _compose_row(
+            self._bindings,
+            select_mode_checkbox,
+            copy_selection_button,
+            clear_selection_button,
         )
         status_label = self._bindings.q_label("")
         detail_label = self._bindings.q_label("")
@@ -2365,7 +2465,13 @@ class SigningWorkspaceWidget:
         previous_button.clicked.connect(self.previous_document_text_match)  # type: ignore[attr-defined]
         next_button.clicked.connect(self.next_document_text_match)  # type: ignore[attr-defined]
         copy_button.clicked.connect(self.copy_current_document_text_match)  # type: ignore[attr-defined]
+        select_mode_checkbox.stateChanged.connect(  # type: ignore[attr-defined]
+            lambda state: self.set_document_text_selection_mode(bool(state))
+        )
+        copy_selection_button.clicked.connect(self.copy_selected_document_text)  # type: ignore[attr-defined]
+        clear_selection_button.clicked.connect(self.clear_selected_document_text)  # type: ignore[attr-defined]
         layout.addWidget(controls_row)
+        layout.addWidget(selection_row)
         layout.addWidget(status_label)
         layout.addWidget(detail_label)
         return DocumentTextControls(
@@ -2375,6 +2481,9 @@ class SigningWorkspaceWidget:
             previous_button=previous_button,
             next_button=next_button,
             copy_button=copy_button,
+            select_mode_checkbox=select_mode_checkbox,
+            copy_selection_button=copy_selection_button,
+            clear_selection_button=clear_selection_button,
             status_label=status_label,
             detail_label=detail_label,
         )
@@ -2387,6 +2496,25 @@ class SigningWorkspaceWidget:
         self._document_text_controls.copy_button.setEnabled(
             state.can_copy and self._on_copy_text is not None
         )
+
+    def _apply_document_text_selection_state(
+        self,
+        state: DocumentTextSelectionState,
+        *,
+        update_labels: bool = True,
+    ) -> None:
+        self._document_text_controls.copy_selection_button.setEnabled(
+            state.can_copy and self._on_copy_text is not None
+        )
+        self._document_text_controls.clear_selection_button.setEnabled(state.can_clear)
+        if update_labels:
+            self._document_text_controls.status_label.setText(state.status_text)
+            self._document_text_controls.detail_label.setText(state.detail_text)
+
+    def _clear_document_text_highlight_overlay(self) -> None:
+        clearer = getattr(self._viewer_widget, "clear_text_highlight_overlay", None)
+        if callable(clearer):
+            clearer()
 
     def _show_document_text_match(self, state: DocumentTextSearchState) -> None:
         current_match = state.current_match
@@ -2477,6 +2605,7 @@ class SigningShellAdapter:
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         document_review_inspector: DocumentReviewInspector | None = None,
+        document_text_selection_engine: DocumentTextSelectionEngine | None = None,
         document_text_search_engine: DocumentTextSearchEngine | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
@@ -2498,6 +2627,7 @@ class SigningShellAdapter:
             app_settings=app_settings,
             app_settings_store=app_settings_store,
             document_review_inspector=document_review_inspector,
+            document_text_selection_engine=document_text_selection_engine,
             document_text_search_engine=document_text_search_engine,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
@@ -2569,6 +2699,7 @@ def build_qt_signing_shell(
     app_settings: AppSettings | None = None,
     app_settings_store: AppSettingsStore | None = None,
     document_review_inspector: DocumentReviewInspector | None = None,
+    document_text_selection_engine: DocumentTextSelectionEngine | None = None,
     document_text_search_engine: DocumentTextSearchEngine | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
@@ -2591,6 +2722,7 @@ def build_qt_signing_shell(
         app_settings=app_settings,
         app_settings_store=app_settings_store,
         document_review_inspector=document_review_inspector,
+        document_text_selection_engine=document_text_selection_engine,
         document_text_search_engine=document_text_search_engine,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,

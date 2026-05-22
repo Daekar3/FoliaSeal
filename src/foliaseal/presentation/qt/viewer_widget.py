@@ -76,6 +76,9 @@ class PdfViewerWidgetAdapter:
                 self._overlay_drag_offset_y = 0.0
                 self._overlay_handle_half_size = 6.0
                 self._overlay_min_span_px = 8.0
+                self._interaction_mode = "signature"
+                self._text_highlight_page_index: int | None = None
+                self._text_highlight_rects: tuple[PdfRect, ...] = ()
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
                 start_time = perf_counter() if elapsed_ms is None else None
@@ -108,6 +111,15 @@ class PdfViewerWidgetAdapter:
 
                     if self._pixmap is not None:
                         painter.drawPixmap(0, 0, self._pixmap)
+
+                    if callable(fill_rect):
+                        for highlight_rect in self._current_text_highlight_qrects():
+                            fill_rect(
+                                highlight_rect.normalized(),
+                                bindings.q_color(255, 235, 59, 96),
+                            )
+                            painter.setPen(bindings.q_pen(bindings.q_color(245, 158, 11), 1))
+                            painter.drawRect(highlight_rect.normalized())
 
                     if self._selection_rect is not None:
                         painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
@@ -233,26 +245,27 @@ class PdfViewerWidgetAdapter:
                 if event.button() != bindings.qt.LeftButton:
                     return super().mousePressEvent(event)
                 point = event.position()
-                overlay_rect = self._current_overlay_view_rect()
-                if overlay_rect is not None:
-                    handle = self._hit_test_overlay_handle(overlay_rect, point)
-                    if handle is not None:
-                        self._overlay_drag_handle = handle
-                        self._overlay_drag_start_view_rect = overlay_rect
-                        handle_x, handle_y = self._overlay_handle_target(overlay_rect, handle)
-                        self._overlay_drag_offset_x = float(point.x()) - handle_x
-                        self._overlay_drag_offset_y = float(point.y()) - handle_y
-                        self._overlay_drag_view_rect = self._overlay_resize_view_rect(
-                            overlay_rect=overlay_rect,
-                            handle=handle,
-                            current_x=handle_x,
-                            current_y=handle_y,
-                        )
-                        self._selection_rect = None
-                        self.grabMouse()
-                        self.update()
-                        event.accept()
-                        return
+                if self._interaction_mode == "signature":
+                    overlay_rect = self._current_overlay_view_rect()
+                    if overlay_rect is not None:
+                        handle = self._hit_test_overlay_handle(overlay_rect, point)
+                        if handle is not None:
+                            self._overlay_drag_handle = handle
+                            self._overlay_drag_start_view_rect = overlay_rect
+                            handle_x, handle_y = self._overlay_handle_target(overlay_rect, handle)
+                            self._overlay_drag_offset_x = float(point.x()) - handle_x
+                            self._overlay_drag_offset_y = float(point.y()) - handle_y
+                            self._overlay_drag_view_rect = self._overlay_resize_view_rect(
+                                overlay_rect=overlay_rect,
+                                handle=handle,
+                                current_x=handle_x,
+                                current_y=handle_y,
+                            )
+                            self._selection_rect = None
+                            self.grabMouse()
+                            self.update()
+                            event.accept()
+                            return
                 self._drag_origin = point.toPoint()
                 self._selection_rect = bindings.q_rect(self._drag_origin, self._drag_origin)
                 self.update()
@@ -353,6 +366,26 @@ class PdfViewerWidgetAdapter:
             def clear_signature_overlay(self) -> None:
                 self._overlay_signature_rect = None
                 self.update()
+
+            def set_text_highlight_overlay(
+                self,
+                *,
+                page_index: int,
+                highlight_rects: tuple[PdfRect, ...],
+            ) -> None:
+                self._text_highlight_page_index = page_index
+                self._text_highlight_rects = tuple(highlight_rects)
+                self.update()
+
+            def clear_text_highlight_overlay(self) -> None:
+                self._text_highlight_page_index = None
+                self._text_highlight_rects = ()
+                self.update()
+
+            def set_interaction_mode(self, mode: str) -> None:
+                if mode not in {"signature", "text"}:
+                    raise ValueError(f"Unsupported viewer interaction mode: {mode}")
+                self._interaction_mode = mode
 
             def attach_scroll_container(self, scroll_container: Any) -> None:
                 self._scroll_container = scroll_container
@@ -486,6 +519,32 @@ class PdfViewerWidgetAdapter:
                     bindings.q_point(int(view_rect.x1), int(view_rect.y1)),
                     bindings.q_point(int(view_rect.x2), int(view_rect.y2)),
                 )
+
+            def _current_text_highlight_qrects(self) -> tuple[Any, ...]:
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None:
+                    return ()
+                if self._text_highlight_page_index != snapshot.page_index:
+                    return ()
+                highlight_rects: list[Any] = []
+                for pdf_rect in self._text_highlight_rects:
+                    view_rect = pdf_rect_to_view_rect(
+                        pdf_rect=pdf_rect,
+                        transform=ViewTransform(
+                            zoom=snapshot.zoom,
+                            pan_x=snapshot.pan_x,
+                            pan_y=snapshot.pan_y,
+                        ),
+                        page_box=snapshot.page_box,
+                        rotation=snapshot.rotation,
+                    )
+                    highlight_rects.append(
+                        bindings.q_rect(
+                            bindings.q_point(int(view_rect.x1), int(view_rect.y1)),
+                            bindings.q_point(int(view_rect.x2), int(view_rect.y2)),
+                        )
+                    )
+                return tuple(highlight_rects)
 
             def _current_page_view_bounds(self) -> ViewRect | None:
                 snapshot = getattr(self._workflow, "snapshot", None)
@@ -740,5 +799,22 @@ def build_qt_pdf_viewer_widget(
 
         def clear_signature_overlay(self) -> None:
             preview_widget.clear_signature_overlay()
+
+        def set_text_highlight_overlay(
+            self,
+            *,
+            page_index: int,
+            highlight_rects: tuple[PdfRect, ...],
+        ) -> None:
+            preview_widget.set_text_highlight_overlay(
+                page_index=page_index,
+                highlight_rects=highlight_rects,
+            )
+
+        def clear_text_highlight_overlay(self) -> None:
+            preview_widget.clear_text_highlight_overlay()
+
+        def set_interaction_mode(self, mode: str) -> None:
+            preview_widget.set_interaction_mode(mode)
 
     return ScrollablePdfViewer()

@@ -10,6 +10,7 @@ from foliaseal.application import (
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.document_text_search import DocumentTextMatch
+from foliaseal.application.document_text_selection import DocumentTextSelection
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
@@ -456,6 +457,9 @@ class _FakeViewerWidget(_FakeWidget):
         self.on_interaction = on_interaction
         self.refresh_calls = []
         self.overlay_signature_rect = None
+        self.text_highlight_page_index = None
+        self.text_highlight_rects = ()
+        self.interaction_mode = "signature"
 
     def refresh(self, *, elapsed_ms=None, navigation=False):
         self.refresh_calls.append((elapsed_ms, navigation))
@@ -470,6 +474,17 @@ class _FakeViewerWidget(_FakeWidget):
 
     def clear_signature_overlay(self):
         self.overlay_signature_rect = None
+
+    def set_text_highlight_overlay(self, *, page_index, highlight_rects):
+        self.text_highlight_page_index = page_index
+        self.text_highlight_rects = tuple(highlight_rects)
+
+    def clear_text_highlight_overlay(self):
+        self.text_highlight_page_index = None
+        self.text_highlight_rects = ()
+
+    def set_interaction_mode(self, mode):
+        self.interaction_mode = mode
 
 
 class _FakeSigningExecutor:
@@ -503,6 +518,20 @@ class _FakeDocumentTextSearchEngine:
     def search(self, input_pdf_path: str, query: str) -> tuple[DocumentTextMatch, ...]:
         self.calls.append((input_pdf_path, query))
         return self.matches_by_query.get(query, ())
+
+
+class _FakeDocumentTextSelectionEngine:
+    def __init__(
+        self,
+        *,
+        selection: DocumentTextSelection | None = None,
+    ) -> None:
+        self.selection = selection
+        self.calls = []
+
+    def select(self, input_pdf_path: str, *, page_index: int, selection_rect: PdfRect):
+        self.calls.append((input_pdf_path, page_index, selection_rect))
+        return self.selection
 
 
 class _FakeClipboard:
@@ -1128,6 +1157,124 @@ def test_signing_shell_document_text_search_uses_default_qt_clipboard_callback(
     widget.document_text_copy_button.click()
 
     assert clipboard.values == ["Alice"]
+
+
+def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    selection_engine = _FakeDocumentTextSelectionEngine(
+        selection=DocumentTextSelection(
+            page_index=0,
+            text="Alice Example",
+            highlight_rects=(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),),
+        )
+    )
+    copied_text = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_text_selection_engine=selection_engine,
+        on_copy_text=copied_text.append,
+    )
+
+    widget.document_text_select_mode_checkbox.setChecked(True)
+
+    assert widget.viewer_widget.interaction_mode == "text"
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
+
+    assert selection_engine.calls == [
+        ("/tmp/sample.pdf", 0, PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
+    ]
+    assert widget.document_text_status_label.text() == "Selected text on page 1."
+    assert widget.document_text_detail_label.text() == "Alice Example"
+    assert widget.viewer_widget.text_highlight_page_index == 0
+    assert widget.viewer_widget.text_highlight_rects == (
+        PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),
+    )
+
+    widget.document_text_copy_selection_button.click()
+
+    assert copied_text == ["Alice Example"]
+
+    widget.document_text_clear_selection_button.click()
+
+    assert widget.viewer_widget.text_highlight_page_index is None
+    assert widget.viewer_widget.text_highlight_rects == ()
+    assert widget.document_text_copy_selection_button._enabled is False
+
+    widget.document_text_select_mode_checkbox.setChecked(False)
+    widget.viewer_widget.emit_selection(PdfRect(x1=1.0, y1=2.0, x2=3.0, y2=4.0))
+
+    assert widget.viewer_widget.interaction_mode == "signature"
+    assert widget.signature_rect() is not None
+    assert widget.signature_rect().left_pt == 1.0
+
+
+def test_signing_shell_restores_search_state_when_text_selection_mode_is_disabled(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    search_engine = _FakeDocumentTextSearchEngine(
+        {
+            "Alice": (
+                DocumentTextMatch(
+                    page_index=1,
+                    start_index=5,
+                    end_index=10,
+                    text="Alice",
+                    context="Signed by Alice Example on page two",
+                ),
+            ),
+        }
+    )
+    selection_engine = _FakeDocumentTextSelectionEngine(
+        selection=DocumentTextSelection(
+            page_index=1,
+            text="Alice Example",
+            highlight_rects=(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),),
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_text_search_engine=search_engine,
+        document_text_selection_engine=selection_engine,
+    )
+
+    widget.document_text_query_input.setText("Alice")
+    widget.document_text_find_button.click()
+    widget.document_text_select_mode_checkbox.setChecked(True)
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
+
+    assert widget.document_text_status_label.text() == "Selected text on page 2."
+
+    widget.document_text_select_mode_checkbox.setChecked(False)
+
+    assert widget.document_text_status_label.text() == "Found 1 matches for 'Alice'."
+    assert "Showing 1 of 1 on page 2" in widget.document_text_detail_label.text()
+    assert widget.viewer_widget.text_highlight_rects == ()
 
 
 def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_changes(
