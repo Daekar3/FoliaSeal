@@ -296,6 +296,34 @@ def test_preview_lifecycle_falls_back_when_rendering_is_unavailable(tmp_path: Pa
     assert lifecycle.current_snapshot() is None
 
 
+def test_preview_lifecycle_falls_back_when_qt_render_backend_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    def _render_snapshot(preview, **kwargs):
+        raise RuntimeError("QtPdf backend unavailable")
+
+    lifecycle = QtCanonicalPreviewLifecycle(
+        q_pixmap=_FakePixmap,
+        qt=_FakeQt,
+        render_backend_factory=_FakeRenderBackend,
+        render_snapshot=_render_snapshot,
+    )
+
+    state = lifecycle.refresh(
+        preview=_workflow(tmp_path).preview(),
+        preview_scale=1.0,
+        inner_body_width=100,
+        inner_body_height=50,
+        fallback_card_style="fallback-style",
+    )
+
+    assert state.snapshot is None
+    assert state.pixmap is None
+    assert state.card_style == "fallback-style"
+    assert state.render_label_visible is False
+    assert lifecycle.current_snapshot() is None
+
+
 def test_preview_lifecycle_cleans_up_last_snapshot_on_dispose(tmp_path: Path) -> None:
     image_dir = tmp_path / "foliaseal-canonical-preview-final"
     image_dir.mkdir()

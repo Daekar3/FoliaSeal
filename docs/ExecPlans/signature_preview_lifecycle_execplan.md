@@ -127,7 +127,7 @@ Current lifecycle evidence:
     - the shell root widget and panel widget both dispose the lifecycle on destruction.
 
     tests/unit/test_signature_preview_lifecycle.py
-    - pins render params, backend reuse, replacement cleanup, repeated-refresh retention, ValueError fallback, and dispose cleanup.
+    - pins render params, backend reuse, replacement cleanup, repeated-refresh retention, fallback for both invalid previews and unavailable Qt render backends, and dispose cleanup.
 
     tests/unit/test_qt_signing_shell.py
     - proves the shell still exposes the current snapshot, sizes the render label/body to the scaled pixmap, suppresses card chrome when canonical preview is active, and cleans up the active snapshot on widget close.

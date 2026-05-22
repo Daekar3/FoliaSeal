@@ -68,7 +68,7 @@ class QtCanonicalPreviewLifecycle:
                 include_border=True,
                 flatten_to_white=False,
             )
-        except ValueError:
+        except (RuntimeError, ValueError):
             snapshot = None
         self._replace_snapshot(snapshot)
         if snapshot is None:
