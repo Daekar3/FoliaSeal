@@ -12,8 +12,8 @@ This slice is intentionally narrow. It introduced the coordinator/state boundary
 
 ## Child ExecPlan Dependencies
 
-- [x] A later child ExecPlan moved canonical preview lifecycle management into `docs/ExecPlans/signature_preview_lifecycle_execplan.md`; preview-layout orchestration remains for later work.
-- [ ] A later child ExecPlan may simplify `SigningWorkspaceWidget` and `app_frame.py` refresh seams after callers depend on the new coordinator contract instead of widget internals.
+- [x] A later child ExecPlan moved canonical preview lifecycle management into `docs/ExecPlans/signature_preview_lifecycle_execplan.md`; preview-layout orchestration remained for later work at that point.
+- [x] A later child ExecPlan tightened `SigningWorkspaceWidget` and `app_frame.py` refresh seams into public shell entrypoints in `docs/ExecPlans/app_frame_shell_public_seam_execplan.md`.
 
 ## Progress
 

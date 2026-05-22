@@ -1862,6 +1862,7 @@ class SigningWorkspaceWidget:
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.refresh_document_review = self.refresh_document_review  # type: ignore[attr-defined]
+        self.widget.apply_app_settings = self.apply_app_settings  # type: ignore[attr-defined]
         self.widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
         self.widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
             self.refresh_certificate_configurations
@@ -1900,6 +1901,11 @@ class SigningWorkspaceWidget:
         self._document_review_controls.headline_label.setText(summary.headline)
         self._document_review_controls.detail_label.setText(summary.detail)
         return summary
+
+    def apply_app_settings(self, settings: AppSettings) -> None:
+        """Apply new app-level settings to the live shell state."""
+        self._app_settings = settings
+        self.widget.app_settings = settings  # type: ignore[attr-defined]
 
     def submit_sign_request(self) -> SigningRequest | None:
         self.properties_panel.apply_changes()
@@ -2063,10 +2069,6 @@ class SigningWorkspaceWidget:
         self._sync_signature_overlay()
         self._refresh_sign_button_state()
         self._refresh_flow_summary()
-
-    def _handle_app_settings_change(self, settings: AppSettings) -> None:
-        self._app_settings = settings
-        self.widget.app_settings = settings  # type: ignore[attr-defined]
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh shell controls."""

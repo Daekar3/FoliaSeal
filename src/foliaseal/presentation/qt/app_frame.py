@@ -1001,9 +1001,7 @@ class FoliaSealAppFrame:
         shell = self._current_shell
         if shell is None:
             return
-        shell.app_settings = settings  # type: ignore[attr-defined]
-        workspace = getattr(shell, "_signing_workspace", None)
-        update_settings = getattr(workspace, "_handle_app_settings_change", None)
+        update_settings = getattr(shell, "apply_app_settings", None)
         if callable(update_settings):
             update_settings(settings)
 
@@ -1012,11 +1010,6 @@ class FoliaSealAppFrame:
         if shell is None:
             return
         refresh = getattr(shell, "refresh_certificate_configurations", None)
-        if callable(refresh):
-            refresh()
-            return
-        workspace = getattr(shell, "_signing_workspace", None)
-        refresh = getattr(workspace, "refresh_certificate_configurations", None)
         if callable(refresh):
             refresh()
 
