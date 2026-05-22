@@ -9,6 +9,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import DocumentReviewSummary
+from foliaseal.application.document_text_search import DocumentTextMatch
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
@@ -489,6 +490,27 @@ class _FakeDocumentReviewInspector:
     def inspect(self, input_pdf_path: str) -> DocumentReviewSummary:
         self.calls.append(input_pdf_path)
         return self.summary
+
+
+class _FakeDocumentTextSearchEngine:
+    def __init__(
+        self,
+        matches_by_query: dict[str, tuple[DocumentTextMatch, ...]] | None = None,
+    ) -> None:
+        self.matches_by_query = matches_by_query or {}
+        self.calls = []
+
+    def search(self, input_pdf_path: str, query: str) -> tuple[DocumentTextMatch, ...]:
+        self.calls.append((input_pdf_path, query))
+        return self.matches_by_query.get(query, ())
+
+
+class _FakeClipboard:
+    def __init__(self) -> None:
+        self.values = []
+
+    def setText(self, value):  # noqa: N802
+        self.values.append(value)
 
 
 def _fake_bindings() -> QtSigningWidgetBindings:
@@ -985,6 +1007,127 @@ def test_signing_shell_shows_document_review_summary_from_injected_inspector(
     assert widget.document_review_headline_label.text() == "Signature review"
     assert "Found 1 embedded signature." in widget.document_review_detail_label.text()
     assert "Latest signer: CN=Alice Example." in widget.document_review_detail_label.text()
+
+
+def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    search_engine = _FakeDocumentTextSearchEngine(
+        {
+            "Alice": (
+                DocumentTextMatch(
+                    page_index=1,
+                    start_index=5,
+                    end_index=10,
+                    text="Alice",
+                    context="Signed by Alice Example on page two",
+                ),
+                DocumentTextMatch(
+                    page_index=2,
+                    start_index=0,
+                    end_index=5,
+                    text="Alice",
+                    context="Alice appears again on page three",
+                ),
+            ),
+        }
+    )
+    copied_text = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_text_search_engine=search_engine,
+        on_copy_text=copied_text.append,
+    )
+    initial_refresh_count = len(widget.viewer_widget.refresh_calls)
+
+    widget.document_text_query_input.setText("Alice")
+    widget.document_text_find_button.click()
+
+    assert search_engine.calls == [("/tmp/sample.pdf", "Alice")]
+    assert widget.logical_page_index() == 1
+    assert len(widget.viewer_widget.refresh_calls) == initial_refresh_count + 1
+    assert widget.viewer_widget.refresh_calls[-1] == (None, True)
+    assert widget.document_text_status_label.text() == "Found 2 matches for 'Alice'."
+    assert "Showing 1 of 2 on page 2" in widget.document_text_detail_label.text()
+
+    widget.document_text_next_button.click()
+
+    assert widget.logical_page_index() == 2
+    assert "Showing 2 of 2 on page 3" in widget.document_text_detail_label.text()
+
+    widget.document_text_copy_button.click()
+
+    assert copied_text == ["Alice"]
+
+
+def test_signing_shell_document_text_search_uses_default_qt_clipboard_callback(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    clipboard = _FakeClipboard()
+
+    class _FakeQGuiApplication:
+        @staticmethod
+        def clipboard():
+            return clipboard
+
+    class _FakeQtGuiModule:
+        QGuiApplication = _FakeQGuiApplication
+
+    real_import_module = signing_shell_module.importlib.import_module
+
+    def _fake_import_module(name: str):
+        if name == "PySide6.QtGui":
+            return _FakeQtGuiModule
+        return real_import_module(name)
+
+    monkeypatch.setattr(signing_shell_module.importlib, "import_module", _fake_import_module)
+    search_engine = _FakeDocumentTextSearchEngine(
+        {
+            "Alice": (
+                DocumentTextMatch(
+                    page_index=0,
+                    start_index=0,
+                    end_index=5,
+                    text="Alice",
+                    context="Alice Example",
+                ),
+            ),
+        }
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_text_search_engine=search_engine,
+    )
+
+    widget.document_text_query_input.setText("Alice")
+    widget.document_text_find_button.click()
+    widget.document_text_copy_button.click()
+
+    assert clipboard.values == ["Alice"]
 
 
 def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_changes(

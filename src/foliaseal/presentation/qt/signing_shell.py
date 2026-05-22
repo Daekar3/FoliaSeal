@@ -23,6 +23,11 @@ from foliaseal.application.document_review import (
     DocumentReviewSummary,
     PyHankoDocumentReviewInspector,
 )
+from foliaseal.application.document_text_search import (
+    DocumentTextSearchEngine,
+    DocumentTextSearchSession,
+    DocumentTextSearchState,
+)
 from foliaseal.application.signature_font_registry import (
     validate_signature_font_request,
 )
@@ -62,6 +67,7 @@ from foliaseal.infra.config.schemas import (
     ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
+from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
 from foliaseal.presentation.qt.signature_preview_layout import (
     QtSignaturePreviewLayout,
     _ensure_preview_fonts_registered,
@@ -159,6 +165,20 @@ class DocumentReviewControls:
 
     container: Any
     headline_label: Any
+    detail_label: Any
+
+
+@dataclass(frozen=True)
+class DocumentTextControls:
+    """Read-only widgets that expose document text search and copy-current-hit."""
+
+    container: Any
+    query_input: Any
+    find_button: Any
+    previous_button: Any
+    next_button: Any
+    copy_button: Any
+    status_label: Any
     detail_label: Any
 
 
@@ -1740,9 +1760,11 @@ class SigningWorkspaceWidget:
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         document_review_inspector: DocumentReviewInspector | None = None,
+        document_text_search_engine: DocumentTextSearchEngine | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_open_signed_output: Callable[[str], Any] | None = None,
+        on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> None:
@@ -1759,6 +1781,11 @@ class SigningWorkspaceWidget:
             document_review_inspector or PyHankoDocumentReviewInspector()
         )
         self._document_review_summary: DocumentReviewSummary | None = None
+        self._document_text_search_session = DocumentTextSearchSession(
+            input_pdf_path=viewer_workflow.document_path,
+            search_engine=document_text_search_engine or QtPdfDocumentTextSearchEngine(),
+        )
+        self._on_copy_text = on_copy_text
         if app_settings is not None:
             self._app_settings = app_settings
         elif app_settings_store is not None:
@@ -1777,6 +1804,7 @@ class SigningWorkspaceWidget:
 
         self._flow_summary_controls = self._build_flow_summary_controls()
         self._document_review_controls = self._build_document_review_controls()
+        self._document_text_controls = self._build_document_text_controls()
         self._main_row = bindings.q_hbox_layout()
         self._main_row.setContentsMargins(0, 0, 0, 0)
         self._main_row.setSpacing(8)
@@ -1828,6 +1856,7 @@ class SigningWorkspaceWidget:
         self._main_row.addWidget(self._properties_scroll, 2)
         self._layout.addWidget(self._flow_summary_controls.container)
         self._layout.addWidget(self._document_review_controls.container)
+        self._layout.addWidget(self._document_text_controls.container)
         self._layout.addLayout(self._main_row)
         self._layout.addWidget(self._choose_output_button)
         self._layout.addWidget(self._sign_button)
@@ -1857,11 +1886,32 @@ class SigningWorkspaceWidget:
         self.widget.document_review_detail_label = (  # type: ignore[attr-defined]
             self._document_review_controls.detail_label
         )
+        self.widget.document_text_query_input = (  # type: ignore[attr-defined]
+            self._document_text_controls.query_input
+        )
+        self.widget.document_text_find_button = self._document_text_controls.find_button  # type: ignore[attr-defined]
+        self.widget.document_text_previous_button = (  # type: ignore[attr-defined]
+            self._document_text_controls.previous_button
+        )
+        self.widget.document_text_next_button = self._document_text_controls.next_button  # type: ignore[attr-defined]
+        self.widget.document_text_copy_button = self._document_text_controls.copy_button  # type: ignore[attr-defined]
+        self.widget.document_text_status_label = (  # type: ignore[attr-defined]
+            self._document_text_controls.status_label
+        )
+        self.widget.document_text_detail_label = (  # type: ignore[attr-defined]
+            self._document_text_controls.detail_label
+        )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.refresh_document_review = self.refresh_document_review  # type: ignore[attr-defined]
+        self.widget.search_document_text = self.search_document_text  # type: ignore[attr-defined]
+        self.widget.next_document_text_match = self.next_document_text_match  # type: ignore[attr-defined]
+        self.widget.previous_document_text_match = self.previous_document_text_match  # type: ignore[attr-defined]
+        self.widget.copy_current_document_text_match = (  # type: ignore[attr-defined]
+            self.copy_current_document_text_match
+        )
         self.widget.apply_app_settings = self.apply_app_settings  # type: ignore[attr-defined]
         self.widget.set_logical_page_index = self.set_logical_page_index  # type: ignore[attr-defined]
         self.widget.logical_page_index = self.logical_page_index  # type: ignore[attr-defined]
@@ -1884,6 +1934,7 @@ class SigningWorkspaceWidget:
 
         self.refresh_viewer()
         self.refresh_document_review()
+        self._apply_document_text_state(self._document_text_search_session.search(""))
         self._refresh_sign_button_state()
 
     @property
@@ -1912,6 +1963,32 @@ class SigningWorkspaceWidget:
         self._document_review_controls.headline_label.setText(summary.headline)
         self._document_review_controls.detail_label.setText(summary.detail)
         return summary
+
+    def search_document_text(self) -> DocumentTextSearchState:
+        query = _text(self._document_text_controls.query_input)
+        state = self._document_text_search_session.search(query)
+        self._apply_document_text_state(state)
+        self._show_document_text_match(state)
+        return state
+
+    def next_document_text_match(self) -> DocumentTextSearchState:
+        state = self._document_text_search_session.next_match()
+        self._apply_document_text_state(state)
+        self._show_document_text_match(state)
+        return state
+
+    def previous_document_text_match(self) -> DocumentTextSearchState:
+        state = self._document_text_search_session.previous_match()
+        self._apply_document_text_state(state)
+        self._show_document_text_match(state)
+        return state
+
+    def copy_current_document_text_match(self) -> str | None:
+        copy_text = self._document_text_search_session.current_copy_text()
+        if copy_text is None or self._on_copy_text is None:
+            return None
+        self._on_copy_text(copy_text)
+        return copy_text
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         """Apply new app-level settings to the live shell state."""
@@ -2244,6 +2321,84 @@ class SigningWorkspaceWidget:
             detail_label=detail_label,
         )
 
+    def _build_document_text_controls(self) -> DocumentTextControls:
+        container = self._bindings.q_group_box("Document text")
+        if hasattr(container, "setStyleSheet"):
+            container.setStyleSheet(
+                "QGroupBox {"
+                " border: 1px solid #d0d7de;"
+                " border-radius: 6px;"
+                " padding: 6px;"
+                " background: #f6f8fa;"
+                "}"
+            )
+        layout = self._bindings.q_vbox_layout(container)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(4)
+        query_input = self._bindings.q_line_edit()
+        query_input.setPlaceholderText("Search document text")
+        find_button = self._bindings.q_push_button("Find")
+        previous_button = self._bindings.q_push_button("Previous")
+        next_button = self._bindings.q_push_button("Next")
+        copy_button = self._bindings.q_push_button("Copy result")
+        previous_button.setEnabled(False)
+        next_button.setEnabled(False)
+        copy_button.setEnabled(False)
+        controls_row = _compose_row(
+            self._bindings,
+            query_input,
+            find_button,
+            previous_button,
+            next_button,
+            copy_button,
+        )
+        status_label = self._bindings.q_label("")
+        detail_label = self._bindings.q_label("")
+        for label in (status_label, detail_label):
+            if hasattr(label, "setWordWrap"):
+                label.setWordWrap(True)
+        if hasattr(status_label, "setStyleSheet"):
+            status_label.setStyleSheet("font-weight: 700; color: #111827;")
+        if hasattr(detail_label, "setStyleSheet"):
+            detail_label.setStyleSheet("color: #374151;")
+        find_button.clicked.connect(self.search_document_text)  # type: ignore[attr-defined]
+        previous_button.clicked.connect(self.previous_document_text_match)  # type: ignore[attr-defined]
+        next_button.clicked.connect(self.next_document_text_match)  # type: ignore[attr-defined]
+        copy_button.clicked.connect(self.copy_current_document_text_match)  # type: ignore[attr-defined]
+        layout.addWidget(controls_row)
+        layout.addWidget(status_label)
+        layout.addWidget(detail_label)
+        return DocumentTextControls(
+            container=container,
+            query_input=query_input,
+            find_button=find_button,
+            previous_button=previous_button,
+            next_button=next_button,
+            copy_button=copy_button,
+            status_label=status_label,
+            detail_label=detail_label,
+        )
+
+    def _apply_document_text_state(self, state: DocumentTextSearchState) -> None:
+        self._document_text_controls.status_label.setText(state.status_text)
+        self._document_text_controls.detail_label.setText(state.detail_text)
+        self._document_text_controls.previous_button.setEnabled(state.can_go_previous)
+        self._document_text_controls.next_button.setEnabled(state.can_go_next)
+        self._document_text_controls.copy_button.setEnabled(
+            state.can_copy and self._on_copy_text is not None
+        )
+
+    def _show_document_text_match(self, state: DocumentTextSearchState) -> None:
+        current_match = state.current_match
+        if current_match is None:
+            return
+        try:
+            self._viewer_workflow.jump_to_page(current_match.page_index)
+            self._viewer_widget.refresh(navigation=True)
+            self._sync_signature_overlay()
+        except Exception as exc:
+            self._emit_error(f"Unable to show document text match: {exc}")
+
     def _refresh_flow_summary(self) -> None:
         stage, detail = self._flow_summary_text()
         self._flow_summary_controls.stage_label.setText(stage)
@@ -2322,12 +2477,15 @@ class SigningShellAdapter:
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         document_review_inspector: DocumentReviewInspector | None = None,
+        document_text_search_engine: DocumentTextSearchEngine | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_open_signed_output: Callable[[str], Any] | None = None,
+        on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> Any:
+        copy_text_callback = on_copy_text or self._load_copy_text_callback()
         return SigningWorkspaceWidget(
             bindings=self._bindings,
             viewer_workflow=viewer_workflow,
@@ -2340,9 +2498,11 @@ class SigningShellAdapter:
             app_settings=app_settings,
             app_settings_store=app_settings_store,
             document_review_inspector=document_review_inspector,
+            document_text_search_engine=document_text_search_engine,
             sign_executor=sign_executor,
             on_sign_request=on_sign_request,
             on_open_signed_output=on_open_signed_output,
+            on_copy_text=copy_text_callback,
             on_error=on_error,
             on_status_change=on_status_change,
         ).container
@@ -2378,6 +2538,24 @@ class SigningShellAdapter:
             qt=getattr(qt_core, "Qt"),
         )
 
+    def _load_copy_text_callback(self) -> Callable[[str], Any] | None:
+        try:
+            qt_gui = importlib.import_module("PySide6.QtGui")
+        except Exception:
+            return None
+        application_cls = getattr(qt_gui, "QGuiApplication", None)
+        clipboard_getter = getattr(application_cls, "clipboard", None)
+        if not callable(clipboard_getter):
+            return None
+
+        def _copy_text(value: str) -> None:
+            clipboard = clipboard_getter()
+            set_text = getattr(clipboard, "setText", None)
+            if callable(set_text):
+                set_text(value)
+
+        return _copy_text
+
 
 def build_qt_signing_shell(
     *,
@@ -2391,9 +2569,11 @@ def build_qt_signing_shell(
     app_settings: AppSettings | None = None,
     app_settings_store: AppSettingsStore | None = None,
     document_review_inspector: DocumentReviewInspector | None = None,
+    document_text_search_engine: DocumentTextSearchEngine | None = None,
     sign_executor: SigningRequestExecutor | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_open_signed_output: Callable[[str], Any] | None = None,
+    on_copy_text: Callable[[str], Any] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
 ) -> Any:
@@ -2411,9 +2591,11 @@ def build_qt_signing_shell(
         app_settings=app_settings,
         app_settings_store=app_settings_store,
         document_review_inspector=document_review_inspector,
+        document_text_search_engine=document_text_search_engine,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         on_open_signed_output=on_open_signed_output,
+        on_copy_text=on_copy_text,
         on_error=on_error,
         on_status_change=on_status_change,
     )
