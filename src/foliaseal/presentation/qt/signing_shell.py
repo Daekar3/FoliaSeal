@@ -1858,6 +1858,9 @@ class SigningWorkspaceWidget:
             self._document_review_controls.detail_label
         )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
+        self.widget.signing_workflow = self._draft_workflow  # type: ignore[attr-defined]
+        self.widget.viewer_workflow = self._viewer_workflow  # type: ignore[attr-defined]
+        self.widget.sign_button = self._sign_button  # type: ignore[attr-defined]
         self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
@@ -1869,7 +1872,6 @@ class SigningWorkspaceWidget:
         )
         self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
         self.widget.open_signed_output = self.open_signed_output  # type: ignore[attr-defined]
-        self.widget._signing_workspace = self  # type: ignore[attr-defined]
 
         self.refresh_viewer()
         self.refresh_document_review()

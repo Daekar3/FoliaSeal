@@ -40,7 +40,7 @@ This is a narrow behavior and UI-architecture slice for Brief F in `docs/ExecPla
 ## Surprises & Discoveries
 
 - Observation: the current fake-Qt test suite explicitly asserts the shell does not have a stage box.
-  Evidence: `tests/unit/test_qt_signing_shell.py::test_signing_shell_uses_split_layout_without_stage_box` checks `not hasattr(widget._signing_workspace, "_flow_summary_box")`.
+  Evidence: `tests/unit/test_qt_signing_shell.py::test_signing_shell_uses_split_layout_without_stage_box` checks the returned shell widget surface directly rather than depending on a backing workspace alias.
 
 - Observation: the workspace already has stable state transition hooks.
   Evidence: `SigningWorkspaceWidget.refresh_viewer()`, `_handle_viewer_selection()`, `_handle_panel_change()`, `choose_output_pdf_path()`, and `submit_sign_request()` all converge through signing readiness/result state and can refresh a summary without inventing a new model.

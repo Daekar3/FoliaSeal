@@ -623,7 +623,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
 
     assert result is None
     assert workflow.output_pdf_path == original_output_path
-    assert widget._signing_workspace.last_signing_result is not None
+    assert widget.last_signing_result is not None
     assert widget.last_signing_result is not None
     assert widget.sign_result_label.text() == original_result_label
     assert bindings.q_message_box.calls == [
@@ -713,7 +713,7 @@ def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
 
     assert result == str(existing_output_path)
     assert workflow.output_pdf_path == str(existing_output_path)
-    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert widget.sign_result_label.text() == (f"Output will be saved to: {existing_output_path}")
     assert bindings.q_message_box.calls == [
@@ -883,7 +883,7 @@ def test_signing_shell_selection_uses_rendered_snapshot_page_for_validation(
         signing_workflow=_workflow(tmp_path),
     )
 
-    widget._signing_workspace._viewer_workflow.session.jump_to_page(2)
+    widget.viewer_workflow.session.jump_to_page(2)
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
 
     preview = widget.properties_panel.preview
@@ -935,8 +935,8 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
 
     assert request is not None
     assert executor.calls == [request]
-    assert widget._signing_workspace.last_signing_result is not None
-    assert widget._signing_workspace.last_signing_result.success is True
+    assert widget.last_signing_result is not None
+    assert widget.last_signing_result.success is True
     assert "Signing completed successfully." in widget.sign_result_label.text()
     assert f"Saved to: {request.output_pdf_path}" in widget.sign_result_label.text()
     assert (
@@ -1020,7 +1020,7 @@ def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_change
     widget.viewer_widget.emit_selection(PdfRect(x1=12.0, y1=12.0, x2=34.0, y2=24.0))
 
     assert widget.flow_stage_label.text() == "Confirm/sign"
-    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert widget.sign_result_label.text() == ""
 
@@ -1061,7 +1061,7 @@ def test_signing_shell_flow_summary_replaces_signed_result_after_output_path_cha
     widget.choose_output_pdf_path()
 
     assert widget.flow_stage_label.text() == "Confirm/sign"
-    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert "Signing completed successfully." not in widget.sign_result_label.text()
     assert widget.sign_result_label.text() == f"Output will be saved to: {selected_path}"
@@ -1100,7 +1100,7 @@ def test_signing_shell_flow_summary_clears_signed_result_after_page_change(
     widget.properties_panel._placement_controls.page_spin.setValue(2)
 
     assert widget.flow_stage_label.text() == "Confirm/sign"
-    assert widget._signing_workspace.last_signing_result is None
+    assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert widget.sign_result_label.text() == ""
 
@@ -1222,8 +1222,8 @@ def test_signing_shell_reports_sign_failure_when_executor_returns_failure(
 
     assert request is not None
     assert executor.calls == [request]
-    assert widget._signing_workspace.last_signing_result is not None
-    assert widget._signing_workspace.last_signing_result.success is False
+    assert widget.last_signing_result is not None
+    assert widget.last_signing_result.success is False
     assert errors == ["Post-sign verification failed."]
     assert widget.sign_result_label.text() == "Post-sign verification failed."
 
@@ -1298,7 +1298,7 @@ def test_signing_shell_flow_summary_advances_after_signature_placement(
 
     assert widget.flow_stage_label.text() == "Confirm/sign"
     assert "Confirm the output path" in widget.flow_detail_label.text()
-    assert widget._signing_workspace._sign_button._enabled is True
+    assert widget.sign_button._enabled is True
 
 
 def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Path) -> None:
@@ -1354,12 +1354,12 @@ def test_signing_shell_page_selection_and_resize_controls_update_workflow(
     panel._placement_controls.width_spin.setValue(40.0)
     panel._placement_controls.height_spin.setValue(20.0)
 
-    assert widget._signing_workspace._viewer_workflow.session.current_page == 1
-    assert widget._signing_workspace._draft_workflow.signature_rect is not None
-    assert widget._signing_workspace._draft_workflow.signature_rect.page_index == 1
-    assert widget._signing_workspace._draft_workflow.signature_rect.width_pt == 40.0
-    assert widget._signing_workspace._draft_workflow.signature_rect.height_pt == 20.0
-    assert widget._signing_workspace._sign_button._enabled is True
+    assert widget.viewer_workflow.session.current_page == 1
+    assert widget.signing_workflow.signature_rect is not None
+    assert widget.signing_workflow.signature_rect.page_index == 1
+    assert widget.signing_workflow.signature_rect.width_pt == 40.0
+    assert widget.signing_workflow.signature_rect.height_pt == 20.0
+    assert widget.sign_button._enabled is True
 
 
 def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
@@ -1389,8 +1389,8 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.signature_rect
-        or widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.signature_rect
+        or widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1431,11 +1431,11 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert detail_lines[7] == "Reason: Approved"
     assert len(detail_lines) == 8
     assert preview_controls.footer_label.text() == ""
-    assert widget._signing_workspace.properties_panel._appearance_controls.font_family._items[
+    assert widget.properties_panel._appearance_controls.font_family._items[
         :3
     ] == ["Sans Serif", "Serif", "Monospace"]
     assert (
-        widget._signing_workspace.properties_panel._appearance_controls.font_family.currentText()
+        widget.properties_panel._appearance_controls.font_family.currentText()
         == "Source Sans 3"
     )
     assert "Digitally signed by" in preview_text
@@ -1479,7 +1479,7 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1531,7 +1531,7 @@ def test_signing_shell_validation_label_is_width_limited_to_panel(
 
     panel = widget.properties_panel
     panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1578,7 +1578,7 @@ def test_signing_shell_card_size_tracks_selected_rectangle_aspect_ratio(
     panel = widget.properties_panel
     preview_controls = panel.preview_controls
     panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=35.0,
             bottom_pt=429.0,
@@ -1620,7 +1620,7 @@ def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1667,7 +1667,7 @@ def test_signing_shell_stamp_position_left_centers_text_beside_stamp(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1715,12 +1715,12 @@ def test_signing_shell_stamp_position_control_updates_workflow(
     panel._appearance_controls.stamp_position.setCurrentText("Right")
 
     assert (
-        widget._signing_workspace._draft_workflow.signature_appearance.stamp_position
+        widget.signing_workflow.signature_appearance.stamp_position
         == SignatureStampPosition.RIGHT
     )
     assert panel.preview.stamp_position == SignatureStampPosition.RIGHT
     assert "Stamp position: right" in signing_shell_module._format_appearance_summary(
-        widget._signing_workspace._draft_workflow.signature_appearance
+        widget.signing_workflow.signature_appearance
     )
 
 
@@ -1755,7 +1755,7 @@ def test_signing_shell_preview_respects_small_font_sizes(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1800,7 +1800,7 @@ def test_signing_shell_preview_updates_style_when_font_size_changes(
         )
     )
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -1846,7 +1846,7 @@ def test_signing_shell_preview_keeps_text_size_invariant_across_layout_modes(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
     )
-    rect = widget._signing_workspace._draft_workflow.update_signature_rect(
+    rect = widget.signing_workflow.update_signature_rect(
         page_index=0,
         left_pt=24.0,
         bottom_pt=18.0,
@@ -1926,7 +1926,7 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
         signing_workflow=_workflow(tmp_path),
     )
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2039,7 +2039,7 @@ def test_signing_shell_wrapped_block_preview_groups_tail_fields(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2087,7 +2087,7 @@ def test_signing_shell_wrapped_block_preview_uses_value_only_text_by_default(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2137,7 +2137,7 @@ def test_signing_shell_preview_text_uses_active_vertical_label_for_wrapped_block
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2349,8 +2349,8 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     )
 
     panel = widget.properties_panel
-    assert widget._signing_workspace._draft_workflow.signature_rect is None
-    widget._signing_workspace._draft_workflow.selected_certificate_configuration_id = (
+    assert widget.signing_workflow.signature_rect is None
+    widget.signing_workflow.selected_certificate_configuration_id = (
         "cert-config-current"
     )
 
@@ -2359,9 +2359,9 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     assert panel._signature_preset_controls.preset_name.text() == "Compact"
     assert panel._placement_controls.width_spin.value() == 144.0
     assert panel._placement_controls.height_spin.value() == 36.0
-    assert widget._signing_workspace._draft_workflow.signature_rect is None
+    assert widget.signing_workflow.signature_rect is None
     assert (
-        widget._signing_workspace._draft_workflow.selected_certificate_configuration_id
+        widget.signing_workflow.selected_certificate_configuration_id
         == "cert-config-current"
     )
 
@@ -2595,7 +2595,7 @@ def test_signing_shell_warning_only_issue_keeps_readiness_enabled(
         signing_workflow=_workflow(tmp_path),
     )
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2613,7 +2613,7 @@ def test_signing_shell_warning_only_issue_keeps_readiness_enabled(
 
     assert widget.properties_panel.preview.can_submit is True
     assert widget.properties_panel.is_ready_to_sign() is True
-    assert widget._signing_workspace._sign_button._enabled is True
+    assert widget.sign_button._enabled is True
     assert widget.properties_panel.validation_text() == "Ready to sign."
 
 
@@ -2652,7 +2652,7 @@ def test_signing_shell_allows_blank_signer_label_prefix_and_frees_title_line(
 
     assert request is not None
     assert errors == []
-    assert widget._signing_workspace._sign_button._enabled is True
+    assert widget.sign_button._enabled is True
 
 
 def test_signing_shell_single_line_preview_matches_backend_wrapping(
@@ -2679,7 +2679,7 @@ def test_signing_shell_single_line_preview_matches_backend_wrapping(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2722,7 +2722,7 @@ def test_signing_shell_single_line_horizontal_preview_text_uses_active_detail_la
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2765,7 +2765,7 @@ def test_signing_shell_single_line_horizontal_preview_reserves_width_for_stamp(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2822,7 +2822,7 @@ def test_signing_shell_multi_line_horizontal_preview_uses_reserved_text_height(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=35.84,
             bottom_pt=429.12,
@@ -2868,7 +2868,7 @@ def test_signing_shell_single_line_horizontal_preview_centers_stamp_within_side_
         )
         widget.properties_panel.set_signature_appearance(appearance)
         widget.properties_panel.set_signature_rect(
-            widget._signing_workspace._draft_workflow.update_signature_rect(
+            widget.signing_workflow.update_signature_rect(
                 page_index=0,
                 left_pt=24.0,
                 bottom_pt=18.0,
@@ -2917,7 +2917,7 @@ def test_signing_shell_horizontal_preview_updates_text_width_for_thick_borders(
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -2974,7 +2974,7 @@ def test_signing_shell_uses_canonical_preview_snapshot_when_assets_are_renderabl
     )
     widget.properties_panel.set_signature_appearance(appearance)
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
@@ -3011,7 +3011,7 @@ def test_signing_shell_disposes_canonical_preview_snapshot_on_widget_close(
         signing_workflow=_workflow(tmp_path),
     )
     widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
+        widget.signing_workflow.update_signature_rect(
             page_index=0,
             left_pt=24.0,
             bottom_pt=18.0,
