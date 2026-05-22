@@ -8,7 +8,10 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.coordinate_transform import PdfRect
-from foliaseal.application.document_review import DocumentReviewSummary
+from foliaseal.application.document_review import (
+    DocumentReviewSummary,
+    DocumentSignatureReviewItem,
+)
 from foliaseal.application.document_text_search import DocumentTextMatch
 from foliaseal.application.document_text_selection import DocumentTextSelection
 from foliaseal.application.viewer_session import ViewerSession
@@ -1038,6 +1041,60 @@ def test_signing_shell_shows_document_review_summary_from_injected_inspector(
     assert "Latest signer: CN=Alice Example." in widget.document_review_detail_label.text()
 
 
+def test_signing_shell_renders_per_signature_review_items(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail=(
+                "Found 2 embedded signatures. Latest signer: CN=Alice Example. "
+                "Latest signature needs attention: local verification failed."
+            ),
+            signature_count=2,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1",
+                    signer_subject="CN=Bob Example",
+                    cryptographic_validation_passed=True,
+                    detail="CN=Bob Example: verified locally.",
+                ),
+                DocumentSignatureReviewItem(
+                    label="Signature 2 (latest)",
+                    signer_subject="CN=Alice Example",
+                    cryptographic_validation_passed=False,
+                    detail="CN=Alice Example: needs local verification attention.",
+                ),
+            ),
+            signer_subject="CN=Alice Example",
+            cryptographic_validation_passed=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    rendered = widget.document_review_signature_items_label.text()
+    assert "Signature 1: CN=Bob Example: verified locally." in rendered
+    assert (
+        "Signature 2 (latest): "
+        "CN=Alice Example: needs local verification attention."
+    ) in rendered
+
+
 def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
     monkeypatch,
     tmp_path: Path,
@@ -1434,6 +1491,46 @@ def test_signing_shell_open_signed_output_uses_success_callback(
     assert opened == request.output_pdf_path
     assert opened_paths == [request.output_pdf_path]
     assert widget.open_signed_output_button._enabled is True
+    assert widget.document_review_verify_button._enabled is True
+
+
+def test_signing_shell_review_verify_button_reuses_open_signed_output_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    opened_paths = []
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+        on_open_signed_output=opened_paths.append,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    request = widget.submit_sign_request()
+    widget.document_review_verify_button.click()
+
+    assert request is not None
+    assert opened_paths == [request.output_pdf_path]
 
 
 def test_signing_shell_disables_open_signed_output_after_sign_failure(

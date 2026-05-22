@@ -20,12 +20,23 @@ class DocumentReviewSummary:
     headline: str
     detail: str
     signature_count: int | None
+    signature_items: tuple[DocumentSignatureReviewItem, ...] = ()
     signer_subject: str | None = None
     docmdp_permission: str | None = None
     certification_restricted: bool = False
     restriction_reason: str | None = None
     cryptographic_validation_passed: bool | None = None
     inspection_error: str | None = None
+
+
+@dataclass(frozen=True)
+class DocumentSignatureReviewItem:
+    """Plain-language review state for one embedded signature."""
+
+    label: str
+    signer_subject: str | None
+    cryptographic_validation_passed: bool | None
+    detail: str
 
 
 class DocumentReviewInspector(Protocol):
@@ -38,6 +49,7 @@ class DocumentReviewInspector(Protocol):
 def summarize_document_review(
     *,
     signature_count: int | None,
+    signature_items: tuple[DocumentSignatureReviewItem, ...] = (),
     signer_subject: str | None = None,
     docmdp_permission: str | None = None,
     certification_restricted: bool = False,
@@ -52,6 +64,7 @@ def summarize_document_review(
             headline="Review unavailable",
             detail=f"Current PDF could not be inspected: {inspection_error}",
             signature_count=signature_count,
+            signature_items=signature_items,
             signer_subject=signer_subject,
             docmdp_permission=docmdp_permission,
             certification_restricted=certification_restricted,
@@ -65,6 +78,7 @@ def summarize_document_review(
             headline="Review unavailable",
             detail="Current PDF could not be inspected.",
             signature_count=None,
+            signature_items=signature_items,
             signer_subject=signer_subject,
             docmdp_permission=docmdp_permission,
             certification_restricted=certification_restricted,
@@ -86,6 +100,7 @@ def summarize_document_review(
             headline="No signatures found",
             detail=" ".join(lines),
             signature_count=0,
+            signature_items=signature_items,
             docmdp_permission=docmdp_permission,
             certification_restricted=certification_restricted,
             restriction_reason=restriction_reason,
@@ -115,6 +130,7 @@ def summarize_document_review(
         headline=headline,
         detail=" ".join(lines),
         signature_count=signature_count,
+        signature_items=signature_items,
         signer_subject=signer_subject,
         docmdp_permission=docmdp_permission,
         certification_restricted=certification_restricted,
@@ -142,16 +158,26 @@ class PyHankoDocumentReviewInspector:
                 if not embedded_signatures:
                     return summarize_document_review(
                         signature_count=0,
+                        signature_items=(),
                         docmdp_permission=certification.docmdp_permission,
                         certification_restricted=certification.certification_restricted,
                         restriction_reason=certification.restriction_reason,
                     )
 
+                signature_items = tuple(
+                    _signature_review_item(
+                        signature,
+                        index=index,
+                        latest_index=len(embedded_signatures) - 1,
+                    )
+                    for index, signature in enumerate(embedded_signatures)
+                )
                 signature = embedded_signatures[-1]
                 signer_subject = _signer_subject(signature)
                 cryptographic_validation_passed = _verify_signature_locally(signature)
                 return summarize_document_review(
                     signature_count=len(embedded_signatures),
+                    signature_items=signature_items,
                     signer_subject=signer_subject,
                     docmdp_permission=certification.docmdp_permission,
                     certification_restricted=certification.certification_restricted,
@@ -188,6 +214,35 @@ def _verify_signature_locally(signature: object) -> bool | None:
     except Exception:
         return False
     return bool(status.intact and status.valid)
+
+
+def _signature_review_item(
+    signature: object,
+    *,
+    index: int,
+    latest_index: int,
+) -> DocumentSignatureReviewItem:
+    signer_subject = _signer_subject(signature)
+    cryptographic_validation_passed = _verify_signature_locally(signature)
+    label = f"Signature {index + 1}"
+    if index == latest_index:
+        label = f"{label} (latest)"
+    if signer_subject is None:
+        subject_text = "Signer not available"
+    else:
+        subject_text = signer_subject
+    if cryptographic_validation_passed is True:
+        status_text = "verified locally"
+    elif cryptographic_validation_passed is False:
+        status_text = "needs local verification attention"
+    else:
+        status_text = "local verification not evaluated"
+    return DocumentSignatureReviewItem(
+        label=label,
+        signer_subject=signer_subject,
+        cryptographic_validation_passed=cryptographic_validation_passed,
+        detail=f"{subject_text}: {status_text}.",
+    )
 
 
 def _certification_guidance(
