@@ -30,6 +30,7 @@ from foliaseal.infra.config.profile_storage import (
 from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
+from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
 from tests.support.phase3_builders import (
@@ -69,6 +70,7 @@ class _FakeWidget:
         self.minimum_width = None
         self._width_value = 480
         self.word_wrap = None
+        self.destroyed = _FakeSignal()
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
@@ -130,6 +132,9 @@ class _FakeWidget:
                 return self._height
 
         return _Hint(width, height)
+
+    def close(self):
+        self.destroyed.emit(self)
 
 
 class _FakeLayout:
@@ -3616,7 +3621,7 @@ def test_signing_shell_uses_canonical_preview_snapshot_when_assets_are_renderabl
     assert snapshot.stamp_bounds_px is not None
 
 
-def test_signing_shell_requests_bordered_canonical_preview_render(
+def test_signing_shell_disposes_canonical_preview_snapshot_on_widget_close(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -3631,37 +3636,30 @@ def test_signing_shell_requests_bordered_canonical_preview_render(
         lambda self: _fake_bindings(),
     )
 
-    recorded_calls: list[dict[str, object]] = []
-    preview_path = tmp_path / "preview.png"
-    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
-
-    def _fake_render(preview, **kwargs):
-        recorded_calls.append(kwargs)
-        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
-            image_path=str(preview_path),
-            width_px=120,
-            height_px=60,
-            text_area_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
-            stamp_area_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
-            text_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
-            stamp_bounds_px={"x": 0, "y": 0, "width": 120, "height": 60},
-        )
-
-    monkeypatch.setattr(
-        signing_shell_module,
-        "render_canonical_signature_preview",
-        _fake_render,
-    )
-
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
     )
-    widget.properties_panel.refresh_preview()
+    widget.properties_panel.set_signature_rect(
+        widget._signing_workspace._draft_workflow.update_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=18.0,
+            width_pt=180.0,
+            height_pt=48.0,
+        )
+    )
 
-    assert recorded_calls
-    assert recorded_calls[-1]["include_border"] is True
-    assert recorded_calls[-1]["flatten_to_white"] is False
+    snapshot = widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
+    assert snapshot is not None
+    snapshot_dir = Path(snapshot.image_path).parent
+    assert snapshot_dir.exists()
+
+    widget.close()
+
+    snapshot = widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
+    assert snapshot is None
+    assert not snapshot_dir.exists()
 
 
 def test_signing_shell_sizes_canonical_render_label_to_scaled_pixmap(
@@ -3683,7 +3681,7 @@ def test_signing_shell_sizes_canonical_render_label_to_scaled_pixmap(
     Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
 
     def _fake_render(preview, **kwargs):
-        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
+        return preview_lifecycle_module.CanonicalSignaturePreviewSnapshot(
             image_path=str(preview_path),
             width_px=120,
             height_px=60,
@@ -3694,12 +3692,12 @@ def test_signing_shell_sizes_canonical_render_label_to_scaled_pixmap(
         )
 
     monkeypatch.setattr(
-        signing_shell_module,
+        preview_lifecycle_module,
         "render_canonical_signature_preview",
         _fake_render,
     )
     monkeypatch.setattr(
-        signing_shell_module.SignaturePropertiesPanel,
+        signing_shell_module.QtCanonicalPreviewLifecycle,
         "_load_canonical_preview_pixmap",
         lambda self, **kwargs: _FakePixmap("preview", width=91, height=37),
         raising=False,
@@ -3734,7 +3732,7 @@ def test_signing_shell_suppresses_outer_card_chrome_when_canonical_preview_is_ac
     Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
 
     def _fake_render(preview, **kwargs):
-        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
+        return preview_lifecycle_module.CanonicalSignaturePreviewSnapshot(
             image_path=str(preview_path),
             width_px=120,
             height_px=60,
@@ -3745,7 +3743,7 @@ def test_signing_shell_suppresses_outer_card_chrome_when_canonical_preview_is_ac
         )
 
     monkeypatch.setattr(
-        signing_shell_module,
+        preview_lifecycle_module,
         "render_canonical_signature_preview",
         _fake_render,
     )
@@ -3759,235 +3757,3 @@ def test_signing_shell_suppresses_outer_card_chrome_when_canonical_preview_is_ac
     assert widget.properties_panel.preview_controls.card_container.style == (
         "QGroupBox { border: none; background: transparent; padding: 0px; }"
     )
-
-
-def test_signing_shell_cleans_up_replaced_canonical_preview_snapshot(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    created_dirs: list[Path] = []
-    call_count = {"value": 0}
-
-    def _next_snapshot(
-        _preview, *, zoom, render_backend=None, include_border=True, flatten_to_white=True
-    ):
-        index = call_count["value"]
-        call_count["value"] += 1
-        image_dir = tmp_path / f"foliaseal-canonical-preview-{index}"
-        image_dir.mkdir()
-        image_path = image_dir / "preview.png"
-        Image.new("RGBA", (12, 12), color=(0, 0, 0, 255)).save(image_path)
-        created_dirs.append(image_dir)
-        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
-            image_path=str(image_path),
-            width_px=12,
-            height_px=12,
-            text_area_bounds_px={"x": 0, "y": 0, "width": 12, "height": 12},
-            stamp_area_bounds_px=None,
-            text_bounds_px={"x": 0, "y": 0, "width": 12, "height": 12},
-            stamp_bounds_px=None,
-        )
-    monkeypatch.setattr(
-        signing_shell_module,
-        "render_canonical_signature_preview",
-        _next_snapshot,
-    )
-
-    stamp_path = tmp_path / "stamp.png"
-    Image.new("RGBA", (96, 32), color=(0, 0, 0, 255)).save(stamp_path)
-    appearance = build_signature_appearance(
-        layout_template=SignatureLayoutTemplate.MULTI_LINE,
-        stamp_position=SignatureStampPosition.LEFT,
-        image_stamp_path=str(stamp_path),
-    )
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    widget.properties_panel.set_signature_appearance(appearance)
-    widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=180.0,
-            height_pt=48.0,
-        )
-    )
-
-    current_snapshot = (
-        widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
-    )
-    assert current_snapshot is not None
-    current_dir = Path(current_snapshot.image_path).parent
-    assert current_dir.exists()
-    assert all(not path.exists() for path in created_dirs if path != current_dir)
-
-    widget.properties_panel.refresh_preview()
-
-    next_snapshot = (
-        widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
-    )
-    assert next_snapshot is not None
-    next_dir = Path(next_snapshot.image_path).parent
-    assert next_dir.exists()
-    assert next_dir != current_dir
-    assert not current_dir.exists()
-
-
-def test_signing_shell_repeated_preview_refreshes_keep_only_latest_snapshot(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    created_dirs: list[Path] = []
-    call_count = {"value": 0}
-
-    def _next_snapshot(
-        _preview, *, zoom, render_backend=None, include_border=True, flatten_to_white=True
-    ):
-        index = call_count["value"]
-        call_count["value"] += 1
-        image_dir = tmp_path / f"foliaseal-canonical-preview-{index}"
-        image_dir.mkdir()
-        image_path = image_dir / "preview.png"
-        Image.new("RGBA", (16, 16), color=(0, 0, 0, 255)).save(image_path)
-        created_dirs.append(image_dir)
-        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
-            image_path=str(image_path),
-            width_px=16,
-            height_px=16,
-            text_area_bounds_px={"x": 0, "y": 0, "width": 16, "height": 16},
-            stamp_area_bounds_px=None,
-            text_bounds_px={"x": 0, "y": 0, "width": 16, "height": 16},
-            stamp_bounds_px=None,
-        )
-
-    monkeypatch.setattr(
-        signing_shell_module,
-        "render_canonical_signature_preview",
-        _next_snapshot,
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    widget.properties_panel.set_signature_appearance(
-        build_signature_appearance(
-            layout_template=SignatureLayoutTemplate.MULTI_LINE,
-            stamp_position=SignatureStampPosition.LEFT,
-        )
-    )
-    widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=180.0,
-            height_pt=48.0,
-        )
-    )
-
-    for _ in range(24):
-        widget.properties_panel.refresh_preview()
-
-    current_snapshot = (
-        widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
-    )
-    assert current_snapshot is not None
-    current_dir = Path(current_snapshot.image_path).parent
-    assert current_dir.exists()
-    assert sum(1 for path in created_dirs if path.exists()) == 1
-    assert current_dir == created_dirs[-1]
-
-
-def test_signing_shell_reuses_one_canonical_preview_render_backend(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    backend_construction_count = {"value": 0}
-
-    class _FakeRenderBackend:
-        def __init__(self) -> None:
-            backend_construction_count["value"] += 1
-
-    captured_backends: list[object] = []
-
-    def _render_snapshot(
-        _preview, *, zoom, render_backend, include_border=True, flatten_to_white=True
-    ):
-        captured_backends.append(render_backend)
-        image_dir = tmp_path / f"foliaseal-canonical-preview-{len(captured_backends)}"
-        image_dir.mkdir()
-        image_path = image_dir / "preview.png"
-        Image.new("RGBA", (16, 16), color=(0, 0, 0, 255)).save(image_path)
-        return signing_shell_module.CanonicalSignaturePreviewSnapshot(
-            image_path=str(image_path),
-            width_px=16,
-            height_px=16,
-            text_area_bounds_px={"x": 0, "y": 0, "width": 16, "height": 16},
-            stamp_area_bounds_px=None,
-            text_bounds_px={"x": 0, "y": 0, "width": 16, "height": 16},
-            stamp_bounds_px=None,
-        )
-
-    monkeypatch.setattr(signing_shell_module, "QtPdfRenderBackend", _FakeRenderBackend)
-    monkeypatch.setattr(
-        signing_shell_module,
-        "render_canonical_signature_preview",
-        _render_snapshot,
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-    widget.properties_panel.set_signature_rect(
-        widget._signing_workspace._draft_workflow.update_signature_rect(
-            page_index=0,
-            left_pt=24.0,
-            bottom_pt=18.0,
-            width_pt=180.0,
-            height_pt=48.0,
-        )
-    )
-
-    for _ in range(5):
-        widget.properties_panel.refresh_preview()
-
-    assert backend_construction_count["value"] == 1
-    assert len(captured_backends) >= 1
-    assert all(backend is captured_backends[0] for backend in captured_backends)

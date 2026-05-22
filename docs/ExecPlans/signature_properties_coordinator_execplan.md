@@ -8,11 +8,11 @@ This plan follows the requirements in `.agents/skills/write-execplan/PLANS.md`. 
 
 FoliaSeal's signing shell used to mix Qt widget concerns with certificate-configuration application, signature-preset reconciliation, validation messaging, and sign-readiness rules. That state has now been split: the shell still renders the same controls, but those responsibilities are driven by a dedicated `SignaturePropertiesCoordinator` that returns an immutable view state. A contributor or user can prove the change worked by running focused unit tests: coordinator tests exercise certificate and preset flows without inspecting Qt internals, and the shell tests still show that the panel renders and updates correctly.
 
-This slice is intentionally narrow. It introduced the coordinator/state boundary described by issue `#51`, but it did not migrate canonical preview rendering, preview-layout helpers, or the preview snapshot lifecycle. Those stay in the Qt panel for a later slice so this record can focus on state reconciliation and test-surface cleanup.
+This slice is intentionally narrow. It introduced the coordinator/state boundary described by issue `#51`, but it did not migrate canonical preview rendering or preview-layout helpers. A later child slice has since moved canonical preview lifecycle management into `signature_preview_lifecycle.py`; preview geometry helpers remain in the Qt panel.
 
 ## Child ExecPlan Dependencies
 
-- [ ] A later child ExecPlan may move canonical preview rendering and preview-layout orchestration behind the coordinator once this plan's state boundary exists.
+- [x] A later child ExecPlan moved canonical preview lifecycle management into `docs/ExecPlans/signature_preview_lifecycle_execplan.md`; preview-layout orchestration remains for later work.
 - [ ] A later child ExecPlan may simplify `SigningWorkspaceWidget` and `app_frame.py` refresh seams after callers depend on the new coordinator contract instead of widget internals.
 
 ## Progress
@@ -46,12 +46,12 @@ This slice is intentionally narrow. It introduced the coordinator/state boundary
   Date/Author: 2026-05-21 / Codex
 
 - Decision: Preview/canonical-render responsibilities stay in `SignaturePropertiesPanel` for this slice.
-  Rationale: The preview path is still the brittle, geometry-heavy part of the module. Keeping it local avoided widening the change set and kept the coordinator boundary focused on state reconciliation.
+  Rationale: At the time of this slice, the preview path was still the brittle, geometry-heavy part of the module. Keeping it local avoided widening the change set and kept the coordinator boundary focused on state reconciliation. A later ExecPlan extracted the lifecycle portion while leaving geometry helpers behind.
   Date/Author: 2026-05-21 / Codex
 
 ## Outcomes & Retrospective
 
-This slice is now implemented. The signing-properties interface is smaller and clearer: certificate and preset reconciliation, catalog refresh, dirty-selection clearing, validation text, and readiness state are now application-layer concerns, while `signing_shell.py` keeps the preview and canonical-render work.
+This slice is now implemented. The signing-properties interface is smaller and clearer: certificate and preset reconciliation, catalog refresh, dirty-selection clearing, validation text, and readiness state are now application-layer concerns. At the time this slice landed, `signing_shell.py` still kept preview and canonical-render work; a later child slice extracted the canonical preview lifecycle while leaving preview geometry in the shell.
 
 The biggest behavioral constraint held: a preset without a certificate reference still preserves the active certificate configuration, and catalog refreshes reconcile stale display-name selections instead of forcing the user back into widget-private recovery paths.
 
@@ -61,7 +61,7 @@ The remaining structural debt is also clearer now. `signing_shell.py` is still a
 
 The current signing UI still lives in `src/foliaseal/presentation/qt/signing_shell.py`. Inside that file, `SignaturePropertiesPanel` builds the certificate configuration selector, signature preset controls, appearance controls, placement controls, preview card, and validation label. It now delegates certificate configuration application, preset apply/save/delete, catalog refresh, dirty-selection clearing, and validation/readiness reconciliation to `DefaultSignaturePropertiesCoordinator`, then renders the returned state back into the Qt controls.
 
-The preview path remains in the panel on purpose. `signing_shell.py` still owns canonical preview rendering, preview geometry, and snapshot cleanup, so the slice stays narrow and the brittle layout work is isolated from the state-boundary refactor.
+The preview path remained in the panel on purpose when this slice landed. That kept the state-boundary refactor narrow. A later child slice moved canonical preview lifecycle management into `src/foliaseal/presentation/qt/signature_preview_lifecycle.py`, while preview geometry helpers and final widget rendering still remain in `signing_shell.py`.
 
 `src/foliaseal/application/signing_draft_workflow.py` is the mutable application-layer state machine for a visible-signature draft. It owns the draft's current certificate path, passphrase, selected object identifiers, signature rectangle, appearance, preview data, and validation issues. It also captures and applies `ResolvedSignaturePreset` values. This file is already the source of truth for draft invariants, so the new coordinator must work with it rather than duplicate its rules.
 
@@ -73,7 +73,7 @@ Tests for the current shell are concentrated in `tests/unit/test_qt_signing_shel
 
 ## Plan of Work
 
-This slice is complete. `src/foliaseal/application/signature_properties_coordinator.py` defines the immutable view state, command objects, and default coordinator for signing-shell certificate/preset reconciliation. `SignaturePropertiesPanel` now depends on that coordinator for certificate application, preset apply/save/delete, catalog refresh, dirty-selection clearing, validation text, and ready-to-sign state. The panel still owns Qt-only control construction, preview-card rendering, canonical preview rendering, preview widget geometry, and snapshot cleanup.
+This slice is complete. `src/foliaseal/application/signature_properties_coordinator.py` defines the immutable view state, command objects, and default coordinator for signing-shell certificate/preset reconciliation. `SignaturePropertiesPanel` now depends on that coordinator for certificate application, preset apply/save/delete, catalog refresh, dirty-selection clearing, validation text, and ready-to-sign state. At completion time, the panel still owned Qt-only control construction, preview-card rendering, canonical preview rendering, preview widget geometry, and snapshot cleanup. The later preview-lifecycle ExecPlan narrowed that preview ownership further without changing the coordinator boundary.
 
 The tests are split across two layers. `tests/unit/test_signature_properties_coordinator.py` covers the boundary directly without Qt, including initial load, certificate application, missing managed certificate errors, preset application with and without certificate references, save/delete, and refresh reconciliation. `tests/unit/test_qt_signing_shell.py` remains the thin shell seam that proves the panel still responds to coordinator-backed state.
 
@@ -111,9 +111,9 @@ If a store-backed test becomes flaky because it writes to disk, switch it to a t
 Current responsibility evidence:
 
     src/foliaseal/presentation/qt/signing_shell.py
-    - SignaturePropertiesPanel still builds the Qt controls, preview card, and canonical preview rendering path.
+    - SignaturePropertiesPanel still builds the Qt controls and preview card.
     - Certificate/preset reconciliation now routes through DefaultSignaturePropertiesCoordinator.
-    - Preview widget geometry and snapshot cleanup remain panel responsibilities.
+    - Preview widget geometry remains a panel responsibility; canonical preview lifecycle has since moved to `signature_preview_lifecycle.py`.
 
     src/foliaseal/application/signature_properties_coordinator.py
     - Owns display-name reconciliation, catalog refresh/save/delete, dirty-selection clearing, validation text, and ready-to-sign state.
@@ -201,4 +201,4 @@ The concrete coordinator uses `SigningDraftWorkflow`, `CertificateCatalogStore`,
 
 Change note: 2026-05-21 / Codex
 
-This ExecPlan now records the completed `#51` ExecPlan A slice. The implementation introduced the application-layer signature-properties coordinator, moved certificate/preset reconciliation and validation/readiness state out of the Qt panel, and left preview/canonical-render responsibilities in `signing_shell.py` for a later slice.
+This ExecPlan records the completed `#51` ExecPlan A slice. The implementation introduced the application-layer signature-properties coordinator and moved certificate/preset reconciliation plus validation/readiness state out of the Qt panel. A later child slice further extracted canonical preview lifecycle responsibilities while leaving preview geometry helpers in `signing_shell.py`.

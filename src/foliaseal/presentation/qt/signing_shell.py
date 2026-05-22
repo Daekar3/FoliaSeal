@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
@@ -47,10 +46,6 @@ from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesViewState,
 )
 from foliaseal.application.signing_material_resolver import CertificateSecretProvider
-from foliaseal.application.signing_preview_renderer import (
-    CanonicalSignaturePreviewSnapshot,
-    render_canonical_signature_preview,
-)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.application.visible_signature_layout import (
     ImageMetrics,
@@ -81,7 +76,9 @@ from foliaseal.infra.config.schemas import (
     ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
-from foliaseal.infra.render import QtPdfRenderBackend
+from foliaseal.presentation.qt.signature_preview_lifecycle import (
+    QtCanonicalPreviewLifecycle,
+)
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
 SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
@@ -1236,8 +1233,15 @@ class SignaturePropertiesPanel:
         self._suspend_updates = False
         self._placement_initialized = workflow.signature_rect is not None
         self._control_issue: SigningDraftValidationIssue | None = None
-        self._canonical_preview_render_backend = QtPdfRenderBackend()
+        self._canonical_preview_lifecycle = QtCanonicalPreviewLifecycle(
+            q_pixmap=bindings.q_pixmap,
+            qt=bindings.qt,
+        )
         self.widget = bindings.q_widget()
+        destroyed_signal = getattr(self.widget, "destroyed", None)
+        destroy_connect = getattr(destroyed_signal, "connect", None)
+        if callable(destroy_connect):
+            destroy_connect(lambda *_args: self.dispose())
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
 
@@ -1285,6 +1289,10 @@ class SignaturePropertiesPanel:
     def validation_text(self) -> str:
         text = _text(self._validation_label)
         return text
+
+    def dispose(self) -> None:
+        self._canonical_preview_lifecycle.dispose()
+        self._preview_controls.card_container._canonical_preview_snapshot = None
 
     def preview_text(self) -> str:
         preview = self._workflow.preview()
@@ -2589,40 +2597,29 @@ class SignaturePropertiesPanel:
         inner_body_height: int,
         is_vertical: bool,
     ) -> None:
-        try:
-            snapshot = render_canonical_signature_preview(
-                preview,
-                zoom=max(1.0, preview_scale),
-                render_backend=self._canonical_preview_render_backend,
-                include_border=True,
-                flatten_to_white=False,
-            )
-        except ValueError:
-            snapshot = None
-        self._cleanup_canonical_preview_snapshot(
-            getattr(self._preview_controls.card_container, "_canonical_preview_snapshot", None)
+        border_css, background_color = _preview_box_styles(preview)
+        preview_padding_px = _preview_card_padding_px(preview)
+        state = self._canonical_preview_lifecycle.refresh(
+            preview=preview,
+            preview_scale=preview_scale,
+            inner_body_width=inner_body_width,
+            inner_body_height=inner_body_height,
+            fallback_card_style=(
+                "QGroupBox {"
+                f" {border_css}"
+                " border-radius: 6px;"
+                f" background: {background_color};"
+                f" padding: {preview_padding_px:.1f}px;"
+                "}"
+            ),
         )
-        self._preview_controls.card_container._canonical_preview_snapshot = snapshot
-        if snapshot is None:
-            if hasattr(self._preview_controls.card_container, "setStyleSheet"):
-                border_css, background_color = _preview_box_styles(preview)
-                preview_padding_px = _preview_card_padding_px(preview)
-                self._preview_controls.card_container.setStyleSheet(
-                    "QGroupBox {"
-                    f" {border_css}"
-                    " border-radius: 6px;"
-                    f" background: {background_color};"
-                    f" padding: {preview_padding_px:.1f}px;"
-                    "}"
-                )
+        self._preview_controls.card_container._canonical_preview_snapshot = state.snapshot
+        if hasattr(self._preview_controls.card_container, "setStyleSheet"):
+            self._preview_controls.card_container.setStyleSheet(state.card_style)
+        if state.snapshot is None:
             _set_widget_visible(self._preview_controls.single_render_label, False)
             _set_widget_visible(self._preview_controls.multi_render_label, False)
             return
-
-        if hasattr(self._preview_controls.card_container, "setStyleSheet"):
-            self._preview_controls.card_container.setStyleSheet(
-                "QGroupBox { border: none; background: transparent; padding: 0px; }"
-            )
 
         render_label = (
             self._preview_controls.single_render_label
@@ -2634,35 +2631,27 @@ class SignaturePropertiesPanel:
             if is_vertical
             else self._preview_controls.multi_body_container
         )
-        pixmap = self._load_canonical_preview_pixmap(
-            snapshot=snapshot,
-            max_width=inner_body_width,
-            max_height=inner_body_height,
-        )
+        pixmap = state.pixmap
         if pixmap is not None and hasattr(render_label, "setPixmap"):
             render_label.setPixmap(pixmap)
         if hasattr(render_label, "setFixedSize"):
-            pixmap_width = getattr(pixmap, "width", None)
-            pixmap_height = getattr(pixmap, "height", None)
-            if callable(pixmap_width):
-                pixmap_width = pixmap_width()
-            if callable(pixmap_height):
-                pixmap_height = pixmap_height()
-            if isinstance(pixmap_width, int) and isinstance(pixmap_height, int):
-                render_label.setFixedSize(pixmap_width, pixmap_height)
-                if hasattr(render_body, "setFixedSize"):
-                    render_body.setFixedSize(pixmap_width, pixmap_height)
-            else:
-                render_label.setFixedSize(inner_body_width, inner_body_height)
-                if hasattr(render_body, "setFixedSize"):
-                    render_body.setFixedSize(inner_body_width, inner_body_height)
+            render_width, render_height = state.render_body_size
+            render_label.setFixedSize(render_width, render_height)
+            if hasattr(render_body, "setFixedSize"):
+                render_body.setFixedSize(render_width, render_height)
 
         _set_widget_visible(self._preview_controls.stamp_label, False)
         _set_widget_visible(self._preview_controls.multi_stamp_label, False)
         _set_widget_visible(self._preview_controls.detail_label, False)
         _set_widget_visible(self._preview_controls.multi_detail_label, False)
-        _set_widget_visible(self._preview_controls.single_render_label, is_vertical)
-        _set_widget_visible(self._preview_controls.multi_render_label, not is_vertical)
+        _set_widget_visible(
+            self._preview_controls.single_render_label,
+            is_vertical and state.render_label_visible,
+        )
+        _set_widget_visible(
+            self._preview_controls.multi_render_label,
+            (not is_vertical) and state.render_label_visible,
+        )
         if is_vertical:
             _set_container_widgets(
                 self._preview_controls.single_body_container,
@@ -2673,42 +2662,6 @@ class SignaturePropertiesPanel:
                 self._preview_controls.multi_body_container,
                 self._preview_controls.multi_render_label,
             )
-
-    def _cleanup_canonical_preview_snapshot(
-        self,
-        snapshot: CanonicalSignaturePreviewSnapshot | None,
-    ) -> None:
-        if snapshot is None:
-            return
-        image_path = Path(snapshot.image_path)
-        temp_dir = image_path.parent
-        if not temp_dir.name.startswith("foliaseal-canonical-preview-"):
-            return
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-    def _load_canonical_preview_pixmap(
-        self,
-        *,
-        snapshot: CanonicalSignaturePreviewSnapshot,
-        max_width: int,
-        max_height: int,
-    ) -> Any | None:
-        pixmap = self._bindings.q_pixmap(snapshot.image_path)
-        is_null = getattr(pixmap, "isNull", None)
-        if callable(is_null) and is_null():
-            return None
-        scaled = getattr(pixmap, "scaled", None)
-        if callable(scaled):
-            keep_aspect = getattr(self._bindings.qt, "KeepAspectRatio", None)
-            smooth = getattr(self._bindings.qt, "SmoothTransformation", None)
-            if keep_aspect is not None and smooth is not None:
-                return scaled(
-                    max_width,
-                    max_height,
-                    keep_aspect,
-                    smooth,
-                )
-        return pixmap
 
     def _format_validation_text(self, preview: SigningDraftPreview) -> str:
         del preview
@@ -2940,6 +2893,10 @@ class SigningWorkspaceWidget:
         self.widget.open_signed_output_button = (  # type: ignore[attr-defined]
             self._open_signed_output_button
         )
+        destroyed_signal = getattr(self.widget, "destroyed", None)
+        destroy_connect = getattr(destroyed_signal, "connect", None)
+        if callable(destroy_connect):
+            destroy_connect(lambda *_args: self.properties_panel.dispose())
         self.widget.flow_stage_label = (  # type: ignore[attr-defined]
             self._flow_summary_controls.stage_label
         )
