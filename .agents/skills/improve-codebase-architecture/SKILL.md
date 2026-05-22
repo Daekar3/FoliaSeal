@@ -71,6 +71,6 @@ After comparing, give your own recommendation: which design you think is stronge
 
 ### 6. User picks an interface (or accepts recommendation)
 
-### 7. Create GitHub issue
+### 7. Create ExecPlan
 
-Create a refactor RFC as a GitHub issue using `gh issue create`. Use the template in [REFERENCE.md](REFERENCE.md). Do NOT ask the user to review before creating — just create it and share the URL.
+Create a refactor ExecPlan using $write-execplan to create one or more parent/child ExecPlans. Use the template in [REFERENCE.md](REFERENCE.md) to inform your approach but comply with all ExecPlan requirements. Do NOT ask the user to review before creating — just create it.
