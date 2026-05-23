@@ -295,6 +295,8 @@ def _signature_drill_in_detail(
     ]
     next_step = _signature_next_action_guidance(
         cryptographic_validation_passed=cryptographic_validation_passed,
+        certification_restricted=certification_restricted,
+        restriction_reason=restriction_reason,
     )
     if next_step is not None:
         lines.append(f"Recommended next step: {next_step}")
@@ -304,13 +306,26 @@ def _signature_drill_in_detail(
 def _signature_next_action_guidance(
     *,
     cryptographic_validation_passed: bool | None,
+    certification_restricted: bool,
+    restriction_reason: str | None,
 ) -> str | None:
     if cryptographic_validation_passed is True:
         return None
+    restricted = certification_restricted or restriction_reason is not None
     if cryptographic_validation_passed is False:
+        if restricted:
+            return (
+                "reopen the signed PDF, review the selected signature details "
+                "carefully, and expect that further changes may be blocked."
+            )
         return (
             "reopen the signed PDF and review the selected signature details "
             "carefully before relying on it."
+        )
+    if restricted:
+        return (
+            "reopen the signed PDF, review the embedded signer details, "
+            "and expect that further changes may be blocked."
         )
     return (
         "reopen the signed PDF and review the embedded signer details before "

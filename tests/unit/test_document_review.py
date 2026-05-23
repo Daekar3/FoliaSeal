@@ -148,6 +148,11 @@ def test_document_review_inspector_reports_signed_restricted_pdf(monkeypatch, tm
     assert summary.signer_subject == "CN=Alice Example"
     assert "Latest signature verified locally." in summary.detail
     assert "DocMDP NO_CHANGES forbids signing" in summary.detail
+    assert (
+        "Document restrictions: Certification-restricted PDF: DocMDP NO_CHANGES forbids signing."
+        in summary.signature_items[0].drill_in_detail
+    )
+    assert "Recommended next step:" not in summary.signature_items[0].drill_in_detail
 
 
 def test_summarize_document_review_next_action_guidance_for_not_evaluated_signature() -> None:
@@ -273,6 +278,62 @@ def test_document_review_inspector_reports_all_embedded_signatures(
     )
 
 
+def test_document_review_inspector_reports_restricted_failed_validation_guidance(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    pdf_path = tmp_path / "restricted-failed-validation.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    class _FakeStatus:
+        def __init__(self, *, intact: bool, valid: bool) -> None:
+            self.intact = intact
+            self.valid = valid
+
+    class _FakeSubject:
+        human_friendly = "CN=Alice Example"
+
+    class _FakeSignerCert:
+        subject = _FakeSubject()
+
+    class _FakeSignature:
+        signer_cert = _FakeSignerCert()
+
+    class _FakeReader:
+        def __init__(self, _handle) -> None:
+            self.embedded_signatures = [_FakeSignature()]
+
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.PdfFileReader",
+        _FakeReader,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.inspect_pdf_certification_reader",
+        lambda _reader: CertificationPolicyResult(
+            docmdp_permission="no_changes",
+            certification_restricted=True,
+            restriction_reason="Certification-restricted PDF: DocMDP NO_CHANGES forbids signing.",
+        ),
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.validation.validate_pdf_signature",
+        lambda signature, signer_validation_context: _FakeStatus(intact=True, valid=False),
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.ValidationContext",
+        lambda trust_roots: object(),
+    )
+
+    summary = PyHankoDocumentReviewInspector().inspect(str(pdf_path))
+
+    assert summary.cryptographic_validation_passed is False
+    assert (
+        "Recommended next step: reopen the signed PDF, review the selected signature details "
+        "carefully, and expect that further changes may be blocked."
+        in summary.signature_items[0].drill_in_detail
+    )
+
+
 def test_document_review_inspector_reports_next_action_guidance_when_not_evaluated(
     monkeypatch,
     tmp_path,
@@ -308,5 +369,44 @@ def test_document_review_inspector_reports_next_action_guidance_when_not_evaluat
     assert (
         "Recommended next step: reopen the signed PDF and review the embedded signer "
         "details before relying on this signature."
+        in summary.signature_items[0].drill_in_detail
+    )
+
+
+def test_document_review_inspector_reports_restricted_next_action_guidance_when_not_evaluated(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    pdf_path = tmp_path / "restricted-unsigned-validation.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    class _FakeSignature:
+        signer_cert = None
+
+    class _FakeReader:
+        def __init__(self, _handle) -> None:
+            self.embedded_signatures = [_FakeSignature()]
+
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.PdfFileReader",
+        _FakeReader,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.inspect_pdf_certification_reader",
+        lambda _reader: CertificationPolicyResult(
+            docmdp_permission="no_changes",
+            certification_restricted=True,
+            restriction_reason="Certification-restricted PDF: DocMDP NO_CHANGES forbids signing.",
+        ),
+    )
+
+    summary = PyHankoDocumentReviewInspector().inspect(str(pdf_path))
+
+    assert summary.signature_count == 1
+    assert summary.cryptographic_validation_passed is None
+    assert len(summary.signature_items) == 1
+    assert (
+        "Recommended next step: reopen the signed PDF, review the embedded signer details, "
+        "and expect that further changes may be blocked."
         in summary.signature_items[0].drill_in_detail
     )

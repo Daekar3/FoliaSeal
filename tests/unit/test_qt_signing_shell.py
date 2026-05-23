@@ -1292,6 +1292,64 @@ def test_signing_shell_renders_next_action_guidance_for_not_evaluated_signature(
     )
 
 
+def test_signing_shell_renders_restricted_next_action_guidance(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review: restricted",
+            detail=(
+                "Found 1 embedded signature. Latest signer: CN=Alice Example. "
+                "Latest signature needs attention: local verification failed."
+            ),
+            signature_count=1,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1 (latest)",
+                    signer_subject="CN=Alice Example",
+                    cryptographic_validation_passed=False,
+                    detail="CN=Alice Example: needs local verification attention.",
+                    drill_in_detail=(
+                        "Signer: CN=Alice Example.\n"
+                        "Local verification: needs local verification attention.\n"
+                        "Document restrictions: Certification-restricted PDF: DocMDP "
+                        "NO_CHANGES forbids signing.\n"
+                        "Recommended next step: reopen the signed PDF, review the "
+                        "selected signature details carefully, and expect that further "
+                        "changes may be blocked."
+                    ),
+                ),
+            ),
+            signer_subject="CN=Alice Example",
+            cryptographic_validation_passed=False,
+            certification_restricted=True,
+            restriction_reason="Certification-restricted PDF: DocMDP NO_CHANGES forbids signing.",
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    assert (
+        "Recommended next step: reopen the signed PDF, review the selected signature "
+        "details carefully, and expect that further changes may be blocked."
+        in widget.document_review_signature_detail_label.text()
+    )
+
+
 def test_signing_shell_preserves_selected_signature_on_review_refresh(
     monkeypatch,
     tmp_path: Path,
