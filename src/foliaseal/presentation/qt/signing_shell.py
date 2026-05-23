@@ -174,6 +174,8 @@ class DocumentReviewControls:
     headline_label: Any
     detail_label: Any
     signature_items_label: Any
+    signature_selector: Any
+    signature_detail_label: Any
     verify_button: Any
 
 
@@ -1803,6 +1805,7 @@ class SigningWorkspaceWidget:
             document_review_inspector or PyHankoDocumentReviewInspector()
         )
         self._document_review_summary: DocumentReviewSummary | None = None
+        self._selected_document_review_signature_label: str | None = None
         self._document_text_selection_session = DocumentTextSelectionSession(
             input_pdf_path=viewer_workflow.document_path,
             selection_engine=document_text_selection_engine
@@ -1917,6 +1920,12 @@ class SigningWorkspaceWidget:
         self.widget.document_review_signature_items_label = (  # type: ignore[attr-defined]
             self._document_review_controls.signature_items_label
         )
+        self.widget.document_review_signature_selector = (  # type: ignore[attr-defined]
+            self._document_review_controls.signature_selector
+        )
+        self.widget.document_review_signature_detail_label = (  # type: ignore[attr-defined]
+            self._document_review_controls.signature_detail_label
+        )
         self.widget.document_review_verify_button = (  # type: ignore[attr-defined]
             self._document_review_controls.verify_button
         )
@@ -2014,6 +2023,7 @@ class SigningWorkspaceWidget:
         self._document_review_controls.signature_items_label.setText(
             _format_document_signature_items(summary.signature_items)
         )
+        self._sync_document_review_signature_detail(summary.signature_items)
         return summary
 
     def search_document_text(self) -> DocumentTextSearchState:
@@ -2420,9 +2430,17 @@ class SigningWorkspaceWidget:
         headline_label = self._bindings.q_label("")
         detail_label = self._bindings.q_label("")
         signature_items_label = self._bindings.q_label("")
+        signature_selector = self._bindings.q_combo_box()
+        signature_selector.setEnabled(False)
+        signature_detail_label = self._bindings.q_label("")
         verify_button = self._bindings.q_push_button("Verify signed PDF")
         verify_button.setEnabled(False)
-        for label in (headline_label, detail_label, signature_items_label):
+        for label in (
+            headline_label,
+            detail_label,
+            signature_items_label,
+            signature_detail_label,
+        ):
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
         if hasattr(headline_label, "setStyleSheet"):
@@ -2431,18 +2449,69 @@ class SigningWorkspaceWidget:
             detail_label.setStyleSheet("color: #374151;")
         if hasattr(signature_items_label, "setStyleSheet"):
             signature_items_label.setStyleSheet("color: #1f2937;")
+        if hasattr(signature_detail_label, "setStyleSheet"):
+            signature_detail_label.setStyleSheet("color: #374151;")
+        index_changed = getattr(signature_selector, "currentIndexChanged", None)
+        if hasattr(index_changed, "connect"):
+            index_changed.connect(  # type: ignore[attr-defined]
+                self._on_document_review_signature_selected
+            )
         verify_button.clicked.connect(self.open_signed_output)  # type: ignore[attr-defined]
         layout.addWidget(headline_label)
         layout.addWidget(detail_label)
         layout.addWidget(signature_items_label)
+        layout.addWidget(signature_selector)
+        layout.addWidget(signature_detail_label)
         layout.addWidget(verify_button)
         return DocumentReviewControls(
             container=container,
             headline_label=headline_label,
             detail_label=detail_label,
             signature_items_label=signature_items_label,
+            signature_selector=signature_selector,
+            signature_detail_label=signature_detail_label,
             verify_button=verify_button,
         )
+
+    def _sync_document_review_signature_detail(
+        self,
+        signature_items: tuple[DocumentSignatureReviewItem, ...],
+    ) -> None:
+        selector = self._document_review_controls.signature_selector
+        detail_label = self._document_review_controls.signature_detail_label
+        selector.clear()
+        if not signature_items:
+            selector.setEnabled(False)
+            detail_label.setText("")
+            self._selected_document_review_signature_label = None
+            return
+        selector.addItems([item.label for item in signature_items])
+        selector.setEnabled(len(signature_items) > 1)
+        selected_label = self._selected_document_review_signature_label
+        selected_index = next(
+            (
+                index
+                for index, item in enumerate(signature_items)
+                if item.label == selected_label
+            ),
+            len(signature_items) - 1,
+        )
+        setter = getattr(selector, "setCurrentIndex", None)
+        if callable(setter):
+            setter(selected_index)
+            return
+        self._selected_document_review_signature_label = signature_items[selected_index].label
+        detail_label.setText(signature_items[selected_index].drill_in_detail)
+
+    def _on_document_review_signature_selected(self, index: int) -> None:
+        summary = self._document_review_summary
+        if summary is None or index < 0 or index >= len(summary.signature_items):
+            self._selected_document_review_signature_label = None
+            self._document_review_controls.signature_detail_label.setText("")
+            return
+        item = summary.signature_items[index]
+        self._selected_document_review_signature_label = item.label
+        self._document_review_controls.signature_detail_label.setText(item.drill_in_detail)
 
     def _build_document_text_controls(self) -> DocumentTextControls:
         container = self._bindings.q_group_box("Document text")

@@ -1069,12 +1069,24 @@ def test_signing_shell_renders_per_signature_review_items(
                     signer_subject="CN=Bob Example",
                     cryptographic_validation_passed=True,
                     detail="CN=Bob Example: verified locally.",
+                    drill_in_detail=(
+                        "Signer: CN=Bob Example.\n"
+                        "Local verification: verified locally.\n"
+                        "Document permissions: Certification permits form filling "
+                        "and additional signing changes."
+                    ),
                 ),
                 DocumentSignatureReviewItem(
                     label="Signature 2 (latest)",
                     signer_subject="CN=Alice Example",
                     cryptographic_validation_passed=False,
                     detail="CN=Alice Example: needs local verification attention.",
+                    drill_in_detail=(
+                        "Signer: CN=Alice Example.\n"
+                        "Local verification: needs local verification attention.\n"
+                        "Document permissions: Certification permits form filling "
+                        "and additional signing changes."
+                    ),
                 ),
             ),
             signer_subject="CN=Alice Example",
@@ -1093,6 +1105,220 @@ def test_signing_shell_renders_per_signature_review_items(
         "Signature 2 (latest): "
         "CN=Alice Example: needs local verification attention."
     ) in rendered
+
+
+def test_signing_shell_updates_drill_in_detail_for_selected_signature(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail=(
+                "Found 2 embedded signatures. Latest signer: CN=Alice Example. "
+                "Latest signature needs attention: local verification failed."
+            ),
+            signature_count=2,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1",
+                    signer_subject="CN=Bob Example",
+                    cryptographic_validation_passed=True,
+                    detail="CN=Bob Example: verified locally.",
+                    drill_in_detail=(
+                        "Signer: CN=Bob Example.\n"
+                        "Local verification: verified locally.\n"
+                        "Document permissions: Certification permits form filling "
+                        "and additional signing changes."
+                    ),
+                ),
+                DocumentSignatureReviewItem(
+                    label="Signature 2 (latest)",
+                    signer_subject="CN=Alice Example",
+                    cryptographic_validation_passed=False,
+                    detail="CN=Alice Example: needs local verification attention.",
+                    drill_in_detail=(
+                        "Signer: CN=Alice Example.\n"
+                        "Local verification: needs local verification attention.\n"
+                        "Document permissions: Certification permits form filling "
+                        "and additional signing changes."
+                    ),
+                ),
+            ),
+            signer_subject="CN=Alice Example",
+            cryptographic_validation_passed=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    assert widget.document_review_signature_selector.count() == 2
+    assert widget.document_review_signature_selector.currentText() == "Signature 2 (latest)"
+    assert "Signer: CN=Alice Example." in widget.document_review_signature_detail_label.text()
+
+    widget.document_review_signature_selector.setCurrentIndex(0)
+
+    assert widget.document_review_signature_selector.currentText() == "Signature 1"
+    assert "Signer: CN=Bob Example." in widget.document_review_signature_detail_label.text()
+    assert (
+        "Local verification: verified locally."
+        in widget.document_review_signature_detail_label.text()
+    )
+
+
+def test_signing_shell_disables_review_selector_for_single_signature_detail(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail=(
+                "Found 1 embedded signature. Latest signer: CN=Alice Example. "
+                "Latest signature verified locally."
+            ),
+            signature_count=1,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1 (latest)",
+                    signer_subject="CN=Alice Example",
+                    cryptographic_validation_passed=True,
+                    detail="CN=Alice Example: verified locally.",
+                    drill_in_detail=(
+                        "Signer: CN=Alice Example.\n"
+                        "Local verification: verified locally.\n"
+                        "Document permissions: No certification restriction was detected."
+                    ),
+                ),
+            ),
+            signer_subject="CN=Alice Example",
+            cryptographic_validation_passed=True,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    assert widget.document_review_signature_selector.count() == 1
+    assert widget.document_review_signature_selector.enabled is False
+    assert "Signer: CN=Alice Example." in widget.document_review_signature_detail_label.text()
+
+
+def test_signing_shell_preserves_selected_signature_on_review_refresh(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail="Found 2 embedded signatures.",
+            signature_count=2,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1",
+                    signer_subject="CN=Bob Example",
+                    cryptographic_validation_passed=True,
+                    detail="CN=Bob Example: verified locally.",
+                    drill_in_detail=(
+                        "Signer: CN=Bob Example.\n"
+                        "Local verification: verified locally."
+                    ),
+                ),
+                DocumentSignatureReviewItem(
+                    label="Signature 2 (latest)",
+                    signer_subject="CN=Alice Example",
+                    cryptographic_validation_passed=False,
+                    detail="CN=Alice Example: needs local verification attention.",
+                    drill_in_detail=(
+                        "Signer: CN=Alice Example.\n"
+                        "Local verification: needs local verification attention."
+                    ),
+                ),
+            ),
+            signer_subject="CN=Alice Example",
+            cryptographic_validation_passed=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    widget.document_review_signature_selector.setCurrentIndex(0)
+    inspector.summary = DocumentReviewSummary(
+        headline="Signature review",
+        detail="Found 2 embedded signatures.",
+        signature_count=2,
+        signature_items=(
+            DocumentSignatureReviewItem(
+                label="Signature 1",
+                signer_subject="CN=Bob Example",
+                cryptographic_validation_passed=True,
+                detail="CN=Bob Example: verified locally.",
+                drill_in_detail=(
+                    "Signer: CN=Bob Example.\n"
+                    "Local verification: verified locally.\n"
+                    "Document permissions: No certification restriction was detected."
+                ),
+            ),
+            DocumentSignatureReviewItem(
+                label="Signature 2 (latest)",
+                signer_subject="CN=Alice Example",
+                cryptographic_validation_passed=False,
+                detail="CN=Alice Example: needs local verification attention.",
+                drill_in_detail=(
+                    "Signer: CN=Alice Example.\n"
+                    "Local verification: needs local verification attention."
+                ),
+            ),
+        ),
+        signer_subject="CN=Alice Example",
+        cryptographic_validation_passed=False,
+    )
+
+    widget.refresh_document_review()
+
+    assert widget.document_review_signature_selector.currentText() == "Signature 1"
+    assert (
+        "Document permissions: No certification restriction was detected."
+        in widget.document_review_signature_detail_label.text()
+    )
 
 
 def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(

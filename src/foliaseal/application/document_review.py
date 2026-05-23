@@ -37,6 +37,7 @@ class DocumentSignatureReviewItem:
     signer_subject: str | None
     cryptographic_validation_passed: bool | None
     detail: str
+    drill_in_detail: str = ""
 
 
 class DocumentReviewInspector(Protocol):
@@ -169,6 +170,9 @@ class PyHankoDocumentReviewInspector:
                         signature,
                         index=index,
                         latest_index=len(embedded_signatures) - 1,
+                        docmdp_permission=certification.docmdp_permission,
+                        certification_restricted=certification.certification_restricted,
+                        restriction_reason=certification.restriction_reason,
                     )
                     for index, signature in enumerate(embedded_signatures)
                 )
@@ -221,6 +225,9 @@ def _signature_review_item(
     *,
     index: int,
     latest_index: int,
+    docmdp_permission: str | None,
+    certification_restricted: bool,
+    restriction_reason: str | None,
 ) -> DocumentSignatureReviewItem:
     signer_subject = _signer_subject(signature)
     cryptographic_validation_passed = _verify_signature_locally(signature)
@@ -242,6 +249,51 @@ def _signature_review_item(
         signer_subject=signer_subject,
         cryptographic_validation_passed=cryptographic_validation_passed,
         detail=f"{subject_text}: {status_text}.",
+        drill_in_detail=_signature_drill_in_detail(
+            signer_subject=signer_subject,
+            cryptographic_validation_passed=cryptographic_validation_passed,
+            docmdp_permission=docmdp_permission,
+            certification_restricted=certification_restricted,
+            restriction_reason=restriction_reason,
+        ),
+    )
+
+
+def _signature_drill_in_detail(
+    *,
+    signer_subject: str | None,
+    cryptographic_validation_passed: bool | None,
+    docmdp_permission: str | None,
+    certification_restricted: bool,
+    restriction_reason: str | None,
+) -> str:
+    signer_text = signer_subject or "Signer not available"
+    if cryptographic_validation_passed is True:
+        verification_text = "verified locally"
+    elif cryptographic_validation_passed is False:
+        verification_text = "needs local verification attention"
+    else:
+        verification_text = "local verification not evaluated"
+    if certification_restricted or restriction_reason:
+        guidance_line = (
+            "Document restrictions: "
+            f"{restriction_reason or 'document certification restricts changes.'}"
+        )
+    else:
+        guidance_line = (
+            "Document permissions: "
+            + _certification_guidance(
+                docmdp_permission=docmdp_permission,
+                certification_restricted=False,
+                restriction_reason=None,
+            )
+        )
+    return "\n".join(
+        (
+            f"Signer: {signer_text}.",
+            f"Local verification: {verification_text}.",
+            guidance_line,
+        )
     )
 
 

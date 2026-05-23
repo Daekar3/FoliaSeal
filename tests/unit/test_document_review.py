@@ -220,8 +220,18 @@ def test_document_review_inspector_reports_all_embedded_signatures(
     assert len(summary.signature_items) == 2
     assert summary.signature_items[0].label == "Signature 1"
     assert summary.signature_items[0].detail == "CN=Bob Example: verified locally."
+    assert "Signer: CN=Bob Example." in summary.signature_items[0].drill_in_detail
+    assert "Local verification: verified locally." in summary.signature_items[0].drill_in_detail
+    assert (
+        "Document permissions: Certification permits form filling and additional signing changes."
+        in summary.signature_items[0].drill_in_detail
+    )
     assert summary.signature_items[1].label == "Signature 2 (latest)"
     assert (
         summary.signature_items[1].detail
         == "CN=Alice Example: needs local verification attention."
+    )
+    assert (
+        "Local verification: needs local verification attention."
+        in summary.signature_items[1].drill_in_detail
     )
