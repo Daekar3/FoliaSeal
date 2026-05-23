@@ -1981,6 +1981,10 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
 
     assert widget.flow_stage_label.text() == "Place signature"
     assert "Drag on the page" in widget.flow_detail_label.text()
+    assert len(widget.layout.items) == 1
+    assert len(widget.layout.items[0][0].items) == 2
+    assert widget.properties_scroll.parent is widget.sidebar
+    assert widget.choose_output_button.parent is widget.sidebar
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2

@@ -1,4 +1,4 @@
-"""Qt signing shell for the Phase 3 visible-signature workflow."""
+"""Qt signing shell for the FoliaSeal signing workspace."""
 
 from __future__ import annotations
 
@@ -83,6 +83,10 @@ from foliaseal.presentation.qt.signature_preview_layout import (
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     QtCanonicalPreviewLifecycle,
 )
+from foliaseal.presentation.qt.signing_workspace_sidebar import (
+    SigningWorkspaceSidebar,
+    format_document_signature_items,
+)
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
 SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
@@ -157,45 +161,6 @@ class CertificateConfigurationControls:
     apply_button: Any
 
 
-@dataclass(frozen=True)
-class SigningFlowSummaryControls:
-    """Read-only labels that show the current signing-flow stage."""
-
-    container: Any
-    stage_label: Any
-    detail_label: Any
-
-
-@dataclass(frozen=True)
-class DocumentReviewControls:
-    """Read-only labels that summarize the current PDF review state."""
-
-    container: Any
-    headline_label: Any
-    detail_label: Any
-    signature_items_label: Any
-    signature_selector: Any
-    signature_detail_label: Any
-    verify_button: Any
-
-
-@dataclass(frozen=True)
-class DocumentTextControls:
-    """Read-only widgets that expose document text review actions."""
-
-    container: Any
-    query_input: Any
-    find_button: Any
-    previous_button: Any
-    next_button: Any
-    copy_button: Any
-    select_mode_checkbox: Any
-    copy_selection_button: Any
-    clear_selection_button: Any
-    status_label: Any
-    detail_label: Any
-
-
 class SigningRequestExecutor(Protocol):
     """Executes a validated signing request and returns a signing result."""
 
@@ -256,15 +221,6 @@ class PreviewControls:
     multi_detail_label: Any
     multi_render_label: Any
     footer_label: Any
-
-
-def _format_document_signature_items(
-    signature_items: tuple[DocumentSignatureReviewItem, ...],
-) -> str:
-    if not signature_items:
-        return ""
-    return "\n".join(f"{item.label}: {item.detail}" for item in signature_items)
-
 
 def _compose_row(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
     container = bindings.q_widget()
@@ -1833,13 +1789,6 @@ class SigningWorkspaceWidget:
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
 
-        self._flow_summary_controls = self._build_flow_summary_controls()
-        self._document_review_controls = self._build_document_review_controls()
-        self._document_text_controls = self._build_document_text_controls()
-        self._main_row = bindings.q_hbox_layout()
-        self._main_row.setContentsMargins(0, 0, 0, 0)
-        self._main_row.setSpacing(8)
-
         self._viewer_widget = build_qt_pdf_viewer_widget(
             workflow=viewer_workflow,
             on_selection=self._handle_viewer_selection,
@@ -1859,44 +1808,49 @@ class SigningWorkspaceWidget:
             on_page_change=self._handle_page_change,
             on_error=self._emit_error,
         )
-        self._properties_scroll = bindings.q_scroll_area()
-        scroll_setter = getattr(self._properties_scroll, "setWidgetResizable", None)
-        if callable(scroll_setter):
-            scroll_setter(True)
-        widget_setter = getattr(self._properties_scroll, "setWidget", None)
-        if callable(widget_setter):
-            widget_setter(self.properties_panel.container)
-        self._sign_button = bindings.q_push_button("Confirm and sign")
-        self._sign_button.clicked.connect(self.submit_sign_request)  # type: ignore[attr-defined]
-        self._result_label = bindings.q_label("")
-        if hasattr(self._result_label, "setWordWrap"):
-            self._result_label.setWordWrap(True)
-        if hasattr(self._result_label, "setStyleSheet"):
-            self._result_label.setStyleSheet("color: #444;")
+        self._sidebar = SigningWorkspaceSidebar(
+            bindings=bindings,
+            properties_widget=self.properties_panel.container,
+            on_choose_output=self.choose_output_pdf_path,
+            on_sign=self.submit_sign_request,
+            on_open_signed_output=self.open_signed_output,
+            on_find_text=self.search_document_text,
+            on_previous_text_match=self.previous_document_text_match,
+            on_next_text_match=self.next_document_text_match,
+            on_copy_text_match=self.copy_current_document_text_match,
+            on_text_selection_mode_changed=self.set_document_text_selection_mode,
+            on_copy_selected_text=self.copy_selected_document_text,
+            on_clear_selected_text=self.clear_selected_document_text,
+        )
+        self._flow_summary_controls = self._sidebar.flow_summary_controls
+        self._document_review_controls = self._sidebar.document_review_controls
+        self._document_text_controls = self._sidebar.document_text_controls
+        self._properties_scroll = self._sidebar.properties_scroll
+        self._choose_output_button = self._sidebar.choose_output_button
+        self._sign_button = self._sidebar.sign_button
+        self._open_signed_output_button = self._sidebar.open_signed_output_button
+        self._result_label = self._sidebar.result_label
+        index_changed = getattr(
+            self._document_review_controls.signature_selector,
+            "currentIndexChanged",
+            None,
+        )
+        if hasattr(index_changed, "connect"):
+            index_changed.connect(  # type: ignore[attr-defined]
+                self._on_document_review_signature_selected
+            )
 
-        self._choose_output_button = bindings.q_push_button("Choose output...")
-        self._choose_output_button.clicked.connect(  # type: ignore[attr-defined]
-            self.choose_output_pdf_path
-        )
-        self._open_signed_output_button = bindings.q_push_button("Open signed PDF")
-        self._open_signed_output_button.setEnabled(False)
-        self._open_signed_output_button.clicked.connect(  # type: ignore[attr-defined]
-            self.open_signed_output
-        )
+        self._main_row = bindings.q_hbox_layout()
+        self._main_row.setContentsMargins(0, 0, 0, 0)
+        self._main_row.setSpacing(8)
         self._main_row.addWidget(self._viewer_widget, 3)
-        self._main_row.addWidget(self._properties_scroll, 2)
-        self._layout.addWidget(self._flow_summary_controls.container)
-        self._layout.addWidget(self._document_review_controls.container)
-        self._layout.addWidget(self._document_text_controls.container)
+        self._main_row.addWidget(self._sidebar.container, 2)
         self._layout.addLayout(self._main_row)
-        self._layout.addWidget(self._choose_output_button)
-        self._layout.addWidget(self._sign_button)
-        self._layout.addWidget(self._open_signed_output_button)
-        self._layout.addWidget(self._result_label)
 
         self.widget.properties_panel = self.properties_panel  # type: ignore[attr-defined]
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
+        self.widget.sidebar = self._sidebar.container  # type: ignore[attr-defined]
         self.widget.choose_output_button = self._choose_output_button  # type: ignore[attr-defined]
         self.widget.open_signed_output_button = (  # type: ignore[attr-defined]
             self._open_signed_output_button
@@ -2021,7 +1975,7 @@ class SigningWorkspaceWidget:
         self._document_review_controls.headline_label.setText(summary.headline)
         self._document_review_controls.detail_label.setText(summary.detail)
         self._document_review_controls.signature_items_label.setText(
-            _format_document_signature_items(summary.signature_items)
+            format_document_signature_items(summary.signature_items)
         )
         self._sync_document_review_signature_detail(summary.signature_items)
         return summary
@@ -2382,97 +2336,6 @@ class SigningWorkspaceWidget:
     def _refresh_sign_button_state(self) -> None:
         self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
 
-    def _build_flow_summary_controls(self) -> SigningFlowSummaryControls:
-        container = self._bindings.q_group_box("Signing flow")
-        if hasattr(container, "setStyleSheet"):
-            container.setStyleSheet(
-                "QGroupBox {"
-                " border: 1px solid #d0d7de;"
-                " border-radius: 6px;"
-                " padding: 6px;"
-                " background: #f6f8fa;"
-                "}"
-            )
-        layout = self._bindings.q_vbox_layout(container)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(3)
-        stage_label = self._bindings.q_label("")
-        detail_label = self._bindings.q_label("")
-        for label in (stage_label, detail_label):
-            if hasattr(label, "setWordWrap"):
-                label.setWordWrap(True)
-        if hasattr(stage_label, "setStyleSheet"):
-            stage_label.setStyleSheet("font-weight: 700; color: #111827;")
-        if hasattr(detail_label, "setStyleSheet"):
-            detail_label.setStyleSheet("color: #374151;")
-        layout.addWidget(stage_label)
-        layout.addWidget(detail_label)
-        return SigningFlowSummaryControls(
-            container=container,
-            stage_label=stage_label,
-            detail_label=detail_label,
-        )
-
-    def _build_document_review_controls(self) -> DocumentReviewControls:
-        container = self._bindings.q_group_box("Document review")
-        if hasattr(container, "setStyleSheet"):
-            container.setStyleSheet(
-                "QGroupBox {"
-                " border: 1px solid #d0d7de;"
-                " border-radius: 6px;"
-                " padding: 6px;"
-                " background: #f6f8fa;"
-                "}"
-            )
-        layout = self._bindings.q_vbox_layout(container)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(3)
-        headline_label = self._bindings.q_label("")
-        detail_label = self._bindings.q_label("")
-        signature_items_label = self._bindings.q_label("")
-        signature_selector = self._bindings.q_combo_box()
-        signature_selector.setEnabled(False)
-        signature_detail_label = self._bindings.q_label("")
-        verify_button = self._bindings.q_push_button("Verify signed PDF")
-        verify_button.setEnabled(False)
-        for label in (
-            headline_label,
-            detail_label,
-            signature_items_label,
-            signature_detail_label,
-        ):
-            if hasattr(label, "setWordWrap"):
-                label.setWordWrap(True)
-        if hasattr(headline_label, "setStyleSheet"):
-            headline_label.setStyleSheet("font-weight: 700; color: #111827;")
-        if hasattr(detail_label, "setStyleSheet"):
-            detail_label.setStyleSheet("color: #374151;")
-        if hasattr(signature_items_label, "setStyleSheet"):
-            signature_items_label.setStyleSheet("color: #1f2937;")
-        if hasattr(signature_detail_label, "setStyleSheet"):
-            signature_detail_label.setStyleSheet("color: #374151;")
-        index_changed = getattr(signature_selector, "currentIndexChanged", None)
-        if hasattr(index_changed, "connect"):
-            index_changed.connect(  # type: ignore[attr-defined]
-                self._on_document_review_signature_selected
-            )
-        verify_button.clicked.connect(self.open_signed_output)  # type: ignore[attr-defined]
-        layout.addWidget(headline_label)
-        layout.addWidget(detail_label)
-        layout.addWidget(signature_items_label)
-        layout.addWidget(signature_selector)
-        layout.addWidget(signature_detail_label)
-        layout.addWidget(verify_button)
-        return DocumentReviewControls(
-            container=container,
-            headline_label=headline_label,
-            detail_label=detail_label,
-            signature_items_label=signature_items_label,
-            signature_selector=signature_selector,
-            signature_detail_label=signature_detail_label,
-            verify_button=verify_button,
-        )
-
     def _sync_document_review_signature_detail(
         self,
         signature_items: tuple[DocumentSignatureReviewItem, ...],
@@ -2512,84 +2375,6 @@ class SigningWorkspaceWidget:
         item = summary.signature_items[index]
         self._selected_document_review_signature_label = item.label
         self._document_review_controls.signature_detail_label.setText(item.drill_in_detail)
-
-    def _build_document_text_controls(self) -> DocumentTextControls:
-        container = self._bindings.q_group_box("Document text")
-        if hasattr(container, "setStyleSheet"):
-            container.setStyleSheet(
-                "QGroupBox {"
-                " border: 1px solid #d0d7de;"
-                " border-radius: 6px;"
-                " padding: 6px;"
-                " background: #f6f8fa;"
-                "}"
-            )
-        layout = self._bindings.q_vbox_layout(container)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
-        query_input = self._bindings.q_line_edit()
-        query_input.setPlaceholderText("Search document text")
-        find_button = self._bindings.q_push_button("Find")
-        previous_button = self._bindings.q_push_button("Previous")
-        next_button = self._bindings.q_push_button("Next")
-        copy_button = self._bindings.q_push_button("Copy result")
-        select_mode_checkbox = self._bindings.q_check_box("Select text")
-        copy_selection_button = self._bindings.q_push_button("Copy selection")
-        clear_selection_button = self._bindings.q_push_button("Clear selection")
-        previous_button.setEnabled(False)
-        next_button.setEnabled(False)
-        copy_button.setEnabled(False)
-        copy_selection_button.setEnabled(False)
-        clear_selection_button.setEnabled(False)
-        controls_row = _compose_row(
-            self._bindings,
-            query_input,
-            find_button,
-            previous_button,
-            next_button,
-            copy_button,
-        )
-        selection_row = _compose_row(
-            self._bindings,
-            select_mode_checkbox,
-            copy_selection_button,
-            clear_selection_button,
-        )
-        status_label = self._bindings.q_label("")
-        detail_label = self._bindings.q_label("")
-        for label in (status_label, detail_label):
-            if hasattr(label, "setWordWrap"):
-                label.setWordWrap(True)
-        if hasattr(status_label, "setStyleSheet"):
-            status_label.setStyleSheet("font-weight: 700; color: #111827;")
-        if hasattr(detail_label, "setStyleSheet"):
-            detail_label.setStyleSheet("color: #374151;")
-        find_button.clicked.connect(self.search_document_text)  # type: ignore[attr-defined]
-        previous_button.clicked.connect(self.previous_document_text_match)  # type: ignore[attr-defined]
-        next_button.clicked.connect(self.next_document_text_match)  # type: ignore[attr-defined]
-        copy_button.clicked.connect(self.copy_current_document_text_match)  # type: ignore[attr-defined]
-        select_mode_checkbox.stateChanged.connect(  # type: ignore[attr-defined]
-            lambda state: self.set_document_text_selection_mode(bool(state))
-        )
-        copy_selection_button.clicked.connect(self.copy_selected_document_text)  # type: ignore[attr-defined]
-        clear_selection_button.clicked.connect(self.clear_selected_document_text)  # type: ignore[attr-defined]
-        layout.addWidget(controls_row)
-        layout.addWidget(selection_row)
-        layout.addWidget(status_label)
-        layout.addWidget(detail_label)
-        return DocumentTextControls(
-            container=container,
-            query_input=query_input,
-            find_button=find_button,
-            previous_button=previous_button,
-            next_button=next_button,
-            copy_button=copy_button,
-            select_mode_checkbox=select_mode_checkbox,
-            copy_selection_button=copy_selection_button,
-            clear_selection_button=clear_selection_button,
-            status_label=status_label,
-            detail_label=detail_label,
-        )
 
     def _apply_document_text_state(self, state: DocumentTextSearchState) -> None:
         self._document_text_controls.status_label.setText(state.status_text)
@@ -2690,7 +2475,7 @@ class SigningWorkspaceWidget:
 
 
 class SigningShellAdapter:
-    """Factory for the Phase 3 Qt signing shell."""
+    """Factory for the FoliaSeal Qt signing shell."""
 
     def __init__(self) -> None:
         self._bindings = self._load_bindings()
@@ -2811,7 +2596,7 @@ def build_qt_signing_shell(
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
 ) -> Any:
-    """Build a QWidget instance for the Phase 3 signing shell."""
+    """Build a QWidget instance for the FoliaSeal signing shell."""
 
     adapter = SigningShellAdapter()
     return adapter.create(
