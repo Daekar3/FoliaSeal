@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import importlib
-from collections.abc import Callable
+import sys
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,7 @@ class QtAppFrameBindings:
     q_file_dialog: Any
     q_message_box: Any
     q_action: type[Any]
+    q_application: type[Any]
     qpdf_document: type[Any]
 
 
@@ -1092,6 +1094,52 @@ class QtAppFrameAdapter:
             on_status_change=on_status_change,
         ).container
 
+    def launch(
+        self,
+        *,
+        argv: Sequence[str] | None = None,
+        initial_pdf_path: str | Path | None = None,
+        app_settings: AppSettings | None = None,
+        app_settings_store: AppSettingsStore | None = None,
+        certificate_catalog_store: CertificateCatalogStore | None = None,
+        certificate_secret_provider: Any | None = None,
+        preset_catalog_store: SignaturePresetCatalogStore | None = None,
+        sign_executor: SigningRequestExecutor | None = None,
+        on_sign_request: Callable[[SigningRequest], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
+        on_status_change: Callable[[str], None] | None = None,
+    ) -> int:
+        q_application = self._bindings.q_application
+        instance_getter = getattr(q_application, "instance", None)
+        app = instance_getter() if callable(instance_getter) else None
+        if app is None:
+            launch_argv = list(argv) if argv is not None else list(sys.argv)
+            if not launch_argv:
+                launch_argv = ["foliaseal", "gui"]
+            app = q_application(launch_argv)
+
+        frame = FoliaSealAppFrame(
+            bindings=self._bindings,
+            app_settings=app_settings,
+            app_settings_store=app_settings_store,
+            certificate_catalog_store=certificate_catalog_store,
+            certificate_secret_provider=certificate_secret_provider,
+            preset_catalog_store=preset_catalog_store,
+            sign_executor=sign_executor,
+            on_sign_request=on_sign_request,
+            on_error=on_error,
+            on_status_change=on_status_change,
+        )
+        show = getattr(frame.window, "show", None)
+        if callable(show):
+            show()
+        if initial_pdf_path is not None:
+            frame.open_pdf_path(initial_pdf_path)
+        exec_method = getattr(app, "exec", None)
+        if not callable(exec_method):
+            return 0
+        return int(exec_method())
+
     def _load_bindings(self) -> QtAppFrameBindings:
         try:
             qt_widgets = importlib.import_module("PySide6.QtWidgets")
@@ -1115,6 +1163,7 @@ class QtAppFrameAdapter:
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),
             q_action=getattr(qt_gui, "QAction"),
+            q_application=getattr(qt_widgets, "QApplication"),
             qpdf_document=getattr(qtpdf, "QPdfDocument"),
         )
 
@@ -1135,6 +1184,38 @@ def build_qt_app_frame(
 
     adapter = QtAppFrameAdapter()
     return adapter.create(
+        app_settings=app_settings,
+        app_settings_store=app_settings_store,
+        certificate_catalog_store=certificate_catalog_store,
+        certificate_secret_provider=certificate_secret_provider,
+        preset_catalog_store=preset_catalog_store,
+        sign_executor=sign_executor,
+        on_sign_request=on_sign_request,
+        on_error=on_error,
+        on_status_change=on_status_change,
+    )
+
+
+def launch_qt_app_frame(
+    *,
+    argv: Sequence[str] | None = None,
+    initial_pdf_path: str | Path | None = None,
+    app_settings: AppSettings | None = None,
+    app_settings_store: AppSettingsStore | None = None,
+    certificate_catalog_store: CertificateCatalogStore | None = None,
+    certificate_secret_provider: Any | None = None,
+    preset_catalog_store: SignaturePresetCatalogStore | None = None,
+    sign_executor: SigningRequestExecutor | None = None,
+    on_sign_request: Callable[[SigningRequest], None] | None = None,
+    on_error: Callable[[str], None] | None = None,
+    on_status_change: Callable[[str], None] | None = None,
+) -> int:
+    """Create QApplication, show the FoliaSeal main window, and run the event loop."""
+
+    adapter = QtAppFrameAdapter()
+    return adapter.launch(
+        argv=argv,
+        initial_pdf_path=initial_pdf_path,
         app_settings=app_settings,
         app_settings_store=app_settings_store,
         certificate_catalog_store=certificate_catalog_store,

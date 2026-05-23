@@ -142,8 +142,15 @@ source .venv/bin/activate
 python -m pip install -e .[dev]
 ruff check .
 python -m pytest -q
-foliaseal
-python -m foliaseal
+foliaseal gui
+python -m foliaseal gui
+```
+
+If you only want to run the real Qt GUI without the full dev toolchain, install the GUI extra instead:
+
+```bash
+python -m pip install -e .[gui]
+foliaseal gui --pdf-path "/path/to/representative.pdf"
 ```
 
 ## PyInstaller build

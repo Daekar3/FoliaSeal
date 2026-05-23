@@ -1,6 +1,21 @@
 from foliaseal.__main__ import _build_parser
 
 
+def test_gui_parser_accepts_optional_pdf_path() -> None:
+    parser = _build_parser()
+
+    args = parser.parse_args(
+        [
+            "gui",
+            "--pdf-path",
+            "/tmp/example.pdf",
+        ]
+    )
+
+    assert args.command == "gui"
+    assert args.pdf_path == "/tmp/example.pdf"
+
+
 def test_phase3_harness_parser_accepts_certificate_cli_arguments() -> None:
     parser = _build_parser()
 

@@ -67,6 +67,7 @@ class _FakeMainWindow:
         self.title = ""
         self.central_widget = None
         self.menu_bar = _FakeMenuBar()
+        self.show_calls = 0
 
     def setWindowTitle(self, title):  # noqa: N802
         self.title = title
@@ -76,6 +77,9 @@ class _FakeMainWindow:
 
     def setCentralWidget(self, widget):  # noqa: N802
         self.central_widget = widget
+
+    def show(self) -> None:
+        self.show_calls += 1
 
 
 class _FakeLabel:
@@ -235,6 +239,26 @@ class _FakeQPdfDocument:
         return self.next_page_count
 
 
+class _FakeQApplication:
+    _instance = None
+    created_argv = []
+    exec_result = 0
+    exec_calls = 0
+
+    def __init__(self, argv) -> None:
+        self.argv = list(argv)
+        type(self).created_argv.append(self.argv)
+        type(self)._instance = self
+
+    @classmethod
+    def instance(cls):
+        return cls._instance
+
+    def exec(self):
+        type(self).exec_calls += 1
+        return type(self).exec_result
+
+
 class _FakeShell:
     def __init__(self) -> None:
         self.refresh_certificate_configurations_calls = 0
@@ -292,6 +316,10 @@ def _fake_bindings() -> QtAppFrameBindings:
     _FakeQPdfDocument.next_status = _FakeQPdfDocument.Error.None_
     _FakeQPdfDocument.next_page_count = 3
     _FakeQPdfDocument.load_calls = []
+    _FakeQApplication._instance = None
+    _FakeQApplication.created_argv = []
+    _FakeQApplication.exec_result = 0
+    _FakeQApplication.exec_calls = 0
     return QtAppFrameBindings(
         q_main_window=_FakeMainWindow,
         q_dialog=_FakeDialog,
@@ -304,6 +332,7 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_file_dialog=file_dialog,
         q_message_box=message_box,
         q_action=_FakeAction,
+        q_application=_FakeQApplication,
         qpdf_document=_FakeQPdfDocument,
     )
 
@@ -1083,3 +1112,114 @@ def test_build_qt_app_frame_uses_adapter_bindings(monkeypatch, tmp_path: Path) -
 
     assert isinstance(window, _FakeMainWindow)
     assert window.title == "FoliaSeal"
+
+
+def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_pdf(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    _FakeQApplication.exec_result = 7
+
+    class _FakeLaunchFrame:
+        instances = []
+
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            self.window = _FakeMainWindow()
+            self.opened_paths = []
+            type(self).instances.append(self)
+
+        def open_pdf_path(self, path) -> None:
+            self.opened_paths.append(path)
+
+    monkeypatch.setattr(
+        app_frame_module.QtAppFrameAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    monkeypatch.setattr(app_frame_module, "FoliaSealAppFrame", _FakeLaunchFrame)
+
+    exit_code = app_frame_module.launch_qt_app_frame(
+        argv=["foliaseal", "gui", "--pdf-path", "/tmp/sample.pdf"],
+        initial_pdf_path="/tmp/sample.pdf",
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+
+    assert exit_code == 7
+    assert _FakeQApplication.created_argv == [
+        ["foliaseal", "gui", "--pdf-path", "/tmp/sample.pdf"]
+    ]
+    assert _FakeQApplication.exec_calls == 1
+    frame = _FakeLaunchFrame.instances[0]
+    assert frame.window.show_calls == 1
+    assert frame.opened_paths == ["/tmp/sample.pdf"]
+
+
+def test_launch_qt_app_frame_reuses_existing_application(monkeypatch, tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    existing_app = _FakeQApplication(["existing-app"])
+    _FakeQApplication.created_argv = []
+    _FakeQApplication.exec_result = 3
+    _FakeQApplication.exec_calls = 0
+
+    class _FakeLaunchFrame:
+        instances = []
+
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            self.window = _FakeMainWindow()
+            type(self).instances.append(self)
+
+    monkeypatch.setattr(
+        app_frame_module.QtAppFrameAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    monkeypatch.setattr(app_frame_module, "FoliaSealAppFrame", _FakeLaunchFrame)
+
+    exit_code = app_frame_module.launch_qt_app_frame(
+        argv=["foliaseal", "gui"],
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+
+    assert exit_code == 3
+    assert _FakeQApplication.instance() is existing_app
+    assert _FakeQApplication.created_argv == []
+    assert _FakeQApplication.exec_calls == 1
+    assert _FakeLaunchFrame.instances[0].window.show_calls == 1
+
+
+def test_launch_qt_app_frame_uses_process_argv_when_none_is_supplied(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    _FakeQApplication.exec_result = 0
+
+    class _FakeLaunchFrame:
+        def __init__(self, **kwargs) -> None:
+            self.window = _FakeMainWindow()
+
+    monkeypatch.setattr(
+        app_frame_module.QtAppFrameAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    monkeypatch.setattr(app_frame_module, "FoliaSealAppFrame", _FakeLaunchFrame)
+    monkeypatch.setattr(
+        app_frame_module.sys,
+        "argv",
+        ["foliaseal", "gui", "--pdf-path", "/tmp/live.pdf"],
+    )
+
+    app_frame_module.launch_qt_app_frame(
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+
+    assert _FakeQApplication.created_argv == [
+        ["foliaseal", "gui", "--pdf-path", "/tmp/live.pdf"]
+    ]

@@ -9,9 +9,10 @@ from foliaseal import __main__
 
 
 def test_main_without_subcommand_prints_default_message(capsys: pytest.CaptureFixture[str]) -> None:
-    __main__.main([])
+    result = __main__.main([])
 
     output = capsys.readouterr().out
+    assert result == 0
     assert "FoliaSeal phase 0 skeleton ready" in output
 
 
@@ -283,6 +284,61 @@ def test_main_phase2_viewer_harness_dispatches_to_qt_harness(
         "evidence_command_path": "/tmp/evidence-command.sh",
         "checklist_results_path": "artifacts/phase2_manual_qa_results.md",
         "checklist_template_path": "docs/ExecPlans/phase2_manual_qa_checklist.md",
+    }
+
+
+def test_main_gui_dispatches_to_qt_app_launcher(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = {}
+
+    def fake_launch_qt_app_frame(
+        *,
+        argv,
+        initial_pdf_path,
+    ) -> int:
+        captured["argv"] = list(argv) if argv is not None else None
+        captured["initial_pdf_path"] = initial_pdf_path
+        return 0
+
+    monkeypatch.setattr("foliaseal.__main__.launch_qt_app_frame", fake_launch_qt_app_frame)
+
+    result = __main__.main(
+        [
+            "gui",
+            "--pdf-path",
+            "/tmp/sample.pdf",
+        ]
+    )
+
+    assert result == 0
+    assert captured == {
+        "argv": ["gui", "--pdf-path", "/tmp/sample.pdf"],
+        "initial_pdf_path": "/tmp/sample.pdf",
+    }
+
+
+def test_main_gui_uses_process_argv_when_called_without_explicit_argv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    def fake_launch_qt_app_frame(
+        *,
+        argv,
+        initial_pdf_path,
+    ) -> int:
+        captured["argv"] = list(argv) if argv is not None else None
+        captured["initial_pdf_path"] = initial_pdf_path
+        return 9
+
+    monkeypatch.setattr("foliaseal.__main__.launch_qt_app_frame", fake_launch_qt_app_frame)
+    monkeypatch.setattr(__main__.sys, "argv", ["foliaseal", "gui", "--pdf-path", "/tmp/live.pdf"])
+
+    result = __main__.main()
+
+    assert result == 9
+    assert captured == {
+        "argv": ["foliaseal", "gui", "--pdf-path", "/tmp/live.pdf"],
+        "initial_pdf_path": "/tmp/live.pdf",
     }
 
 

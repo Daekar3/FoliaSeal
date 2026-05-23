@@ -4,6 +4,7 @@ from .app_frame import (
     QtAppFrameAdapter,
     QtAppFrameBindingsUnavailable,
     build_qt_app_frame,
+    launch_qt_app_frame,
 )
 from .phase2_harness import (
     HarnessCapture,
@@ -39,6 +40,7 @@ __all__ = [
     "SigningShellAdapter",
     "build_qt_pdf_viewer_widget",
     "build_qt_app_frame",
+    "launch_qt_app_frame",
     "build_qt_signing_shell",
     "build_phase2_evidence_command",
     "build_phase3_checklist_results_markdown",

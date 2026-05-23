@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from foliaseal.application.runtime_metrics import (
     collect_runtime_footprint_snapshot,
     measure_startup_latency_ms,
 )
+from foliaseal.presentation.qt.app_frame import launch_qt_app_frame
 from foliaseal.presentation.qt.phase2_harness import (
     DEFAULT_CHECKLIST_RESULTS_PATH,
     DEFAULT_CHECKLIST_TEMPLATE_PATH,
@@ -252,6 +254,16 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    gui = subparsers.add_parser(
+        "gui",
+        help="Launch the FoliaSeal main GUI.",
+    )
+    gui.add_argument(
+        "--pdf-path",
+        default=None,
+        help="Optional PDF to open immediately after the main window launches.",
+    )
+
     phase3_matrix = subparsers.add_parser(
         "phase3-signing-preview-matrix",
         help="Run a repeatable Phase 3 preview scenario sweep and capture per-scenario artifacts.",
@@ -448,14 +460,14 @@ def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
         raise ValueError("Phase 3 harness capture failed evidence contract validation.")
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run command-line helpers for local development workflows."""
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "phase2-evidence":
         _run_phase2_evidence(args)
-        return
+        return 0
     if args.command == "phase2-viewer-harness":
         run_phase2_viewer_harness(
             pdf_path=args.pdf_path,
@@ -464,7 +476,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             checklist_results_path=args.checklist_results_path,
             checklist_template_path=args.checklist_template_path,
         )
-        return
+        return 0
     if args.command == "phase3-signing-harness":
         run_phase3_signing_harness(
             pdf_path=args.pdf_path,
@@ -475,7 +487,12 @@ def main(argv: Sequence[str] | None = None) -> None:
             checklist_template_path=args.checklist_template_path,
             artifacts_dir=args.artifacts_dir,
         )
-        return
+        return 0
+    if args.command == "gui":
+        return launch_qt_app_frame(
+            argv=argv if argv is not None else sys.argv,
+            initial_pdf_path=args.pdf_path,
+        )
 
     if args.command == "phase3-signing-preview-matrix":
         summary = run_phase3_preview_matrix(
@@ -489,7 +506,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(f"- scenarios executed: {summary['scenario_count']}")
         print(f"- artifacts directory: {summary['artifacts_dir']}")
         print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
-        return
+        return 0
     if args.command == "phase3-signing-acceptance-matrix":
         summary = run_phase3_signed_acceptance_matrix(
             pdf_path=args.pdf_path,
@@ -503,7 +520,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         print(f"- successful signings: {summary['successful_signing_run_count']}")
         print(f"- artifacts directory: {summary['artifacts_dir']}")
         print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
-        return
+        return 0
     if args.command == "phase3-signing-acceptance-evidence":
         evidence = run_signed_acceptance_evidence(
             artifacts_root=args.artifacts_root,
@@ -518,13 +535,14 @@ def main(argv: Sequence[str] | None = None) -> None:
                 f"({counters['scenario_count']} scenarios, "
                 f"{counters['successful_signing_run_count']} successful signings)"
             )
-        return
+        return 0
     if args.command == "phase3-signing-harness-validate":
         _run_phase3_harness_validate(args)
-        return
+        return 0
 
     print("FoliaSeal phase 0 skeleton ready")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
