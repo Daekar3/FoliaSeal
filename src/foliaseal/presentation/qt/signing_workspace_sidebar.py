@@ -8,12 +8,16 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class SigningFlowSummaryControls:
-    """Read-only labels that show the current signing-flow stage."""
+class SigningActionControls:
+    """Widgets used for the primary signing action/status panel."""
 
     container: Any
     stage_label: Any
     detail_label: Any
+    choose_output_button: Any
+    sign_button: Any
+    open_signed_output_button: Any
+    result_label: Any
 
 
 @dataclass(frozen=True)
@@ -87,7 +91,11 @@ class SigningWorkspaceSidebar:
         if callable(widget_setter):
             widget_setter(properties_widget)
 
-        self.flow_summary_controls = self._build_flow_summary_controls()
+        self.signing_action_controls = self._build_signing_action_controls(
+            on_choose_output=on_choose_output,
+            on_sign=on_sign,
+            on_open_signed_output=on_open_signed_output,
+        )
         self.document_review_controls = self._build_document_review_controls(
             on_open_signed_output=on_open_signed_output
         )
@@ -100,49 +108,65 @@ class SigningWorkspaceSidebar:
             on_copy_selected_text=on_copy_selected_text,
             on_clear_selected_text=on_clear_selected_text,
         )
-        self.choose_output_button = bindings.q_push_button("Choose output...")
-        self.choose_output_button.clicked.connect(on_choose_output)  # type: ignore[attr-defined]
-        self.sign_button = bindings.q_push_button("Confirm and sign")
-        self.sign_button.clicked.connect(on_sign)  # type: ignore[attr-defined]
-        self.open_signed_output_button = bindings.q_push_button("Open signed PDF")
-        self.open_signed_output_button.setEnabled(False)
-        self.open_signed_output_button.clicked.connect(on_open_signed_output)  # type: ignore[attr-defined]
-        self.result_label = bindings.q_label("")
-        if hasattr(self.result_label, "setWordWrap"):
-            self.result_label.setWordWrap(True)
-        if hasattr(self.result_label, "setStyleSheet"):
-            self.result_label.setStyleSheet("color: #444;")
+        self.choose_output_button = self.signing_action_controls.choose_output_button
+        self.sign_button = self.signing_action_controls.sign_button
+        self.open_signed_output_button = (
+            self.signing_action_controls.open_signed_output_button
+        )
+        self.result_label = self.signing_action_controls.result_label
 
         self._layout.addWidget(self.properties_scroll)
-        self._layout.addWidget(self.flow_summary_controls.container)
-        self._layout.addWidget(self.choose_output_button)
-        self._layout.addWidget(self.sign_button)
-        self._layout.addWidget(self.open_signed_output_button)
-        self._layout.addWidget(self.result_label)
+        self._layout.addWidget(self.signing_action_controls.container)
         self._layout.addWidget(self.document_review_controls.container)
         self._layout.addWidget(self.document_text_controls.container)
 
-    def _build_flow_summary_controls(self) -> SigningFlowSummaryControls:
-        container = self._bindings.q_group_box("Sign document")
+    def _build_signing_action_controls(
+        self,
+        *,
+        on_choose_output: Callable[[], Any],
+        on_sign: Callable[[], Any],
+        on_open_signed_output: Callable[[], Any],
+    ) -> SigningActionControls:
+        container = self._bindings.q_group_box("Sign PDF")
         _style_panel(container)
         layout = self._bindings.q_vbox_layout(container)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(3)
+        layout.setSpacing(4)
         stage_label = self._bindings.q_label("")
         detail_label = self._bindings.q_label("")
+        choose_output_button = self._bindings.q_push_button("Choose output...")
+        sign_button = self._bindings.q_push_button("Confirm and sign")
+        open_signed_output_button = self._bindings.q_push_button("Open signed PDF")
+        open_signed_output_button.setEnabled(False)
+        result_label = self._bindings.q_label("")
         for label in (stage_label, detail_label):
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
+        if hasattr(result_label, "setWordWrap"):
+            result_label.setWordWrap(True)
         if hasattr(stage_label, "setStyleSheet"):
             stage_label.setStyleSheet("font-weight: 700; color: #111827;")
         if hasattr(detail_label, "setStyleSheet"):
             detail_label.setStyleSheet("color: #374151;")
+        if hasattr(result_label, "setStyleSheet"):
+            result_label.setStyleSheet("color: #444;")
+        choose_output_button.clicked.connect(on_choose_output)  # type: ignore[attr-defined]
+        sign_button.clicked.connect(on_sign)  # type: ignore[attr-defined]
+        open_signed_output_button.clicked.connect(on_open_signed_output)  # type: ignore[attr-defined]
         layout.addWidget(stage_label)
         layout.addWidget(detail_label)
-        return SigningFlowSummaryControls(
+        layout.addWidget(choose_output_button)
+        layout.addWidget(sign_button)
+        layout.addWidget(open_signed_output_button)
+        layout.addWidget(result_label)
+        return SigningActionControls(
             container=container,
             stage_label=stage_label,
             detail_label=detail_label,
+            choose_output_button=choose_output_button,
+            sign_button=sign_button,
+            open_signed_output_button=open_signed_output_button,
+            result_label=result_label,
         )
 
     def _build_document_review_controls(

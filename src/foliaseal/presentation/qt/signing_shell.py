@@ -1822,7 +1822,7 @@ class SigningWorkspaceWidget:
             on_copy_selected_text=self.copy_selected_document_text,
             on_clear_selected_text=self.clear_selected_document_text,
         )
-        self._flow_summary_controls = self._sidebar.flow_summary_controls
+        self._flow_summary_controls = self._sidebar.signing_action_controls
         self._document_review_controls = self._sidebar.document_review_controls
         self._document_text_controls = self._sidebar.document_text_controls
         self._properties_scroll = self._sidebar.properties_scroll
@@ -1851,6 +1851,9 @@ class SigningWorkspaceWidget:
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
         self.widget.sidebar = self._sidebar.container  # type: ignore[attr-defined]
+        self.widget.signing_action_panel = (  # type: ignore[attr-defined]
+            self._flow_summary_controls.container
+        )
         self.widget.choose_output_button = self._choose_output_button  # type: ignore[attr-defined]
         self.widget.open_signed_output_button = (  # type: ignore[attr-defined]
             self._open_signed_output_button

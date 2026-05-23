@@ -1984,7 +1984,8 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert len(widget.layout.items) == 1
     assert len(widget.layout.items[0][0].items) == 2
     assert widget.properties_scroll.parent is widget.sidebar
-    assert widget.choose_output_button.parent is widget.sidebar
+    assert widget.choose_output_button.parent is widget.signing_action_panel
+    assert widget.sign_result_label.parent is widget.signing_action_panel
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
