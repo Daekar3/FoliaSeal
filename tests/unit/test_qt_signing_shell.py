@@ -1085,7 +1085,9 @@ def test_signing_shell_renders_per_signature_review_items(
                         "Signer: CN=Alice Example.\n"
                         "Local verification: needs local verification attention.\n"
                         "Document permissions: Certification permits form filling "
-                        "and additional signing changes."
+                        "and additional signing changes.\n"
+                        "Recommended next step: reopen the signed PDF and review "
+                        "the selected signature details carefully before relying on it."
                     ),
                 ),
             ),
@@ -1151,7 +1153,9 @@ def test_signing_shell_updates_drill_in_detail_for_selected_signature(
                         "Signer: CN=Alice Example.\n"
                         "Local verification: needs local verification attention.\n"
                         "Document permissions: Certification permits form filling "
-                        "and additional signing changes."
+                        "and additional signing changes.\n"
+                        "Recommended next step: reopen the signed PDF and review "
+                        "the selected signature details carefully before relying on it."
                     ),
                 ),
             ),
@@ -1168,6 +1172,11 @@ def test_signing_shell_updates_drill_in_detail_for_selected_signature(
     assert widget.document_review_signature_selector.count() == 2
     assert widget.document_review_signature_selector.currentText() == "Signature 2 (latest)"
     assert "Signer: CN=Alice Example." in widget.document_review_signature_detail_label.text()
+    assert (
+        "Recommended next step: reopen the signed PDF and review "
+        "the selected signature details carefully before relying on it."
+        in widget.document_review_signature_detail_label.text()
+    )
 
     widget.document_review_signature_selector.setCurrentIndex(0)
 
@@ -1227,6 +1236,60 @@ def test_signing_shell_disables_review_selector_for_single_signature_detail(
     assert widget.document_review_signature_selector.count() == 1
     assert widget.document_review_signature_selector.enabled is False
     assert "Signer: CN=Alice Example." in widget.document_review_signature_detail_label.text()
+
+
+def test_signing_shell_renders_next_action_guidance_for_not_evaluated_signature(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail=(
+                "Found 1 embedded signature. "
+                "Latest signature validity was not evaluated locally."
+            ),
+            signature_count=1,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1 (latest)",
+                    signer_subject=None,
+                    cryptographic_validation_passed=None,
+                    detail="Signer not available: local verification not evaluated.",
+                    drill_in_detail=(
+                        "Signer: Signer not available.\n"
+                        "Local verification: local verification not evaluated.\n"
+                        "Document permissions: No certification restriction was detected.\n"
+                        "Recommended next step: reopen the signed PDF and review the embedded "
+                        "signer details before relying on this signature."
+                    ),
+                ),
+            ),
+            signer_subject=None,
+            cryptographic_validation_passed=None,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+    )
+
+    assert (
+        "Recommended next step: reopen the signed PDF and review the embedded "
+        "signer details before relying on this signature."
+        in widget.document_review_signature_detail_label.text()
+    )
 
 
 def test_signing_shell_preserves_selected_signature_on_review_refresh(

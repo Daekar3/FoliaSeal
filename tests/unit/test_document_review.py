@@ -150,6 +150,37 @@ def test_document_review_inspector_reports_signed_restricted_pdf(monkeypatch, tm
     assert "DocMDP NO_CHANGES forbids signing" in summary.detail
 
 
+def test_summarize_document_review_next_action_guidance_for_not_evaluated_signature() -> None:
+    summary = summarize_document_review(
+        signature_count=1,
+        signature_items=(
+            DocumentSignatureReviewItem(
+                label="Signature 1 (latest)",
+                signer_subject=None,
+                cryptographic_validation_passed=None,
+                detail="Signer not available: local verification not evaluated.",
+                drill_in_detail=(
+                    "Signer: Signer not available.\n"
+                    "Local verification: local verification not evaluated.\n"
+                    "Document permissions: No certification restriction was detected.\n"
+                    "Recommended next step: reopen the signed PDF and review the embedded "
+                    "signer details before relying on this signature."
+                ),
+            ),
+        ),
+        signer_subject=None,
+        cryptographic_validation_passed=None,
+        docmdp_permission=None,
+    )
+
+    assert summary.signature_items[0].cryptographic_validation_passed is None
+    assert (
+        "Recommended next step: reopen the signed PDF and review the embedded "
+        "signer details before relying on this signature."
+        in summary.signature_items[0].drill_in_detail
+    )
+
+
 def test_document_review_inspector_reports_all_embedded_signatures(
     monkeypatch,
     tmp_path,
@@ -234,4 +265,48 @@ def test_document_review_inspector_reports_all_embedded_signatures(
     assert (
         "Local verification: needs local verification attention."
         in summary.signature_items[1].drill_in_detail
+    )
+    assert (
+        "Recommended next step: reopen the signed PDF and review the selected signature details "
+        "carefully before relying on it."
+        in summary.signature_items[1].drill_in_detail
+    )
+
+
+def test_document_review_inspector_reports_next_action_guidance_when_not_evaluated(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    pdf_path = tmp_path / "unsigned-validation.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    class _FakeSignature:
+        signer_cert = None
+
+    class _FakeReader:
+        def __init__(self, _handle) -> None:
+            self.embedded_signatures = [_FakeSignature()]
+
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.PdfFileReader",
+        _FakeReader,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.inspect_pdf_certification_reader",
+        lambda _reader: CertificationPolicyResult(
+            docmdp_permission=None,
+            certification_restricted=False,
+            restriction_reason=None,
+        ),
+    )
+
+    summary = PyHankoDocumentReviewInspector().inspect(str(pdf_path))
+
+    assert summary.signature_count == 1
+    assert summary.cryptographic_validation_passed is None
+    assert len(summary.signature_items) == 1
+    assert (
+        "Recommended next step: reopen the signed PDF and review the embedded signer "
+        "details before relying on this signature."
+        in summary.signature_items[0].drill_in_detail
     )

@@ -288,12 +288,33 @@ def _signature_drill_in_detail(
                 restriction_reason=None,
             )
         )
-    return "\n".join(
-        (
-            f"Signer: {signer_text}.",
-            f"Local verification: {verification_text}.",
-            guidance_line,
+    lines = [
+        f"Signer: {signer_text}.",
+        f"Local verification: {verification_text}.",
+        guidance_line,
+    ]
+    next_step = _signature_next_action_guidance(
+        cryptographic_validation_passed=cryptographic_validation_passed,
+    )
+    if next_step is not None:
+        lines.append(f"Recommended next step: {next_step}")
+    return "\n".join(lines)
+
+
+def _signature_next_action_guidance(
+    *,
+    cryptographic_validation_passed: bool | None,
+) -> str | None:
+    if cryptographic_validation_passed is True:
+        return None
+    if cryptographic_validation_passed is False:
+        return (
+            "reopen the signed PDF and review the selected signature details "
+            "carefully before relying on it."
         )
+    return (
+        "reopen the signed PDF and review the embedded signer details before "
+        "relying on this signature."
     )
 
 
