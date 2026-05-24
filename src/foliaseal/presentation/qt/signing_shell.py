@@ -216,6 +216,14 @@ class VisibleTextControls:
 
 
 @dataclass(frozen=True)
+class VisibleSignatureControls:
+    """Top-level widgets for visible signature setup."""
+
+    container: Any
+    summary_label: Any
+
+
+@dataclass(frozen=True)
 class PreviewControls:
     """Widgets used to present the visible-signature preview."""
 
@@ -664,14 +672,14 @@ class SignaturePropertiesPanel:
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
         self._visible_text_controls = self._build_visible_text_controls()
+        self._visible_signature_controls = self._build_visible_signature_controls()
         self._preview_controls = self._build_preview_controls()
         self.preview_controls = self._preview_controls
         self._validation_text = ""
 
         self._layout.addWidget(self._certificate_controls.container)
         self._layout.addWidget(self._signature_preset_controls.container)
-        self._layout.addWidget(self._appearance_controls.container)
-        self._layout.addWidget(self._visible_text_controls.container)
+        self._layout.addWidget(self._visible_signature_controls.container)
         self._layout.addWidget(self._placement_controls.container)
         self._layout.addWidget(self._preview_controls.container)
 
@@ -1306,6 +1314,27 @@ class SignaturePropertiesPanel:
             container=container,
             summary_label=summary_label,
             show_field_names=self._appearance_controls.show_field_names,
+        )
+
+    def _build_visible_signature_controls(self) -> VisibleSignatureControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Visible signature")
+        layout = bindings.q_vbox_layout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        summary_label = bindings.q_label(
+            "Configure the visible signature exactly as it should appear on the PDF."
+        )
+        if hasattr(summary_label, "setWordWrap"):
+            summary_label.setWordWrap(True)
+        if hasattr(summary_label, "setStyleSheet"):
+            summary_label.setStyleSheet("color: #374151;")
+        layout.addWidget(summary_label)
+        layout.addWidget(self._appearance_controls.container)
+        layout.addWidget(self._visible_text_controls.container)
+        return VisibleSignatureControls(
+            container=container,
+            summary_label=summary_label,
         )
 
     def _build_field_controls(self) -> dict[SignatureFieldKey, FieldControls]:

@@ -1988,7 +1988,8 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.sign_result_label.parent is widget.signing_action_panel
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
-    assert len(widget.properties_panel.container.layout.items) == 6
+    assert len(widget.properties_panel.container.layout.items) == 5
+    assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 10
     assert (
@@ -2003,6 +2004,10 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
     assert widget.properties_panel._appearance_controls.stamp_position.currentText() == "Top"
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
+    assert (
+        widget.properties_panel._visible_signature_controls.summary_label.text()
+        == "Configure the visible signature exactly as it should appear on the PDF."
+    )
     assert (
         widget.properties_panel._appearance_controls.summary_label.text()
         == "Choose how the visible signature should look on the page."
