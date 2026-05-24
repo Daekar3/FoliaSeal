@@ -173,6 +173,8 @@ class PlacementControls:
     """Controls used to edit placement and page selection."""
 
     container: Any
+    summary_label: Any
+    form_container: Any
     page_spin: Any
     left_spin: Any
     bottom_spin: Any
@@ -209,6 +211,7 @@ class VisibleTextControls:
     """Widgets used to edit visible signature field content."""
 
     container: Any
+    summary_label: Any
     show_field_names: Any
 
 
@@ -217,6 +220,7 @@ class PreviewControls:
     """Widgets used to present the visible-signature preview."""
 
     container: Any
+    summary_label: Any
     card_container: Any
     title_label: Any
     stamp_label: Any
@@ -668,9 +672,7 @@ class SignaturePropertiesPanel:
         self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
         self._layout.addWidget(self._visible_text_controls.container)
-        self._layout.addWidget(self._heading("Placement"))
         self._layout.addWidget(self._placement_controls.container)
-        self._layout.addWidget(self._heading("Preview"))
         self._layout.addWidget(self._preview_controls.container)
 
         if self._workflow.signature_appearance is None:
@@ -740,7 +742,7 @@ class SignaturePropertiesPanel:
 
     def _build_preview_controls(self) -> PreviewControls:
         bindings = self._bindings
-        container = bindings.q_group_box("")
+        container = bindings.q_group_box("Signed appearance preview")
         if hasattr(container, "setStyleSheet"):
             container.setStyleSheet(
                 "QGroupBox {"
@@ -753,6 +755,13 @@ class SignaturePropertiesPanel:
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
+        summary_label = bindings.q_label(
+            "This preview should match the signed PDF."
+        )
+        if hasattr(summary_label, "setWordWrap"):
+            summary_label.setWordWrap(True)
+        if hasattr(summary_label, "setStyleSheet"):
+            summary_label.setStyleSheet("color: #374151;")
 
         card_container = bindings.q_group_box("")
         if hasattr(card_container, "setStyleSheet"):
@@ -832,10 +841,12 @@ class SignaturePropertiesPanel:
         card_layout.addWidget(title_label)
         card_layout.addWidget(single_body_container)
         card_layout.addWidget(multi_body_container)
+        layout.addWidget(summary_label)
         layout.addWidget(card_container)
 
         return PreviewControls(
             container=container,
+            summary_label=summary_label,
             card_container=card_container,
             title_label=title_label,
             stamp_label=stamp_label,
@@ -1026,9 +1037,22 @@ class SignaturePropertiesPanel:
 
     def _build_placement_controls(self) -> PlacementControls:
         bindings = self._bindings
-        container = bindings.q_widget()
-        layout = bindings.q_form_layout(container)
+        container = bindings.q_group_box("Placement on page")
+        outer_layout = bindings.q_vbox_layout(container)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(4)
+        summary_label = bindings.q_label(
+            "Drag on the PDF, or fine-tune the page, position, and size here."
+        )
+        if hasattr(summary_label, "setWordWrap"):
+            summary_label.setWordWrap(True)
+        if hasattr(summary_label, "setStyleSheet"):
+            summary_label.setStyleSheet("color: #374151;")
+        form_container = bindings.q_widget()
+        layout = bindings.q_form_layout(form_container)
         layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.addWidget(summary_label)
+        outer_layout.addWidget(form_container)
 
         page_spin = bindings.q_spin_box()
         page_spin.setRange(1, 9999)
@@ -1058,6 +1082,8 @@ class SignaturePropertiesPanel:
 
         return PlacementControls(
             container=container,
+            summary_label=summary_label,
+            form_container=form_container,
             page_spin=page_spin,
             left_spin=left_spin,
             bottom_spin=bottom_spin,
@@ -1110,17 +1136,24 @@ class SignaturePropertiesPanel:
 
     def _build_appearance_controls(self) -> Any:
         bindings = self._bindings
-        container = bindings.q_group_box("Appearance")
+        container = bindings.q_group_box("Signature style")
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
+        summary_label = bindings.q_label(
+            "Choose how the visible signature should look on the page."
+        )
+        if hasattr(summary_label, "setWordWrap"):
+            summary_label.setWordWrap(True)
+        if hasattr(summary_label, "setStyleSheet"):
+            summary_label.setStyleSheet("color: #374151;")
 
         text_group = bindings.q_group_box("Text and layout")
         text_layout = bindings.q_form_layout(text_group)
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(4)
 
-        box_group = bindings.q_group_box("Box and stamp")
+        box_group = bindings.q_group_box("Stamp and border")
         box_layout = bindings.q_form_layout(box_group)
         box_layout.setContentsMargins(0, 0, 0, 0)
         box_layout.setSpacing(4)
@@ -1207,6 +1240,7 @@ class SignaturePropertiesPanel:
             _compose_row(bindings, border_show, border_color, border_width, background_color),
         )
 
+        layout.addWidget(summary_label)
         layout.addWidget(text_group)
         layout.addWidget(box_group)
 
@@ -1230,29 +1264,26 @@ class SignaturePropertiesPanel:
         ):
             self._connect_change_signal(control)
 
-        return type(
-            "AppearanceControls",
-            (),
-            {
-                "container": container,
-                "signer_label_prefix": signer_label_prefix,
-                "layout_template": layout_template,
-                "stamp_position": stamp_position,
-                "timezone_display_mode": timezone_display_mode,
-                "datetime_format": datetime_format,
-                "font_family": font_family,
-                "font_size": font_size,
-                "bold": bold,
-                "italic": italic,
-                "text_color": text_color,
-                "image_stamp_path": image_stamp_path,
-                "border_show": border_show,
-                "border_color": border_color,
-                "border_width": border_width,
-                "background_color": background_color,
-                "show_field_names": show_field_names,
-            },
-        )()
+        return AppearanceControls(
+            container=container,
+            summary_label=summary_label,
+            signer_label_prefix=signer_label_prefix,
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            timezone_display_mode=timezone_display_mode,
+            datetime_format=datetime_format,
+            font_family=font_family,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            text_color=text_color,
+            image_stamp_path=image_stamp_path,
+            border_show=border_show,
+            border_color=border_color,
+            border_width=border_width,
+            background_color=background_color,
+            show_field_names=show_field_names,
+        )
 
     def _build_visible_text_controls(self) -> VisibleTextControls:
         bindings = self._bindings
@@ -1260,11 +1291,20 @@ class SignaturePropertiesPanel:
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
+        summary_label = bindings.q_label(
+            "Choose which signature details appear in the visible text."
+        )
+        if hasattr(summary_label, "setWordWrap"):
+            summary_label.setWordWrap(True)
+        if hasattr(summary_label, "setStyleSheet"):
+            summary_label.setStyleSheet("color: #374151;")
+        layout.addWidget(summary_label)
         layout.addWidget(self._appearance_controls.show_field_names)
         for controls in self.field_controls.values():
             layout.addWidget(controls.container)
         return VisibleTextControls(
             container=container,
+            summary_label=summary_label,
             show_field_names=self._appearance_controls.show_field_names,
         )
 
@@ -1685,12 +1725,6 @@ class SignaturePropertiesPanel:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.widget, "Certificate configuration error", message)
-
-    def _heading(self, text: str) -> Any:
-        label = self._bindings.q_label(text)
-        if hasattr(label, "setStyleSheet"):
-            label.setStyleSheet("font-weight: 600;")
-        return label
 
     def _connect_change_signal(self, control: Any) -> None:
         changed_signal = getattr(control, "textChanged", None)

@@ -1988,20 +1988,37 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.sign_result_label.parent is widget.signing_action_panel
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
-    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
-    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 9
+    assert len(widget.properties_panel.container.layout.items) == 6
+    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
+    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 10
     assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows)
+        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
         == 5
     )
     assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
+        len(widget.properties_panel._appearance_controls.container.layout.items[2][0].layout.rows)
         == 2
     )
-    assert len(widget.properties_panel._placement_controls.container.layout.rows) == 3
+    assert len(widget.properties_panel._placement_controls.form_container.layout.rows) == 3
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
     assert widget.properties_panel._appearance_controls.stamp_position.currentText() == "Top"
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
+    assert (
+        widget.properties_panel._appearance_controls.summary_label.text()
+        == "Choose how the visible signature should look on the page."
+    )
+    assert (
+        widget.properties_panel._visible_text_controls.summary_label.text()
+        == "Choose which signature details appear in the visible text."
+    )
+    assert (
+        widget.properties_panel._placement_controls.summary_label.text()
+        == "Drag on the PDF, or fine-tune the page, position, and size here."
+    )
+    assert (
+        widget.properties_panel.preview_controls.summary_label.text()
+        == "This preview should match the signed PDF."
+    )
     assert list(widget.properties_panel.field_controls.keys()) == [
         SignatureFieldKey.DISTINGUISHED_NAME,
         SignatureFieldKey.COMMON_NAME,
@@ -2140,13 +2157,13 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     preview_text = widget.properties_panel.preview_text()
     preview_controls = widget.properties_panel.preview_controls
 
-    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
+    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
     assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows)
+        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
         == 5
     )
     assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
+        len(widget.properties_panel._appearance_controls.container.layout.items[2][0].layout.rows)
         == 2
     )
     assert preview_controls.multi_body_container.layout.items[0][0].pixmap() is not None
