@@ -598,11 +598,8 @@ class SignaturePropertiesPanel:
 
     def load_from_workflow(self) -> None:
         state = self._coordinator.load(control_issue=self._control_issue)
-        self._sync_coordinator_state(state)
         self._suspend_updates = True
         try:
-            self._load_certificate_configuration_controls()
-            self._load_signature_preset_controls()
             self._setup_form.load(state.visible_signature_setup_draft)
         finally:
             self._suspend_updates = False
@@ -962,9 +959,10 @@ class SignaturePropertiesPanel:
         object.__setattr__(controls, "profile_name", preset_name)
         return controls
 
-    def _reload_certificate_configuration_controls(
+    def _render_certificate_configuration_controls(
         self,
         *,
+        names: tuple[str, ...],
         selected_name: str | None = None,
     ) -> None:
         configuration_combo = self._certificate_controls.configuration_combo
@@ -975,23 +973,10 @@ class SignaturePropertiesPanel:
             configuration_combo._items = []  # type: ignore[attr-defined]
             configuration_combo._current = ""  # type: ignore[attr-defined]
 
-        names = tuple(
-            configuration.display_name
-            for configuration in self._certificate_catalog.certificate_configurations
-        )
         configuration_combo.addItem(CERTIFICATE_CONFIGURATION_PLACEHOLDER)
         configuration_combo.addItems(names)
 
         current_name = selected_name if selected_name in names else None
-        if current_name is None and self._workflow.selected_certificate_configuration_id:
-            try:
-                selected_configuration = self._certificate_catalog.configuration_by_id(
-                    self._workflow.selected_certificate_configuration_id
-                )
-            except KeyError:
-                selected_configuration = None
-            if selected_configuration is not None:
-                current_name = selected_configuration.display_name
 
         _set_combo_text(
             configuration_combo,
@@ -1002,14 +987,10 @@ class SignaturePropertiesPanel:
             bool(names) or self._certificate_catalog_store is not None,
         )
 
-    def _load_certificate_configuration_controls(self) -> None:
-        self._reload_certificate_configuration_controls(
-            selected_name=self._selected_certificate_configuration_name
-        )
-
-    def _reload_signature_preset_controls(
+    def _render_signature_preset_controls(
         self,
         *,
+        preset_names: tuple[str, ...],
         selected_name: str | None = None,
     ) -> None:
         preset_combo = self._signature_preset_controls.preset_combo
@@ -1021,7 +1002,6 @@ class SignaturePropertiesPanel:
             preset_combo._current = ""  # type: ignore[attr-defined]
 
         preset_combo.addItem(SIGNATURE_PRESET_PLACEHOLDER)
-        preset_names = self._preset_catalog.preset_names()
         preset_combo.addItems(preset_names)
         current_name = selected_name if selected_name in preset_names else None
         _set_combo_text(preset_combo, current_name or SIGNATURE_PRESET_PLACEHOLDER)
@@ -1030,11 +1010,6 @@ class SignaturePropertiesPanel:
                 _set_text(self._signature_preset_controls.preset_name, "")
         else:
             _set_text(self._signature_preset_controls.preset_name, current_name)
-
-    def _load_signature_preset_controls(self) -> None:
-        self._reload_signature_preset_controls(
-            selected_name=self._selected_signature_preset_name
-        )
 
     def _on_signature_preset_selected(self) -> None:
         if self._suspend_updates:
@@ -1070,21 +1045,6 @@ class SignaturePropertiesPanel:
         self.load_from_workflow()
         self._notify_change()
 
-    def _mark_signature_preset_dirty(self) -> None:
-        if self._selected_signature_preset_name is None:
-            return
-        self._sync_coordinator_state(
-            self._coordinator.reconcile(
-                ClearSelectedSignaturePreset(),
-                control_issue=self._control_issue,
-            )
-        )
-        self._suspend_updates = True
-        try:
-            self._reload_signature_preset_controls(selected_name=None)
-        finally:
-            self._suspend_updates = False
-
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
         layout_state = self._preview_layout.plan(
             preview=preview,
@@ -1117,6 +1077,18 @@ class SignaturePropertiesPanel:
         state: SignaturePropertiesViewState,
     ) -> SigningDraftPreview:
         self._sync_coordinator_state(state)
+        self._suspend_updates = True
+        try:
+            self._render_certificate_configuration_controls(
+                names=state.certificate_configuration_names,
+                selected_name=state.selected_certificate_configuration_name,
+            )
+            self._render_signature_preset_controls(
+                preset_names=state.signature_preset_names,
+                selected_name=state.selected_signature_preset_name,
+            )
+        finally:
+            self._suspend_updates = False
         preview = state.preview
         self._update_preview_controls(preview)
         self._validation_text = state.validation_text
@@ -1129,13 +1101,11 @@ class SignaturePropertiesPanel:
     def _handle_visible_signature_form_change(self) -> None:
         if self._suspend_updates:
             return
-        self._mark_signature_preset_dirty()
         self.apply_changes()
 
     def _handle_visible_signature_page_change(self, page_number: int) -> None:
         if self._suspend_updates:
             return
-        self._mark_signature_preset_dirty()
         self.apply_changes()
         if self._on_page_change is not None:
             self._on_page_change(page_number)
