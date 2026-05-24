@@ -50,7 +50,7 @@ Focused validation passed:
 - `ruff check src/foliaseal/application/signature_properties_coordinator.py src/foliaseal/application/__init__.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_signature_properties_coordinator.py tests/unit/test_qt_signing_shell.py`
 - `git diff --check`
 
-The next refactor slice should probably move more of the raw control-to-draft mapping out of `signing_shell.py`, because that is now the remaining shallow seam inside the visible-signature setup flow.
+That next refactor slice was completed separately in `qt_visible_signature_setup_form_execplan.md`, which moved raw visible-signature form construction and draft mapping out of `signing_shell.py` and into a dedicated Qt boundary.
 
 ## Context and Orientation
 
