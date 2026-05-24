@@ -1989,6 +1989,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
+    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 9
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[0][0].layout.rows)
         == 5
@@ -2244,7 +2245,7 @@ def test_signing_shell_preview_keeps_fixed_width_for_oversized_text(
     assert preview_controls.detail_label.text().startswith("A very long prefix")
 
 
-def test_signing_shell_validation_label_is_width_limited_to_panel(
+def test_signing_shell_readiness_detail_is_width_limited_to_action_panel(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2284,8 +2285,12 @@ def test_signing_shell_validation_label_is_width_limited_to_panel(
     )
 
     panel.refresh_preview()
+    widget.refresh_viewer()
 
-    assert panel._validation_label.fixed_width == 464
+    assert not hasattr(panel, "_validation_label")
+    assert widget.flow_detail_label.fixed_width == 464
+    assert widget.flow_stage_label.text() == "Review preview"
+    assert widget.flow_detail_label.text().startswith("Will fail to sign:")
     assert panel.validation_text().startswith("Will fail to sign:")
 
 

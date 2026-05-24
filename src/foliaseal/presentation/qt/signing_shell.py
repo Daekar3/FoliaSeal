@@ -205,6 +205,14 @@ class AppearanceControls:
 
 
 @dataclass(frozen=True)
+class VisibleTextControls:
+    """Widgets used to edit visible signature field content."""
+
+    container: Any
+    show_field_names: Any
+
+
+@dataclass(frozen=True)
 class PreviewControls:
     """Widgets used to present the visible-signature preview."""
 
@@ -651,25 +659,19 @@ class SignaturePropertiesPanel:
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
         self.field_controls = self._build_field_controls()
+        self._visible_text_controls = self._build_visible_text_controls()
         self._preview_controls = self._build_preview_controls()
         self.preview_controls = self._preview_controls
-        self._validation_label = bindings.q_label("")
-        if hasattr(self._validation_label, "setWordWrap"):
-            self._validation_label.setWordWrap(True)
+        self._validation_text = ""
 
         self._layout.addWidget(self._certificate_controls.container)
         self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._appearance_controls.container)
-        self._layout.addWidget(self._heading("Visible Fields"))
-        self._layout.addWidget(self._appearance_controls.show_field_names)
-        for controls in self.field_controls.values():
-            self._layout.addWidget(controls.container)
+        self._layout.addWidget(self._visible_text_controls.container)
         self._layout.addWidget(self._heading("Placement"))
         self._layout.addWidget(self._placement_controls.container)
         self._layout.addWidget(self._heading("Preview"))
         self._layout.addWidget(self._preview_controls.container)
-        self._layout.addWidget(self._heading("Validation"))
-        self._layout.addWidget(self._validation_label)
 
         if self._workflow.signature_appearance is None:
             self._workflow.set_signature_appearance(SignatureAppearance())
@@ -688,8 +690,7 @@ class SignaturePropertiesPanel:
         return self._coordinator.load(control_issue=self._control_issue).ready_to_sign
 
     def validation_text(self) -> str:
-        text = _text(self._validation_label)
-        return text
+        return self._validation_text
 
     def dispose(self) -> None:
         self._canonical_preview_lifecycle.dispose()
@@ -704,11 +705,7 @@ class SignaturePropertiesPanel:
         self._sync_coordinator_state(state)
         preview = state.preview
         self._update_preview_controls(preview)
-        _set_widget_width_limit(
-            self._validation_label,
-            _panel_available_width(self.widget),
-        )
-        self._validation_label.setText(state.validation_text)
+        self._validation_text = state.validation_text
         return preview
 
     def load_from_workflow(self) -> None:
@@ -1256,6 +1253,20 @@ class SignaturePropertiesPanel:
                 "show_field_names": show_field_names,
             },
         )()
+
+    def _build_visible_text_controls(self) -> VisibleTextControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Visible text")
+        layout = bindings.q_vbox_layout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.addWidget(self._appearance_controls.show_field_names)
+        for controls in self.field_controls.values():
+            layout.addWidget(controls.container)
+        return VisibleTextControls(
+            container=container,
+            show_field_names=self._appearance_controls.show_field_names,
+        )
 
     def _build_field_controls(self) -> dict[SignatureFieldKey, FieldControls]:
         bindings = self._bindings
@@ -2422,6 +2433,10 @@ class SigningWorkspaceWidget:
         stage, detail = self._flow_summary_text()
         self._flow_summary_controls.stage_label.setText(stage)
         self._flow_summary_controls.detail_label.setText(detail)
+        _set_widget_width_limit(
+            self._flow_summary_controls.detail_label,
+            _panel_available_width(self._sidebar.container),
+        )
 
     def _flow_summary_text(self) -> tuple[str, str]:
         if (
