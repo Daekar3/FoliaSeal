@@ -2985,10 +2985,10 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     panel._placement_controls.height_spin.setValue(36.0)
     panel._signature_preset_controls.save_button.click()
 
-    assert panel._preset_catalog.preset_names()[-1] == "My Preset"
+    assert store.load_catalog().preset_names()[-1] == "My Preset"
     assert panel._signature_preset_controls.preset_combo.currentText() == "My Preset"
     assert panel._signature_preset_controls.preset_name.text() == "My Preset"
-    assert panel._preset_catalog.preset_named("My Preset").placement_defaults == (
+    assert store.load_catalog().preset_named("My Preset").placement_defaults == (
         SignaturePlacementDefaults(
             width_pt=144.0,
             height_pt=36.0,
@@ -3018,7 +3018,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     )
     relaunch_panel = relaunch_widget.properties_panel
 
-    assert relaunch_panel._preset_catalog.preset_names() == (
+    assert store.load_catalog().preset_names() == (
         "Default",
         "Compact",
         "My Preset",
@@ -3219,7 +3219,6 @@ def test_signing_shell_signature_preset_delete_can_be_canceled_and_keeps_preset(
     assert result is None
     assert store.load_catalog().preset_names() == ("Default", "Compact")
     assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
-    assert panel._preset_catalog.preset_names() == ("Default", "Compact")
 
 
 def test_signing_shell_signature_preset_delete_requires_confirmation_and_refreshes_catalog(
@@ -3256,7 +3255,6 @@ def test_signing_shell_signature_preset_delete_requires_confirmation_and_refresh
     assert result.preset_names() == ("Default",)
     assert store.load_catalog().preset_names() == ("Default",)
     assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
-    assert panel._preset_catalog.preset_names() == ("Default",)
     assert panel._signature_preset_controls.preset_combo.findText("Compact") == -1
 
     relaunched_widget = build_qt_signing_shell(
@@ -3266,7 +3264,7 @@ def test_signing_shell_signature_preset_delete_requires_confirmation_and_refresh
     )
     relaunched_panel = relaunched_widget.properties_panel
 
-    assert relaunched_panel._preset_catalog.preset_names() == ("Default",)
+    assert store.load_catalog().preset_names() == ("Default",)
     assert relaunched_panel._signature_preset_controls.preset_combo.findText("Compact") == -1
 
 
@@ -3286,14 +3284,23 @@ def test_signing_shell_signature_preset_overwrite_requires_confirmation(
         lambda self: fake_bindings,
     )
 
-    existing = build_signature_preset(
-        name="Team Standard",
-        appearance=build_signature_appearance(signer_label_prefix="Signed by Team"),
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    store.save_catalog(
+        build_signature_preset_catalog(
+            profiles=(
+                build_signature_preset(
+                    name="Team Standard",
+                    appearance=build_signature_appearance(
+                        signer_label_prefix="Signed by Team"
+                    ),
+                ),
+            )
+        )
     )
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
-        preset_catalog=build_signature_preset_catalog(profiles=(existing,)),
+        preset_catalog_store=store,
     )
 
     panel = widget.properties_panel
@@ -3305,14 +3312,19 @@ def test_signing_shell_signature_preset_overwrite_requires_confirmation(
 
     assert result is None
     assert fake_bindings.q_message_box.calls
-    assert panel._preset_catalog.preset_named("Team Standard").appearance == existing.appearance
+    assert (
+        store.load_catalog()
+        .preset_named("Team Standard")
+        .appearance.signer_label_prefix
+        == "Signed by Team"
+    )
 
     fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.Yes
     result = panel.save_current_signature_preset()
 
     assert result is not None
     assert result.name == "Team Standard"
-    assert panel._preset_catalog.preset_named("Team Standard").appearance.signer_label_prefix == (
+    assert store.load_catalog().preset_named("Team Standard").appearance.signer_label_prefix == (
         "Signed by Current Draft"
     )
     assert panel._signature_preset_controls.preset_combo.currentText() == "Team Standard"

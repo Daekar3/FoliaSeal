@@ -13,7 +13,7 @@ The most important user-visible effect is stability and simplification of future
 ## Child ExecPlan Dependencies
 
 - [x] Child A: [signing_setup_boundary_coordinator_deepening_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/signing_setup_boundary_coordinator_deepening_execplan.md) completed on 2026-05-24. Child B can now assume the main visible-signature form path clears preset state only through `ApplyVisibleSignatureSetup` and that selector rendering follows returned coordinator state.
-- [ ] Child B: [signing_setup_boundary_shell_migration_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/signing_setup_boundary_shell_migration_execplan.md) depends on Child A and completes the Qt-side migration, test replacement, and documentation closeout.
+- [x] Child B: [signing_setup_boundary_shell_migration_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/signing_setup_boundary_shell_migration_execplan.md) completed on 2026-05-24. The Qt-side migration, test replacement, and documentation closeout are done.
 
 ## Progress
 
@@ -21,8 +21,8 @@ The most important user-visible effect is stability and simplification of future
 - [x] (2026-05-24 20:12Z) Chose the hybrid design centered on deepening the existing coordinator boundary rather than introducing a separate intent bag or a heavier ports-and-adapters layer.
 - [x] (2026-05-24 20:18Z) Recorded this parent ExecPlan and its required child plans before implementation.
 - [x] (2026-05-24 21:42Z) Completed Child A as a narrow coordinator-deepening slice: removed shell-side preset pre-clearing on visible-signature edits and made selector rendering follow returned coordinator state.
-- [ ] Complete Child B to migrate the shell to the new boundary and collapse white-box tests into boundary tests where possible.
-- [ ] Perform final compliance review against `docs/SPEC.md` and `docs/ARCHITECTURE.md`, then update this parent plan to completion state.
+- [x] (2026-05-24) Completed Child B to migrate the shell to the new boundary and collapse white-box tests into boundary tests where possible.
+- [x] (2026-05-24) Performed the final compliance review against `docs/SPEC.md` and `docs/ARCHITECTURE.md`, then updated this parent plan to completion state.
 
 ## Surprises & Discoveries
 
@@ -51,7 +51,11 @@ The most important user-visible effect is stability and simplification of future
 
 ## Outcomes & Retrospective
 
-This section will be completed after both child plans are implemented and the full boundary migration is validated.
+The full boundary migration is complete. Child A deepened the coordinator boundary, and Child B finished the Qt-side shell migration so the shell now behaves as a thinner adapter over that boundary.
+
+The remaining setup behavior is documented and tested at the correct layer: coordinator tests carry the deeper setup semantics, shell tests are thinner integration checks, and the docs now match the implemented ownership split.
+
+Validation for the parent effort was completed through the focused child test suites and the documented compliance review against `docs/SPEC.md` and `docs/ARCHITECTURE.md`.
 
 ## Context and Orientation
 
@@ -109,7 +113,7 @@ Acceptance for the full parent effort is behavioral:
 - the shell is thinner because setup orchestration moved into the deeper boundary,
 - and the relevant focused test suites pass cleanly.
 
-This parent plan is complete only when both child plans are complete and the final compliance review finds no mismatches.
+This parent plan is complete. Both child plans are complete and the final compliance review found no mismatches.
 
 ## Idempotence and Recovery
 

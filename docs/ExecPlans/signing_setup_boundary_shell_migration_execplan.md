@@ -12,15 +12,15 @@ This is the second child slice of the parent effort in [signing_setup_boundary_p
 
 ## Child ExecPlan Dependencies
 
-- [ ] Child A in [signing_setup_boundary_coordinator_deepening_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/signing_setup_boundary_coordinator_deepening_execplan.md) must be complete before this plan begins.
+- [x] Child A in [signing_setup_boundary_coordinator_deepening_execplan.md](/home/daekar/FoliaSeal/docs/ExecPlans/signing_setup_boundary_coordinator_deepening_execplan.md) was complete before this plan began.
 
 ## Progress
 
 - [x] (2026-05-24 20:18Z) Recorded the child plan before implementation.
-- [ ] Rewire `SignaturePropertiesPanel` to render setup state from the deeper coordinator boundary and reduce shell-owned setup synchronization.
-- [ ] Replace redundant white-box shell tests with boundary tests where the deeper coordinator now carries the behavior.
-- [ ] Perform compliance review against `docs/SPEC.md` and `docs/ARCHITECTURE.md`.
-- [ ] Update docs and close out the parent plan.
+- [x] (2026-05-24) Rewired `SignaturePropertiesPanel` to render setup state from the deeper coordinator boundary and reduce shell-owned setup synchronization.
+- [x] (2026-05-24) Replaced redundant white-box shell tests with boundary tests where the deeper coordinator now carries the behavior.
+- [x] (2026-05-24) Performed the compliance review against `docs/SPEC.md` and `docs/ARCHITECTURE.md`.
+- [x] (2026-05-24) Updated docs and closed out the parent plan.
 
 ## Surprises & Discoveries
 
@@ -42,7 +42,11 @@ This is the second child slice of the parent effort in [signing_setup_boundary_p
 
 ## Outcomes & Retrospective
 
-This section will be completed after the slice is implemented and validated.
+Child B is complete. `SignaturePropertiesPanel` now acts as a thinner Qt adapter over the deeper current-signing-setup boundary, with presentation-only concerns such as confirmation dialogs remaining in the shell and setup-state choreography moving behind the coordinator.
+
+The focused shell suite now reflects that split: behavior that belongs to the deeper boundary is covered there, while the shell tests that remain are thinner integration checks around Qt wiring and user-facing presentation.
+
+Validation for this slice was performed with the focused `pytest` and `ruff` commands listed below, plus `git diff --check`.
 
 ## Context and Orientation
 
@@ -108,7 +112,7 @@ Acceptance is behavioral:
 - shell tests become thinner where deeper boundary tests now exist,
 - and `docs/ARCHITECTURE.md` matches the implemented ownership split.
 
-This child slice is complete when the shell is materially thinner in the signing-setup area and the test suite reflects that new boundary.
+This child slice is complete. The shell is materially thinner in the signing-setup area and the test suite reflects that new boundary.
 
 ## Idempotence and Recovery
 
