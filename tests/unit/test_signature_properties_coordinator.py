@@ -10,13 +10,16 @@ from foliaseal.application import (
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
+    ApplyVisibleSignatureSetup,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
     RefreshCatalogs,
     SaveCurrentPreset,
     SignaturePropertiesCoordinatorError,
+    VisibleSignaturePlacementDraft,
+    VisibleSignatureSetupDraft,
 )
-from foliaseal.domain.models import SignatureRect
+from foliaseal.domain.models import SignaturePlacementDefaults, SignatureRect
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
@@ -89,6 +92,60 @@ def test_coordinator_load_reports_catalog_names_and_initial_readiness(tmp_path: 
     assert state.selected_signature_preset_name is None
     assert state.ready_to_sign is False
     assert state.validation_text == "Place a signature on the page to continue."
+    assert state.visible_signature_setup_draft.placement.enabled is False
+    assert state.visible_signature_setup_draft.placement.width_pt == 72.0
+    assert state.visible_signature_setup_draft.placement.height_pt == 24.0
+
+
+def test_coordinator_load_reports_visible_signature_setup_draft(tmp_path: Path) -> None:
+    workflow = _ready_workflow(tmp_path)
+    appearance = build_signature_appearance(
+        signer_label_prefix="Signed by Team",
+        show_field_names=True,
+    )
+    workflow.set_signature_appearance(appearance)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.load()
+
+    assert state.visible_signature_setup_draft.appearance == appearance
+    assert state.visible_signature_setup_draft.placement == VisibleSignaturePlacementDraft(
+        page_number=1,
+        left_pt=24.0,
+        bottom_pt=18.0,
+        width_pt=180.0,
+        height_pt=48.0,
+        enabled=True,
+    )
+
+
+def test_coordinator_load_uses_placement_defaults_when_rect_missing(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    workflow.signature_placement_defaults = SignaturePlacementDefaults(
+        width_pt=96.0,
+        height_pt=36.0,
+    )
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.load()
+
+    assert state.visible_signature_setup_draft.placement == VisibleSignaturePlacementDraft(
+        page_number=1,
+        left_pt=24.0,
+        bottom_pt=18.0,
+        width_pt=96.0,
+        height_pt=36.0,
+        enabled=False,
+    )
 
 
 def test_coordinator_load_keeps_warning_only_control_issue_ready(tmp_path: Path) -> None:
@@ -109,6 +166,79 @@ def test_coordinator_load_keeps_warning_only_control_issue_ready(tmp_path: Path)
 
     assert state.ready_to_sign is True
     assert state.validation_text == "Ready to sign."
+
+
+def test_coordinator_apply_visible_signature_setup_updates_workflow_and_clears_preset(
+    tmp_path: Path,
+) -> None:
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+    updated_appearance = build_signature_appearance(
+        signer_label_prefix="Signed by Current Draft",
+        show_field_names=True,
+    )
+
+    state = coordinator.reconcile(
+        ApplyVisibleSignatureSetup(
+            draft=VisibleSignatureSetupDraft(
+                appearance=updated_appearance,
+                placement=VisibleSignaturePlacementDraft(
+                    page_number=2,
+                    left_pt=40.0,
+                    bottom_pt=22.0,
+                    width_pt=200.0,
+                    height_pt=54.0,
+                    enabled=True,
+                ),
+            )
+        )
+    )
+
+    assert workflow.signature_appearance == updated_appearance
+    assert workflow.signature_rect == SignatureRect(
+        page_index=1,
+        left_pt=40.0,
+        bottom_pt=22.0,
+        width_pt=200.0,
+        height_pt=54.0,
+    )
+    assert workflow.selected_signature_preset_id is None
+    assert state.selected_signature_preset_name is None
+    assert state.visible_signature_setup_draft.placement.enabled is True
+
+
+def test_coordinator_apply_visible_signature_setup_keeps_rect_empty_when_disabled(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    draft = VisibleSignatureSetupDraft(
+        appearance=build_signature_appearance(),
+        placement=VisibleSignaturePlacementDraft(
+            page_number=3,
+            left_pt=50.0,
+            bottom_pt=30.0,
+            width_pt=120.0,
+            height_pt=40.0,
+            enabled=False,
+        ),
+    )
+
+    state = coordinator.reconcile(ApplyVisibleSignatureSetup(draft=draft))
+
+    assert workflow.signature_appearance == draft.appearance
+    assert workflow.signature_rect is None
+    assert state.visible_signature_setup_draft.placement.enabled is False
+    assert state.ready_to_sign is False
 
 
 def test_coordinator_applies_certificate_configuration_and_updates_workflow(

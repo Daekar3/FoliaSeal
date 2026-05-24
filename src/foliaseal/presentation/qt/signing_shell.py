@@ -40,6 +40,7 @@ from foliaseal.application.signature_font_registry import (
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
+    ApplyVisibleSignatureSetup,
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
@@ -47,6 +48,8 @@ from foliaseal.application.signature_properties_coordinator import (
     SaveCurrentPreset,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
+    VisibleSignaturePlacementDraft,
+    VisibleSignatureSetupDraft,
 )
 from foliaseal.application.signing_material_resolver import CertificateSecretProvider
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -712,39 +715,40 @@ class SignaturePropertiesPanel:
 
     def refresh_preview(self) -> SigningDraftPreview:
         state = self._coordinator.load(control_issue=self._control_issue)
-        self._sync_coordinator_state(state)
-        preview = state.preview
-        self._update_preview_controls(preview)
-        self._validation_text = state.validation_text
-        return preview
+        return self._apply_coordinator_state(state)
 
     def load_from_workflow(self) -> None:
-        self._sync_coordinator_state(self._coordinator.load(control_issue=self._control_issue))
+        state = self._coordinator.load(control_issue=self._control_issue)
+        self._sync_coordinator_state(state)
         self._suspend_updates = True
         try:
             self._load_certificate_configuration_controls()
             self._load_signature_preset_controls()
-            self._load_placement_controls()
-            self._load_appearance_controls()
-            self._load_field_controls()
+            self._load_visible_signature_setup_controls(
+                state.visible_signature_setup_draft
+            )
         finally:
             self._suspend_updates = False
-        self.refresh_preview()
+        self._apply_coordinator_state(state)
 
     def apply_changes(self) -> SigningDraftPreview:
         self._control_issue = None
         try:
-            appearance = self._build_appearance_from_controls()
-            self._workflow.set_signature_appearance(appearance)
-            if self._placement_initialized or self._workflow.signature_rect is not None:
-                self._workflow.set_signature_rect(self._build_rect_from_controls())
+            state = self._coordinator.reconcile(
+                ApplyVisibleSignatureSetup(
+                    draft=self._build_visible_signature_setup_draft()
+                ),
+                control_issue=self._control_issue,
+            )
         except ValueError as exc:
             self._control_issue = _build_preview_issue(
                 code="signature_appearance_invalid",
                 message=str(exc),
                 field_name="signature_appearance",
             )
-        preview = self.refresh_preview()
+            preview = self.refresh_preview()
+        else:
+            preview = self._apply_coordinator_state(state)
         self._notify_change()
         return preview
 
@@ -1385,31 +1389,23 @@ class SignaturePropertiesPanel:
             )
         return controls
 
-    def _load_placement_controls(self) -> None:
-        rect = self._workflow.signature_rect
-        if rect is None:
-            _set_spin_value(self._placement_controls.page_spin, 1)
-            _set_spin_value(self._placement_controls.left_spin, 24.0)
-            _set_spin_value(self._placement_controls.bottom_spin, 18.0)
-            placement_defaults = self._workflow.signature_placement_defaults
-            if placement_defaults is not None:
-                _set_spin_value(self._placement_controls.width_spin, placement_defaults.width_pt)
-                _set_spin_value(self._placement_controls.height_spin, placement_defaults.height_pt)
-            else:
-                _set_spin_value(self._placement_controls.width_spin, 72.0)
-                _set_spin_value(self._placement_controls.height_spin, 24.0)
-            self._placement_initialized = False
-            return
+    def _load_visible_signature_setup_controls(
+        self,
+        draft: VisibleSignatureSetupDraft,
+    ) -> None:
+        self._load_placement_controls(draft.placement)
+        self._load_appearance_controls(draft.appearance)
+        self._load_field_controls(draft.appearance)
 
-        _set_spin_value(self._placement_controls.page_spin, rect.page_index + 1)
-        _set_spin_value(self._placement_controls.left_spin, rect.left_pt)
-        _set_spin_value(self._placement_controls.bottom_spin, rect.bottom_pt)
-        _set_spin_value(self._placement_controls.width_spin, rect.width_pt)
-        _set_spin_value(self._placement_controls.height_spin, rect.height_pt)
-        self._placement_initialized = True
+    def _load_placement_controls(self, placement: VisibleSignaturePlacementDraft) -> None:
+        _set_spin_value(self._placement_controls.page_spin, placement.page_number)
+        _set_spin_value(self._placement_controls.left_spin, placement.left_pt)
+        _set_spin_value(self._placement_controls.bottom_spin, placement.bottom_pt)
+        _set_spin_value(self._placement_controls.width_spin, placement.width_pt)
+        _set_spin_value(self._placement_controls.height_spin, placement.height_pt)
+        self._placement_initialized = placement.enabled
 
-    def _load_appearance_controls(self) -> None:
-        appearance = self._workflow.signature_appearance or SignatureAppearance()
+    def _load_appearance_controls(self, appearance: SignatureAppearance) -> None:
         _set_text(self._appearance_controls.signer_label_prefix, appearance.signer_label_prefix)
         _set_combo_text(
             self._appearance_controls.layout_template,
@@ -1531,13 +1527,28 @@ class SignaturePropertiesPanel:
             selected_name=self._selected_signature_preset_name
         )
 
-    def _load_field_controls(self) -> None:
-        appearance = self._workflow.signature_appearance or SignatureAppearance()
+    def _load_field_controls(self, appearance: SignatureAppearance) -> None:
         for field_key, binding in appearance.iter_field_bindings():
             controls = self.field_controls[field_key]
             _set_combo_text(controls.source_combo, _enum_display_text(binding.source))
             _set_text(controls.override_edit, binding.override_text or "")
             self._sync_field_control_state(field_key)
+
+    def _build_visible_signature_setup_draft(self) -> VisibleSignatureSetupDraft:
+        placement_enabled = (
+            self._placement_initialized or self._workflow.signature_rect is not None
+        )
+        return VisibleSignatureSetupDraft(
+            appearance=self._build_appearance_from_controls(),
+            placement=VisibleSignaturePlacementDraft(
+                page_number=int(_spin_value(self._placement_controls.page_spin)),
+                left_pt=_spin_value(self._placement_controls.left_spin),
+                bottom_pt=_spin_value(self._placement_controls.bottom_spin),
+                width_pt=_spin_value(self._placement_controls.width_spin),
+                height_pt=_spin_value(self._placement_controls.height_spin),
+                enabled=placement_enabled,
+            ),
+        )
 
     def _build_appearance_from_controls(self) -> SignatureAppearance:
         text_style = SignatureTextStyle(
@@ -1698,6 +1709,16 @@ class SignaturePropertiesPanel:
             state.selected_certificate_configuration_name
         )
         self._selected_signature_preset_name = state.selected_signature_preset_name
+
+    def _apply_coordinator_state(
+        self,
+        state: SignaturePropertiesViewState,
+    ) -> SigningDraftPreview:
+        self._sync_coordinator_state(state)
+        preview = state.preview
+        self._update_preview_controls(preview)
+        self._validation_text = state.validation_text
+        return preview
 
     def _sync_field_control_state(self, field_key: SignatureFieldKey) -> None:
         controls = self.field_controls[field_key]

@@ -29,6 +29,7 @@ from foliaseal.application.performance_timing import (
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
+    ApplyVisibleSignatureSetup,
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
@@ -37,6 +38,8 @@ from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinator,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
+    VisibleSignaturePlacementDraft,
+    VisibleSignatureSetupDraft,
 )
 from foliaseal.application.signing_completion import format_signing_completion_message
 from foliaseal.application.signing_draft_workflow import (
@@ -160,6 +163,7 @@ __all__ = [
     "SigningDraftValidationSeverity",
     "SigningDraftWorkflow",
     "ApplyCertificateConfiguration",
+    "ApplyVisibleSignatureSetup",
     "ApplySignaturePreset",
     "ClearSelectedSignaturePreset",
     "DefaultSignaturePropertiesCoordinator",
@@ -169,6 +173,8 @@ __all__ = [
     "SignaturePropertiesCoordinator",
     "SignaturePropertiesCoordinatorError",
     "SignaturePropertiesViewState",
+    "VisibleSignaturePlacementDraft",
+    "VisibleSignatureSetupDraft",
     "SigningClock",
     "StampImageProbe",
     "SystemSigningClock",

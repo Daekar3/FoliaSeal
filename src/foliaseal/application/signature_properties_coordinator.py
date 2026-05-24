@@ -16,6 +16,7 @@ from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialResolver,
     SigningMaterialResolutionError,
 )
+from foliaseal.domain.models import SignatureAppearance, SignatureRect
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
@@ -31,6 +32,26 @@ class SignaturePropertiesCoordinatorError(ValueError):
 
 
 @dataclass(frozen=True)
+class VisibleSignaturePlacementDraft:
+    """Qt-independent visible-signature placement form state."""
+
+    page_number: int
+    left_pt: float
+    bottom_pt: float
+    width_pt: float
+    height_pt: float
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
+class VisibleSignatureSetupDraft:
+    """Qt-independent visible-signature setup state."""
+
+    appearance: SignatureAppearance
+    placement: VisibleSignaturePlacementDraft
+
+
+@dataclass(frozen=True)
 class SignaturePropertiesViewState:
     """Immutable state rendered by the signature-properties panel."""
 
@@ -38,6 +59,7 @@ class SignaturePropertiesViewState:
     selected_signature_preset_name: str | None
     certificate_configuration_names: tuple[str, ...]
     signature_preset_names: tuple[str, ...]
+    visible_signature_setup_draft: VisibleSignatureSetupDraft
     validation_text: str
     ready_to_sign: bool
     preview: SigningDraftPreview
@@ -84,8 +106,16 @@ class ClearSelectedSignaturePreset:
     """Clear the currently selected preset name without mutating the workflow."""
 
 
+@dataclass(frozen=True)
+class ApplyVisibleSignatureSetup:
+    """Apply the current visible-signature setup draft to the workflow."""
+
+    draft: VisibleSignatureSetupDraft
+
+
 SignaturePropertiesCommand = (
-    ApplyCertificateConfiguration
+    ApplyVisibleSignatureSetup
+    | ApplyCertificateConfiguration
     | ApplySignaturePreset
     | SaveCurrentPreset
     | DeletePreset
@@ -161,6 +191,7 @@ class DefaultSignaturePropertiesCoordinator:
                 for configuration in self.certificate_catalog.certificate_configurations
             ),
             signature_preset_names=self.preset_catalog.preset_names(),
+            visible_signature_setup_draft=self._current_visible_signature_setup_draft(),
             validation_text=_format_validation_text(
                 preview,
                 control_issue=control_issue,
@@ -175,7 +206,9 @@ class DefaultSignaturePropertiesCoordinator:
         *,
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState:
-        if isinstance(command, ApplyCertificateConfiguration):
+        if isinstance(command, ApplyVisibleSignatureSetup):
+            self._apply_visible_signature_setup(command)
+        elif isinstance(command, ApplyCertificateConfiguration):
             self._apply_certificate_configuration(command)
         elif isinstance(command, ApplySignaturePreset):
             self._apply_signature_preset(command)
@@ -190,6 +223,22 @@ class DefaultSignaturePropertiesCoordinator:
         else:  # pragma: no cover - defensive branch
             raise TypeError(f"Unsupported signature properties command: {type(command)!r}")
         return self.load(control_issue=control_issue)
+
+    def _apply_visible_signature_setup(self, command: ApplyVisibleSignatureSetup) -> None:
+        self.workflow.set_signature_appearance(command.draft.appearance)
+        placement = command.draft.placement
+        if placement.enabled:
+            self.workflow.set_signature_rect(
+                SignatureRect(
+                    page_index=placement.page_number - 1,
+                    left_pt=placement.left_pt,
+                    bottom_pt=placement.bottom_pt,
+                    width_pt=placement.width_pt,
+                    height_pt=placement.height_pt,
+                )
+            )
+        if self._selected_signature_preset_name is not None:
+            self._selected_signature_preset_name = None
 
     def _apply_certificate_configuration(self, command: ApplyCertificateConfiguration) -> None:
         selected_name = _require_name(
@@ -320,6 +369,41 @@ class DefaultSignaturePropertiesCoordinator:
         if preset is None:
             return None
         return preset.display_name
+
+    def _current_visible_signature_setup_draft(self) -> VisibleSignatureSetupDraft:
+        appearance = self.workflow.signature_appearance or SignatureAppearance()
+        rect = self.workflow.signature_rect
+        if rect is not None:
+            placement = VisibleSignaturePlacementDraft(
+                page_number=rect.page_index + 1,
+                left_pt=rect.left_pt,
+                bottom_pt=rect.bottom_pt,
+                width_pt=rect.width_pt,
+                height_pt=rect.height_pt,
+                enabled=True,
+            )
+        else:
+            placement_defaults = self.workflow.signature_placement_defaults
+            placement = VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=(
+                    placement_defaults.width_pt
+                    if placement_defaults is not None
+                    else 72.0
+                ),
+                height_pt=(
+                    placement_defaults.height_pt
+                    if placement_defaults is not None
+                    else 24.0
+                ),
+                enabled=False,
+            )
+        return VisibleSignatureSetupDraft(
+            appearance=appearance,
+            placement=placement,
+        )
 
 
 def _preset_by_id(
