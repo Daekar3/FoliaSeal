@@ -45,6 +45,12 @@ def test_setup_form_loads_visible_signature_draft_into_controls() -> None:
     assert form.placement_controls.width_spin.value() == 180.0
     assert form.field_controls[SignatureFieldKey.SIGNING_TIME].override_edit.enabled is False
     assert form.field_controls[SignatureFieldKey.LOCATION].override_edit.enabled is False
+    assert form.visible_text_controls.advanced_container.visible is False
+    assert (
+        form.visible_text_controls.detail_label.text()
+        == "Showing 7 visible fields with labels on. 4 field overrides configured. "
+        "Open the advanced editor only when individual fields need different sources or text."
+    )
     assert form.build_draft().placement.enabled is True
 
 
@@ -73,6 +79,7 @@ def test_setup_form_builds_draft_and_emits_change_callbacks() -> None:
     form.appearance_controls.signer_label_prefix.setText("Signed by Product")
     form.appearance_controls.font_family.setCurrentText("Serif")
     form.appearance_controls.show_field_names.setChecked(True)
+    form.visible_text_controls.advanced_toggle.setChecked(True)
     form.field_controls[SignatureFieldKey.EMAIL].source_combo.setCurrentText("Override")
     form.field_controls[SignatureFieldKey.EMAIL].override_edit.setText("product@example.com")
     form.placement_controls.page_spin.setValue(3)
@@ -85,6 +92,7 @@ def test_setup_form_builds_draft_and_emits_change_callbacks() -> None:
 
     assert change_calls
     assert page_changes[-1] == 3
+    assert form.visible_text_controls.advanced_container.visible is True
     assert draft.appearance.signer_label_prefix == "Signed by Product"
     assert draft.appearance.text_style.font_family == "Serif"
     assert draft.appearance.show_field_names is True
@@ -146,3 +154,30 @@ def test_setup_form_disables_unsupported_font_styles() -> None:
 
     assert form.appearance_controls.bold.enabled is False
     assert form.appearance_controls.italic.enabled is False
+
+
+def test_setup_form_advanced_visible_text_toggle_does_not_emit_draft_change() -> None:
+    change_calls: list[str] = []
+    form = QtVisibleSignatureSetupForm(
+        bindings=_fake_bindings(),
+        on_change=lambda: change_calls.append("changed"),
+    )
+    form.load(
+        VisibleSignatureSetupDraft(
+            appearance=build_signature_appearance(),
+            placement=VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=48.0,
+                enabled=False,
+            ),
+        )
+    )
+
+    change_calls.clear()
+    form.visible_text_controls.advanced_toggle.setChecked(True)
+
+    assert change_calls == []
+    assert form.visible_text_controls.advanced_container.visible is True

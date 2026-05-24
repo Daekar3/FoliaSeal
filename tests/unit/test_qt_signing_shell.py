@@ -1991,7 +1991,9 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert len(widget.properties_panel.container.layout.items) == 5
     assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
-    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 10
+    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 5
+    assert len(widget.properties_panel._visible_text_controls.advanced_container.layout.items) == 8
+    assert widget.properties_panel._visible_text_controls.advanced_container.visible is False
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
         == 5
@@ -2014,7 +2016,12 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         widget.properties_panel._visible_text_controls.summary_label.text()
-        == "Choose which signature details appear in the visible text."
+        == "Use the default visible signature text unless this document needs field-level changes."
+    )
+    assert (
+        widget.properties_panel._visible_text_controls.detail_label.text()
+        == "Showing 8 visible fields with labels off. 0 field overrides configured. "
+        "Open the advanced editor only when individual fields need different sources or text."
     )
     assert (
         widget.properties_panel._placement_controls.summary_label.text()

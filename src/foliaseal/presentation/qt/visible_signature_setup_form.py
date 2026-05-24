@@ -88,7 +88,10 @@ class VisibleTextControls:
 
     container: Any
     summary_label: Any
+    detail_label: Any
     show_field_names: Any
+    advanced_toggle: Any
+    advanced_container: Any
 
 
 @dataclass(frozen=True)
@@ -242,6 +245,12 @@ def _text(line_edit: Any) -> str:
     return ""
 
 
+def _set_widget_visible(widget: Any, visible: bool) -> None:
+    setter = getattr(widget, "setVisible", None)
+    if callable(setter):
+        setter(visible)
+
+
 def _selected_enum(value: str, enum_cls: type[Any]) -> Any:
     for member in enum_cls:
         if value == member.value or value == _enum_display_text(member):
@@ -268,6 +277,7 @@ class QtVisibleSignatureSetupForm:
         self._on_page_change = on_page_change
         self._suspend_updates = False
         self._placement_enabled = False
+        self._advanced_visible_text_expanded = False
 
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
@@ -300,6 +310,7 @@ class QtVisibleSignatureSetupForm:
         finally:
             self._suspend_updates = False
         self._sync_font_style_control_availability()
+        self._refresh_visible_text_summary()
 
     def build_draft(self) -> VisibleSignatureSetupDraft:
         return VisibleSignatureSetupDraft(
@@ -579,20 +590,43 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         summary_label = bindings.q_label(
-            "Choose which signature details appear in the visible text."
+            "Use the default visible signature text unless this document needs field-level changes."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
         if hasattr(summary_label, "setStyleSheet"):
             summary_label.setStyleSheet("color: #374151;")
+        detail_label = bindings.q_label("")
+        if hasattr(detail_label, "setWordWrap"):
+            detail_label.setWordWrap(True)
+        if hasattr(detail_label, "setStyleSheet"):
+            detail_label.setStyleSheet("color: #4b5563;")
+        advanced_toggle = bindings.q_check_box("Customize individual text fields")
+        advanced_container = bindings.q_widget()
+        advanced_layout = bindings.q_vbox_layout(advanced_container)
+        advanced_layout.setContentsMargins(12, 0, 0, 0)
+        advanced_layout.setSpacing(4)
+
         layout.addWidget(summary_label)
         layout.addWidget(self._appearance_controls.show_field_names)
+        layout.addWidget(detail_label)
+        layout.addWidget(advanced_toggle)
+        layout.addWidget(advanced_container)
         for controls in self.field_controls.values():
-            layout.addWidget(controls.container)
+            advanced_layout.addWidget(controls.container)
+
+        advanced_toggle.stateChanged.connect(  # type: ignore[attr-defined]
+            self._on_advanced_text_toggle
+        )
+        _set_widget_visible(advanced_container, False)
+
         return VisibleTextControls(
             container=container,
             summary_label=summary_label,
+            detail_label=detail_label,
             show_field_names=self._appearance_controls.show_field_names,
+            advanced_toggle=advanced_toggle,
+            advanced_container=advanced_container,
         )
 
     def _build_visible_signature_controls(self) -> VisibleSignatureControls:
@@ -677,6 +711,14 @@ class QtVisibleSignatureSetupForm:
             _set_combo_text(controls.source_combo, _enum_display_text(binding.source))
             _set_text(controls.override_edit, binding.override_text or "")
             self._sync_field_control_state(field_key)
+        _set_checked(
+            self._visible_text_controls.advanced_toggle,
+            self._advanced_visible_text_expanded,
+        )
+        _set_widget_visible(
+            self._visible_text_controls.advanced_container,
+            self._advanced_visible_text_expanded,
+        )
 
     def _build_appearance_from_controls(self) -> SignatureAppearance:
         text_style = SignatureTextStyle(
@@ -775,6 +817,26 @@ class QtVisibleSignatureSetupForm:
         if callable(italic_setter):
             italic_setter(italic_supported or italic_checked)
 
+    def _refresh_visible_text_summary(self) -> None:
+        bindings = tuple(
+            self._build_field_binding(field_key)
+            for field_key in SIGNATURE_FIELD_DISPLAY_ORDER
+        )
+        visible_count = sum(1 for binding in bindings if binding.show_in_visible_appearance)
+        override_count = sum(
+            1
+            for binding in bindings
+            if binding.source == SignatureFieldSource.OVERRIDE
+        )
+        field_names = "on" if _is_checked(self._visible_text_controls.show_field_names) else "off"
+        summary = (
+            f"Showing {visible_count} visible fields with labels {field_names}. "
+            f"{override_count} field override"
+            f"{'' if override_count == 1 else 's'} configured. "
+            "Open the advanced editor only when individual fields need different sources or text."
+        )
+        _set_text(self._visible_text_controls.detail_label, summary)
+
     def _connect_change_signal(self, control: Any) -> None:
         changed_signal = getattr(control, "textChanged", None)
         if hasattr(control, "currentTextChanged"):
@@ -790,6 +852,7 @@ class QtVisibleSignatureSetupForm:
         if self._suspend_updates:
             return
         self._sync_font_style_control_availability()
+        self._refresh_visible_text_summary()
         if self._on_change is not None:
             self._on_change()
 
@@ -797,6 +860,7 @@ class QtVisibleSignatureSetupForm:
         if self._suspend_updates:
             return
         self._sync_field_control_state(field_key)
+        self._refresh_visible_text_summary()
         if self._on_change is not None:
             self._on_change()
 
@@ -804,6 +868,7 @@ class QtVisibleSignatureSetupForm:
         if self._suspend_updates:
             return
         self._sync_field_control_state(field_key)
+        self._refresh_visible_text_summary()
         if self._on_change is not None:
             self._on_change()
 
@@ -815,3 +880,12 @@ class QtVisibleSignatureSetupForm:
             self._on_change()
         if self._on_page_change is not None:
             self._on_page_change(int(_spin_value(self._placement_controls.page_spin)))
+
+    def _on_advanced_text_toggle(self, *_args: object) -> None:
+        self._advanced_visible_text_expanded = _is_checked(
+            self._visible_text_controls.advanced_toggle
+        )
+        _set_widget_visible(
+            self._visible_text_controls.advanced_container,
+            self._advanced_visible_text_expanded,
+        )
