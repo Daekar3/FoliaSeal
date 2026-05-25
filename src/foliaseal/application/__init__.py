@@ -26,6 +26,10 @@ from foliaseal.application.performance_timing import (
     ViewerPerformanceTracker,
     ViewerTimingSnapshot,
 )
+from foliaseal.application.phase3_signing_backend import (
+    BackendReservationEvidence,
+    build_backend_reservation_evidence,
+)
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
@@ -118,6 +122,7 @@ __all__ = [
     "ViewerWorkflow",
     "ViewerZoomLimits",
     "CanonicalSignaturePreviewSnapshot",
+    "BackendReservationEvidence",
     "CanonicalPreviewLayout",
     "CertificateCreationError",
     "CertificateCreationResult",
@@ -197,6 +202,7 @@ __all__ = [
     "compare_signature_appearance_snapshots",
     "compare_preview_to_request",
     "build_horizontal_single_line_ink_reservation",
+    "build_backend_reservation_evidence",
     "format_signing_completion_message",
     "measure_horizontal_single_line_rendered_reference",
     "render_canonical_signature_preview",

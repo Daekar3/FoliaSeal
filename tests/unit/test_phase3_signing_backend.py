@@ -52,6 +52,7 @@ from foliaseal.application.phase3_signing_backend import (
     _stamp_background_for_path,
     _visible_signature_fit_issues,
     _visible_signature_fit_issues_for_stamp_text,
+    build_backend_reservation_evidence,
     build_phase3_signing_executor,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance, SignPdfUseCase
@@ -3084,6 +3085,197 @@ def test_phase3_signing_executor_rejects_visible_signature_that_does_not_fit(
     assert result.success is False
     assert result.failure_code == FailureCode.PDF_SIGNING_FAILED
     assert "does not fit" in result.message.lower()
+
+
+def test_build_backend_reservation_evidence_retains_error_details_for_bad_request(
+    tmp_path: Path,
+) -> None:
+    request = build_signing_request(
+        tmp_path,
+        certificate_name="missing-cert.p12",
+        passphrase="passphrase",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=10.0,
+            bottom_pt=20.0,
+            width_pt=30.0,
+            height_pt=40.0,
+        ),
+        signature_appearance=build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        ),
+    )
+
+    evidence = build_backend_reservation_evidence(request)
+
+    assert evidence is not None
+    assert evidence.snapshot is not None
+    assert evidence.snapshot["layout_template"] == "single_line"
+    assert evidence.snapshot["signature_rect"]["page_number"] == 1
+    assert "missing-cert.p12" in evidence.snapshot["error"]
+    assert evidence.error is not None
+    assert "missing-cert.p12" in evidence.error
+
+
+def test_build_backend_reservation_evidence_retains_fit_numbers_for_layout_failure(
+    tmp_path: Path,
+) -> None:
+    _write_test_pdf(tmp_path / "input.pdf")
+    _write_test_pkcs12(tmp_path / "cert.p12", passphrase="secret")
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+
+    appearance = build_signature_appearance(
+        image_stamp_path=str(stamp_path),
+        signer_label_prefix="Digitally signed by",
+        show_field_names=False,
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Morgan Ellery-Prescott",
+            show_in_visible_appearance=True,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Deputy Board Secretary",
+            show_in_visible_appearance=True,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="FoliaSeal Governance Holdings",
+            show_in_visible_appearance=True,
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="2026-04-24 00:59 EDT",
+            show_in_visible_appearance=True,
+        ),
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Sans Serif",
+            font_size_pt=8.5,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+    )
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=246.4, height_pt=87.68),
+        signature_appearance=appearance,
+    )
+
+    evidence = build_backend_reservation_evidence(request)
+
+    assert evidence is not None
+    assert evidence.snapshot is not None
+    assert evidence.snapshot["fit_gate_passed"] is False
+    assert evidence.snapshot["measured_text_box_width_pt"] is not None
+    assert evidence.snapshot["fit_gate_width_limit_pt"] is not None
+    assert (
+        evidence.snapshot["measured_text_box_width_pt"]
+        > evidence.snapshot["fit_gate_width_limit_pt"]
+    )
+    assert evidence.snapshot["text_area_width_pt"] is not None
+    assert evidence.snapshot["stamp_area_height_pt"] is not None
+    assert "does not fit inside the selected rectangle" in evidence.snapshot["error"]
+    assert evidence.error is not None
+    assert "does not fit inside the selected rectangle" in evidence.error
+
+
+def test_build_backend_reservation_evidence_uses_backend_appearance_fields(
+    tmp_path: Path,
+) -> None:
+    _write_test_pdf(tmp_path / "input.pdf")
+    _write_test_pkcs12(tmp_path / "cert.p12", passphrase="secret")
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_stamp_image(stamp_path)
+
+    appearance = build_signature_appearance(
+        image_stamp_path=str(stamp_path),
+        signer_label_prefix="Digitally signed by",
+        show_field_names=False,
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        distinguished_name=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        signing_time=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        location=build_signature_field_binding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+        text_style=SignatureTextStyle(
+            font_family="Serif",
+            font_size_pt=8.0,
+            bold=False,
+            italic=False,
+            text_color_hex="#000000",
+        ),
+    )
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=540.0, height_pt=120.0),
+        signature_appearance=appearance,
+    )
+
+    evidence = build_backend_reservation_evidence(request)
+
+    assert evidence is not None
+    assert evidence.snapshot is not None
+    assert evidence.snapshot["layout_template"] == "single_line"
+    assert evidence.snapshot["stamp_position"] == "top"
+    assert evidence.snapshot["signature_rect"]["page_number"] == 1
+    assert evidence.snapshot["error"] is None
+    assert evidence.snapshot["stamp_text_length"] > 0
+    assert evidence.snapshot["background_layout"]["inner_content_scaling"] == "shrink_to_fit"
+    assert evidence.snapshot["fit_gate_passed"] is True
+    assert evidence.snapshot["measured_text_box_width_pt"] is not None
+    assert evidence.snapshot["text_area_width_pt"] is not None
+    assert evidence.error is None
 
 
 def test_visible_signature_fit_issues_accept_compact_real_world_rectangle(

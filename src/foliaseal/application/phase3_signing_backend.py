@@ -11,6 +11,7 @@ from fractions import Fraction
 from io import BytesIO
 from math import ceil
 from pathlib import Path
+from typing import Any
 
 from asn1crypto import pkcs12
 from PIL import Image
@@ -92,6 +93,14 @@ from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validati
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 _SIG_FIELD_NAME = "Signature1"
 _SINGLE_LINE_RENDERED_INK_FIT_CACHE: dict[tuple[object, ...], bool] = {}
+
+
+@dataclass(frozen=True)
+class BackendReservationEvidence:
+    """JSON-ready backend reservation evidence for a signing request."""
+
+    snapshot: dict[str, Any] | None
+    error: str | None
 
 
 def _fmt_pdf_number(value: float) -> bytes:
@@ -2073,6 +2082,151 @@ def _current_signing_time(timezone_mode: SignatureTimezoneDisplayMode) -> dateti
     if timezone_mode is SignatureTimezoneDisplayMode.LOCAL:
         timestamp = timestamp.astimezone()
     return timestamp
+
+
+def _layout_value_name(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(getattr(value, "name", value)).lower()
+
+
+def _snapshot_layout_rule(layout_rule: object | None) -> dict[str, Any] | None:
+    if layout_rule is None:
+        return None
+    margins = getattr(layout_rule, "margins", None)
+    return {
+        "x_align": _layout_value_name(getattr(layout_rule, "x_align", None)),
+        "y_align": _layout_value_name(getattr(layout_rule, "y_align", None)),
+        "inner_content_scaling": _layout_value_name(
+            getattr(
+                layout_rule,
+                "inner_content_scaling",
+                getattr(layout_rule, "scaling", None),
+            )
+        ),
+        "margins": None
+        if margins is None
+        else {
+            "left": margins.left,
+            "right": margins.right,
+            "top": margins.top,
+            "bottom": margins.bottom,
+        },
+    }
+
+
+def build_backend_reservation_evidence(
+    request: SigningRequest | None,
+) -> BackendReservationEvidence | None:
+    """Build backend reservation snapshot/error evidence for UI and harness callers."""
+
+    if request is None or request.signature_rect is None or request.signature_appearance is None:
+        return None
+
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        request.signature_appearance
+    )
+    snapshot: dict[str, Any] = {
+        "layout_template": appearance.layout_template.value,
+        "stamp_position": appearance.stamp_position.value,
+        "signature_rect": {
+            "page_index": request.signature_rect.page_index,
+            "page_number": request.signature_rect.page_index + 1,
+            "left_pt": request.signature_rect.left_pt,
+            "bottom_pt": request.signature_rect.bottom_pt,
+            "width_pt": request.signature_rect.width_pt,
+            "height_pt": request.signature_rect.height_pt,
+        },
+        "error": None,
+    }
+
+    try:
+        signer = _load_simple_signer(request.certificate_path, request.passphrase)
+        signing_time = _current_signing_time(appearance.timezone_display_mode)
+        stamp_text = _build_stamp_text(
+            appearance=appearance,
+            signer=signer,
+            signing_time=signing_time,
+            signature_rect=request.signature_rect,
+        )
+        stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
+        layout_plan = VisibleSignatureLayoutEngine().plan(
+            LayoutRequest(
+                signature_rect=request.signature_rect,
+                layout_template=appearance.layout_template,
+                stamp_position=appearance.stamp_position,
+                text_style=appearance.text_style,
+                box_style=appearance.box_style,
+                stamp_text=stamp_text,
+                image_stamp_path=appearance.image_stamp_path,
+            )
+        )
+        text_box_width = layout_plan.text_box.width_pt
+        text_box_height = layout_plan.text_box.height_pt
+        fit_gate_width_limit = layout_plan.text_area_width_pt + 1
+        fit_gate_height_limit = layout_plan.text_area_height_pt
+        fit_gate_passed = not layout_plan.fit_issues
+        if layout_plan.fit_issues:
+            snapshot["error"] = layout_plan.fit_issues[0].message
+        background_layout = _background_layout_for_stamp(
+            appearance.layout_template,
+            stamp_position=appearance.stamp_position,
+            stamp_background=stamp_background,
+            signature_rect=request.signature_rect,
+            text_box_width=text_box_width,
+            text_box_height=text_box_height,
+            box_style=appearance.box_style,
+        )
+        snapshot.update(
+            {
+                "stamp_text": stamp_text,
+                "stamp_text_length": len(stamp_text),
+                "stamp_text_line_count": len(stamp_text.splitlines()) if stamp_text else 0,
+                "stamp_background_present": stamp_background is not None,
+                "measured_text_box_width_pt": text_box_width,
+                "measured_text_box_height_pt": text_box_height,
+                "reserved_primary_extent_pt": layout_plan.reserved_primary_extent_pt,
+                "stamp_area_width_pt": layout_plan.stamp_area_width_pt,
+                "stamp_area_height_pt": layout_plan.stamp_area_height_pt,
+                "text_area_width_pt": layout_plan.text_area_width_pt,
+                "text_area_height_pt": layout_plan.text_area_height_pt,
+                "fit_gate_width_limit_pt": fit_gate_width_limit,
+                "fit_gate_height_limit_pt": fit_gate_height_limit,
+                "fit_gate_passed": fit_gate_passed,
+                "text_style": {
+                    "font_family": appearance.text_style.font_family,
+                    "font_size_pt": appearance.text_style.font_size_pt,
+                    "bold": appearance.text_style.bold,
+                    "italic": appearance.text_style.italic,
+                    "text_color_hex": appearance.text_style.text_color_hex,
+                },
+                "box_style": {
+                    "border_color_hex": appearance.box_style.border_color_hex,
+                    "border_width_pt": appearance.box_style.border_width_pt,
+                    "background_color_hex": appearance.box_style.background_color_hex,
+                }
+                if appearance.box_style is not None
+                else None,
+                "background_layout": _snapshot_layout_rule(background_layout),
+                "content_layout": _snapshot_layout_rule(layout_plan.text_layout),
+            }
+        )
+    except Exception as exc:
+        snapshot["error"] = str(exc)
+        return BackendReservationEvidence(snapshot=snapshot, error=str(exc))
+
+    try:
+        _build_stamp_style(
+            appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=request.signature_rect,
+        )
+    except Exception as exc:
+        snapshot["error"] = str(exc)
+        return BackendReservationEvidence(snapshot=snapshot, error=str(exc))
+
+    return BackendReservationEvidence(snapshot=snapshot, error=None)
 
 
 def _rect_to_box(signature_rect) -> tuple[int, int, int, int]:

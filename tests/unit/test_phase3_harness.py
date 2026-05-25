@@ -16,7 +16,10 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
+from foliaseal.application.phase3_signing_backend import (
+    BackendReservationEvidence,
+    build_phase3_signing_executor,
+)
 from foliaseal.application.qa_evidence_contract import (
     ENGINEERING_RUN,
     GATE_CANDIDATE,
@@ -37,15 +40,12 @@ from foliaseal.application.qa_signed_acceptance_assets import (
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
-    SignatureFieldBinding,
-    SignatureFieldKey,
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
-    SigningRequest,
     SigningResult,
 )
 from foliaseal.presentation.qt.phase3_harness import (
@@ -72,7 +72,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
     _signed_output_appearance_snapshot,
-    _snapshot_backend_reservation,
     _snapshot_current_draft_request,
     _snapshot_output_verification,
     _snapshot_preview,
@@ -1767,12 +1766,11 @@ def test_capture_interactive_state_collects_preview_and_backend_snapshots(monkey
         lambda **_kwargs: {"preview_image_path": "artifacts/preview.png"},
     )
     monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._snapshot_backend_reservation",
-        lambda request: {"layout_template": request.signature_appearance.layout_template.value},
-    )
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._backend_reservation_error",
-        lambda _request: None,
+        "foliaseal.presentation.qt.phase3_harness.build_backend_reservation_evidence",
+        lambda request: BackendReservationEvidence(
+            snapshot={"layout_template": request.signature_appearance.layout_template.value},
+            error=None,
+        ),
     )
 
     request = build_signing_request(
@@ -2443,12 +2441,11 @@ def test_capture_interactive_state_preserves_render_artifacts_when_preview_captu
         },
     )
     monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._snapshot_backend_reservation",
-        lambda request: {"layout_template": request.signature_appearance.layout_template.value},
-    )
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._backend_reservation_error",
-        lambda _request: None,
+        "foliaseal.presentation.qt.phase3_harness.build_backend_reservation_evidence",
+        lambda request: BackendReservationEvidence(
+            snapshot={"layout_template": request.signature_appearance.layout_template.value},
+            error=None,
+        ),
     )
 
     request = build_signing_request(
@@ -4024,132 +4021,6 @@ def test_apply_visible_fields_override_rejects_empty_or_unknown_values() -> None
         _apply_visible_fields_override(appearance, ["not_a_field"])
 
 
-def test_backend_reservation_snapshot_retains_error_details_for_bad_request() -> None:
-    appearance = SignatureAppearance(
-        signer_label_prefix="Digitally signed by",
-        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-        common_name=SignatureFieldBinding(),
-        email=SignatureFieldBinding(),
-        title=SignatureFieldBinding(),
-        company=SignatureFieldBinding(),
-        signing_time=SignatureFieldBinding(),
-        reason=SignatureFieldBinding(),
-        location=SignatureFieldBinding(),
-        field_order=(
-            SignatureFieldKey.DISTINGUISHED_NAME,
-            SignatureFieldKey.COMMON_NAME,
-            SignatureFieldKey.EMAIL,
-            SignatureFieldKey.TITLE,
-            SignatureFieldKey.COMPANY,
-            SignatureFieldKey.SIGNING_TIME,
-            SignatureFieldKey.REASON,
-            SignatureFieldKey.LOCATION,
-        ),
-    )
-    request = SigningRequest(
-        input_pdf_path="/tmp/sample.pdf",
-        output_pdf_path="/tmp/sample-signed.pdf",
-        certificate_path="/tmp/missing-cert.p12",
-        passphrase="passphrase",
-        tsa_url="https://tsa.example.invalid",
-        timestamp_required=False,
-        signature_rect=SignatureRect(
-            page_index=0,
-            left_pt=10.0,
-            bottom_pt=20.0,
-            width_pt=30.0,
-            height_pt=40.0,
-        ),
-        signature_appearance=appearance,
-    )
-
-    snapshot = _snapshot_backend_reservation(request)
-
-    assert snapshot is not None
-    assert snapshot["layout_template"] == "single_line"
-    assert snapshot["signature_rect"]["page_number"] == 1
-    assert "missing-cert.p12" in snapshot["error"]
-
-
-def test_backend_reservation_snapshot_retains_fit_numbers_for_layout_failure(
-    tmp_path: Path,
-) -> None:
-    input_pdf = tmp_path / "input.pdf"
-    cert_path = tmp_path / "cert.p12"
-    stamp_path = tmp_path / "stamp.png"
-    _write_test_pdf(input_pdf)
-    _write_test_pkcs12(cert_path, passphrase="secret")
-    _write_test_stamp_image(stamp_path)
-
-    appearance = build_signature_appearance(
-        image_stamp_path=str(stamp_path),
-        signer_label_prefix="Digitally signed by",
-        show_field_names=False,
-        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        common_name=build_signature_field_binding(
-            source=SignatureFieldSource.OVERRIDE,
-            override_text="Morgan Ellery-Prescott",
-            show_in_visible_appearance=True,
-        ),
-        title=build_signature_field_binding(
-            source=SignatureFieldSource.OVERRIDE,
-            override_text="Deputy Board Secretary",
-            show_in_visible_appearance=True,
-        ),
-        company=build_signature_field_binding(
-            source=SignatureFieldSource.OVERRIDE,
-            override_text="FoliaSeal Governance Holdings",
-            show_in_visible_appearance=True,
-        ),
-        signing_time=build_signature_field_binding(
-            source=SignatureFieldSource.OVERRIDE,
-            override_text="2026-04-24 00:59 EDT",
-            show_in_visible_appearance=True,
-        ),
-        distinguished_name=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        reason=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        location=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        text_style=SignatureTextStyle(
-            font_family="Sans Serif",
-            font_size_pt=8.5,
-            bold=False,
-            italic=False,
-            text_color_hex="#000000",
-        ),
-    )
-    request = build_signing_request(
-        tmp_path,
-        input_name="input.pdf",
-        output_name="output.pdf",
-        certificate_name="cert.p12",
-        passphrase="secret",
-        timestamp_required=False,
-        signature_rect=build_signature_rect(page_index=0, width_pt=246.4, height_pt=87.68),
-        signature_appearance=appearance,
-    )
-
-    snapshot = _snapshot_backend_reservation(request)
-
-    assert snapshot is not None
-    assert snapshot["fit_gate_passed"] is False
-    assert snapshot["measured_text_box_width_pt"] is not None
-    assert snapshot["fit_gate_width_limit_pt"] is not None
-    assert snapshot["measured_text_box_width_pt"] > snapshot["fit_gate_width_limit_pt"]
-    assert snapshot["text_area_width_pt"] is not None
-    assert snapshot["stamp_area_height_pt"] is not None
-    assert "does not fit inside the selected rectangle" in snapshot["error"]
-
-
 def test_snapshot_current_draft_request_uses_workflow_state(tmp_path: Path) -> None:
     request = build_signing_request(
         tmp_path,
@@ -4175,81 +4046,6 @@ def test_snapshot_current_draft_request_uses_workflow_state(tmp_path: Path) -> N
     assert draft_request.certificate_path == request.certificate_path
     assert draft_request.signature_rect == request.signature_rect
     assert draft_request.signature_appearance == request.signature_appearance
-
-
-def test_backend_reservation_snapshot_uses_backend_appearance_fields(tmp_path: Path) -> None:
-    input_pdf = tmp_path / "input.pdf"
-    cert_path = tmp_path / "cert.p12"
-    stamp_path = tmp_path / "stamp.png"
-    _write_test_pdf(input_pdf)
-    _write_test_pkcs12(cert_path, passphrase="secret")
-    _write_test_stamp_image(stamp_path)
-
-    appearance = build_signature_appearance(
-        image_stamp_path=str(stamp_path),
-        signer_label_prefix="Digitally signed by",
-        show_field_names=False,
-        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        distinguished_name=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        email=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        title=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        company=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        signing_time=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        reason=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        location=build_signature_field_binding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-        ),
-        text_style=SignatureTextStyle(
-            font_family="Serif",
-            font_size_pt=8.0,
-            bold=False,
-            italic=False,
-            text_color_hex="#000000",
-        ),
-    )
-    request = build_signing_request(
-        tmp_path,
-        input_name="input.pdf",
-        output_name="output.pdf",
-        certificate_name="cert.p12",
-        passphrase="secret",
-        timestamp_required=False,
-        signature_rect=build_signature_rect(page_index=0, width_pt=540.0, height_pt=120.0),
-        signature_appearance=appearance,
-    )
-
-    snapshot = _snapshot_backend_reservation(request)
-
-    assert snapshot is not None
-    assert snapshot["layout_template"] == "single_line"
-    assert snapshot["stamp_position"] == "top"
-    assert snapshot["signature_rect"]["page_number"] == 1
-    assert "error" not in snapshot
-    assert snapshot["stamp_text_length"] > 0
-    assert snapshot["background_layout"]["inner_content_scaling"] == "shrink_to_fit"
-    assert snapshot["fit_gate_passed"] is True
-    assert snapshot["measured_text_box_width_pt"] is not None
-    assert snapshot["text_area_width_pt"] is not None
 
 
 def test_snapshot_sign_time_fit_diagnostics_combines_backend_and_canonical_geometry() -> None:

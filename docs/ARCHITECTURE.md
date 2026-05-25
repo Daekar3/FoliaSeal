@@ -91,12 +91,12 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/application/phase3_signing_backend.py`
 - Responsibility: Concrete pyHanko signing, verification, certificate loading, visible signature style construction, fit validation, and timestamp integration.
-- Owns: `PyHankoPdfSigner`, `PyHankoPdfInspector`, `PyHankoCertificateLoader`, `PyHankoSignatureVerifier`, `Phase3SigningExecutor`, rounded visible signature stamp style, backend-only rendered-fit fallbacks.
+- Owns: `PyHankoPdfSigner`, `PyHankoPdfInspector`, `PyHankoCertificateLoader`, `PyHankoSignatureVerifier`, `Phase3SigningExecutor`, `BackendReservationEvidence`, `build_backend_reservation_evidence()`, rounded visible signature stamp style, backend-only rendered-fit fallbacks.
 - Does not own: Qt widgets, persisted profile schemas, high-level request/failure orchestration, visible-signature text/metadata semantics.
 - Key collaborators: `SignPdfUseCase`, `visible_signature_semantics.py`, `visible_signature_layout.py`, bundled fonts, `infra.tsa`, `infra.certification`.
-- Main entry points: `build_phase3_signing_executor()`, `Phase3SigningExecutor.execute()`.
+- Main entry points: `build_phase3_signing_executor()`, `Phase3SigningExecutor.execute()`, `build_backend_reservation_evidence()`.
 - Important types/classes/functions: `RoundedBorderTextStampStyle`, `PyHankoPdfSigner.sign()`, `_visible_signature_fit_issues()`, `_build_stamp_text()`.
-- Known constraints: This module is currently large and contains both concrete adapter logic and many private layout helpers. Recent layout work introduced `VisibleSignatureLayoutEngine`, and visible text/metadata now comes from `VisibleSignatureSemanticsService`. Some layout helper policy still lives here as compatibility delegation. New production callers should not import those backend-private layout helpers directly. `_build_stamp_text()` remains as a private compatibility wrapper for backend tests and harness diagnostics.
+- Known constraints: This module is currently large and contains both concrete adapter logic and many private layout helpers. Recent layout work introduced `VisibleSignatureLayoutEngine`, and visible text/metadata now comes from `VisibleSignatureSemanticsService`. Some layout helper policy still lives here as compatibility delegation. New production callers should not import those backend-private layout helpers directly. `_build_stamp_text()` remains as a private compatibility wrapper for backend tests and backend-owned evidence assembly. `build_backend_reservation_evidence()` is the boundary for JSON-ready reservation snapshot/error facts; temporary UI layers such as the Phase 3 harness should consume that boundary instead of reconstructing reservation evidence from backend-private helpers.
 - Status: Confirmed by code and tests; helper concentration is marked as debt.
 
 ### Visible signature semantics boundary
@@ -262,8 +262,9 @@ The canonical repository document split is:
 - Location: `src/foliaseal/application/qa_*`, `src/foliaseal/application/phase2_evidence.py`, `src/foliaseal/presentation/qt/phase*_harness.py`, `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py`, `artifacts/`
 - Responsibility: Produce manual QA evidence, preview matrix outputs, signed-output acceptance artifacts, signed acceptance evidence summaries, and evidence contract evaluations.
 - Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering. The evidence command suppresses known fit-rejection layout warnings only for the intentional rejection matrix; raw per-manifest matrix commands remain the diagnostic path.
-- Does not own: Core domain models or signing semantics.
+- Does not own: Core domain models, signing semantics, or backend reservation evidence assembly.
 - Key collaborators: CLI entry points, Qt shell, signing backend, artifacts directory.
+- Known constraints: The Phase 3 harness still owns capture payload assembly, JSON serialization, and markdown rendering, but backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. That keeps the harness disposable and prevents it from depending on backend-private layout/signing helpers for reservation evidence.
 - Status: Confirmed by code, README, tests, and artifacts.
 
 ### Packaging
@@ -289,6 +290,7 @@ The canonical repository document split is:
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, selected reusable-object ids, rect, appearance, placement context. | Produces preview and final `SigningRequest`; can apply resolved `CertificateConfiguration` material. |
 | `CertificatePreviewReader` / `Pkcs12CertificatePreviewReader` | `application/certificate_preview.py` | Extract certificate-derived visible-signature preview values. | certificate path, passphrase -> field-value map and availability flag. | Injected into draft workflow so PKCS#12 parsing is not implemented inside the draft object. |
 | `SigningDraftPreview` | `application/signing_draft_workflow.py` | UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, stamp text, issues, can_submit. | Used by Qt and preview renderer. |
+| `BackendReservationEvidence` | `application/phase3_signing_backend.py` | JSON-ready backend reservation evidence for non-Qt callers and temporary harnesses. | snapshot dict, top-level error string. | Lets the harness consume backend reservation facts without reconstructing them from private helpers. |
 | `SignaturePropertiesViewState` | `application/signature_properties_coordinator.py` | Immutable signing-properties panel state. | selected certificate/preset display names, catalog names, visible-signature setup draft, validation text, readiness, preview. | Display-name boundary plus Qt-independent visible-signature setup state between the panel and application-layer reconciliation. |
 | `VisibleSignatureSetupDraft` / `VisibleSignaturePlacementDraft` | `application/signature_properties_coordinator.py` | Qt-independent visible-signature setup form state. | `SignatureAppearance`, placement values, placement-enabled flag. | Lets the panel load and submit visible-signature setup without mutating `SigningDraftWorkflow` directly on the main form path. |
 | `ApplyVisibleSignatureSetup` / `ApplyCertificateConfiguration` / `ApplySignaturePreset` / `SaveCurrentPreset` / `DeletePreset` / `RefreshCatalogs` / `ClearSelectedSignaturePreset` | `application/signature_properties_coordinator.py` | Command payloads for signing-properties reconciliation. | setup draft, selected name, optional passphrase, overwrite flag. | Used by the panel to express user intent without mutating widget internals directly. |
@@ -442,6 +444,7 @@ The canonical repository document split is:
 - Format: JSON summaries, markdown checklists, preview PNGs, signed-output crops/comparisons.
 - Validation: `evaluate_phase3_evidence_contract()` checks capture consistency and gate verdict.
 - Error behavior: `phase3-signing-harness-validate` raises when evidence contract fails.
+- Known constraints: `backend_reservation_snapshot` and `backend_reservation_error` remain part of the capture payload, but Phase 3 harness code now consumes those values from `build_backend_reservation_evidence()` instead of reconstructing them from backend-private helpers.
 - Source files: `src/foliaseal/presentation/qt/phase3_harness.py`, `src/foliaseal/application/qa_evidence_contract.py`, `artifacts/`.
 
 ## 7. Control flow

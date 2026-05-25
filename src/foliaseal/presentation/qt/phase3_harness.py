@@ -31,21 +31,15 @@ from foliaseal.application.coordinate_transform import (
     pdf_rect_to_view_rect,
 )
 from foliaseal.application.phase3_signing_backend import (
-    _background_layout_for_stamp,
-    _build_stamp_style,
-    _build_stamp_text,
-    _current_signing_time,
     _effective_layout_edge_margin,
-    _load_simple_signer,
     _single_line_vertical_outer_margin,
-    _stamp_background_for_path,
+    build_backend_reservation_evidence,
     build_phase3_signing_executor,
 )
 from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
 from foliaseal.application.qa_preview_stress_fixtures import (
     apply_preview_stress_fixture_profile,
 )
-from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signature_font_registry import preview_font_family_supported
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
@@ -994,8 +988,9 @@ def _capture_interactive_state(
         artifacts_dir=artifacts_dir,
         artifact_basename=artifact_basename,
     )
+    backend_reservation = build_backend_reservation_evidence(request)
     backend_reservation_snapshot = (
-        _snapshot_backend_reservation(request) if request is not None else None
+        None if backend_reservation is None else backend_reservation.snapshot
     )
     sign_time_diagnostics = _snapshot_sign_time_fit_diagnostics(
         preview_render_capture=render_capture,
@@ -1019,7 +1014,9 @@ def _capture_interactive_state(
         "validation_text": validation_text,
         "sign_request_snapshot": _snapshot_signing_request(request),
         "backend_reservation_snapshot": backend_reservation_snapshot,
-        "backend_reservation_error": _backend_reservation_error(request) if request else None,
+        "backend_reservation_error": (
+            None if backend_reservation is None else backend_reservation.error
+        ),
     }
 
 
@@ -2509,6 +2506,7 @@ def _execute_preview_matrix_scenario(
     preview_text = shell.properties_panel.preview_text()
     validation_text = shell.properties_panel.validation_text()
     request = _snapshot_current_draft_request(shell.properties_panel._workflow)
+    backend_reservation = build_backend_reservation_evidence(request)
     artifact_basename = _scenario_slug(str(scenario["name"]))
     render_capture = _capture_preview_render(
         shell=shell,
@@ -2524,7 +2522,7 @@ def _execute_preview_matrix_scenario(
         "validation_text": validation_text,
         "sign_request_snapshot": _snapshot_signing_request(request),
         "backend_reservation_snapshot": (
-            _snapshot_backend_reservation(request) if request is not None else None
+            None if backend_reservation is None else backend_reservation.snapshot
         ),
     }
 
@@ -2552,6 +2550,7 @@ def _execute_headless_preview_matrix_scenario(
     preview_text = _headless_preview_text(preview)
     validation_text = _headless_validation_text(preview)
     request = _snapshot_current_draft_request(workflow)
+    backend_reservation = build_backend_reservation_evidence(request)
     artifact_basename = _scenario_slug(str(scenario["name"]))
     render_capture = _capture_headless_preview_render(
         preview=preview,
@@ -2566,7 +2565,7 @@ def _execute_headless_preview_matrix_scenario(
         "validation_text": validation_text,
         "sign_request_snapshot": _snapshot_signing_request(request),
         "backend_reservation_snapshot": (
-            _snapshot_backend_reservation(request) if request is not None else None
+            None if backend_reservation is None else backend_reservation.snapshot
         ),
     }
 
@@ -2680,6 +2679,7 @@ def _execute_signed_acceptance_scenario(
     signing_result_payload = None
 
     request_snapshot = _snapshot_signing_request(request)
+    backend_reservation = build_backend_reservation_evidence(request)
     if request is not None:
         scenario_output = artifacts_dir / f"{artifact_basename}_signed.pdf"
         scenario_request = replace(
@@ -2727,7 +2727,7 @@ def _execute_signed_acceptance_scenario(
         "validation_text": validation_text,
         "sign_request_snapshot": request_snapshot,
         "backend_reservation_snapshot": (
-            _snapshot_backend_reservation(request) if request is not None else None
+            None if backend_reservation is None else backend_reservation.snapshot
         ),
         "signing_result": signing_result_payload,
         "output_file_exists": output_file_exists,
@@ -5532,110 +5532,6 @@ def _snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRe
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,
     )
-
-
-def _snapshot_backend_reservation(request: SigningRequest) -> dict[str, Any] | None:
-    if request.signature_rect is None or request.signature_appearance is None:
-        return None
-
-    appearance = SigningBackendAppearance.from_signature_appearance(
-        request.signature_appearance
-    )
-    snapshot = {
-        "layout_template": appearance.layout_template.value,
-        "stamp_position": appearance.stamp_position.value,
-        "signature_rect": _snapshot_signature_rect(request.signature_rect),
-    }
-    try:
-        signer = _load_simple_signer(request.certificate_path, request.passphrase)
-        signing_time = _current_signing_time(appearance.timezone_display_mode)
-        stamp_text = _build_stamp_text(
-            appearance=appearance,
-            signer=signer,
-            signing_time=signing_time,
-            signature_rect=request.signature_rect,
-        )
-        stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
-        layout_plan = VisibleSignatureLayoutEngine().plan(
-            LayoutRequest(
-                signature_rect=request.signature_rect,
-                layout_template=appearance.layout_template,
-                stamp_position=appearance.stamp_position,
-                text_style=appearance.text_style,
-                box_style=appearance.box_style,
-                stamp_text=stamp_text,
-                image_stamp_path=appearance.image_stamp_path,
-            )
-        )
-        text_box_width = layout_plan.text_box.width_pt
-        text_box_height = layout_plan.text_box.height_pt
-        fit_gate_width_limit = layout_plan.text_area_width_pt + 1
-        fit_gate_height_limit = layout_plan.text_area_height_pt
-        fit_gate_passed = not layout_plan.fit_issues
-        if layout_plan.fit_issues:
-            snapshot["error"] = layout_plan.fit_issues[0].message
-        background_layout = _background_layout_for_stamp(
-            appearance.layout_template,
-            stamp_position=appearance.stamp_position,
-            stamp_background=stamp_background,
-            signature_rect=request.signature_rect,
-            text_box_width=text_box_width,
-            text_box_height=text_box_height,
-            box_style=appearance.box_style,
-        )
-        snapshot.update(
-            {
-                "stamp_text": stamp_text,
-                "stamp_text_length": len(stamp_text),
-                "stamp_text_line_count": len(stamp_text.splitlines()) if stamp_text else 0,
-                "stamp_background_present": stamp_background is not None,
-                "measured_text_box_width_pt": text_box_width,
-                "measured_text_box_height_pt": text_box_height,
-                "reserved_primary_extent_pt": layout_plan.reserved_primary_extent_pt,
-                "stamp_area_width_pt": layout_plan.stamp_area_width_pt,
-                "stamp_area_height_pt": layout_plan.stamp_area_height_pt,
-                "text_area_width_pt": layout_plan.text_area_width_pt,
-                "text_area_height_pt": layout_plan.text_area_height_pt,
-                "fit_gate_width_limit_pt": fit_gate_width_limit,
-                "fit_gate_height_limit_pt": fit_gate_height_limit,
-                "fit_gate_passed": fit_gate_passed,
-                "text_style": _snapshot_text_style(appearance.text_style),
-                "box_style": _snapshot_box_style(appearance.box_style),
-                "background_layout": _snapshot_layout_rule(background_layout),
-                "content_layout": _snapshot_layout_rule(layout_plan.text_layout),
-            }
-        )
-    except Exception as exc:
-        snapshot["error"] = str(exc)
-        return snapshot
-    return snapshot
-
-
-def _backend_reservation_error(request: SigningRequest) -> str | None:
-    if request.signature_rect is None or request.signature_appearance is None:
-        return None
-    try:
-        appearance = SigningBackendAppearance.from_signature_appearance(
-            request.signature_appearance
-        )
-        signer = _load_simple_signer(request.certificate_path, request.passphrase)
-        signing_time = _current_signing_time(appearance.timezone_display_mode)
-        stamp_text = _build_stamp_text(
-            appearance=appearance,
-            signer=signer,
-            signing_time=signing_time,
-            signature_rect=request.signature_rect,
-        )
-        stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
-        _build_stamp_style(
-            appearance,
-            stamp_text=stamp_text,
-            stamp_background=stamp_background,
-            signature_rect=request.signature_rect,
-        )
-    except Exception as exc:
-        return str(exc)
-    return None
 
 
 def _snapshot_layout_rule(layout_rule) -> dict[str, Any] | None:
