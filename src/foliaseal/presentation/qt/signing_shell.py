@@ -14,7 +14,6 @@ from foliaseal.application import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
-    format_signing_completion_message,
     suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
@@ -79,6 +78,10 @@ from foliaseal.presentation.qt.signature_preview_layout import (
 )
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     QtCanonicalPreviewLifecycle,
+)
+from foliaseal.presentation.qt.signing_action_coordinator import (
+    SigningActionCoordinator,
+    SigningActionState,
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar,
@@ -1147,8 +1150,6 @@ class SigningWorkspaceWidget:
             self._app_settings = app_settings_store.load_settings()
         else:
             self._app_settings = AppSettings.default()
-        self._last_signing_result: SigningResult | None = None
-        self._last_successful_output_path: str | None = None
         self.widget = _build_close_aware_widget(
             bindings.q_widget,
             on_close=lambda: self.properties_panel.dispose(),
@@ -1198,6 +1199,15 @@ class SigningWorkspaceWidget:
         self._sign_button = self._sidebar.sign_button
         self._open_signed_output_button = self._sidebar.open_signed_output_button
         self._result_label = self._sidebar.result_label
+        self._signing_action_coordinator = SigningActionCoordinator(
+            workflow=self._draft_workflow,
+            apply_changes=self.properties_panel.apply_changes,
+            is_ready_to_sign=self.properties_panel.is_ready_to_sign,
+            validation_text=self.properties_panel.validation_text,
+            sign_executor=self._sign_executor,
+            on_sign_request=self._on_sign_request,
+            can_open_signed_output=self._on_open_signed_output is not None,
+        )
         index_changed = getattr(
             self._document_review_controls.signature_selector,
             "currentIndexChanged",
@@ -1318,7 +1328,7 @@ class SigningWorkspaceWidget:
         self.refresh_document_review()
         self._apply_document_text_state(self._document_text_search_session.search(""))
         self._apply_document_text_selection_state(self._document_text_selection_session.clear())
-        self._refresh_sign_button_state()
+        self._apply_signing_action_state(self._signing_action_coordinator.load())
 
     @property
     def container(self) -> Any:
@@ -1337,8 +1347,7 @@ class SigningWorkspaceWidget:
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
         self.properties_panel.refresh_preview()
-        self._refresh_sign_button_state()
-        self._refresh_flow_summary()
+        self._apply_signing_action_state(self._signing_action_coordinator.load())
 
     def refresh_document_review(self) -> DocumentReviewSummary:
         summary = self._document_review_inspector.inspect(self._viewer_workflow.document_path)
@@ -1469,61 +1478,19 @@ class SigningWorkspaceWidget:
         return bool(getattr(self._sign_button, "enabled", False))
 
     def submit_sign_request(self) -> SigningRequest | None:
-        self.properties_panel.apply_changes()
-        if not self.properties_panel.is_ready_to_sign():
-            self._last_signing_result = None
-            self._set_last_successful_output_path(None)
-            self._set_sign_result_text("")
-            self._emit_error(self.properties_panel.validation_text())
-            self._refresh_flow_summary()
-            return None
-        request = self._draft_workflow.build_signing_request()
-        if self._on_sign_request is not None:
-            self._on_sign_request(request)
-        if self._sign_executor is not None:
-            try:
-                result = self._sign_executor.execute(request)
-            except Exception as exc:  # pragma: no cover - defensive integration guard
-                failure_message = f"Signing failed: {exc}"
-                self._last_signing_result = SigningResult(
-                    success=False,
-                    failure_code=None,
-                    message=failure_message,
-                )
-                self._set_last_successful_output_path(None)
-                self._set_sign_result_text(failure_message, success=False)
-                self._emit_error(failure_message)
-                self.widget.last_signing_result = self._last_signing_result  # type: ignore[attr-defined]
-                self._refresh_flow_summary()
-                return request
-            self._last_signing_result = result
-            self.widget.last_signing_result = result  # type: ignore[attr-defined]
-            if result.success:
-                self._set_last_successful_output_path(request.output_pdf_path)
-                self._set_sign_result_text(
-                    format_signing_completion_message(result, request.output_pdf_path),
-                    success=True,
-                )
-                if self._on_status_change is not None:
-                    self._on_status_change("sign_success")
-            else:
-                self._set_last_successful_output_path(None)
-                self._set_sign_result_text(result.message, success=False)
-                if self._on_error is not None:
-                    self._on_error(result.message)
-                if self._on_status_change is not None:
-                    self._on_status_change("sign_failure")
-            self._refresh_flow_summary()
-            return request
-        self._last_signing_result = None
-        self.widget.last_signing_result = None  # type: ignore[attr-defined]
-        self._set_last_successful_output_path(None)
-        self._set_sign_result_text("")
-        self._refresh_flow_summary()
-        return request
+        transition = self._signing_action_coordinator.submit()
+        self._apply_signing_action_state(transition.state)
+        if transition.status_event is not None and self._on_status_change is not None:
+            self._on_status_change(transition.status_event)
+        if transition.error_message is not None:
+            if transition.error_via_emit:
+                self._emit_error(transition.error_message)
+            elif self._on_error is not None:
+                self._on_error(transition.error_message)
+        return transition.request
 
     def open_signed_output(self) -> str | None:
-        output_path = self._last_successful_output_path
+        output_path = self._signing_action_coordinator.open_signed_output()
         if output_path is None or self._on_open_signed_output is None:
             return None
         self._on_open_signed_output(output_path)
@@ -1546,11 +1513,9 @@ class SigningWorkspaceWidget:
             return None
         if not self._confirm_output_overwrite(selected_path):
             return None
-        self._draft_workflow.output_pdf_path = selected_path
-        self._clear_previous_signing_result()
-        self._set_sign_result_text(f"Output will be saved to: {selected_path}")
-        self._refresh_sign_button_state()
-        self._refresh_flow_summary()
+        self._apply_signing_action_state(
+            self._signing_action_coordinator.accept_output_path(selected_path)
+        )
         return selected_path
 
     def _confirm_output_overwrite(self, selected_path: str) -> bool:
@@ -1575,10 +1540,9 @@ class SigningWorkspaceWidget:
     @property
     def last_signing_result(self) -> SigningResult | None:
         """Return the most recent signing result, if a real executor ran."""
-        return self._last_signing_result
+        return self._signing_action_coordinator.last_signing_result
 
     def _set_last_successful_output_path(self, output_path: str | None) -> None:
-        self._last_successful_output_path = output_path
         self._open_signed_output_button.setEnabled(
             output_path is not None and self._on_open_signed_output is not None
         )
@@ -1587,12 +1551,7 @@ class SigningWorkspaceWidget:
         )
 
     def _clear_previous_signing_result(self) -> None:
-        if self._last_signing_result is None and self._last_successful_output_path is None:
-            return
-        self._last_signing_result = None
-        self.widget.last_signing_result = None  # type: ignore[attr-defined]
-        self._set_last_successful_output_path(None)
-        self._set_sign_result_text("")
+        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("clear"))
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         if self._document_text_selection_mode_enabled:
@@ -1617,11 +1576,9 @@ class SigningWorkspaceWidget:
         except ValueError as exc:
             self._emit_error(f"Unable to apply signature placement: {exc}")
             return
-        self._clear_previous_signing_result()
         self.properties_panel.set_signature_rect(signature_rect)
         self._sync_signature_overlay()
-        self._refresh_sign_button_state()
-        self._refresh_flow_summary()
+        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("selection"))
 
     def _handle_document_text_selection(self, pdf_rect: PdfRect) -> None:
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
@@ -1654,17 +1611,14 @@ class SigningWorkspaceWidget:
             self._on_status_change(name)
 
     def _handle_panel_change(self) -> None:
-        self._clear_previous_signing_result()
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
-        self._refresh_sign_button_state()
-        self._refresh_flow_summary()
+        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("panel"))
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh shell controls."""
         catalog = self.properties_panel.refresh_certificate_configurations()
-        self._refresh_sign_button_state()
-        self._refresh_flow_summary()
+        self._apply_signing_action_state(self._signing_action_coordinator.load())
         return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
@@ -1675,11 +1629,9 @@ class SigningWorkspaceWidget:
         except Exception as exc:
             self._emit_error(f"Unable to change PDF page: {exc}")
             return
-        self._clear_previous_signing_result()
         self._sync_placement_context_from_viewer()
         self._sync_signature_overlay()
-        self._refresh_sign_button_state()
-        self._refresh_flow_summary()
+        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("page"))
 
     def _sync_placement_context_from_viewer(self) -> None:
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
@@ -1705,7 +1657,7 @@ class SigningWorkspaceWidget:
             setter(self._draft_workflow.signature_rect)
 
     def _refresh_sign_button_state(self) -> None:
-        self._sign_button.setEnabled(self.properties_panel.is_ready_to_sign())
+        self._apply_signing_action_state(self._signing_action_coordinator.load())
 
     def _sync_document_review_signature_detail(
         self,
@@ -1787,41 +1739,26 @@ class SigningWorkspaceWidget:
             self._emit_error(f"Unable to show document text match: {exc}")
 
     def _refresh_flow_summary(self) -> None:
-        stage, detail = self._flow_summary_text()
-        self._flow_summary_controls.stage_label.setText(stage)
-        self._flow_summary_controls.detail_label.setText(detail)
+        self._apply_signing_action_state(self._signing_action_coordinator.load())
+
+    def _apply_signing_action_state(self, state: SigningActionState) -> None:
+        self._sign_button.setEnabled(state.can_sign)
+        self.widget.last_signing_result = state.last_signing_result  # type: ignore[attr-defined]
+        self._set_last_successful_output_path(state.last_successful_output_path)
+        self._set_sign_result_text(
+            state.result_text,
+            success=(
+                True
+                if state.result_kind == "success"
+                else False if state.result_kind == "error" else None
+            ),
+        )
+        self._flow_summary_controls.stage_label.setText(state.stage_text)
+        self._flow_summary_controls.detail_label.setText(state.detail_text)
         _set_widget_width_limit(
             self._flow_summary_controls.detail_label,
             _panel_available_width(self._sidebar.container),
         )
-
-    def _flow_summary_text(self) -> tuple[str, str]:
-        if (
-            self._last_signing_result is not None
-            and self._last_signing_result.success
-            and self._last_successful_output_path is not None
-        ):
-            return (
-                "Signed",
-                "Open or verify the signed PDF, then add another approval signature later "
-                "if the document permits it.",
-            )
-        if self.properties_panel.is_ready_to_sign():
-            return (
-                "Confirm/sign",
-                "Confirm the output path, review readiness, then sign the PDF.",
-            )
-        if self._draft_workflow.signature_rect is None:
-            return (
-                "Place signature",
-                "Drag on the page to place the visible signature, or enter placement values.",
-            )
-        validation_text = self.properties_panel.validation_text().strip()
-        if validation_text:
-            detail = validation_text
-        else:
-            detail = "Review the on-page preview and resolve any readiness warnings."
-        return "Review preview", detail
 
     def _default_output_dialog_path(self) -> Path:
         return suggest_signed_output_path(
