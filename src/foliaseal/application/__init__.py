@@ -76,6 +76,11 @@ from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
     render_signing_preview,
 )
+from foliaseal.application.viewer_interaction_session import (
+    ViewerInteractionSession,
+    ViewerPlacementContextResult,
+    ViewerSelectionPlacementResult,
+)
 from foliaseal.application.viewer_session import ViewerSession, ViewerZoomLimits
 from foliaseal.application.viewer_workflow import ViewerRenderSnapshot, ViewerWorkflow
 from foliaseal.application.visible_signature_layout import (
@@ -122,6 +127,9 @@ from foliaseal.application.visible_signature_semantics import (
 
 __all__ = [
     "ViewerPerformanceTracker",
+    "ViewerInteractionSession",
+    "ViewerPlacementContextResult",
+    "ViewerSelectionPlacementResult",
     "ViewerRenderSnapshot",
     "ViewerSession",
     "ViewerTimingSnapshot",

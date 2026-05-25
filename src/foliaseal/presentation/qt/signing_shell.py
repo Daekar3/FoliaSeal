@@ -16,7 +16,7 @@ from foliaseal.application import (
     SigningDraftWorkflow,
     suggest_signed_output_path,
 )
-from foliaseal.application.coordinate_transform import PageBox, PdfRect
+from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
     DocumentReviewSummary,
@@ -51,6 +51,9 @@ from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesViewState,
 )
 from foliaseal.application.signing_material_resolver import CertificateSecretProvider
+from foliaseal.application.viewer_interaction_session import (
+    ViewerInteractionSession,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -1133,6 +1136,9 @@ class SigningWorkspaceWidget:
         self._on_error = on_error
         self._on_status_change = on_status_change
         self._app_settings_store = app_settings_store
+        self._viewer_interaction_session = ViewerInteractionSession(
+            viewer_workflow=viewer_workflow
+        )
         self._document_review_inspector = (
             document_review_inspector or PyHankoDocumentReviewInspector()
         )
@@ -1353,7 +1359,7 @@ class SigningWorkspaceWidget:
 
     def refresh_viewer(self) -> None:
         self._viewer_widget.refresh()
-        self._sync_placement_context_from_viewer()
+        self._apply_current_placement_context()
         self._sync_signature_overlay()
         self.properties_panel.refresh_preview()
         self._apply_signing_action_state(self._signing_action_coordinator.load())
@@ -1410,7 +1416,7 @@ class SigningWorkspaceWidget:
 
     def set_logical_page_index(self, page_index: int) -> None:
         """Update the logical session page without forcing a viewer rerender."""
-        self._viewer_workflow.session.jump_to_page(page_index)
+        self._viewer_interaction_session.set_logical_page_index(page_index)
 
     def logical_page_index(self) -> int:
         """Return the current logical viewer page index."""
@@ -1553,19 +1559,16 @@ class SigningWorkspaceWidget:
         if review_transition.viewer_selection_consumed:
             self._apply_document_review_workspace_transition(review_transition)
             return
-        self._sync_placement_context_from_viewer()
-        try:
-            signature_rect = SignatureRect(
-                page_index=page_index,
-                left_pt=normalized_rect.x1,
-                bottom_pt=normalized_rect.y1,
-                width_pt=normalized_rect.x2 - normalized_rect.x1,
-                height_pt=normalized_rect.y2 - normalized_rect.y1,
-            )
-        except ValueError as exc:
-            self._emit_error(f"Unable to apply signature placement: {exc}")
+        selection_result = self._viewer_interaction_session.select_signature_rect(
+            normalized_rect
+        )
+        if selection_result.error_message is not None:
+            self._emit_error(selection_result.error_message)
             return
-        self.properties_panel.set_signature_rect(signature_rect)
+        self._apply_placement_context_result(selection_result.placement_context)
+        if selection_result.signature_rect is None:
+            return
+        self.properties_panel.set_signature_rect(selection_result.signature_rect)
         self._sync_signature_overlay()
         self._apply_signing_action_state(self._signing_action_coordinator.invalidate("selection"))
 
@@ -1577,7 +1580,7 @@ class SigningWorkspaceWidget:
             self._on_status_change(name)
 
     def _handle_panel_change(self) -> None:
-        self._sync_placement_context_from_viewer()
+        self._apply_current_placement_context()
         self._sync_signature_overlay()
         self._apply_signing_action_state(self._signing_action_coordinator.invalidate("panel"))
 
@@ -1588,33 +1591,16 @@ class SigningWorkspaceWidget:
         return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
-        target_index = max(page_number - 1, 0)
         try:
-            self._viewer_workflow.jump_to_page(target_index)
-            self._viewer_widget.refresh(navigation=True)
+            target_index = self._viewer_interaction_session.set_page_number(page_number)
         except Exception as exc:
             self._emit_error(f"Unable to change PDF page: {exc}")
             return
-        self._sync_placement_context_from_viewer()
-        self._sync_signature_overlay()
-        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("page"))
-
-    def _sync_placement_context_from_viewer(self) -> None:
-        snapshot = getattr(self._viewer_workflow, "snapshot", None)
-        if snapshot is None:
-            return
-        page_box = snapshot.page_box
-        self._draft_workflow.set_placement_context(
-            SignaturePlacementContext(
-                page_index=snapshot.page_index,
-                page_box=PageBox(
-                    left=page_box.left,
-                    bottom=page_box.bottom,
-                    right=page_box.right,
-                    top=page_box.top,
-                ),
-                rotation=snapshot.rotation,
-            )
+        self._refresh_viewer_navigation(
+            target_index=target_index,
+            error_summary="Unable to change PDF page",
+            invalidate_reason="page",
+            logical_page_already_set=True,
         )
 
     def _sync_signature_overlay(self) -> None:
@@ -1720,12 +1706,44 @@ class SigningWorkspaceWidget:
                 )
         if effects.jump_to_page_index is None:
             return
+        self._refresh_viewer_navigation(
+            target_index=effects.jump_to_page_index,
+            error_summary="Unable to show document text match",
+        )
+
+    def _apply_placement_context_result(
+        self,
+        placement_context: SignaturePlacementContext | None,
+    ) -> None:
+        if placement_context is None:
+            return
+        self._draft_workflow.set_placement_context(placement_context)
+
+    def _apply_current_placement_context(self) -> None:
+        result = self._viewer_interaction_session.current_placement_context()
+        self._apply_placement_context_result(result.placement_context)
+
+    def _refresh_viewer_navigation(
+        self,
+        *,
+        target_index: int,
+        error_summary: str,
+        invalidate_reason: str | None = None,
+        logical_page_already_set: bool = False,
+    ) -> None:
         try:
-            self._viewer_workflow.jump_to_page(effects.jump_to_page_index)
+            if not logical_page_already_set:
+                self._viewer_interaction_session.set_logical_page_index(target_index)
             self._viewer_widget.refresh(navigation=True)
-            self._sync_signature_overlay()
         except Exception as exc:
-            self._emit_error(f"Unable to show document text match: {exc}")
+            self._emit_error(f"{error_summary}: {exc}")
+            return
+        self._apply_current_placement_context()
+        self._sync_signature_overlay()
+        if invalidate_reason is not None:
+            self._apply_signing_action_state(
+                self._signing_action_coordinator.invalidate(invalidate_reason)
+            )
 
     def _refresh_flow_summary(self) -> None:
         self._apply_signing_action_state(self._signing_action_coordinator.load())
