@@ -20,8 +20,13 @@ from foliaseal.application.coordinate_transform import PageBox, PdfRect
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
     DocumentReviewSummary,
-    DocumentSignatureReviewItem,
     PyHankoDocumentReviewInspector,
+)
+from foliaseal.application.document_review_workspace import (
+    DocumentReviewWorkspaceSession,
+    DocumentReviewWorkspaceState,
+    DocumentReviewWorkspaceTransition,
+    DocumentReviewWorkspaceViewerEffects,
 )
 from foliaseal.application.document_text_search import (
     DocumentTextSearchEngine,
@@ -1131,19 +1136,22 @@ class SigningWorkspaceWidget:
         self._document_review_inspector = (
             document_review_inspector or PyHankoDocumentReviewInspector()
         )
-        self._document_review_summary: DocumentReviewSummary | None = None
-        self._selected_document_review_signature_label: str | None = None
-        self._document_text_selection_session = DocumentTextSelectionSession(
+        document_text_selection_session = DocumentTextSelectionSession(
             input_pdf_path=viewer_workflow.document_path,
             selection_engine=document_text_selection_engine
             or QtPdfDocumentTextSelectionEngine(),
         )
-        self._document_text_search_session = DocumentTextSearchSession(
+        document_text_search_session = DocumentTextSearchSession(
             input_pdf_path=viewer_workflow.document_path,
             search_engine=document_text_search_engine or QtPdfDocumentTextSearchEngine(),
         )
         self._on_copy_text = on_copy_text
-        self._document_text_selection_mode_enabled = False
+        self._document_review_workspace = DocumentReviewWorkspaceSession(
+            document_review_inspector=self._document_review_inspector,
+            document_text_search_session=document_text_search_session,
+            document_text_selection_session=document_text_selection_session,
+            input_pdf_path=viewer_workflow.document_path,
+        )
         if app_settings is not None:
             self._app_settings = app_settings
         elif app_settings_store is not None:
@@ -1213,6 +1221,7 @@ class SigningWorkspaceWidget:
             "currentIndexChanged",
             None,
         )
+        self._updating_document_review_selector = False
         if hasattr(index_changed, "connect"):
             index_changed.connect(  # type: ignore[attr-defined]
                 self._on_document_review_signature_selected
@@ -1325,9 +1334,9 @@ class SigningWorkspaceWidget:
         self.widget.open_signed_output = self.open_signed_output  # type: ignore[attr-defined]
 
         self.refresh_viewer()
-        self.refresh_document_review()
-        self._apply_document_text_state(self._document_text_search_session.search(""))
-        self._apply_document_text_selection_state(self._document_text_selection_session.clear())
+        self._apply_document_review_workspace_state(
+            self._document_review_workspace.load()
+        )
         self._apply_signing_action_state(self._signing_action_coordinator.load())
 
     @property
@@ -1350,73 +1359,49 @@ class SigningWorkspaceWidget:
         self._apply_signing_action_state(self._signing_action_coordinator.load())
 
     def refresh_document_review(self) -> DocumentReviewSummary:
-        summary = self._document_review_inspector.inspect(self._viewer_workflow.document_path)
-        self._document_review_summary = summary
-        self._document_review_controls.headline_label.setText(summary.headline)
-        self._document_review_controls.detail_label.setText(summary.detail)
-        self._document_review_controls.signature_items_label.setText(
-            format_document_signature_items(summary.signature_items)
-        )
-        self._sync_document_review_signature_detail(summary.signature_items)
-        return summary
+        state = self._document_review_workspace.refresh_review()
+        self._apply_document_review_workspace_state(state)
+        return state.review_summary
 
     def search_document_text(self) -> DocumentTextSearchState:
         query = _text(self._document_text_controls.query_input)
-        state = self._document_text_search_session.search(query)
-        self._apply_document_text_state(state)
-        self._show_document_text_match(state)
-        return state
+        transition = self._document_review_workspace.search_text(query)
+        self._apply_document_review_workspace_transition(transition)
+        return transition.state.text_search_state
 
     def next_document_text_match(self) -> DocumentTextSearchState:
-        state = self._document_text_search_session.next_match()
-        self._apply_document_text_state(state)
-        self._show_document_text_match(state)
-        return state
+        transition = self._document_review_workspace.next_text_match()
+        self._apply_document_review_workspace_transition(transition)
+        return transition.state.text_search_state
 
     def previous_document_text_match(self) -> DocumentTextSearchState:
-        state = self._document_text_search_session.previous_match()
-        self._apply_document_text_state(state)
-        self._show_document_text_match(state)
-        return state
+        transition = self._document_review_workspace.previous_text_match()
+        self._apply_document_review_workspace_transition(transition)
+        return transition.state.text_search_state
 
     def copy_current_document_text_match(self) -> str | None:
-        copy_text = self._document_text_search_session.current_copy_text()
+        copy_text = self._document_review_workspace.copy_current_text_match()
         if copy_text is None or self._on_copy_text is None:
             return None
         self._on_copy_text(copy_text)
         return copy_text
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
-        enabled = bool(enabled)
-        self._document_text_selection_mode_enabled = enabled
-        setter = getattr(self._viewer_widget, "set_interaction_mode", None)
-        if callable(setter):
-            setter("text" if enabled else "signature")
-        checkbox = self._document_text_controls.select_mode_checkbox
-        is_checked = getattr(checkbox, "isChecked", None)
-        if callable(is_checked) and bool(is_checked()) != enabled:
-            checkbox.setChecked(enabled)
-        if not enabled:
-            self._apply_document_text_selection_state(
-                self._document_text_selection_session.clear(),
-                update_labels=False,
-            )
-            self._clear_document_text_highlight_overlay()
-            self._apply_document_text_state(self._document_text_search_session.current_state())
-        return enabled
+        transition = self._document_review_workspace.set_text_selection_mode(enabled)
+        self._apply_document_review_workspace_transition(transition)
+        return transition.state.text_selection_mode_enabled
 
     def copy_selected_document_text(self) -> str | None:
-        copy_text = self._document_text_selection_session.current_copy_text()
+        copy_text = self._document_review_workspace.copy_selected_text()
         if copy_text is None or self._on_copy_text is None:
             return None
         self._on_copy_text(copy_text)
         return copy_text
 
     def clear_selected_document_text(self) -> DocumentTextSelectionState:
-        state = self._document_text_selection_session.clear()
-        self._apply_document_text_selection_state(state)
-        self._clear_document_text_highlight_overlay()
-        return state
+        transition = self._document_review_workspace.clear_selected_text()
+        self._apply_document_review_workspace_transition(transition)
+        return transition.state.text_selection_state
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         """Apply new app-level settings to the live shell state."""
@@ -1554,9 +1539,6 @@ class SigningWorkspaceWidget:
         self._apply_signing_action_state(self._signing_action_coordinator.invalidate("clear"))
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
-        if self._document_text_selection_mode_enabled:
-            self._handle_document_text_selection(pdf_rect)
-            return
         snapshot = getattr(self._viewer_workflow, "snapshot", None)
         page_index = (
             snapshot.page_index
@@ -1564,6 +1546,13 @@ class SigningWorkspaceWidget:
             else self._viewer_workflow.session.current_page
         )
         normalized_rect = pdf_rect.normalized()
+        review_transition = self._document_review_workspace.handle_viewer_selection(
+            page_index=page_index,
+            selection_rect=normalized_rect,
+        )
+        if review_transition.viewer_selection_consumed:
+            self._apply_document_review_workspace_transition(review_transition)
+            return
         self._sync_placement_context_from_viewer()
         try:
             signature_rect = SignatureRect(
@@ -1579,29 +1568,6 @@ class SigningWorkspaceWidget:
         self.properties_panel.set_signature_rect(signature_rect)
         self._sync_signature_overlay()
         self._apply_signing_action_state(self._signing_action_coordinator.invalidate("selection"))
-
-    def _handle_document_text_selection(self, pdf_rect: PdfRect) -> None:
-        snapshot = getattr(self._viewer_workflow, "snapshot", None)
-        page_index = (
-            snapshot.page_index
-            if snapshot is not None
-            else self._viewer_workflow.session.current_page
-        )
-        state = self._document_text_selection_session.select(
-            page_index=page_index,
-            selection_rect=pdf_rect.normalized(),
-        )
-        self._apply_document_text_selection_state(state)
-        selection = state.selection
-        if selection is None:
-            self._clear_document_text_highlight_overlay()
-            return
-        setter = getattr(self._viewer_widget, "set_text_highlight_overlay", None)
-        if callable(setter):
-            setter(
-                page_index=selection.page_index,
-                highlight_rects=selection.highlight_rects,
-            )
 
     def _handle_viewer_error(self, message: str) -> None:
         self._emit_error(message)
@@ -1659,80 +1625,103 @@ class SigningWorkspaceWidget:
     def _refresh_sign_button_state(self) -> None:
         self._apply_signing_action_state(self._signing_action_coordinator.load())
 
-    def _sync_document_review_signature_detail(
+    def _apply_document_review_workspace_state(
         self,
-        signature_items: tuple[DocumentSignatureReviewItem, ...],
+        state: DocumentReviewWorkspaceState,
     ) -> None:
-        selector = self._document_review_controls.signature_selector
-        detail_label = self._document_review_controls.signature_detail_label
-        selector.clear()
-        if not signature_items:
-            selector.setEnabled(False)
-            detail_label.setText("")
-            self._selected_document_review_signature_label = None
-            return
-        selector.addItems([item.label for item in signature_items])
-        selector.setEnabled(len(signature_items) > 1)
-        selected_label = self._selected_document_review_signature_label
-        selected_index = next(
-            (
-                index
-                for index, item in enumerate(signature_items)
-                if item.label == selected_label
-            ),
-            len(signature_items) - 1,
+        self._document_review_controls.headline_label.setText(state.review_summary.headline)
+        self._document_review_controls.detail_label.setText(state.review_summary.detail)
+        self._document_review_controls.signature_items_label.setText(
+            format_document_signature_items(state.review_summary.signature_items)
         )
-        setter = getattr(selector, "setCurrentIndex", None)
-        if callable(setter):
-            setter(selected_index)
-            return
-        self._selected_document_review_signature_label = signature_items[selected_index].label
-        detail_label.setText(signature_items[selected_index].drill_in_detail)
+        selector = self._document_review_controls.signature_selector
+        self._updating_document_review_selector = True
+        try:
+            selector.clear()
+            if not state.review_signature_labels:
+                selector.setEnabled(False)
+            else:
+                selector.addItems(list(state.review_signature_labels))
+                selector.setEnabled(state.review_selector_enabled)
+                setter = getattr(selector, "setCurrentIndex", None)
+                current_text = getattr(selector, "currentText", None)
+                current_label = current_text() if callable(current_text) else None
+                if (
+                    callable(setter)
+                    and state.selected_review_signature_index is not None
+                    and current_label != state.selected_review_signature_label
+                ):
+                    setter(state.selected_review_signature_index)
+        finally:
+            self._updating_document_review_selector = False
+        self._document_review_controls.signature_detail_label.setText(
+            state.selected_review_signature_detail
+        )
+        checkbox = self._document_text_controls.select_mode_checkbox
+        is_checked = getattr(checkbox, "isChecked", None)
+        if callable(is_checked) and bool(is_checked()) != state.text_selection_mode_enabled:
+            checkbox.setChecked(state.text_selection_mode_enabled)
+        self._document_text_controls.status_label.setText(
+            state.document_text_status_text
+        )
+        self._document_text_controls.detail_label.setText(
+            state.document_text_detail_text
+        )
+        self._document_text_controls.previous_button.setEnabled(
+            state.text_search_state.can_go_previous
+        )
+        self._document_text_controls.next_button.setEnabled(
+            state.text_search_state.can_go_next
+        )
+        self._document_text_controls.copy_button.setEnabled(
+            state.text_search_state.can_copy and self._on_copy_text is not None
+        )
+        self._document_text_controls.copy_selection_button.setEnabled(
+            state.text_selection_state.can_copy and self._on_copy_text is not None
+        )
+        self._document_text_controls.clear_selection_button.setEnabled(
+            state.text_selection_state.can_clear
+        )
 
     def _on_document_review_signature_selected(self, index: int) -> None:
-        summary = self._document_review_summary
-        if summary is None or index < 0 or index >= len(summary.signature_items):
-            self._selected_document_review_signature_label = None
-            self._document_review_controls.signature_detail_label.setText("")
+        if self._updating_document_review_selector:
             return
-        item = summary.signature_items[index]
-        self._selected_document_review_signature_label = item.label
-        self._document_review_controls.signature_detail_label.setText(item.drill_in_detail)
-
-    def _apply_document_text_state(self, state: DocumentTextSearchState) -> None:
-        self._document_text_controls.status_label.setText(state.status_text)
-        self._document_text_controls.detail_label.setText(state.detail_text)
-        self._document_text_controls.previous_button.setEnabled(state.can_go_previous)
-        self._document_text_controls.next_button.setEnabled(state.can_go_next)
-        self._document_text_controls.copy_button.setEnabled(
-            state.can_copy and self._on_copy_text is not None
-        )
-
-    def _apply_document_text_selection_state(
-        self,
-        state: DocumentTextSelectionState,
-        *,
-        update_labels: bool = True,
-    ) -> None:
-        self._document_text_controls.copy_selection_button.setEnabled(
-            state.can_copy and self._on_copy_text is not None
-        )
-        self._document_text_controls.clear_selection_button.setEnabled(state.can_clear)
-        if update_labels:
-            self._document_text_controls.status_label.setText(state.status_text)
-            self._document_text_controls.detail_label.setText(state.detail_text)
+        state = self._document_review_workspace.select_review_signature(index)
+        self._apply_document_review_workspace_state(state)
 
     def _clear_document_text_highlight_overlay(self) -> None:
         clearer = getattr(self._viewer_widget, "clear_text_highlight_overlay", None)
         if callable(clearer):
             clearer()
 
-    def _show_document_text_match(self, state: DocumentTextSearchState) -> None:
-        current_match = state.current_match
-        if current_match is None:
+    def _apply_document_review_workspace_transition(
+        self,
+        transition: DocumentReviewWorkspaceTransition,
+    ) -> None:
+        self._apply_document_review_workspace_state(transition.state)
+        self._apply_document_review_workspace_effects(transition.effects)
+
+    def _apply_document_review_workspace_effects(
+        self,
+        effects: DocumentReviewWorkspaceViewerEffects,
+    ) -> None:
+        if effects.interaction_mode is not None:
+            setter = getattr(self._viewer_widget, "set_interaction_mode", None)
+            if callable(setter):
+                setter(effects.interaction_mode)
+        if effects.clear_highlights:
+            self._clear_document_text_highlight_overlay()
+        elif effects.highlight_page_index is not None:
+            setter = getattr(self._viewer_widget, "set_text_highlight_overlay", None)
+            if callable(setter):
+                setter(
+                    page_index=effects.highlight_page_index,
+                    highlight_rects=effects.highlight_rects,
+                )
+        if effects.jump_to_page_index is None:
             return
         try:
-            self._viewer_workflow.jump_to_page(current_match.page_index)
+            self._viewer_workflow.jump_to_page(effects.jump_to_page_index)
             self._viewer_widget.refresh(navigation=True)
             self._sync_signature_overlay()
         except Exception as exc:

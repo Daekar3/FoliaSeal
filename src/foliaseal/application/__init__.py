@@ -15,6 +15,12 @@ from foliaseal.application.certificate_lifecycle import (
     CertificateLifecycleResult,
     CertificateLifecycleService,
 )
+from foliaseal.application.document_review_workspace import (
+    DocumentReviewWorkspaceSession,
+    DocumentReviewWorkspaceState,
+    DocumentReviewWorkspaceTransition,
+    DocumentReviewWorkspaceViewerEffects,
+)
 from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     HorizontalSingleLineRenderedReference,
@@ -133,6 +139,10 @@ __all__ = [
     "CertificateLifecycleError",
     "CertificateLifecycleResult",
     "CertificateLifecycleService",
+    "DocumentReviewWorkspaceSession",
+    "DocumentReviewWorkspaceState",
+    "DocumentReviewWorkspaceTransition",
+    "DocumentReviewWorkspaceViewerEffects",
     "CertificateFieldReader",
     "CertificateFieldValues",
     "HorizontalSingleLineInkReservation",
