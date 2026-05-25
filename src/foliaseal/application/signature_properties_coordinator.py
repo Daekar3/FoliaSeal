@@ -133,6 +133,13 @@ class SignaturePropertiesCoordinator(Protocol):
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState: ...
 
+    def apply_visible_setup(
+        self,
+        draft: VisibleSignatureSetupDraft,
+        *,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState: ...
+
     def reconcile(
         self,
         command: SignaturePropertiesCommand,
@@ -222,6 +229,15 @@ class DefaultSignaturePropertiesCoordinator:
             self._selected_signature_preset_name = None
         else:  # pragma: no cover - defensive branch
             raise TypeError(f"Unsupported signature properties command: {type(command)!r}")
+        return self.load(control_issue=control_issue)
+
+    def apply_visible_setup(
+        self,
+        draft: VisibleSignatureSetupDraft,
+        *,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        self._apply_visible_signature_setup(ApplyVisibleSignatureSetup(draft=draft))
         return self.load(control_issue=control_issue)
 
     def _apply_visible_signature_setup(self, command: ApplyVisibleSignatureSetup) -> None:

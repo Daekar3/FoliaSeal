@@ -3109,6 +3109,73 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     assert widget.selected_certificate_configuration_id() == "cert-config-current"
 
 
+def test_signing_shell_visible_setup_edit_clears_selected_preset_and_keeps_validation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    panel = widget.properties_panel
+
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
+
+    panel._appearance_controls.signer_label_prefix.setText("Signed by Product")
+
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel.validation_text() == "Place a signature on the page to continue."
+    assert panel.preview_text()
+
+
+def test_signing_shell_apply_changes_maps_form_value_error_to_validation_issue(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    panel = widget.properties_panel
+
+    def _raise_invalid_draft() -> None:
+        raise ValueError("Appearance is invalid.")
+
+    monkeypatch.setattr(panel._setup_form, "build_draft", _raise_invalid_draft)
+
+    preview = panel.apply_changes()
+
+    assert preview == panel.preview
+    assert panel._control_issue is not None
+    assert panel._control_issue.code == "signature_appearance_invalid"
+    assert "Appearance is invalid." in panel.validation_text()
+
+
 def test_signing_shell_signature_preset_selection_applies_certificate_material(
     monkeypatch,
     tmp_path: Path,

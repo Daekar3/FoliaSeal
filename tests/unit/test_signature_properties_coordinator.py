@@ -212,6 +212,89 @@ def test_coordinator_apply_visible_signature_setup_updates_workflow_and_clears_p
     assert state.visible_signature_setup_draft.placement.enabled is True
 
 
+def test_coordinator_apply_visible_setup_wrapper_updates_workflow_and_state(
+    tmp_path: Path,
+) -> None:
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+    updated_appearance = build_signature_appearance(
+        signer_label_prefix="Signed by Wrapper",
+        show_field_names=True,
+    )
+
+    state = coordinator.apply_visible_setup(
+        VisibleSignatureSetupDraft(
+            appearance=updated_appearance,
+            placement=VisibleSignaturePlacementDraft(
+                page_number=3,
+                left_pt=44.0,
+                bottom_pt=28.0,
+                width_pt=190.0,
+                height_pt=52.0,
+                enabled=True,
+            ),
+        )
+    )
+
+    assert workflow.signature_appearance == updated_appearance
+    assert workflow.signature_rect == SignatureRect(
+        page_index=2,
+        left_pt=44.0,
+        bottom_pt=28.0,
+        width_pt=190.0,
+        height_pt=52.0,
+    )
+    assert workflow.selected_signature_preset_id is None
+    assert state.selected_signature_preset_name is None
+    assert state.visible_signature_setup_draft.placement == VisibleSignaturePlacementDraft(
+        page_number=3,
+        left_pt=44.0,
+        bottom_pt=28.0,
+        width_pt=190.0,
+        height_pt=52.0,
+        enabled=True,
+    )
+
+
+def test_coordinator_apply_visible_setup_wrapper_preserves_control_issue_folding(
+    tmp_path: Path,
+) -> None:
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.apply_visible_setup(
+        VisibleSignatureSetupDraft(
+            appearance=build_signature_appearance(),
+            placement=VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=48.0,
+                enabled=True,
+            ),
+        ),
+        control_issue=SigningDraftValidationIssue(
+            code="preview_warning",
+            message="Preview is stale but still usable.",
+            field_name="signature_appearance",
+            severity=SigningDraftValidationSeverity.WARNING,
+        ),
+    )
+
+    assert state.ready_to_sign is True
+    assert state.validation_text == "Ready to sign."
+
+
 def test_coordinator_apply_visible_signature_setup_keeps_rect_empty_when_disabled(
     tmp_path: Path,
 ) -> None:

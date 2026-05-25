@@ -367,8 +367,8 @@ The canonical repository document split is:
 
 ### Signature-properties coordinator contract
 
-- Producer: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.reconcile()`
-- Consumer: `SignaturePropertiesPanel`, coordinator tests, future non-Qt orchestration callers.
+- Producer: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.apply_visible_setup()`, `DefaultSignaturePropertiesCoordinator.reconcile()`
+- Consumer: `SignaturePropertiesPanel.apply_changes()`, `SignaturePropertiesPanel`, coordinator tests, future non-Qt orchestration callers.
 - Stability: Active application boundary.
 - Backward compatibility requirements: Preserve display-name based UI state, workflow-backed selection ids, catalog refresh reconciliation, password resolution for saved certificate configurations, preset save/delete behavior, and preview/readiness values returned to the panel.
 - Validation: catalog lookups, `SigningDraftWorkflow` methods, `CertificateSigningMaterialResolver`, and `control_issue` folding into validation text.
@@ -672,6 +672,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-25 | Added the explicit visible-setup coordinator entrypoint and routed the Qt panel through it. | Reflected the public `apply_visible_setup()` path now used by `SignaturePropertiesPanel.apply_changes()`. |
 | 2026-05-25 | Added the signing-action coordinator boundary. | Reflected the extraction of action/result/reopen state into `signing_action_coordinator.py` and the thin-shell adapter behavior. |
 | 2026-05-22 | Added the Qt preview-layout boundary and narrowed shell tests to thin preview integration coverage. | Reflected `signature_preview_layout.py` extraction and close-aware preview cleanup wiring. |
 | 2026-05-21 | Added the application-layer signature-properties coordinator and narrowed the Qt signing shell boundary to preview/presentation work. | Reflected the current coordinator-backed implementation. |

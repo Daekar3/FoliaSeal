@@ -41,7 +41,6 @@ from foliaseal.application.document_text_selection import (
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
-    ApplyVisibleSignatureSetup,
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
@@ -610,10 +609,8 @@ class SignaturePropertiesPanel:
     def apply_changes(self) -> SigningDraftPreview:
         self._control_issue = None
         try:
-            state = self._coordinator.reconcile(
-                ApplyVisibleSignatureSetup(
-                    draft=self._setup_form.build_draft()
-                ),
+            state = self._coordinator.apply_visible_setup(
+                self._setup_form.build_draft(),
                 control_issue=self._control_issue,
             )
         except ValueError as exc:
