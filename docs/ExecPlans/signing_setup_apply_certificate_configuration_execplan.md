@@ -19,7 +19,7 @@ After this change, the signing setup workflow will expose an explicit applicatio
 - [x] (2026-05-26 21:38Z) Rewired `SignaturePropertiesPanel.apply_selected_certificate_configuration()` in `src/foliaseal/presentation/qt/signing_shell.py` to use the explicit coordinator entrypoint.
 - [x] (2026-05-26 21:38Z) Added or updated focused unit tests in `tests/unit/test_signature_properties_coordinator.py` and `tests/unit/test_qt_signing_shell.py`.
 - [x] (2026-05-26 21:38Z) Updated `docs/ARCHITECTURE.md` and this ExecPlan to completion state.
-- [x] (2026-05-26 21:38Z) Recorded final validation evidence: `99 passed`, `ruff clean`, `git diff --check clean`.
+- [x] (2026-05-26 21:38Z) Recorded final validation evidence: `100 passed`, `ruff clean`, `git diff --check clean`.
 
 ## Surprises & Discoveries
 
@@ -40,7 +40,7 @@ After this change, the signing setup workflow will expose an explicit applicatio
 
 The signing-setup boundary now exposes a public `apply_certificate_configuration(...)` entrypoint on the coordinator, and the Qt shell uses that method directly for the common certificate-application path. That completed the symmetry work so certificate application now matches the already-explicit visible-setup and preset-application paths while preserving the existing password forwarding and error-reporting behavior.
 
-The completion evidence for the slice is recorded as `99 passed`, `ruff clean`, and `git diff --check clean`. The final pass also closed the saved-secret shell regression gap by adding the missing local fake secret provider helper and the empty-password shell-path coverage.
+The completion evidence for the slice is recorded as `100 passed`, `ruff clean`, and `git diff --check clean`. The final pass also closed the saved-secret shell regression gap by adding the missing local fake secret provider helper and the empty-password shell-path coverage.
 
 ## Context and Orientation
 
@@ -81,7 +81,7 @@ Work from `/home/daekar/FoliaSeal`.
 
 Recorded evidence after completion:
 
-       99 passed
+       100 passed
        ruff clean
        git diff --check clean
 
@@ -92,7 +92,7 @@ Acceptance is behavior-preserving. The slice is complete if:
 - applying a certificate through the new coordinator method preserves typed-password and saved-secret behavior exactly as before;
 - `SignaturePropertiesPanel.apply_selected_certificate_configuration()` still reports errors through the same path and still refreshes rendered state from the returned coordinator state on success;
 - focused coordinator and shell tests pass without changing the visible-signature form contract or preset behavior;
-- the recorded validation evidence for the finished slice is `99 passed`, `ruff clean`, and `git diff --check clean`.
+- the recorded validation evidence for the finished slice is `100 passed`, `ruff clean`, and `git diff --check clean`.
 
 ## Idempotence and Recovery
 

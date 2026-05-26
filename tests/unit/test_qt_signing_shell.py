@@ -994,6 +994,64 @@ def test_signing_shell_reports_certificate_configuration_resolution_errors(
     assert bindings.q_message_box.calls[-1][1] == "Certificate configuration error"
 
 
+def test_signing_shell_blank_certificate_selection_reports_error(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    errors: list[str] = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        on_error=errors.append,
+    )
+    panel = widget.properties_panel
+    calls: list[tuple[str, str | None]] = []
+    original = panel._coordinator.apply_certificate_configuration
+
+    def _spy_apply_certificate_configuration(
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue=None,
+    ):
+        calls.append((selected_name, passphrase))
+        return original(
+            selected_name,
+            passphrase=passphrase,
+            control_issue=control_issue,
+        )
+
+    monkeypatch.setattr(
+        panel._coordinator,
+        "apply_certificate_configuration",
+        _spy_apply_certificate_configuration,
+    )
+    panel._certificate_controls.configuration_combo.setCurrentText(
+        signing_shell_module.CERTIFICATE_CONFIGURATION_PLACEHOLDER
+    )
+    panel._certificate_controls.password_input.setText("typed-secret")
+
+    assert panel.apply_selected_certificate_configuration() is False
+    assert calls == [("", "typed-secret")]
+    assert errors == ["Select a certificate configuration before applying it."]
+    assert bindings.q_message_box.calls[-1][1:] == (
+        "Certificate configuration error",
+        "Select a certificate configuration before applying it.",
+    )
+
+
 def test_signing_shell_refreshes_certificate_configurations_from_store(
     monkeypatch,
     tmp_path: Path,
