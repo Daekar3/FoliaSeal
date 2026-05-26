@@ -20,7 +20,7 @@ The change is observable by running the preset-selection shell tests and by forc
 - [x] 2026-05-26 18:04 EDT: Updated focused shell tests in `tests/unit/test_qt_signing_shell.py` to prove the corrected error path and removal of profile-era aliases.
 - [x] 2026-05-26 18:04 EDT: Reviewed compliance against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and `docs/SCHEMAS.md`; no doc updates were required for this slice.
 - [x] 2026-05-26 18:04 EDT: Validated with focused pytest, `ruff check`, and `git diff --check`.
-- [ ] Commit the slice once implementation, compliance review, and documentation updates are complete.
+- [x] 2026-05-26 18:08 EDT: Committed the slice after implementation, compliance review, and documentation updates were complete.
 
 ## Surprises & Discoveries
 
