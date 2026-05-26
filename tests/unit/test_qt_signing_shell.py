@@ -3326,6 +3326,8 @@ def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entr
     assert calls
     assert set(calls) == {("Compact", "typed-secret")}
     assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
+    assert not hasattr(panel._signature_preset_controls, "profile_combo")
+    assert not hasattr(panel._signature_preset_controls, "profile_name")
 
 
 def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
@@ -3496,9 +3498,9 @@ def test_signing_shell_signature_preset_selection_error_reloads_current_state(
 
     assert load_calls
     assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
-    assert errors == ["Preset failed."]
+    assert errors == []
     assert fake_bindings.q_message_box.calls[-1][1:] == (
-        "Certificate configuration error",
+        "Signature preset error",
         "Preset failed.",
     )
 

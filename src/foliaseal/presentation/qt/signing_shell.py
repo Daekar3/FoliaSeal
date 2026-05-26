@@ -935,8 +935,6 @@ class SignaturePropertiesPanel:
             save_button=save_button,
             delete_button=delete_button,
         )
-        object.__setattr__(controls, "profile_combo", preset_combo)
-        object.__setattr__(controls, "profile_name", preset_name)
         return controls
 
     def _render_certificate_configuration_controls(
@@ -1011,7 +1009,7 @@ class SignaturePropertiesPanel:
                     control_issue=self._control_issue,
                 )
         except SignaturePropertiesCoordinatorError as exc:
-            self._show_certificate_configuration_error(str(exc))
+            self._show_signature_preset_error(str(exc))
             self._apply_coordinator_state(
                 self._coordinator.load(control_issue=self._control_issue)
             )
