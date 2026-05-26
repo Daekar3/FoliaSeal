@@ -141,7 +141,7 @@ The canonical repository document split is:
 - Owns: `DefaultSignaturePropertiesCoordinator`, `SignaturePropertiesViewState`, `VisibleSignatureSetupDraft`, `VisibleSignaturePlacementDraft`, command dataclasses for applying certificates/presets, applying visible-signature setup, saving/deleting presets, refreshing catalogs, and clearing the selected preset, plus the certificate-material resolver wiring used for selected certificate configurations.
 - Does not own: Qt control construction, preview-card rendering, canonical preview snapshot lifecycle, signature geometry rendering, or signing execution.
 - Key collaborators: `SigningDraftWorkflow`, `CertificateCatalogStore`, `SignaturePresetCatalogStore`, `CertificateSecretProvider`, `signing_shell.py`.
-- Main entry points: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.reconcile()`.
+- Main entry points: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.apply_visible_setup()`, `DefaultSignaturePropertiesCoordinator.apply_signature_preset()`, `DefaultSignaturePropertiesCoordinator.reconcile()`.
 - Important types/classes/functions: `SignaturePropertiesViewState`, `VisibleSignatureSetupDraft`, `VisibleSignaturePlacementDraft`, `ApplyVisibleSignatureSetup`, `ApplyCertificateConfiguration`, `ApplySignaturePreset`, `SaveCurrentPreset`, `DeletePreset`, `RefreshCatalogs`, `ClearSelectedSignaturePreset`, `SignaturePropertiesCoordinatorError`.
 - Known constraints: The coordinator exposes display-name based state and a Qt-independent visible-signature setup draft to the panel but resolves and mutates workflow ids internally. `load()` and `reconcile()` can fold an optional control issue into validation/readiness state so the panel does not duplicate formatting rules. Refreshes reconcile stale selections against current catalogs, preset application without a certificate reference preserves the active certificate selection through `SigningDraftWorkflow`, and visible-signature setup application clears selected preset state when the current draft diverges.
 - Status: Confirmed by code and tests.
@@ -367,7 +367,7 @@ The canonical repository document split is:
 
 ### Signature-properties coordinator contract
 
-- Producer: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.apply_visible_setup()`, `DefaultSignaturePropertiesCoordinator.reconcile()`
+- Producer: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.apply_visible_setup()`, `DefaultSignaturePropertiesCoordinator.apply_signature_preset()`, `DefaultSignaturePropertiesCoordinator.reconcile()`
 - Consumer: `SignaturePropertiesPanel.apply_changes()`, `SignaturePropertiesPanel`, coordinator tests, future non-Qt orchestration callers.
 - Stability: Active application boundary.
 - Backward compatibility requirements: Preserve display-name based UI state, workflow-backed selection ids, catalog refresh reconciliation, password resolution for saved certificate configurations, preset save/delete behavior, and preview/readiness values returned to the panel.
@@ -519,7 +519,7 @@ The canonical repository document split is:
 2. The shell creates a viewer workflow and signing draft workflow.
 3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
 4. The workspace shows read-only signing-flow and document-review cards derived from current draft/readiness/result state and the currently open PDF; the review card includes a top-level summary, a compact per-signature list, selector-driven per-signature detail, and a reopen-and-verify action for the last successful signed output when available.
-5. The signature-properties panel delegates certificate configuration, signature preset, visible-signature setup load/apply orchestration, catalog refresh, dirty-selection clearing, and validation/readiness reconciliation to `DefaultSignaturePropertiesCoordinator`; the panel still maps Qt controls to and from the setup draft, but it no longer drives the main visible-signature setup path by mutating `SigningDraftWorkflow` directly, and it re-renders setup selectors from returned coordinator state when visible-signature edits clear the active preset.
+5. The signature-properties panel delegates certificate configuration, signature preset, visible-signature setup load/apply orchestration, catalog refresh, dirty-selection clearing, and validation/readiness reconciliation to `DefaultSignaturePropertiesCoordinator`; the panel still maps Qt controls to and from the setup draft, but it no longer drives the main visible-signature setup path by mutating `SigningDraftWorkflow` directly, and it re-renders setup selectors from returned coordinator state when visible-signature edits clear the active preset. Nonblank preset selections now call `DefaultSignaturePropertiesCoordinator.apply_signature_preset(...)` directly, while blank selections still use the clear-selection command path.
 6. The panel derives `SigningDraftPreview`, asks `QtCanonicalPreviewLifecycle` for canonical render state when a snapshot is available, and hands that state plus the preview draft to `QtSignaturePreviewLayout` to plan and apply card sizing, widget ordering, and visibility.
 7. When the user signs, `SigningWorkspaceWidget.submit_sign_request()` delegates to `SigningActionCoordinator.submit()`, which applies pending property changes, checks readiness, builds the `SigningRequest`, and emits the request through the existing callback path before it touches the executor.
 8. If no executor is injected, the coordinator returns the request and a neutral state snapshot; the shell applies that returned state and stops.
@@ -672,6 +672,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-25 | Added the explicit preset-application coordinator entrypoint and routed the Qt panel's nonblank preset-selection path through it. | Reflected the public `apply_signature_preset()` path now used by `SignaturePropertiesPanel._on_signature_preset_selected()`. |
 | 2026-05-25 | Added the explicit visible-setup coordinator entrypoint and routed the Qt panel through it. | Reflected the public `apply_visible_setup()` path now used by `SignaturePropertiesPanel.apply_changes()`. |
 | 2026-05-25 | Added the signing-action coordinator boundary. | Reflected the extraction of action/result/reopen state into `signing_action_coordinator.py` and the thin-shell adapter behavior. |
 | 2026-05-22 | Added the Qt preview-layout boundary and narrowed shell tests to thin preview integration coverage. | Reflected `signature_preview_layout.py` extraction and close-aware preview cleanup wiring. |

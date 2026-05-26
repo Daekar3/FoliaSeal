@@ -3109,6 +3109,109 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     assert widget.selected_certificate_configuration_id() == "cert-config-current"
 
 
+def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    preset = build_signature_preset(name="Compact")
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
+    )
+    panel = widget.properties_panel
+    calls: list[tuple[str, str | None]] = []
+    original = panel._coordinator.apply_signature_preset
+
+    def _spy_apply_signature_preset(
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue=None,
+    ):
+        calls.append((selected_name, passphrase))
+        return original(
+            selected_name,
+            passphrase=passphrase,
+            control_issue=control_issue,
+        )
+
+    monkeypatch.setattr(panel._coordinator, "apply_signature_preset", _spy_apply_signature_preset)
+    panel._certificate_controls.password_input.setText("typed-secret")
+
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+
+    assert calls
+    assert set(calls) == {("Compact", "typed-secret")}
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
+
+
+def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    panel = widget.properties_panel
+    calls: list[str] = []
+    cleared: list[str] = []
+
+    def _unexpected_apply_signature_preset(
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue=None,
+    ):
+        calls.append(selected_name)
+        raise AssertionError("Blank preset selection should not apply a preset.")
+
+    original_reconcile = panel._coordinator.reconcile
+
+    def _spy_reconcile(command, *, control_issue=None):
+        if isinstance(command, signing_shell_module.ClearSelectedSignaturePreset):
+            cleared.append("cleared")
+        return original_reconcile(command, control_issue=control_issue)
+
+    monkeypatch.setattr(
+        panel._coordinator,
+        "apply_signature_preset",
+        _unexpected_apply_signature_preset,
+    )
+    monkeypatch.setattr(panel._coordinator, "reconcile", _spy_reconcile)
+
+    panel._signature_preset_controls.preset_combo._current = "Current signature setup"
+    panel._on_signature_preset_selected()
+
+    assert calls == []
+    assert cleared == ["cleared"]
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+
+
 def test_signing_shell_visible_setup_edit_clears_selected_preset_and_keeps_validation(
     monkeypatch,
     tmp_path: Path,
@@ -3174,6 +3277,59 @@ def test_signing_shell_apply_changes_maps_form_value_error_to_validation_issue(
     assert panel._control_issue is not None
     assert panel._control_issue.code == "signature_appearance_invalid"
     assert "Appearance is invalid." in panel.validation_text()
+
+
+def test_signing_shell_signature_preset_selection_error_reloads_current_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+
+    errors: list[str] = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+        on_error=errors.append,
+    )
+    panel = widget.properties_panel
+    load_calls: list[str] = []
+    original_load = panel._coordinator.load
+
+    def _raise_apply_signature_preset(
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue=None,
+    ):
+        raise signing_shell_module.SignaturePropertiesCoordinatorError("Preset failed.")
+
+    def _spy_load(*, control_issue=None):
+        load_calls.append("load")
+        return original_load(control_issue=control_issue)
+
+    monkeypatch.setattr(panel._coordinator, "apply_signature_preset", _raise_apply_signature_preset)
+    monkeypatch.setattr(panel._coordinator, "load", _spy_load)
+
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+
+    assert load_calls
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert errors == ["Preset failed."]
+    assert fake_bindings.q_message_box.calls[-1][1:] == (
+        "Certificate configuration error",
+        "Preset failed.",
+    )
 
 
 def test_signing_shell_signature_preset_selection_applies_certificate_material(

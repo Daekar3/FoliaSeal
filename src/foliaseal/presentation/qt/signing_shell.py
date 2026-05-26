@@ -40,7 +40,6 @@ from foliaseal.application.document_text_selection import (
 )
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
-    ApplySignaturePreset,
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
@@ -1004,15 +1003,16 @@ class SignaturePropertiesPanel:
         try:
             if not selected_name.strip():
                 command = ClearSelectedSignaturePreset()
-            else:
-                command = ApplySignaturePreset(
-                    selected_name=selected_name,
-                    passphrase=_text(self._certificate_controls.password_input) or None,
+                state = self._coordinator.reconcile(
+                    command,
+                    control_issue=self._control_issue,
                 )
-            state = self._coordinator.reconcile(
-                command,
-                control_issue=self._control_issue,
-            )
+            else:
+                state = self._coordinator.apply_signature_preset(
+                    selected_name,
+                    passphrase=_text(self._certificate_controls.password_input) or None,
+                    control_issue=self._control_issue,
+                )
         except SignaturePropertiesCoordinatorError as exc:
             self._show_certificate_configuration_error(str(exc))
             self._apply_coordinator_state(

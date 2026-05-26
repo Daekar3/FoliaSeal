@@ -140,6 +140,14 @@ class SignaturePropertiesCoordinator(Protocol):
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState: ...
 
+    def apply_signature_preset(
+        self,
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState: ...
+
     def reconcile(
         self,
         command: SignaturePropertiesCommand,
@@ -238,6 +246,21 @@ class DefaultSignaturePropertiesCoordinator:
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState:
         self._apply_visible_signature_setup(ApplyVisibleSignatureSetup(draft=draft))
+        return self.load(control_issue=control_issue)
+
+    def apply_signature_preset(
+        self,
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        self._apply_signature_preset(
+            ApplySignaturePreset(
+                selected_name=selected_name,
+                passphrase=passphrase,
+            )
+        )
         return self.load(control_issue=control_issue)
 
     def _apply_visible_signature_setup(self, command: ApplyVisibleSignatureSetup) -> None:
