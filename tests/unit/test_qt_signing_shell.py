@@ -19,7 +19,6 @@ from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
 from foliaseal.domain.models import (
     SignatureBoxStyle,
-    SignatureFieldKey,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureStampPosition,
@@ -2162,9 +2161,11 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert len(widget.properties_panel.container.layout.items) == 5
     assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
-    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 5
-    assert len(widget.properties_panel._visible_text_controls.advanced_container.layout.items) == 8
-    assert widget.properties_panel._visible_text_controls.advanced_container.visible is False
+    assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
+    assert (
+        len(widget.properties_panel._visible_text_controls.field_checks_container.layout.items)
+        == 8
+    )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
         == 5
@@ -2187,12 +2188,11 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         widget.properties_panel._visible_text_controls.summary_label.text()
-        == "Use the default visible signature text unless this document needs field-level changes."
+        == "Use the standard visible signing details for this signature."
     )
     assert (
         widget.properties_panel._visible_text_controls.detail_label.text()
-        == "Showing 8 visible fields with labels off. 0 field overrides configured. "
-        "Open the advanced editor only when individual fields need different sources or text."
+        == "Showing 8 of 8 standard signing fields with labels off."
     )
     assert (
         widget.properties_panel._placement_controls.summary_label.text()
@@ -2202,16 +2202,75 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.properties_panel.preview_controls.summary_label.text()
         == "This preview should match the signed PDF."
     )
-    assert list(widget.properties_panel.field_controls.keys()) == [
-        SignatureFieldKey.DISTINGUISHED_NAME,
-        SignatureFieldKey.COMMON_NAME,
-        SignatureFieldKey.EMAIL,
-        SignatureFieldKey.TITLE,
-        SignatureFieldKey.COMPANY,
-        SignatureFieldKey.SIGNING_TIME,
-        SignatureFieldKey.REASON,
-        SignatureFieldKey.LOCATION,
+    assert not hasattr(widget.properties_panel, "field_controls")
+
+
+def test_signing_shell_visible_text_field_checkboxes_control_preview_visibility(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    email_check = widget.properties_panel._setup_form._field_visibility_checks[  # noqa: SLF001
+        signing_shell_module.SignatureFieldKey.EMAIL
     ]
+    email_check.setChecked(False)
+    widget.properties_panel.refresh_preview()
+
+    preview_field = next(
+        field
+        for field in widget.properties_panel.preview.fields
+        if field.field_key == signing_shell_module.SignatureFieldKey.EMAIL
+    )
+    assert preview_field.visible is False
+
+
+def test_signing_shell_hidden_field_state_survives_visible_setup_reapply(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    signing_time_check = widget.properties_panel._setup_form._field_visibility_checks[  # noqa: SLF001
+        signing_shell_module.SignatureFieldKey.SIGNING_TIME
+    ]
+    signing_time_check.setChecked(False)
+    widget.properties_panel.apply_changes()
+
+    preview_field = next(
+        field
+        for field in widget.properties_panel.preview.fields
+        if field.field_key == signing_shell_module.SignatureFieldKey.SIGNING_TIME
+    )
+    assert preview_field.visible is False
 
 
 def test_signing_shell_flow_summary_advances_after_signature_placement(
@@ -2871,71 +2930,6 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
     )
     assert detail_text.endswith(" UTC | Reason | Location")
     assert expected_stamp_text.startswith("Digitally signed by\nDistinguished name | Common name")
-
-
-def test_signing_shell_visible_fields_use_source_as_single_visibility_control(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-
-    distinguished_name_controls = widget.properties_panel.field_controls[
-        SignatureFieldKey.DISTINGUISHED_NAME
-    ]
-    source_combo = distinguished_name_controls.source_combo
-
-    assert not hasattr(distinguished_name_controls, "visible_check")
-    assert source_combo.findText("Hidden") != -1
-    source_combo.setCurrentText("Hidden")
-    widget.properties_panel.refresh_preview()
-
-    assert widget.properties_panel.preview.fields[0].visible is False
-
-
-def test_signing_shell_signing_time_hidden_source_hides_preview_field(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-    )
-
-    signing_time_controls = widget.properties_panel.field_controls[SignatureFieldKey.SIGNING_TIME]
-    signing_time_controls.source_combo.setCurrentText("Hidden")
-    widget.properties_panel.refresh_preview()
-
-    preview_field = next(
-        field
-        for field in widget.properties_panel.preview.fields
-        if field.field_key == SignatureFieldKey.SIGNING_TIME
-    )
-    assert preview_field.visible is False
 
 
 def test_signing_shell_wrapped_block_preview_groups_tail_fields(

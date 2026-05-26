@@ -556,7 +556,6 @@ class SignaturePropertiesPanel:
         )
         self._placement_controls = self._setup_form.placement_controls
         self._appearance_controls = self._setup_form.appearance_controls
-        self.field_controls = self._setup_form.field_controls
         self._visible_text_controls = self._setup_form.visible_text_controls
         self._visible_signature_controls = self._setup_form.visible_signature_controls
         self._preview_controls = self._build_preview_controls()

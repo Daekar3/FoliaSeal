@@ -36,15 +36,6 @@ SIGNATURE_FIELD_DISPLAY_ORDER: tuple[SignatureFieldKey, ...] = (
 
 
 @dataclass(frozen=True)
-class FieldControls:
-    """Controls used to edit one visible signature field."""
-
-    container: Any
-    source_combo: Any
-    override_edit: Any
-
-
-@dataclass(frozen=True)
 class PlacementControls:
     """Controls used to edit placement and page selection."""
 
@@ -90,8 +81,7 @@ class VisibleTextControls:
     summary_label: Any
     detail_label: Any
     show_field_names: Any
-    advanced_toggle: Any
-    advanced_container: Any
+    field_checks_container: Any
 
 
 @dataclass(frozen=True)
@@ -112,6 +102,21 @@ def _compose_row(bindings: Any, *widgets: Any) -> Any:
     return container
 
 
+def _enum_display_text(
+    value: SignatureLayoutTemplate
+    | SignatureStampPosition
+    | SignatureTimezoneDisplayMode
+    | str,
+) -> str:
+    if isinstance(value, SignatureTimezoneDisplayMode):
+        return "UTC" if value == SignatureTimezoneDisplayMode.UTC else "Local"
+    if isinstance(value, SignatureStampPosition):
+        return value.value.replace("_", " ").title()
+    if isinstance(value, SignatureLayoutTemplate):
+        return value.value.replace("_", " ").title()
+    return str(value)
+
+
 def _field_label(field_key: SignatureFieldKey) -> str:
     labels = {
         SignatureFieldKey.DISTINGUISHED_NAME: "Distinguished name",
@@ -126,33 +131,22 @@ def _field_label(field_key: SignatureFieldKey) -> str:
     return labels[field_key]
 
 
-def _enum_display_text(
-    value: SignatureFieldSource
-    | SignatureLayoutTemplate
-    | SignatureStampPosition
-    | SignatureTimezoneDisplayMode
-    | str,
-) -> str:
-    if isinstance(value, SignatureTimezoneDisplayMode):
-        return "UTC" if value == SignatureTimezoneDisplayMode.UTC else "Local"
-    if isinstance(value, SignatureStampPosition):
-        return value.value.replace("_", " ").title()
-    if isinstance(value, SignatureLayoutTemplate):
-        return value.value.replace("_", " ").title()
-    if isinstance(value, SignatureFieldSource):
-        return value.value.title()
-    return str(value)
-
-
 def _enum_combo_items(
     enum_cls: type[
-        SignatureFieldSource
-        | SignatureLayoutTemplate
+        SignatureLayoutTemplate
         | SignatureStampPosition
         | SignatureTimezoneDisplayMode
     ],
 ) -> tuple[str, ...]:
     return tuple(_enum_display_text(member) for member in enum_cls)
+
+
+def _standard_field_binding() -> SignatureFieldBinding:
+    return SignatureFieldBinding(
+        source=SignatureFieldSource.DERIVED,
+        show_in_visible_appearance=True,
+        override_text=None,
+    )
 
 
 def _choice_combo_items(*, preferred: str, options: tuple[str, ...]) -> tuple[str, ...]:
@@ -277,11 +271,11 @@ class QtVisibleSignatureSetupForm:
         self._on_page_change = on_page_change
         self._suspend_updates = False
         self._placement_enabled = False
-        self._advanced_visible_text_expanded = False
+        self._field_order = SIGNATURE_FIELD_DISPLAY_ORDER
 
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
-        self.field_controls = self._build_field_controls()
+        self._field_visibility_checks: dict[SignatureFieldKey, Any] = {}
         self._visible_text_controls = self._build_visible_text_controls()
         self._visible_signature_controls = self._build_visible_signature_controls()
 
@@ -306,7 +300,7 @@ class QtVisibleSignatureSetupForm:
         try:
             self._load_placement_controls(draft.placement)
             self._load_appearance_controls(draft.appearance)
-            self._load_field_controls(draft.appearance)
+            self._load_field_visibility_controls(draft.appearance)
         finally:
             self._suspend_updates = False
         self._sync_font_style_control_availability()
@@ -535,54 +529,6 @@ class QtVisibleSignatureSetupForm:
             show_field_names=show_field_names,
         )
 
-    def _build_field_controls(self) -> dict[SignatureFieldKey, FieldControls]:
-        bindings = self._bindings
-        controls: dict[SignatureFieldKey, FieldControls] = {}
-        for field_key in SIGNATURE_FIELD_DISPLAY_ORDER:
-            container = bindings.q_widget()
-            layout = bindings.q_hbox_layout(container)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(6)
-
-            label = bindings.q_label(_field_label(field_key))
-            if hasattr(label, "setMinimumWidth"):
-                label.setMinimumWidth(132)
-            source_combo = bindings.q_combo_box()
-            source_items = _enum_combo_items(SignatureFieldSource)
-            if field_key == SignatureFieldKey.SIGNING_TIME:
-                source_items = tuple(
-                    item for item in source_items if item != SignatureFieldSource.OVERRIDE.value
-                )
-            source_combo.addItems(source_items)
-            override_edit = bindings.q_line_edit()
-            if field_key == SignatureFieldKey.SIGNING_TIME:
-                override_edit.setPlaceholderText("Derived at sign time")
-            else:
-                override_edit.setPlaceholderText("Override text")
-
-            layout.addWidget(label)
-            layout.addWidget(source_combo)
-            layout.addWidget(override_edit)
-
-            source_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
-                lambda _text, key=field_key: self._on_field_source_changed(key)
-            )
-            index_changed = getattr(source_combo, "currentIndexChanged", None)
-            if hasattr(index_changed, "connect"):
-                index_changed.connect(  # type: ignore[attr-defined]
-                    lambda _index, key=field_key: self._on_field_source_changed(key)
-                )
-            override_edit.textChanged.connect(  # type: ignore[attr-defined]
-                lambda _text, key=field_key: self._on_field_changed(key)
-            )
-
-            controls[field_key] = FieldControls(
-                container=container,
-                source_combo=source_combo,
-                override_edit=override_edit,
-            )
-        return controls
-
     def _build_visible_text_controls(self) -> VisibleTextControls:
         bindings = self._bindings
         container = bindings.q_group_box("Visible text")
@@ -590,7 +536,7 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         summary_label = bindings.q_label(
-            "Use the default visible signature text unless this document needs field-level changes."
+            "Use the standard visible signing details for this signature."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
@@ -601,32 +547,28 @@ class QtVisibleSignatureSetupForm:
             detail_label.setWordWrap(True)
         if hasattr(detail_label, "setStyleSheet"):
             detail_label.setStyleSheet("color: #4b5563;")
-        advanced_toggle = bindings.q_check_box("Customize individual text fields")
-        advanced_container = bindings.q_widget()
-        advanced_layout = bindings.q_vbox_layout(advanced_container)
-        advanced_layout.setContentsMargins(12, 0, 0, 0)
-        advanced_layout.setSpacing(4)
+        field_checks_container = bindings.q_widget()
+        field_checks_layout = bindings.q_vbox_layout(field_checks_container)
+        field_checks_layout.setContentsMargins(12, 0, 0, 0)
+        field_checks_layout.setSpacing(3)
+
+        for field_key in SIGNATURE_FIELD_DISPLAY_ORDER:
+            check_box = bindings.q_check_box(_field_label(field_key))
+            self._field_visibility_checks[field_key] = check_box
+            check_box.stateChanged.connect(self._on_any_control_changed)  # type: ignore[attr-defined]
+            field_checks_layout.addWidget(check_box)
 
         layout.addWidget(summary_label)
         layout.addWidget(self._appearance_controls.show_field_names)
         layout.addWidget(detail_label)
-        layout.addWidget(advanced_toggle)
-        layout.addWidget(advanced_container)
-        for controls in self.field_controls.values():
-            advanced_layout.addWidget(controls.container)
-
-        advanced_toggle.stateChanged.connect(  # type: ignore[attr-defined]
-            self._on_advanced_text_toggle
-        )
-        _set_widget_visible(advanced_container, False)
+        layout.addWidget(field_checks_container)
 
         return VisibleTextControls(
             container=container,
             summary_label=summary_label,
             detail_label=detail_label,
             show_field_names=self._appearance_controls.show_field_names,
-            advanced_toggle=advanced_toggle,
-            advanced_container=advanced_container,
+            field_checks_container=field_checks_container,
         )
 
     def _build_visible_signature_controls(self) -> VisibleSignatureControls:
@@ -659,6 +601,7 @@ class QtVisibleSignatureSetupForm:
         self._placement_enabled = placement.enabled
 
     def _load_appearance_controls(self, appearance: SignatureAppearance) -> None:
+        self._field_order = appearance.field_order
         _set_text(self._appearance_controls.signer_label_prefix, appearance.signer_label_prefix)
         _set_combo_text(
             self._appearance_controls.layout_template,
@@ -705,21 +648,6 @@ class QtVisibleSignatureSetupForm:
             appearance.box_style.background_color_hex,
         )
 
-    def _load_field_controls(self, appearance: SignatureAppearance) -> None:
-        for field_key, binding in appearance.iter_field_bindings():
-            controls = self.field_controls[field_key]
-            _set_combo_text(controls.source_combo, _enum_display_text(binding.source))
-            _set_text(controls.override_edit, binding.override_text or "")
-            self._sync_field_control_state(field_key)
-        _set_checked(
-            self._visible_text_controls.advanced_toggle,
-            self._advanced_visible_text_expanded,
-        )
-        _set_widget_visible(
-            self._visible_text_controls.advanced_container,
-            self._advanced_visible_text_expanded,
-        )
-
     def _build_appearance_from_controls(self) -> SignatureAppearance:
         text_style = SignatureTextStyle(
             font_family=_combo_text(self._appearance_controls.font_family),
@@ -755,7 +683,7 @@ class QtVisibleSignatureSetupForm:
             ),
             show_field_names=_is_checked(self._appearance_controls.show_field_names),
             datetime_format=_combo_text(self._appearance_controls.datetime_format),
-            field_order=SIGNATURE_FIELD_DISPLAY_ORDER,
+            field_order=self._field_order,
             distinguished_name=field_bindings[SignatureFieldKey.DISTINGUISHED_NAME],
             common_name=field_bindings[SignatureFieldKey.COMMON_NAME],
             email=field_bindings[SignatureFieldKey.EMAIL],
@@ -769,32 +697,22 @@ class QtVisibleSignatureSetupForm:
             image_stamp_path=_text(self._appearance_controls.image_stamp_path) or None,
         )
 
-    def _build_field_binding(self, field_key: SignatureFieldKey) -> SignatureFieldBinding:
-        controls = self.field_controls[field_key]
-        source = _selected_enum(_combo_text(controls.source_combo), SignatureFieldSource)
-        if field_key == SignatureFieldKey.SIGNING_TIME and source == SignatureFieldSource.OVERRIDE:
-            source = SignatureFieldSource.DERIVED
-        override_text = _text(controls.override_edit) or None
-        if source != SignatureFieldSource.OVERRIDE:
-            override_text = None
-        return SignatureFieldBinding(
-            source=source,
-            show_in_visible_appearance=source != SignatureFieldSource.HIDDEN,
-            override_text=override_text,
-        )
+    def _load_field_visibility_controls(self, appearance: SignatureAppearance) -> None:
+        for field_key, binding in appearance.iter_field_bindings():
+            _set_checked(
+                self._field_visibility_checks[field_key],
+                binding.show_in_visible_appearance,
+            )
 
-    def _sync_field_control_state(self, field_key: SignatureFieldKey) -> None:
-        controls = self.field_controls[field_key]
-        source = _selected_enum(_combo_text(controls.source_combo), SignatureFieldSource)
-        if field_key == SignatureFieldKey.SIGNING_TIME:
-            controls.override_edit.setEnabled(False)
-            return
-        if source == SignatureFieldSource.HIDDEN:
-            controls.override_edit.setEnabled(False)
-        elif source == SignatureFieldSource.OVERRIDE:
-            controls.override_edit.setEnabled(True)
-        else:
-            controls.override_edit.setEnabled(False)
+    def _build_field_binding(self, field_key: SignatureFieldKey) -> SignatureFieldBinding:
+        visible = _is_checked(self._field_visibility_checks[field_key])
+        if visible:
+            return _standard_field_binding()
+        return SignatureFieldBinding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+            override_text=None,
+        )
 
     def _sync_font_style_control_availability(self) -> None:
         family = _combo_text(self._appearance_controls.font_family)
@@ -818,22 +736,13 @@ class QtVisibleSignatureSetupForm:
             italic_setter(italic_supported or italic_checked)
 
     def _refresh_visible_text_summary(self) -> None:
-        bindings = tuple(
-            self._build_field_binding(field_key)
-            for field_key in SIGNATURE_FIELD_DISPLAY_ORDER
-        )
-        visible_count = sum(1 for binding in bindings if binding.show_in_visible_appearance)
-        override_count = sum(
-            1
-            for binding in bindings
-            if binding.source == SignatureFieldSource.OVERRIDE
-        )
         field_names = "on" if _is_checked(self._visible_text_controls.show_field_names) else "off"
+        visible_count = sum(
+            1 for check_box in self._field_visibility_checks.values() if _is_checked(check_box)
+        )
         summary = (
-            f"Showing {visible_count} visible fields with labels {field_names}. "
-            f"{override_count} field override"
-            f"{'' if override_count == 1 else 's'} configured. "
-            "Open the advanced editor only when individual fields need different sources or text."
+            f"Showing {visible_count} of {len(SIGNATURE_FIELD_DISPLAY_ORDER)} standard "
+            f"signing fields with labels {field_names}."
         )
         _set_text(self._visible_text_controls.detail_label, summary)
 
@@ -856,22 +765,6 @@ class QtVisibleSignatureSetupForm:
         if self._on_change is not None:
             self._on_change()
 
-    def _on_field_changed(self, field_key: SignatureFieldKey) -> None:
-        if self._suspend_updates:
-            return
-        self._sync_field_control_state(field_key)
-        self._refresh_visible_text_summary()
-        if self._on_change is not None:
-            self._on_change()
-
-    def _on_field_source_changed(self, field_key: SignatureFieldKey) -> None:
-        if self._suspend_updates:
-            return
-        self._sync_field_control_state(field_key)
-        self._refresh_visible_text_summary()
-        if self._on_change is not None:
-            self._on_change()
-
     def _on_placement_changed(self, *_args: object) -> None:
         if self._suspend_updates:
             return
@@ -880,12 +773,3 @@ class QtVisibleSignatureSetupForm:
             self._on_change()
         if self._on_page_change is not None:
             self._on_page_change(int(_spin_value(self._placement_controls.page_spin)))
-
-    def _on_advanced_text_toggle(self, *_args: object) -> None:
-        self._advanced_visible_text_expanded = _is_checked(
-            self._visible_text_controls.advanced_toggle
-        )
-        _set_widget_visible(
-            self._visible_text_controls.advanced_container,
-            self._advanced_visible_text_expanded,
-        )
