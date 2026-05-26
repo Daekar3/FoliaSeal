@@ -354,6 +354,34 @@ def test_coordinator_applies_certificate_configuration_and_updates_workflow(
     assert workflow.passphrase == "typed-secret"
 
 
+def test_coordinator_apply_certificate_configuration_wrapper_updates_workflow(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.apply_certificate_configuration(
+        "Corporate Records Signing",
+        passphrase="typed-secret",
+    )
+
+    assert state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+
+
 def test_coordinator_applies_certificate_configuration_with_saved_password(
     tmp_path: Path,
 ) -> None:
@@ -386,6 +414,68 @@ def test_coordinator_applies_certificate_configuration_with_saved_password(
     assert workflow.passphrase == "stored-secret"
 
 
+def test_coordinator_apply_certificate_configuration_wrapper_uses_saved_password(
+    tmp_path: Path,
+) -> None:
+    configuration = build_certificate_configuration(
+        save_password=True,
+        password_secret_ref="secret-ref-1",
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog(certificate_configurations=(configuration,))
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=store,
+        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.apply_certificate_configuration("Corporate Records Signing")
+
+    assert state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "stored-secret"
+
+
+def test_coordinator_apply_certificate_configuration_wrapper_preserves_control_issue_folding(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.parent.mkdir(parents=True, exist_ok=True)
+    cert_file.write_bytes(b"pkcs12-bytes")
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.apply_certificate_configuration(
+        "Corporate Records Signing",
+        passphrase="typed-secret",
+        control_issue=SigningDraftValidationIssue(
+            code="preview_warning",
+            message="Preview is stale but still usable.",
+            field_name="signature_appearance",
+            severity=SigningDraftValidationSeverity.WARNING,
+        ),
+    )
+
+    assert state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert state.ready_to_sign is False
+    assert "preview_warning" not in state.validation_text
+
+
 def test_coordinator_apply_certificate_configuration_reports_missing_file(
     tmp_path: Path,
 ) -> None:
@@ -406,6 +496,27 @@ def test_coordinator_apply_certificate_configuration_reports_missing_file(
                 selected_name="Corporate Records Signing",
                 passphrase="typed-secret",
             )
+        )
+
+
+def test_coordinator_apply_certificate_configuration_wrapper_reports_missing_file(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(build_certificate_catalog())
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    with pytest.raises(
+        SignaturePropertiesCoordinatorError,
+        match="managed certificate file is missing",
+    ):
+        coordinator.apply_certificate_configuration(
+            "Corporate Records Signing",
+            passphrase="typed-secret",
         )
 
 

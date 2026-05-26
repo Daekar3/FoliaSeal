@@ -48,6 +48,18 @@ from tests.support.phase3_builders import (
 )
 
 
+class _FakeSecretProvider:
+    def __init__(self, secrets: dict[str, str] | None = None, *, available: bool = True) -> None:
+        self._secrets = secrets or {}
+        self._available = available
+
+    def is_available(self) -> bool:
+        return self._available
+
+    def get_secret(self, secret_ref: str) -> str | None:
+        return self._secrets.get(secret_ref)
+
+
 class _FakeSignal:
     def __init__(self) -> None:
         self._callbacks = []
@@ -845,6 +857,107 @@ def test_signing_shell_applies_selected_certificate_configuration(
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "typed-secret"
+
+
+def test_signing_shell_certificate_selection_uses_explicit_coordinator_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=store,
+    )
+
+    panel = widget.properties_panel
+    calls: list[tuple[str, str | None]] = []
+    original = panel._coordinator.apply_certificate_configuration
+
+    def _spy_apply_certificate_configuration(
+        selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue=None,
+    ):
+        calls.append((selected_name, passphrase))
+        return original(
+            selected_name,
+            passphrase=passphrase,
+            control_issue=control_issue,
+        )
+
+    monkeypatch.setattr(
+        panel._coordinator,
+        "apply_certificate_configuration",
+        _spy_apply_certificate_configuration,
+    )
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
+    panel._certificate_controls.password_input.setText("typed-secret")
+
+    assert panel.apply_selected_certificate_configuration() is True
+    assert calls == [("Corporate Records Signing", "typed-secret")]
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+
+
+def test_signing_shell_certificate_selection_empty_password_uses_saved_secret(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    configuration = build_certificate_configuration(
+        save_password=True,
+        password_secret_ref="secret-ref-1",
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog(certificate_configurations=(configuration,))
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=store,
+        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+    )
+
+    panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
+    panel._certificate_controls.password_input.setText("")
+
+    assert panel.apply_selected_certificate_configuration() is True
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "stored-secret"
 
 
 def test_signing_shell_reports_certificate_configuration_resolution_errors(
