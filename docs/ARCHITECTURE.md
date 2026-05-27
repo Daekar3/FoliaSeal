@@ -518,14 +518,14 @@ The canonical repository document split is:
 1. `build_qt_signing_shell()` constructs a `SigningShellAdapter`.
 2. The shell creates a viewer workflow and signing draft workflow.
 3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
-4. The workspace shows read-only signing-flow and document-review cards derived from current draft/readiness/result state and the currently open PDF; the review card includes a top-level summary, a compact per-signature list, selector-driven per-signature detail, and a reopen-and-verify action for the last successful signed output when available.
+4. The workspace shows read-only signing-flow and document-review cards derived from current draft/readiness/result state and the currently open PDF; the review card includes a top-level summary, a compact per-signature list, and selector-driven per-signature detail only. Reopening the last successful signed output now lives exclusively in the primary sign panel.
 5. The signature-properties panel delegates certificate configuration, signature preset, visible-signature setup load/apply orchestration, catalog refresh, dirty-selection clearing, and validation/readiness reconciliation to `DefaultSignaturePropertiesCoordinator`; the panel still maps Qt controls to and from the setup draft, but it no longer drives the main visible-signature setup path by mutating `SigningDraftWorkflow` directly, and it re-renders setup selectors from returned coordinator state when visible-signature edits clear the active preset. Nonblank preset selections now call `DefaultSignaturePropertiesCoordinator.apply_signature_preset(...)` directly, certificate configuration applies through `DefaultSignaturePropertiesCoordinator.apply_certificate_configuration(...)`, and blank selections still use the clear-selection command path.
 6. The panel derives `SigningDraftPreview`, asks `QtCanonicalPreviewLifecycle` for canonical render state when a snapshot is available, and hands that state plus the preview draft to `QtSignaturePreviewLayout` to plan and apply card sizing, widget ordering, and visibility.
 7. When the user signs, `SigningWorkspaceWidget.submit_sign_request()` delegates to `SigningActionCoordinator.submit()`, which applies pending property changes, checks readiness, builds the `SigningRequest`, and emits the request through the existing callback path before it touches the executor.
 8. If no executor is injected, the coordinator returns the request and a neutral state snapshot; the shell applies that returned state and stops.
 9. If an executor is injected, it runs the request and returns a `SigningResult`; the coordinator stores the result, updates the sign/result/open-state flags, and derives the success or failure transition metadata.
 10. The shell applies the returned state snapshot to the Qt controls, updates the result label, and emits either `sign_success` or a plain error depending on the transition metadata.
-11. On success, the coordinator records the signed output path so the shell can enable `Open signed PDF` and `Verify signed PDF`; on failure, it clears the reopen target, keeps the error text visible, and harnesses can capture structured evidence.
+11. On success, the coordinator records the signed output path so the shell can enable `Open signed PDF`; on failure, it clears the reopen target, keeps the error text visible, and harnesses can capture structured evidence.
 
 ### Qt output path selection
 
@@ -672,6 +672,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-27 | Removed the misleading review-card verify affordance and kept reopen in the primary sign panel only. | Reflected the read-only document review card and the one-button reopen flow now owned solely by the sign panel. |
 | 2026-05-26 | Added the explicit certificate-application coordinator entrypoint and routed the Qt panel's certificate-application path through it. | Reflected the public `apply_certificate_configuration()` path now used by `SignaturePropertiesPanel.apply_selected_certificate_configuration()`. |
 | 2026-05-25 | Added the explicit preset-application coordinator entrypoint and routed the Qt panel's nonblank preset-selection path through it. | Reflected the public `apply_signature_preset()` path now used by `SignaturePropertiesPanel._on_signature_preset_selected()`. |
 | 2026-05-25 | Added the explicit visible-setup coordinator entrypoint and routed the Qt panel through it. | Reflected the public `apply_visible_setup()` path now used by `SignaturePropertiesPanel.apply_changes()`. |

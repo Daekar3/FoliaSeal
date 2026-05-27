@@ -30,7 +30,6 @@ class DocumentReviewControls:
     signature_items_label: Any
     signature_selector: Any
     signature_detail_label: Any
-    verify_button: Any
 
 
 @dataclass(frozen=True)
@@ -96,9 +95,7 @@ class SigningWorkspaceSidebar:
             on_sign=on_sign,
             on_open_signed_output=on_open_signed_output,
         )
-        self.document_review_controls = self._build_document_review_controls(
-            on_open_signed_output=on_open_signed_output
-        )
+        self.document_review_controls = self._build_document_review_controls()
         self.document_text_controls = self._build_document_text_controls(
             on_find_text=on_find_text,
             on_previous_text_match=on_previous_text_match,
@@ -171,8 +168,6 @@ class SigningWorkspaceSidebar:
 
     def _build_document_review_controls(
         self,
-        *,
-        on_open_signed_output: Callable[[], Any],
     ) -> DocumentReviewControls:
         container = self._bindings.q_group_box("Document review")
         _style_panel(container)
@@ -185,8 +180,6 @@ class SigningWorkspaceSidebar:
         signature_selector = self._bindings.q_combo_box()
         signature_selector.setEnabled(False)
         signature_detail_label = self._bindings.q_label("")
-        verify_button = self._bindings.q_push_button("Verify signed PDF")
-        verify_button.setEnabled(False)
         for label in (
             headline_label,
             detail_label,
@@ -203,13 +196,11 @@ class SigningWorkspaceSidebar:
             signature_items_label.setStyleSheet("color: #1f2937;")
         if hasattr(signature_detail_label, "setStyleSheet"):
             signature_detail_label.setStyleSheet("color: #374151;")
-        verify_button.clicked.connect(on_open_signed_output)  # type: ignore[attr-defined]
         layout.addWidget(headline_label)
         layout.addWidget(detail_label)
         layout.addWidget(signature_items_label)
         layout.addWidget(signature_selector)
         layout.addWidget(signature_detail_label)
-        layout.addWidget(verify_button)
         return DocumentReviewControls(
             container=container,
             headline_label=headline_label,
@@ -217,7 +208,6 @@ class SigningWorkspaceSidebar:
             signature_items_label=signature_items_label,
             signature_selector=signature_selector,
             signature_detail_label=signature_detail_label,
-            verify_button=verify_button,
         )
 
     def _build_document_text_controls(

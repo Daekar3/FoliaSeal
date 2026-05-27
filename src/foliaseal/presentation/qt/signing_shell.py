@@ -1267,9 +1267,6 @@ class SigningWorkspaceWidget:
         self.widget.document_review_signature_detail_label = (  # type: ignore[attr-defined]
             self._document_review_controls.signature_detail_label
         )
-        self.widget.document_review_verify_button = (  # type: ignore[attr-defined]
-            self._document_review_controls.verify_button
-        )
         self.widget.document_text_query_input = (  # type: ignore[attr-defined]
             self._document_text_controls.query_input
         )
@@ -1526,9 +1523,6 @@ class SigningWorkspaceWidget:
 
     def _set_last_successful_output_path(self, output_path: str | None) -> None:
         self._open_signed_output_button.setEnabled(
-            output_path is not None and self._on_open_signed_output is not None
-        )
-        self._document_review_controls.verify_button.setEnabled(
             output_path is not None and self._on_open_signed_output is not None
         )
 
