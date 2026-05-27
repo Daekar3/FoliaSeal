@@ -13,7 +13,6 @@ from foliaseal.application.signature_properties_coordinator import (
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
-    SignatureBoxStyle,
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
@@ -59,17 +58,10 @@ class AppearanceControls:
     layout_template: Any
     stamp_position: Any
     timezone_display_mode: Any
-    datetime_format: Any
     font_family: Any
     font_size: Any
     bold: Any
     italic: Any
-    text_color: Any
-    image_stamp_path: Any
-    border_show: Any
-    border_color: Any
-    border_width: Any
-    background_color: Any
     show_field_names: Any
 
 
@@ -239,12 +231,6 @@ def _text(line_edit: Any) -> str:
     return ""
 
 
-def _set_widget_visible(widget: Any, visible: bool) -> None:
-    setter = getattr(widget, "setVisible", None)
-    if callable(setter):
-        setter(visible)
-
-
 def _selected_enum(value: str, enum_cls: type[Any]) -> Any:
     for member in enum_cls:
         if value == member.value or value == _enum_display_text(member):
@@ -272,6 +258,7 @@ class QtVisibleSignatureSetupForm:
         self._suspend_updates = False
         self._placement_enabled = False
         self._field_order = SIGNATURE_FIELD_DISPLAY_ORDER
+        self._appearance_template = SignatureAppearance()
 
         self._placement_controls = self._build_placement_controls()
         self._appearance_controls = self._build_appearance_controls()
@@ -385,7 +372,7 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
         summary_label = bindings.q_label(
-            "Choose how the visible signature should look on the page."
+            "Refine the preset's visible signature with the bounded choices used by the MVP."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
@@ -396,11 +383,6 @@ class QtVisibleSignatureSetupForm:
         text_layout = bindings.q_form_layout(text_group)
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(4)
-
-        box_group = bindings.q_group_box("Stamp and border")
-        box_layout = bindings.q_form_layout(box_group)
-        box_layout.setContentsMargins(0, 0, 0, 0)
-        box_layout.setSpacing(4)
 
         signer_label_prefix = bindings.q_line_edit()
         signer_label_prefix.setPlaceholderText("Digitally signed by")
@@ -413,19 +395,6 @@ class QtVisibleSignatureSetupForm:
 
         timezone_display_mode = bindings.q_combo_box()
         timezone_display_mode.addItems(_enum_combo_items(SignatureTimezoneDisplayMode))
-
-        datetime_format = bindings.q_combo_box()
-        datetime_format.addItems(
-            _choice_combo_items(
-                preferred="%Y-%m-%d %H:%M:%S %Z",
-                options=(
-                    "%Y-%m-%d %H:%M:%S %Z",
-                    "%Y-%m-%d %H:%M",
-                    "%d/%m/%Y %H:%M",
-                    "%b %d, %Y %I:%M %p",
-                ),
-            )
-        )
 
         font_family = bindings.q_combo_box()
         font_family.addItems(
@@ -442,22 +411,6 @@ class QtVisibleSignatureSetupForm:
 
         bold = bindings.q_check_box("Bold")
         italic = bindings.q_check_box("Italic")
-
-        text_color = bindings.q_line_edit()
-        text_color.setPlaceholderText("#000000")
-
-        image_stamp_path = bindings.q_line_edit()
-        image_stamp_path.setPlaceholderText("/path/to/stamp.png")
-
-        border_show = bindings.q_check_box("Show border")
-        border_color = bindings.q_line_edit()
-        border_color.setPlaceholderText("#000000")
-        border_width = bindings.q_double_spin_box()
-        border_width.setRange(0.5, 10.0)
-        border_width.setDecimals(1)
-        border_width.setSingleStep(0.5)
-        background_color = bindings.q_line_edit()
-        background_color.setPlaceholderText("#FFFFFF")
         show_field_names = bindings.q_check_box("Show field names")
 
         text_layout.addRow(
@@ -469,41 +422,26 @@ class QtVisibleSignatureSetupForm:
             _compose_row(bindings, layout_template, timezone_display_mode),
         )
         text_layout.addRow(
-            "Datetime / Font",
-            _compose_row(bindings, datetime_format, font_family),
+            "Font / Size",
+            _compose_row(bindings, font_family, font_size),
         )
         text_layout.addRow(
-            "Style / Size",
-            _compose_row(bindings, font_size, bold, italic),
-        )
-        text_layout.addRow("Text color", text_color)
-
-        box_layout.addRow("Image stamp", image_stamp_path)
-        box_layout.addRow(
-            "Border / Background",
-            _compose_row(bindings, border_show, border_color, border_width, background_color),
+            "Weight / Labels",
+            _compose_row(bindings, bold, italic, show_field_names),
         )
 
         layout.addWidget(summary_label)
         layout.addWidget(text_group)
-        layout.addWidget(box_group)
 
         for control in (
             signer_label_prefix,
             layout_template,
             stamp_position,
             timezone_display_mode,
-            datetime_format,
             font_family,
             font_size,
             bold,
             italic,
-            text_color,
-            image_stamp_path,
-            border_show,
-            border_color,
-            border_width,
-            background_color,
             show_field_names,
         ):
             self._connect_change_signal(control)
@@ -515,17 +453,10 @@ class QtVisibleSignatureSetupForm:
             layout_template=layout_template,
             stamp_position=stamp_position,
             timezone_display_mode=timezone_display_mode,
-            datetime_format=datetime_format,
             font_family=font_family,
             font_size=font_size,
             bold=bold,
             italic=italic,
-            text_color=text_color,
-            image_stamp_path=image_stamp_path,
-            border_show=border_show,
-            border_color=border_color,
-            border_width=border_width,
-            background_color=background_color,
             show_field_names=show_field_names,
         )
 
@@ -536,7 +467,7 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         summary_label = bindings.q_label(
-            "Use the standard visible signing details for this signature."
+            "Use the preset's standard signing details, and hide fields only when needed."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
@@ -578,7 +509,7 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         summary_label = bindings.q_label(
-            "Configure the visible signature exactly as it should appear on the PDF."
+            "Start from a signature preset, then adjust the visible approval signature as needed."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
@@ -602,6 +533,7 @@ class QtVisibleSignatureSetupForm:
 
     def _load_appearance_controls(self, appearance: SignatureAppearance) -> None:
         self._field_order = appearance.field_order
+        self._appearance_template = appearance
         _set_text(self._appearance_controls.signer_label_prefix, appearance.signer_label_prefix)
         _set_combo_text(
             self._appearance_controls.layout_template,
@@ -617,11 +549,6 @@ class QtVisibleSignatureSetupForm:
         )
         _set_checked(self._appearance_controls.show_field_names, appearance.show_field_names)
         _set_combo_text(
-            self._appearance_controls.datetime_format,
-            appearance.datetime_format,
-            allow_custom=True,
-        )
-        _set_combo_text(
             self._appearance_controls.font_family,
             appearance.text_style.font_family,
             allow_custom=True,
@@ -629,39 +556,17 @@ class QtVisibleSignatureSetupForm:
         _set_spin_value(self._appearance_controls.font_size, appearance.text_style.font_size_pt)
         _set_checked(self._appearance_controls.bold, appearance.text_style.bold)
         _set_checked(self._appearance_controls.italic, appearance.text_style.italic)
-        _set_text(self._appearance_controls.text_color, appearance.text_style.text_color_hex)
-        _set_text(
-            self._appearance_controls.image_stamp_path,
-            appearance.image_stamp_path or "",
-        )
-        _set_checked(self._appearance_controls.border_show, appearance.box_style.show_border)
-        _set_text(
-            self._appearance_controls.border_color,
-            appearance.box_style.border_color_hex,
-        )
-        _set_spin_value(
-            self._appearance_controls.border_width,
-            appearance.box_style.border_width_pt,
-        )
-        _set_text(
-            self._appearance_controls.background_color,
-            appearance.box_style.background_color_hex,
-        )
 
     def _build_appearance_from_controls(self) -> SignatureAppearance:
+        preserved = self._appearance_template
         text_style = SignatureTextStyle(
             font_family=_combo_text(self._appearance_controls.font_family),
             font_size_pt=_spin_value(self._appearance_controls.font_size),
             bold=_is_checked(self._appearance_controls.bold),
             italic=_is_checked(self._appearance_controls.italic),
-            text_color_hex=_text(self._appearance_controls.text_color),
+            text_color_hex=preserved.text_style.text_color_hex,
         )
-        box_style = SignatureBoxStyle(
-            show_border=_is_checked(self._appearance_controls.border_show),
-            border_color_hex=_text(self._appearance_controls.border_color),
-            border_width_pt=_spin_value(self._appearance_controls.border_width),
-            background_color_hex=_text(self._appearance_controls.background_color),
-        )
+        box_style = preserved.box_style
 
         field_bindings = {
             field_key: self._build_field_binding(field_key)
@@ -682,7 +587,7 @@ class QtVisibleSignatureSetupForm:
                 SignatureTimezoneDisplayMode,
             ),
             show_field_names=_is_checked(self._appearance_controls.show_field_names),
-            datetime_format=_combo_text(self._appearance_controls.datetime_format),
+            datetime_format=preserved.datetime_format,
             field_order=self._field_order,
             distinguished_name=field_bindings[SignatureFieldKey.DISTINGUISHED_NAME],
             common_name=field_bindings[SignatureFieldKey.COMMON_NAME],
@@ -694,7 +599,7 @@ class QtVisibleSignatureSetupForm:
             location=field_bindings[SignatureFieldKey.LOCATION],
             text_style=text_style,
             box_style=box_style,
-            image_stamp_path=_text(self._appearance_controls.image_stamp_path) or None,
+            image_stamp_path=preserved.image_stamp_path,
         )
 
     def _load_field_visibility_controls(self, appearance: SignatureAppearance) -> None:

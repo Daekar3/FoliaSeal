@@ -562,8 +562,8 @@ class SignaturePropertiesPanel:
         self.preview_controls = self._preview_controls
         self._validation_text = ""
 
-        self._layout.addWidget(self._certificate_controls.container)
         self._layout.addWidget(self._signature_preset_controls.container)
+        self._layout.addWidget(self._certificate_controls.container)
         self._layout.addWidget(self._visible_signature_controls.container)
         self._layout.addWidget(self._placement_controls.container)
         self._layout.addWidget(self._preview_controls.container)

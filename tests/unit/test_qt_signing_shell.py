@@ -2121,8 +2121,16 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel.container.layout.items) == 5
+    assert (
+        widget.properties_panel.container.layout.items[0][0]
+        is widget.properties_panel._signature_preset_controls.container
+    )
+    assert (
+        widget.properties_panel.container.layout.items[1][0]
+        is widget.properties_panel._certificate_controls.container
+    )
     assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
-    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
+    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
     assert (
         len(widget.properties_panel._visible_text_controls.field_checks_container.layout.items)
@@ -2130,11 +2138,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
-        == 5
-    )
-    assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[2][0].layout.rows)
-        == 2
+        == 4
     )
     assert len(widget.properties_panel._placement_controls.form_container.layout.rows) == 3
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
@@ -2142,15 +2146,15 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
     assert (
         widget.properties_panel._visible_signature_controls.summary_label.text()
-        == "Configure the visible signature exactly as it should appear on the PDF."
+        == "Start from a signature preset, then adjust the visible approval signature as needed."
     )
     assert (
         widget.properties_panel._appearance_controls.summary_label.text()
-        == "Choose how the visible signature should look on the page."
+        == "Refine the preset's visible signature with the bounded choices used by the MVP."
     )
     assert (
         widget.properties_panel._visible_text_controls.summary_label.text()
-        == "Use the standard visible signing details for this signature."
+        == "Use the preset's standard signing details, and hide fields only when needed."
     )
     assert (
         widget.properties_panel._visible_text_controls.detail_label.text()
@@ -2165,6 +2169,11 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         == "This preview should match the signed PDF."
     )
     assert not hasattr(widget.properties_panel, "field_controls")
+    assert not hasattr(widget.properties_panel._appearance_controls, "datetime_format")
+    assert not hasattr(widget.properties_panel._appearance_controls, "image_stamp_path")
+    assert not hasattr(widget.properties_panel._appearance_controls, "text_color")
+    assert not hasattr(widget.properties_panel._appearance_controls, "background_color")
+    assert not hasattr(widget.properties_panel._appearance_controls, "border_show")
 
 
 def test_signing_shell_visible_text_field_checkboxes_control_preview_visibility(
@@ -2324,7 +2333,7 @@ def test_signing_shell_page_selection_and_resize_controls_update_workflow(
     assert widget.is_sign_action_enabled() is True
 
 
-def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
+def test_signing_shell_visible_style_edits_preserve_hidden_preset_appearance_values(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2361,15 +2370,15 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     preview_text = widget.properties_panel.preview_text()
     preview_controls = widget.properties_panel.preview_controls
 
-    assert len(widget.properties_panel._appearance_controls.container.layout.items) == 3
-    assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
-        == 5
-    )
-    assert (
-        len(widget.properties_panel._appearance_controls.container.layout.items[2][0].layout.rows)
-        == 2
-    )
+    widget.properties_panel._appearance_controls.font_family.setCurrentText("Serif")
+
+    current_appearance = widget.signature_appearance()
+
+    assert current_appearance is not None
+    assert current_appearance.text_style.font_family == "Serif"
+    assert current_appearance.text_style.text_color_hex == "#123456"
+    assert current_appearance.datetime_format == "%d/%m/%Y %H:%M"
+    assert current_appearance.image_stamp_path == "/tmp/stamp.png"
     assert preview_controls.multi_body_container.layout.items[0][0].pixmap() is not None
     assert (
         preview_controls.multi_body_container.layout.items[0][0].pixmap().path == "/tmp/stamp.png"
@@ -2383,20 +2392,18 @@ def test_signing_shell_preview_surfaces_datetime_format_and_image_stamp(
     assert detail_lines[0] == "Digitally signed by"
     assert detail_lines[1] == "Distinguished name: Distinguished name"
     assert detail_lines[2] == "Common name: Common name"
-    assert detail_lines[3] == "Email: alice@example.com"
-    assert detail_lines[4] == "Title: Director"
-    assert detail_lines[5] == "Company: FoliaSeal"
+    assert detail_lines[3] == "Email: Email"
+    assert detail_lines[4] == "Title: Title"
+    assert detail_lines[5] == "Company: Company"
     assert detail_lines[6].startswith("Signing time:")
-    assert detail_lines[7] == "Reason: Approved"
+    assert detail_lines[7] == "Reason: Reason"
     assert len(detail_lines) == 8
     assert preview_controls.footer_label.text() == ""
     assert widget.properties_panel._appearance_controls.font_family._items[
         :3
     ] == ["Sans Serif", "Serif", "Monospace"]
-    assert (
-        widget.properties_panel._appearance_controls.font_family.currentText()
-        == "Source Sans 3"
-    )
+    assert "Source Sans 3" in widget.properties_panel._appearance_controls.font_family._items
+    assert widget.properties_panel._appearance_controls.font_family.currentText() == "Serif"
     assert "Digitally signed by" in preview_text
     assert "alice@example.com" in preview_text
     assert "Single line" not in preview_text
@@ -3028,7 +3035,7 @@ def test_signing_shell_preview_text_uses_active_vertical_label_for_wrapped_block
     assert widget.properties_panel.preview_text() == detail.strip()
 
 
-def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
+def test_signing_shell_repeated_custom_font_loads_do_not_duplicate_items(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -3044,7 +3051,6 @@ def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
     )
 
     appearance = build_signature_appearance(
-        datetime_format="custom-format",
         text_style=SignatureTextStyle(
             font_family="Custom Font",
             font_size_pt=9.5,
@@ -3062,10 +3068,8 @@ def test_signing_shell_repeated_custom_combo_value_loads_do_not_duplicate_items(
     widget.properties_panel.load_from_workflow()
     widget.properties_panel.load_from_workflow()
 
-    datetime_combo = widget.properties_panel._appearance_controls.datetime_format
     font_combo = widget.properties_panel._appearance_controls.font_family
 
-    assert datetime_combo._items.count("custom-format") == 1
     assert font_combo._items.count("Custom Font") == 1
 
 

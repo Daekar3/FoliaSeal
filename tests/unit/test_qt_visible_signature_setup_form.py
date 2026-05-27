@@ -40,7 +40,6 @@ def test_setup_form_loads_visible_signature_draft_into_controls() -> None:
     assert form.appearance_controls.signer_label_prefix.text() == "Signed by Team"
     assert form.appearance_controls.show_field_names.isChecked() is True
     assert form.appearance_controls.font_family.currentText() == "Source Sans 3"
-    assert form.appearance_controls.image_stamp_path.text() == "/tmp/stamp.png"
     assert form.placement_controls.page_spin.value() == 2
     assert form.placement_controls.width_spin.value() == 180.0
     assert (
@@ -51,6 +50,11 @@ def test_setup_form_loads_visible_signature_draft_into_controls() -> None:
     assert not hasattr(form, "field_controls")
     assert not hasattr(form.visible_text_controls, "advanced_toggle")
     assert not hasattr(form.visible_text_controls, "advanced_container")
+    assert not hasattr(form.appearance_controls, "datetime_format")
+    assert not hasattr(form.appearance_controls, "image_stamp_path")
+    assert not hasattr(form.appearance_controls, "text_color")
+    assert not hasattr(form.appearance_controls, "background_color")
+    assert not hasattr(form.appearance_controls, "border_show")
 
 
 def test_setup_form_builds_draft_and_normalizes_legacy_field_customizations() -> None:
@@ -112,6 +116,44 @@ def test_setup_form_builds_draft_and_normalizes_legacy_field_customizations() ->
         height_pt=36.0,
         enabled=True,
     )
+
+
+def test_setup_form_preserves_hidden_loaded_appearance_values_on_rebuild() -> None:
+    form = QtVisibleSignatureSetupForm(bindings=_fake_bindings())
+    appearance = build_signature_appearance(
+        datetime_format="custom-format",
+        image_stamp_path="/tmp/stamp.png",
+        text_style=SignatureTextStyle(
+            font_family="Source Sans 3",
+            font_size_pt=9.5,
+            bold=True,
+            italic=False,
+            text_color_hex="#ABCDEF",
+        ),
+    )
+
+    form.load(
+        VisibleSignatureSetupDraft(
+            appearance=appearance,
+            placement=VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=48.0,
+                enabled=False,
+            ),
+        )
+    )
+
+    form.appearance_controls.font_family.setCurrentText("Serif")
+    draft = form.build_draft()
+
+    assert draft.appearance.text_style.font_family == "Serif"
+    assert draft.appearance.text_style.text_color_hex == "#ABCDEF"
+    assert draft.appearance.datetime_format == "custom-format"
+    assert draft.appearance.image_stamp_path == "/tmp/stamp.png"
+    assert draft.appearance.box_style == appearance.box_style
 
 
 def test_setup_form_disables_unsupported_font_styles() -> None:
