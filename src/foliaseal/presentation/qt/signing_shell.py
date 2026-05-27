@@ -122,6 +122,7 @@ class QtSigningWidgetBindings:
     q_check_box: type[Any]
     q_combo_box: type[Any]
     q_file_dialog: Any
+    q_input_dialog: Any
     q_message_box: type[Any]
     q_pixmap: type[Any]
     q_double_spin_box: type[Any]
@@ -147,7 +148,6 @@ class CertificateConfigurationControls:
 
     container: Any
     configuration_combo: Any
-    password_input: Any
     apply_button: Any
 
 
@@ -561,6 +561,7 @@ class SignaturePropertiesPanel:
         self._preview_controls = self._build_preview_controls()
         self.preview_controls = self._preview_controls
         self._validation_text = ""
+        self._session_certificate_passphrases: dict[str, str] = {}
 
         self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._certificate_controls.container)
@@ -843,13 +844,13 @@ class SignaturePropertiesPanel:
         )
 
         try:
-            state = self._coordinator.apply_certificate_configuration(
-                normalized_name,
-                passphrase=_text(self._certificate_controls.password_input) or None,
-                control_issue=self._control_issue,
+            state = self._apply_certificate_configuration_with_manual_password_retry(
+                normalized_name
             )
         except SignaturePropertiesCoordinatorError as exc:
             self._show_certificate_configuration_error(str(exc))
+            return False
+        if state is None:
             return False
         self._apply_coordinator_state(state)
         self._notify_change()
@@ -876,12 +877,9 @@ class SignaturePropertiesPanel:
         layout.setSpacing(4)
 
         configuration_combo = bindings.q_combo_box()
-        password_input = bindings.q_line_edit()
-        password_input.setPlaceholderText("Certificate password if not saved")
         apply_button = bindings.q_push_button("Apply certificate")
 
         layout.addRow("Saved certificate", configuration_combo)
-        layout.addRow("Password", password_input)
         layout.addRow("", apply_button)
 
         apply_button.clicked.connect(  # type: ignore[attr-defined]
@@ -891,7 +889,6 @@ class SignaturePropertiesPanel:
         return CertificateConfigurationControls(
             container=container,
             configuration_combo=configuration_combo,
-            password_input=password_input,
             apply_button=apply_button,
         )
 
@@ -1002,10 +999,8 @@ class SignaturePropertiesPanel:
                     control_issue=self._control_issue,
                 )
             else:
-                state = self._coordinator.apply_signature_preset(
-                    selected_name,
-                    passphrase=_text(self._certificate_controls.password_input) or None,
-                    control_issue=self._control_issue,
+                state = self._apply_signature_preset_with_manual_password_retry(
+                    selected_name
                 )
         except SignaturePropertiesCoordinatorError as exc:
             self._show_signature_preset_error(str(exc))
@@ -1013,6 +1008,8 @@ class SignaturePropertiesPanel:
                 self._coordinator.load(control_issue=self._control_issue)
             )
             self._notify_change()
+            return
+        if state is None:
             return
         self._apply_coordinator_state(state)
         self._notify_change()
@@ -1090,6 +1087,115 @@ class SignaturePropertiesPanel:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.widget, "Certificate configuration error", message)
+
+    def _apply_certificate_configuration_with_manual_password_retry(
+        self,
+        selected_name: str,
+    ) -> SignaturePropertiesViewState | None:
+        prompt_label = (
+            f"Enter the certificate password for '{selected_name}'."
+            if selected_name
+            else "Enter the certificate password."
+        )
+        return self._run_with_manual_certificate_password_retry(
+            cache_key=selected_name or None,
+            prompt_label=prompt_label,
+            action=lambda passphrase: self._coordinator.apply_certificate_configuration(
+                selected_name,
+                passphrase=passphrase,
+                control_issue=self._control_issue,
+            ),
+        )
+
+    def _apply_signature_preset_with_manual_password_retry(
+        self,
+        selected_name: str,
+    ) -> SignaturePropertiesViewState | None:
+        configuration_name = self._certificate_configuration_name_for_preset(selected_name)
+        prompt_label = (
+            f"Enter the certificate password for '{configuration_name}'."
+            if configuration_name
+            else "Enter the certificate password required by this signature preset."
+        )
+        return self._run_with_manual_certificate_password_retry(
+            cache_key=configuration_name,
+            prompt_label=prompt_label,
+            action=lambda passphrase: self._coordinator.apply_signature_preset(
+                selected_name,
+                passphrase=passphrase,
+                control_issue=self._control_issue,
+            ),
+        )
+
+    def _run_with_manual_certificate_password_retry(
+        self,
+        *,
+        cache_key: str | None,
+        prompt_label: str,
+        action: Callable[[str | None], SignaturePropertiesViewState],
+    ) -> SignaturePropertiesViewState | None:
+        cached_passphrase = (
+            self._session_certificate_passphrases.get(cache_key)
+            if cache_key is not None
+            else None
+        )
+        try:
+            return action(cached_passphrase)
+        except SignaturePropertiesCoordinatorError as exc:
+            if not self._should_prompt_for_certificate_password(str(exc)):
+                raise
+        prompted_passphrase = self._prompt_certificate_passphrase(prompt_label)
+        if prompted_passphrase is None:
+            return None
+        state = action(prompted_passphrase)
+        if cache_key is not None and prompted_passphrase:
+            self._session_certificate_passphrases[cache_key] = prompted_passphrase
+        return state
+
+    def _prompt_certificate_passphrase(self, prompt_label: str) -> str | None:
+        input_dialog = getattr(self._bindings, "q_input_dialog", None)
+        get_text = getattr(input_dialog, "getText", None)
+        if not callable(get_text):
+            return None
+        password_mode = getattr(self._bindings.q_line_edit, "Password", None)
+        if password_mode is None:
+            echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
+            password_mode = getattr(echo_mode, "Password", None)
+        if password_mode is None:
+            text, accepted = get_text(
+                self.widget,
+                "Certificate password",
+                prompt_label,
+            )
+        else:
+            text, accepted = get_text(
+                self.widget,
+                "Certificate password",
+                prompt_label,
+                password_mode,
+            )
+        if not accepted:
+            return None
+        return str(text)
+
+    def _should_prompt_for_certificate_password(self, message: str) -> bool:
+        lowered = message.lower()
+        return "enter the password" in lowered or "enter the certificate password" in lowered
+
+    def _certificate_configuration_name_for_preset(self, preset_name: str) -> str | None:
+        try:
+            preset = self._coordinator.preset_catalog.preset_named(preset_name)
+        except KeyError:
+            return None
+        configuration_id = preset.preset.certificate_configuration_id
+        if configuration_id is None:
+            return None
+        try:
+            return self._coordinator.certificate_catalog.configuration_by_id(
+                configuration_id
+            ).display_name
+        except KeyError:
+            return None
 
 
 class SigningWorkspaceWidget:
@@ -1852,6 +1958,7 @@ class SigningShellAdapter:
             q_check_box=getattr(qt_widgets, "QCheckBox"),
             q_combo_box=getattr(qt_widgets, "QComboBox"),
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
+            q_input_dialog=getattr(qt_widgets, "QInputDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),
             q_pixmap=getattr(qt_gui, "QPixmap"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),

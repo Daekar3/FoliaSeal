@@ -245,6 +245,8 @@ class _FakeLabel(_FakeWidget):
 
 
 class _FakeLineEdit(_FakeWidget):
+    Password = 2
+
     def __init__(self, text="") -> None:
         super().__init__()
         self._text = text
@@ -342,6 +344,17 @@ class _FakeMessageBox:
     def warning(self, parent, title, text):  # noqa: N802
         self.calls.append((parent, title, text))
         return self.Yes
+
+
+class _FakeInputDialog:
+    def __init__(self) -> None:
+        self.calls = []
+        self.next_text = ""
+        self.next_accepted = True
+
+    def getText(self, parent, title, label, mode=None):  # noqa: N802
+        self.calls.append((parent, title, label, mode))
+        return (self.next_text, self.next_accepted)
 
 
 class _FakeFileDialog:
@@ -569,6 +582,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_check_box=_FakeCheckBox,
         q_combo_box=_FakeComboBox,
         q_file_dialog=_FakeFileDialog(),
+        q_input_dialog=_FakeInputDialog(),
         q_message_box=_FakeMessageBox(),
         q_double_spin_box=_FakeDoubleSpinBox,
         q_spin_box=_FakeSpinBox,
@@ -796,10 +810,11 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
         "build_qt_pdf_viewer_widget",
         lambda **kwargs: _FakeViewerWidget(**kwargs),
     )
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
 
     requests = []
@@ -824,6 +839,7 @@ def test_signing_shell_applies_selected_certificate_configuration(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -832,7 +848,7 @@ def test_signing_shell_applies_selected_certificate_configuration(
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
     store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
     catalog = build_certificate_catalog()
@@ -849,19 +865,22 @@ def test_signing_shell_applies_selected_certificate_configuration(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-    panel._certificate_controls.password_input.setText("typed-secret")
+    fake_bindings.q_input_dialog.next_text = "typed-secret"
 
     assert panel.apply_selected_certificate_configuration() is True
 
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "typed-secret"
+    assert not hasattr(panel._certificate_controls, "password_input")
+    assert fake_bindings.q_input_dialog.calls
 
 
 def test_signing_shell_certificate_selection_uses_explicit_coordinator_entrypoint(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -870,7 +889,7 @@ def test_signing_shell_certificate_selection_uses_explicit_coordinator_entrypoin
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
     store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
     catalog = build_certificate_catalog()
@@ -908,10 +927,13 @@ def test_signing_shell_certificate_selection_uses_explicit_coordinator_entrypoin
         _spy_apply_certificate_configuration,
     )
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-    panel._certificate_controls.password_input.setText("typed-secret")
+    fake_bindings.q_input_dialog.next_text = "typed-secret"
 
     assert panel.apply_selected_certificate_configuration() is True
-    assert calls == [("Corporate Records Signing", "typed-secret")]
+    assert calls == [
+        ("Corporate Records Signing", None),
+        ("Corporate Records Signing", "typed-secret"),
+    ]
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "typed-secret"
@@ -921,6 +943,7 @@ def test_signing_shell_certificate_selection_empty_password_uses_saved_secret(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -929,7 +952,7 @@ def test_signing_shell_certificate_selection_empty_password_uses_saved_secret(
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
     configuration = build_certificate_configuration(
         save_password=True,
@@ -951,12 +974,102 @@ def test_signing_shell_certificate_selection_empty_password_uses_saved_secret(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-    panel._certificate_controls.password_input.setText("")
 
     assert panel.apply_selected_certificate_configuration() is True
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "stored-secret"
+    assert fake_bindings.q_input_dialog.calls == []
+
+
+def test_signing_shell_certificate_selection_prompt_can_be_canceled(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_input_dialog.next_text = ""
+    bindings.q_input_dialog.next_accepted = False
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    errors: list[str] = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=store,
+        on_error=errors.append,
+    )
+
+    panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
+
+    assert panel.apply_selected_certificate_configuration() is False
+    assert workflow.selected_certificate_configuration_id is None
+    assert workflow.certificate_path == str(tmp_path / "cert.p12")
+    assert workflow.passphrase == "secret"
+    assert errors == []
+    assert len(bindings.q_input_dialog.calls) == 1
+    assert bindings.q_message_box.calls == []
+    assert not hasattr(panel._certificate_controls, "password_input")
+
+
+def test_signing_shell_certificate_selection_reuses_session_passphrase_cache(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_input_dialog.next_text = "typed-secret"
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed_cert = catalog.managed_certificates[0]
+    cert_file = store.managed_certificate_dir / managed_cert.storage_filename
+    cert_file.write_bytes(b"pkcs12-bytes")
+    workflow = _workflow(tmp_path)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=store,
+    )
+
+    panel = widget.properties_panel
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
+
+    assert panel.apply_selected_certificate_configuration() is True
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+    assert len(bindings.q_input_dialog.calls) == 1
+
+    assert panel.apply_selected_certificate_configuration() is True
+    assert workflow.selected_certificate_configuration_id == "cert-config-default"
+    assert workflow.certificate_path == str(cert_file)
+    assert workflow.passphrase == "typed-secret"
+    assert len(bindings.q_input_dialog.calls) == 1
 
 
 def test_signing_shell_reports_certificate_configuration_resolution_errors(
@@ -1040,15 +1153,15 @@ def test_signing_shell_blank_certificate_selection_reports_error(
     panel._certificate_controls.configuration_combo.setCurrentText(
         signing_shell_module.CERTIFICATE_CONFIGURATION_PLACEHOLDER
     )
-    panel._certificate_controls.password_input.setText("typed-secret")
 
     assert panel.apply_selected_certificate_configuration() is False
-    assert calls == [("", "typed-secret")]
+    assert calls == [("", None)]
     assert errors == ["Select a certificate configuration before applying it."]
     assert bindings.q_message_box.calls[-1][1:] == (
         "Certificate configuration error",
         "Select a certificate configuration before applying it.",
     )
+    assert bindings.q_input_dialog.calls == []
 
 
 def test_signing_shell_refreshes_certificate_configurations_from_store(
@@ -2129,6 +2242,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.properties_panel.container.layout.items[1][0]
         is widget.properties_panel._certificate_controls.container
     )
+    assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 2
     assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
@@ -2174,6 +2288,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert not hasattr(widget.properties_panel._appearance_controls, "text_color")
     assert not hasattr(widget.properties_panel._appearance_controls, "background_color")
     assert not hasattr(widget.properties_panel._appearance_controls, "border_show")
+    assert not hasattr(widget.properties_panel._certificate_controls, "password_input")
 
 
 def test_signing_shell_visible_text_field_checkboxes_control_preview_visibility(
@@ -3077,6 +3192,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -3085,7 +3201,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
 
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
@@ -3107,7 +3223,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-    panel._certificate_controls.password_input.setText("typed-secret")
+    fake_bindings.q_input_dialog.next_text = "typed-secret"
     assert panel.apply_selected_certificate_configuration() is True
     panel._signature_preset_controls.preset_name.setText("My Preset")
     panel._appearance_controls.signer_label_prefix.setText("Signed by Me")
@@ -3244,6 +3360,7 @@ def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entr
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -3252,7 +3369,7 @@ def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entr
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
 
     preset = build_signature_preset(name="Compact")
@@ -3279,12 +3396,11 @@ def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entr
         )
 
     monkeypatch.setattr(panel._coordinator, "apply_signature_preset", _spy_apply_signature_preset)
-    panel._certificate_controls.password_input.setText("typed-secret")
 
     panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
 
     assert calls
-    assert set(calls) == {("Compact", "typed-secret")}
+    assert set(calls) == {("Compact", None)}
     assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
     assert not hasattr(panel._signature_preset_controls, "profile_combo")
     assert not hasattr(panel._signature_preset_controls, "profile_name")
@@ -3299,10 +3415,11 @@ def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
         "build_qt_pdf_viewer_widget",
         lambda **kwargs: _FakeViewerWidget(**kwargs),
     )
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
 
     widget = build_qt_signing_shell(
@@ -3469,6 +3586,7 @@ def test_signing_shell_signature_preset_selection_applies_certificate_material(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    fake_bindings = _fake_bindings()
     monkeypatch.setattr(
         signing_shell_module,
         "build_qt_pdf_viewer_widget",
@@ -3477,7 +3595,7 @@ def test_signing_shell_signature_preset_selection_applies_certificate_material(
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
-        lambda self: _fake_bindings(),
+        lambda self: fake_bindings,
     )
 
     default_certificate = build_managed_certificate(
@@ -3526,14 +3644,14 @@ def test_signing_shell_signature_preset_selection_applies_certificate_material(
     )
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Default Signing")
-    panel._certificate_controls.password_input.setText("default-secret")
+    fake_bindings.q_input_dialog.next_text = "default-secret"
 
     assert panel.apply_selected_certificate_configuration() is True
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(default_path)
     assert workflow.passphrase == "default-secret"
 
-    panel._certificate_controls.password_input.setText("alternate-secret")
+    fake_bindings.q_input_dialog.next_text = "alternate-secret"
     panel._signature_preset_controls.preset_combo.setCurrentText("Alternate Preset")
 
     assert workflow.selected_certificate_configuration_id == "cert-config-alt"
