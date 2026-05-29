@@ -260,6 +260,45 @@ def test_signing_setup_session_applies_visible_setup_and_clears_selected_preset(
     assert coordinator.workflow.signature_appearance == updated_appearance
 
 
+def test_signing_setup_session_save_preset_persists_and_selects_it(
+    tmp_path: Path,
+) -> None:
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    session = SigningSetupSession(
+        coordinator=coordinator,
+        passphrase_prompter=_FakePrompter([]),
+    )
+
+    state = session.save_preset("Team Standard")
+
+    assert state.selected_signature_preset_name == "Team Standard"
+    assert coordinator.preset_catalog.preset_named("Team Standard").name == "Team Standard"
+
+
+def test_signing_setup_session_delete_preset_removes_it_and_clears_selection(
+    tmp_path: Path,
+) -> None:
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    session = SigningSetupSession(
+        coordinator=coordinator,
+        passphrase_prompter=_FakePrompter([]),
+    )
+    session.select_signature_preset("Compact")
+
+    state = session.delete_preset("Compact")
+
+    assert state.selected_signature_preset_name is None
+    assert state.signature_preset_names == ("Default",)
+
+
 def test_signing_setup_session_surfaces_non_promptable_errors(
     tmp_path: Path,
 ) -> None:

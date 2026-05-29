@@ -45,6 +45,7 @@ from tests.support.phase3_builders import (
     build_signature_preset,
     build_signature_preset_catalog,
 )
+from tests.unit.test_signature_properties_coordinator import _ready_workflow
 
 
 class _FakeSecretProvider:
@@ -3404,6 +3405,83 @@ def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entr
     assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
     assert not hasattr(panel._signature_preset_controls, "profile_combo")
     assert not hasattr(panel._signature_preset_controls, "profile_name")
+
+
+def test_signing_shell_signature_preset_save_uses_setup_session_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_ready_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    panel = widget.properties_panel
+    calls: list[tuple[str, bool]] = []
+    original = panel._setup_session.save_preset
+
+    def _spy_save_preset(name: str, *, overwrite: bool = False, control_issue=None):
+        calls.append((name, overwrite))
+        return original(name, overwrite=overwrite, control_issue=control_issue)
+
+    monkeypatch.setattr(panel._setup_session, "save_preset", _spy_save_preset)
+    panel._signature_preset_controls.preset_name.setText("Team Standard")
+
+    result = panel.save_current_signature_preset()
+
+    assert result is not None
+    assert result.name == "Team Standard"
+    assert calls == [("Team Standard", False)]
+
+
+def test_signing_shell_signature_preset_delete_uses_setup_session_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    panel = widget.properties_panel
+    calls: list[str] = []
+    original = panel._setup_session.delete_preset
+
+    def _spy_delete_preset(name: str, *, control_issue=None):
+        calls.append(name)
+        return original(name, control_issue=control_issue)
+
+    monkeypatch.setattr(panel._setup_session, "delete_preset", _spy_delete_preset)
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+    fake_bindings.q_message_box.next_result = fake_bindings.q_message_box.Yes
+
+    result = panel.delete_current_signature_preset()
+
+    assert result is not None
+    assert calls == ["Compact"]
 
 
 def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(

@@ -8,7 +8,9 @@ from typing import Protocol
 from foliaseal.application.signature_properties_coordinator import (
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
+    DeletePreset,
     RefreshCatalogs,
+    SaveCurrentPreset,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
     VisibleSignatureSetupDraft,
@@ -109,6 +111,29 @@ class SigningSetupSession:
     ) -> SignaturePropertiesViewState:
         return self.coordinator.reconcile(
             RefreshCatalogs(),
+            control_issue=control_issue,
+        )
+
+    def save_preset(
+        self,
+        name: str,
+        *,
+        overwrite: bool = False,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        return self.coordinator.reconcile(
+            SaveCurrentPreset(name=name, overwrite=overwrite),
+            control_issue=control_issue,
+        )
+
+    def delete_preset(
+        self,
+        name: str,
+        *,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        return self.coordinator.reconcile(
+            DeletePreset(name=name),
             control_issue=control_issue,
         )
 

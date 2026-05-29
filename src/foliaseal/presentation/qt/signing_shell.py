@@ -42,8 +42,6 @@ from foliaseal.application.document_text_selection import (
 from foliaseal.application.signature_properties_coordinator import (
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
-    DeletePreset,
-    SaveCurrentPreset,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
 )
@@ -810,15 +808,11 @@ class SignaturePropertiesPanel:
 
     def save_current_signature_preset(self) -> ResolvedSignaturePreset | None:
         name = _text(self._signature_preset_controls.preset_name).strip()
-        if not name:
-            self._show_signature_preset_error("Preset name is required before saving.")
-            return None
-        try:
-            existing = self._coordinator.preset_catalog.preset_named(name)
-        except KeyError:
-            existing = None
+        existing = name and name in self._setup_session.load(
+            control_issue=self._control_issue
+        ).signature_preset_names
 
-        if existing is not None:
+        if existing:
             message_box = self._bindings.q_message_box
             yes_value = getattr(message_box, "Yes", None)
             if yes_value is None:
@@ -833,8 +827,9 @@ class SignaturePropertiesPanel:
                 return None
 
         try:
-            state = self._coordinator.reconcile(
-                SaveCurrentPreset(name=name, overwrite=existing is not None),
+            state = self._setup_session.save_preset(
+                name,
+                overwrite=bool(existing),
                 control_issue=self._control_issue,
             )
         except SignaturePropertiesCoordinatorError as exc:
@@ -867,8 +862,8 @@ class SignaturePropertiesPanel:
             return None
 
         try:
-            state = self._coordinator.reconcile(
-                DeletePreset(name=normalized_name),
+            state = self._setup_session.delete_preset(
+                normalized_name,
                 control_issue=self._control_issue,
             )
         except SignaturePropertiesCoordinatorError as exc:
