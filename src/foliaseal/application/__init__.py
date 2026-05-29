@@ -76,6 +76,10 @@ from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
     render_signing_preview,
 )
+from foliaseal.application.signing_setup_session import (
+    CertificatePassphrasePrompter,
+    SigningSetupSession,
+)
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
     ViewerPlacementContextResult,
@@ -185,6 +189,7 @@ __all__ = [
     "SigningDraftValidationIssue",
     "SigningDraftValidationSeverity",
     "SigningDraftWorkflow",
+    "CertificatePassphrasePrompter",
     "ApplyCertificateConfiguration",
     "ApplyVisibleSignatureSetup",
     "ApplySignaturePreset",
@@ -196,6 +201,7 @@ __all__ = [
     "SignaturePropertiesCoordinator",
     "SignaturePropertiesCoordinatorError",
     "SignaturePropertiesViewState",
+    "SigningSetupSession",
     "VisibleSignaturePlacementDraft",
     "VisibleSignatureSetupDraft",
     "SigningClock",

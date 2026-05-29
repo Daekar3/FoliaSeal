@@ -14,6 +14,7 @@ from foliaseal.application import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
+    SigningSetupSession,
     suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PdfRect
@@ -42,7 +43,6 @@ from foliaseal.application.signature_properties_coordinator import (
     ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
-    RefreshCatalogs,
     SaveCurrentPreset,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
@@ -175,6 +175,41 @@ class PreviewControls:
     multi_detail_label: Any
     multi_render_label: Any
     footer_label: Any
+
+
+class _QtCertificatePassphrasePrompter:
+    """Qt adapter for manual certificate-passphrase entry."""
+
+    def __init__(self, *, bindings: QtSigningWidgetBindings, parent: Any) -> None:
+        self._bindings = bindings
+        self._parent = parent
+
+    def prompt(self, label: str) -> str | None:
+        input_dialog = getattr(self._bindings, "q_input_dialog", None)
+        get_text = getattr(input_dialog, "getText", None)
+        if not callable(get_text):
+            return None
+        password_mode = getattr(self._bindings.q_line_edit, "Password", None)
+        if password_mode is None:
+            echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
+            password_mode = getattr(echo_mode, "Password", None)
+        if password_mode is None:
+            text, accepted = get_text(
+                self._parent,
+                "Certificate password",
+                label,
+            )
+        else:
+            text, accepted = get_text(
+                self._parent,
+                "Certificate password",
+                label,
+                password_mode,
+            )
+        if not accepted:
+            return None
+        return str(text)
+
 
 def _compose_row(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
     container = bindings.q_widget()
@@ -540,6 +575,13 @@ class SignaturePropertiesPanel:
             bindings.q_widget,
             on_close=self.dispose,
         )
+        self._setup_session = SigningSetupSession(
+            coordinator=self._coordinator,
+            passphrase_prompter=_QtCertificatePassphrasePrompter(
+                bindings=bindings,
+                parent=self.widget,
+            ),
+        )
         destroyed_signal = getattr(self.widget, "destroyed", None)
         destroy_connect = getattr(destroyed_signal, "connect", None)
         if callable(destroy_connect):
@@ -561,7 +603,6 @@ class SignaturePropertiesPanel:
         self._preview_controls = self._build_preview_controls()
         self.preview_controls = self._preview_controls
         self._validation_text = ""
-        self._session_certificate_passphrases: dict[str, str] = {}
 
         self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._certificate_controls.container)
@@ -583,7 +624,7 @@ class SignaturePropertiesPanel:
         return self._workflow.preview()
 
     def is_ready_to_sign(self) -> bool:
-        return self._coordinator.load(control_issue=self._control_issue).ready_to_sign
+        return self._setup_session.load(control_issue=self._control_issue).ready_to_sign
 
     def validation_text(self) -> str:
         return self._validation_text
@@ -597,17 +638,17 @@ class SignaturePropertiesPanel:
         return _preview_stamp_text(preview).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
-        state = self._coordinator.load(control_issue=self._control_issue)
+        state = self._setup_session.load(control_issue=self._control_issue)
         return self._apply_coordinator_state(state)
 
     def load_from_workflow(self) -> None:
-        state = self._coordinator.load(control_issue=self._control_issue)
+        state = self._setup_session.load(control_issue=self._control_issue)
         self._apply_coordinator_state(state)
 
     def apply_changes(self) -> SigningDraftPreview:
         self._control_issue = None
         try:
-            state = self._coordinator.apply_visible_setup(
+            state = self._setup_session.apply_visible_setup(
                 self._setup_form.build_draft(),
                 control_issue=self._control_issue,
             )
@@ -844,8 +885,9 @@ class SignaturePropertiesPanel:
         )
 
         try:
-            state = self._apply_certificate_configuration_with_manual_password_retry(
-                normalized_name
+            state = self._setup_session.select_certificate_configuration(
+                normalized_name,
+                control_issue=self._control_issue,
             )
         except SignaturePropertiesCoordinatorError as exc:
             self._show_certificate_configuration_error(str(exc))
@@ -858,8 +900,7 @@ class SignaturePropertiesPanel:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh the selector."""
-        state = self._coordinator.reconcile(
-            RefreshCatalogs(),
+        state = self._setup_session.refresh_catalogs(
             control_issue=self._control_issue,
         )
         self._apply_coordinator_state(state)
@@ -993,19 +1034,18 @@ class SignaturePropertiesPanel:
             selected_name = ""
         try:
             if not selected_name.strip():
-                command = ClearSelectedSignaturePreset()
-                state = self._coordinator.reconcile(
-                    command,
+                state = self._setup_session.clear_selected_signature_preset(
                     control_issue=self._control_issue,
                 )
             else:
-                state = self._apply_signature_preset_with_manual_password_retry(
-                    selected_name
+                state = self._setup_session.select_signature_preset(
+                    selected_name,
+                    control_issue=self._control_issue,
                 )
         except SignaturePropertiesCoordinatorError as exc:
             self._show_signature_preset_error(str(exc))
             self._apply_coordinator_state(
-                self._coordinator.load(control_issue=self._control_issue)
+                self._setup_session.load(control_issue=self._control_issue)
             )
             self._notify_change()
             return
@@ -1087,115 +1127,6 @@ class SignaturePropertiesPanel:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.widget, "Certificate configuration error", message)
-
-    def _apply_certificate_configuration_with_manual_password_retry(
-        self,
-        selected_name: str,
-    ) -> SignaturePropertiesViewState | None:
-        prompt_label = (
-            f"Enter the certificate password for '{selected_name}'."
-            if selected_name
-            else "Enter the certificate password."
-        )
-        return self._run_with_manual_certificate_password_retry(
-            cache_key=selected_name or None,
-            prompt_label=prompt_label,
-            action=lambda passphrase: self._coordinator.apply_certificate_configuration(
-                selected_name,
-                passphrase=passphrase,
-                control_issue=self._control_issue,
-            ),
-        )
-
-    def _apply_signature_preset_with_manual_password_retry(
-        self,
-        selected_name: str,
-    ) -> SignaturePropertiesViewState | None:
-        configuration_name = self._certificate_configuration_name_for_preset(selected_name)
-        prompt_label = (
-            f"Enter the certificate password for '{configuration_name}'."
-            if configuration_name
-            else "Enter the certificate password required by this signature preset."
-        )
-        return self._run_with_manual_certificate_password_retry(
-            cache_key=configuration_name,
-            prompt_label=prompt_label,
-            action=lambda passphrase: self._coordinator.apply_signature_preset(
-                selected_name,
-                passphrase=passphrase,
-                control_issue=self._control_issue,
-            ),
-        )
-
-    def _run_with_manual_certificate_password_retry(
-        self,
-        *,
-        cache_key: str | None,
-        prompt_label: str,
-        action: Callable[[str | None], SignaturePropertiesViewState],
-    ) -> SignaturePropertiesViewState | None:
-        cached_passphrase = (
-            self._session_certificate_passphrases.get(cache_key)
-            if cache_key is not None
-            else None
-        )
-        try:
-            return action(cached_passphrase)
-        except SignaturePropertiesCoordinatorError as exc:
-            if not self._should_prompt_for_certificate_password(str(exc)):
-                raise
-        prompted_passphrase = self._prompt_certificate_passphrase(prompt_label)
-        if prompted_passphrase is None:
-            return None
-        state = action(prompted_passphrase)
-        if cache_key is not None and prompted_passphrase:
-            self._session_certificate_passphrases[cache_key] = prompted_passphrase
-        return state
-
-    def _prompt_certificate_passphrase(self, prompt_label: str) -> str | None:
-        input_dialog = getattr(self._bindings, "q_input_dialog", None)
-        get_text = getattr(input_dialog, "getText", None)
-        if not callable(get_text):
-            return None
-        password_mode = getattr(self._bindings.q_line_edit, "Password", None)
-        if password_mode is None:
-            echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
-            password_mode = getattr(echo_mode, "Password", None)
-        if password_mode is None:
-            text, accepted = get_text(
-                self.widget,
-                "Certificate password",
-                prompt_label,
-            )
-        else:
-            text, accepted = get_text(
-                self.widget,
-                "Certificate password",
-                prompt_label,
-                password_mode,
-            )
-        if not accepted:
-            return None
-        return str(text)
-
-    def _should_prompt_for_certificate_password(self, message: str) -> bool:
-        lowered = message.lower()
-        return "enter the password" in lowered or "enter the certificate password" in lowered
-
-    def _certificate_configuration_name_for_preset(self, preset_name: str) -> str | None:
-        try:
-            preset = self._coordinator.preset_catalog.preset_named(preset_name)
-        except KeyError:
-            return None
-        configuration_id = preset.preset.certificate_configuration_id
-        if configuration_id is None:
-            return None
-        try:
-            return self._coordinator.certificate_catalog.configuration_by_id(
-                configuration_id
-            ).display_name
-        except KeyError:
-            return None
 
 
 class SigningWorkspaceWidget:

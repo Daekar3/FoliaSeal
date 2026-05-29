@@ -143,7 +143,7 @@ The canonical repository document split is:
 - Key collaborators: `SigningDraftWorkflow`, `CertificateCatalogStore`, `SignaturePresetCatalogStore`, `CertificateSecretProvider`, `signing_shell.py`.
 - Main entry points: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.apply_visible_setup()`, `DefaultSignaturePropertiesCoordinator.apply_signature_preset()`, `DefaultSignaturePropertiesCoordinator.apply_certificate_configuration()`, `DefaultSignaturePropertiesCoordinator.reconcile()`.
 - Important types/classes/functions: `SignaturePropertiesViewState`, `VisibleSignatureSetupDraft`, `VisibleSignaturePlacementDraft`, `ApplyVisibleSignatureSetup`, `ApplyCertificateConfiguration`, `ApplySignaturePreset`, `SaveCurrentPreset`, `DeletePreset`, `RefreshCatalogs`, `ClearSelectedSignaturePreset`, `SignaturePropertiesCoordinatorError`.
-- Known constraints: The coordinator exposes display-name based state and a Qt-independent visible-signature setup draft to the panel but resolves and mutates workflow ids internally. `load()` and `reconcile()` can fold an optional control issue into validation/readiness state so the panel does not duplicate formatting rules. Refreshes reconcile stale selections against current catalogs, preset application without a certificate reference preserves the active certificate selection through `SigningDraftWorkflow`, certificate application is available through the public `apply_certificate_configuration()` entrypoint, and visible-signature setup application clears selected preset state when the current draft diverges. The signing shell no longer renders a permanent certificate-password row; certificate application and preset application now prompt on demand with `QInputDialog`, retain a session-local passphrase cache for repeated manual entries, and still bypass prompting when a saved secret can be resolved through `CertificateSecretProvider`.
+- Known constraints: The coordinator exposes display-name based state and a Qt-independent visible-signature setup draft to the panel but resolves and mutates workflow ids internally. `load()` and `reconcile()` can fold an optional control issue into validation/readiness state so the panel does not duplicate formatting rules. Refreshes reconcile stale selections against current catalogs, preset application without a certificate reference preserves the active certificate selection through `SigningDraftWorkflow`, certificate application is available through the public `apply_certificate_configuration()` entrypoint, and visible-signature setup application clears selected preset state when the current draft diverges. The shell no longer renders a permanent certificate-password row; instead, the setup session prompts on demand through a Qt `QInputDialog` adapter, retains a session-local passphrase cache for repeated manual entries, and still bypasses prompting when a saved secret can be resolved through `CertificateSecretProvider`.
 - Status: Confirmed by code and tests.
 
 ### Document review summary
@@ -368,12 +368,22 @@ The canonical repository document split is:
 ### Signature-properties coordinator contract
 
 - Producer: `DefaultSignaturePropertiesCoordinator.load()`, `DefaultSignaturePropertiesCoordinator.apply_visible_setup()`, `DefaultSignaturePropertiesCoordinator.apply_signature_preset()`, `DefaultSignaturePropertiesCoordinator.reconcile()`
-- Consumer: `SignaturePropertiesPanel.apply_changes()`, `SignaturePropertiesPanel`, coordinator tests, future non-Qt orchestration callers.
+- Consumer: `SigningSetupSession`, coordinator tests, future non-Qt orchestration callers.
 - Stability: Active application boundary.
 - Backward compatibility requirements: Preserve display-name based UI state, workflow-backed selection ids, catalog refresh reconciliation, password resolution for saved certificate configurations, preset save/delete behavior, and preview/readiness values returned to the panel.
 - Validation: catalog lookups, `SigningDraftWorkflow` methods, `CertificateSigningMaterialResolver`, and `control_issue` folding into validation text.
 - Error behavior: Invalid selections or resolution failures raise `SignaturePropertiesCoordinatorError`; the panel maps those to user-visible error messages.
 - Source files: `src/foliaseal/application/signature_properties_coordinator.py`, `src/foliaseal/presentation/qt/signing_shell.py`.
+
+### Signing setup session contract
+
+- Producer: `SigningSetupSession`
+- Consumer: `SignaturePropertiesPanel`, direct setup-session tests, future non-Qt setup orchestration callers.
+- Stability: Active application boundary.
+- Backward compatibility requirements: Preserve preset-first setup behavior, partial preset preservation of the active certificate when a preset omits a certificate reference, on-demand manual certificate-password prompting, session-local passphrase cache reuse, cancel-without-mutation behavior, and coordinator-backed `SignaturePropertiesViewState` rendering inputs.
+- Validation: delegates signing-draft rule enforcement to `DefaultSignaturePropertiesCoordinator`; retries only when coordinator errors indicate manual password entry is required.
+- Error behavior: non-promptable coordinator failures still raise `SignaturePropertiesCoordinatorError`; canceled manual-password prompts return `None` so the Qt adapter can stop without mutating the workflow.
+- Source files: `src/foliaseal/application/signing_setup_session.py`, `src/foliaseal/presentation/qt/signing_shell.py`, `tests/unit/test_signing_setup_session.py`.
 
 ### Qt visible-signature setup form contract
 
@@ -519,7 +529,7 @@ The canonical repository document split is:
 2. The shell creates a viewer workflow and signing draft workflow.
 3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
 4. The workspace shows read-only signing-flow and document-review cards derived from current draft/readiness/result state and the currently open PDF; the review card includes a top-level summary, a compact per-signature list, and selector-driven per-signature detail only. Reopening the last successful signed output now lives exclusively in the primary sign panel.
-5. The signature-properties panel delegates certificate configuration, signature preset, visible-signature setup load/apply orchestration, catalog refresh, dirty-selection clearing, and validation/readiness reconciliation to `DefaultSignaturePropertiesCoordinator`; the panel still maps Qt controls to and from the setup draft, but it no longer drives the main visible-signature setup path by mutating `SigningDraftWorkflow` directly, and it re-renders setup selectors from returned coordinator state when visible-signature edits clear the active preset. Nonblank preset selections now call `DefaultSignaturePropertiesCoordinator.apply_signature_preset(...)` directly, certificate configuration applies through `DefaultSignaturePropertiesCoordinator.apply_certificate_configuration(...)`, and blank selections still use the clear-selection command path. When either path needs a manual certificate password, the shell now prompts through `QInputDialog`, retries once, and caches the entered passphrase for the current UI session instead of keeping a permanent password field in the sidebar.
+5. The signature-properties panel now delegates the common setup workflow to `SigningSetupSession`, which composes `DefaultSignaturePropertiesCoordinator` plus a tiny Qt passphrase-prompt adapter. The panel still maps Qt controls to and from the visible-signature draft and still owns preview rendering, but it no longer owns the main setup orchestration for load, visible-signature apply, nonblank preset selection, certificate selection, or catalog refresh. The session now owns manual certificate-password retry, cancel handling, and session-local passphrase caching instead of the panel.
 6. The panel derives `SigningDraftPreview`, asks `QtCanonicalPreviewLifecycle` for canonical render state when a snapshot is available, and hands that state plus the preview draft to `QtSignaturePreviewLayout` to plan and apply card sizing, widget ordering, and visibility.
 7. When the user signs, `SigningWorkspaceWidget.submit_sign_request()` delegates to `SigningActionCoordinator.submit()`, which applies pending property changes, checks readiness, builds the `SigningRequest`, and emits the request through the existing callback path before it touches the executor.
 8. If no executor is injected, the coordinator returns the request and a neutral state snapshot; the shell applies that returned state and stops.
@@ -557,20 +567,21 @@ The canonical repository document split is:
 
 1. `build_qt_signing_shell()` may receive a `CertificateCatalogStore`, `CertificateCatalog`, and `CertificateSecretProvider`.
 2. The coordinator loads certificate configuration display names into a compact selector state.
-3. The user selects a saved certificate configuration and the panel first tries `ApplyCertificateConfiguration` without a manual password.
+3. The user selects a saved certificate configuration and the panel delegates that action to `SigningSetupSession.select_certificate_configuration(...)`.
 4. `CertificateSigningMaterialResolver` verifies the referenced managed certificate record and app-managed PKCS#12 file, then returns runtime `SigningMaterial` either from a saved secret or a provided passphrase.
-5. If the resolver reports that a manual password must be entered, the shell prompts through `QInputDialog`, retries once with the entered passphrase, and keeps that passphrase in a session-local cache keyed by certificate configuration so the same session does not re-prompt unnecessarily.
+5. If the resolver reports that a manual password must be entered, the setup session prompts through its injected `CertificatePassphrasePrompter`, retries once with the entered passphrase, and keeps that passphrase in a session-local cache keyed by certificate configuration so the same UI session does not re-prompt unnecessarily.
 6. `SigningDraftWorkflow.apply_certificate_configuration()` records the selected configuration id, updates runtime certificate path/passphrase/alias, clears certificate-preview cache state, and future preview/request calls use the resolved material.
 7. Resolver failures, such as a missing managed certificate file, canceled prompt, blank password retry, or unavailable saved password, are reported through the Qt shell error path instead of escaping as uncaught exceptions.
 
 ### Signature-properties reconciliation
 
 1. `SignaturePropertiesPanel` creates `DefaultSignaturePropertiesCoordinator` with the current `SigningDraftWorkflow` plus optional catalog/store and secret-provider dependencies.
-2. `load()` seeds the combo-box selections, validation text, and ready-to-sign state from workflow/catalog state.
-3. User actions on the certificate and preset controls become coordinator commands; the panel passes any current control issue so UI validation text can include placement/appearance errors.
-4. The coordinator resolves certificate material, applies or captures presets through `SigningDraftWorkflow`, persists catalogs when stores are present, and returns a fresh immutable `SignaturePropertiesViewState`. When a manual certificate password is needed, the shell retries the same coordinator entrypoint after prompting through `QInputDialog`, and both direct certificate application and preset-driven certificate changes share that retry path.
-5. The panel renders the returned state into controls and labels, then refreshes the existing preview card and canonical preview snapshot machinery.
-6. `ClearSelectedSignaturePreset` is used when appearance or placement edits dirty a saved preset selection without mutating the underlying workflow state.
+2. `SignaturePropertiesPanel` also creates `SigningSetupSession`, injecting the coordinator and a Qt `QInputDialog` adapter for manual certificate-password prompts.
+3. `load()` seeds the combo-box selections, validation text, and ready-to-sign state from workflow/catalog state through the setup session.
+4. User actions on the certificate and preset controls become explicit setup-session verb calls; the panel passes any current control issue so UI validation text can include placement/appearance errors.
+5. The session delegates signing-draft rule enforcement to the coordinator, owns manual password retry/cancel/cache policy, and returns the same immutable `SignaturePropertiesViewState` shape back to the panel.
+6. The panel renders the returned state into controls and labels, then refreshes the existing preview card and canonical preview snapshot machinery.
+7. `ClearSelectedSignaturePreset` is used when appearance or placement edits dirty a saved preset selection without mutating the underlying workflow state.
 
 ### Phase 3 evidence validation
 
@@ -673,6 +684,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-29 | Added the signing-setup session boundary above the coordinator. | Reflected `SigningSetupSession` taking ownership of common setup orchestration plus manual certificate-password retry/cancel/cache policy, leaving `SignaturePropertiesPanel` as a thinner Qt adapter. |
 | 2026-05-29 | Added the explicit app-frame shell port/factory boundary. | Reflected the typed `AppFrameShellBootstrap`, `AppFrameShellPort`, and `QtSigningShellFactory` seam now used by `FoliaSealAppFrame` for workspace bootstrap and live shell refresh hooks. |
 | 2026-05-27 | Removed the misleading review-card verify affordance and kept reopen in the primary sign panel only. | Reflected the read-only document review card and the one-button reopen flow now owned solely by the sign panel. |
 | 2026-05-26 | Added the explicit certificate-application coordinator entrypoint and routed the Qt panel's certificate-application path through it. | Reflected the public `apply_certificate_configuration()` path now used by `SignaturePropertiesPanel.apply_selected_certificate_configuration()`. |
