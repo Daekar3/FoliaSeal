@@ -24,7 +24,7 @@ This is observable in two ways. First, the user-visible GUI behavior stays the s
 - [x] (2026-05-29 02:02Z) Ran focused validation with `pytest`, `ruff check`, and `git diff --check`.
 - [x] (2026-05-29 02:02Z) Ran the required compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and `docs/SCHEMAS.md`; the only gap was that the adapter/top-level constructors had not yet threaded through `shell_factory`, so that was added and revalidated.
 - [x] (2026-05-29 02:02Z) Updated documentation, including this ExecPlan, to final state.
-- [ ] Commit the slice as one narrow architecture change.
+- [x] (2026-05-29 02:02Z) Committed the slice as one narrow architecture change.
 
 ## Surprises & Discoveries
 
@@ -53,7 +53,7 @@ This is observable in two ways. First, the user-visible GUI behavior stays the s
 
 ## Outcomes & Retrospective
 
-This slice is complete apart from the final commit.
+This slice is complete.
 
 Implemented results:
 
