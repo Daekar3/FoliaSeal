@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from foliaseal.application import (
     CertificateLifecycleService,
@@ -108,6 +108,87 @@ class CertificateConfigurationManagementDialogControls:
     export_certificate_button: Any
     delete_certificate_button: Any
     cancel_button: Any
+
+
+@dataclass(frozen=True)
+class AppFrameShellBootstrap:
+    """Typed inputs required to create one signing workspace shell."""
+
+    viewer_workflow: ViewerWorkflow
+    signing_workflow: SigningDraftWorkflow
+    app_settings: AppSettings
+    app_settings_store: AppSettingsStore | None = None
+    certificate_catalog_store: CertificateCatalogStore | None = None
+    certificate_secret_provider: Any | None = None
+    preset_catalog_store: SignaturePresetCatalogStore | None = None
+    sign_executor: SigningRequestExecutor | None = None
+    on_sign_request: Callable[[SigningRequest], None] | None = None
+    on_open_signed_output: Callable[[str | Path], Any | None] | None = None
+    on_error: Callable[[str], None] | None = None
+    on_status_change: Callable[[str], None] | None = None
+
+
+class AppFrameShellPort(Protocol):
+    """Explicit app-frame contract for an active signing workspace."""
+
+    def widget(self) -> Any:
+        """Return the concrete widget to install as the central widget."""
+
+    def choose_output_pdf_path(self) -> str | None:
+        """Drive the shell's Save As behavior."""
+
+    def apply_app_settings(self, settings: AppSettings) -> None:
+        """Apply updated app settings to the live shell."""
+
+    def refresh_certificate_configurations(self) -> None:
+        """Refresh live certificate configuration choices."""
+
+
+class AppFrameShellFactory(Protocol):
+    """Creates an app-frame shell port from typed bootstrap inputs."""
+
+    def create(self, bootstrap: AppFrameShellBootstrap) -> AppFrameShellPort:
+        """Build and return the active shell port."""
+
+
+@dataclass(frozen=True)
+class QtSigningShellPort:
+    """Port adapter over the concrete Qt signing shell widget."""
+
+    shell_widget: Any
+
+    def widget(self) -> Any:
+        return self.shell_widget
+
+    def choose_output_pdf_path(self) -> str | None:
+        return self.shell_widget.choose_output_pdf_path()
+
+    def apply_app_settings(self, settings: AppSettings) -> None:
+        self.shell_widget.apply_app_settings(settings)
+
+    def refresh_certificate_configurations(self) -> None:
+        self.shell_widget.refresh_certificate_configurations()
+
+
+class QtSigningShellFactory:
+    """Production factory that wraps the Qt signing shell behind a port."""
+
+    def create(self, bootstrap: AppFrameShellBootstrap) -> AppFrameShellPort:
+        shell_widget = build_qt_signing_shell(
+            viewer_workflow=bootstrap.viewer_workflow,
+            signing_workflow=bootstrap.signing_workflow,
+            certificate_catalog_store=bootstrap.certificate_catalog_store,
+            certificate_secret_provider=bootstrap.certificate_secret_provider,
+            preset_catalog_store=bootstrap.preset_catalog_store,
+            app_settings=bootstrap.app_settings,
+            app_settings_store=bootstrap.app_settings_store,
+            sign_executor=bootstrap.sign_executor,
+            on_sign_request=bootstrap.on_sign_request,
+            on_open_signed_output=bootstrap.on_open_signed_output,
+            on_error=bootstrap.on_error,
+            on_status_change=bootstrap.on_status_change,
+        )
+        return QtSigningShellPort(shell_widget=shell_widget)
 
 
 class AppSettingsDialog:
@@ -763,7 +844,7 @@ class FoliaSealAppFrame:
         certificate_lifecycle_service: CertificateLifecycleService | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
-        shell_builder: Callable[..., Any] = build_qt_signing_shell,
+        shell_factory: AppFrameShellFactory | None = None,
         render_backend_factory: Callable[[], Any] = QtPdfRenderBackend,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
@@ -786,12 +867,12 @@ class FoliaSealAppFrame:
         )
         self._preset_catalog_store = preset_catalog_store
         self._sign_executor = sign_executor
-        self._shell_builder = shell_builder
+        self._shell_factory = shell_factory or QtSigningShellFactory()
         self._render_backend_factory = render_backend_factory
         self._on_sign_request = on_sign_request
         self._on_error = on_error
         self._on_status_change = on_status_change
-        self._current_shell: Any | None = None
+        self._current_shell_port: AppFrameShellPort | None = None
         self._current_viewer_workflow: ViewerWorkflow | None = None
         self._current_signing_workflow: SigningDraftWorkflow | None = None
         self._settings_dialog: AppSettingsDialog | None = None
@@ -872,25 +953,28 @@ class FoliaSealAppFrame:
                 tsa_url="",
                 timestamp_required=False,
             )
-            shell = self._shell_builder(
-                viewer_workflow=viewer_workflow,
-                signing_workflow=signing_workflow,
-                certificate_catalog_store=self._certificate_catalog_store,
-                certificate_secret_provider=self._certificate_secret_provider,
-                preset_catalog_store=self._preset_catalog_store,
-                app_settings=self._app_settings,
-                app_settings_store=self._app_settings_store,
-                sign_executor=self._sign_executor,
-                on_sign_request=self._on_sign_request,
-                on_open_signed_output=self.open_pdf_path,
-                on_error=self._emit_error,
-                on_status_change=self._on_status_change,
+            shell_port = self._shell_factory.create(
+                AppFrameShellBootstrap(
+                    viewer_workflow=viewer_workflow,
+                    signing_workflow=signing_workflow,
+                    certificate_catalog_store=self._certificate_catalog_store,
+                    certificate_secret_provider=self._certificate_secret_provider,
+                    preset_catalog_store=self._preset_catalog_store,
+                    app_settings=self._app_settings,
+                    app_settings_store=self._app_settings_store,
+                    sign_executor=self._sign_executor,
+                    on_sign_request=self._on_sign_request,
+                    on_open_signed_output=self.open_pdf_path,
+                    on_error=self._emit_error,
+                    on_status_change=self._on_status_change,
+                )
             )
+            shell = shell_port.widget()
         except Exception as exc:
             self._emit_error(f"Unable to open PDF: {exc}")
             return None
 
-        self._current_shell = shell
+        self._current_shell_port = shell_port
         self._current_viewer_workflow = viewer_workflow
         self._current_signing_workflow = signing_workflow
         self.window.current_shell = shell  # type: ignore[attr-defined]
@@ -1003,13 +1087,10 @@ class FoliaSealAppFrame:
         return action
 
     def _choose_save_as(self) -> str | None:
-        shell = self._current_shell
-        if shell is None:
+        shell_port = self._current_shell_port
+        if shell_port is None:
             return None
-        choose_output = getattr(shell, "choose_output_pdf_path", None)
-        if not callable(choose_output):
-            return None
-        return choose_output()
+        return shell_port.choose_output_pdf_path()
 
     def _set_save_as_enabled(self, enabled: bool) -> None:
         action = self._save_as_action
@@ -1046,20 +1127,16 @@ class FoliaSealAppFrame:
     def _apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
         self.window.app_settings = settings  # type: ignore[attr-defined]
-        shell = self._current_shell
-        if shell is None:
+        shell_port = self._current_shell_port
+        if shell_port is None:
             return
-        update_settings = getattr(shell, "apply_app_settings", None)
-        if callable(update_settings):
-            update_settings(settings)
+        shell_port.apply_app_settings(settings)
 
     def _refresh_shell_certificate_configurations(self) -> None:
-        shell = self._current_shell
-        if shell is None:
+        shell_port = self._current_shell_port
+        if shell_port is None:
             return
-        refresh = getattr(shell, "refresh_certificate_configurations", None)
-        if callable(refresh):
-            refresh()
+        shell_port.refresh_certificate_configurations()
 
 
 class QtAppFrameAdapter:
@@ -1077,6 +1154,7 @@ class QtAppFrameAdapter:
         certificate_secret_provider: Any | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
+        shell_factory: AppFrameShellFactory | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
@@ -1089,6 +1167,7 @@ class QtAppFrameAdapter:
             certificate_secret_provider=certificate_secret_provider,
             preset_catalog_store=preset_catalog_store,
             sign_executor=sign_executor,
+            shell_factory=shell_factory,
             on_sign_request=on_sign_request,
             on_error=on_error,
             on_status_change=on_status_change,
@@ -1105,6 +1184,7 @@ class QtAppFrameAdapter:
         certificate_secret_provider: Any | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
+        shell_factory: AppFrameShellFactory | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
@@ -1126,6 +1206,7 @@ class QtAppFrameAdapter:
             certificate_secret_provider=certificate_secret_provider,
             preset_catalog_store=preset_catalog_store,
             sign_executor=sign_executor,
+            shell_factory=shell_factory,
             on_sign_request=on_sign_request,
             on_error=on_error,
             on_status_change=on_status_change,
@@ -1176,6 +1257,7 @@ def build_qt_app_frame(
     certificate_secret_provider: Any | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
+    shell_factory: AppFrameShellFactory | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
@@ -1190,6 +1272,7 @@ def build_qt_app_frame(
         certificate_secret_provider=certificate_secret_provider,
         preset_catalog_store=preset_catalog_store,
         sign_executor=sign_executor,
+        shell_factory=shell_factory,
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,
@@ -1206,6 +1289,7 @@ def launch_qt_app_frame(
     certificate_secret_provider: Any | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     sign_executor: SigningRequestExecutor | None = None,
+    shell_factory: AppFrameShellFactory | None = None,
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
@@ -1222,6 +1306,7 @@ def launch_qt_app_frame(
         certificate_secret_provider=certificate_secret_provider,
         preset_catalog_store=preset_catalog_store,
         sign_executor=sign_executor,
+        shell_factory=shell_factory,
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,

@@ -4,7 +4,11 @@ from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt import app_frame as app_frame_module
-from foliaseal.presentation.qt.app_frame import FoliaSealAppFrame, QtAppFrameBindings
+from foliaseal.presentation.qt.app_frame import (
+    AppFrameShellBootstrap,
+    FoliaSealAppFrame,
+    QtAppFrameBindings,
+)
 from tests.support.phase3_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
@@ -279,6 +283,33 @@ class _FakeShell:
         return "/tmp/signed-output.pdf"
 
 
+class _FakeShellPort:
+    def __init__(self, shell_widget) -> None:
+        self.shell_widget = shell_widget
+
+    def widget(self):
+        return self.shell_widget
+
+    def choose_output_pdf_path(self):
+        return self.shell_widget.choose_output_pdf_path()
+
+    def apply_app_settings(self, settings) -> None:
+        self.shell_widget.apply_app_settings(settings)
+
+    def refresh_certificate_configurations(self) -> None:
+        self.shell_widget.refresh_certificate_configurations()
+
+
+class _FakeShellFactory:
+    def __init__(self, shell_widget, *, bootstrap_calls=None) -> None:
+        self.shell_widget = shell_widget
+        self.bootstrap_calls = bootstrap_calls if bootstrap_calls is not None else []
+
+    def create(self, bootstrap: AppFrameShellBootstrap):
+        self.bootstrap_calls.append(bootstrap)
+        return _FakeShellPort(self.shell_widget)
+
+
 class _FakeSecretStore:
     def __init__(
         self,
@@ -354,11 +385,7 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
     selected_pdf = tmp_path / "source" / "contract.pdf"
     bindings.q_file_dialog.next_open_file_name = str(selected_pdf)
     shell = _FakeShell()
-    shell_calls = []
-
-    def shell_builder(**kwargs):
-        shell_calls.append(kwargs)
-        return shell
+    bootstrap_calls = []
     secret_store = _FakeSecretStore()
 
     frame = FoliaSealAppFrame(
@@ -366,7 +393,7 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_secret_provider=secret_store,
-        shell_builder=shell_builder,
+        shell_factory=_FakeShellFactory(shell, bootstrap_calls=bootstrap_calls),
         render_backend_factory=lambda: object(),
     )
 
@@ -384,38 +411,36 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
     assert _FakeQPdfDocument.load_calls == [str(selected_pdf)]
     assert frame.window.central_widget is shell
     assert frame.window.current_shell is shell
-    assert shell_calls[0]["viewer_workflow"].session.page_count == 3
-    assert shell_calls[0]["viewer_workflow"]._document_path == str(selected_pdf)
-    assert shell_calls[0]["signing_workflow"].input_pdf_path == str(selected_pdf)
-    assert shell_calls[0]["signing_workflow"].output_pdf_path == str(
+    assert bootstrap_calls[0].viewer_workflow.session.page_count == 3
+    assert bootstrap_calls[0].viewer_workflow._document_path == str(selected_pdf)
+    assert bootstrap_calls[0].signing_workflow.input_pdf_path == str(selected_pdf)
+    assert bootstrap_calls[0].signing_workflow.output_pdf_path == str(
         tmp_path / "signed" / "contract-signed.pdf"
     )
-    assert shell_calls[0]["app_settings"] == _settings(tmp_path)
-    assert shell_calls[0]["certificate_secret_provider"] is secret_store
-    assert shell_calls[0]["on_open_signed_output"] == frame.open_pdf_path
+    assert bootstrap_calls[0].app_settings == _settings(tmp_path)
+    assert bootstrap_calls[0].certificate_secret_provider is secret_store
+    assert bootstrap_calls[0].on_open_signed_output == frame.open_pdf_path
 
 
 def test_app_frame_reopens_signed_output_from_shell_callback(tmp_path: Path) -> None:
     bindings = _fake_bindings()
     opened_paths = []
-    shell_calls = []
-
-    def shell_builder(**kwargs):
-        shell_calls.append(kwargs)
-        opened_paths.append(kwargs["viewer_workflow"]._document_path)
-        return _FakeShell()
+    bootstrap_calls = []
+    shell = _FakeShell()
 
     frame = FoliaSealAppFrame(
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-        shell_builder=shell_builder,
+        shell_factory=_FakeShellFactory(shell, bootstrap_calls=bootstrap_calls),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
-    shell_callback = shell_calls[0]["on_open_signed_output"]
+    opened_paths.append(bootstrap_calls[0].viewer_workflow._document_path)
+    shell_callback = bootstrap_calls[0].on_open_signed_output
 
     reopened = shell_callback(tmp_path / "signed" / "contract-signed.pdf")
+    opened_paths.append(bootstrap_calls[1].viewer_workflow._document_path)
 
     assert reopened is frame.window.current_shell
     assert opened_paths == [
@@ -430,7 +455,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -467,7 +492,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
 
@@ -495,7 +520,7 @@ def test_app_frame_certificate_creation_dialog_creates_and_refreshes_loaded_shel
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -535,7 +560,7 @@ def test_app_frame_certificate_creation_dialog_saves_password_outside_catalog(
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
         certificate_secret_provider=secret_store,
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -572,7 +597,7 @@ def test_app_frame_certificate_creation_dialog_reports_secure_storage_unavailabl
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
         certificate_secret_provider=secret_store,
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -602,7 +627,7 @@ def test_app_frame_certificate_import_dialog_imports_and_refreshes_loaded_shell(
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -646,7 +671,7 @@ def test_app_frame_certificate_import_dialog_saves_password_outside_catalog(
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
         certificate_secret_provider=secret_store,
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -682,7 +707,7 @@ def test_app_frame_certificate_management_dialog_saves_and_refreshes_loaded_shel
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -747,7 +772,7 @@ def test_app_frame_certificate_management_dialog_deletes_configuration_only(
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -782,7 +807,7 @@ def test_app_frame_certificate_management_dialog_blocks_referenced_certificate_d
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -831,7 +856,7 @@ def test_app_frame_certificate_management_dialog_deletes_unreferenced_certificat
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -876,7 +901,7 @@ def test_app_frame_certificate_management_dialog_exports_selected_certificate(
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -915,7 +940,7 @@ def test_app_frame_certificate_management_dialog_export_cancel_does_nothing(
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=certificate_store,
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -939,7 +964,7 @@ def test_app_frame_certificate_management_dialog_handles_empty_catalog(
         certificate_catalog_store=CertificateCatalogStore(
             storage_dir=tmp_path / "Certificates"
         ),
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -991,7 +1016,7 @@ def test_app_frame_certificate_import_choose_button_prefills_path_and_name(
         certificate_catalog_store=CertificateCatalogStore(
             storage_dir=tmp_path / "Certificates"
         ),
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
 
@@ -1022,7 +1047,7 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=settings_store,
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
     )
     next_open_dir = tmp_path / "next-source"
@@ -1059,7 +1084,7 @@ def test_app_frame_settings_dialog_refreshes_loaded_shell_settings(
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-        shell_builder=lambda **_kwargs: shell,
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -1084,7 +1109,7 @@ def test_app_frame_reports_open_errors(tmp_path: Path) -> None:
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-        shell_builder=lambda **_kwargs: _FakeShell(),
+        shell_factory=_FakeShellFactory(_FakeShell()),
         render_backend_factory=lambda: object(),
         on_error=errors.append,
     )
