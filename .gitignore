@@ -11,6 +11,7 @@ build/
 src/foliaseal/build/__pycache__/
 src/foliaseal/build/*.pyc
 dist/
+.tmp
 
 # Generated harness and matrix output live under artifacts/. Keep that tree as
 # a local workspace so large evidence outputs do not get committed again.
