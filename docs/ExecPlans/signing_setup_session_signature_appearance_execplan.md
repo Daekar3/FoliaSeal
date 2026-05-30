@@ -25,7 +25,7 @@ The user-visible behavior should stay the same. Programmatic appearance changes 
 - [x] (2026-05-30 02:35Z) Ran focused validation with `pytest`, `ruff check`, and `git diff --check`.
 - [x] (2026-05-30 02:35Z) Ran the required compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and `docs/SCHEMAS.md`, then addressed the remaining architecture-doc gap.
 - [x] (2026-05-30 02:35Z) Updated documentation, including this ExecPlan, to final state.
-- [ ] Commit the slice as one narrow architecture change.
+- [x] (2026-05-30 02:35Z) Committed the slice as one narrow architecture change.
 
 ## Surprises & Discoveries
 
