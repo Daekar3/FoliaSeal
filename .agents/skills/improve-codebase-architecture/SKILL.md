@@ -13,7 +13,7 @@ A **deep module** (John Ousterhout, "A Philosophy of Software Design") has a sma
 
 ### 1. Explore the codebase
 
-Use the Agent tool with subagent_type=Explore to navigate the codebase naturally. Do NOT follow rigid heuristics — explore organically and note where you experience friction:
+Use the Agent tool with subagent_type=explorer-light to navigate the codebase naturally. Do NOT follow rigid heuristics — explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many small files?
 - Where are modules so shallow that the interface is nearly as complex as the implementation?
