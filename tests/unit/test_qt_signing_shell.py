@@ -3528,6 +3528,117 @@ def test_signing_shell_set_signature_appearance_uses_setup_session_entrypoint(
     assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
 
 
+def test_signing_shell_viewer_selection_uses_workspace_interaction_session_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    calls: list[PdfRect] = []
+    original = signing_shell_module.WorkspaceInteractionSession.select_in_viewer
+
+    def _spy_select_in_viewer(self, pdf_rect: PdfRect):
+        calls.append(pdf_rect)
+        return original(self, pdf_rect)
+
+    monkeypatch.setattr(
+        signing_shell_module.WorkspaceInteractionSession,
+        "select_in_viewer",
+        _spy_select_in_viewer,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+
+    assert calls == [PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0)]
+
+
+def test_signing_shell_page_change_uses_workspace_interaction_session_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    calls: list[int] = []
+    original = signing_shell_module.WorkspaceInteractionSession.change_page
+
+    def _spy_change_page(self, page_number: int):
+        calls.append(page_number)
+        return original(self, page_number)
+
+    monkeypatch.setattr(
+        signing_shell_module.WorkspaceInteractionSession,
+        "change_page",
+        _spy_change_page,
+    )
+
+    widget.properties_panel._placement_controls.page_spin.setValue(2)
+
+    assert calls[-1] == 2
+
+
+def test_signing_shell_refresh_viewer_uses_workspace_interaction_session_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    calls: list[str] = []
+    original = signing_shell_module.WorkspaceInteractionSession.refresh_after_viewer_refresh
+
+    def _spy_refresh_after_viewer_refresh(self):
+        calls.append("refresh")
+        return original(self)
+
+    monkeypatch.setattr(
+        signing_shell_module.WorkspaceInteractionSession,
+        "refresh_after_viewer_refresh",
+        _spy_refresh_after_viewer_refresh,
+    )
+
+    widget.refresh_viewer()
+
+    assert calls == ["refresh"]
+
+
 def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
     monkeypatch,
     tmp_path: Path,
@@ -3553,28 +3664,30 @@ def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
     calls: list[str] = []
     cleared: list[str] = []
 
-    def _unexpected_apply_signature_preset(
+    def _unexpected_select_signature_preset(
         selected_name: str,
         *,
-        passphrase: str | None = None,
         control_issue=None,
     ):
         calls.append(selected_name)
         raise AssertionError("Blank preset selection should not apply a preset.")
 
-    original_reconcile = panel._coordinator.reconcile
+    original_clear = panel._setup_session.clear_selected_signature_preset
 
-    def _spy_reconcile(command, *, control_issue=None):
-        if isinstance(command, signing_shell_module.ClearSelectedSignaturePreset):
-            cleared.append("cleared")
-        return original_reconcile(command, control_issue=control_issue)
+    def _spy_clear_selected_signature_preset(*, control_issue=None):
+        cleared.append("cleared")
+        return original_clear(control_issue=control_issue)
 
     monkeypatch.setattr(
-        panel._coordinator,
-        "apply_signature_preset",
-        _unexpected_apply_signature_preset,
+        panel._setup_session,
+        "select_signature_preset",
+        _unexpected_select_signature_preset,
     )
-    monkeypatch.setattr(panel._coordinator, "reconcile", _spy_reconcile)
+    monkeypatch.setattr(
+        panel._setup_session,
+        "clear_selected_signature_preset",
+        _spy_clear_selected_signature_preset,
+    )
 
     panel._signature_preset_controls.preset_combo._current = "Current signature setup"
     panel._on_signature_preset_selected()

@@ -15,6 +15,8 @@ from foliaseal.application import (
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
     SigningSetupSession,
+    WorkspaceInteractionSession,
+    WorkspaceInteractionTransition,
     suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PdfRect
@@ -1179,6 +1181,11 @@ class SigningWorkspaceWidget:
             document_text_selection_session=document_text_selection_session,
             input_pdf_path=viewer_workflow.document_path,
         )
+        self._workspace_interaction_session = WorkspaceInteractionSession(
+            viewer_workflow=viewer_workflow,
+            viewer_interaction_session=self._viewer_interaction_session,
+            document_review_workspace=self._document_review_workspace,
+        )
         if app_settings is not None:
             self._app_settings = app_settings
         elif app_settings_store is not None:
@@ -1376,11 +1383,10 @@ class SigningWorkspaceWidget:
         return self._app_settings
 
     def refresh_viewer(self) -> None:
-        self._viewer_widget.refresh()
-        self._apply_current_placement_context()
-        self._sync_signature_overlay()
-        self.properties_panel.refresh_preview()
-        self._apply_signing_action_state(self._signing_action_coordinator.load())
+        self._apply_workspace_interaction_transition(
+            self._workspace_interaction_session.refresh_after_viewer_refresh(),
+            refresh_error_summary="Unable to refresh viewer",
+        )
 
     def refresh_document_review(self) -> DocumentReviewSummary:
         state = self._document_review_workspace.refresh_review()
@@ -1560,32 +1566,9 @@ class SigningWorkspaceWidget:
         self._apply_signing_action_state(self._signing_action_coordinator.invalidate("clear"))
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
-        snapshot = getattr(self._viewer_workflow, "snapshot", None)
-        page_index = (
-            snapshot.page_index
-            if snapshot is not None
-            else self._viewer_workflow.session.current_page
+        self._apply_workspace_interaction_transition(
+            self._workspace_interaction_session.select_in_viewer(pdf_rect),
         )
-        normalized_rect = pdf_rect.normalized()
-        review_transition = self._document_review_workspace.handle_viewer_selection(
-            page_index=page_index,
-            selection_rect=normalized_rect,
-        )
-        if review_transition.viewer_selection_consumed:
-            self._apply_document_review_workspace_transition(review_transition)
-            return
-        selection_result = self._viewer_interaction_session.select_signature_rect(
-            normalized_rect
-        )
-        if selection_result.error_message is not None:
-            self._emit_error(selection_result.error_message)
-            return
-        self._apply_placement_context_result(selection_result.placement_context)
-        if selection_result.signature_rect is None:
-            return
-        self.properties_panel.set_signature_rect(selection_result.signature_rect)
-        self._sync_signature_overlay()
-        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("selection"))
 
     def _handle_viewer_error(self, message: str) -> None:
         self._emit_error(message)
@@ -1595,9 +1578,9 @@ class SigningWorkspaceWidget:
             self._on_status_change(name)
 
     def _handle_panel_change(self) -> None:
-        self._apply_current_placement_context()
-        self._sync_signature_overlay()
-        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("panel"))
+        self._apply_workspace_interaction_transition(
+            self._workspace_interaction_session.refresh_after_panel_change()
+        )
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh shell controls."""
@@ -1606,16 +1589,9 @@ class SigningWorkspaceWidget:
         return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
-        try:
-            target_index = self._viewer_interaction_session.set_page_number(page_number)
-        except Exception as exc:
-            self._emit_error(f"Unable to change PDF page: {exc}")
-            return
-        self._refresh_viewer_navigation(
-            target_index=target_index,
-            error_summary="Unable to change PDF page",
-            invalidate_reason="page",
-            logical_page_already_set=True,
+        self._apply_workspace_interaction_transition(
+            self._workspace_interaction_session.change_page(page_number),
+            refresh_error_summary="Unable to change PDF page",
         )
 
     def _sync_signature_overlay(self) -> None:
@@ -1721,9 +1697,11 @@ class SigningWorkspaceWidget:
                 )
         if effects.jump_to_page_index is None:
             return
-        self._refresh_viewer_navigation(
-            target_index=effects.jump_to_page_index,
-            error_summary="Unable to show document text match",
+        self._apply_workspace_interaction_transition(
+            self._workspace_interaction_session.refresh_navigation_to_page_index(
+                effects.jump_to_page_index
+            ),
+            refresh_error_summary="Unable to show document text match",
         )
 
     def _apply_placement_context_result(
@@ -1738,26 +1716,42 @@ class SigningWorkspaceWidget:
         result = self._viewer_interaction_session.current_placement_context()
         self._apply_placement_context_result(result.placement_context)
 
-    def _refresh_viewer_navigation(
+    def _apply_workspace_interaction_transition(
         self,
+        transition: WorkspaceInteractionTransition,
         *,
-        target_index: int,
-        error_summary: str,
-        invalidate_reason: str | None = None,
-        logical_page_already_set: bool = False,
+        refresh_error_summary: str | None = None,
     ) -> None:
-        try:
-            if not logical_page_already_set:
-                self._viewer_interaction_session.set_logical_page_index(target_index)
-            self._viewer_widget.refresh(navigation=True)
-        except Exception as exc:
-            self._emit_error(f"{error_summary}: {exc}")
+        if transition.review_transition is not None:
+            self._apply_document_review_workspace_transition(transition.review_transition)
             return
-        self._apply_current_placement_context()
-        self._sync_signature_overlay()
-        if invalidate_reason is not None:
+        if transition.error_message is not None:
+            self._emit_error(transition.error_message)
+            return
+        if transition.refresh_viewer:
+            try:
+                self._viewer_widget.refresh(navigation=transition.navigation_refresh)
+            except Exception as exc:
+                summary = refresh_error_summary or "Unable to refresh viewer"
+                self._emit_error(f"{summary}: {exc}")
+                return
+        if transition.refresh_current_placement_context:
+            self._apply_current_placement_context()
+        elif transition.placement_context is not None:
+            self._apply_placement_context_result(transition.placement_context)
+        if transition.signature_rect is not None:
+            self.properties_panel.set_signature_rect(transition.signature_rect)
+        if transition.sync_signature_overlay:
+            self._sync_signature_overlay()
+        if transition.refresh_preview:
+            self.properties_panel.refresh_preview()
+        if transition.reload_signing_action_state:
+            self._apply_signing_action_state(self._signing_action_coordinator.load())
+        elif transition.signing_action_invalidation_reason is not None:
             self._apply_signing_action_state(
-                self._signing_action_coordinator.invalidate(invalidate_reason)
+                self._signing_action_coordinator.invalidate(
+                    transition.signing_action_invalidation_reason
+                )
             )
 
     def _refresh_flow_summary(self) -> None:

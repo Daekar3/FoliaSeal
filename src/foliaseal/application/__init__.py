@@ -128,12 +128,18 @@ from foliaseal.application.visible_signature_semantics import (
     VisibleSignatureSemanticsService,
     VisibleSignatureText,
 )
+from foliaseal.application.workspace_interaction_session import (
+    WorkspaceInteractionSession,
+    WorkspaceInteractionTransition,
+)
 
 __all__ = [
     "ViewerPerformanceTracker",
     "ViewerInteractionSession",
     "ViewerPlacementContextResult",
     "ViewerSelectionPlacementResult",
+    "WorkspaceInteractionSession",
+    "WorkspaceInteractionTransition",
     "ViewerRenderSnapshot",
     "ViewerSession",
     "ViewerTimingSnapshot",

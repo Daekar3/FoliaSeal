@@ -212,6 +212,17 @@ The canonical repository document split is:
 - Known constraints: The boundary is intentionally Qt-free and leaves widget refresh/application of overlays to the shell. It composes with `document_review_workspace.py`: the review/text workspace gets first chance to consume a viewer drag, and only then does the viewer-interaction session translate that drag into a signing placement.
 - Status: Implemented and confirmed by code and tests.
 
+### Workspace interaction session
+
+- Location: `src/foliaseal/application/workspace_interaction_session.py`
+- Responsibility: Own the shell-level sequencing for viewer selection, page changes, document-text jump navigation, panel-change follow-up, and viewer-refresh follow-up while staying Qt-free.
+- Owns: `WorkspaceInteractionSession`, `WorkspaceInteractionTransition`, the routing between `DocumentReviewWorkspaceSession` and `ViewerInteractionSession`, plus transition intents for viewer refresh, overlay sync, placement-context refresh, preview refresh, and signing-action invalidation/reload.
+- Does not own: widget refresh calls themselves, signature overlay painting, preview rendering, or direct `SignatureRect` mutation in the panel.
+- Key collaborators: `DocumentReviewWorkspaceSession`, `ViewerInteractionSession`, `ViewerWorkflow`, `presentation/qt/signing_shell.py`.
+- Main entry points: `select_in_viewer()`, `change_page()`, `refresh_navigation_to_page_index()`, `refresh_after_panel_change()`, `refresh_after_viewer_refresh()`.
+- Known constraints: The boundary is intentionally Qt-free and returns plain transition data. `SignaturePropertiesPanel.set_signature_rect(...)` still triggers shell follow-up through its existing `on_change` callback, so this slice centralizes the recurring shell sequences around that path rather than replacing direct rectangle mutation itself.
+- Status: Implemented and confirmed by code and tests.
+
 ### Rendering infrastructure
 
 - Location: `src/foliaseal/infra/render/`
@@ -530,12 +541,13 @@ The canonical repository document split is:
 3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
 4. The workspace shows read-only signing-flow and document-review cards derived from current draft/readiness/result state and the currently open PDF; the review card includes a top-level summary, a compact per-signature list, and selector-driven per-signature detail only. Reopening the last successful signed output now lives exclusively in the primary sign panel.
 5. The signature-properties panel now delegates the common setup workflow to `SigningSetupSession`, which composes `DefaultSignaturePropertiesCoordinator` plus a tiny Qt passphrase-prompt adapter. The panel still maps Qt controls to and from the visible-signature draft, still owns overwrite/delete confirmation dialogs, and still owns preview rendering, but it no longer owns the main setup orchestration for load, visible-signature apply, nonblank preset selection, preset save/delete mutation, programmatic appearance dirty clearing, certificate selection, or catalog refresh. The session now owns manual certificate-password retry, cancel handling, session-local passphrase caching, programmatic appearance-update preset clearing, and preset mutation delegation instead of the panel.
-6. The panel derives `SigningDraftPreview`, asks `QtCanonicalPreviewLifecycle` for canonical render state when a snapshot is available, and hands that state plus the preview draft to `QtSignaturePreviewLayout` to plan and apply card sizing, widget ordering, and visibility.
-7. When the user signs, `SigningWorkspaceWidget.submit_sign_request()` delegates to `SigningActionCoordinator.submit()`, which applies pending property changes, checks readiness, builds the `SigningRequest`, and emits the request through the existing callback path before it touches the executor.
-8. If no executor is injected, the coordinator returns the request and a neutral state snapshot; the shell applies that returned state and stops.
-9. If an executor is injected, it runs the request and returns a `SigningResult`; the coordinator stores the result, updates the sign/result/open-state flags, and derives the success or failure transition metadata.
-10. The shell applies the returned state snapshot to the Qt controls, updates the result label, and emits either `sign_success` or a plain error depending on the transition metadata.
-11. On success, the coordinator records the signed output path so the shell can enable `Open signed PDF`; on failure, it clears the reopen target, keeps the error text visible, and harnesses can capture structured evidence.
+6. `SigningWorkspaceWidget` now delegates recurring viewer/panel interaction sequencing to `WorkspaceInteractionSession`, which composes `DocumentReviewWorkspaceSession` plus `ViewerInteractionSession`. That session now owns routing viewer drags between text selection and signature placement, page-change follow-up, document-text jump navigation follow-up, panel-change placement-context resync, and viewer-refresh resync.
+7. The panel derives `SigningDraftPreview`, asks `QtCanonicalPreviewLifecycle` for canonical render state when a snapshot is available, and hands that state plus the preview draft to `QtSignaturePreviewLayout` to plan and apply card sizing, widget ordering, and visibility.
+8. When the user signs, `SigningWorkspaceWidget.submit_sign_request()` delegates to `SigningActionCoordinator.submit()`, which applies pending property changes, checks readiness, builds the `SigningRequest`, and emits the request through the existing callback path before it touches the executor.
+9. If no executor is injected, the coordinator returns the request and a neutral state snapshot; the shell applies that returned state and stops.
+10. If an executor is injected, it runs the request and returns a `SigningResult`; the coordinator stores the result, updates the sign/result/open-state flags, and derives the success or failure transition metadata.
+11. The shell applies the returned state snapshot to the Qt controls, updates the result label, and emits either `sign_success` or a plain error depending on the transition metadata.
+12. On success, the coordinator records the signed output path so the shell can enable `Open signed PDF`; on failure, it clears the reopen target, keeps the error text visible, and harnesses can capture structured evidence.
 
 ### Qt output path selection
 
@@ -582,6 +594,14 @@ The canonical repository document split is:
 5. The session delegates signing-draft rule enforcement to the coordinator, owns manual password retry/cancel/cache policy plus preset save/delete orchestration and programmatic appearance dirty clearing, and returns the same immutable `SignaturePropertiesViewState` shape back to the panel.
 6. The panel renders the returned state into controls and labels, then refreshes the existing preview card and canonical preview snapshot machinery.
 7. `ClearSelectedSignaturePreset` is used when appearance or placement edits dirty a saved preset selection without mutating the underlying workflow state.
+
+### Workspace interaction sequencing
+
+1. `SigningWorkspaceWidget` creates `DocumentReviewWorkspaceSession`, `ViewerInteractionSession`, and `WorkspaceInteractionSession`.
+2. Viewer drags go first to `WorkspaceInteractionSession.select_in_viewer(...)`, which lets the review/text workspace consume selection-mode drags before trying signing placement.
+3. If a drag becomes a signing placement, the workspace interaction session returns a plain transition carrying the `SignatureRect`, optional placement context, overlay-sync intent, and signing-action invalidation reason.
+4. The shell applies that transition to concrete widgets and the signing draft, while `SignaturePropertiesPanel.set_signature_rect(...)` still drives its existing panel-change callback path.
+5. Page changes, document-text jump navigation, panel-change follow-up, and viewer-refresh follow-up all go through explicit workspace-interaction session verbs that return the same transition shape.
 
 ### Phase 3 evidence validation
 
@@ -684,6 +704,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-30 | Added the workspace-interaction session boundary above the review and viewer helpers. | Reflected `WorkspaceInteractionSession` taking ownership of recurring selection/page/refresh transition sequencing in the shell. |
 | 2026-05-30 | Moved programmatic signature-appearance updates behind `SigningSetupSession`. | Reflected the panel delegating `set_signature_appearance()` to the setup session instead of mutating the workflow and clearing presets directly. |
 | 2026-05-29 | Moved preset save/delete orchestration behind `SigningSetupSession`. | Reflected the panel delegating preset mutation to the setup session while keeping overwrite/delete confirmation dialogs in Qt. |
 | 2026-05-29 | Added the signing-setup session boundary above the coordinator. | Reflected `SigningSetupSession` taking ownership of common setup orchestration plus manual certificate-password retry/cancel/cache policy, leaving `SignaturePropertiesPanel` as a thinner Qt adapter. |
