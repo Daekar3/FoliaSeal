@@ -3484,6 +3484,50 @@ def test_signing_shell_signature_preset_delete_uses_setup_session_entrypoint(
     assert calls == ["Compact"]
 
 
+def test_signing_shell_set_signature_appearance_uses_setup_session_entrypoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_ready_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    panel = widget.properties_panel
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+    calls: list[object] = []
+    original = panel._setup_session.set_signature_appearance
+    appearance = build_signature_appearance(
+        signer_label_prefix="Programmatic Panel",
+    )
+
+    def _spy_set_signature_appearance(signature_appearance, *, control_issue=None):
+        calls.append(signature_appearance)
+        return original(signature_appearance, control_issue=control_issue)
+
+    monkeypatch.setattr(
+        panel._setup_session,
+        "set_signature_appearance",
+        _spy_set_signature_appearance,
+    )
+
+    panel.set_signature_appearance(appearance)
+
+    assert calls == [appearance]
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+
+
 def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
     monkeypatch,
     tmp_path: Path,

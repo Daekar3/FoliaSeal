@@ -260,6 +260,30 @@ def test_signing_setup_session_applies_visible_setup_and_clears_selected_preset(
     assert coordinator.workflow.signature_appearance == updated_appearance
 
 
+def test_signing_setup_session_set_signature_appearance_clears_selected_preset(
+    tmp_path: Path,
+) -> None:
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    session = SigningSetupSession(
+        coordinator=coordinator,
+        passphrase_prompter=_FakePrompter([]),
+    )
+    session.select_signature_preset("Compact")
+    updated_appearance = build_signature_appearance(
+        signer_label_prefix="Programmatic Session",
+        show_field_names=False,
+    )
+
+    state = session.set_signature_appearance(updated_appearance)
+
+    assert state.selected_signature_preset_name is None
+    assert coordinator.workflow.signature_appearance == updated_appearance
+
+
 def test_signing_setup_session_save_preset_persists_and_selects_it(
     tmp_path: Path,
 ) -> None:

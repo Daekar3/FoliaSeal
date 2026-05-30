@@ -40,7 +40,6 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionState,
 )
 from foliaseal.application.signature_properties_coordinator import (
-    ClearSelectedSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
@@ -798,12 +797,11 @@ class SignaturePropertiesPanel:
         self._notify_change()
 
     def set_signature_appearance(self, signature_appearance: SignatureAppearance | None) -> None:
-        self._workflow.set_signature_appearance(signature_appearance)
-        self._coordinator.reconcile(
-            ClearSelectedSignaturePreset(),
+        state = self._setup_session.set_signature_appearance(
+            signature_appearance,
             control_issue=self._control_issue,
         )
-        self.load_from_workflow()
+        self._apply_coordinator_state(state)
         self._notify_change()
 
     def save_current_signature_preset(self) -> ResolvedSignaturePreset | None:
