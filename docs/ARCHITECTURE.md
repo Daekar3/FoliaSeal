@@ -220,7 +220,7 @@ The canonical repository document split is:
 - Does not own: widget refresh calls themselves, signature overlay painting, preview rendering, or direct `SignatureRect` mutation in the panel.
 - Key collaborators: `DocumentReviewWorkspaceSession`, `ViewerInteractionSession`, `ViewerWorkflow`, `presentation/qt/signing_shell.py`.
 - Main entry points: `select_in_viewer()`, `change_page()`, `refresh_navigation_to_page_index()`, `refresh_after_panel_change()`, `refresh_after_viewer_refresh()`.
-- Known constraints: The boundary is intentionally Qt-free and returns plain transition data. `SignaturePropertiesPanel.set_signature_rect(...)` still triggers shell follow-up through its existing `on_change` callback, so this slice centralizes the recurring shell sequences around that path rather than replacing direct rectangle mutation itself.
+- Known constraints: The boundary is intentionally Qt-free and returns plain transition data. The shell now applies transition-carried `SignatureRect` values through a non-notifying panel path and explicitly chooses when `refresh_after_panel_change()` should run, instead of relying on the panel's generic `on_change` callback for internal rect application.
 - Status: Implemented and confirmed by code and tests.
 
 ### Rendering infrastructure
@@ -600,7 +600,7 @@ The canonical repository document split is:
 1. `SigningWorkspaceWidget` creates `DocumentReviewWorkspaceSession`, `ViewerInteractionSession`, and `WorkspaceInteractionSession`.
 2. Viewer drags go first to `WorkspaceInteractionSession.select_in_viewer(...)`, which lets the review/text workspace consume selection-mode drags before trying signing placement.
 3. If a drag becomes a signing placement, the workspace interaction session returns a plain transition carrying the `SignatureRect`, optional placement context, overlay-sync intent, and signing-action invalidation reason.
-4. The shell applies that transition to concrete widgets and the signing draft, while `SignaturePropertiesPanel.set_signature_rect(...)` still drives its existing panel-change callback path.
+4. The shell applies that transition to concrete widgets and the signing draft through a non-notifying `SignaturePropertiesPanel.set_signature_rect(...)` path, so viewer-selection placement does not loop back through the generic panel-change callback.
 5. Page changes, document-text jump navigation, panel-change follow-up, and viewer-refresh follow-up all go through explicit workspace-interaction session verbs that return the same transition shape.
 
 ### Phase 3 evidence validation
@@ -704,6 +704,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-05-30 | Removed internal signature-rect callback coupling from the shell interaction seam. | Reflected direct rect application and viewer-selection placement now using explicit workspace-interaction follow-up instead of routing back through the panel's generic change callback. |
 | 2026-05-30 | Added the workspace-interaction session boundary above the review and viewer helpers. | Reflected `WorkspaceInteractionSession` taking ownership of recurring selection/page/refresh transition sequencing in the shell. |
 | 2026-05-30 | Moved programmatic signature-appearance updates behind `SigningSetupSession`. | Reflected the panel delegating `set_signature_appearance()` to the setup session instead of mutating the workflow and clearing presets directly. |
 | 2026-05-29 | Moved preset save/delete orchestration behind `SigningSetupSession`. | Reflected the panel delegating preset mutation to the setup session while keeping overwrite/delete confirmation dialogs in Qt. |

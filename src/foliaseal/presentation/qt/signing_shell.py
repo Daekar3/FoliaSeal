@@ -784,7 +784,12 @@ class SignaturePropertiesPanel:
             footer_label=footer_label,
         )
 
-    def set_signature_rect(self, signature_rect: SignatureRect | None) -> None:
+    def set_signature_rect(
+        self,
+        signature_rect: SignatureRect | None,
+        *,
+        notify: bool = True,
+    ) -> None:
         self._suspend_updates = True
         try:
             if signature_rect is None:
@@ -796,7 +801,8 @@ class SignaturePropertiesPanel:
         finally:
             self._suspend_updates = False
         self.load_from_workflow()
-        self._notify_change()
+        if notify:
+            self._notify_change()
 
     def set_signature_appearance(self, signature_appearance: SignatureAppearance | None) -> None:
         state = self._setup_session.set_signature_appearance(
@@ -1454,7 +1460,7 @@ class SigningWorkspaceWidget:
         bottom_pt: float,
         width_pt: float,
         height_pt: float,
-    ) -> SignatureRect:
+        ) -> SignatureRect:
         """Apply a signature rectangle through the shell surface."""
         signature_rect = SignatureRect(
             page_index=page_index,
@@ -1463,7 +1469,10 @@ class SigningWorkspaceWidget:
             width_pt=width_pt,
             height_pt=height_pt,
         )
-        self.properties_panel.set_signature_rect(signature_rect)
+        self.properties_panel.set_signature_rect(signature_rect, notify=False)
+        self._apply_workspace_interaction_transition(
+            self._workspace_interaction_session.refresh_after_panel_change()
+        )
         return signature_rect
 
     def signature_rect(self) -> SignatureRect | None:
@@ -1740,7 +1749,7 @@ class SigningWorkspaceWidget:
         elif transition.placement_context is not None:
             self._apply_placement_context_result(transition.placement_context)
         if transition.signature_rect is not None:
-            self.properties_panel.set_signature_rect(transition.signature_rect)
+            self.properties_panel.set_signature_rect(transition.signature_rect, notify=False)
         if transition.sync_signature_overlay:
             self._sync_signature_overlay()
         if transition.refresh_preview:

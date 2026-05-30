@@ -3639,6 +3639,88 @@ def test_signing_shell_refresh_viewer_uses_workspace_interaction_session_entrypo
     assert calls == ["refresh"]
 
 
+def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    calls: list[str] = []
+    original = signing_shell_module.WorkspaceInteractionSession.refresh_after_panel_change
+
+    def _spy_refresh_after_panel_change(self):
+        calls.append("panel")
+        return original(self)
+
+    monkeypatch.setattr(
+        signing_shell_module.WorkspaceInteractionSession,
+        "refresh_after_panel_change",
+        _spy_refresh_after_panel_change,
+    )
+
+    widget.set_signature_rect(
+        page_index=0,
+        left_pt=24.0,
+        bottom_pt=18.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+
+    assert calls == ["panel"]
+
+
+def test_signing_shell_viewer_selection_does_not_route_rect_application_back_through_panel_refresh(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    calls: list[str] = []
+    original = signing_shell_module.WorkspaceInteractionSession.refresh_after_panel_change
+
+    def _spy_refresh_after_panel_change(self):
+        calls.append("panel")
+        return original(self)
+
+    monkeypatch.setattr(
+        signing_shell_module.WorkspaceInteractionSession,
+        "refresh_after_panel_change",
+        _spy_refresh_after_panel_change,
+    )
+
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+
+    rect = widget.signature_rect()
+    assert rect is not None
+    assert calls == []
+
+
 def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
     monkeypatch,
     tmp_path: Path,
