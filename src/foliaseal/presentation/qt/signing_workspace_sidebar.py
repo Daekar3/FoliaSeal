@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from foliaseal.presentation.qt.signing_action_coordinator import SigningActionState
+
 
 @dataclass(frozen=True)
 class SigningActionControls:
@@ -116,6 +118,28 @@ class SigningWorkspaceSidebar:
         self._layout.addWidget(self.signing_action_controls.container)
         self._layout.addWidget(self.document_review_controls.container)
         self._layout.addWidget(self.document_text_controls.container)
+
+    def apply_signing_action_state(self, state: SigningActionState) -> None:
+        self.sign_button.setEnabled(state.can_sign)
+        self.open_signed_output_button.setEnabled(state.can_open_signed_output)
+        self.signing_action_controls.stage_label.setText(state.stage_text)
+        self.signing_action_controls.detail_label.setText(state.detail_text)
+        _set_widget_width_limit(
+            self.signing_action_controls.detail_label,
+            _panel_available_width(self.container),
+        )
+        self.result_label.setText(state.result_text)
+        if hasattr(self.result_label, "setStyleSheet"):
+            if state.result_kind == "success":
+                self.result_label.setStyleSheet(
+                    "color: #1f6f2a; font-weight: 600;"
+                )
+            elif state.result_kind == "error":
+                self.result_label.setStyleSheet(
+                    "color: #9f1d1d; font-weight: 600;"
+                )
+            else:
+                self.result_label.setStyleSheet("color: #444;")
 
     def _build_signing_action_controls(
         self,
@@ -311,3 +335,26 @@ def _style_panel(container: Any) -> None:
             " background: #f6f8fa;"
             "}"
         )
+
+
+def _set_widget_width_limit(widget: Any, width: int) -> None:
+    fixed_width = getattr(widget, "setFixedWidth", None)
+    if callable(fixed_width):
+        fixed_width(width)
+        return
+    max_width = getattr(widget, "setMaximumWidth", None)
+    if callable(max_width):
+        max_width(width)
+
+
+def _panel_available_width(widget: Any) -> int:
+    width_getter = getattr(widget, "width", None)
+    if not callable(width_getter):
+        return 520
+    try:
+        width = int(width_getter())
+    except TypeError:
+        return 520
+    if width > 0:
+        return max(1, width - 16)
+    return 520

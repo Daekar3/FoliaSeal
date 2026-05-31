@@ -289,16 +289,6 @@ def _set_container_widgets(container: Any, *widgets: Any) -> None:
         layout.addWidget(widget)
 
 
-def _set_widget_width_limit(widget: Any, width: int) -> None:
-    fixed_width = getattr(widget, "setFixedWidth", None)
-    if callable(fixed_width):
-        fixed_width(width)
-        return
-    max_width = getattr(widget, "setMaximumWidth", None)
-    if callable(max_width):
-        max_width(width)
-
-
 def _set_combo_text(combo: Any, value: str, *, allow_custom: bool = False) -> None:
     index = getattr(combo, "findText", None)
     if callable(index):
@@ -488,13 +478,6 @@ def _ancestor_width(widget: Any) -> int | None:
     if not widths:
         return None
     return min(widths)
-
-
-def _panel_available_width(widget: Any) -> int:
-    panel_width = _ancestor_width(widget) or _widget_width(widget)
-    if isinstance(panel_width, int) and panel_width > 0:
-        return max(1, panel_width - 16)
-    return 520
 
 
 def _build_close_aware_widget(
@@ -1566,11 +1549,6 @@ class SigningWorkspaceWidget:
         """Return the most recent signing result, if a real executor ran."""
         return self._signing_action_coordinator.last_signing_result
 
-    def _set_last_successful_output_path(self, output_path: str | None) -> None:
-        self._open_signed_output_button.setEnabled(
-            output_path is not None and self._on_open_signed_output is not None
-        )
-
     def _clear_previous_signing_result(self) -> None:
         self._apply_signing_action_state(self._signing_action_coordinator.invalidate("clear"))
 
@@ -1767,23 +1745,8 @@ class SigningWorkspaceWidget:
         self._apply_signing_action_state(self._signing_action_coordinator.load())
 
     def _apply_signing_action_state(self, state: SigningActionState) -> None:
-        self._sign_button.setEnabled(state.can_sign)
         self.widget.last_signing_result = state.last_signing_result  # type: ignore[attr-defined]
-        self._set_last_successful_output_path(state.last_successful_output_path)
-        self._set_sign_result_text(
-            state.result_text,
-            success=(
-                True
-                if state.result_kind == "success"
-                else False if state.result_kind == "error" else None
-            ),
-        )
-        self._flow_summary_controls.stage_label.setText(state.stage_text)
-        self._flow_summary_controls.detail_label.setText(state.detail_text)
-        _set_widget_width_limit(
-            self._flow_summary_controls.detail_label,
-            _panel_available_width(self._sidebar.container),
-        )
+        self._sidebar.apply_signing_action_state(state)
 
     def _default_output_dialog_path(self) -> Path:
         return suggest_signed_output_path(

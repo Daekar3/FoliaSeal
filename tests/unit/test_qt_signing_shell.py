@@ -1201,6 +1201,52 @@ def test_signing_shell_refreshes_certificate_configurations_from_store(
     )
 
 
+def test_signing_shell_refresh_certificate_configurations_reapplies_signed_action_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(CertificateCatalog(schema_version=1))
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+            timestamp_present=False,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        certificate_catalog_store=store,
+        sign_executor=executor,
+        on_open_signed_output=lambda _path: None,
+    )
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    widget.submit_sign_request()
+
+    assert widget.flow_stage_label.text() == "Signed"
+    assert "Signing completed successfully." in widget.sign_result_label.text()
+    assert widget.open_signed_output_button._enabled is True
+
+    store.save_catalog(build_certificate_catalog())
+    widget.refresh_certificate_configurations()
+
+    assert widget.flow_stage_label.text() == "Signed"
+    assert "Signing completed successfully." in widget.sign_result_label.text()
+    assert widget.open_signed_output_button._enabled is True
+
+
 def test_signing_shell_selection_uses_rendered_snapshot_page_for_validation(
     monkeypatch,
     tmp_path: Path,

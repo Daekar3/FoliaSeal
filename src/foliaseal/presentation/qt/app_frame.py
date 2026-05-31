@@ -1087,10 +1087,9 @@ class FoliaSealAppFrame:
         return action
 
     def _choose_save_as(self) -> str | None:
-        shell_port = self._current_shell_port
-        if shell_port is None:
-            return None
-        return shell_port.choose_output_pdf_path()
+        return self._with_current_shell_port(
+            lambda shell_port: shell_port.choose_output_pdf_path()
+        )
 
     def _set_save_as_enabled(self, enabled: bool) -> None:
         action = self._save_as_action
@@ -1127,16 +1126,23 @@ class FoliaSealAppFrame:
     def _apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
         self.window.app_settings = settings  # type: ignore[attr-defined]
-        shell_port = self._current_shell_port
-        if shell_port is None:
-            return
-        shell_port.apply_app_settings(settings)
+        self._with_current_shell_port(
+            lambda shell_port: shell_port.apply_app_settings(settings)
+        )
 
     def _refresh_shell_certificate_configurations(self) -> None:
+        self._with_current_shell_port(
+            lambda shell_port: shell_port.refresh_certificate_configurations()
+        )
+
+    def _with_current_shell_port(
+        self,
+        action: Callable[[AppFrameShellPort], Any | None],
+    ) -> Any | None:
         shell_port = self._current_shell_port
         if shell_port is None:
-            return
-        shell_port.refresh_certificate_configurations()
+            return None
+        return action(shell_port)
 
 
 class QtAppFrameAdapter:
