@@ -83,6 +83,9 @@ from foliaseal.presentation.qt.signature_preview_layout import (
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     QtCanonicalPreviewLifecycle,
 )
+from foliaseal.presentation.qt.signing_action_boundary import (
+    SigningActionBoundary,
+)
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
     SigningActionState,
@@ -1239,6 +1242,13 @@ class SigningWorkspaceWidget:
             on_sign_request=self._on_sign_request,
             can_open_signed_output=self._on_open_signed_output is not None,
         )
+        self._signing_action_boundary = SigningActionBoundary(
+            coordinator=self._signing_action_coordinator,
+            emit_error=self._emit_error,
+            on_error=self._on_error,
+            on_status_change=self._on_status_change,
+            on_open_signed_output=self._on_open_signed_output,
+        )
         index_changed = getattr(
             self._document_review_controls.signature_selector,
             "currentIndexChanged",
@@ -1357,7 +1367,7 @@ class SigningWorkspaceWidget:
         self._apply_document_review_workspace_state(
             self._document_review_workspace.load()
         )
-        self._apply_signing_action_state(self._signing_action_coordinator.load())
+        self._apply_signing_action_state(self._signing_action_boundary.load())
 
     @property
     def container(self) -> Any:
@@ -1485,23 +1495,13 @@ class SigningWorkspaceWidget:
         return bool(getattr(self._sign_button, "enabled", False))
 
     def submit_sign_request(self) -> SigningRequest | None:
-        transition = self._signing_action_coordinator.submit()
-        self._apply_signing_action_state(transition.state)
-        if transition.status_event is not None and self._on_status_change is not None:
-            self._on_status_change(transition.status_event)
-        if transition.error_message is not None:
-            if transition.error_via_emit:
-                self._emit_error(transition.error_message)
-            elif self._on_error is not None:
-                self._on_error(transition.error_message)
-        return transition.request
+        result = self._signing_action_boundary.submit()
+        self._apply_signing_action_state(result.state)
+        return result.request
 
     def open_signed_output(self) -> str | None:
-        output_path = self._signing_action_coordinator.open_signed_output()
-        if output_path is None or self._on_open_signed_output is None:
-            return None
-        self._on_open_signed_output(output_path)
-        return output_path
+        result = self._signing_action_boundary.open_signed_output()
+        return result.opened_output_path
 
     def choose_output_pdf_path(self) -> str | None:
         initial_path = self._default_output_dialog_path()
@@ -1521,7 +1521,7 @@ class SigningWorkspaceWidget:
         if not self._confirm_output_overwrite(selected_path):
             return None
         self._apply_signing_action_state(
-            self._signing_action_coordinator.accept_output_path(selected_path)
+            self._signing_action_boundary.accept_output_path(selected_path).state
         )
         return selected_path
 
@@ -1550,7 +1550,9 @@ class SigningWorkspaceWidget:
         return self._signing_action_coordinator.last_signing_result
 
     def _clear_previous_signing_result(self) -> None:
-        self._apply_signing_action_state(self._signing_action_coordinator.invalidate("clear"))
+        self._apply_signing_action_state(
+            self._signing_action_boundary.invalidate("clear").state
+        )
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         self._apply_workspace_interaction_transition(
@@ -1572,7 +1574,7 @@ class SigningWorkspaceWidget:
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh shell controls."""
         catalog = self.properties_panel.refresh_certificate_configurations()
-        self._apply_signing_action_state(self._signing_action_coordinator.load())
+        self._apply_signing_action_state(self._signing_action_boundary.load())
         return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
@@ -1587,7 +1589,7 @@ class SigningWorkspaceWidget:
             setter(self._draft_workflow.signature_rect)
 
     def _refresh_sign_button_state(self) -> None:
-        self._apply_signing_action_state(self._signing_action_coordinator.load())
+        self._apply_signing_action_state(self._signing_action_boundary.load())
 
     def _apply_document_review_workspace_state(
         self,
@@ -1742,20 +1744,20 @@ class SigningWorkspaceWidget:
         if transition.refresh_preview:
             self.properties_panel.refresh_preview()
         if transition.reload_signing_action_state:
-            self._apply_signing_action_state(self._signing_action_coordinator.load())
+            self._apply_signing_action_state(self._signing_action_boundary.load())
         elif transition.signing_action_invalidation_reason is not None:
             self._apply_signing_action_state(
-                self._signing_action_coordinator.invalidate(
+                self._signing_action_boundary.invalidate(
                     transition.signing_action_invalidation_reason
-                )
+                ).state
             )
 
     def _refresh_flow_summary(self) -> None:
-        self._apply_signing_action_state(self._signing_action_coordinator.load())
+        self._apply_signing_action_state(self._signing_action_boundary.load())
 
     def _apply_signing_action_state(self, state: SigningActionState) -> None:
         self.widget.last_signing_result = state.last_signing_result  # type: ignore[attr-defined]
-        self._sidebar.apply_signing_action_state(state)
+        self._sidebar.render_signing_action_state(state)
 
     def _default_output_dialog_path(self) -> Path:
         return suggest_signed_output_path(

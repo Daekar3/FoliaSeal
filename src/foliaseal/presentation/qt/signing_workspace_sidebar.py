@@ -119,7 +119,7 @@ class SigningWorkspaceSidebar:
         self._layout.addWidget(self.document_review_controls.container)
         self._layout.addWidget(self.document_text_controls.container)
 
-    def apply_signing_action_state(self, state: SigningActionState) -> None:
+    def render_signing_action_state(self, state: SigningActionState) -> None:
         self.sign_button.setEnabled(state.can_sign)
         self.open_signed_output_button.setEnabled(state.can_open_signed_output)
         self.signing_action_controls.stage_label.setText(state.stage_text)
@@ -140,6 +140,9 @@ class SigningWorkspaceSidebar:
                 )
             else:
                 self.result_label.setStyleSheet("color: #444;")
+
+    def apply_signing_action_state(self, state: SigningActionState) -> None:
+        self.render_signing_action_state(state)
 
     def _build_signing_action_controls(
         self,
