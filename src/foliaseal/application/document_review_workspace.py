@@ -36,21 +36,35 @@ class DocumentReviewWorkspaceViewerEffects:
 
 
 @dataclass(frozen=True)
-class DocumentReviewWorkspaceState:
-    """Combined immutable state for review and document-text workflow UI."""
+class DocumentReviewCardState:
+    """Immutable state for the document-review card only."""
 
     review_summary: DocumentReviewSummary
-    review_signature_labels: tuple[str, ...]
-    selected_review_signature_index: int | None
-    selected_review_signature_label: str | None
-    selected_review_signature_detail: str
-    review_selector_enabled: bool
-    text_search_state: DocumentTextSearchState
-    text_selection_state: DocumentTextSelectionState
-    text_selection_mode_enabled: bool
-    document_text_display_source: DocumentTextDisplaySource
-    document_text_status_text: str
-    document_text_detail_text: str
+    signature_labels: tuple[str, ...]
+    selected_signature_index: int | None
+    selected_signature_label: str | None
+    selected_signature_detail: str
+    selector_enabled: bool
+
+
+@dataclass(frozen=True)
+class DocumentTextWorkspaceState:
+    """Immutable state for the document-text card only."""
+
+    search_state: DocumentTextSearchState
+    selection_state: DocumentTextSelectionState
+    selection_mode_enabled: bool
+    display_source: DocumentTextDisplaySource
+    status_text: str
+    detail_text: str
+
+
+@dataclass(frozen=True)
+class DocumentReviewWorkspaceState:
+    """Combined immutable state composed from smaller review/text states."""
+
+    review: DocumentReviewCardState
+    document_text: DocumentTextWorkspaceState
 
 
 @dataclass(frozen=True)
@@ -213,18 +227,22 @@ class DocumentReviewWorkspaceSession:
             document_text_status_text = self._text_selection_state.status_text
             document_text_detail_text = self._text_selection_state.detail_text
         return DocumentReviewWorkspaceState(
-            review_summary=self._review_summary,
-            review_signature_labels=review_signature_labels,
-            selected_review_signature_index=selected_index,
-            selected_review_signature_label=selected_label,
-            selected_review_signature_detail=selected_detail,
-            review_selector_enabled=review_selector_enabled,
-            text_search_state=self._text_search_state,
-            text_selection_state=self._text_selection_state,
-            text_selection_mode_enabled=self._text_selection_mode_enabled,
-            document_text_display_source=self._document_text_display_source,
-            document_text_status_text=document_text_status_text,
-            document_text_detail_text=document_text_detail_text,
+            review=DocumentReviewCardState(
+                review_summary=self._review_summary,
+                signature_labels=review_signature_labels,
+                selected_signature_index=selected_index,
+                selected_signature_label=selected_label,
+                selected_signature_detail=selected_detail,
+                selector_enabled=review_selector_enabled,
+            ),
+            document_text=DocumentTextWorkspaceState(
+                search_state=self._text_search_state,
+                selection_state=self._text_selection_state,
+                selection_mode_enabled=self._text_selection_mode_enabled,
+                display_source=self._document_text_display_source,
+                status_text=document_text_status_text,
+                detail_text=document_text_detail_text,
+            ),
         )
 
     def _selected_review_signature_state(

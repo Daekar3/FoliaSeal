@@ -103,7 +103,7 @@ def test_workspace_refresh_preserves_selected_signature_label_when_it_still_exis
     session.load()
     state = session.select_review_signature(0)
 
-    assert state.selected_review_signature_label == "Signature 1"
+    assert state.review.selected_signature_label == "Signature 1"
 
     session._document_review_inspector.summary = DocumentReviewSummary(  # type: ignore[attr-defined]
         headline="Signature review",
@@ -129,9 +129,9 @@ def test_workspace_refresh_preserves_selected_signature_label_when_it_still_exis
 
     refreshed = session.refresh_review()
 
-    assert refreshed.selected_review_signature_label == "Signature 1"
-    assert refreshed.selected_review_signature_index == 0
-    assert "Updated detail." in refreshed.selected_review_signature_detail
+    assert refreshed.review.selected_signature_label == "Signature 1"
+    assert refreshed.review.selected_signature_index == 0
+    assert "Updated detail." in refreshed.review.selected_signature_detail
 
 
 def test_workspace_search_emits_page_jump_for_current_match() -> None:
@@ -157,9 +157,38 @@ def test_workspace_search_emits_page_jump_for_current_match() -> None:
     session.load()
     transition = session.search_text("Alice")
 
-    assert transition.state.text_search_state.status_text == "Found 1 matches for 'Alice'."
-    assert transition.state.document_text_display_source == "search"
+    assert transition.state.document_text.search_state.status_text == "Found 1 matches for 'Alice'."
+    assert transition.state.document_text.display_source == "search"
     assert transition.effects.jump_to_page_index == 1
+
+
+def test_workspace_load_exposes_review_and_document_text_substates() -> None:
+    session = _session(
+        summary=DocumentReviewSummary(
+            headline="Signature review",
+            detail="Found 1 embedded signature.",
+            signature_count=1,
+            signature_items=(
+                DocumentSignatureReviewItem(
+                    label="Signature 1",
+                    signer_subject="CN=Alice Example",
+                    cryptographic_validation_passed=True,
+                    detail="CN=Alice Example: verified locally.",
+                    drill_in_detail="Signer: CN=Alice Example.",
+                ),
+            ),
+        )
+    )
+
+    state = session.load()
+
+    assert state.review.review_summary.headline == "Signature review"
+    assert state.review.signature_labels == ("Signature 1",)
+    assert state.review.selected_signature_label == "Signature 1"
+    assert state.review.selected_signature_detail == "Signer: CN=Alice Example."
+    assert state.document_text.search_state.status_text == "Enter text to search this PDF."
+    assert state.document_text.selection_mode_enabled is False
+    assert state.document_text.status_text == "No document text selected."
 
 
 def test_workspace_restores_search_state_when_selection_mode_is_disabled() -> None:
@@ -195,13 +224,13 @@ def test_workspace_restores_search_state_when_selection_mode_is_disabled() -> No
         selection_rect=PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),
     )
 
-    assert transition.state.document_text_status_text == "Selected text on page 2."
+    assert transition.state.document_text.status_text == "Selected text on page 2."
 
     disabled = session.set_text_selection_mode(False)
 
-    assert disabled.state.document_text_display_source == "search"
-    assert disabled.state.document_text_status_text == "Found 1 matches for 'Alice'."
-    assert "Showing 1 of 1 on page 2" in disabled.state.document_text_detail_text
+    assert disabled.state.document_text.display_source == "search"
+    assert disabled.state.document_text.status_text == "Found 1 matches for 'Alice'."
+    assert "Showing 1 of 1 on page 2" in disabled.state.document_text.detail_text
     assert disabled.effects.interaction_mode == "signature"
     assert disabled.effects.clear_highlights is True
 
@@ -229,7 +258,7 @@ def test_workspace_consumes_viewer_selection_in_text_mode_and_emits_highlights()
     )
 
     assert transition.viewer_selection_consumed is True
-    assert transition.state.document_text_display_source == "selection"
-    assert transition.state.document_text_status_text == "Selected text on page 1."
+    assert transition.state.document_text.display_source == "selection"
+    assert transition.state.document_text.status_text == "Selected text on page 1."
     assert transition.effects.highlight_page_index == 0
     assert transition.effects.highlight_rects == selection.highlight_rects

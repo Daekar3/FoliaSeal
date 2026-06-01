@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
 from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.document_review_workspace import (
+    DocumentReviewCardState,
     DocumentReviewWorkspaceState,
     DocumentReviewWorkspaceTransition,
+    DocumentTextWorkspaceState,
 )
 from foliaseal.application.document_text_search import DocumentTextSearchState
 from foliaseal.application.document_text_selection import DocumentTextSelectionState
@@ -87,38 +89,42 @@ class _FakeDocumentReviewWorkspace:
 
 def _workspace_state() -> DocumentReviewWorkspaceState:
     return DocumentReviewWorkspaceState(
-        review_summary=DocumentReviewSummary(
-            headline="No signatures found",
-            detail="You can place and sign a new visible approval signature.",
-            signature_count=0,
+        review=DocumentReviewCardState(
+            review_summary=DocumentReviewSummary(
+                headline="No signatures found",
+                detail="You can place and sign a new visible approval signature.",
+                signature_count=0,
+            ),
+            signature_labels=(),
+            selected_signature_index=None,
+            selected_signature_label=None,
+            selected_signature_detail="",
+            selector_enabled=False,
         ),
-        review_signature_labels=(),
-        selected_review_signature_index=None,
-        selected_review_signature_label=None,
-        selected_review_signature_detail="",
-        review_selector_enabled=False,
-        text_search_state=DocumentTextSearchState(
-            query="",
-            match_count=0,
-            current_index=None,
+        document_text=DocumentTextWorkspaceState(
+            search_state=DocumentTextSearchState(
+                query="",
+                match_count=0,
+                current_index=None,
+                status_text="Enter text to search this PDF.",
+                detail_text="",
+                current_match=None,
+                can_go_previous=False,
+                can_go_next=False,
+                can_copy=False,
+            ),
+            selection_state=DocumentTextSelectionState(
+                status_text="No document text selected.",
+                detail_text="Enable Select text, then drag across visible PDF text.",
+                selection=None,
+                can_copy=False,
+                can_clear=False,
+            ),
+            selection_mode_enabled=False,
+            display_source="search",
             status_text="Enter text to search this PDF.",
             detail_text="",
-            current_match=None,
-            can_go_previous=False,
-            can_go_next=False,
-            can_copy=False,
         ),
-        text_selection_state=DocumentTextSelectionState(
-            status_text="No document text selected.",
-            detail_text="Enable Select text, then drag across visible PDF text.",
-            selection=None,
-            can_copy=False,
-            can_clear=False,
-        ),
-        text_selection_mode_enabled=False,
-        document_text_display_source="search",
-        document_text_status_text="Enter text to search this PDF.",
-        document_text_detail_text="",
     )
 
 

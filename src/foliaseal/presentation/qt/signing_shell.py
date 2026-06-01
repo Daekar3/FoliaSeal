@@ -1380,23 +1380,23 @@ class SigningWorkspaceWidget:
     def refresh_document_review(self) -> DocumentReviewSummary:
         state = self._document_review_workspace.refresh_review()
         self._apply_document_review_workspace_state(state)
-        return state.review_summary
+        return state.review.review_summary
 
     def search_document_text(self) -> DocumentTextSearchState:
         query = _text(self._document_text_controls.query_input)
         transition = self._document_review_workspace.search_text(query)
         self._apply_document_review_workspace_transition(transition)
-        return transition.state.text_search_state
+        return transition.state.document_text.search_state
 
     def next_document_text_match(self) -> DocumentTextSearchState:
         transition = self._document_review_workspace.next_text_match()
         self._apply_document_review_workspace_transition(transition)
-        return transition.state.text_search_state
+        return transition.state.document_text.search_state
 
     def previous_document_text_match(self) -> DocumentTextSearchState:
         transition = self._document_review_workspace.previous_text_match()
         self._apply_document_review_workspace_transition(transition)
-        return transition.state.text_search_state
+        return transition.state.document_text.search_state
 
     def copy_current_document_text_match(self) -> str | None:
         copy_text = self._document_review_workspace.copy_current_text_match()
@@ -1408,7 +1408,7 @@ class SigningWorkspaceWidget:
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         transition = self._document_review_workspace.set_text_selection_mode(enabled)
         self._apply_document_review_workspace_transition(transition)
-        return transition.state.text_selection_mode_enabled
+        return transition.state.document_text.selection_mode_enabled
 
     def copy_selected_document_text(self) -> str | None:
         copy_text = self._document_review_workspace.copy_selected_text()
@@ -1420,7 +1420,7 @@ class SigningWorkspaceWidget:
     def clear_selected_document_text(self) -> DocumentTextSelectionState:
         transition = self._document_review_workspace.clear_selected_text()
         self._apply_document_review_workspace_transition(transition)
-        return transition.state.text_selection_state
+        return transition.state.document_text.selection_state
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         """Apply new app-level settings to the live shell state."""
@@ -1593,58 +1593,67 @@ class SigningWorkspaceWidget:
         self,
         state: DocumentReviewWorkspaceState,
     ) -> None:
-        self._document_review_controls.headline_label.setText(state.review_summary.headline)
-        self._document_review_controls.detail_label.setText(state.review_summary.detail)
+        review_state = state.review
+        document_text_state = state.document_text
+        self._document_review_controls.headline_label.setText(
+            review_state.review_summary.headline
+        )
+        self._document_review_controls.detail_label.setText(
+            review_state.review_summary.detail
+        )
         self._document_review_controls.signature_items_label.setText(
-            format_document_signature_items(state.review_summary.signature_items)
+            format_document_signature_items(review_state.review_summary.signature_items)
         )
         selector = self._document_review_controls.signature_selector
         self._updating_document_review_selector = True
         try:
             selector.clear()
-            if not state.review_signature_labels:
+            if not review_state.signature_labels:
                 selector.setEnabled(False)
             else:
-                selector.addItems(list(state.review_signature_labels))
-                selector.setEnabled(state.review_selector_enabled)
+                selector.addItems(list(review_state.signature_labels))
+                selector.setEnabled(review_state.selector_enabled)
                 setter = getattr(selector, "setCurrentIndex", None)
                 current_text = getattr(selector, "currentText", None)
                 current_label = current_text() if callable(current_text) else None
                 if (
                     callable(setter)
-                    and state.selected_review_signature_index is not None
-                    and current_label != state.selected_review_signature_label
+                    and review_state.selected_signature_index is not None
+                    and current_label != review_state.selected_signature_label
                 ):
-                    setter(state.selected_review_signature_index)
+                    setter(review_state.selected_signature_index)
         finally:
             self._updating_document_review_selector = False
         self._document_review_controls.signature_detail_label.setText(
-            state.selected_review_signature_detail
+            review_state.selected_signature_detail
         )
         checkbox = self._document_text_controls.select_mode_checkbox
         is_checked = getattr(checkbox, "isChecked", None)
-        if callable(is_checked) and bool(is_checked()) != state.text_selection_mode_enabled:
-            checkbox.setChecked(state.text_selection_mode_enabled)
+        if (
+            callable(is_checked)
+            and bool(is_checked()) != document_text_state.selection_mode_enabled
+        ):
+            checkbox.setChecked(document_text_state.selection_mode_enabled)
         self._document_text_controls.status_label.setText(
-            state.document_text_status_text
+            document_text_state.status_text
         )
         self._document_text_controls.detail_label.setText(
-            state.document_text_detail_text
+            document_text_state.detail_text
         )
         self._document_text_controls.previous_button.setEnabled(
-            state.text_search_state.can_go_previous
+            document_text_state.search_state.can_go_previous
         )
         self._document_text_controls.next_button.setEnabled(
-            state.text_search_state.can_go_next
+            document_text_state.search_state.can_go_next
         )
         self._document_text_controls.copy_button.setEnabled(
-            state.text_search_state.can_copy and self._on_copy_text is not None
+            document_text_state.search_state.can_copy and self._on_copy_text is not None
         )
         self._document_text_controls.copy_selection_button.setEnabled(
-            state.text_selection_state.can_copy and self._on_copy_text is not None
+            document_text_state.selection_state.can_copy and self._on_copy_text is not None
         )
         self._document_text_controls.clear_selection_button.setEnabled(
-            state.text_selection_state.can_clear
+            document_text_state.selection_state.can_clear
         )
 
     def _on_document_review_signature_selected(self, index: int) -> None:
