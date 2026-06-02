@@ -57,9 +57,9 @@ def test_signing_setup_session_retries_certificate_selection_and_caches_passphra
     first_state = session.select_certificate_configuration("Corporate Records Signing")
     second_state = session.select_certificate_configuration("Corporate Records Signing")
 
-    assert first_state is not None
-    assert second_state is not None
-    assert first_state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert first_state.applied is True
+    assert second_state.applied is True
+    assert first_state.state.selected_certificate_configuration_name == "Corporate Records Signing"
     assert coordinator.workflow.selected_certificate_configuration_id == "cert-config-default"
     assert coordinator.workflow.certificate_path == str(cert_file)
     assert coordinator.workflow.passphrase == "typed-secret"
@@ -88,7 +88,8 @@ def test_signing_setup_session_returns_none_when_certificate_prompt_is_canceled(
 
     state = session.select_certificate_configuration("Corporate Records Signing")
 
-    assert state is None
+    assert state.applied is False
+    assert state.state.selected_certificate_configuration_name is None
     assert coordinator.workflow.selected_certificate_configuration_id is None
 
 
@@ -120,8 +121,8 @@ def test_signing_setup_session_uses_saved_secret_without_prompt(
 
     state = session.select_certificate_configuration("Corporate Records Signing")
 
-    assert state is not None
-    assert state.selected_certificate_configuration_name == "Corporate Records Signing"
+    assert state.applied is True
+    assert state.state.selected_certificate_configuration_name == "Corporate Records Signing"
     assert coordinator.workflow.passphrase == "stored-secret"
     assert prompter.calls == []
 
@@ -152,9 +153,9 @@ def test_signing_setup_session_applies_partial_preset_without_prompting_or_chang
 
     state = session.select_signature_preset("Compact")
 
-    assert initial_state is not None
-    assert state is not None
-    assert state.selected_signature_preset_name == "Compact"
+    assert initial_state.applied is True
+    assert state.applied is True
+    assert state.state.selected_signature_preset_name == "Compact"
     assert coordinator.workflow.selected_certificate_configuration_id == "cert-config-default"
     assert coordinator.workflow.certificate_path == str(cert_file)
     assert prompter.calls == ["Enter the certificate password for 'Corporate Records Signing'."]
@@ -214,14 +215,73 @@ def test_signing_setup_session_retries_preset_certificate_selection_and_caches_p
     first_state = session.select_signature_preset("Alternate Preset")
     second_state = session.select_signature_preset("Alternate Preset")
 
-    assert first_state is not None
-    assert second_state is not None
-    assert first_state.selected_signature_preset_name == "Alternate Preset"
-    assert first_state.selected_certificate_configuration_name == "Alternate Signing"
+    assert first_state.applied is True
+    assert second_state.applied is True
+    assert first_state.state.selected_signature_preset_name == "Alternate Preset"
+    assert first_state.state.selected_certificate_configuration_name == "Alternate Signing"
     assert coordinator.workflow.selected_certificate_configuration_id == "cert-config-alt"
     assert coordinator.workflow.certificate_path == str(alternate_path)
     assert coordinator.workflow.passphrase == "alternate-secret"
     assert prompter.calls == ["Enter the certificate password for 'Alternate Signing'."]
+
+
+def test_signing_setup_session_returns_explicit_noop_when_preset_prompt_is_canceled(
+    tmp_path: Path,
+) -> None:
+    default_certificate = build_managed_certificate(
+        managed_certificate_id="managed-cert-default",
+        display_name="Default Certificate",
+        storage_filename="default.p12",
+    )
+    alternate_certificate = build_managed_certificate(
+        managed_certificate_id="managed-cert-alt",
+        display_name="Alternate Certificate",
+        storage_filename="alternate.p12",
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(
+        build_certificate_catalog(
+            managed_certificates=(default_certificate, alternate_certificate),
+            certificate_configurations=(
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-default",
+                    display_name="Default Signing",
+                    managed_certificate_id="managed-cert-default",
+                ),
+                build_certificate_configuration(
+                    certificate_configuration_id="cert-config-alt",
+                    display_name="Alternate Signing",
+                    managed_certificate_id="managed-cert-alt",
+                ),
+            ),
+        )
+    )
+    default_path = store.managed_certificate_dir / "default.p12"
+    alternate_path = store.managed_certificate_dir / "alternate.p12"
+    default_path.parent.mkdir(parents=True, exist_ok=True)
+    default_path.write_bytes(b"default-pkcs12")
+    alternate_path.write_bytes(b"alternate-pkcs12")
+    preset = build_signature_preset(
+        name="Alternate Preset",
+        certificate_configuration_id="cert-config-alt",
+    )
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog_store=store,
+        preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
+    )
+    session = SigningSetupSession(
+        coordinator=coordinator,
+        passphrase_prompter=_FakePrompter([None]),
+    )
+
+    outcome = session.select_signature_preset("Alternate Preset")
+
+    assert outcome.applied is False
+    assert outcome.state.selected_signature_preset_name is None
+    assert outcome.state.selected_certificate_configuration_name is None
+    assert coordinator.workflow.selected_certificate_configuration_id is None
+    assert coordinator.workflow.certificate_path == str(tmp_path / "cert.p12")
 
 
 def test_signing_setup_session_applies_visible_setup_and_clears_selected_preset(

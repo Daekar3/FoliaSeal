@@ -80,6 +80,7 @@ from foliaseal.application.signing_preview_renderer import (
 )
 from foliaseal.application.signing_setup_session import (
     CertificatePassphrasePrompter,
+    SigningSetupSelectionOutcome,
     SigningSetupSession,
 )
 from foliaseal.application.viewer_interaction_session import (
@@ -233,6 +234,7 @@ __all__ = [
     "SignaturePropertiesCoordinator",
     "SignaturePropertiesCoordinatorError",
     "SignaturePropertiesViewState",
+    "SigningSetupSelectionOutcome",
     "SigningSetupSession",
     "VisibleSignaturePlacementDraft",
     "VisibleSignatureSetupDraft",

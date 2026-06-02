@@ -890,9 +890,9 @@ class SignaturePropertiesPanel:
         except SignaturePropertiesCoordinatorError as exc:
             self._show_certificate_configuration_error(str(exc))
             return False
-        if state is None:
+        self._apply_coordinator_state(state.state)
+        if not state.applied:
             return False
-        self._apply_coordinator_state(state)
         self._notify_change()
         return True
 
@@ -1036,7 +1036,7 @@ class SignaturePropertiesPanel:
                     control_issue=self._control_issue,
                 )
             else:
-                state = self._setup_session.select_signature_preset(
+                outcome = self._setup_session.select_signature_preset(
                     selected_name,
                     control_issue=self._control_issue,
                 )
@@ -1047,10 +1047,13 @@ class SignaturePropertiesPanel:
             )
             self._notify_change()
             return
-        if state is None:
+        if not selected_name.strip():
+            self._apply_coordinator_state(state)
+            self._notify_change()
             return
-        self._apply_coordinator_state(state)
-        self._notify_change()
+        self._apply_coordinator_state(outcome.state)
+        if outcome.applied:
+            self._notify_change()
 
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
         layout_state = self._preview_layout.plan(

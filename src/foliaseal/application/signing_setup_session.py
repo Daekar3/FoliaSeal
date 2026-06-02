@@ -26,6 +26,14 @@ class CertificatePassphrasePrompter(Protocol):
         """Return a passphrase or ``None`` if prompting was canceled."""
 
 
+@dataclass(frozen=True)
+class SigningSetupSelectionOutcome:
+    """Explicit result for selection-style setup operations."""
+
+    state: SignaturePropertiesViewState
+    applied: bool
+
+
 @dataclass
 class SigningSetupSession:
     """Own common signing-setup orchestration above the coordinator."""
@@ -66,7 +74,7 @@ class SigningSetupSession:
         selected_name: str,
         *,
         control_issue: SigningDraftValidationIssue | None = None,
-    ) -> SignaturePropertiesViewState | None:
+    ) -> SigningSetupSelectionOutcome:
         configuration_name = self._certificate_configuration_name_for_preset(selected_name)
         prompt_label = (
             f"Enter the certificate password for '{configuration_name}'."
@@ -81,6 +89,7 @@ class SigningSetupSession:
                 passphrase=passphrase,
                 control_issue=control_issue,
             ),
+            control_issue=control_issue,
         )
 
     def clear_selected_signature_preset(
@@ -98,7 +107,7 @@ class SigningSetupSession:
         selected_name: str,
         *,
         control_issue: SigningDraftValidationIssue | None = None,
-    ) -> SignaturePropertiesViewState | None:
+    ) -> SigningSetupSelectionOutcome:
         prompt_label = (
             f"Enter the certificate password for '{selected_name}'."
             if selected_name
@@ -112,6 +121,7 @@ class SigningSetupSession:
                 passphrase=passphrase,
                 control_issue=control_issue,
             ),
+            control_issue=control_issue,
         )
 
     def refresh_catalogs(
@@ -153,26 +163,34 @@ class SigningSetupSession:
         cache_key: str | None,
         prompt_label: str,
         action,
-    ) -> SignaturePropertiesViewState | None:
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SigningSetupSelectionOutcome:
         cached_passphrase = (
             self._session_certificate_passphrases.get(cache_key)
             if cache_key is not None
             else None
         )
         try:
-            return action(cached_passphrase)
+            state = action(cached_passphrase)
+            return SigningSetupSelectionOutcome(state=state, applied=True)
         except SignaturePropertiesCoordinatorError as exc:
             if not _should_prompt_for_certificate_password(str(exc)):
                 raise
         if self.passphrase_prompter is None:
-            return None
+            return SigningSetupSelectionOutcome(
+                state=self.load(control_issue=control_issue),
+                applied=False,
+            )
         prompted_passphrase = self.passphrase_prompter.prompt(prompt_label)
         if prompted_passphrase is None:
-            return None
+            return SigningSetupSelectionOutcome(
+                state=self.load(control_issue=control_issue),
+                applied=False,
+            )
         state = action(prompted_passphrase)
         if cache_key is not None and prompted_passphrase:
             self._session_certificate_passphrases[cache_key] = prompted_passphrase
-        return state
+        return SigningSetupSelectionOutcome(state=state, applied=True)
 
     def _certificate_configuration_name_for_preset(self, preset_name: str) -> str | None:
         try:
