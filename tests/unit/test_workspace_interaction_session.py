@@ -12,6 +12,17 @@ from foliaseal.application.document_text_search import DocumentTextSearchState
 from foliaseal.application.document_text_selection import DocumentTextSelectionState
 from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
 from foliaseal.application.workspace_interaction_session import (
+    ApplyPlacementContext,
+    ApplyReviewTransition,
+    ApplySignatureRect,
+    EmitInteractionError,
+    InvalidateSigningAction,
+    RefreshCurrentPlacementContext,
+    RefreshPreview,
+    RefreshViewer,
+    ReloadSigningActionState,
+    SyncSignatureOverlay,
+    WorkspaceInteractionPlan,
     WorkspaceInteractionSession,
 )
 from foliaseal.domain.models import SignatureRect
@@ -142,9 +153,11 @@ def test_workspace_interaction_session_returns_review_transition_when_consumed()
         document_review_workspace=review_workspace,
     )
 
-    transition = session.select_in_viewer(PdfRect(x1=30.0, y1=20.0, x2=10.0, y2=12.0))
+    plan = session.select_in_viewer(PdfRect(x1=30.0, y1=20.0, x2=10.0, y2=12.0))
 
-    assert transition.review_transition is consumed_transition
+    assert plan == WorkspaceInteractionPlan(
+        effects=(ApplyReviewTransition(consumed_transition),)
+    )
     assert review_workspace.calls == [(3, PdfRect(x1=10.0, y1=12.0, x2=30.0, y2=20.0))]
     assert viewer_interaction.selection_rects == []
 
@@ -176,30 +189,63 @@ def test_workspace_interaction_session_returns_signature_rect_transition() -> No
         document_review_workspace=review_workspace,
     )
 
-    transition = session.select_in_viewer(PdfRect(x1=30.0, y1=20.0, x2=10.0, y2=12.0))
+    plan = session.select_in_viewer(PdfRect(x1=30.0, y1=20.0, x2=10.0, y2=12.0))
 
-    assert transition.signature_rect is not None
-    assert transition.signature_rect.page_index == 2
-    assert transition.placement_context == placement_context
-    assert transition.sync_signature_overlay is True
-    assert transition.signing_action_invalidation_reason == "selection"
+    assert plan == WorkspaceInteractionPlan(
+        effects=(
+            ApplyPlacementContext(placement_context),
+            ApplySignatureRect(
+                SignatureRect(
+                    page_index=2,
+                    left_pt=10.0,
+                    bottom_pt=12.0,
+                    width_pt=20.0,
+                    height_pt=8.0,
+                )
+            ),
+            SyncSignatureOverlay(),
+            InvalidateSigningAction("selection"),
+        )
+    )
     assert viewer_interaction.selection_rects == [PdfRect(x1=10.0, y1=12.0, x2=30.0, y2=20.0)]
 
 
-def test_workspace_interaction_session_change_page_returns_navigation_refresh() -> None:
+def test_workspace_interaction_session_change_page_returns_ordered_effects() -> None:
     session = WorkspaceInteractionSession(
         viewer_workflow=_FakeViewerWorkflow(session=_FakeViewerSession(current_page=0)),
         viewer_interaction_session=_FakeViewerInteractionSession(),
         document_review_workspace=_FakeDocumentReviewWorkspace(),
     )
 
-    transition = session.change_page(2)
+    plan = session.change_page(2)
 
-    assert transition.refresh_viewer is True
-    assert transition.navigation_refresh is True
-    assert transition.refresh_current_placement_context is True
-    assert transition.sync_signature_overlay is True
-    assert transition.signing_action_invalidation_reason == "page"
+    assert plan == WorkspaceInteractionPlan(
+        effects=(
+            RefreshViewer(
+                navigation=True,
+                error_summary="Unable to change PDF page",
+            ),
+            RefreshCurrentPlacementContext(),
+            SyncSignatureOverlay(),
+            InvalidateSigningAction("page"),
+        )
+    )
+
+
+def test_workspace_interaction_session_change_page_error_is_mapped() -> None:
+    viewer_interaction = _FakeViewerInteractionSession()
+    viewer_interaction.page_error = RuntimeError("page failed")
+    session = WorkspaceInteractionSession(
+        viewer_workflow=_FakeViewerWorkflow(session=_FakeViewerSession(current_page=0)),
+        viewer_interaction_session=viewer_interaction,
+        document_review_workspace=_FakeDocumentReviewWorkspace(),
+    )
+
+    plan = session.change_page(4)
+
+    assert plan == WorkspaceInteractionPlan(
+        effects=(EmitInteractionError("Unable to change PDF page: page failed"),)
+    )
 
 
 def test_workspace_interaction_session_navigation_error_is_mapped() -> None:
@@ -211,9 +257,50 @@ def test_workspace_interaction_session_navigation_error_is_mapped() -> None:
         document_review_workspace=_FakeDocumentReviewWorkspace(),
     )
 
-    transition = session.refresh_navigation_to_page_index(4)
+    plan = session.refresh_navigation_to_page_index(4)
 
-    assert transition.error_message == "Unable to show document text match: jump failed"
+    assert plan == WorkspaceInteractionPlan(
+        effects=(EmitInteractionError("Unable to show document text match: jump failed"),)
+    )
+
+
+def test_workspace_interaction_session_navigation_success_returns_ordered_effects() -> None:
+    session = WorkspaceInteractionSession(
+        viewer_workflow=_FakeViewerWorkflow(session=_FakeViewerSession(current_page=0)),
+        viewer_interaction_session=_FakeViewerInteractionSession(),
+        document_review_workspace=_FakeDocumentReviewWorkspace(),
+    )
+
+    plan = session.refresh_navigation_to_page_index(4)
+
+    assert plan == WorkspaceInteractionPlan(
+        effects=(
+            RefreshViewer(
+                navigation=True,
+                error_summary="Unable to show document text match",
+            ),
+            RefreshCurrentPlacementContext(),
+            SyncSignatureOverlay(),
+        )
+    )
+
+
+def test_workspace_interaction_session_refresh_after_panel_change_returns_ordered_effects() -> None:
+    session = WorkspaceInteractionSession(
+        viewer_workflow=_FakeViewerWorkflow(session=_FakeViewerSession(current_page=0)),
+        viewer_interaction_session=_FakeViewerInteractionSession(),
+        document_review_workspace=_FakeDocumentReviewWorkspace(),
+    )
+
+    plan = session.refresh_after_panel_change()
+
+    assert plan == WorkspaceInteractionPlan(
+        effects=(
+            RefreshCurrentPlacementContext(),
+            SyncSignatureOverlay(),
+            InvalidateSigningAction("panel"),
+        )
+    )
 
 
 def test_workspace_interaction_session_refresh_after_viewer_refresh_requests_follow_up() -> None:
@@ -223,10 +310,14 @@ def test_workspace_interaction_session_refresh_after_viewer_refresh_requests_fol
         document_review_workspace=_FakeDocumentReviewWorkspace(),
     )
 
-    transition = session.refresh_after_viewer_refresh()
+    plan = session.refresh_after_viewer_refresh()
 
-    assert transition.refresh_viewer is True
-    assert transition.refresh_preview is True
-    assert transition.reload_signing_action_state is True
-    assert transition.sync_signature_overlay is True
-    assert transition.refresh_current_placement_context is True
+    assert plan == WorkspaceInteractionPlan(
+        effects=(
+            RefreshViewer(),
+            RefreshCurrentPlacementContext(),
+            SyncSignatureOverlay(),
+            RefreshPreview(),
+            ReloadSigningActionState(),
+        )
+    )

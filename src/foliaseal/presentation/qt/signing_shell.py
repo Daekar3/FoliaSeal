@@ -9,14 +9,25 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from foliaseal.application import (
+    ApplyPlacementContext,
+    ApplyReviewTransition,
+    ApplySignatureRect,
+    EmitInteractionError,
+    InvalidateSigningAction,
+    RefreshCurrentPlacementContext,
+    RefreshPreview,
+    RefreshViewer,
+    ReloadSigningActionState,
     SignaturePlacementContext,
     SigningDraftPreview,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
     SigningSetupSession,
+    SyncSignatureOverlay,
+    WorkspaceInteractionEffect,
+    WorkspaceInteractionPlan,
     WorkspaceInteractionSession,
-    WorkspaceInteractionTransition,
     suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PdfRect
@@ -1382,9 +1393,8 @@ class SigningWorkspaceWidget:
         return self._app_settings
 
     def refresh_viewer(self) -> None:
-        self._apply_workspace_interaction_transition(
+        self._apply_workspace_interaction_plan(
             self._workspace_interaction_session.refresh_after_viewer_refresh(),
-            refresh_error_summary="Unable to refresh viewer",
         )
 
     def refresh_document_review(self) -> DocumentReviewSummary:
@@ -1463,7 +1473,7 @@ class SigningWorkspaceWidget:
             height_pt=height_pt,
         )
         self.properties_panel.set_signature_rect(signature_rect, notify=False)
-        self._apply_workspace_interaction_transition(
+        self._apply_workspace_interaction_plan(
             self._workspace_interaction_session.refresh_after_panel_change()
         )
         return signature_rect
@@ -1555,7 +1565,7 @@ class SigningWorkspaceWidget:
         )
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
-        self._apply_workspace_interaction_transition(
+        self._apply_workspace_interaction_plan(
             self._workspace_interaction_session.select_in_viewer(pdf_rect),
         )
 
@@ -1567,7 +1577,7 @@ class SigningWorkspaceWidget:
             self._on_status_change(name)
 
     def _handle_panel_change(self) -> None:
-        self._apply_workspace_interaction_transition(
+        self._apply_workspace_interaction_plan(
             self._workspace_interaction_session.refresh_after_panel_change()
         )
 
@@ -1578,9 +1588,8 @@ class SigningWorkspaceWidget:
         return catalog
 
     def _handle_page_change(self, page_number: int) -> None:
-        self._apply_workspace_interaction_transition(
+        self._apply_workspace_interaction_plan(
             self._workspace_interaction_session.change_page(page_number),
-            refresh_error_summary="Unable to change PDF page",
         )
 
     def _sync_signature_overlay(self) -> None:
@@ -1695,11 +1704,10 @@ class SigningWorkspaceWidget:
                 )
         if effects.jump_to_page_index is None:
             return
-        self._apply_workspace_interaction_transition(
+        self._apply_workspace_interaction_plan(
             self._workspace_interaction_session.refresh_navigation_to_page_index(
                 effects.jump_to_page_index
             ),
-            refresh_error_summary="Unable to show document text match",
         )
 
     def _apply_placement_context_result(
@@ -1714,43 +1722,56 @@ class SigningWorkspaceWidget:
         result = self._viewer_interaction_session.current_placement_context()
         self._apply_placement_context_result(result.placement_context)
 
-    def _apply_workspace_interaction_transition(
+    def _apply_workspace_interaction_plan(
         self,
-        transition: WorkspaceInteractionTransition,
-        *,
-        refresh_error_summary: str | None = None,
+        plan: WorkspaceInteractionPlan,
     ) -> None:
-        if transition.review_transition is not None:
-            self._apply_document_review_workspace_transition(transition.review_transition)
+        for effect in plan.effects:
+            self._apply_workspace_interaction_effect(effect)
+
+    def _apply_workspace_interaction_effect(
+        self,
+        effect: WorkspaceInteractionEffect,
+    ) -> None:
+        if isinstance(effect, ApplyReviewTransition):
+            self._apply_document_review_workspace_transition(effect.transition)
             return
-        if transition.error_message is not None:
-            self._emit_error(transition.error_message)
+        if isinstance(effect, EmitInteractionError):
+            self._emit_error(effect.message)
             return
-        if transition.refresh_viewer:
+        if isinstance(effect, RefreshViewer):
             try:
-                self._viewer_widget.refresh(navigation=transition.navigation_refresh)
+                self._viewer_widget.refresh(navigation=effect.navigation)
             except Exception as exc:
-                summary = refresh_error_summary or "Unable to refresh viewer"
-                self._emit_error(f"{summary}: {exc}")
-                return
-        if transition.refresh_current_placement_context:
+                self._emit_error(f"{effect.error_summary}: {exc}")
+            return
+        if isinstance(effect, RefreshCurrentPlacementContext):
             self._apply_current_placement_context()
-        elif transition.placement_context is not None:
-            self._apply_placement_context_result(transition.placement_context)
-        if transition.signature_rect is not None:
-            self.properties_panel.set_signature_rect(transition.signature_rect, notify=False)
-        if transition.sync_signature_overlay:
-            self._sync_signature_overlay()
-        if transition.refresh_preview:
-            self.properties_panel.refresh_preview()
-        if transition.reload_signing_action_state:
-            self._apply_signing_action_state(self._signing_action_boundary.load())
-        elif transition.signing_action_invalidation_reason is not None:
-            self._apply_signing_action_state(
-                self._signing_action_boundary.invalidate(
-                    transition.signing_action_invalidation_reason
-                ).state
+            return
+        if isinstance(effect, ApplyPlacementContext):
+            self._apply_placement_context_result(effect.placement_context)
+            return
+        if isinstance(effect, ApplySignatureRect):
+            self.properties_panel.set_signature_rect(
+                effect.signature_rect,
+                notify=effect.notify,
             )
+            return
+        if isinstance(effect, SyncSignatureOverlay):
+            self._sync_signature_overlay()
+            return
+        if isinstance(effect, RefreshPreview):
+            self.properties_panel.refresh_preview()
+            return
+        if isinstance(effect, ReloadSigningActionState):
+            self._apply_signing_action_state(self._signing_action_boundary.load())
+            return
+        if isinstance(effect, InvalidateSigningAction):
+            self._apply_signing_action_state(
+                self._signing_action_boundary.invalidate(effect.reason).state
+            )
+            return
+        raise TypeError(f"Unsupported workspace interaction effect: {effect!r}")
 
     def _refresh_flow_summary(self) -> None:
         self._apply_signing_action_state(self._signing_action_boundary.load())

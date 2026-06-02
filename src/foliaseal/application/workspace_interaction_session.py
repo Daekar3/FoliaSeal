@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TypeAlias
 
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review_workspace import (
@@ -18,20 +19,88 @@ from foliaseal.domain.models import SignatureRect
 
 
 @dataclass(frozen=True)
-class WorkspaceInteractionTransition:
-    """One shell-facing interaction transition with no Qt dependencies."""
+class ApplyReviewTransition:
+    """Apply a review/text transition returned by the review workspace."""
 
-    review_transition: DocumentReviewWorkspaceTransition | None = None
-    signature_rect: SignatureRect | None = None
-    placement_context: SignaturePlacementContext | None = None
-    refresh_viewer: bool = False
-    navigation_refresh: bool = False
-    refresh_current_placement_context: bool = False
-    sync_signature_overlay: bool = False
-    refresh_preview: bool = False
-    reload_signing_action_state: bool = False
-    signing_action_invalidation_reason: str | None = None
-    error_message: str | None = None
+    transition: DocumentReviewWorkspaceTransition
+
+
+@dataclass(frozen=True)
+class EmitInteractionError:
+    """Emit one user-facing interaction error and stop further work."""
+
+    message: str
+
+
+@dataclass(frozen=True)
+class RefreshViewer:
+    """Refresh the viewer, optionally preserving navigation intent."""
+
+    navigation: bool = False
+    error_summary: str = "Unable to refresh viewer"
+
+
+@dataclass(frozen=True)
+class RefreshCurrentPlacementContext:
+    """Refresh placement context from the current viewer snapshot."""
+
+
+@dataclass(frozen=True)
+class ApplyPlacementContext:
+    """Apply an explicit placement context already computed by the session."""
+
+    placement_context: SignaturePlacementContext | None
+
+
+@dataclass(frozen=True)
+class ApplySignatureRect:
+    """Apply a signature rectangle through the non-notifying panel path."""
+
+    signature_rect: SignatureRect
+    notify: bool = False
+
+
+@dataclass(frozen=True)
+class SyncSignatureOverlay:
+    """Resync the signature overlay with current draft state."""
+
+
+@dataclass(frozen=True)
+class RefreshPreview:
+    """Refresh the visible-signature preview."""
+
+
+@dataclass(frozen=True)
+class ReloadSigningActionState:
+    """Reload signing-action state from the current boundary."""
+
+
+@dataclass(frozen=True)
+class InvalidateSigningAction:
+    """Invalidate current signing-action state for the given reason."""
+
+    reason: str
+
+
+WorkspaceInteractionEffect: TypeAlias = (
+    ApplyReviewTransition
+    | EmitInteractionError
+    | RefreshViewer
+    | RefreshCurrentPlacementContext
+    | ApplyPlacementContext
+    | ApplySignatureRect
+    | SyncSignatureOverlay
+    | RefreshPreview
+    | ReloadSigningActionState
+    | InvalidateSigningAction
+)
+
+
+@dataclass(frozen=True)
+class WorkspaceInteractionPlan:
+    """One shell-facing ordered interaction plan with no Qt dependencies."""
+
+    effects: tuple[WorkspaceInteractionEffect, ...]
 
 
 @dataclass
@@ -42,7 +111,7 @@ class WorkspaceInteractionSession:
     viewer_interaction_session: ViewerInteractionSession
     document_review_workspace: DocumentReviewWorkspaceSession
 
-    def select_in_viewer(self, pdf_rect: PdfRect) -> WorkspaceInteractionTransition:
+    def select_in_viewer(self, pdf_rect: PdfRect) -> WorkspaceInteractionPlan:
         snapshot = getattr(self.viewer_workflow, "snapshot", None)
         page_index = (
             snapshot.page_index
@@ -55,60 +124,85 @@ class WorkspaceInteractionSession:
             selection_rect=normalized_rect,
         )
         if review_transition.viewer_selection_consumed:
-            return WorkspaceInteractionTransition(review_transition=review_transition)
+            return WorkspaceInteractionPlan(
+                effects=(ApplyReviewTransition(review_transition),)
+            )
         selection_result = self.viewer_interaction_session.select_signature_rect(
             normalized_rect
         )
         if selection_result.error_message is not None:
-            return WorkspaceInteractionTransition(error_message=selection_result.error_message)
-        return WorkspaceInteractionTransition(
-            signature_rect=selection_result.signature_rect,
-            placement_context=selection_result.placement_context,
-            sync_signature_overlay=True,
-            signing_action_invalidation_reason="selection",
+            return WorkspaceInteractionPlan(
+                effects=(EmitInteractionError(selection_result.error_message),)
+            )
+        signature_rect = selection_result.signature_rect
+        if signature_rect is None:
+            return WorkspaceInteractionPlan(effects=())
+        return WorkspaceInteractionPlan(
+            effects=(
+                ApplyPlacementContext(selection_result.placement_context),
+                ApplySignatureRect(signature_rect),
+                SyncSignatureOverlay(),
+                InvalidateSigningAction("selection"),
+            )
         )
 
-    def change_page(self, page_number: int) -> WorkspaceInteractionTransition:
+    def change_page(self, page_number: int) -> WorkspaceInteractionPlan:
         try:
             self.viewer_interaction_session.set_page_number(page_number)
         except Exception as exc:
-            return WorkspaceInteractionTransition(
-                error_message=f"Unable to change PDF page: {exc}"
+            return WorkspaceInteractionPlan(
+                effects=(EmitInteractionError(f"Unable to change PDF page: {exc}"),)
             )
-        return WorkspaceInteractionTransition(
-            refresh_viewer=True,
-            navigation_refresh=True,
-            refresh_current_placement_context=True,
-            sync_signature_overlay=True,
-            signing_action_invalidation_reason="page",
+        return WorkspaceInteractionPlan(
+            effects=(
+                RefreshViewer(
+                    navigation=True,
+                    error_summary="Unable to change PDF page",
+                ),
+                RefreshCurrentPlacementContext(),
+                SyncSignatureOverlay(),
+                InvalidateSigningAction("page"),
+            )
         )
 
-    def refresh_navigation_to_page_index(self, target_index: int) -> WorkspaceInteractionTransition:
+    def refresh_navigation_to_page_index(self, target_index: int) -> WorkspaceInteractionPlan:
         try:
             self.viewer_interaction_session.set_logical_page_index(target_index)
         except Exception as exc:
-            return WorkspaceInteractionTransition(
-                error_message=f"Unable to show document text match: {exc}"
+            return WorkspaceInteractionPlan(
+                effects=(
+                    EmitInteractionError(
+                        f"Unable to show document text match: {exc}"
+                    ),
+                )
             )
-        return WorkspaceInteractionTransition(
-            refresh_viewer=True,
-            navigation_refresh=True,
-            refresh_current_placement_context=True,
-            sync_signature_overlay=True,
+        return WorkspaceInteractionPlan(
+            effects=(
+                RefreshViewer(
+                    navigation=True,
+                    error_summary="Unable to show document text match",
+                ),
+                RefreshCurrentPlacementContext(),
+                SyncSignatureOverlay(),
+            )
         )
 
-    def refresh_after_panel_change(self) -> WorkspaceInteractionTransition:
-        return WorkspaceInteractionTransition(
-            refresh_current_placement_context=True,
-            sync_signature_overlay=True,
-            signing_action_invalidation_reason="panel",
+    def refresh_after_panel_change(self) -> WorkspaceInteractionPlan:
+        return WorkspaceInteractionPlan(
+            effects=(
+                RefreshCurrentPlacementContext(),
+                SyncSignatureOverlay(),
+                InvalidateSigningAction("panel"),
+            )
         )
 
-    def refresh_after_viewer_refresh(self) -> WorkspaceInteractionTransition:
-        return WorkspaceInteractionTransition(
-            refresh_viewer=True,
-            refresh_current_placement_context=True,
-            sync_signature_overlay=True,
-            refresh_preview=True,
-            reload_signing_action_state=True,
+    def refresh_after_viewer_refresh(self) -> WorkspaceInteractionPlan:
+        return WorkspaceInteractionPlan(
+            effects=(
+                RefreshViewer(),
+                RefreshCurrentPlacementContext(),
+                SyncSignatureOverlay(),
+                RefreshPreview(),
+                ReloadSigningActionState(),
+            )
         )

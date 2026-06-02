@@ -218,11 +218,11 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/application/workspace_interaction_session.py`
 - Responsibility: Own the shell-level sequencing for viewer selection, page changes, document-text jump navigation, panel-change follow-up, and viewer-refresh follow-up while staying Qt-free.
-- Owns: `WorkspaceInteractionSession`, `WorkspaceInteractionTransition`, the routing between `DocumentReviewWorkspaceSession` and `ViewerInteractionSession`, plus transition intents for viewer refresh, overlay sync, placement-context refresh, preview refresh, and signing-action invalidation/reload.
+- Owns: `WorkspaceInteractionSession`, `WorkspaceInteractionPlan`, the routing between `DocumentReviewWorkspaceSession` and `ViewerInteractionSession`, and the ordered effect vocabulary for review-transition application, viewer refresh, placement-context application, signature-rectangle application, overlay sync, preview refresh, signing-action reload, signing-action invalidation, and error emission.
 - Does not own: widget refresh calls themselves, signature overlay painting, preview rendering, or direct `SignatureRect` mutation in the panel.
 - Key collaborators: `DocumentReviewWorkspaceSession`, `ViewerInteractionSession`, `ViewerWorkflow`, `presentation/qt/signing_shell.py`.
 - Main entry points: `select_in_viewer()`, `change_page()`, `refresh_navigation_to_page_index()`, `refresh_after_panel_change()`, `refresh_after_viewer_refresh()`.
-- Known constraints: The boundary is intentionally Qt-free and returns plain transition data. The shell now applies transition-carried `SignatureRect` values through a non-notifying panel path and explicitly chooses when `refresh_after_panel_change()` should run, instead of relying on the panel's generic `on_change` callback for internal rect application.
+- Known constraints: The boundary is intentionally Qt-free and returns an explicit `WorkspaceInteractionPlan`. The shell iterates that ordered plan, applies `SignatureRect` values through a non-notifying panel path, and explicitly chooses when `refresh_after_panel_change()` should run instead of relying on the panel's generic `on_change` callback for internal rect application.
 - Status: Implemented and confirmed by code and tests.
 
 ### Rendering infrastructure
@@ -568,7 +568,7 @@ The canonical repository document split is:
 3. The workspace resolves the current document review summary from `ViewerWorkflow.document_path` through the injected application review helper; optional `AppSettings` or `AppSettingsStore` input is loaded by the workspace, otherwise home-directory defaults are used.
 4. The workspace shows read-only signing-flow and document-review cards derived from current draft/readiness/result state and the currently open PDF; the review card includes a top-level summary, a compact per-signature list, and selector-driven per-signature detail only. Reopening the last successful signed output now lives exclusively in the primary sign panel.
 5. The signature-properties panel now delegates the common setup workflow to `SigningSetupSession`, which composes `DefaultSignaturePropertiesCoordinator` plus a tiny Qt passphrase-prompt adapter. The panel still maps Qt controls to and from the visible-signature draft, still owns overwrite/delete confirmation dialogs, and still owns preview rendering, but it no longer owns the main setup orchestration for load, visible-signature apply, nonblank preset selection, preset save/delete mutation, programmatic appearance dirty clearing, certificate selection, or catalog refresh. The session now owns manual certificate-password retry, cancel handling, session-local passphrase caching, programmatic appearance-update preset clearing, and preset mutation delegation instead of the panel.
-6. `SigningWorkspaceWidget` now delegates recurring viewer/panel interaction sequencing to `WorkspaceInteractionSession`, which composes `DocumentReviewWorkspaceSession` plus `ViewerInteractionSession`. That session now owns routing viewer drags between text selection and signature placement, page-change follow-up, document-text jump navigation follow-up, panel-change placement-context resync, and viewer-refresh resync.
+6. `SigningWorkspaceWidget` delegates recurring viewer/panel interaction sequencing to `WorkspaceInteractionSession`, which composes `DocumentReviewWorkspaceSession` plus `ViewerInteractionSession`. That session returns a `WorkspaceInteractionPlan` whose ordered effects cover review-transition application, viewer refresh, placement-context application, signature-rectangle application, overlay sync, preview refresh, signing-action reload, signing-action invalidation, and error emission, and the shell executes that plan without re-deriving the choreography from flag fields.
 7. The panel derives `SigningDraftPreview`, asks `QtCanonicalPreviewLifecycle` for canonical render state when a snapshot is available, and hands that state plus the preview draft to `QtSignaturePreviewLayout` to plan and apply card sizing, widget ordering, and visibility.
 8. When the user chooses an output path, `SigningWorkspaceWidget.choose_output_pdf_path()` confirms overwrite if needed and delegates to `SigningActionBoundary.accept_output_path()`, which forwards the path into `SigningActionCoordinator.accept_output_path()` and returns the updated signing-action state snapshot.
 9. When the user signs, `SigningWorkspaceWidget.submit_sign_request()` delegates to `SigningActionBoundary.submit()`, which applies pending property changes via the coordinator, checks readiness, builds the `SigningRequest`, and routes success or failure callbacks before returning the updated state.
@@ -627,9 +627,9 @@ The canonical repository document split is:
 
 1. `SigningWorkspaceWidget` creates `DocumentReviewWorkspaceSession`, `ViewerInteractionSession`, and `WorkspaceInteractionSession`.
 2. Viewer drags go first to `WorkspaceInteractionSession.select_in_viewer(...)`, which lets the review/text workspace consume selection-mode drags before trying signing placement.
-3. If a drag becomes a signing placement, the workspace interaction session returns a plain transition carrying the `SignatureRect`, optional placement context, overlay-sync intent, and signing-action invalidation reason.
-4. The shell applies that transition to concrete widgets and the signing draft through a non-notifying `SignaturePropertiesPanel.set_signature_rect(...)` path, so viewer-selection placement does not loop back through the generic panel-change callback.
-5. Page changes, document-text jump navigation, panel-change follow-up, and viewer-refresh follow-up all go through explicit workspace-interaction session verbs that return the same transition shape.
+3. If a drag becomes a signing placement, the workspace interaction session returns a `WorkspaceInteractionPlan` carrying ordered effects for the `SignatureRect`, optional placement context, overlay sync, preview refresh, and signing-action invalidation/reload.
+4. The shell executes that ordered plan against concrete widgets and the signing draft through a non-notifying `SignaturePropertiesPanel.set_signature_rect(...)` path, so viewer-selection placement does not loop back through the generic panel-change callback.
+5. Page changes, document-text jump navigation, panel-change follow-up, and viewer-refresh follow-up all go through explicit workspace-interaction session verbs that return the same ordered-effect shape.
 
 ### Phase 3 evidence validation
 
@@ -732,6 +732,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-06-01 | Updated workspace-interaction documentation for ordered effects. | Reflected the implemented `WorkspaceInteractionPlan` boundary and thin shell executor. |
 | 2026-05-30 | Removed internal signature-rect callback coupling from the shell interaction seam. | Reflected direct rect application and viewer-selection placement now using explicit workspace-interaction follow-up instead of routing back through the panel's generic change callback. |
 | 2026-05-31 | Moved `SigningActionState` rendering into the sidebar. | Reflected the completed ownership split where the sidebar mutates the `Sign PDF` widgets and the shell keeps orchestration, callback emission, and public surface ownership. |
 | 2026-05-31 | Added a sidebar width fallback for the action-panel detail label. | Reflected the test-harness and early-layout case where the sidebar container can report zero width before layout stabilizes. |

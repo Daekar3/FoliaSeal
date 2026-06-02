@@ -3685,6 +3685,77 @@ def test_signing_shell_refresh_viewer_uses_workspace_interaction_session_entrypo
     assert calls == ["refresh"]
 
 
+def test_signing_shell_refresh_viewer_applies_ordered_workspace_effects(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    order: list[str] = []
+
+    def _record_refresh(*, navigation: bool = False):
+        order.append(f"refresh:{navigation}")
+
+    def _record_current_placement_context():
+        order.append("placement")
+
+    def _record_overlay(_rect=None):
+        order.append("overlay")
+
+    def _record_preview():
+        order.append("preview")
+
+    original_current_context = (
+        signing_shell_module.ViewerInteractionSession.current_placement_context
+    )
+    original_boundary_load = signing_shell_module.SigningActionBoundary.load
+
+    def _record_current_context(self):
+        order.append("placement")
+        return original_current_context(self)
+
+    def _record_boundary_load(self):
+        order.append("signing")
+        return original_boundary_load(self)
+
+    monkeypatch.setattr(widget.viewer_widget, "refresh", _record_refresh)
+    monkeypatch.setattr(
+        signing_shell_module.ViewerInteractionSession,
+        "current_placement_context",
+        _record_current_context,
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningActionBoundary,
+        "load",
+        _record_boundary_load,
+    )
+    monkeypatch.setattr(widget.viewer_widget, "set_signature_overlay", _record_overlay)
+    monkeypatch.setattr(widget.properties_panel, "refresh_preview", _record_preview)
+
+    widget.refresh_viewer()
+
+    assert order == [
+        "refresh:False",
+        "placement",
+        "overlay",
+        "preview",
+        "signing",
+    ]
+
+
 def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition(
     monkeypatch,
     tmp_path: Path,
