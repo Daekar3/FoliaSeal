@@ -347,28 +347,22 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
 ) -> None:
     captured = {}
 
-    def fake_run_phase3_preview_matrix(
-        *,
-        pdf_path: str,
-        certificate_path: str,
-        passphrase: str,
-        scenario_manifest_path: str,
-        artifacts_dir: str,
-    ) -> dict[str, object]:
-        captured["pdf_path"] = pdf_path
-        captured["certificate_path"] = certificate_path
-        captured["passphrase"] = passphrase
-        captured["scenario_manifest_path"] = scenario_manifest_path
-        captured["artifacts_dir"] = artifacts_dir
-        return {
-            "artifacts_dir": artifacts_dir,
-            "scenario_count": 1,
-            "successful_scenario_count": 1,
-        }
+    class _FakeService:
+        def run_preview_matrix(self, request):
+            captured["pdf_path"] = request.pdf_path
+            captured["certificate_path"] = request.certificate_path
+            captured["passphrase"] = request.passphrase
+            captured["scenario_manifest_path"] = request.scenario_manifest_path
+            captured["artifacts_dir"] = request.artifacts_dir
+            return {
+                "artifacts_dir": request.artifacts_dir,
+                "scenario_count": 1,
+                "successful_scenario_count": 1,
+            }
 
     monkeypatch.setattr(
-        "foliaseal.__main__.run_phase3_preview_matrix",
-        fake_run_phase3_preview_matrix,
+        "foliaseal.__main__._build_phase3_evidence_service",
+        lambda: _FakeService(),
     )
 
     __main__.main(
@@ -396,35 +390,138 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
     }
 
 
-def test_main_phase3_signed_acceptance_evidence_dispatches_to_runner(
+def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     captured = {}
 
-    def fake_run_signed_acceptance_evidence(
-        *,
-        artifacts_root: str,
-        summary_markdown_path: str,
-    ) -> dict[str, object]:
-        captured["artifacts_root"] = artifacts_root
-        captured["summary_markdown_path"] = summary_markdown_path
-        return {
-            "summary_markdown_path": summary_markdown_path,
-            "matrix_results": [
-                {
-                    "name": "signed_acceptance_matrix",
-                    "counters": {
-                        "scenario_count": 10,
-                        "successful_signing_run_count": 7,
-                    },
-                }
-            ],
-        }
+    class _FakeService:
+        def run_signed_acceptance_matrix(self, request):
+            captured["pdf_path"] = request.pdf_path
+            captured["certificate_path"] = request.certificate_path
+            captured["passphrase"] = request.passphrase
+            captured["scenario_manifest_path"] = request.scenario_manifest_path
+            captured["artifacts_dir"] = request.artifacts_dir
+            return {
+                "artifacts_dir": request.artifacts_dir,
+                "scenario_count": 3,
+                "successful_signing_run_count": 2,
+            }
 
     monkeypatch.setattr(
-        "foliaseal.__main__.run_signed_acceptance_evidence",
-        fake_run_signed_acceptance_evidence,
+        "foliaseal.__main__._build_phase3_evidence_service",
+        lambda: _FakeService(),
+    )
+
+    __main__.main(
+        [
+            "phase3-signing-acceptance-matrix",
+            "--pdf-path",
+            "/tmp/sample.pdf",
+            "--certificate-path",
+            "/tmp/cert.p12",
+            "--passphrase",
+            "secret",
+            "--scenario-manifest-path",
+            "/tmp/manifest.json",
+            "--artifacts-dir",
+            "/tmp/artifacts",
+        ]
+    )
+
+    assert captured == {
+        "pdf_path": "/tmp/sample.pdf",
+        "certificate_path": "/tmp/cert.p12",
+        "passphrase": "secret",
+        "scenario_manifest_path": "/tmp/manifest.json",
+        "artifacts_dir": "/tmp/artifacts",
+    }
+    output = capsys.readouterr().out
+    assert "Phase 3 signed acceptance matrix" in output
+    assert "- scenarios executed: 3" in output
+    assert "- successful signings: 2" in output
+
+
+def test_main_phase3_signing_harness_dispatches_through_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class _FakeService:
+        def capture_harness(self, request):
+            captured["pdf_path"] = request.pdf_path
+            captured["certificate_path"] = request.certificate_path
+            captured["passphrase"] = request.passphrase
+            captured["summary_json_path"] = request.summary_json_path
+            captured["checklist_results_path"] = request.checklist_results_path
+            captured["checklist_template_path"] = request.checklist_template_path
+            captured["artifacts_dir"] = request.artifacts_dir
+            return object()
+
+    monkeypatch.setattr(
+        "foliaseal.__main__._build_phase3_evidence_service",
+        lambda: _FakeService(),
+    )
+
+    __main__.main(
+        [
+            "phase3-signing-harness",
+            "--pdf-path",
+            "/tmp/sample.pdf",
+            "--certificate-path",
+            "/tmp/cert.p12",
+            "--passphrase",
+            "secret",
+            "--summary-json-path",
+            "/tmp/summary.json",
+            "--checklist-results-path",
+            "/tmp/results.md",
+            "--checklist-template-path",
+            "/tmp/template.md",
+            "--artifacts-dir",
+            "/tmp/artifacts",
+        ]
+    )
+
+    assert captured == {
+        "pdf_path": "/tmp/sample.pdf",
+        "certificate_path": "/tmp/cert.p12",
+        "passphrase": "secret",
+        "summary_json_path": "/tmp/summary.json",
+        "checklist_results_path": "/tmp/results.md",
+        "checklist_template_path": "/tmp/template.md",
+        "artifacts_dir": "/tmp/artifacts",
+    }
+
+
+def test_main_phase3_signed_acceptance_evidence_dispatches_to_service(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    captured = {}
+
+    class _FakeCounters:
+        scenario_count = 10
+        successful_signing_run_count = 7
+
+    class _FakeMatrixResult:
+        name = "signed_acceptance_matrix"
+        counters = _FakeCounters()
+
+    class _FakeEvidence:
+        summary_markdown_path = "/tmp/foliaseal-evidence/summary.md"
+        matrix_results = (_FakeMatrixResult(),)
+
+    class _FakeService:
+        def run_signed_acceptance_evidence(self, request):
+            captured["artifacts_root"] = str(request.artifacts_root)
+            captured["summary_markdown_path"] = request.summary_markdown_path
+            return _FakeEvidence()
+
+    monkeypatch.setattr(
+        "foliaseal.__main__._build_phase3_evidence_service",
+        lambda: _FakeService(),
     )
 
     __main__.main(
@@ -446,41 +543,40 @@ def test_main_phase3_signed_acceptance_evidence_dispatches_to_runner(
     assert "signed_acceptance_matrix: PASS (10 scenarios, 7 successful signings)" in output
 
 
-def test_main_phase3_signing_harness_validate_dispatches_to_contract_evaluator(
+def test_main_phase3_signing_harness_validate_dispatches_to_service(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    summary_path = tmp_path / "summary.json"
-    summary_path.write_text('{"contract_version": "phase3.v1"}', encoding="utf-8")
     captured = {}
 
-    def fake_evaluate_phase3_evidence_contract(payload: dict[str, object]) -> SimpleNamespace:
-        captured["payload"] = payload
-        return SimpleNamespace(
-            acceptance_tier="full",
-            gate_verdict="pass",
-            passed=True,
-            contract_version="phase3.v1",
-            errors=(),
-            warnings=(),
-        )
+    class _FakeService:
+        def validate_harness_capture(self, request):
+            captured["summary_json_path"] = str(request.summary_json_path)
+            return SimpleNamespace(
+                acceptance_tier="full",
+                gate_verdict="pass",
+                passed=True,
+                contract_version="phase3.v1",
+                errors=(),
+                warnings=(),
+            )
 
     monkeypatch.setattr(
-        "foliaseal.__main__.evaluate_phase3_evidence_contract",
-        fake_evaluate_phase3_evidence_contract,
+        "foliaseal.__main__._build_phase3_evidence_service",
+        lambda: _FakeService(),
     )
 
     __main__.main(
         [
             "phase3-signing-harness-validate",
             "--summary-json-path",
-            str(summary_path),
+            str(tmp_path / "summary.json"),
         ]
     )
 
     output = capsys.readouterr().out
-    assert captured == {"payload": {"contract_version": "phase3.v1"}}
+    assert captured == {"summary_json_path": str(tmp_path / "summary.json")}
     assert "Phase 3 evidence contract" in output
     assert "- validation passed: yes" in output
 
@@ -490,22 +586,20 @@ def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    summary_path = tmp_path / "summary.json"
-    summary_path.write_text('{"contract_version": "phase3.v1"}', encoding="utf-8")
-
-    def fake_evaluate_phase3_evidence_contract(payload: dict[str, object]) -> SimpleNamespace:
-        return SimpleNamespace(
-            acceptance_tier="partial",
-            gate_verdict="fail",
-            passed=False,
-            contract_version=str(payload["contract_version"]),
-            errors=("missing required field",),
-            warnings=(),
-        )
+    class _FakeService:
+        def validate_harness_capture(self, request):
+            return SimpleNamespace(
+                acceptance_tier="partial",
+                gate_verdict="fail",
+                passed=False,
+                contract_version="phase3.v1",
+                errors=("missing required field",),
+                warnings=(),
+            )
 
     monkeypatch.setattr(
-        "foliaseal.__main__.evaluate_phase3_evidence_contract",
-        fake_evaluate_phase3_evidence_contract,
+        "foliaseal.__main__._build_phase3_evidence_service",
+        lambda: _FakeService(),
     )
 
     with pytest.raises(ValueError, match="failed evidence contract validation"):
@@ -513,7 +607,7 @@ def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
             [
                 "phase3-signing-harness-validate",
                 "--summary-json-path",
-                str(summary_path),
+                str(tmp_path / "summary.json"),
             ]
         )
 

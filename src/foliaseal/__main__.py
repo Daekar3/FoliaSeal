@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -16,8 +15,11 @@ from foliaseal.application.phase2_evidence import (
     build_phase2_timing_evidence,
     parse_checklist_markdown,
 )
-from foliaseal.application.qa_evidence_contract import (
-    evaluate_phase3_evidence_contract,
+from foliaseal.application.phase3_evidence_service import (
+    Phase3HarnessCaptureRequest,
+    Phase3HarnessValidationRequest,
+    Phase3MatrixRequest,
+    Phase3SignedAcceptanceEvidenceRequest,
 )
 from foliaseal.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
@@ -33,13 +35,10 @@ from foliaseal.presentation.qt.phase2_harness import (
 from foliaseal.presentation.qt.phase3_harness import (
     DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
     DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
-    run_phase3_preview_matrix,
-    run_phase3_signed_acceptance_matrix,
-    run_phase3_signing_harness,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
     DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
-    run_signed_acceptance_evidence,
+    build_default_phase3_evidence_service,
 )
 
 
@@ -444,9 +443,9 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
 
 
 def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
-    capture_path = Path(args.summary_json_path)
-    payload = json.loads(capture_path.read_text(encoding="utf-8"))
-    evaluation = evaluate_phase3_evidence_contract(payload)
+    evaluation = _build_phase3_evidence_service().validate_harness_capture(
+        Phase3HarnessValidationRequest(summary_json_path=args.summary_json_path)
+    )
     print("Phase 3 evidence contract")
     print(f"- acceptance tier: {evaluation.acceptance_tier}")
     print(f"- gate verdict: {evaluation.gate_verdict}")
@@ -458,6 +457,10 @@ def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
         print(f"- warnings: {list(evaluation.warnings)}")
     if not evaluation.passed:
         raise ValueError("Phase 3 harness capture failed evidence contract validation.")
+
+
+def _build_phase3_evidence_service():
+    return build_default_phase3_evidence_service()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -478,14 +481,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "phase3-signing-harness":
-        run_phase3_signing_harness(
-            pdf_path=args.pdf_path,
-            certificate_path=args.certificate_path,
-            passphrase=args.passphrase,
-            summary_json_path=args.summary_json_path,
-            checklist_results_path=args.checklist_results_path,
-            checklist_template_path=args.checklist_template_path,
-            artifacts_dir=args.artifacts_dir,
+        _build_phase3_evidence_service().capture_harness(
+            Phase3HarnessCaptureRequest(
+                pdf_path=args.pdf_path,
+                certificate_path=args.certificate_path,
+                passphrase=args.passphrase,
+                summary_json_path=args.summary_json_path,
+                checklist_results_path=args.checklist_results_path,
+                checklist_template_path=args.checklist_template_path,
+                artifacts_dir=args.artifacts_dir,
+            )
         )
         return 0
     if args.command == "gui":
@@ -495,12 +500,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "phase3-signing-preview-matrix":
-        summary = run_phase3_preview_matrix(
-            pdf_path=args.pdf_path,
-            certificate_path=args.certificate_path,
-            passphrase=args.passphrase,
-            scenario_manifest_path=args.scenario_manifest_path,
-            artifacts_dir=args.artifacts_dir,
+        summary = _build_phase3_evidence_service().run_preview_matrix(
+            Phase3MatrixRequest(
+                pdf_path=args.pdf_path,
+                certificate_path=args.certificate_path,
+                passphrase=args.passphrase,
+                scenario_manifest_path=args.scenario_manifest_path,
+                artifacts_dir=args.artifacts_dir,
+            )
         )
         print("Phase 3 preview matrix")
         print(f"- scenarios executed: {summary['scenario_count']}")
@@ -508,12 +515,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
         return 0
     if args.command == "phase3-signing-acceptance-matrix":
-        summary = run_phase3_signed_acceptance_matrix(
-            pdf_path=args.pdf_path,
-            certificate_path=args.certificate_path,
-            passphrase=args.passphrase,
-            scenario_manifest_path=args.scenario_manifest_path,
-            artifacts_dir=args.artifacts_dir,
+        summary = _build_phase3_evidence_service().run_signed_acceptance_matrix(
+            Phase3MatrixRequest(
+                pdf_path=args.pdf_path,
+                certificate_path=args.certificate_path,
+                passphrase=args.passphrase,
+                scenario_manifest_path=args.scenario_manifest_path,
+                artifacts_dir=args.artifacts_dir,
+            )
         )
         print("Phase 3 signed acceptance matrix")
         print(f"- scenarios executed: {summary['scenario_count']}")
@@ -522,18 +531,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
         return 0
     if args.command == "phase3-signing-acceptance-evidence":
-        evidence = run_signed_acceptance_evidence(
-            artifacts_root=args.artifacts_root,
-            summary_markdown_path=args.summary_markdown_path,
+        evidence = _build_phase3_evidence_service().run_signed_acceptance_evidence(
+            Phase3SignedAcceptanceEvidenceRequest(
+                artifacts_root=args.artifacts_root,
+                summary_markdown_path=args.summary_markdown_path,
+            )
         )
         print("Phase 3 signed acceptance evidence")
-        print(f"- summary markdown: {evidence['summary_markdown_path']}")
-        for result in evidence["matrix_results"]:
-            counters = result["counters"]
+        print(f"- summary markdown: {evidence.summary_markdown_path}")
+        for result in evidence.matrix_results:
+            counters = result.counters
             print(
-                f"- {result['name']}: PASS "
-                f"({counters['scenario_count']} scenarios, "
-                f"{counters['successful_signing_run_count']} successful signings)"
+                f"- {result.name}: PASS "
+                f"({counters.scenario_count} scenarios, "
+                f"{counters.successful_signing_run_count} successful signings)"
             )
         return 0
     if args.command == "phase3-signing-harness-validate":

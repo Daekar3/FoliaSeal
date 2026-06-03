@@ -42,11 +42,12 @@ The canonical repository document split is:
 |---|---|---|
 | `src/foliaseal/__main__.py` | CLI parser and command dispatch. | Exposes `foliaseal` console script and `python -m foliaseal`. |
 | `src/foliaseal/domain/` | Stable domain models, enums, protocols, and failure codes. | No Qt imports found. |
-| `src/foliaseal/application/` | Use cases, workflows, geometry, preview/render evidence logic, layout planning, and protocol boundaries. | Some transitional modules still import concrete infra helpers. |
+| `src/foliaseal/application/` | Use cases, workflows, geometry, preview/render evidence logic, layout planning, protocol boundaries, and the Phase 3 evidence service. | Some transitional modules still import concrete infra helpers. |
+| `src/foliaseal/application/phase3_evidence_service.py` | Explicit service boundary for Phase 3 evidence capture, matrix execution, validation, and signed-acceptance evidence generation. | Owns the request/result dataclasses and the caller-facing service verbs. |
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, Qt PDF rendering, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
-| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; the signing shell delegates certificate/preset reconciliation to the application coordinator, signing-action orchestration to `signing_action_boundary.py`, canonical preview lifecycle to `signature_preview_lifecycle.py`, preview geometry/layout handoff to `signature_preview_layout.py`, and Phase 3 harness session/reporting splitting to `phase3_harness.py` plus `phase3_harness_reporting.py`. |
+| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; the signing shell delegates certificate/preset reconciliation to the application coordinator, signing-action orchestration to `signing_action_boundary.py`, canonical preview lifecycle to `signature_preview_lifecycle.py`, preview geometry/layout handoff to `signature_preview_layout.py`, and Phase 3 harness session/reporting splitting to `phase3_harness.py` plus `phase3_harness_reporting.py`. `phase3_signed_acceptance_evidence.py` is now a thin wrapper/client around the application-layer evidence service. |
 | `src/foliaseal/presentation/qt/phase3_harness_reporting.py` | Pure Phase 3 harness reporting boundary. | Finalizes raw capture payloads into JSON/checklist evidence without owning the interactive Qt session. |
 | `src/foliaseal/presentation/qt/signing_action_boundary.py` | Shell-facing boundary for the signing-action flow. | Bridges the shell to `SigningActionCoordinator` while keeping dialog/callback orchestration separate from the state machine. |
 | `src/foliaseal/presentation/qt/signature_preview_layout.py` | Widget-facing preview geometry planning and application. | Owns preview card sizing, orientation, ordering, and widget visibility decisions. |
@@ -328,13 +329,24 @@ The canonical repository document split is:
 
 ### QA and evidence machinery
 
-- Location: `src/foliaseal/application/qa_*`, `src/foliaseal/application/phase2_evidence.py`, `src/foliaseal/presentation/qt/phase*_harness.py`, `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py`, `artifacts/`
-- Responsibility: Produce manual QA evidence, preview matrix outputs, signed-output acceptance artifacts, signed acceptance evidence summaries, and evidence contract evaluations.
-- Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering. The evidence command suppresses known fit-rejection layout warnings only for the intentional rejection matrix; raw per-manifest matrix commands remain the diagnostic path.
+- Location: `src/foliaseal/application/qa_*`, `src/foliaseal/application/phase2_evidence.py`, `src/foliaseal/application/phase3_evidence_service.py`, `src/foliaseal/presentation/qt/phase*_harness.py`, `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py`, `artifacts/`
+- Responsibility: Produce manual QA evidence, preview matrix outputs, signed-output acceptance artifacts, signed acceptance evidence summaries, and evidence contract evaluations through an explicit application-layer service boundary.
+- Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, Phase 3 evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering. The evidence service owns the explicit caller-facing verbs for capture harness, matrix execution, validation, and signed acceptance evidence; the thin presentation wrapper only suppresses known runtime chatter and wires default request values.
 - Does not own: Core domain models, signing semantics, or backend reservation evidence assembly.
-- Key collaborators: CLI entry points, Qt shell, signing backend, artifacts directory.
-- Known constraints: The Phase 3 harness now splits interactive session collection, capture payload assembly, and report finalization across `src/foliaseal/presentation/qt/phase3_harness.py` and `src/foliaseal/presentation/qt/phase3_harness_reporting.py`; the reporting module still owns JSON serialization and checklist markdown rendering. Backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. That keeps the harness disposable and prevents it from depending on backend-private layout/signing helpers for reservation evidence.
+- Key collaborators: CLI entry points, `phase3_evidence_service.py`, Qt shell, signing backend, artifacts directory.
+- Known constraints: The Phase 3 harness now splits interactive session collection, capture payload assembly, and report finalization across `src/foliaseal/presentation/qt/phase3_harness.py` and `src/foliaseal/presentation/qt/phase3_harness_reporting.py`; the reporting module still owns JSON serialization and checklist markdown rendering. Backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. `src/foliaseal/application/phase3_evidence_service.py` is the explicit boundary for the CLI-facing evidence flows, while `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is now a thin wrapper/client used by the CLI and any direct callers.
 - Status: Confirmed by code, README, tests, and artifacts.
+
+### Phase 3 evidence service
+
+- Location: `src/foliaseal/application/phase3_evidence_service.py`
+- Responsibility: Own the explicit application-layer boundary for Phase 3 harness capture, preview matrices, signed-acceptance matrices, capture validation, and signed-acceptance evidence generation.
+- Owns: `Phase3HarnessCaptureRequest`, `Phase3MatrixRequest`, `Phase3SignedAcceptanceEvidenceRequest`, `Phase3HarnessValidationRequest`, `Phase3SignedAcceptanceMatrixCounters`, `Phase3SignedAcceptanceMatrixResult`, `Phase3SignedAcceptanceEvidenceResult`, `Phase3EvidenceService`, `capture_harness()`, `run_preview_matrix()`, `run_signed_acceptance_matrix()`, `validate_harness_capture()`, `run_signed_acceptance_evidence()`, `validate_signed_acceptance_matrix_summary()`.
+- Does not own: Qt widget behavior, direct harness UI orchestration, or the concrete artifact writer implementation.
+- Key collaborators: `presentation/qt/phase3_harness.py`, `presentation/qt/phase3_signed_acceptance_evidence.py`, `__main__.py`, `qa_evidence_contract.py`, `qa_signed_acceptance_generation.py`.
+- Main entry points: `build_default_phase3_evidence_service()`, `Phase3EvidenceService.capture_harness()`, `Phase3EvidenceService.run_preview_matrix()`, `Phase3EvidenceService.run_signed_acceptance_matrix()`, `Phase3EvidenceService.validate_harness_capture()`, `Phase3EvidenceService.run_signed_acceptance_evidence()`.
+- Known constraints: The service is intentionally thin over injected runners and writers, but it centralizes the CLI-facing request/result types and the signed-acceptance summary assembly. The default wrapper suppresses known benign Qt/pyHanko chatter and preserves the documented output paths.
+- Status: Confirmed by code and tests.
 
 ### Phase 3 harness session runner
 
@@ -723,7 +735,7 @@ Tests live under `tests/unit/` with support builders in `tests/support/`. The su
 | Qt shell/viewer | `test_qt_signing_shell.py`, `test_qt_viewer_widget.py`, `test_qt_render_backend.py` | Widget behavior through fakes, selection geometry, render diagnostics, and thin integration of the preview lifecycle and preview layout boundaries into the shell card. | Use fakes; avoid requiring a live GUI unless intentionally running harnesses. |
 | Viewer geometry/workflow | `test_coordinate_transform.py`, `test_viewer_session.py`, `test_viewer_workflow.py` | Coordinate math and page/zoom workflow. | Add cases for rotations/page boxes when geometry changes. |
 | Evidence/harnesses | `test_phase2_harness.py`, `test_phase3_harness.py`, `test_phase3_harness_reporting.py`, `test_phase2_evidence.py`, `test_preview_stress_fixtures.py` | Capture JSON, reporting-boundary behavior, checklist/evidence contract behavior, matrix diagnostics. | Keep generated outputs controlled and `.gitignore` aligned. |
-| Packaging/build helpers | `test_pyinstaller_support.py`, CLI tests | Hidden imports and command dispatch. | Update when CLI commands or packaging runtime imports change. |
+| Packaging/build helpers | `test_pyinstaller_support.py`, `test_phase3_evidence_service.py`, CLI tests | Hidden imports, service-boundary behavior, and command dispatch. | Update when CLI commands, packaging runtime imports, or evidence-service seams change. |
 
 Default local validation from README:
 

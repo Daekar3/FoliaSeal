@@ -6,45 +6,50 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-After this slice, the preview matrix, signed-acceptance matrix, signed-acceptance evidence command, and capture-validation command will all call through one explicit Phase 3 evidence service. The public commands and artifact outputs stay stable, but `src/foliaseal/__main__.py` becomes a dispatcher instead of a second orchestration layer.
+This slice is complete. The preview matrix, signed-acceptance matrix, signed-acceptance evidence command, and capture-validation command all call through one explicit Phase 3 evidence service. The public commands and artifact outputs stayed stable, and `src/foliaseal/__main__.py` now behaves as a dispatcher instead of a second orchestration layer.
 
 This is the slice that finishes the hybrid `3+4` direction: explicit caller-facing verbs with internally injected adapters for Qt boot, matrix execution, and artifact writing.
 
 ## Child ExecPlan Dependencies
 
-- [ ] `docs/ExecPlans/phase3_reporting_boundary_execplan.md` must be complete first.
-- [ ] `docs/ExecPlans/phase3_harness_session_runner_execplan.md` must be complete first.
+- [x] `docs/ExecPlans/phase3_reporting_boundary_execplan.md` is complete.
+- [x] `docs/ExecPlans/phase3_harness_session_runner_execplan.md` is complete.
 
 ## Progress
 
-- [ ] Begin after the prior child plans land.
+- [x] The explicit Phase 3 evidence service and thin CLI dispatch path are in place.
+- [x] The signed-acceptance evidence wrapper now delegates through the service boundary instead of acting as a peer orchestrator.
+- [x] `src/foliaseal/__main__.py` now builds request objects and dispatches through the service for harness, matrix, evidence, and validation commands.
 
 ## Surprises & Discoveries
 
-- Observation: fill this section as the slice proceeds.
-  Evidence: add concise test output or code references.
+- Observation: the service boundary is small, but it is still the right place to own the caller-facing request/result types.
+  Evidence: `src/foliaseal/application/phase3_evidence_service.py` now owns the request dataclasses, result dataclasses, matrix-summary validation, and the evidence-summary writer path.
+
+- Observation: the CLI and wrapper layers are now intentionally thin.
+  Evidence: `src/foliaseal/__main__.py` routes every Phase 3 workflow through `build_default_phase3_evidence_service()`, and `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` just filters known chatter and supplies default request wiring.
 
 ## Decision Log
 
-- Decision: no decisions recorded yet.
-  Rationale: this plan has not been implemented yet.
+- Decision: keep the command names and output paths stable while moving orchestration behind the service.
+  Rationale: the user-visible evidence workflow was already documented and tested; only the ownership of orchestration needed to move.
   Date/Author: 2026-06-03 / Codex
 
 ## Outcomes & Retrospective
 
-This slice has not started yet.
+This slice is complete. The CLI-facing evidence flows now have a single application-layer service boundary, the wrapper module is thin, and the documented command outputs remain unchanged.
 
 ## Context and Orientation
 
-`src/foliaseal/presentation/qt/phase3_harness.py` currently exports the preview-matrix and signed-acceptance matrix runners directly. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` adds another orchestration layer on top of that for one-command evidence generation. `src/foliaseal/__main__.py` then dispatches directly into both families. The result is that callers still know too much about which helper to call and how its output should be summarized.
+`src/foliaseal/presentation/qt/phase3_harness.py` still exports the preview-matrix and signed-acceptance matrix runners directly, but the CLI-facing orchestration now routes through `src/foliaseal/application/phase3_evidence_service.py`. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is now a thin wrapper/client around that service, and `src/foliaseal/__main__.py` dispatches through the service for the Phase 3 harness, matrix, evidence, and validation commands.
 
-The prior child plans establish smaller reporting and session-runner boundaries. This final child plan should wrap those boundaries and the matrix flows in one explicit service with caller-facing verbs such as capture harness, run preview matrix, run signed acceptance evidence, and validate capture.
+The prior child plans established smaller reporting and session-runner boundaries. This final child plan wrapped those boundaries and the matrix flows in one explicit service with caller-facing verbs such as capture harness, run preview matrix, run signed acceptance evidence, and validate capture.
 
 ## Plan of Work
 
-Create an explicit service module that owns Phase 3 evidence orchestration. Give it a caller-friendly surface with explicit methods rather than a generic mode flag. Internally, inject or wrap the concrete Qt boot path, matrix execution path, artifact writer, asset generator, and evidence contract evaluator.
+Complete the explicit service module that owns Phase 3 evidence orchestration. Give it a caller-friendly surface with explicit methods rather than a generic mode flag. Internally, inject or wrap the concrete Qt boot path, matrix execution path, artifact writer, asset generator, and evidence contract evaluator.
 
-Migrate `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` so it becomes a client of the new service rather than a peer orchestrator. Then migrate `src/foliaseal/__main__.py` so the relevant CLI commands build request objects, call the service, and print concise summaries. Preserve command names, exit behavior, and documented output paths.
+`src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` now acts as a client of the service rather than a peer orchestrator. `src/foliaseal/__main__.py` now builds request objects, calls the service, and prints concise summaries. Command names, exit behavior, and documented output paths were preserved.
 
 ## Concrete Steps
 
@@ -65,11 +70,11 @@ Expected edit surfaces:
 
 ## Validation and Acceptance
 
-This slice is accepted when the Phase 3 CLI commands still behave the same for users, but the implementation path is routed through one explicit service boundary with direct tests that no longer need broad orchestration patching.
+This slice is accepted. The Phase 3 CLI commands still behave the same for users, but the implementation path now routes through one explicit service boundary with direct tests that no longer need broad orchestration patching.
 
 ## Idempotence and Recovery
 
-If migration needs a temporary compatibility wrapper, keep it additive and remove it before closing the plan. Do not leave two long-term orchestrators in parallel.
+The compatibility wrapper was kept thin and should not be expanded. Do not reintroduce a second long-term orchestrator in parallel.
 
 ## Artifacts and Notes
 
@@ -86,9 +91,9 @@ Forbidden changes:
 
 ## Interfaces and Dependencies
 
-The end state should expose explicit caller-facing request/result types and service methods, with internally injected adapters for Qt bootstrapping, matrix execution, artifact writing, and asset generation. The dependency strategy is the full hybrid:
+The end state exposes explicit caller-facing request/result types and service methods, with internally injected adapters for Qt bootstrapping, matrix execution, artifact writing, and asset generation. The dependency strategy is the full hybrid:
 
 - external surface shaped like Design 3, with explicit verbs,
 - internal dependency handling shaped like Design 4, with adapter seams around concrete Qt and filesystem behavior.
 
-Revision note: created on 2026-06-03 as child plan 3 of the Phase 3 evidence-service program.
+Revision note: created on 2026-06-03 as child plan 3 of the Phase 3 evidence-service program; completed on 2026-06-03 after the service boundary and CLI dispatch landed.

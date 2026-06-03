@@ -6,15 +6,15 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-After this program is complete, the Phase 3 automatic evidence path will be easier to run, easier to test, and much easier to extend without editing one 6,000-line Qt harness file. The user-visible behavior does not change: `foliaseal phase3-signing-harness`, `foliaseal phase3-signing-preview-matrix`, `foliaseal phase3-signing-acceptance-matrix`, and the signed-acceptance evidence workflow still produce the same kinds of JSON and Markdown artifacts, but the orchestration boundary will be explicit and testable.
+This program is complete. The Phase 3 automatic evidence path is easier to run, easier to test, and much easier to extend without editing one 6,000-line Qt harness file. The user-visible behavior did not change: `foliaseal phase3-signing-harness`, `foliaseal phase3-signing-preview-matrix`, `foliaseal phase3-signing-acceptance-matrix`, and the signed-acceptance evidence workflow still produce the same kinds of JSON and Markdown artifacts, but the orchestration boundary is now explicit and testable.
 
-The practical outcome is that future automatic acceptance work will no longer require broad monkeypatch-heavy edits in `src/foliaseal/presentation/qt/phase3_harness.py` and `tests/unit/test_phase3_harness.py`. A later contributor will be able to test the evidence service at a smaller boundary while leaving Qt adapters and artifact-writing adapters thinner.
+The practical outcome is that future automatic acceptance work no longer requires broad monkeypatch-heavy edits in `src/foliaseal/presentation/qt/phase3_harness.py` and `tests/unit/test_phase3_harness.py`. A later contributor can test the evidence service at a smaller boundary while leaving Qt adapters and artifact-writing adapters thinner.
 
 ## Child ExecPlan Dependencies
 
 - [x] `docs/ExecPlans/phase3_reporting_boundary_execplan.md` landed first. It created the first pure reporting boundary and proved that capture finalization can move out of the Qt runner without changing schemas.
 - [x] `docs/ExecPlans/phase3_harness_session_runner_execplan.md` depended on the reporting boundary and is now complete. It separated interactive Qt session execution from capture assembly.
-- [ ] `docs/ExecPlans/phase3_evidence_service_and_cli_execplan.md` depends on the prior two plans. It consolidates the matrix and signed-acceptance evidence flows behind the explicit service and reduces `src/foliaseal/__main__.py` to a dispatcher.
+- [x] `docs/ExecPlans/phase3_evidence_service_and_cli_execplan.md` depended on the prior two plans and is now complete. It consolidated the matrix and signed-acceptance evidence flows behind the explicit service and reduced `src/foliaseal/__main__.py` to a dispatcher.
 
 ## Progress
 
@@ -23,7 +23,7 @@ The practical outcome is that future automatic acceptance work will no longer re
 - [x] (2026-06-03 03:01Z) Split the full correction into three child ExecPlans so the refactor can land in narrow, reviewable slices.
 - [x] Complete the reporting-boundary child plan.
 - [x] Complete the interactive harness session-runner child plan.
-- [ ] Complete the matrix/evidence service and CLI child plan.
+- [x] Complete the matrix/evidence service and CLI child plan.
 
 ## Surprises & Discoveries
 
@@ -31,7 +31,7 @@ The practical outcome is that future automatic acceptance work will no longer re
   Evidence: `run_phase3_signing_harness()` in `src/foliaseal/presentation/qt/phase3_harness.py` still assembles payloads, evaluates the evidence contract, constructs `Phase3HarnessCapture`, writes JSON, writes the checklist Markdown, and prints summaries in one path.
 
 - Observation: the harness is part of the supported automated evidence path, not just developer scratch tooling.
-  Evidence: `src/foliaseal/__main__.py` exposes dedicated Phase 3 commands, `README.md` documents them, and `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` depends on the matrix runner as a production-like evidence workflow.
+  Evidence: `src/foliaseal/__main__.py` exposes dedicated Phase 3 commands, `README.md` documents them, `src/foliaseal/application/phase3_evidence_service.py` now owns the CLI-facing evidence verbs, and `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is a thin wrapper/client around that service.
 
 ## Decision Log
 
@@ -43,25 +43,29 @@ The practical outcome is that future automatic acceptance work will no longer re
   Rationale: contract evaluation, checklist rendering, and artifact writing are already mostly pure and already have focused tests, so that seam can move first without touching JSON shape or matrix summaries.
   Date/Author: 2026-06-03 / Codex
 
+- Decision: finish the final child plan by making the application layer the explicit service boundary and leaving `phase3_signed_acceptance_evidence.py` as a thin wrapper/client.
+  Rationale: the CLI-facing workflows needed one stable orchestration seam, but the existing command names, artifact paths, and summary shape were already good contracts.
+  Date/Author: 2026-06-03 / Codex
+
 ## Outcomes & Retrospective
 
-This program plan is not complete yet. Its role is to keep the full correction coherent while each child ExecPlan lands a narrow, independently testable slice. The reporting-boundary child plan and the interactive harness session-runner child plan are now complete; the matrix/evidence service and CLI child plan is still pending.
+This program plan is complete. The reporting-boundary child plan, the interactive harness session-runner child plan, and the matrix/evidence service and CLI child plan all landed, leaving a smaller and testable Phase 3 evidence stack with the same documented command surface.
 
 ## Context and Orientation
 
-The current Phase 3 evidence path is spread across four key files. `src/foliaseal/presentation/qt/phase3_harness.py` contains the interactive signing harness, the session-runner boundary, the capture-payload assembler, the preview matrix runner, the signed-acceptance matrix runner, and many helper functions for snapshotting rendered output, serializing summary payloads, and writing artifacts. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` orchestrates the higher-level “run several matrices and summarize them” workflow. `src/foliaseal/application/qa_evidence_contract.py` validates saved capture payloads and determines whether they are engineering-only, gate-candidate, or release-gating evidence. `src/foliaseal/__main__.py` exposes the relevant commands and currently calls directly into these helper families.
+The current Phase 3 evidence path is spread across four key files. `src/foliaseal/presentation/qt/phase3_harness.py` contains the interactive signing harness, the session-runner boundary, the capture-payload assembler, the preview matrix runner, the signed-acceptance matrix runner, and many helper functions for snapshotting rendered output, serializing summary payloads, and writing artifacts. `src/foliaseal/application/phase3_evidence_service.py` owns the CLI-facing service boundary and the signed-acceptance evidence summary assembly. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is the thin wrapper/client that provides noise filtering and default service wiring. `src/foliaseal/application/qa_evidence_contract.py` validates saved capture payloads and determines whether they are engineering-only, gate-candidate, or release-gating evidence. `src/foliaseal/__main__.py` exposes the relevant commands and dispatches through the service boundary.
 
-The architectural problem is that the caller-facing workflows are not yet backed by one explicit service. Instead, callers reach into a large presentation module whose public functions still co-own Qt bootstrapping, capture finalization, contract evaluation, artifact writing, matrix loops, and summary formatting.
+The architectural problem that motivated this program has been resolved. The caller-facing workflows now go through one explicit service instead of reaching into a large presentation module whose public functions co-own Qt bootstrapping, capture finalization, contract evaluation, artifact writing, matrix loops, and summary formatting.
 
-The intended end state for this program is a deep module with explicit caller-facing verbs such as “capture harness,” “run preview matrix,” “run signed acceptance evidence,” and “validate capture,” while Qt bootstrapping, filesystem writing, and matrix execution sit behind smaller internal adapter seams.
+The achieved end state for this program is a deep module with explicit caller-facing verbs such as “capture harness,” “run preview matrix,” “run signed acceptance evidence,” and “validate capture,” while Qt bootstrapping, filesystem writing, and matrix execution sit behind smaller internal adapter seams.
 
 ## Plan of Work
 
-The first child plan has extracted the reporting boundary. It leaves Qt execution in place, but moves contract evaluation, capture construction, checklist generation, and artifact writing behind one explicit helper path.
+The first child plan extracted the reporting boundary. It left Qt execution in place, but moved contract evaluation, capture construction, checklist generation, and artifact writing behind one explicit helper path.
 
-The second child plan has already landed. The Qt session now returns raw session state and signed-run state while a separate capture assembler converts that state into one stable `Phase3HarnessCapture`.
+The second child plan landed. The Qt session now returns raw session state and signed-run state while a separate capture assembler converts that state into one stable `Phase3HarnessCapture`.
 
-The third child plan lifts the matrix and signed-acceptance evidence flow behind the explicit service boundary. At that point, `src/foliaseal/__main__.py` should become a thin dispatcher that builds request objects and prints concise summaries.
+The third child plan lifted the matrix and signed-acceptance evidence flow behind the explicit service boundary. `src/foliaseal/__main__.py` is now the thin dispatcher that builds request objects and prints concise summaries.
 
 ## Concrete Steps
 
@@ -91,7 +95,7 @@ The first and second child plans do not change JSON schema shape, matrix summary
 
 ## Interfaces and Dependencies
 
-The full program targets a hybrid interface. The external surface should look like a small service with explicit verbs for harness capture, matrix execution, signed-acceptance evidence generation, and capture validation. Internally, the implementation should move toward port-shaped boundaries for Qt bootstrapping, matrix execution, and artifact writing. The dependency categories are:
+The full program targeted a hybrid interface and now has the expected shape. The external surface looks like a small service with explicit verbs for harness capture, matrix execution, signed-acceptance evidence generation, and capture validation. Internally, the implementation uses port-shaped boundaries for Qt bootstrapping, matrix execution, and artifact writing. The dependency categories are:
 
 - `In-process` for evidence shaping, contract evaluation, and summary formatting.
 - `Local-substitutable` for filesystem writes, Qt test doubles, and fixture-driven matrix runners.
