@@ -142,6 +142,21 @@ class Phase3HarnessCapture:
         return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
 
 
+@dataclass(frozen=True)
+class Phase3HarnessSessionResult:
+    """Raw interactive harness session state before report finalization."""
+
+    first_render_ms: float | None
+    sign_requests: tuple[SigningRequest, ...]
+    signed_runs: tuple[dict[str, Any], ...]
+    errors: tuple[str, ...]
+    interaction_counts: dict[str, int]
+    captured_states: tuple[dict[str, Any], ...]
+    final_state: dict[str, Any]
+    capture_request: SigningRequest | None
+    last_signing_result: SigningResult | None
+
+
 def build_phase3_checklist_results_markdown(
     capture: Phase3HarnessCapture,
     *,
@@ -564,7 +579,63 @@ def run_phase3_signing_harness(
     )
     profile_store = SignaturePresetCatalogStore.default()
     sign_executor = build_phase3_signing_executor()
+    session = _run_phase3_harness_session(
+        bindings=bindings,
+        source_path=source_path,
+        artifacts_dir=artifacts_dir,
+        viewer_workflow=viewer_workflow,
+        signing_workflow=signing_workflow,
+        profile_store=profile_store,
+        sign_executor=sign_executor,
+    )
+    capture_payload = _build_phase3_harness_capture_payload(
+        source_path=source_path,
+        summary_json_path=summary_json_path,
+        checklist_results_path=checklist_results_path,
+        artifacts_dir=artifacts_dir,
+        session=session,
+    )
+    report = finalize_phase3_harness_report(
+        Phase3HarnessReportRequest(
+            capture_payload=capture_payload,
+            summary_json_path=summary_json_path,
+            checklist_results_path=checklist_results_path,
+            checklist_template_path=checklist_template_path,
+        ),
+        contract_evaluator=evaluate_phase3_evidence_contract,
+        capture_factory=_build_phase3_harness_capture,
+        checklist_renderer=build_phase3_checklist_results_markdown,
+        text_writer=_write_optional_text,
+    )
+    capture = report.capture
+    if summary_json_path is None:
+        print("Phase 3 harness capture")
+        print(capture.to_json())
+        print()
+    else:
+        print("Phase 3 harness capture written")
+        print(f"- summary json: {summary_json_path}")
+        print(f"- acceptance tier: {capture.acceptance_tier}")
+        print(f"- gate verdict: {capture.gate_verdict}")
+        print(f"- validation: {capture.validation_text}")
+        print(f"- captured states: {len(capture.captured_states)}")
+        print()
+    print(f"Checklist results file: {checklist_results_path}")
+    print("Review the pre-checked items, complete the remaining manual-only checks, and")
+    print("use the generated file as the acceptance worksheet for Phase 3.")
+    return capture
 
+
+def _run_phase3_harness_session(
+    *,
+    bindings: _QtHarnessBindings,
+    source_path: Path,
+    artifacts_dir: str | None,
+    viewer_workflow: ViewerWorkflow,
+    signing_workflow: SigningDraftWorkflow,
+    profile_store: SignaturePresetCatalogStore,
+    sign_executor: Any,
+) -> Phase3HarnessSessionResult:
     sign_requests: list[SigningRequest] = []
     signed_runs: list[dict[str, Any]] = []
     errors: list[str] = []
@@ -584,12 +655,12 @@ def run_phase3_signing_harness(
 
     window.setCentralWidget(central)
 
+    captured_states: list[dict[str, Any]] = []
+
     def refocus_shell() -> None:
         focus_setter = getattr(shell, "setFocus", None)
         if callable(focus_setter):
             focus_setter()
-
-    captured_states: list[dict[str, Any]] = []
 
     def on_sign_request(request: SigningRequest) -> None:
         sign_requests.append(request)
@@ -719,6 +790,7 @@ def run_phase3_signing_harness(
 
     start = perf_counter()
     shell.refresh_viewer()
+    first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
     _elapsed_ms = (perf_counter() - start) * 1000.0
 
     window.show()
@@ -731,17 +803,42 @@ def run_phase3_signing_harness(
         else _snapshot_current_draft_request(shell.properties_panel._workflow)
     )
     final_state = capture_current_state(capture_kind="final", request=capture_request)
-    preview_text = final_state["preview_text"]
-    validation_text = final_state["validation_text"]
     last_signing_result = getattr(shell, "last_signing_result", None)
-    backend_reservation_snapshot = final_state["backend_reservation_snapshot"]
-    backend_reservation_error = final_state["backend_reservation_error"]
+    return Phase3HarnessSessionResult(
+        first_render_ms=first_render_ms,
+        sign_requests=tuple(sign_requests),
+        signed_runs=tuple(signed_runs),
+        errors=tuple(errors),
+        interaction_counts=dict(sorted(interaction_counts.items())),
+        captured_states=tuple(captured_states),
+        final_state=final_state,
+        capture_request=capture_request,
+        last_signing_result=(
+            last_signing_result if isinstance(last_signing_result, SigningResult) else None
+        ),
+    )
+
+
+def _build_phase3_harness_capture_payload(
+    *,
+    source_path: Path,
+    summary_json_path: str | None,
+    checklist_results_path: str,
+    artifacts_dir: str | None,
+    session: Phase3HarnessSessionResult,
+) -> dict[str, Any]:
+    preview_text = session.final_state["preview_text"]
+    validation_text = session.final_state["validation_text"]
+    backend_reservation_snapshot = session.final_state["backend_reservation_snapshot"]
+    backend_reservation_error = session.final_state["backend_reservation_error"]
     last_signature_page_index = (
-        sign_requests[-1].signature_rect.page_index
-        if sign_requests and sign_requests[-1].signature_rect is not None
+        session.sign_requests[-1].signature_rect.page_index
+        if session.sign_requests and session.sign_requests[-1].signature_rect is not None
         else None
     )
-    output_path = sign_requests[-1].output_pdf_path if sign_requests else None
+    output_path = (
+        session.sign_requests[-1].output_pdf_path if session.sign_requests else None
+    )
     output_exists = False
     output_size_bytes = None
     output_signature_count = None
@@ -749,8 +846,8 @@ def run_phase3_signing_harness(
     output_verification_snapshot = None
     output_visible_appearance_snapshot = None
     signed_output_render_snapshot = None
-    if signed_runs:
-        latest_signed_run = _mapping(signed_runs[-1])
+    if session.signed_runs:
+        latest_signed_run = _mapping(session.signed_runs[-1])
         output_path = latest_signed_run.get("output_pdf_path")
         output_exists = bool(latest_signed_run.get("output_file_exists"))
         output_size_bytes = latest_signed_run.get("output_file_size_bytes")
@@ -771,8 +868,8 @@ def run_phase3_signing_harness(
             output_verification_snapshot = _snapshot_output_verification(
                 output_file,
                 trust_policy=(
-                    capture_request.trust_policy
-                    if capture_request is not None
+                    session.capture_request.trust_policy
+                    if session.capture_request is not None
                     else None
                 ),
             )
@@ -780,12 +877,13 @@ def run_phase3_signing_harness(
             signed_output_render_snapshot = _snapshot_signed_output_render(
                 output_pdf_path=str(output_file),
                 page_index=last_signature_page_index,
-                preview_snapshot=final_state["preview_snapshot"],
+                preview_snapshot=session.final_state["preview_snapshot"],
                 preview_text=preview_text,
                 output_visible_appearance_snapshot=output_visible_appearance_snapshot,
                 artifacts_dir=artifacts_dir,
                 artifact_basename="final_signed_output",
             )
+
     checklist_results_written = bool(checklist_results_path)
     capture_payload = {
         "pdf_path": str(source_path),
@@ -793,25 +891,31 @@ def run_phase3_signing_harness(
         "summary_json_written": summary_json_path is not None,
         "checklist_results_path": checklist_results_path,
         "checklist_results_written": checklist_results_written,
-        "first_render_ms": viewer_workflow.timing_tracker.snapshot().first_render_ms,
-        "selection_count": interaction_counts.get("selection_success", 0),
-        "sign_request_count": len(sign_requests),
+        "first_render_ms": session.first_render_ms,
+        "selection_count": session.interaction_counts.get("selection_success", 0),
+        "sign_request_count": len(session.sign_requests),
         "last_signature_page_index": last_signature_page_index,
         "last_signature_page_number": (
             last_signature_page_index + 1 if last_signature_page_index is not None else None
         ),
         "last_signature_has_visible_appearance": (
-            sign_requests[-1].has_visible_signature_settings() if sign_requests else False
+            session.sign_requests[-1].has_visible_signature_settings()
+            if session.sign_requests
+            else False
         ),
         "last_signature_output_path": output_path,
         "last_signing_result_message": (
-            last_signing_result.message if isinstance(last_signing_result, SigningResult) else None
+            session.last_signing_result.message
+            if isinstance(session.last_signing_result, SigningResult)
+            else None
         ),
         "last_signing_result_success": (
-            last_signing_result.success if isinstance(last_signing_result, SigningResult) else None
+            session.last_signing_result.success
+            if isinstance(session.last_signing_result, SigningResult)
+            else None
         ),
-        "preview_snapshot": final_state["preview_snapshot"],
-        "sign_request_snapshot": final_state["sign_request_snapshot"],
+        "preview_snapshot": session.final_state["preview_snapshot"],
+        "sign_request_snapshot": session.final_state["sign_request_snapshot"],
         "backend_reservation_snapshot": backend_reservation_snapshot,
         "backend_reservation_error": backend_reservation_error,
         "output_file_exists": output_exists,
@@ -867,43 +971,15 @@ def run_phase3_signing_harness(
         "preview_available": bool(preview_text.strip()),
         "preview_text": preview_text,
         "validation_text": validation_text,
-        "interaction_counts": dict(sorted(interaction_counts.items())),
-        "errors": tuple(errors),
-        "signed_runs": tuple(signed_runs),
-        "captured_states": tuple(captured_states + [final_state]),
+        "interaction_counts": session.interaction_counts,
+        "errors": session.errors,
+        "signed_runs": session.signed_runs,
+        "captured_states": tuple(session.captured_states + (session.final_state,)),
     }
     capture_payload["captured_state_transition_diagnostics"] = (
         _analyze_capture_state_transitions(capture_payload["captured_states"])
     )
-    report = finalize_phase3_harness_report(
-        Phase3HarnessReportRequest(
-            capture_payload=capture_payload,
-            summary_json_path=summary_json_path,
-            checklist_results_path=checklist_results_path,
-            checklist_template_path=checklist_template_path,
-        ),
-        contract_evaluator=evaluate_phase3_evidence_contract,
-        capture_factory=_build_phase3_harness_capture,
-        checklist_renderer=build_phase3_checklist_results_markdown,
-        text_writer=_write_optional_text,
-    )
-    capture = report.capture
-    if summary_json_path is None:
-        print("Phase 3 harness capture")
-        print(capture.to_json())
-        print()
-    else:
-        print("Phase 3 harness capture written")
-        print(f"- summary json: {summary_json_path}")
-        print(f"- acceptance tier: {capture.acceptance_tier}")
-        print(f"- gate verdict: {capture.gate_verdict}")
-        print(f"- validation: {capture.validation_text}")
-        print(f"- captured states: {len(capture.captured_states)}")
-        print()
-    print(f"Checklist results file: {checklist_results_path}")
-    print("Review the pre-checked items, complete the remaining manual-only checks, and")
-    print("use the generated file as the acceptance worksheet for Phase 3.")
-    return capture
+    return capture_payload
 
 
 def _build_phase3_harness_capture(

@@ -13,7 +13,7 @@ The practical outcome is that future automatic acceptance work will no longer re
 ## Child ExecPlan Dependencies
 
 - [x] `docs/ExecPlans/phase3_reporting_boundary_execplan.md` landed first. It created the first pure reporting boundary and proved that capture finalization can move out of the Qt runner without changing schemas.
-- [ ] `docs/ExecPlans/phase3_harness_session_runner_execplan.md` depends on the reporting boundary. It separates interactive Qt session execution from capture assembly.
+- [x] `docs/ExecPlans/phase3_harness_session_runner_execplan.md` depended on the reporting boundary and is now complete. It separated interactive Qt session execution from capture assembly.
 - [ ] `docs/ExecPlans/phase3_evidence_service_and_cli_execplan.md` depends on the prior two plans. It consolidates the matrix and signed-acceptance evidence flows behind the explicit service and reduces `src/foliaseal/__main__.py` to a dispatcher.
 
 ## Progress
@@ -22,7 +22,7 @@ The practical outcome is that future automatic acceptance work will no longer re
 - [x] (2026-06-03 03:01Z) Chose the hybrid `3+4` direction for the full correction: explicit caller-facing verbs over an internally port-shaped evidence service.
 - [x] (2026-06-03 03:01Z) Split the full correction into three child ExecPlans so the refactor can land in narrow, reviewable slices.
 - [x] Complete the reporting-boundary child plan.
-- [ ] Complete the interactive harness session-runner child plan.
+- [x] Complete the interactive harness session-runner child plan.
 - [ ] Complete the matrix/evidence service and CLI child plan.
 
 ## Surprises & Discoveries
@@ -45,11 +45,11 @@ The practical outcome is that future automatic acceptance work will no longer re
 
 ## Outcomes & Retrospective
 
-This program plan is not complete yet. Its role is to keep the full correction coherent while each child ExecPlan lands a narrow, independently testable slice. The reporting-boundary child plan is now complete; the remaining child plans are still pending.
+This program plan is not complete yet. Its role is to keep the full correction coherent while each child ExecPlan lands a narrow, independently testable slice. The reporting-boundary child plan and the interactive harness session-runner child plan are now complete; the matrix/evidence service and CLI child plan is still pending.
 
 ## Context and Orientation
 
-The current Phase 3 evidence path is spread across four key files. `src/foliaseal/presentation/qt/phase3_harness.py` contains the interactive signing harness, the preview matrix runner, the signed-acceptance matrix runner, and many helper functions for snapshotting rendered output, serializing summary payloads, and writing artifacts. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` orchestrates the higher-level “run several matrices and summarize them” workflow. `src/foliaseal/application/qa_evidence_contract.py` validates saved capture payloads and determines whether they are engineering-only, gate-candidate, or release-gating evidence. `src/foliaseal/__main__.py` exposes the relevant commands and currently calls directly into these helper families.
+The current Phase 3 evidence path is spread across four key files. `src/foliaseal/presentation/qt/phase3_harness.py` contains the interactive signing harness, the session-runner boundary, the capture-payload assembler, the preview matrix runner, the signed-acceptance matrix runner, and many helper functions for snapshotting rendered output, serializing summary payloads, and writing artifacts. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` orchestrates the higher-level “run several matrices and summarize them” workflow. `src/foliaseal/application/qa_evidence_contract.py` validates saved capture payloads and determines whether they are engineering-only, gate-candidate, or release-gating evidence. `src/foliaseal/__main__.py` exposes the relevant commands and currently calls directly into these helper families.
 
 The architectural problem is that the caller-facing workflows are not yet backed by one explicit service. Instead, callers reach into a large presentation module whose public functions still co-own Qt bootstrapping, capture finalization, contract evaluation, artifact writing, matrix loops, and summary formatting.
 
@@ -59,7 +59,7 @@ The intended end state for this program is a deep module with explicit caller-fa
 
 The first child plan has extracted the reporting boundary. It leaves Qt execution in place, but moves contract evaluation, capture construction, checklist generation, and artifact writing behind one explicit helper path.
 
-The second child plan narrows the interactive harness itself. The goal is for the Qt session to return raw session state and signed-run state while a separate capture assembler converts that state into one stable `Phase3HarnessCapture`.
+The second child plan has already landed. The Qt session now returns raw session state and signed-run state while a separate capture assembler converts that state into one stable `Phase3HarnessCapture`.
 
 The third child plan lifts the matrix and signed-acceptance evidence flow behind the explicit service boundary. At that point, `src/foliaseal/__main__.py` should become a thin dispatcher that builds request objects and prints concise summaries.
 
@@ -87,7 +87,7 @@ This parent plan is safe to revise repeatedly. If child plans change shape, upda
 
 ## Artifacts and Notes
 
-The first child plan should not change JSON schema shape, matrix summary counters, or CLI command names. Those constraints exist to keep the program incremental and are repeated in the child plans where they matter.
+The first and second child plans do not change JSON schema shape, matrix summary counters, or CLI command names. Those constraints exist to keep the program incremental and are repeated in the child plans where they matter.
 
 ## Interfaces and Dependencies
 

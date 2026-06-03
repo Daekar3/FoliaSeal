@@ -46,7 +46,7 @@ The canonical repository document split is:
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, Qt PDF rendering, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
-| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; the signing shell delegates certificate/preset reconciliation to the application coordinator, signing-action orchestration to `signing_action_boundary.py`, canonical preview lifecycle to `signature_preview_lifecycle.py`, and preview geometry/layout handoff to `signature_preview_layout.py`. |
+| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; the signing shell delegates certificate/preset reconciliation to the application coordinator, signing-action orchestration to `signing_action_boundary.py`, canonical preview lifecycle to `signature_preview_lifecycle.py`, preview geometry/layout handoff to `signature_preview_layout.py`, and Phase 3 harness session/reporting splitting to `phase3_harness.py` plus `phase3_harness_reporting.py`. |
 | `src/foliaseal/presentation/qt/phase3_harness_reporting.py` | Pure Phase 3 harness reporting boundary. | Finalizes raw capture payloads into JSON/checklist evidence without owning the interactive Qt session. |
 | `src/foliaseal/presentation/qt/signing_action_boundary.py` | Shell-facing boundary for the signing-action flow. | Bridges the shell to `SigningActionCoordinator` while keeping dialog/callback orchestration separate from the state machine. |
 | `src/foliaseal/presentation/qt/signature_preview_layout.py` | Widget-facing preview geometry planning and application. | Owns preview card sizing, orientation, ordering, and widget visibility decisions. |
@@ -333,8 +333,19 @@ The canonical repository document split is:
 - Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering. The evidence command suppresses known fit-rejection layout warnings only for the intentional rejection matrix; raw per-manifest matrix commands remain the diagnostic path.
 - Does not own: Core domain models, signing semantics, or backend reservation evidence assembly.
 - Key collaborators: CLI entry points, Qt shell, signing backend, artifacts directory.
-- Known constraints: The Phase 3 harness still owns capture payload assembly and reporting orchestration, while `src/foliaseal/presentation/qt/phase3_harness_reporting.py` owns JSON serialization and checklist markdown rendering. Backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. That keeps the harness disposable and prevents it from depending on backend-private layout/signing helpers for reservation evidence.
+- Known constraints: The Phase 3 harness now splits interactive session collection, capture payload assembly, and report finalization across `src/foliaseal/presentation/qt/phase3_harness.py` and `src/foliaseal/presentation/qt/phase3_harness_reporting.py`; the reporting module still owns JSON serialization and checklist markdown rendering. Backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. That keeps the harness disposable and prevents it from depending on backend-private layout/signing helpers for reservation evidence.
 - Status: Confirmed by code, README, tests, and artifacts.
+
+### Phase 3 harness session runner
+
+- Location: `src/foliaseal/presentation/qt/phase3_harness.py`
+- Responsibility: Run the interactive Qt session for Phase 3 and collect raw state before capture assembly.
+- Owns: `Phase3HarnessSessionResult`, `_run_phase3_harness_session()`, session-level sign request/error/state tracking, final-state capture inputs.
+- Does not own: report finalization, JSON serialization, checklist rendering, or evidence-contract evaluation.
+- Key collaborators: `phase3_harness_reporting.py`, `_build_phase3_harness_capture_payload()`, `build_qt_signing_shell()`, `SigningDraftWorkflow`, `ViewerWorkflow`.
+- Main entry points: `_run_phase3_harness_session()`, `_build_phase3_harness_capture_payload()`, `run_phase3_signing_harness()`.
+- Known constraints: The helper keeps the interactive shell flow Qt-bound, but the collected session result must stay stable enough for later payload assembly and report finalization. `run_phase3_signing_harness()` now passes `Phase3HarnessSessionResult` into `_build_phase3_harness_capture_payload()` instead of deriving final capture data inline.
+- Status: Confirmed by code and tests.
 
 ### Phase 3 harness reporting boundary
 
@@ -342,8 +353,8 @@ The canonical repository document split is:
 - Responsibility: Finalize the post-Qt reporting boundary for a single Phase 3 harness run.
 - Owns: `Phase3HarnessReportRequest`, `Phase3HarnessReportResult`, `finalize_phase3_harness_report()`, summary JSON writing, checklist markdown rendering, checklist file writing.
 - Does not own: interactive Qt session control, raw capture-state collection, or backend reservation evidence generation.
-- Key collaborators: `phase3_harness.py`, `qa_evidence_contract.py`, `build_phase3_checklist_results_markdown()`, `Phase3HarnessCapture`.
-- Known constraints: direct unit tests can exercise this module without the interactive harness path; it should stay a narrow pure boundary with injected evaluator/renderer/writer callables.
+- Key collaborators: `phase3_harness.py`, `_build_phase3_harness_capture_payload()`, `qa_evidence_contract.py`, `build_phase3_checklist_results_markdown()`, `Phase3HarnessCapture`.
+- Known constraints: direct unit tests can exercise this module without the interactive harness path; it should stay a narrow pure boundary with injected evaluator/renderer/writer callables that consume the raw capture payload produced by the session runner.
 - Status: Confirmed by code and tests.
 
 ### Packaging
@@ -389,6 +400,7 @@ The canonical repository document split is:
 | `SigningMaterial` / `CertificateSigningMaterialResolver` | `application/signing_material_resolver.py` | Convert a selected certificate configuration into runtime signing inputs. | certificate path, passphrase, optional alias. | Uses explicit passphrase or a `CertificateSecretProvider`; reports helpful missing-file/secret errors. |
 | `RenderPageRequest` / `RenderPageResult` | `infra/render/base.py` | Render backend request/result. | document path, page index, zoom; width/height/RGBA bytes. | Backend protocol contract. |
 | `Phase3HarnessReportRequest` / `Phase3HarnessReportResult` | `presentation/qt/phase3_harness_reporting.py` | Post-Qt reporting request/result for one Phase 3 harness run. | raw capture payload, summary/checklist paths, finalized capture, contract evaluation, rendered checklist text. | Gives the harness a smaller direct reporting boundary for tests and orchestration. |
+| `Phase3HarnessSessionResult` | `presentation/qt/phase3_harness.py` | Raw interactive Qt session state before capture assembly. | first render timing, sign requests, signed runs, errors, interaction counts, captured states, final session state, capture request, last signing result. | Feeds `_build_phase3_harness_capture_payload()` so capture assembly stays separate from the Qt loop. |
 | `Phase3HarnessCapture` | `presentation/qt/phase3_harness.py` | Structured acceptance harness result. | preview/request/signing/evidence fields. | JSON output is validated by evidence contract. |
 | `DocumentReviewCardState` | `application/document_review_workspace.py` | Immutable review-card state rendered by the Qt shell. | review summary, signature labels, selected signature index/label/detail, selector enablement. | Gives the shell a narrow review-only view model instead of a mixed review/text bag. |
 | `DocumentTextWorkspaceState` | `application/document_review_workspace.py` | Immutable document-text card state rendered by the Qt shell. | search state, selection state, selection mode flag, display source, status text, detail text. | The shell reads `state.document_text` directly and uses its nested search/selection state for button enablement. |
@@ -538,7 +550,7 @@ The canonical repository document split is:
 - Format: JSON summaries, markdown checklists, preview PNGs, signed-output crops/comparisons.
 - Validation: `evaluate_phase3_evidence_contract()` checks capture consistency and gate verdict.
 - Error behavior: `phase3-signing-harness-validate` raises when evidence contract fails.
-- Known constraints: `backend_reservation_snapshot` and `backend_reservation_error` remain part of the capture payload, but Phase 3 harness code now consumes those values from `build_backend_reservation_evidence()` instead of reconstructing them from backend-private helpers.
+- Known constraints: `backend_reservation_snapshot` and `backend_reservation_error` remain part of the capture payload, but Phase 3 harness code now consumes those values from `build_backend_reservation_evidence()` instead of reconstructing them from backend-private helpers. The session runner returns `Phase3HarnessSessionResult`, and `_build_phase3_harness_capture_payload()` derives the stable capture payload before `phase3_harness_reporting.py` finalizes the files.
 - Source files: `src/foliaseal/presentation/qt/phase3_harness.py`, `src/foliaseal/application/qa_evidence_contract.py`, `artifacts/`.
 
 ## 7. Control flow
