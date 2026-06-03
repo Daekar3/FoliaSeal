@@ -1374,6 +1374,56 @@ def test_signing_shell_shows_document_review_summary_from_injected_inspector(
     assert "Latest signer: CN=Alice Example." in widget.document_review_detail_label.text()
 
 
+def test_signing_shell_delegates_review_rendering_to_sidebar(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    calls = []
+    original_apply = (
+        signing_shell_module.SigningWorkspaceSidebar.apply_document_review_workspace_state
+    )
+
+    def _spy_apply(self, state, *, can_copy_text):
+        calls.append((state, can_copy_text))
+        return original_apply(self, state, can_copy_text=can_copy_text)
+
+    monkeypatch.setattr(
+        signing_shell_module.SigningWorkspaceSidebar,
+        "apply_document_review_workspace_state",
+        _spy_apply,
+    )
+    inspector = _FakeDocumentReviewInspector(
+        DocumentReviewSummary(
+            headline="Signature review",
+            detail="Found 1 embedded signature.",
+            signature_count=1,
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_review_inspector=inspector,
+        on_copy_text=lambda value: None,
+    )
+
+    widget.refresh_document_review()
+
+    assert len(calls) == 2
+    assert all(can_copy_text is True for _, can_copy_text in calls)
+    assert calls[-1][0].review.review_summary.headline == "Signature review"
+    assert widget.document_review_headline_label.text() == "Signature review"
+
+
 def test_signing_shell_renders_per_signature_review_items(
     monkeypatch,
     tmp_path: Path,

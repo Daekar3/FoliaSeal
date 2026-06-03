@@ -6,6 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from foliaseal.application.document_review_workspace import (
+    DocumentReviewWorkspaceState,
+)
 from foliaseal.presentation.qt.signing_action_coordinator import SigningActionState
 
 
@@ -74,11 +77,13 @@ class SigningWorkspaceSidebar:
         on_previous_text_match: Callable[[], Any],
         on_next_text_match: Callable[[], Any],
         on_copy_text_match: Callable[[], Any],
+        on_review_signature_selected: Callable[[int], Any],
         on_text_selection_mode_changed: Callable[[bool], Any],
         on_copy_selected_text: Callable[[], Any],
         on_clear_selected_text: Callable[[], Any],
     ) -> None:
         self._bindings = bindings
+        self._updating_document_review_selector = False
         self.container = bindings.q_widget()
         self._layout = bindings.q_vbox_layout(self.container)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -107,6 +112,18 @@ class SigningWorkspaceSidebar:
             on_copy_selected_text=on_copy_selected_text,
             on_clear_selected_text=on_clear_selected_text,
         )
+        index_changed = getattr(
+            self.document_review_controls.signature_selector,
+            "currentIndexChanged",
+            None,
+        )
+        if hasattr(index_changed, "connect"):
+            index_changed.connect(  # type: ignore[attr-defined]
+                lambda index: self._handle_review_signature_selected(
+                    index,
+                    on_review_signature_selected=on_review_signature_selected,
+                )
+            )
         self.choose_output_button = self.signing_action_controls.choose_output_button
         self.sign_button = self.signing_action_controls.sign_button
         self.open_signed_output_button = (
@@ -143,6 +160,71 @@ class SigningWorkspaceSidebar:
 
     def apply_signing_action_state(self, state: SigningActionState) -> None:
         self.render_signing_action_state(state)
+
+    def apply_document_review_workspace_state(
+        self,
+        state: DocumentReviewWorkspaceState,
+        *,
+        can_copy_text: bool,
+    ) -> None:
+        review_state = state.review
+        document_text_state = state.document_text
+        self.document_review_controls.headline_label.setText(
+            review_state.review_summary.headline
+        )
+        self.document_review_controls.detail_label.setText(
+            review_state.review_summary.detail
+        )
+        self.document_review_controls.signature_items_label.setText(
+            format_document_signature_items(review_state.review_summary.signature_items)
+        )
+        selector = self.document_review_controls.signature_selector
+        self._updating_document_review_selector = True
+        try:
+            selector.clear()
+            if not review_state.signature_labels:
+                selector.setEnabled(False)
+            else:
+                selector.addItems(list(review_state.signature_labels))
+                selector.setEnabled(review_state.selector_enabled)
+                setter = getattr(selector, "setCurrentIndex", None)
+                current_text = getattr(selector, "currentText", None)
+                current_label = current_text() if callable(current_text) else None
+                if (
+                    callable(setter)
+                    and review_state.selected_signature_index is not None
+                    and current_label != review_state.selected_signature_label
+                ):
+                    setter(review_state.selected_signature_index)
+        finally:
+            self._updating_document_review_selector = False
+        self.document_review_controls.signature_detail_label.setText(
+            review_state.selected_signature_detail
+        )
+        checkbox = self.document_text_controls.select_mode_checkbox
+        is_checked = getattr(checkbox, "isChecked", None)
+        if (
+            callable(is_checked)
+            and bool(is_checked()) != document_text_state.selection_mode_enabled
+        ):
+            checkbox.setChecked(document_text_state.selection_mode_enabled)
+        self.document_text_controls.status_label.setText(document_text_state.status_text)
+        self.document_text_controls.detail_label.setText(document_text_state.detail_text)
+        self.document_text_controls.previous_button.setEnabled(
+            document_text_state.search_state.can_go_previous
+        )
+        self.document_text_controls.next_button.setEnabled(
+            document_text_state.search_state.can_go_next
+        )
+        self.document_text_controls.copy_button.setEnabled(
+            document_text_state.search_state.can_copy and can_copy_text
+        )
+        self.document_text_controls.copy_selection_button.setEnabled(
+            document_text_state.selection_state.can_copy and can_copy_text
+        )
+        self.document_text_controls.clear_selection_button.setEnabled(
+            document_text_state.selection_state.can_clear
+        )
 
     def _build_signing_action_controls(
         self,
@@ -316,6 +398,16 @@ class SigningWorkspaceSidebar:
             status_label=status_label,
             detail_label=detail_label,
         )
+
+    def _handle_review_signature_selected(
+        self,
+        index: int,
+        *,
+        on_review_signature_selected: Callable[[int], Any],
+    ) -> None:
+        if self._updating_document_review_selector:
+            return
+        on_review_signature_selected(index)
 
 
 def _compose_row(bindings: Any, *widgets: Any) -> Any:

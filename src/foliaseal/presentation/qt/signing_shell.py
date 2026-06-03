@@ -103,7 +103,6 @@ from foliaseal.presentation.qt.signing_action_coordinator import (
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar,
-    format_document_signature_items,
 )
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 from foliaseal.presentation.qt.visible_signature_setup_form import (
@@ -1235,6 +1234,7 @@ class SigningWorkspaceWidget:
             on_previous_text_match=self.previous_document_text_match,
             on_next_text_match=self.next_document_text_match,
             on_copy_text_match=self.copy_current_document_text_match,
+            on_review_signature_selected=self._on_document_review_signature_selected,
             on_text_selection_mode_changed=self.set_document_text_selection_mode,
             on_copy_selected_text=self.copy_selected_document_text,
             on_clear_selected_text=self.clear_selected_document_text,
@@ -1263,17 +1263,6 @@ class SigningWorkspaceWidget:
             on_status_change=self._on_status_change,
             on_open_signed_output=self._on_open_signed_output,
         )
-        index_changed = getattr(
-            self._document_review_controls.signature_selector,
-            "currentIndexChanged",
-            None,
-        )
-        self._updating_document_review_selector = False
-        if hasattr(index_changed, "connect"):
-            index_changed.connect(  # type: ignore[attr-defined]
-                self._on_document_review_signature_selected
-            )
-
         self._main_row = bindings.q_hbox_layout()
         self._main_row.setContentsMargins(0, 0, 0, 0)
         self._main_row.setSpacing(8)
@@ -1607,72 +1596,12 @@ class SigningWorkspaceWidget:
         self,
         state: DocumentReviewWorkspaceState,
     ) -> None:
-        review_state = state.review
-        document_text_state = state.document_text
-        self._document_review_controls.headline_label.setText(
-            review_state.review_summary.headline
-        )
-        self._document_review_controls.detail_label.setText(
-            review_state.review_summary.detail
-        )
-        self._document_review_controls.signature_items_label.setText(
-            format_document_signature_items(review_state.review_summary.signature_items)
-        )
-        selector = self._document_review_controls.signature_selector
-        self._updating_document_review_selector = True
-        try:
-            selector.clear()
-            if not review_state.signature_labels:
-                selector.setEnabled(False)
-            else:
-                selector.addItems(list(review_state.signature_labels))
-                selector.setEnabled(review_state.selector_enabled)
-                setter = getattr(selector, "setCurrentIndex", None)
-                current_text = getattr(selector, "currentText", None)
-                current_label = current_text() if callable(current_text) else None
-                if (
-                    callable(setter)
-                    and review_state.selected_signature_index is not None
-                    and current_label != review_state.selected_signature_label
-                ):
-                    setter(review_state.selected_signature_index)
-        finally:
-            self._updating_document_review_selector = False
-        self._document_review_controls.signature_detail_label.setText(
-            review_state.selected_signature_detail
-        )
-        checkbox = self._document_text_controls.select_mode_checkbox
-        is_checked = getattr(checkbox, "isChecked", None)
-        if (
-            callable(is_checked)
-            and bool(is_checked()) != document_text_state.selection_mode_enabled
-        ):
-            checkbox.setChecked(document_text_state.selection_mode_enabled)
-        self._document_text_controls.status_label.setText(
-            document_text_state.status_text
-        )
-        self._document_text_controls.detail_label.setText(
-            document_text_state.detail_text
-        )
-        self._document_text_controls.previous_button.setEnabled(
-            document_text_state.search_state.can_go_previous
-        )
-        self._document_text_controls.next_button.setEnabled(
-            document_text_state.search_state.can_go_next
-        )
-        self._document_text_controls.copy_button.setEnabled(
-            document_text_state.search_state.can_copy and self._on_copy_text is not None
-        )
-        self._document_text_controls.copy_selection_button.setEnabled(
-            document_text_state.selection_state.can_copy and self._on_copy_text is not None
-        )
-        self._document_text_controls.clear_selection_button.setEnabled(
-            document_text_state.selection_state.can_clear
+        self._sidebar.apply_document_review_workspace_state(
+            state,
+            can_copy_text=self._on_copy_text is not None,
         )
 
     def _on_document_review_signature_selected(self, index: int) -> None:
-        if self._updating_document_review_selector:
-            return
         state = self._document_review_workspace.select_review_signature(index)
         self._apply_document_review_workspace_state(state)
 
