@@ -47,6 +47,7 @@ The canonical repository document split is:
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
 | `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; the signing shell delegates certificate/preset reconciliation to the application coordinator, signing-action orchestration to `signing_action_boundary.py`, canonical preview lifecycle to `signature_preview_lifecycle.py`, and preview geometry/layout handoff to `signature_preview_layout.py`. |
+| `src/foliaseal/presentation/qt/phase3_harness_reporting.py` | Pure Phase 3 harness reporting boundary. | Finalizes raw capture payloads into JSON/checklist evidence without owning the interactive Qt session. |
 | `src/foliaseal/presentation/qt/signing_action_boundary.py` | Shell-facing boundary for the signing-action flow. | Bridges the shell to `SigningActionCoordinator` while keeping dialog/callback orchestration separate from the state machine. |
 | `src/foliaseal/presentation/qt/signature_preview_layout.py` | Widget-facing preview geometry planning and application. | Owns preview card sizing, orientation, ordering, and widget visibility decisions. |
 | `src/foliaseal/presentation/qt/signature_preview_lifecycle.py` | Canonical preview snapshot lifecycle for the Qt shell. | Owns canonical render invocation, backend reuse, pixmap loading, and snapshot cleanup. |
@@ -332,8 +333,18 @@ The canonical repository document split is:
 - Owns: Evidence contract evaluation, harness capture JSON shape, preview/signed matrix summary generation, signed acceptance evidence orchestration, scoped filtering of known benign evidence-command runtime chatter, checklist rendering. The evidence command suppresses known fit-rejection layout warnings only for the intentional rejection matrix; raw per-manifest matrix commands remain the diagnostic path.
 - Does not own: Core domain models, signing semantics, or backend reservation evidence assembly.
 - Key collaborators: CLI entry points, Qt shell, signing backend, artifacts directory.
-- Known constraints: The Phase 3 harness still owns capture payload assembly, JSON serialization, and markdown rendering, but backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. That keeps the harness disposable and prevents it from depending on backend-private layout/signing helpers for reservation evidence.
+- Known constraints: The Phase 3 harness still owns capture payload assembly and reporting orchestration, while `src/foliaseal/presentation/qt/phase3_harness_reporting.py` owns JSON serialization and checklist markdown rendering. Backend reservation snapshot/error generation now lives in `application/phase3_signing_backend.py::build_backend_reservation_evidence()`. That keeps the harness disposable and prevents it from depending on backend-private layout/signing helpers for reservation evidence.
 - Status: Confirmed by code, README, tests, and artifacts.
+
+### Phase 3 harness reporting boundary
+
+- Location: `src/foliaseal/presentation/qt/phase3_harness_reporting.py`
+- Responsibility: Finalize the post-Qt reporting boundary for a single Phase 3 harness run.
+- Owns: `Phase3HarnessReportRequest`, `Phase3HarnessReportResult`, `finalize_phase3_harness_report()`, summary JSON writing, checklist markdown rendering, checklist file writing.
+- Does not own: interactive Qt session control, raw capture-state collection, or backend reservation evidence generation.
+- Key collaborators: `phase3_harness.py`, `qa_evidence_contract.py`, `build_phase3_checklist_results_markdown()`, `Phase3HarnessCapture`.
+- Known constraints: direct unit tests can exercise this module without the interactive harness path; it should stay a narrow pure boundary with injected evaluator/renderer/writer callables.
+- Status: Confirmed by code and tests.
 
 ### Packaging
 
@@ -377,6 +388,7 @@ The canonical repository document split is:
 | `ManagedCertificate` / `CertificateConfiguration` / `CertificateCatalog` | `infra/config/schemas.py` | Persist managed certificate file records and user-facing certificate selections. | managed certificate id, display name, storage filename, subject summary; configuration id, managed certificate id, save-password flag, password secret reference. | Passwords are referenced by secret id only, never stored in config JSON. |
 | `SigningMaterial` / `CertificateSigningMaterialResolver` | `application/signing_material_resolver.py` | Convert a selected certificate configuration into runtime signing inputs. | certificate path, passphrase, optional alias. | Uses explicit passphrase or a `CertificateSecretProvider`; reports helpful missing-file/secret errors. |
 | `RenderPageRequest` / `RenderPageResult` | `infra/render/base.py` | Render backend request/result. | document path, page index, zoom; width/height/RGBA bytes. | Backend protocol contract. |
+| `Phase3HarnessReportRequest` / `Phase3HarnessReportResult` | `presentation/qt/phase3_harness_reporting.py` | Post-Qt reporting request/result for one Phase 3 harness run. | raw capture payload, summary/checklist paths, finalized capture, contract evaluation, rendered checklist text. | Gives the harness a smaller direct reporting boundary for tests and orchestration. |
 | `Phase3HarnessCapture` | `presentation/qt/phase3_harness.py` | Structured acceptance harness result. | preview/request/signing/evidence fields. | JSON output is validated by evidence contract. |
 | `DocumentReviewCardState` | `application/document_review_workspace.py` | Immutable review-card state rendered by the Qt shell. | review summary, signature labels, selected signature index/label/detail, selector enablement. | Gives the shell a narrow review-only view model instead of a mixed review/text bag. |
 | `DocumentTextWorkspaceState` | `application/document_review_workspace.py` | Immutable document-text card state rendered by the Qt shell. | search state, selection state, selection mode flag, display source, status text, detail text. | The shell reads `state.document_text` directly and uses its nested search/selection state for button enablement. |
@@ -662,7 +674,7 @@ The canonical repository document split is:
 | `domain` | Python stdlib and typing/dataclasses/enums. | `application`, `infra`, `presentation`, Qt, pyHanko. | Confirmed by current imports. |
 | `application` | `domain`, small infra protocols/adapters where currently wired, Pillow for layout image probing. | Qt presentation widgets. | Some application modules import infra DTOs or backend concrete helpers; see debt. `signature_properties_coordinator.py` is the application-layer boundary for signing-properties reconciliation and may depend on config stores plus the certificate-material resolver. |
 | `infra` | `domain`, application protocol DTOs where implementing adapters, external libraries such as pyHanko/PySide6/cryptography/Pillow. | Qt presentation widgets. | Rendering backend uses dynamic Qt imports. |
-| `presentation/qt` | `domain`, `application`, `infra` concrete adapters, dynamic PySide6 bindings. | Domain mutation rules duplicated outside workflows. | Qt shell should orchestrate, not reinterpret signing semantics; `signing_shell.py` should delegate signature-properties reconciliation to the application coordinator, the signing-action sidebar should own `SigningActionState` rendering, and the preview card should delegate layout/lifecycle handoff to the dedicated Qt preview helpers. |
+| `presentation/qt` | `domain`, `application`, `infra` concrete adapters, dynamic PySide6 bindings. | Domain mutation rules duplicated outside workflows. | Qt shell should orchestrate, not reinterpret signing semantics; `signing_shell.py` should delegate signature-properties reconciliation to the application coordinator, the signing-action sidebar should own `SigningActionState` rendering, the preview card should delegate layout/lifecycle handoff to the dedicated Qt preview helpers, and Phase 3 reporting should stay behind the dedicated `phase3_harness_reporting.py` seam. |
 | `tests` | All layers plus fakes/fixtures. | Production code depending on tests. | Tests intentionally inspect private helpers in some transitional layout areas. |
 | `docs` / `artifacts` | N/A. | Runtime imports from production code. | Artifacts are evidence, not app dependencies. |
 
@@ -698,7 +710,7 @@ Tests live under `tests/unit/` with support builders in `tests/support/`. The su
 | Signature-properties coordinator | `test_signature_properties_coordinator.py` | Certificate/preset reconciliation, catalog refresh, validation text, and readiness state without Qt. | Add or update tests here before changing panel or store behavior. |
 | Qt shell/viewer | `test_qt_signing_shell.py`, `test_qt_viewer_widget.py`, `test_qt_render_backend.py` | Widget behavior through fakes, selection geometry, render diagnostics, and thin integration of the preview lifecycle and preview layout boundaries into the shell card. | Use fakes; avoid requiring a live GUI unless intentionally running harnesses. |
 | Viewer geometry/workflow | `test_coordinate_transform.py`, `test_viewer_session.py`, `test_viewer_workflow.py` | Coordinate math and page/zoom workflow. | Add cases for rotations/page boxes when geometry changes. |
-| Evidence/harnesses | `test_phase2_harness.py`, `test_phase3_harness.py`, `test_phase2_evidence.py`, `test_preview_stress_fixtures.py` | Capture JSON, checklist/evidence contract behavior, matrix diagnostics. | Keep generated outputs controlled and `.gitignore` aligned. |
+| Evidence/harnesses | `test_phase2_harness.py`, `test_phase3_harness.py`, `test_phase3_harness_reporting.py`, `test_phase2_evidence.py`, `test_preview_stress_fixtures.py` | Capture JSON, reporting-boundary behavior, checklist/evidence contract behavior, matrix diagnostics. | Keep generated outputs controlled and `.gitignore` aligned. |
 | Packaging/build helpers | `test_pyinstaller_support.py`, CLI tests | Hidden imports and command dispatch. | Update when CLI commands or packaging runtime imports change. |
 
 Default local validation from README:
@@ -735,6 +747,7 @@ Default local validation from README:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-06-02 | Documented explicit `SigningSetupSelectionOutcome` handling for signing setup selection. | Reconciled the architecture doc with the current session/panel contract where selection outcomes carry both state and applied status. |
+| 2026-06-02 | Documented the extracted Phase 3 reporting boundary. | Reconciled the architecture doc with the new `phase3_harness_reporting.py` seam and its direct test surface. |
 | 2026-06-01 | Updated workspace-interaction documentation for ordered effects. | Reflected the implemented `WorkspaceInteractionPlan` boundary and thin shell executor. |
 | 2026-05-30 | Removed internal signature-rect callback coupling from the shell interaction seam. | Reflected direct rect application and viewer-selection placement now using explicit workspace-interaction follow-up instead of routing back through the panel's generic change callback. |
 | 2026-05-31 | Moved `SigningActionState` rendering into the sidebar. | Reflected the completed ownership split where the sidebar mutates the `Sign PDF` widgets and the shell keeps orchestration, callback emission, and public surface ownership. |

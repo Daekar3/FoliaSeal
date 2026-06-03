@@ -78,6 +78,10 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.infra.tsa import build_dummy_timestamper, build_timestamp_validation_context
+from foliaseal.presentation.qt.phase3_harness_reporting import (
+    Phase3HarnessReportRequest,
+    finalize_phase3_harness_report,
+)
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
@@ -871,8 +875,46 @@ def run_phase3_signing_harness(
     capture_payload["captured_state_transition_diagnostics"] = (
         _analyze_capture_state_transitions(capture_payload["captured_states"])
     )
-    contract = evaluate_phase3_evidence_contract(capture_payload)
-    capture = Phase3HarnessCapture(
+    report = finalize_phase3_harness_report(
+        Phase3HarnessReportRequest(
+            capture_payload=capture_payload,
+            summary_json_path=summary_json_path,
+            checklist_results_path=checklist_results_path,
+            checklist_template_path=checklist_template_path,
+        ),
+        contract_evaluator=evaluate_phase3_evidence_contract,
+        capture_factory=_build_phase3_harness_capture,
+        checklist_renderer=build_phase3_checklist_results_markdown,
+        text_writer=_write_optional_text,
+    )
+    capture = report.capture
+    if summary_json_path is None:
+        print("Phase 3 harness capture")
+        print(capture.to_json())
+        print()
+    else:
+        print("Phase 3 harness capture written")
+        print(f"- summary json: {summary_json_path}")
+        print(f"- acceptance tier: {capture.acceptance_tier}")
+        print(f"- gate verdict: {capture.gate_verdict}")
+        print(f"- validation: {capture.validation_text}")
+        print(f"- captured states: {len(capture.captured_states)}")
+        print()
+    print(f"Checklist results file: {checklist_results_path}")
+    print("Review the pre-checked items, complete the remaining manual-only checks, and")
+    print("use the generated file as the acceptance worksheet for Phase 3.")
+    return capture
+
+
+def _build_phase3_harness_capture(
+    *,
+    capture_payload: dict[str, Any],
+    contract,
+    summary_json_path: str | None,
+    checklist_results_path: str,
+    checklist_results_written: bool,
+) -> Phase3HarnessCapture:
+    return Phase3HarnessCapture(
         pdf_path=capture_payload["pdf_path"],
         summary_json_path=summary_json_path,
         summary_json_written=summary_json_path is not None,
@@ -916,28 +958,6 @@ def run_phase3_signing_harness(
             "captured_state_transition_diagnostics"
         ],
     )
-    _write_optional_text(target_path=summary_json_path, content=capture.to_json() + "\n")
-    checklist_results = build_phase3_checklist_results_markdown(
-        capture,
-        checklist_template_path=checklist_template_path,
-    )
-    _write_optional_text(target_path=checklist_results_path, content=checklist_results)
-    if summary_json_path is None:
-        print("Phase 3 harness capture")
-        print(capture.to_json())
-        print()
-    else:
-        print("Phase 3 harness capture written")
-        print(f"- summary json: {summary_json_path}")
-        print(f"- acceptance tier: {capture.acceptance_tier}")
-        print(f"- gate verdict: {capture.gate_verdict}")
-        print(f"- validation: {capture.validation_text}")
-        print(f"- captured states: {len(capture.captured_states)}")
-        print()
-    print(f"Checklist results file: {checklist_results_path}")
-    print("Review the pre-checked items, complete the remaining manual-only checks, and")
-    print("use the generated file as the acceptance worksheet for Phase 3.")
-    return capture
 
 
 def _default_harness_artifacts_dir(
