@@ -23,7 +23,7 @@ The visible win is architectural rather than feature-facing. The app frame no lo
 - [x] (2026-06-04 02:03Z) Ran focused validation with `pytest tests/unit/test_qt_app_frame.py tests/unit/test_qt_signing_shell.py`, `ruff check`, and `git diff --check`; all passed.
 - [x] (2026-06-04 02:07Z) Reconciled `docs/ARCHITECTURE.md` and this ExecPlan to the shell-owned workspace port boundary and current slice status, including the long-form Qt presentation description.
 - [x] (2026-06-04 02:08Z) Completed the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan. The first pass found stale architecture wording; the second pass confirmed the slice is compliant.
-- [ ] Commit the completed slice.
+- [x] (2026-06-04 02:09Z) Committed the completed slice as `e9136e292` (`Move signing workspace port ownership into shell layer`).
 
 ## Surprises & Discoveries
 
@@ -45,7 +45,7 @@ The visible win is architectural rather than feature-facing. The app frame no lo
 
 ## Outcomes & Retrospective
 
-The shell-owned workspace port boundary is in place, validation passed, and the architecture docs now describe the moved ownership correctly. The compliance review found one real gap, which was stale long-form architecture wording; that was corrected without reopening the code slice. The only remaining slice task recorded here is committing the completed change set.
+The shell-owned workspace port boundary is in place, validation passed, and the architecture docs now describe the moved ownership correctly. The compliance review found one real gap, which was stale long-form architecture wording; that was corrected without reopening the code slice. The slice is complete and committed.
 
 ## Context and Orientation
 
