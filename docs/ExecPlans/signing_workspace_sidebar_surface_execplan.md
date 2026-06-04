@@ -23,7 +23,7 @@ This mattered because the hybrid `4+5` direction was trying to make `SigningWork
 - [x] (2026-06-04 21:29Z) Ran focused validation with `pytest tests/unit/test_qt_signing_shell.py tests/unit/test_signing_workspace_sidebar.py`, `ruff check`, and `git diff --check`; all passed.
 - [x] (2026-06-04 21:29Z) Ran the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan; no mismatches were found.
 - [x] (2026-06-04 21:29Z) Updated documentation to final state.
-- [ ] Commit the slice.
+- [x] (2026-06-04 21:33Z) Committed the slice as `eb8032bb8` (`qt: narrow signing shell sidebar surface`).
 
 ## Surprises & Discoveries
 
@@ -45,7 +45,7 @@ This mattered because the hybrid `4+5` direction was trying to make `SigningWork
 
 ## Outcomes & Retrospective
 
-The shell now exports `sidebar_surface` for the sidebar-owned controls and no longer mirrors the old top-level mutable sidebar aliases. Focused shell/sidebar tests were updated to use the grouped surface, and the direct sidebar render tests still cover the underlying widget composition. The architectural review found no remaining spec or architecture mismatches, so the slice is complete apart from the repository commit.
+The shell now exports `sidebar_surface` for the sidebar-owned controls and no longer mirrors the old top-level mutable sidebar aliases. Focused shell/sidebar tests were updated to use the grouped surface, and the direct sidebar render tests still cover the underlying widget composition. The architectural review found no remaining spec or architecture mismatches. The slice is complete and committed.
 
 ## Context and Orientation
 
