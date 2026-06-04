@@ -294,6 +294,8 @@ The intended V2 direction includes page operations such as:
 - move/reorder pages
 - crop pages
 
+V2 also will include full CLI interface suitable for use by both humans and agents.
+
 Those operations should influence architecture decisions when they clearly affect current object
 boundaries, but they must not be opportunistically added to V1.
 
