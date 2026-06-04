@@ -2028,6 +2028,44 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
     assert widget.signature_rect().left_pt == 1.0
 
 
+def test_signing_shell_document_text_selection_consumes_drag_before_signature_placement(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    selection_engine = _FakeDocumentTextSelectionEngine(
+        selection=DocumentTextSelection(
+            page_index=0,
+            text="Alice Example",
+            highlight_rects=(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),),
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        document_text_selection_engine=selection_engine,
+    )
+
+    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(True)
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
+
+    assert widget.signature_rect() is None
+    assert widget.viewer_widget.interaction_mode == "text"
+    assert widget.viewer_widget.text_highlight_page_index == 0
+    assert widget.viewer_widget.text_highlight_rects == (
+        PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),
+    )
+
+
 def test_signing_shell_restores_search_state_when_text_selection_mode_is_disabled(
     monkeypatch,
     tmp_path: Path,

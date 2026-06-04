@@ -38,9 +38,6 @@ from foliaseal.application.document_review import (
 )
 from foliaseal.application.document_review_workspace import (
     DocumentReviewWorkspaceSession,
-    DocumentReviewWorkspaceState,
-    DocumentReviewWorkspaceTransition,
-    DocumentReviewWorkspaceViewerEffects,
 )
 from foliaseal.application.document_text_search import (
     DocumentTextSearchEngine,
@@ -100,6 +97,9 @@ from foliaseal.presentation.qt.signing_action_boundary import (
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
     SigningActionState,
+)
+from foliaseal.presentation.qt.signing_workspace_review_bridge import (
+    SigningWorkspaceReviewBridge,
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar,
@@ -1243,6 +1243,17 @@ class SigningWorkspaceWidget:
         self._properties_scroll = self._sidebar.properties_scroll
         self._sign_button = self._sidebar.sign_button
         self._result_label = self._sidebar.result_label
+        self._review_bridge = SigningWorkspaceReviewBridge(
+            sidebar=self._sidebar,
+            viewer_widget=self._viewer_widget,
+            document_review_workspace=self._document_review_workspace,
+            on_jump_to_page_index=lambda page_index: self._apply_workspace_interaction_plan(
+                self._workspace_interaction_session.refresh_navigation_to_page_index(
+                    page_index
+                )
+            ),
+            can_copy_text=self._on_copy_text is not None,
+        )
         self._signing_action_coordinator = SigningActionCoordinator(
             workflow=self._draft_workflow,
             apply_changes=self.properties_panel.apply_changes,
@@ -1311,9 +1322,7 @@ class SigningWorkspaceWidget:
         self.widget.open_signed_output = self.open_signed_output  # type: ignore[attr-defined]
 
         self.refresh_viewer()
-        self._apply_document_review_workspace_state(
-            self._document_review_workspace.load()
-        )
+        self._review_bridge.apply_state(self._document_review_workspace.load())
         self._apply_signing_action_state(self._signing_action_boundary.load())
 
     @property
@@ -1335,23 +1344,23 @@ class SigningWorkspaceWidget:
 
     def refresh_document_review(self) -> DocumentReviewSummary:
         state = self._document_review_workspace.refresh_review()
-        self._apply_document_review_workspace_state(state)
+        self._review_bridge.apply_state(state)
         return state.review.review_summary
 
     def search_document_text(self) -> DocumentTextSearchState:
         query = _text(self._document_text_controls.query_input)
         transition = self._document_review_workspace.search_text(query)
-        self._apply_document_review_workspace_transition(transition)
+        self._review_bridge.apply_transition(transition)
         return transition.state.document_text.search_state
 
     def next_document_text_match(self) -> DocumentTextSearchState:
         transition = self._document_review_workspace.next_text_match()
-        self._apply_document_review_workspace_transition(transition)
+        self._review_bridge.apply_transition(transition)
         return transition.state.document_text.search_state
 
     def previous_document_text_match(self) -> DocumentTextSearchState:
         transition = self._document_review_workspace.previous_text_match()
-        self._apply_document_review_workspace_transition(transition)
+        self._review_bridge.apply_transition(transition)
         return transition.state.document_text.search_state
 
     def copy_current_document_text_match(self) -> str | None:
@@ -1363,7 +1372,7 @@ class SigningWorkspaceWidget:
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         transition = self._document_review_workspace.set_text_selection_mode(enabled)
-        self._apply_document_review_workspace_transition(transition)
+        self._review_bridge.apply_transition(transition)
         return transition.state.document_text.selection_mode_enabled
 
     def copy_selected_document_text(self) -> str | None:
@@ -1375,7 +1384,7 @@ class SigningWorkspaceWidget:
 
     def clear_selected_document_text(self) -> DocumentTextSelectionState:
         transition = self._document_review_workspace.clear_selected_text()
-        self._apply_document_review_workspace_transition(transition)
+        self._review_bridge.apply_transition(transition)
         return transition.state.document_text.selection_state
 
     def apply_app_settings(self, settings: AppSettings) -> None:
@@ -1536,55 +1545,8 @@ class SigningWorkspaceWidget:
     def _refresh_sign_button_state(self) -> None:
         self._apply_signing_action_state(self._signing_action_boundary.load())
 
-    def _apply_document_review_workspace_state(
-        self,
-        state: DocumentReviewWorkspaceState,
-    ) -> None:
-        self._sidebar.apply_document_review_workspace_state(
-            state,
-            can_copy_text=self._on_copy_text is not None,
-        )
-
     def _on_document_review_signature_selected(self, index: int) -> None:
-        state = self._document_review_workspace.select_review_signature(index)
-        self._apply_document_review_workspace_state(state)
-
-    def _clear_document_text_highlight_overlay(self) -> None:
-        clearer = getattr(self._viewer_widget, "clear_text_highlight_overlay", None)
-        if callable(clearer):
-            clearer()
-
-    def _apply_document_review_workspace_transition(
-        self,
-        transition: DocumentReviewWorkspaceTransition,
-    ) -> None:
-        self._apply_document_review_workspace_state(transition.state)
-        self._apply_document_review_workspace_effects(transition.effects)
-
-    def _apply_document_review_workspace_effects(
-        self,
-        effects: DocumentReviewWorkspaceViewerEffects,
-    ) -> None:
-        if effects.interaction_mode is not None:
-            setter = getattr(self._viewer_widget, "set_interaction_mode", None)
-            if callable(setter):
-                setter(effects.interaction_mode)
-        if effects.clear_highlights:
-            self._clear_document_text_highlight_overlay()
-        elif effects.highlight_page_index is not None:
-            setter = getattr(self._viewer_widget, "set_text_highlight_overlay", None)
-            if callable(setter):
-                setter(
-                    page_index=effects.highlight_page_index,
-                    highlight_rects=effects.highlight_rects,
-                )
-        if effects.jump_to_page_index is None:
-            return
-        self._apply_workspace_interaction_plan(
-            self._workspace_interaction_session.refresh_navigation_to_page_index(
-                effects.jump_to_page_index
-            ),
-        )
+        self._review_bridge.select_review_signature(index)
 
     def _apply_placement_context_result(
         self,
@@ -1610,7 +1572,7 @@ class SigningWorkspaceWidget:
         effect: WorkspaceInteractionEffect,
     ) -> None:
         if isinstance(effect, ApplyReviewTransition):
-            self._apply_document_review_workspace_transition(effect.transition)
+            self._review_bridge.apply_transition(effect.transition)
             return
         if isinstance(effect, EmitInteractionError):
             self._emit_error(effect.message)
