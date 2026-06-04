@@ -4,10 +4,13 @@ from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt import app_frame as app_frame_module
+from foliaseal.presentation.qt import signing_shell_port as signing_shell_port_module
 from foliaseal.presentation.qt.app_frame import (
-    AppFrameShellBootstrap,
     FoliaSealAppFrame,
     QtAppFrameBindings,
+)
+from foliaseal.presentation.qt.signing_shell_port import (
+    SigningWorkspaceBootstrap,
 )
 from tests.support.phase3_builders import (
     build_certificate_catalog,
@@ -305,7 +308,7 @@ class _FakeShellFactory:
         self.shell_widget = shell_widget
         self.bootstrap_calls = bootstrap_calls if bootstrap_calls is not None else []
 
-    def create(self, bootstrap: AppFrameShellBootstrap):
+    def create(self, bootstrap: SigningWorkspaceBootstrap):
         self.bootstrap_calls.append(bootstrap)
         return _FakeShellPort(self.shell_widget)
 
@@ -376,6 +379,57 @@ def _settings(tmp_path: Path) -> AppSettings:
         linux_packaging_channel="unknown",
         ui={},
     )
+
+
+def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
+    tmp_path: Path, monkeypatch
+) -> None:
+    captured = {}
+    shell = _FakeShell()
+
+    def _fake_build_qt_signing_shell(**kwargs):
+        captured.update(kwargs)
+        return shell
+
+    monkeypatch.setattr(
+        signing_shell_port_module,
+        "build_qt_signing_shell",
+        _fake_build_qt_signing_shell,
+    )
+    bootstrap = SigningWorkspaceBootstrap(
+        viewer_workflow=object(),
+        signing_workflow=object(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(
+            storage_dir=tmp_path / "Certificates"
+        ),
+        certificate_secret_provider=object(),
+        preset_catalog_store=object(),
+        sign_executor=object(),
+        on_sign_request=lambda request: None,
+        on_open_signed_output=lambda path: None,
+        on_error=lambda message: None,
+        on_status_change=lambda status: None,
+    )
+
+    port = signing_shell_port_module.QtSigningWorkspaceFactory().create(bootstrap)
+
+    assert port.widget() is shell
+    assert captured == {
+        "viewer_workflow": bootstrap.viewer_workflow,
+        "signing_workflow": bootstrap.signing_workflow,
+        "certificate_catalog_store": bootstrap.certificate_catalog_store,
+        "certificate_secret_provider": bootstrap.certificate_secret_provider,
+        "preset_catalog_store": bootstrap.preset_catalog_store,
+        "app_settings": bootstrap.app_settings,
+        "app_settings_store": bootstrap.app_settings_store,
+        "sign_executor": bootstrap.sign_executor,
+        "on_sign_request": bootstrap.on_sign_request,
+        "on_open_signed_output": bootstrap.on_open_signed_output,
+        "on_error": bootstrap.on_error,
+        "on_status_change": bootstrap.on_status_change,
+    }
 
 
 def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
