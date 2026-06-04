@@ -3882,6 +3882,38 @@ def test_signing_shell_refresh_viewer_applies_ordered_workspace_effects(
     ]
 
 
+def test_signing_shell_refresh_viewer_reports_refresh_error_through_interaction_bridge(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    errors: list[str] = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        on_error=errors.append,
+    )
+
+    def _fail_refresh(*, navigation: bool = False):
+        raise RuntimeError("viewer boom")
+
+    monkeypatch.setattr(widget.viewer_widget, "refresh", _fail_refresh)
+
+    widget.refresh_viewer()
+
+    assert errors == ["Unable to refresh viewer: viewer boom"]
+
+
 def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition(
     monkeypatch,
     tmp_path: Path,
