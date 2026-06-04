@@ -160,6 +160,16 @@ def test_signing_workspace_sidebar_renders_document_review_and_text_state() -> N
         can_copy_text=True,
     )
 
+    assert sidebar.surface.container is sidebar.container
+    assert sidebar.surface.signing_action_panel is sidebar.signing_action_controls.container
+    assert (
+        sidebar.surface.document_review_signature_selector
+        is sidebar.document_review_controls.signature_selector
+    )
+    assert (
+        sidebar.surface.document_text_find_button
+        is sidebar.document_text_controls.find_button
+    )
     assert sidebar.document_review_controls.headline_label.text() == "Signature review"
     assert sidebar.document_review_controls.detail_label.text() == (
         "Found 2 embedded signatures."

@@ -54,6 +54,36 @@ class DocumentTextControls:
     detail_label: Any
 
 
+@dataclass(frozen=True)
+class SigningWorkspaceSidebarSurface:
+    """Grouped shell-facing surface for sidebar-owned controls."""
+
+    container: Any
+    properties_scroll: Any
+    signing_action_panel: Any
+    choose_output_button: Any
+    sign_button: Any
+    open_signed_output_button: Any
+    sign_result_label: Any
+    flow_stage_label: Any
+    flow_detail_label: Any
+    document_review_headline_label: Any
+    document_review_detail_label: Any
+    document_review_signature_items_label: Any
+    document_review_signature_selector: Any
+    document_review_signature_detail_label: Any
+    document_text_query_input: Any
+    document_text_find_button: Any
+    document_text_previous_button: Any
+    document_text_next_button: Any
+    document_text_copy_button: Any
+    document_text_select_mode_checkbox: Any
+    document_text_copy_selection_button: Any
+    document_text_clear_selection_button: Any
+    document_text_status_label: Any
+    document_text_detail_label: Any
+
+
 def format_document_signature_items(signature_items: tuple[Any, ...]) -> str:
     """Render compact per-signature summary lines for the review card."""
 
@@ -130,6 +160,44 @@ class SigningWorkspaceSidebar:
             self.signing_action_controls.open_signed_output_button
         )
         self.result_label = self.signing_action_controls.result_label
+        self.surface = SigningWorkspaceSidebarSurface(
+            container=self.container,
+            properties_scroll=self.properties_scroll,
+            signing_action_panel=self.signing_action_controls.container,
+            choose_output_button=self.choose_output_button,
+            sign_button=self.sign_button,
+            open_signed_output_button=self.open_signed_output_button,
+            sign_result_label=self.result_label,
+            flow_stage_label=self.signing_action_controls.stage_label,
+            flow_detail_label=self.signing_action_controls.detail_label,
+            document_review_headline_label=self.document_review_controls.headline_label,
+            document_review_detail_label=self.document_review_controls.detail_label,
+            document_review_signature_items_label=(
+                self.document_review_controls.signature_items_label
+            ),
+            document_review_signature_selector=(
+                self.document_review_controls.signature_selector
+            ),
+            document_review_signature_detail_label=(
+                self.document_review_controls.signature_detail_label
+            ),
+            document_text_query_input=self.document_text_controls.query_input,
+            document_text_find_button=self.document_text_controls.find_button,
+            document_text_previous_button=self.document_text_controls.previous_button,
+            document_text_next_button=self.document_text_controls.next_button,
+            document_text_copy_button=self.document_text_controls.copy_button,
+            document_text_select_mode_checkbox=(
+                self.document_text_controls.select_mode_checkbox
+            ),
+            document_text_copy_selection_button=(
+                self.document_text_controls.copy_selection_button
+            ),
+            document_text_clear_selection_button=(
+                self.document_text_controls.clear_selection_button
+            ),
+            document_text_status_label=self.document_text_controls.status_label,
+            document_text_detail_label=self.document_text_controls.detail_label,
+        )
 
         self._layout.addWidget(self.properties_scroll)
         self._layout.addWidget(self.signing_action_controls.container)

@@ -697,7 +697,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
     widget.submit_sign_request()
     original_output_path = workflow.output_pdf_path
-    original_result_label = widget.sign_result_label.text()
+    original_result_label = widget.sidebar_surface.sign_result_label.text()
 
     result = widget.choose_output_pdf_path()
 
@@ -705,7 +705,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     assert workflow.output_pdf_path == original_output_path
     assert widget.last_signing_result is not None
     assert widget.last_signing_result is not None
-    assert widget.sign_result_label.text() == original_result_label
+    assert widget.sidebar_surface.sign_result_label.text() == original_result_label
     assert bindings.q_message_box.calls == [
         (
             widget,
@@ -795,7 +795,9 @@ def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
     assert workflow.output_pdf_path == str(existing_output_path)
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
-    assert widget.sign_result_label.text() == (f"Output will be saved to: {existing_output_path}")
+    assert widget.sidebar_surface.sign_result_label.text() == (
+        f"Output will be saved to: {existing_output_path}"
+    )
     assert bindings.q_message_box.calls == [
         (
             widget,
@@ -1238,16 +1240,16 @@ def test_signing_shell_refresh_certificate_configurations_reapplies_signed_actio
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
     widget.submit_sign_request()
 
-    assert widget.flow_stage_label.text() == "Signed"
-    assert "Signing completed successfully." in widget.sign_result_label.text()
-    assert widget.open_signed_output_button._enabled is True
+    assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
+    assert "Signing completed successfully." in widget.sidebar_surface.sign_result_label.text()
+    assert widget.sidebar_surface.open_signed_output_button._enabled is True
 
     store.save_catalog(build_certificate_catalog())
     widget.refresh_certificate_configurations()
 
-    assert widget.flow_stage_label.text() == "Signed"
-    assert "Signing completed successfully." in widget.sign_result_label.text()
-    assert widget.open_signed_output_button._enabled is True
+    assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
+    assert "Signing completed successfully." in widget.sidebar_surface.sign_result_label.text()
+    assert widget.sidebar_surface.open_signed_output_button._enabled is True
 
 
 def test_signing_shell_selection_uses_rendered_snapshot_page_for_validation(
@@ -1324,16 +1326,16 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     assert executor.calls == [request]
     assert widget.last_signing_result is not None
     assert widget.last_signing_result.success is True
-    assert "Signing completed successfully." in widget.sign_result_label.text()
-    assert f"Saved to: {request.output_pdf_path}" in widget.sign_result_label.text()
+    assert "Signing completed successfully." in widget.sidebar_surface.sign_result_label.text()
+    assert f"Saved to: {request.output_pdf_path}" in widget.sidebar_surface.sign_result_label.text()
     assert (
         "Verified locally: PDF 1.7, detached signature, no timestamp."
-        in widget.sign_result_label.text()
+        in widget.sidebar_surface.sign_result_label.text()
     )
-    assert "No timestamp token was found." in widget.sign_result_label.text()
-    assert widget.flow_stage_label.text() == "Signed"
-    assert "Open or verify the signed PDF" in widget.flow_detail_label.text()
-    assert widget.open_signed_output_button._enabled is False
+    assert "No timestamp token was found." in widget.sidebar_surface.sign_result_label.text()
+    assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
+    assert "Open or verify the signed PDF" in widget.sidebar_surface.flow_detail_label.text()
+    assert widget.sidebar_surface.open_signed_output_button._enabled is False
 
 
 def test_signing_shell_shows_document_review_summary_from_injected_inspector(
@@ -1369,9 +1371,15 @@ def test_signing_shell_shows_document_review_summary_from_injected_inspector(
     )
 
     assert inspector.calls == ["/tmp/sample.pdf"]
-    assert widget.document_review_headline_label.text() == "Signature review"
-    assert "Found 1 embedded signature." in widget.document_review_detail_label.text()
-    assert "Latest signer: CN=Alice Example." in widget.document_review_detail_label.text()
+    assert widget.sidebar_surface.document_review_headline_label.text() == (
+        "Signature review"
+    )
+    assert "Found 1 embedded signature." in (
+        widget.sidebar_surface.document_review_detail_label.text()
+    )
+    assert "Latest signer: CN=Alice Example." in (
+        widget.sidebar_surface.document_review_detail_label.text()
+    )
 
 
 def test_signing_shell_delegates_review_rendering_to_sidebar(
@@ -1421,7 +1429,7 @@ def test_signing_shell_delegates_review_rendering_to_sidebar(
     assert len(calls) == 2
     assert all(can_copy_text is True for _, can_copy_text in calls)
     assert calls[-1][0].review.review_summary.headline == "Signature review"
-    assert widget.document_review_headline_label.text() == "Signature review"
+    assert widget.sidebar_surface.document_review_headline_label.text() == "Signature review"
 
 
 def test_signing_shell_renders_per_signature_review_items(
@@ -1484,7 +1492,7 @@ def test_signing_shell_renders_per_signature_review_items(
         document_review_inspector=inspector,
     )
 
-    rendered = widget.document_review_signature_items_label.text()
+    rendered = widget.sidebar_surface.document_review_signature_items_label.text()
     assert "Signature 1: CN=Bob Example: verified locally." in rendered
     assert (
         "Signature 2 (latest): "
@@ -1552,22 +1560,29 @@ def test_signing_shell_updates_drill_in_detail_for_selected_signature(
         document_review_inspector=inspector,
     )
 
-    assert widget.document_review_signature_selector.count() == 2
-    assert widget.document_review_signature_selector.currentText() == "Signature 2 (latest)"
-    assert "Signer: CN=Alice Example." in widget.document_review_signature_detail_label.text()
+    assert widget.sidebar_surface.document_review_signature_selector.count() == 2
+    assert (
+        widget.sidebar_surface.document_review_signature_selector.currentText()
+        == "Signature 2 (latest)"
+    )
+    assert "Signer: CN=Alice Example." in (
+        widget.sidebar_surface.document_review_signature_detail_label.text()
+    )
     assert (
         "Recommended next step: reopen the signed PDF and review "
         "the selected signature details carefully before relying on it."
-        in widget.document_review_signature_detail_label.text()
+        in widget.sidebar_surface.document_review_signature_detail_label.text()
     )
 
-    widget.document_review_signature_selector.setCurrentIndex(0)
+    widget.sidebar_surface.document_review_signature_selector.setCurrentIndex(0)
 
-    assert widget.document_review_signature_selector.currentText() == "Signature 1"
-    assert "Signer: CN=Bob Example." in widget.document_review_signature_detail_label.text()
+    assert widget.sidebar_surface.document_review_signature_selector.currentText() == "Signature 1"
+    assert "Signer: CN=Bob Example." in (
+        widget.sidebar_surface.document_review_signature_detail_label.text()
+    )
     assert (
         "Local verification: verified locally."
-        in widget.document_review_signature_detail_label.text()
+        in widget.sidebar_surface.document_review_signature_detail_label.text()
     )
 
 
@@ -1616,9 +1631,11 @@ def test_signing_shell_disables_review_selector_for_single_signature_detail(
         document_review_inspector=inspector,
     )
 
-    assert widget.document_review_signature_selector.count() == 1
-    assert widget.document_review_signature_selector.enabled is False
-    assert "Signer: CN=Alice Example." in widget.document_review_signature_detail_label.text()
+    assert widget.sidebar_surface.document_review_signature_selector.count() == 1
+    assert widget.sidebar_surface.document_review_signature_selector.enabled is False
+    assert "Signer: CN=Alice Example." in (
+        widget.sidebar_surface.document_review_signature_detail_label.text()
+    )
 
 
 def test_signing_shell_renders_next_action_guidance_for_not_evaluated_signature(
@@ -1671,7 +1688,7 @@ def test_signing_shell_renders_next_action_guidance_for_not_evaluated_signature(
     assert (
         "Recommended next step: reopen the signed PDF and review the embedded "
         "signer details before relying on this signature."
-        in widget.document_review_signature_detail_label.text()
+        in widget.sidebar_surface.document_review_signature_detail_label.text()
     )
 
 
@@ -1729,7 +1746,7 @@ def test_signing_shell_renders_restricted_next_action_guidance(
     assert (
         "Recommended next step: reopen the signed PDF, review the selected signature "
         "details carefully, and expect that further changes may be blocked."
-        in widget.document_review_signature_detail_label.text()
+        in widget.sidebar_surface.document_review_signature_detail_label.text()
     )
 
 
@@ -1784,7 +1801,7 @@ def test_signing_shell_preserves_selected_signature_on_review_refresh(
         document_review_inspector=inspector,
     )
 
-    widget.document_review_signature_selector.setCurrentIndex(0)
+    widget.sidebar_surface.document_review_signature_selector.setCurrentIndex(0)
     inspector.summary = DocumentReviewSummary(
         headline="Signature review",
         detail="Found 2 embedded signatures.",
@@ -1818,10 +1835,10 @@ def test_signing_shell_preserves_selected_signature_on_review_refresh(
 
     widget.refresh_document_review()
 
-    assert widget.document_review_signature_selector.currentText() == "Signature 1"
+    assert widget.sidebar_surface.document_review_signature_selector.currentText() == "Signature 1"
     assert (
         "Document permissions: No certification restriction was detected."
-        in widget.document_review_signature_detail_label.text()
+        in widget.sidebar_surface.document_review_signature_detail_label.text()
     )
 
 
@@ -1868,22 +1885,24 @@ def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
     )
     initial_refresh_count = len(widget.viewer_widget.refresh_calls)
 
-    widget.document_text_query_input.setText("Alice")
-    widget.document_text_find_button.click()
+    widget.sidebar_surface.document_text_query_input.setText("Alice")
+    widget.sidebar_surface.document_text_find_button.click()
 
     assert search_engine.calls == [("/tmp/sample.pdf", "Alice")]
     assert widget.logical_page_index() == 1
     assert len(widget.viewer_widget.refresh_calls) == initial_refresh_count + 1
     assert widget.viewer_widget.refresh_calls[-1] == (None, True)
-    assert widget.document_text_status_label.text() == "Found 2 matches for 'Alice'."
-    assert "Showing 1 of 2 on page 2" in widget.document_text_detail_label.text()
+    assert widget.sidebar_surface.document_text_status_label.text() == (
+        "Found 2 matches for 'Alice'."
+    )
+    assert "Showing 1 of 2 on page 2" in widget.sidebar_surface.document_text_detail_label.text()
 
-    widget.document_text_next_button.click()
+    widget.sidebar_surface.document_text_next_button.click()
 
     assert widget.logical_page_index() == 2
-    assert "Showing 2 of 2 on page 3" in widget.document_text_detail_label.text()
+    assert "Showing 2 of 2 on page 3" in widget.sidebar_surface.document_text_detail_label.text()
 
-    widget.document_text_copy_button.click()
+    widget.sidebar_surface.document_text_copy_button.click()
 
     assert copied_text == ["Alice"]
 
@@ -1939,9 +1958,9 @@ def test_signing_shell_document_text_search_uses_default_qt_clipboard_callback(
         document_text_search_engine=search_engine,
     )
 
-    widget.document_text_query_input.setText("Alice")
-    widget.document_text_find_button.click()
-    widget.document_text_copy_button.click()
+    widget.sidebar_surface.document_text_query_input.setText("Alice")
+    widget.sidebar_surface.document_text_find_button.click()
+    widget.sidebar_surface.document_text_copy_button.click()
 
     assert clipboard.values == ["Alice"]
 
@@ -1975,7 +1994,7 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
         on_copy_text=copied_text.append,
     )
 
-    widget.document_text_select_mode_checkbox.setChecked(True)
+    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(True)
 
     assert widget.viewer_widget.interaction_mode == "text"
 
@@ -1984,24 +2003,24 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
     assert selection_engine.calls == [
         ("/tmp/sample.pdf", 0, PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
     ]
-    assert widget.document_text_status_label.text() == "Selected text on page 1."
-    assert widget.document_text_detail_label.text() == "Alice Example"
+    assert widget.sidebar_surface.document_text_status_label.text() == "Selected text on page 1."
+    assert widget.sidebar_surface.document_text_detail_label.text() == "Alice Example"
     assert widget.viewer_widget.text_highlight_page_index == 0
     assert widget.viewer_widget.text_highlight_rects == (
         PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),
     )
 
-    widget.document_text_copy_selection_button.click()
+    widget.sidebar_surface.document_text_copy_selection_button.click()
 
     assert copied_text == ["Alice Example"]
 
-    widget.document_text_clear_selection_button.click()
+    widget.sidebar_surface.document_text_clear_selection_button.click()
 
     assert widget.viewer_widget.text_highlight_page_index is None
     assert widget.viewer_widget.text_highlight_rects == ()
-    assert widget.document_text_copy_selection_button._enabled is False
+    assert widget.sidebar_surface.document_text_copy_selection_button._enabled is False
 
-    widget.document_text_select_mode_checkbox.setChecked(False)
+    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(False)
     widget.viewer_widget.emit_selection(PdfRect(x1=1.0, y1=2.0, x2=3.0, y2=4.0))
 
     assert widget.viewer_widget.interaction_mode == "signature"
@@ -2050,17 +2069,19 @@ def test_signing_shell_restores_search_state_when_text_selection_mode_is_disable
         document_text_selection_engine=selection_engine,
     )
 
-    widget.document_text_query_input.setText("Alice")
-    widget.document_text_find_button.click()
-    widget.document_text_select_mode_checkbox.setChecked(True)
+    widget.sidebar_surface.document_text_query_input.setText("Alice")
+    widget.sidebar_surface.document_text_find_button.click()
+    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(True)
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
 
-    assert widget.document_text_status_label.text() == "Selected text on page 2."
+    assert widget.sidebar_surface.document_text_status_label.text() == "Selected text on page 2."
 
-    widget.document_text_select_mode_checkbox.setChecked(False)
+    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(False)
 
-    assert widget.document_text_status_label.text() == "Found 1 matches for 'Alice'."
-    assert "Showing 1 of 1 on page 2" in widget.document_text_detail_label.text()
+    assert widget.sidebar_surface.document_text_status_label.text() == (
+        "Found 1 matches for 'Alice'."
+    )
+    assert "Showing 1 of 1 on page 2" in widget.sidebar_surface.document_text_detail_label.text()
     assert widget.viewer_widget.text_highlight_rects == ()
 
 
@@ -2096,10 +2117,10 @@ def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_change
 
     widget.viewer_widget.emit_selection(PdfRect(x1=12.0, y1=12.0, x2=34.0, y2=24.0))
 
-    assert widget.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
-    assert widget.sign_result_label.text() == ""
+    assert widget.sidebar_surface.sign_result_label.text() == ""
 
 
 def test_signing_shell_flow_summary_replaces_signed_result_after_output_path_change(
@@ -2137,11 +2158,13 @@ def test_signing_shell_flow_summary_replaces_signed_result_after_output_path_cha
     bindings.q_file_dialog.next_save_file_name = str(selected_path)
     widget.choose_output_pdf_path()
 
-    assert widget.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
-    assert "Signing completed successfully." not in widget.sign_result_label.text()
-    assert widget.sign_result_label.text() == f"Output will be saved to: {selected_path}"
+    assert "Signing completed successfully." not in widget.sidebar_surface.sign_result_label.text()
+    assert widget.sidebar_surface.sign_result_label.text() == (
+        f"Output will be saved to: {selected_path}"
+    )
 
 
 def test_signing_shell_flow_summary_clears_signed_result_after_page_change(
@@ -2176,10 +2199,10 @@ def test_signing_shell_flow_summary_clears_signed_result_after_page_change(
 
     widget.properties_panel._placement_controls.page_spin.setValue(2)
 
-    assert widget.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
-    assert widget.sign_result_label.text() == ""
+    assert widget.sidebar_surface.sign_result_label.text() == ""
 
 
 def test_signing_shell_open_signed_output_uses_success_callback(
@@ -2220,7 +2243,7 @@ def test_signing_shell_open_signed_output_uses_success_callback(
     assert request is not None
     assert opened == request.output_pdf_path
     assert opened_paths == [request.output_pdf_path]
-    assert widget.open_signed_output_button._enabled is True
+    assert widget.sidebar_surface.open_signed_output_button._enabled is True
     assert not hasattr(widget, "document_review_verify_button")
 
 
@@ -2262,7 +2285,7 @@ def test_signing_shell_disables_open_signed_output_after_sign_failure(
     assert request is not None
     assert opened is None
     assert opened_paths == []
-    assert widget.open_signed_output_button._enabled is False
+    assert widget.sidebar_surface.open_signed_output_button._enabled is False
     assert not hasattr(widget, "document_review_verify_button")
 
 
@@ -2304,7 +2327,7 @@ def test_signing_shell_reports_sign_failure_when_executor_returns_failure(
     assert widget.last_signing_result is not None
     assert widget.last_signing_result.success is False
     assert errors == ["Post-sign verification failed."]
-    assert widget.sign_result_label.text() == "Post-sign verification failed."
+    assert widget.sidebar_surface.sign_result_label.text() == "Post-sign verification failed."
 
 
 def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Path) -> None:
@@ -2324,13 +2347,21 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         signing_workflow=_workflow(tmp_path),
     )
 
-    assert widget.flow_stage_label.text() == "Place signature"
-    assert "Drag on the page" in widget.flow_detail_label.text()
+    assert widget.sidebar_surface.container is widget.sidebar
+    assert widget.sidebar_surface.signing_action_panel is not None
+    assert widget.sidebar_surface.flow_stage_label.text() == "Place signature"
+    assert "Drag on the page" in widget.sidebar_surface.flow_detail_label.text()
     assert len(widget.layout.items) == 1
     assert len(widget.layout.items[0][0].items) == 2
     assert widget.properties_scroll.parent is widget.sidebar
-    assert widget.choose_output_button.parent is widget.signing_action_panel
-    assert widget.sign_result_label.parent is widget.signing_action_panel
+    assert (
+        widget.sidebar_surface.choose_output_button.parent
+        is widget.sidebar_surface.signing_action_panel
+    )
+    assert (
+        widget.sidebar_surface.sign_result_label.parent
+        is widget.sidebar_surface.signing_action_panel
+    )
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel.container.layout.items) == 5
@@ -2382,6 +2413,10 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.properties_panel.preview_controls.summary_label.text()
         == "This preview should match the signed PDF."
     )
+    assert not hasattr(widget, "flow_stage_label")
+    assert not hasattr(widget, "document_review_signature_selector")
+    assert not hasattr(widget, "document_text_find_button")
+    assert not hasattr(widget, "sign_result_label")
     assert not hasattr(widget.properties_panel, "field_controls")
     assert not hasattr(widget.properties_panel._appearance_controls, "datetime_format")
     assert not hasattr(widget.properties_panel._appearance_controls, "image_stamp_path")
@@ -2481,8 +2516,8 @@ def test_signing_shell_flow_summary_advances_after_signature_placement(
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
 
-    assert widget.flow_stage_label.text() == "Confirm/sign"
-    assert "Confirm the output path" in widget.flow_detail_label.text()
+    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
+    assert "Confirm the output path" in widget.sidebar_surface.flow_detail_label.text()
     assert widget.is_sign_action_enabled() is True
 
 
@@ -2731,9 +2766,9 @@ def test_signing_shell_readiness_detail_is_width_limited_to_action_panel(
     widget.refresh_viewer()
 
     assert not hasattr(panel, "_validation_label")
-    assert widget.flow_detail_label.fixed_width == 464
-    assert widget.flow_stage_label.text() == "Review preview"
-    assert widget.flow_detail_label.text().startswith("Will fail to sign:")
+    assert widget.sidebar_surface.flow_detail_label.fixed_width == 464
+    assert widget.sidebar_surface.flow_stage_label.text() == "Review preview"
+    assert widget.sidebar_surface.flow_detail_label.text().startswith("Will fail to sign:")
     assert panel.validation_text().startswith("Will fail to sign:")
 
 

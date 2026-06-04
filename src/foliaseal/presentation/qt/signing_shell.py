@@ -1239,13 +1239,9 @@ class SigningWorkspaceWidget:
             on_copy_selected_text=self.copy_selected_document_text,
             on_clear_selected_text=self.clear_selected_document_text,
         )
-        self._flow_summary_controls = self._sidebar.signing_action_controls
-        self._document_review_controls = self._sidebar.document_review_controls
         self._document_text_controls = self._sidebar.document_text_controls
         self._properties_scroll = self._sidebar.properties_scroll
-        self._choose_output_button = self._sidebar.choose_output_button
         self._sign_button = self._sidebar.sign_button
-        self._open_signed_output_button = self._sidebar.open_signed_output_button
         self._result_label = self._sidebar.result_label
         self._signing_action_coordinator = SigningActionCoordinator(
             workflow=self._draft_workflow,
@@ -1274,64 +1270,12 @@ class SigningWorkspaceWidget:
         self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
         self.widget.sidebar = self._sidebar.container  # type: ignore[attr-defined]
-        self.widget.signing_action_panel = (  # type: ignore[attr-defined]
-            self._flow_summary_controls.container
-        )
-        self.widget.choose_output_button = self._choose_output_button  # type: ignore[attr-defined]
-        self.widget.open_signed_output_button = (  # type: ignore[attr-defined]
-            self._open_signed_output_button
-        )
+        self.widget.sidebar_surface = self._sidebar.surface  # type: ignore[attr-defined]
         destroyed_signal = getattr(self.widget, "destroyed", None)
         destroy_connect = getattr(destroyed_signal, "connect", None)
         if callable(destroy_connect):
             destroy_connect(lambda *_args: self.properties_panel.dispose())
-        self.widget.flow_stage_label = (  # type: ignore[attr-defined]
-            self._flow_summary_controls.stage_label
-        )
-        self.widget.flow_detail_label = (  # type: ignore[attr-defined]
-            self._flow_summary_controls.detail_label
-        )
-        self.widget.document_review_headline_label = (  # type: ignore[attr-defined]
-            self._document_review_controls.headline_label
-        )
-        self.widget.document_review_detail_label = (  # type: ignore[attr-defined]
-            self._document_review_controls.detail_label
-        )
-        self.widget.document_review_signature_items_label = (  # type: ignore[attr-defined]
-            self._document_review_controls.signature_items_label
-        )
-        self.widget.document_review_signature_selector = (  # type: ignore[attr-defined]
-            self._document_review_controls.signature_selector
-        )
-        self.widget.document_review_signature_detail_label = (  # type: ignore[attr-defined]
-            self._document_review_controls.signature_detail_label
-        )
-        self.widget.document_text_query_input = (  # type: ignore[attr-defined]
-            self._document_text_controls.query_input
-        )
-        self.widget.document_text_find_button = self._document_text_controls.find_button  # type: ignore[attr-defined]
-        self.widget.document_text_previous_button = (  # type: ignore[attr-defined]
-            self._document_text_controls.previous_button
-        )
-        self.widget.document_text_next_button = self._document_text_controls.next_button  # type: ignore[attr-defined]
-        self.widget.document_text_copy_button = self._document_text_controls.copy_button  # type: ignore[attr-defined]
-        self.widget.document_text_select_mode_checkbox = (  # type: ignore[attr-defined]
-            self._document_text_controls.select_mode_checkbox
-        )
-        self.widget.document_text_copy_selection_button = (  # type: ignore[attr-defined]
-            self._document_text_controls.copy_selection_button
-        )
-        self.widget.document_text_clear_selection_button = (  # type: ignore[attr-defined]
-            self._document_text_controls.clear_selection_button
-        )
-        self.widget.document_text_status_label = (  # type: ignore[attr-defined]
-            self._document_text_controls.status_label
-        )
-        self.widget.document_text_detail_label = (  # type: ignore[attr-defined]
-            self._document_text_controls.detail_label
-        )
         self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
-        self.widget.sign_result_label = self._result_label  # type: ignore[attr-defined]
         self.widget.last_signing_result = None  # type: ignore[attr-defined]
         self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
         self.widget.refresh_document_review = self.refresh_document_review  # type: ignore[attr-defined]
