@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Protocol
 
 from foliaseal.application import (
@@ -17,7 +16,6 @@ from foliaseal.application import (
     SigningSetupSession,
     WorkspaceInteractionPlan,
     WorkspaceInteractionSession,
-    suggest_signed_output_path,
 )
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
@@ -85,7 +83,9 @@ from foliaseal.presentation.qt.signing_action_boundary import (
 )
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
-    SigningActionState,
+)
+from foliaseal.presentation.qt.signing_workspace_action_bridge import (
+    SigningWorkspaceActionBridge,
 )
 from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
     SigningWorkspaceInteractionBridge,
@@ -1262,6 +1262,15 @@ class SigningWorkspaceWidget:
             on_status_change=self._on_status_change,
             on_open_signed_output=self._on_open_signed_output,
         )
+        self._action_bridge = SigningWorkspaceActionBridge(
+            widget=self.widget,
+            bindings=bindings,
+            sidebar=self._sidebar,
+            properties_panel=self.properties_panel,
+            signing_action_boundary=self._signing_action_boundary,
+            draft_workflow=self._draft_workflow,
+            app_settings_getter=lambda: self._app_settings,
+        )
         self._interaction_bridge = SigningWorkspaceInteractionBridge(
             review_bridge=self._review_bridge,
             viewer_widget=self._viewer_widget,
@@ -1275,10 +1284,8 @@ class SigningWorkspaceWidget:
             ),
             sync_signature_overlay=self._sync_signature_overlay,
             refresh_preview=lambda: self.properties_panel.refresh_preview(),
-            load_signing_action_state=self._refresh_sign_button_state,
-            invalidate_signing_action_state=lambda reason: self._apply_signing_action_state(
-                self._signing_action_boundary.invalidate(reason).state
-            ),
+            load_signing_action_state=self._action_bridge.reload_state,
+            invalidate_signing_action_state=self._action_bridge.invalidate_state,
             emit_error=self._emit_error,
         )
         self._main_row = bindings.q_hbox_layout()
@@ -1334,7 +1341,7 @@ class SigningWorkspaceWidget:
 
         self.refresh_viewer()
         self._review_bridge.apply_state(self._document_review_workspace.load())
-        self._apply_signing_action_state(self._signing_action_boundary.load())
+        self._action_bridge.reload_state()
 
     @property
     def container(self) -> Any:
@@ -1461,64 +1468,18 @@ class SigningWorkspaceWidget:
         return bool(getattr(self._sign_button, "enabled", False))
 
     def submit_sign_request(self) -> SigningRequest | None:
-        result = self._signing_action_boundary.submit()
-        self._apply_signing_action_state(result.state)
-        return result.request
+        return self._action_bridge.submit_sign_request()
 
     def open_signed_output(self) -> str | None:
-        result = self._signing_action_boundary.open_signed_output()
-        return result.opened_output_path
+        return self._action_bridge.open_signed_output()
 
     def choose_output_pdf_path(self) -> str | None:
-        initial_path = self._default_output_dialog_path()
-        selected = self._bindings.q_file_dialog.getSaveFileName(
-            self.widget,
-            "Save signed PDF",
-            str(initial_path),
-            "PDF files (*.pdf)",
-        )
-        if isinstance(selected, tuple):
-            selected_path = str(selected[0])
-        else:
-            selected_path = str(selected)
-        selected_path = selected_path.strip()
-        if not selected_path:
-            return None
-        if not self._confirm_output_overwrite(selected_path):
-            return None
-        self._apply_signing_action_state(
-            self._signing_action_boundary.accept_output_path(selected_path).state
-        )
-        return selected_path
-
-    def _confirm_output_overwrite(self, selected_path: str) -> bool:
-        selected = Path(selected_path)
-        if not selected.exists():
-            return True
-        message_box = self._bindings.q_message_box
-        question = getattr(message_box, "question", None)
-        if not callable(question):
-            return False
-        yes_value = getattr(message_box, "Yes", None)
-        if yes_value is None:
-            standard_button = getattr(message_box, "StandardButton", None)
-            yes_value = getattr(standard_button, "Yes", None)
-        result = question(
-            self.widget,
-            "Overwrite signed PDF?",
-            f"Replace existing signed PDF at {selected_path}?",
-        )
-        return result == yes_value
+        return self._action_bridge.choose_output_pdf_path()
 
     @property
     def last_signing_result(self) -> SigningResult | None:
         """Return the most recent signing result, if a real executor ran."""
         return self._signing_action_coordinator.last_signing_result
-
-    def _clear_previous_signing_result(self) -> None:
-        self._apply_signing_action_state(
-            self._signing_action_boundary.invalidate("clear").state
-        )
 
     def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
         self._apply_workspace_interaction_plan(
@@ -1539,9 +1500,7 @@ class SigningWorkspaceWidget:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Reload certificate configurations from storage and refresh shell controls."""
-        catalog = self.properties_panel.refresh_certificate_configurations()
-        self._apply_signing_action_state(self._signing_action_boundary.load())
-        return catalog
+        return self._action_bridge.refresh_certificate_configurations()
 
     def _handle_page_change(self, page_number: int) -> None:
         self._apply_workspace_interaction_plan(
@@ -1552,9 +1511,6 @@ class SigningWorkspaceWidget:
         setter = getattr(self._viewer_widget, "set_signature_overlay", None)
         if callable(setter):
             setter(self._draft_workflow.signature_rect)
-
-    def _refresh_sign_button_state(self) -> None:
-        self._apply_signing_action_state(self._signing_action_boundary.load())
 
     def _on_document_review_signature_selected(self, index: int) -> None:
         self._review_bridge.select_review_signature(index)
@@ -1572,20 +1528,6 @@ class SigningWorkspaceWidget:
         plan: WorkspaceInteractionPlan,
     ) -> None:
         self._interaction_bridge.apply_plan(plan)
-
-    def _refresh_flow_summary(self) -> None:
-        self._apply_signing_action_state(self._signing_action_boundary.load())
-
-    def _apply_signing_action_state(self, state: SigningActionState) -> None:
-        self.widget.last_signing_result = state.last_signing_result  # type: ignore[attr-defined]
-        self._sidebar.render_signing_action_state(state)
-
-    def _default_output_dialog_path(self) -> Path:
-        return suggest_signed_output_path(
-            input_pdf_path=self._draft_workflow.input_pdf_path,
-            default_output_directory=self._app_settings.default_output_directory,
-            current_output_path=self._draft_workflow.output_pdf_path,
-        )
 
     def _emit_error(self, message: str) -> None:
         self._set_sign_result_text(message, success=False)

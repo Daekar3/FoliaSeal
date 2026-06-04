@@ -753,6 +753,35 @@ def test_signing_shell_output_path_overwrite_cancel_prompts_for_current_path(
     ]
 
 
+def test_signing_shell_output_path_dialog_cancel_keeps_existing_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    workflow = _workflow(tmp_path)
+    original_output_path = workflow.output_pdf_path
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+    )
+
+    result = widget.choose_output_pdf_path()
+
+    assert result is None
+    assert workflow.output_pdf_path == original_output_path
+    assert bindings.q_message_box.calls == []
+
+
 def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
     monkeypatch,
     tmp_path: Path,
