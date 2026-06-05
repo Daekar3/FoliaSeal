@@ -94,6 +94,9 @@ from foliaseal.presentation.qt.signing_workspace_properties_panel import (
 from foliaseal.presentation.qt.signing_workspace_review_bridge import (
     SigningWorkspaceReviewBridge,
 )
+from foliaseal.presentation.qt.signing_workspace_shell_surface import (
+    SigningWorkspaceShellSurface,
+)
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar,
 )
@@ -693,51 +696,30 @@ class SigningWorkspaceWidget:
         self._main_row.addWidget(self._sidebar.container, 2)
         self._layout.addLayout(self._main_row)
 
-        self.widget.properties_panel = self.properties_panel  # type: ignore[attr-defined]
-        self.widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
-        self.widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
-        self.widget.sidebar = self._sidebar.container  # type: ignore[attr-defined]
-        self.widget.sidebar_surface = self._sidebar.surface  # type: ignore[attr-defined]
-        destroyed_signal = getattr(self.widget, "destroyed", None)
-        destroy_connect = getattr(destroyed_signal, "connect", None)
-        if callable(destroy_connect):
-            destroy_connect(lambda *_args: self.properties_panel.dispose())
-        self.widget.app_settings = self._app_settings  # type: ignore[attr-defined]
-        self.widget.last_signing_result = None  # type: ignore[attr-defined]
-        self.widget.refresh_viewer = self.refresh_viewer  # type: ignore[attr-defined]
-        self.widget.refresh_document_review = self.refresh_document_review  # type: ignore[attr-defined]
-        self.widget.search_document_text = self.search_document_text  # type: ignore[attr-defined]
-        self.widget.next_document_text_match = self.next_document_text_match  # type: ignore[attr-defined]
-        self.widget.previous_document_text_match = self.previous_document_text_match  # type: ignore[attr-defined]
-        self.widget.copy_current_document_text_match = (  # type: ignore[attr-defined]
-            self.copy_current_document_text_match
+        self._shell_surface = SigningWorkspaceShellSurface(
+            widget=self.widget,
+            properties_panel=self.properties_panel,
+            viewer_widget=self._viewer_widget,
+            properties_scroll=self._properties_scroll,
+            sidebar_container=self._sidebar.container,
+            sidebar_surface=self._sidebar.surface,
+            sign_button=self._sign_button,
+            document_text_query_input=self._document_text_controls.query_input,
+            get_app_settings=lambda: self._app_settings,
+            set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
+            on_copy_text=self._on_copy_text,
+            draft_workflow=self._draft_workflow,
+            document_review_workspace=self._document_review_workspace,
+            review_bridge=self._review_bridge,
+            viewer_workflow=self._viewer_workflow,
+            viewer_interaction_session=self._viewer_interaction_session,
+            workspace_interaction_session=self._workspace_interaction_session,
+            interaction_bridge=self._interaction_bridge,
+            action_bridge=self._action_bridge,
         )
-        self.widget.set_document_text_selection_mode = (  # type: ignore[attr-defined]
-            self.set_document_text_selection_mode
-        )
-        self.widget.copy_selected_document_text = self.copy_selected_document_text  # type: ignore[attr-defined]
-        self.widget.clear_selected_document_text = self.clear_selected_document_text  # type: ignore[attr-defined]
-        self.widget.apply_app_settings = self.apply_app_settings  # type: ignore[attr-defined]
-        self.widget.set_logical_page_index = self.set_logical_page_index  # type: ignore[attr-defined]
-        self.widget.logical_page_index = self.logical_page_index  # type: ignore[attr-defined]
-        self.widget.set_signature_rect = self.set_signature_rect  # type: ignore[attr-defined]
-        self.widget.signature_rect = self.signature_rect  # type: ignore[attr-defined]
-        self.widget.set_selected_certificate_configuration_id = (  # type: ignore[attr-defined]
-            self.set_selected_certificate_configuration_id
-        )
-        self.widget.selected_certificate_configuration_id = (  # type: ignore[attr-defined]
-            self.selected_certificate_configuration_id
-        )
-        self.widget.signature_appearance = self.signature_appearance  # type: ignore[attr-defined]
-        self.widget.is_sign_action_enabled = self.is_sign_action_enabled  # type: ignore[attr-defined]
-        self.widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
-        self.widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
-            self.refresh_certificate_configurations
-        )
-        self.widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
-        self.widget.open_signed_output = self.open_signed_output  # type: ignore[attr-defined]
+        self._shell_surface.install_widget_exports()
 
-        self.refresh_viewer()
+        self._shell_surface.refresh_viewer()
         self._review_bridge.apply_state(self._document_review_workspace.load())
         self._action_bridge.reload_state()
 
@@ -754,67 +736,40 @@ class SigningWorkspaceWidget:
         return self._app_settings
 
     def refresh_viewer(self) -> None:
-        self._apply_workspace_interaction_plan(
-            self._workspace_interaction_session.refresh_after_viewer_refresh(),
-        )
+        self._shell_surface.refresh_viewer()
 
     def refresh_document_review(self) -> DocumentReviewSummary:
-        state = self._document_review_workspace.refresh_review()
-        self._review_bridge.apply_state(state)
-        return state.review.review_summary
+        return self._shell_surface.refresh_document_review()
 
     def search_document_text(self) -> DocumentTextSearchState:
-        query = _text(self._document_text_controls.query_input)
-        transition = self._document_review_workspace.search_text(query)
-        self._review_bridge.apply_transition(transition)
-        return transition.state.document_text.search_state
+        return self._shell_surface.search_document_text()
 
     def next_document_text_match(self) -> DocumentTextSearchState:
-        transition = self._document_review_workspace.next_text_match()
-        self._review_bridge.apply_transition(transition)
-        return transition.state.document_text.search_state
+        return self._shell_surface.next_document_text_match()
 
     def previous_document_text_match(self) -> DocumentTextSearchState:
-        transition = self._document_review_workspace.previous_text_match()
-        self._review_bridge.apply_transition(transition)
-        return transition.state.document_text.search_state
+        return self._shell_surface.previous_document_text_match()
 
     def copy_current_document_text_match(self) -> str | None:
-        copy_text = self._document_review_workspace.copy_current_text_match()
-        if copy_text is None or self._on_copy_text is None:
-            return None
-        self._on_copy_text(copy_text)
-        return copy_text
+        return self._shell_surface.copy_current_document_text_match()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
-        transition = self._document_review_workspace.set_text_selection_mode(enabled)
-        self._review_bridge.apply_transition(transition)
-        return transition.state.document_text.selection_mode_enabled
+        return self._shell_surface.set_document_text_selection_mode(enabled)
 
     def copy_selected_document_text(self) -> str | None:
-        copy_text = self._document_review_workspace.copy_selected_text()
-        if copy_text is None or self._on_copy_text is None:
-            return None
-        self._on_copy_text(copy_text)
-        return copy_text
+        return self._shell_surface.copy_selected_document_text()
 
     def clear_selected_document_text(self) -> DocumentTextSelectionState:
-        transition = self._document_review_workspace.clear_selected_text()
-        self._review_bridge.apply_transition(transition)
-        return transition.state.document_text.selection_state
+        return self._shell_surface.clear_selected_document_text()
 
     def apply_app_settings(self, settings: AppSettings) -> None:
-        """Apply new app-level settings to the live shell state."""
-        self._app_settings = settings
-        self.widget.app_settings = settings  # type: ignore[attr-defined]
+        self._shell_surface.apply_app_settings(settings)
 
     def set_logical_page_index(self, page_index: int) -> None:
-        """Update the logical session page without forcing a viewer rerender."""
-        self._viewer_interaction_session.set_logical_page_index(page_index)
+        self._shell_surface.set_logical_page_index(page_index)
 
     def logical_page_index(self) -> int:
-        """Return the current logical viewer page index."""
-        return self._viewer_workflow.session.current_page
+        return self._shell_surface.logical_page_index()
 
     def set_signature_rect(
         self,
@@ -825,54 +780,37 @@ class SigningWorkspaceWidget:
         width_pt: float,
         height_pt: float,
         ) -> SignatureRect:
-        """Apply a signature rectangle through the shell surface."""
-        signature_rect = SignatureRect(
+        return self._shell_surface.set_signature_rect(
             page_index=page_index,
             left_pt=left_pt,
             bottom_pt=bottom_pt,
             width_pt=width_pt,
             height_pt=height_pt,
         )
-        self.properties_panel.set_signature_rect(signature_rect, notify=False)
-        self._apply_workspace_interaction_plan(
-            self._workspace_interaction_session.refresh_after_panel_change()
-        )
-        return signature_rect
 
     def signature_rect(self) -> SignatureRect | None:
-        """Return the current signature rectangle, if any."""
-        return self._draft_workflow.signature_rect
+        return self._shell_surface.signature_rect()
 
     def set_selected_certificate_configuration_id(self, configuration_id: str | None) -> None:
-        """Apply a selected certificate configuration identifier to the live draft."""
-        self._draft_workflow.selected_certificate_configuration_id = configuration_id
-        self.properties_panel.load_from_workflow()
+        self._shell_surface.set_selected_certificate_configuration_id(configuration_id)
 
     def selected_certificate_configuration_id(self) -> str | None:
-        """Return the selected certificate configuration identifier, if any."""
-        return self._draft_workflow.selected_certificate_configuration_id
+        return self._shell_surface.selected_certificate_configuration_id()
 
     def signature_appearance(self) -> SignatureAppearance | None:
-        """Return the current signature appearance."""
-        return self._draft_workflow.signature_appearance
+        return self._shell_surface.signature_appearance()
 
     def is_sign_action_enabled(self) -> bool:
-        """Return whether the sign action is currently enabled."""
-        is_enabled = getattr(self._sign_button, "isEnabled", None)
-        if callable(is_enabled):
-            return bool(is_enabled())
-        if hasattr(self._sign_button, "_enabled"):
-            return bool(self._sign_button._enabled)  # type: ignore[attr-defined]
-        return bool(getattr(self._sign_button, "enabled", False))
+        return self._shell_surface.is_sign_action_enabled()
 
     def submit_sign_request(self) -> SigningRequest | None:
-        return self._action_bridge.submit_sign_request()
+        return self._shell_surface.submit_sign_request()
 
     def open_signed_output(self) -> str | None:
-        return self._action_bridge.open_signed_output()
+        return self._shell_surface.open_signed_output()
 
     def choose_output_pdf_path(self) -> str | None:
-        return self._action_bridge.choose_output_pdf_path()
+        return self._shell_surface.choose_output_pdf_path()
 
     @property
     def last_signing_result(self) -> SigningResult | None:
@@ -897,8 +835,7 @@ class SigningWorkspaceWidget:
         )
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
-        """Reload certificate configurations from storage and refresh shell controls."""
-        return self._action_bridge.refresh_certificate_configurations()
+        return self._shell_surface.refresh_certificate_configurations()
 
     def _handle_page_change(self, page_number: int) -> None:
         self._apply_workspace_interaction_plan(
