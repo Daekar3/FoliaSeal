@@ -8,17 +8,14 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from foliaseal.application import (
-    SignaturePlacementContext,
-    SigningDraftWorkflow,
-    WorkspaceInteractionPlan,
+    SigningDraftPreview as _SigningDraftPreview,
 )
 from foliaseal.application import (
-    SigningDraftPreview as _SigningDraftPreview,
+    SigningDraftWorkflow,
 )
 from foliaseal.application import (
     WorkspaceInteractionSession as _WorkspaceInteractionSession,
 )
-from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
     DocumentReviewSummary,
@@ -80,6 +77,9 @@ from foliaseal.presentation.qt.signing_action_boundary import (
 from foliaseal.presentation.qt.signing_workspace_composition import (
     SigningWorkspaceComposition,
     build_signing_workspace_composition,
+)
+from foliaseal.presentation.qt.signing_workspace_runtime import (
+    SigningWorkspaceRuntime,
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar as _SigningWorkspaceSidebar,
@@ -258,6 +258,11 @@ class SigningWorkspaceWidget:
             self._app_settings = app_settings_store.load_settings()
         else:
             self._app_settings = AppSettings.default()
+        self._runtime = SigningWorkspaceRuntime(
+            draft_workflow=signing_workflow,
+            on_error=on_error,
+            on_status_change=on_status_change,
+        )
         self.widget = _build_close_aware_widget(
             bindings.q_widget,
             on_close=lambda: self.properties_panel.dispose(),
@@ -288,12 +293,7 @@ class SigningWorkspaceWidget:
             on_error=on_error,
             on_status_change=on_status_change,
             viewer_widget_builder=build_qt_pdf_viewer_widget,
-            on_viewer_selection=self._handle_viewer_selection,
-            on_viewer_error=self._handle_viewer_error,
-            on_viewer_interaction=self._handle_viewer_interaction,
-            on_panel_change=self._handle_panel_change,
-            on_page_change=self._handle_page_change,
-            emit_error=self._emit_error,
+            runtime=self._runtime,
             choose_output_pdf_path=self.choose_output_pdf_path,
             submit_sign_request=self.submit_sign_request,
             open_signed_output=self.open_signed_output,
@@ -301,13 +301,9 @@ class SigningWorkspaceWidget:
             previous_document_text_match=self.previous_document_text_match,
             next_document_text_match=self.next_document_text_match,
             copy_current_document_text_match=self.copy_current_document_text_match,
-            on_document_review_signature_selected=self._on_document_review_signature_selected,
             set_document_text_selection_mode=self.set_document_text_selection_mode,
             copy_selected_document_text=self.copy_selected_document_text,
             clear_selected_document_text=self.clear_selected_document_text,
-            apply_workspace_interaction_plan=self._apply_workspace_interaction_plan,
-            apply_placement_context_result=self._apply_placement_context_result,
-            sync_signature_overlay=self._sync_signature_overlay,
             get_app_settings=lambda: self._app_settings,
             set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
         )
@@ -331,6 +327,7 @@ class SigningWorkspaceWidget:
         self._signing_action_boundary = composition.signing_action_boundary
         self._action_bridge = composition.action_bridge
         self._interaction_bridge = composition.interaction_bridge
+        self._runtime = composition.runtime
         self._compatibility_surface = composition.compatibility_surface
         self._shell_surface = composition.shell_surface
         self._main_row = composition.main_row
@@ -429,70 +426,8 @@ class SigningWorkspaceWidget:
         """Return the most recent signing result, if a real executor ran."""
         return self._signing_action_coordinator.last_signing_result
 
-    def _handle_viewer_selection(self, pdf_rect: PdfRect) -> None:
-        self._apply_workspace_interaction_plan(
-            self._workspace_interaction_session.select_in_viewer(pdf_rect),
-        )
-
-    def _handle_viewer_error(self, message: str) -> None:
-        self._emit_error(message)
-
-    def _handle_viewer_interaction(self, name: str) -> None:
-        if self._on_status_change is not None:
-            self._on_status_change(name)
-
-    def _handle_panel_change(self) -> None:
-        self._apply_workspace_interaction_plan(
-            self._workspace_interaction_session.refresh_after_panel_change()
-        )
-
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self._shell_surface.refresh_certificate_configurations()
-
-    def _handle_page_change(self, page_number: int) -> None:
-        self._apply_workspace_interaction_plan(
-            self._workspace_interaction_session.change_page(page_number),
-        )
-
-    def _sync_signature_overlay(self) -> None:
-        setter = getattr(self._viewer_widget, "set_signature_overlay", None)
-        if callable(setter):
-            setter(self._draft_workflow.signature_rect)
-
-    def _on_document_review_signature_selected(self, index: int) -> None:
-        self._review_bridge.select_review_signature(index)
-
-    def _apply_placement_context_result(
-        self,
-        placement_context: SignaturePlacementContext | None,
-    ) -> None:
-        if placement_context is None:
-            return
-        self._draft_workflow.set_placement_context(placement_context)
-
-    def _apply_workspace_interaction_plan(
-        self,
-        plan: WorkspaceInteractionPlan,
-    ) -> None:
-        self._interaction_bridge.apply_plan(plan)
-
-    def _emit_error(self, message: str) -> None:
-        self._set_sign_result_text(message, success=False)
-        if self._on_error is not None:
-            self._on_error(message)
-            return
-        raise RuntimeError(message)
-
-    def _set_sign_result_text(self, message: str, *, success: bool | None = None) -> None:
-        self._result_label.setText(message)
-        if not hasattr(self._result_label, "setStyleSheet"):
-            return
-        if success is True:
-            self._result_label.setStyleSheet("color: #1f6f2a; font-weight: 600;")
-        elif success is False:
-            self._result_label.setStyleSheet("color: #9f1d1d; font-weight: 600;")
-        else:
-            self._result_label.setStyleSheet("color: #444;")
 
 
 class SigningShellAdapter:

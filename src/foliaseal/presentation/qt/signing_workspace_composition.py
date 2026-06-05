@@ -63,6 +63,9 @@ from foliaseal.presentation.qt.signing_workspace_properties_panel import (
 from foliaseal.presentation.qt.signing_workspace_review_bridge import (
     SigningWorkspaceReviewBridge,
 )
+from foliaseal.presentation.qt.signing_workspace_runtime import (
+    SigningWorkspaceRuntime,
+)
 from foliaseal.presentation.qt.signing_workspace_shell_surface import (
     SigningWorkspaceShellSurface,
 )
@@ -71,8 +74,7 @@ from foliaseal.presentation.qt.signing_workspace_sidebar import (
 )
 
 if TYPE_CHECKING:
-    from foliaseal.application import SigningDraftWorkflow, WorkspaceInteractionPlan
-    from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
+    from foliaseal.application import SigningDraftWorkflow
     from foliaseal.presentation.qt.signing_shell import (
         QtSigningWidgetBindings,
         SigningRequestExecutor,
@@ -99,6 +101,7 @@ class SigningWorkspaceComposition:
     signing_action_boundary: SigningActionBoundary
     action_bridge: SigningWorkspaceActionBridge
     interaction_bridge: SigningWorkspaceInteractionBridge
+    runtime: SigningWorkspaceRuntime
     compatibility_surface: SigningWorkspaceCompatibilitySurface
     shell_surface: SigningWorkspaceShellSurface
     main_row: Any
@@ -135,12 +138,7 @@ def build_signing_workspace_composition(
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
     viewer_widget_builder: Callable[..., Any],
-    on_viewer_selection: Callable[[Any], None],
-    on_viewer_error: Callable[[str], None],
-    on_viewer_interaction: Callable[[str], None],
-    on_panel_change: Callable[[], None],
-    on_page_change: Callable[[int], None],
-    emit_error: Callable[[str], None],
+    runtime: SigningWorkspaceRuntime,
     choose_output_pdf_path: Callable[[], str | None],
     submit_sign_request: Callable[[], SigningRequest | None],
     open_signed_output: Callable[[], str | None],
@@ -148,13 +146,9 @@ def build_signing_workspace_composition(
     previous_document_text_match: Callable[[], Any],
     next_document_text_match: Callable[[], Any],
     copy_current_document_text_match: Callable[[], str | None],
-    on_document_review_signature_selected: Callable[[int], None],
     set_document_text_selection_mode: Callable[[bool], bool],
     copy_selected_document_text: Callable[[], str | None],
     clear_selected_document_text: Callable[[], Any],
-    apply_workspace_interaction_plan: Callable[[WorkspaceInteractionPlan], None],
-    apply_placement_context_result: Callable[[SignaturePlacementContext | None], None],
-    sync_signature_overlay: Callable[[], None],
     get_app_settings: Callable[[], AppSettings],
     set_app_settings: Callable[[AppSettings], None],
 ) -> SigningWorkspaceComposition:
@@ -184,9 +178,9 @@ def build_signing_workspace_composition(
     )
     viewer_widget = viewer_widget_builder(
         workflow=viewer_workflow,
-        on_selection=on_viewer_selection,
-        on_error=on_viewer_error,
-        on_interaction=on_viewer_interaction,
+        on_selection=runtime.on_viewer_selection,
+        on_error=runtime.on_viewer_error,
+        on_interaction=runtime.on_viewer_interaction,
     )
     properties_panel = SignaturePropertiesPanel(
         bindings=bindings,
@@ -197,9 +191,9 @@ def build_signing_workspace_composition(
         preset_catalog=preset_catalog,
         preset_catalog_store=preset_catalog_store,
         app_settings=app_settings,
-        on_change=on_panel_change,
-        on_page_change=on_page_change,
-        on_error=emit_error,
+        on_change=runtime.on_panel_change,
+        on_page_change=runtime.on_page_change,
+        on_error=runtime.emit_error,
     )
     sidebar = SigningWorkspaceSidebar(
         bindings=bindings,
@@ -211,7 +205,7 @@ def build_signing_workspace_composition(
         on_previous_text_match=previous_document_text_match,
         on_next_text_match=next_document_text_match,
         on_copy_text_match=copy_current_document_text_match,
-        on_review_signature_selected=on_document_review_signature_selected,
+        on_review_signature_selected=runtime.on_document_review_signature_selected,
         on_text_selection_mode_changed=set_document_text_selection_mode,
         on_copy_selected_text=copy_selected_document_text,
         on_clear_selected_text=clear_selected_document_text,
@@ -224,9 +218,7 @@ def build_signing_workspace_composition(
         sidebar=sidebar,
         viewer_widget=viewer_widget,
         document_review_workspace=document_review_workspace,
-        on_jump_to_page_index=lambda page_index: apply_workspace_interaction_plan(
-            workspace_interaction_session.refresh_navigation_to_page_index(page_index)
-        ),
+        on_jump_to_page_index=runtime.refresh_review_jump_to_page_index,
         can_copy_text=on_copy_text is not None,
     )
     signing_action_coordinator = SigningActionCoordinator(
@@ -240,7 +232,7 @@ def build_signing_workspace_composition(
     )
     signing_action_boundary = SigningActionBoundary(
         coordinator=signing_action_coordinator,
-        emit_error=emit_error,
+        emit_error=runtime.emit_error,
         on_error=on_error,
         on_status_change=on_status_change,
         on_open_signed_output=on_open_signed_output,
@@ -258,18 +250,27 @@ def build_signing_workspace_composition(
         review_bridge=review_bridge,
         viewer_widget=viewer_widget,
         viewer_interaction_session=viewer_interaction_session,
-        apply_placement_context=apply_placement_context_result,
+        apply_placement_context=runtime.apply_placement_context,
         apply_signature_rect=lambda signature_rect, notify: (
             properties_panel.set_signature_rect(
                 signature_rect,
                 notify=notify,
             )
         ),
-        sync_signature_overlay=sync_signature_overlay,
+        sync_signature_overlay=runtime.sync_signature_overlay,
         refresh_preview=lambda: properties_panel.refresh_preview(),
         load_signing_action_state=action_bridge.reload_state,
         invalidate_signing_action_state=action_bridge.invalidate_state,
-        emit_error=emit_error,
+        emit_error=runtime.emit_error,
+    )
+    runtime.bind(
+        viewer_interaction_session=viewer_interaction_session,
+        document_review_workspace=document_review_workspace,
+        workspace_interaction_session=workspace_interaction_session,
+        review_bridge=review_bridge,
+        interaction_bridge=interaction_bridge,
+        viewer_widget=viewer_widget,
+        result_label=result_label,
     )
     compatibility_surface = SigningWorkspaceCompatibilitySurface(
         widget=widget,
@@ -318,6 +319,7 @@ def build_signing_workspace_composition(
         signing_action_boundary=signing_action_boundary,
         action_bridge=action_bridge,
         interaction_bridge=interaction_bridge,
+        runtime=runtime,
         compatibility_surface=compatibility_surface,
         shell_surface=shell_surface,
         main_row=main_row,
