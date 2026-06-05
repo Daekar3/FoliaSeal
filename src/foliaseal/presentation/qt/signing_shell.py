@@ -9,32 +9,26 @@ from typing import Any, Protocol
 
 from foliaseal.application import (
     SignaturePlacementContext,
-    SigningDraftValidationIssue,
-    SigningDraftValidationSeverity,
     SigningDraftWorkflow,
     WorkspaceInteractionPlan,
-    WorkspaceInteractionSession,
 )
 from foliaseal.application import (
     SigningDraftPreview as _SigningDraftPreview,
+)
+from foliaseal.application import (
+    WorkspaceInteractionSession as _WorkspaceInteractionSession,
 )
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
     DocumentReviewSummary,
-    PyHankoDocumentReviewInspector,
-)
-from foliaseal.application.document_review_workspace import (
-    DocumentReviewWorkspaceSession,
 )
 from foliaseal.application.document_text_search import (
     DocumentTextSearchEngine,
-    DocumentTextSearchSession,
     DocumentTextSearchState,
 )
 from foliaseal.application.document_text_selection import (
     DocumentTextSelectionEngine,
-    DocumentTextSelectionSession,
     DocumentTextSelectionState,
 )
 from foliaseal.application.signature_properties_coordinator import (
@@ -42,7 +36,7 @@ from foliaseal.application.signature_properties_coordinator import (
 )
 from foliaseal.application.signing_material_resolver import CertificateSecretProvider
 from foliaseal.application.viewer_interaction_session import (
-    ViewerInteractionSession,
+    ViewerInteractionSession as _ViewerInteractionSession,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
@@ -74,33 +68,25 @@ from foliaseal.infra.config.schemas import (
     CertificateCatalog,
     SignaturePresetCatalog,
 )
-from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
-from foliaseal.infra.document_text_selection import QtPdfDocumentTextSelectionEngine
+from foliaseal.presentation.qt.signature_preview_layout import (
+    _preview_stamp_text as _preview_stamp_text_impl,
+)
+from foliaseal.presentation.qt.signature_preview_lifecycle import (
+    QtCanonicalPreviewLifecycle as _QtCanonicalPreviewLifecycle,
+)
 from foliaseal.presentation.qt.signing_action_boundary import (
-    SigningActionBoundary,
+    SigningActionBoundary as _SigningActionBoundary,
 )
-from foliaseal.presentation.qt.signing_action_coordinator import (
-    SigningActionCoordinator,
-)
-from foliaseal.presentation.qt.signing_workspace_action_bridge import (
-    SigningWorkspaceActionBridge,
-)
-from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
-    SigningWorkspaceInteractionBridge,
-)
-from foliaseal.presentation.qt.signing_workspace_properties_panel import (
-    SignaturePropertiesPanel,
-)
-from foliaseal.presentation.qt.signing_workspace_review_bridge import (
-    SigningWorkspaceReviewBridge,
-)
-from foliaseal.presentation.qt.signing_workspace_shell_surface import (
-    SigningWorkspaceShellSurface,
+from foliaseal.presentation.qt.signing_workspace_composition import (
+    SigningWorkspaceComposition,
+    build_signing_workspace_composition,
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
-    SigningWorkspaceSidebar,
+    SigningWorkspaceSidebar as _SigningWorkspaceSidebar,
 )
-from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
+from foliaseal.presentation.qt.viewer_widget import (
+    build_qt_pdf_viewer_widget as _build_qt_pdf_viewer_widget,
+)
 
 SIGNATURE_PRESET_PLACEHOLDER = "Current signature setup"
 CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Current certificate"
@@ -111,6 +97,13 @@ SignatureLayoutTemplate = _SignatureLayoutTemplate
 SignaturePropertiesCoordinatorError = _SignaturePropertiesCoordinatorError
 SignatureTextStyle = _SignatureTextStyle
 SignatureTimezoneDisplayMode = _SignatureTimezoneDisplayMode
+WorkspaceInteractionSession = _WorkspaceInteractionSession
+ViewerInteractionSession = _ViewerInteractionSession
+SigningActionBoundary = _SigningActionBoundary
+SigningWorkspaceSidebar = _SigningWorkspaceSidebar
+QtCanonicalPreviewLifecycle = _QtCanonicalPreviewLifecycle
+build_qt_pdf_viewer_widget = _build_qt_pdf_viewer_widget
+_preview_stamp_text = _preview_stamp_text_impl
 
 
 class QtSigningBindingsUnavailable(RuntimeError):
@@ -140,248 +133,11 @@ class QtSigningWidgetBindings:
     q_push_button: type[Any]
     qt: Any
 
-
-@dataclass(frozen=True)
-class SignaturePresetControls:
-    """Controls used to manage reusable signature presets."""
-
-    container: Any
-    preset_combo: Any
-    preset_name: Any
-    save_button: Any
-    delete_button: Any
-
-
-@dataclass(frozen=True)
-class CertificateConfigurationControls:
-    """Controls used to choose a saved certificate configuration."""
-
-    container: Any
-    configuration_combo: Any
-    apply_button: Any
-
-
 class SigningRequestExecutor(Protocol):
     """Executes a validated signing request and returns a signing result."""
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Apply the signing request and return the result."""
-
-@dataclass(frozen=True)
-class PreviewControls:
-    """Widgets used to present the visible-signature preview."""
-
-    container: Any
-    summary_label: Any
-    card_container: Any
-    title_label: Any
-    stamp_label: Any
-    detail_label: Any
-    single_render_label: Any
-    single_body_container: Any
-    multi_body_container: Any
-    multi_content_container: Any
-    multi_stamp_label: Any
-    multi_detail_label: Any
-    multi_render_label: Any
-    footer_label: Any
-
-
-class _QtCertificatePassphrasePrompter:
-    """Qt adapter for manual certificate-passphrase entry."""
-
-    def __init__(self, *, bindings: QtSigningWidgetBindings, parent: Any) -> None:
-        self._bindings = bindings
-        self._parent = parent
-
-    def prompt(self, label: str) -> str | None:
-        input_dialog = getattr(self._bindings, "q_input_dialog", None)
-        get_text = getattr(input_dialog, "getText", None)
-        if not callable(get_text):
-            return None
-        password_mode = getattr(self._bindings.q_line_edit, "Password", None)
-        if password_mode is None:
-            echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
-            password_mode = getattr(echo_mode, "Password", None)
-        if password_mode is None:
-            text, accepted = get_text(
-                self._parent,
-                "Certificate password",
-                label,
-            )
-        else:
-            text, accepted = get_text(
-                self._parent,
-                "Certificate password",
-                label,
-                password_mode,
-            )
-        if not accepted:
-            return None
-        return str(text)
-
-
-def _compose_row(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
-    container = bindings.q_widget()
-    layout = bindings.q_hbox_layout(container)
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(4)
-    for widget in widgets:
-        layout.addWidget(widget)
-    return container
-
-
-def _compose_preview_column(bindings: QtSigningWidgetBindings, *widgets: Any) -> Any:
-    container = bindings.q_widget()
-    if hasattr(container, "setStyleSheet"):
-        container.setStyleSheet("background: transparent; border: none;")
-    layout = bindings.q_vbox_layout(container)
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(4)
-    for widget in widgets:
-        layout.addWidget(widget)
-    return container
-
-
-def _set_preview_surface_chrome(widget: Any) -> None:
-    if hasattr(widget, "setStyleSheet"):
-        widget.setStyleSheet("background: transparent; border: none; padding: 0px;")
-
-
-def _container_layout(container: Any) -> Any | None:
-    layout_attr = getattr(container, "layout", None)
-    if callable(layout_attr):
-        return layout_attr()
-    return layout_attr
-
-
-def _layout_spacing(layout: Any) -> int:
-    spacing_getter = getattr(layout, "spacing", None)
-    if callable(spacing_getter):
-        try:
-            value = spacing_getter()
-        except TypeError:
-            value = None
-        if isinstance(value, int):
-            return value
-    if isinstance(spacing_getter, int):
-        return spacing_getter
-    value = getattr(layout, "spacing_value", None)
-    if isinstance(value, int):
-        return value
-    return 0
-
-
-def _clear_layout(layout: Any) -> None:
-    take_at = getattr(layout, "takeAt", None)
-    count = getattr(layout, "count", None)
-    if callable(take_at) and callable(count):
-        while count():
-            item = take_at(0)
-            if item is None:
-                break
-        return
-
-    items = getattr(layout, "items", None)
-    if isinstance(items, list):
-        items.clear()
-
-
-def _set_container_widgets(container: Any, *widgets: Any) -> None:
-    layout = _container_layout(container)
-    if layout is None:
-        return
-    _clear_layout(layout)
-    for widget in widgets:
-        if isinstance(widget, tuple):
-            item, *args = widget
-            layout.addWidget(item, *args)
-            continue
-        layout.addWidget(widget)
-
-
-def _set_combo_text(combo: Any, value: str, *, allow_custom: bool = False) -> None:
-    index = getattr(combo, "findText", None)
-    if callable(index):
-        found = index(value)
-        if found >= 0:
-            setter = getattr(combo, "setCurrentIndex", None)
-            if callable(setter):
-                setter(found)
-            return
-    setter = getattr(combo, "setCurrentText", None)
-    if callable(setter) and not allow_custom:
-        setter(value)
-        return
-    if allow_custom:
-        if value not in _combo_items(combo):
-            adder = getattr(combo, "addItem", None)
-            if callable(adder):
-                adder(value)
-            elif hasattr(combo, "addItems"):
-                combo.addItems((value,))
-        if callable(setter):
-            setter(value)
-        return
-    if callable(setter):
-        setter(value)
-
-
-def _combo_text(combo: Any) -> str:
-    getter = getattr(combo, "currentText", None)
-    if callable(getter):
-        return str(getter())
-    return ""
-
-
-def _combo_items(combo: Any) -> tuple[str, ...]:
-    count_getter = getattr(combo, "count", None)
-    item_text_getter = getattr(combo, "itemText", None)
-    if callable(count_getter) and callable(item_text_getter):
-        return tuple(str(item_text_getter(index)) for index in range(int(count_getter())))
-    items = getattr(combo, "_items", None)
-    if items is not None:
-        return tuple(str(item) for item in items)
-    return ()
-
-
-def _set_checked(check_box: Any, value: bool) -> None:
-    setter = getattr(check_box, "setChecked", None)
-    if callable(setter):
-        setter(value)
-
-
-def _is_checked(check_box: Any) -> bool:
-    getter = getattr(check_box, "isChecked", None)
-    if callable(getter):
-        return bool(getter())
-    return False
-
-
-def _set_spin_value(spin_box: Any, value: float | int) -> None:
-    setter = getattr(spin_box, "setValue", None)
-    if callable(setter):
-        setter(value)
-
-
-def _spin_value(spin_box: Any) -> float:
-    getter = getattr(spin_box, "value", None)
-    if callable(getter):
-        return float(getter())
-    return 0.0
-
-
-def _set_text(line_edit: Any, value: str) -> None:
-    setter = getattr(line_edit, "setText", None)
-    if callable(setter):
-        setter(value)
-
-
-def _text(line_edit: Any) -> str:
-    getter = getattr(line_edit, "text", None)
-    if callable(getter):
-        return str(getter())
-    return ""
 
 
 def _format_appearance_summary(appearance: SignatureAppearance) -> str:
@@ -428,67 +184,6 @@ def _format_appearance_summary(appearance: SignatureAppearance) -> str:
             f"Image stamp: {stamp_text}",
         ]
     )
-
-
-def _build_preview_issue(
-    *,
-    code: str,
-    message: str,
-    field_name: str | None = None,
-    ) -> SigningDraftValidationIssue:
-    return SigningDraftValidationIssue(
-        code=code,
-        message=message,
-        field_name=field_name,
-        severity=SigningDraftValidationSeverity.ERROR,
-    )
-
-
-def _set_widget_visible(widget: Any, visible: bool) -> None:
-    setter = getattr(widget, "setVisible", None)
-    if callable(setter):
-        setter(visible)
-
-
-def _widget_width(widget: Any) -> int | None:
-    width_getter = getattr(widget, "width", None)
-    if callable(width_getter):
-        try:
-            value = width_getter()
-        except TypeError:
-            value = None
-        if isinstance(value, int) and value > 0:
-            return value
-    for attr in ("fixed_width", "maximum_width", "minimum_width"):
-        value = getattr(widget, attr, None)
-        if isinstance(value, int) and value > 0:
-            return value
-    return None
-
-
-def _widget_parent(widget: Any) -> Any | None:
-    parent_getter = getattr(widget, "parentWidget", None)
-    if callable(parent_getter):
-        try:
-            parent = parent_getter()
-        except TypeError:
-            parent = None
-        if parent is not None:
-            return parent
-    return getattr(widget, "parent", None)
-
-
-def _ancestor_width(widget: Any) -> int | None:
-    current = _widget_parent(widget)
-    widths: list[int] = []
-    while current is not None:
-        width = _widget_width(current)
-        if isinstance(width, int) and width > 0:
-            widths.append(width)
-        current = _widget_parent(current)
-    if not widths:
-        return None
-    return min(widths)
 
 
 def _build_close_aware_widget(
@@ -551,39 +246,12 @@ class SigningWorkspaceWidget:
         self._bindings = bindings
         self._viewer_workflow = viewer_workflow
         self._draft_workflow = signing_workflow
-        self._sign_executor = sign_executor
         self._on_sign_request = on_sign_request
         self._on_open_signed_output = on_open_signed_output
         self._on_error = on_error
         self._on_status_change = on_status_change
         self._app_settings_store = app_settings_store
-        self._viewer_interaction_session = ViewerInteractionSession(
-            viewer_workflow=viewer_workflow
-        )
-        self._document_review_inspector = (
-            document_review_inspector or PyHankoDocumentReviewInspector()
-        )
-        document_text_selection_session = DocumentTextSelectionSession(
-            input_pdf_path=viewer_workflow.document_path,
-            selection_engine=document_text_selection_engine
-            or QtPdfDocumentTextSelectionEngine(),
-        )
-        document_text_search_session = DocumentTextSearchSession(
-            input_pdf_path=viewer_workflow.document_path,
-            search_engine=document_text_search_engine or QtPdfDocumentTextSearchEngine(),
-        )
         self._on_copy_text = on_copy_text
-        self._document_review_workspace = DocumentReviewWorkspaceSession(
-            document_review_inspector=self._document_review_inspector,
-            document_text_search_session=document_text_search_session,
-            document_text_selection_session=document_text_selection_session,
-            input_pdf_path=viewer_workflow.document_path,
-        )
-        self._workspace_interaction_session = WorkspaceInteractionSession(
-            viewer_workflow=viewer_workflow,
-            viewer_interaction_session=self._viewer_interaction_session,
-            document_review_workspace=self._document_review_workspace,
-        )
         if app_settings is not None:
             self._app_settings = app_settings
         elif app_settings_store is not None:
@@ -597,131 +265,74 @@ class SigningWorkspaceWidget:
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
-
-        self._viewer_widget = build_qt_pdf_viewer_widget(
-            workflow=viewer_workflow,
-            on_selection=self._handle_viewer_selection,
-            on_error=self._handle_viewer_error,
-            on_interaction=self._handle_viewer_interaction,
-        )
-        self.properties_panel = SignaturePropertiesPanel(
+        composition = build_signing_workspace_composition(
             bindings=bindings,
-            workflow=signing_workflow,
+            widget=self.widget,
+            layout=self._layout,
+            viewer_workflow=viewer_workflow,
+            signing_workflow=signing_workflow,
             certificate_catalog=certificate_catalog,
             certificate_catalog_store=certificate_catalog_store,
             certificate_secret_provider=certificate_secret_provider,
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
             app_settings=self._app_settings,
-            on_change=self._handle_panel_change,
+            app_settings_store=app_settings_store,
+            document_review_inspector=document_review_inspector,
+            document_text_selection_engine=document_text_selection_engine,
+            document_text_search_engine=document_text_search_engine,
+            sign_executor=sign_executor,
+            on_sign_request=on_sign_request,
+            on_open_signed_output=on_open_signed_output,
+            on_copy_text=on_copy_text,
+            on_error=on_error,
+            on_status_change=on_status_change,
+            viewer_widget_builder=build_qt_pdf_viewer_widget,
+            on_viewer_selection=self._handle_viewer_selection,
+            on_viewer_error=self._handle_viewer_error,
+            on_viewer_interaction=self._handle_viewer_interaction,
+            on_panel_change=self._handle_panel_change,
             on_page_change=self._handle_page_change,
-            on_error=self._emit_error,
-        )
-        self._sidebar = SigningWorkspaceSidebar(
-            bindings=bindings,
-            properties_widget=self.properties_panel.container,
-            on_choose_output=self.choose_output_pdf_path,
-            on_sign=self.submit_sign_request,
-            on_open_signed_output=self.open_signed_output,
-            on_find_text=self.search_document_text,
-            on_previous_text_match=self.previous_document_text_match,
-            on_next_text_match=self.next_document_text_match,
-            on_copy_text_match=self.copy_current_document_text_match,
-            on_review_signature_selected=self._on_document_review_signature_selected,
-            on_text_selection_mode_changed=self.set_document_text_selection_mode,
-            on_copy_selected_text=self.copy_selected_document_text,
-            on_clear_selected_text=self.clear_selected_document_text,
-        )
-        self._document_text_controls = self._sidebar.document_text_controls
-        self._properties_scroll = self._sidebar.properties_scroll
-        self._sign_button = self._sidebar.sign_button
-        self._result_label = self._sidebar.result_label
-        self._review_bridge = SigningWorkspaceReviewBridge(
-            sidebar=self._sidebar,
-            viewer_widget=self._viewer_widget,
-            document_review_workspace=self._document_review_workspace,
-            on_jump_to_page_index=lambda page_index: self._apply_workspace_interaction_plan(
-                self._workspace_interaction_session.refresh_navigation_to_page_index(
-                    page_index
-                )
-            ),
-            can_copy_text=self._on_copy_text is not None,
-        )
-        self._signing_action_coordinator = SigningActionCoordinator(
-            workflow=self._draft_workflow,
-            apply_changes=self.properties_panel.apply_changes,
-            is_ready_to_sign=self.properties_panel.is_ready_to_sign,
-            validation_text=self.properties_panel.validation_text,
-            sign_executor=self._sign_executor,
-            on_sign_request=self._on_sign_request,
-            can_open_signed_output=self._on_open_signed_output is not None,
-        )
-        self._signing_action_boundary = SigningActionBoundary(
-            coordinator=self._signing_action_coordinator,
             emit_error=self._emit_error,
-            on_error=self._on_error,
-            on_status_change=self._on_status_change,
-            on_open_signed_output=self._on_open_signed_output,
-        )
-        self._action_bridge = SigningWorkspaceActionBridge(
-            widget=self.widget,
-            bindings=bindings,
-            sidebar=self._sidebar,
-            properties_panel=self.properties_panel,
-            signing_action_boundary=self._signing_action_boundary,
-            draft_workflow=self._draft_workflow,
-            app_settings_getter=lambda: self._app_settings,
-        )
-        self._interaction_bridge = SigningWorkspaceInteractionBridge(
-            review_bridge=self._review_bridge,
-            viewer_widget=self._viewer_widget,
-            viewer_interaction_session=self._viewer_interaction_session,
-            apply_placement_context=self._apply_placement_context_result,
-            apply_signature_rect=lambda signature_rect, notify: (
-                self.properties_panel.set_signature_rect(
-                    signature_rect,
-                    notify=notify,
-                )
-            ),
+            choose_output_pdf_path=self.choose_output_pdf_path,
+            submit_sign_request=self.submit_sign_request,
+            open_signed_output=self.open_signed_output,
+            search_document_text=self.search_document_text,
+            previous_document_text_match=self.previous_document_text_match,
+            next_document_text_match=self.next_document_text_match,
+            copy_current_document_text_match=self.copy_current_document_text_match,
+            on_document_review_signature_selected=self._on_document_review_signature_selected,
+            set_document_text_selection_mode=self.set_document_text_selection_mode,
+            copy_selected_document_text=self.copy_selected_document_text,
+            clear_selected_document_text=self.clear_selected_document_text,
+            apply_workspace_interaction_plan=self._apply_workspace_interaction_plan,
+            apply_placement_context_result=self._apply_placement_context_result,
             sync_signature_overlay=self._sync_signature_overlay,
-            refresh_preview=lambda: self.properties_panel.refresh_preview(),
-            load_signing_action_state=self._action_bridge.reload_state,
-            invalidate_signing_action_state=self._action_bridge.invalidate_state,
-            emit_error=self._emit_error,
-        )
-        self._main_row = bindings.q_hbox_layout()
-        self._main_row.setContentsMargins(0, 0, 0, 0)
-        self._main_row.setSpacing(8)
-        self._main_row.addWidget(self._viewer_widget, 3)
-        self._main_row.addWidget(self._sidebar.container, 2)
-        self._layout.addLayout(self._main_row)
-
-        self._shell_surface = SigningWorkspaceShellSurface(
-            widget=self.widget,
-            properties_panel=self.properties_panel,
-            viewer_widget=self._viewer_widget,
-            properties_scroll=self._properties_scroll,
-            sidebar_container=self._sidebar.container,
-            sidebar_surface=self._sidebar.surface,
-            sign_button=self._sign_button,
-            document_text_query_input=self._document_text_controls.query_input,
             get_app_settings=lambda: self._app_settings,
             set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
-            on_copy_text=self._on_copy_text,
-            draft_workflow=self._draft_workflow,
-            document_review_workspace=self._document_review_workspace,
-            review_bridge=self._review_bridge,
-            viewer_workflow=self._viewer_workflow,
-            viewer_interaction_session=self._viewer_interaction_session,
-            workspace_interaction_session=self._workspace_interaction_session,
-            interaction_bridge=self._interaction_bridge,
-            action_bridge=self._action_bridge,
         )
-        self._shell_surface.install_widget_exports()
+        self._install_composition(composition)
+        composition.bootstrap()
 
-        self._shell_surface.refresh_viewer()
-        self._review_bridge.apply_state(self._document_review_workspace.load())
-        self._action_bridge.reload_state()
+    def _install_composition(self, composition: SigningWorkspaceComposition) -> None:
+        self._document_review_inspector = composition.document_review_inspector
+        self._viewer_interaction_session = composition.viewer_interaction_session
+        self._document_review_workspace = composition.document_review_workspace
+        self._workspace_interaction_session = composition.workspace_interaction_session
+        self._viewer_widget = composition.viewer_widget
+        self.properties_panel = composition.properties_panel
+        self._sidebar = composition.sidebar
+        self._document_text_controls = composition.document_text_controls
+        self._properties_scroll = composition.properties_scroll
+        self._sign_button = composition.sign_button
+        self._result_label = composition.result_label
+        self._review_bridge = composition.review_bridge
+        self._signing_action_coordinator = composition.signing_action_coordinator
+        self._signing_action_boundary = composition.signing_action_boundary
+        self._action_bridge = composition.action_bridge
+        self._interaction_bridge = composition.interaction_bridge
+        self._shell_surface = composition.shell_surface
+        self._main_row = composition.main_row
 
     @property
     def container(self) -> Any:
