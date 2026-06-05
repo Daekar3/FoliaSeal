@@ -677,7 +677,7 @@ def _run_phase3_harness_session(
         interaction_counts[name] += 1
         if name != "sign_success" or not sign_requests:
             return
-        signing_result = getattr(shell, "last_signing_result", None)
+        signing_result = getattr(_shell_compat_surface(shell), "last_signing_result", None)
         if not isinstance(signing_result, SigningResult) or not signing_result.success:
             return
         request = sign_requests[-1]
@@ -719,11 +719,11 @@ def _run_phase3_harness_session(
     body_layout.addWidget(shell, 1)
 
     def do_refresh() -> None:
-        shell.refresh_viewer()
+        _shell_compat_surface(shell).refresh_viewer()
         refocus_shell()
 
     def navigate(action_name: str) -> None:
-        action = getattr(shell.viewer_widget, action_name)
+        action = getattr(_shell_compat_surface(shell).viewer_widget, action_name)
         action()
         refocus_shell()
 
@@ -747,7 +747,9 @@ def _run_phase3_harness_session(
     ) -> dict[str, Any]:
         current_request = request
         if current_request is None:
-            current_request = _snapshot_current_draft_request(shell.properties_panel._workflow)
+            current_request = _snapshot_current_draft_request(
+                _shell_compat_surface(shell).properties_panel._workflow
+            )
         capture_index = (
             len(captured_states) + 1
             if capture_kind == "manual"
@@ -789,7 +791,7 @@ def _run_phase3_harness_session(
     toolbar.addWidget(capture_count_label)
 
     start = perf_counter()
-    shell.refresh_viewer()
+    _shell_compat_surface(shell).refresh_viewer()
     first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
     _elapsed_ms = (perf_counter() - start) * 1000.0
 
@@ -800,10 +802,12 @@ def _run_phase3_harness_session(
     capture_request = (
         sign_requests[-1]
         if sign_requests
-        else _snapshot_current_draft_request(shell.properties_panel._workflow)
+        else _snapshot_current_draft_request(
+            _shell_compat_surface(shell).properties_panel._workflow
+        )
     )
     final_state = capture_current_state(capture_kind="final", request=capture_request)
-    last_signing_result = getattr(shell, "last_signing_result", None)
+    last_signing_result = getattr(_shell_compat_surface(shell), "last_signing_result", None)
     return Phase3HarnessSessionResult(
         first_render_ms=first_render_ms,
         sign_requests=tuple(sign_requests),
@@ -1063,6 +1067,10 @@ def _default_harness_output_pdf_path(
     return str(target_dir / f"{source_path.stem}_harness_signed_{sign_attempt_index:03d}.pdf")
 
 
+def _shell_compat_surface(shell: Any) -> Any:
+    return getattr(shell, "compat_surface", shell)
+
+
 def _capture_interactive_state(
     *,
     shell: Any,
@@ -1072,12 +1080,13 @@ def _capture_interactive_state(
     capture_index: int,
     capture_kind: str,
 ) -> dict[str, Any]:
-    preview = shell.properties_panel.refresh_preview()
+    compat = _shell_compat_surface(shell)
+    preview = compat.properties_panel.refresh_preview()
     app = _widget_application(shell)
     if app is not None and hasattr(app, "processEvents"):
         app.processEvents()
-    preview_text = shell.properties_panel.preview_text()
-    validation_text = shell.properties_panel.validation_text()
+    preview_text = compat.properties_panel.preview_text()
+    validation_text = compat.properties_panel.validation_text()
     render_capture = _capture_preview_render(
         shell=shell,
         preview=preview,
@@ -1405,7 +1414,7 @@ def run_phase3_signed_acceptance_matrix(
     )
     window.setCentralWidget(shell)
     window.show()
-    shell.refresh_viewer()
+    _shell_compat_surface(shell).refresh_viewer()
     app.processEvents()
 
     results: list[dict[str, Any]] = []
@@ -2598,10 +2607,11 @@ def _execute_preview_matrix_scenario(
         scenario=scenario,
         profile_store=profile_store,
     )
-    preview = shell.properties_panel.refresh_preview()
-    preview_text = shell.properties_panel.preview_text()
-    validation_text = shell.properties_panel.validation_text()
-    request = _snapshot_current_draft_request(shell.properties_panel._workflow)
+    compat = _shell_compat_surface(shell)
+    preview = compat.properties_panel.refresh_preview()
+    preview_text = compat.properties_panel.preview_text()
+    validation_text = compat.properties_panel.validation_text()
+    request = _snapshot_current_draft_request(compat.properties_panel._workflow)
     backend_reservation = build_backend_reservation_evidence(request)
     artifact_basename = _scenario_slug(str(scenario["name"]))
     render_capture = _capture_preview_render(
@@ -2754,10 +2764,11 @@ def _execute_signed_acceptance_scenario(
         scenario=scenario,
         profile_store=profile_store,
     )
-    preview = shell.properties_panel.refresh_preview()
-    preview_text = shell.properties_panel.preview_text()
-    validation_text = shell.properties_panel.validation_text()
-    request = _snapshot_current_draft_request(shell.properties_panel._workflow)
+    compat = _shell_compat_surface(shell)
+    preview = compat.properties_panel.refresh_preview()
+    preview_text = compat.properties_panel.preview_text()
+    validation_text = compat.properties_panel.validation_text()
+    request = _snapshot_current_draft_request(compat.properties_panel._workflow)
     artifact_basename = _scenario_slug(str(scenario["name"]))
     render_capture = _capture_preview_render(
         shell=shell,
@@ -3076,6 +3087,7 @@ def _apply_preview_matrix_scenario(
     profile_store: SignaturePresetCatalogStore,
 ) -> None:
     catalog = profile_store.load_catalog()
+    compat = _shell_compat_surface(shell)
     profile_name = scenario.get("profile_name")
     if profile_name is not None:
         if not isinstance(profile_name, str) or not profile_name.strip():
@@ -3084,38 +3096,39 @@ def _apply_preview_matrix_scenario(
         base_appearance = preset.appearance
     else:
         base_appearance = (
-            shell.properties_panel._workflow.current_signature_appearance or SignatureAppearance()
+            compat.properties_panel._workflow.current_signature_appearance
+            or SignatureAppearance()
         )
     appearance = _apply_appearance_overrides(
         base_appearance,
         scenario.get("appearance_overrides"),
     )
-    shell.properties_panel.set_signature_appearance(appearance)
+    compat.properties_panel.set_signature_appearance(appearance)
     if "timestamp_required" in scenario:
-        shell.properties_panel._workflow.timestamp_required = bool(
+        compat.properties_panel._workflow.timestamp_required = bool(
             scenario["timestamp_required"]
         )
     signature_rect_payload = scenario.get("signature_rect")
     if signature_rect_payload is not None:
         signature_rect = _signature_rect_from_payload(signature_rect_payload)
-        shell.properties_panel.set_signature_rect(signature_rect)
-        viewer_workflow = getattr(shell, "_viewer_workflow", None)
-        viewer_widget = getattr(shell, "_viewer_widget", None)
+        compat.properties_panel.set_signature_rect(signature_rect)
+        viewer_workflow = getattr(compat, "viewer_workflow", None)
+        viewer_widget = getattr(compat, "viewer_widget", None)
         if viewer_workflow is not None and hasattr(viewer_workflow, "jump_to_page"):
             viewer_workflow.jump_to_page(signature_rect.page_index)
         refresh = getattr(viewer_widget, "refresh", None)
         if callable(refresh):
             refresh(navigation=True)
-        sync_placement = getattr(shell, "_sync_placement_context_from_viewer", None)
+        sync_placement = getattr(compat, "sync_placement_context_from_viewer", None)
         if callable(sync_placement):
             sync_placement()
-        sync_overlay = getattr(shell, "_sync_signature_overlay", None)
+        sync_overlay = getattr(compat, "sync_signature_overlay", None)
         if callable(sync_overlay):
             sync_overlay()
-        refresh_sign_button = getattr(shell, "_refresh_sign_button_state", None)
+        refresh_sign_button = getattr(compat, "refresh_sign_button_state", None)
         if callable(refresh_sign_button):
             refresh_sign_button()
-    shell.refresh_viewer()
+    compat.refresh_viewer()
     app = _widget_application(shell)
     if app is not None and hasattr(app, "processEvents"):
         app.processEvents()
@@ -3256,7 +3269,8 @@ def _capture_preview_render(
     artifacts_dir: str | None,
     artifact_basename: str,
 ) -> dict[str, Any]:
-    controls = shell.properties_panel.preview_controls
+    compat = _shell_compat_surface(shell)
+    controls = compat.properties_panel.preview_controls
     card_container = controls.card_container
     single_body = controls.single_body_container
     multi_body = controls.multi_body_container
@@ -3281,7 +3295,7 @@ def _capture_preview_render(
                 preview,
                 zoom=1.0,
                 render_backend=getattr(
-                    shell.properties_panel,
+                    compat.properties_panel,
                     "_canonical_preview_render_backend",
                     None,
                 ),

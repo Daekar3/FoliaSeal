@@ -3571,9 +3571,16 @@ def test_apply_preview_matrix_scenario_syncs_viewer_to_signature_rect_page() -> 
         "_Shell",
         (),
         {
-            "properties_panel": _FakePanel(),
-            "_viewer_workflow": _FakeViewerWorkflow(),
-            "_viewer_widget": _FakeViewerWidget(),
+            "compat_surface": type(
+                "_CompatSurface",
+                (),
+                {
+                    "properties_panel": _FakePanel(),
+                    "viewer_workflow": _FakeViewerWorkflow(),
+                    "viewer_widget": _FakeViewerWidget(),
+                    "refresh_viewer": lambda self: None,
+                },
+            )(),
             "refresh_viewer": lambda self: None,
         },
     )()
@@ -3597,10 +3604,10 @@ def test_apply_preview_matrix_scenario_syncs_viewer_to_signature_rect_page() -> 
         profile_store=_FakeProfileStore(),
     )
 
-    assert shell.properties_panel.rect is not None
-    assert shell.properties_panel.rect.page_index == 3
-    assert shell._viewer_workflow.jumps == [3]
-    assert shell._viewer_widget.refresh_calls == [True]
+    assert shell.compat_surface.properties_panel.rect is not None
+    assert shell.compat_surface.properties_panel.rect.page_index == 3
+    assert shell.compat_surface.viewer_workflow.jumps == [3]
+    assert shell.compat_surface.viewer_widget.refresh_calls == [True]
 
 
 def test_widget_application_returns_none_when_pyside_is_unavailable(

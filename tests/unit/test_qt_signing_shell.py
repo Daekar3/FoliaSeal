@@ -2493,6 +2493,26 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert not hasattr(widget.properties_panel._certificate_controls, "password_input")
 
 
+def test_signing_shell_installs_named_compatibility_surface(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_ready_workflow(output_pdf_path=str(tmp_path / "signed.pdf")),
+    )
+
+    assert widget.compat_surface.properties_panel is widget.properties_panel
+    assert widget.compat_surface.viewer_widget is widget.viewer_widget
+    assert widget.compat_surface.sidebar_surface is widget.sidebar_surface
+    assert widget.compat_surface.refresh_viewer is widget.refresh_viewer
+
+
 def test_signing_shell_visible_text_field_checkboxes_control_preview_visibility(
     monkeypatch,
     tmp_path: Path,
