@@ -183,3 +183,4 @@ At the end of the slice, `src/foliaseal/presentation/qt/signing_workspace_shell_
 The helper may delegate many of those calls straight into the already-extracted bridges, sessions, or workflows. The point of the slice is ownership and concentration reduction, not behavior reinvention.
 
 Revision note: Created on 2026-06-05 by Codex for the next signing-workspace hybrid `4+5` tracer bullet after the properties-panel extraction slice.
+Revision note: Updated on 2026-06-05 by Codex after implementation, focused validation, and the architecture-doc reconciliation that added the explicit shell-surface helper ownership record.
