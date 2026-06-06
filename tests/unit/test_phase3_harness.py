@@ -47,7 +47,6 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
-    SigningResult,
 )
 from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
@@ -56,7 +55,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     _apply_appearance_overrides,
     _apply_preview_matrix_scenario,
     _apply_visible_fields_override,
-    _build_signed_run_bundle,
     _capture_headless_preview_render,
     _capture_interactive_state,
     _default_harness_artifacts_dir,
@@ -1068,66 +1066,6 @@ def test_phase3_harness_capture_to_json_serializes_signed_runs() -> None:
     assert payload["signed_runs"][0]["preview_snapshot"]["title"] == "At sign time"
 
 
-def test_build_signed_run_bundle_freezes_sign_time_state(monkeypatch, tmp_path: Path) -> None:
-    output_pdf = tmp_path / "signed.pdf"
-    output_pdf.write_bytes(b"%PDF-1.7\n")
-    request = build_signing_request(
-        tmp_path,
-        input_name="input.pdf",
-        output_name="signed.pdf",
-        certificate_name="cert.p12",
-        passphrase="secret",
-        timestamp_required=False,
-        signature_rect=build_signature_rect(page_index=0, width_pt=320.0, height_pt=48.0),
-    )
-    signing_result = SigningResult(
-        success=True,
-        failure_code=None,
-        message="Signing completed successfully.",
-    )
-    sign_time_state = {
-        "capture_label": "signed_run_01_single_line_top",
-        "preview_snapshot": {"title": "Before mutation"},
-        "preview_text": "Before mutation",
-        "validation_text": "Ready to sign.",
-        "sign_request_snapshot": {"output_pdf_path": request.output_pdf_path},
-        "backend_reservation_snapshot": {"stamp_text": "Before mutation"},
-        "backend_reservation_error": None,
-    }
-
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._snapshot_successful_signed_output",
-        lambda **kwargs: {
-            "output_file_exists": True,
-            "output_file_size_bytes": 9,
-            "output_signature_count": 1,
-            "output_signature_snapshot": {"field_name": "Signature1"},
-            "output_verification_snapshot": {"valid": True},
-            "output_visible_appearance_snapshot": {"field_name": "Signature1"},
-            "signed_output_render_snapshot": {"comparison_path": "compare.png"},
-            "signed_output_preview_comparison": {"preview_vs_signed_output_passed": True},
-        },
-    )
-
-    bundle = _build_signed_run_bundle(
-        run_index=1,
-        sign_time_state=sign_time_state,
-        request=request,
-        signing_result=signing_result,
-        artifacts_dir=str(tmp_path),
-        artifact_basename="signed_run_01_signed_output",
-    )
-
-    sign_time_state["preview_snapshot"]["title"] = "After mutation"
-    sign_time_state["sign_request_snapshot"]["output_pdf_path"] = "mutated.pdf"
-    sign_time_state["backend_reservation_snapshot"]["stamp_text"] = "After mutation"
-
-    assert bundle["preview_snapshot"]["title"] == "Before mutation"
-    assert bundle["sign_request_snapshot"]["output_pdf_path"] == str(output_pdf)
-    assert bundle["backend_reservation_snapshot"]["stamp_text"] == "Before mutation"
-    assert bundle["signed_output_preview_comparison"]["preview_vs_signed_output_passed"] is True
-
-
 def test_phase3_harness_capture_can_preserve_signed_runs_after_later_preview_changes() -> None:
     capture = Phase3HarnessCapture(
         pdf_path="/tmp/sample.pdf",
@@ -1878,10 +1816,8 @@ def test_run_phase3_harness_session_returns_raw_session_state(
         "_capture_interactive_state",
         fake_capture_interactive_state,
     )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_build_signed_run_bundle",
-        lambda **kwargs: {
+    fake_capture_assembler = SimpleNamespace(
+        build_signed_run_bundle=lambda **kwargs: {
             "run_index": kwargs["run_index"],
             "output_pdf_path": kwargs["request"].output_pdf_path,
             "output_file_exists": False,
@@ -1891,7 +1827,7 @@ def test_run_phase3_harness_session_returns_raw_session_state(
             "output_verification_snapshot": None,
             "output_visible_appearance_snapshot": None,
             "signed_output_render_snapshot": None,
-        },
+        }
     )
 
     bindings = phase3_harness_module._QtHarnessBindings(
@@ -1928,6 +1864,7 @@ def test_run_phase3_harness_session_returns_raw_session_state(
         signing_workflow=signing_workflow,
         profile_store=object(),
         sign_executor=object(),
+        capture_assembler=fake_capture_assembler,
     )
 
     assert result.sign_requests == (request,)

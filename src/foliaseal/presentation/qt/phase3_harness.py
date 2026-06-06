@@ -8,7 +8,6 @@ import json
 import re
 import shutil
 from collections import Counter
-from copy import deepcopy
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -78,6 +77,9 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.infra.tsa import build_dummy_timestamper, build_timestamp_validation_context
+from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
+    Phase3HarnessCaptureAssembler,
+)
 from foliaseal.presentation.qt.phase3_harness_reporting import (
     Phase3HarnessReportRequest,
     finalize_phase3_harness_report,
@@ -579,6 +581,7 @@ def run_phase3_signing_harness(
     )
     profile_store = SignaturePresetCatalogStore.default()
     sign_executor = build_phase3_signing_executor()
+    capture_assembler = _build_phase3_harness_capture_assembler()
     session = _run_phase3_harness_session(
         bindings=bindings,
         source_path=source_path,
@@ -587,6 +590,7 @@ def run_phase3_signing_harness(
         signing_workflow=signing_workflow,
         profile_store=profile_store,
         sign_executor=sign_executor,
+        capture_assembler=capture_assembler,
     )
     capture_payload = _build_phase3_harness_capture_payload(
         source_path=source_path,
@@ -594,6 +598,7 @@ def run_phase3_signing_harness(
         checklist_results_path=checklist_results_path,
         artifacts_dir=artifacts_dir,
         session=session,
+        capture_assembler=capture_assembler,
     )
     report = finalize_phase3_harness_report(
         Phase3HarnessReportRequest(
@@ -635,6 +640,7 @@ def _run_phase3_harness_session(
     signing_workflow: SigningDraftWorkflow,
     profile_store: SignaturePresetCatalogStore,
     sign_executor: Any,
+    capture_assembler: Phase3HarnessCaptureAssembler,
 ) -> Phase3HarnessSessionResult:
     sign_requests: list[SigningRequest] = []
     signed_runs: list[dict[str, Any]] = []
@@ -693,7 +699,7 @@ def _run_phase3_harness_session(
             capture_kind="signed_run",
         )
         signed_runs.append(
-            _build_signed_run_bundle(
+            capture_assembler.build_signed_run_bundle(
                 run_index=run_index,
                 sign_time_state=sign_time_state,
                 request=request,
@@ -830,160 +836,16 @@ def _build_phase3_harness_capture_payload(
     checklist_results_path: str,
     artifacts_dir: str | None,
     session: Phase3HarnessSessionResult,
+    capture_assembler: Phase3HarnessCaptureAssembler | None = None,
 ) -> dict[str, Any]:
-    preview_text = session.final_state["preview_text"]
-    validation_text = session.final_state["validation_text"]
-    backend_reservation_snapshot = session.final_state["backend_reservation_snapshot"]
-    backend_reservation_error = session.final_state["backend_reservation_error"]
-    last_signature_page_index = (
-        session.sign_requests[-1].signature_rect.page_index
-        if session.sign_requests and session.sign_requests[-1].signature_rect is not None
-        else None
+    assembler = capture_assembler or _build_phase3_harness_capture_assembler()
+    return assembler.build_capture_payload(
+        source_path=source_path,
+        summary_json_path=summary_json_path,
+        checklist_results_path=checklist_results_path,
+        artifacts_dir=artifacts_dir,
+        session=session,
     )
-    output_path = (
-        session.sign_requests[-1].output_pdf_path if session.sign_requests else None
-    )
-    output_exists = False
-    output_size_bytes = None
-    output_signature_count = None
-    output_signature_snapshot = None
-    output_verification_snapshot = None
-    output_visible_appearance_snapshot = None
-    signed_output_render_snapshot = None
-    if session.signed_runs:
-        latest_signed_run = _mapping(session.signed_runs[-1])
-        output_path = latest_signed_run.get("output_pdf_path")
-        output_exists = bool(latest_signed_run.get("output_file_exists"))
-        output_size_bytes = latest_signed_run.get("output_file_size_bytes")
-        output_signature_count = latest_signed_run.get("output_signature_count")
-        output_signature_snapshot = latest_signed_run.get("output_signature_snapshot")
-        output_verification_snapshot = latest_signed_run.get("output_verification_snapshot")
-        output_visible_appearance_snapshot = latest_signed_run.get(
-            "output_visible_appearance_snapshot"
-        )
-        signed_output_render_snapshot = latest_signed_run.get("signed_output_render_snapshot")
-    elif output_path is not None:
-        output_file = Path(output_path)
-        output_exists = output_file.exists()
-        if output_exists:
-            output_size_bytes = output_file.stat().st_size
-            output_signature_count = _count_embedded_signatures(output_file)
-            output_signature_snapshot = _snapshot_output_signature(output_file)
-            output_verification_snapshot = _snapshot_output_verification(
-                output_file,
-                trust_policy=(
-                    session.capture_request.trust_policy
-                    if session.capture_request is not None
-                    else None
-                ),
-            )
-            output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(output_file)
-            signed_output_render_snapshot = _snapshot_signed_output_render(
-                output_pdf_path=str(output_file),
-                page_index=last_signature_page_index,
-                preview_snapshot=session.final_state["preview_snapshot"],
-                preview_text=preview_text,
-                output_visible_appearance_snapshot=output_visible_appearance_snapshot,
-                artifacts_dir=artifacts_dir,
-                artifact_basename="final_signed_output",
-            )
-
-    checklist_results_written = bool(checklist_results_path)
-    capture_payload = {
-        "pdf_path": str(source_path),
-        "summary_json_path": summary_json_path,
-        "summary_json_written": summary_json_path is not None,
-        "checklist_results_path": checklist_results_path,
-        "checklist_results_written": checklist_results_written,
-        "first_render_ms": session.first_render_ms,
-        "selection_count": session.interaction_counts.get("selection_success", 0),
-        "sign_request_count": len(session.sign_requests),
-        "last_signature_page_index": last_signature_page_index,
-        "last_signature_page_number": (
-            last_signature_page_index + 1 if last_signature_page_index is not None else None
-        ),
-        "last_signature_has_visible_appearance": (
-            session.sign_requests[-1].has_visible_signature_settings()
-            if session.sign_requests
-            else False
-        ),
-        "last_signature_output_path": output_path,
-        "last_signing_result_message": (
-            session.last_signing_result.message
-            if isinstance(session.last_signing_result, SigningResult)
-            else None
-        ),
-        "last_signing_result_success": (
-            session.last_signing_result.success
-            if isinstance(session.last_signing_result, SigningResult)
-            else None
-        ),
-        "preview_snapshot": session.final_state["preview_snapshot"],
-        "sign_request_snapshot": session.final_state["sign_request_snapshot"],
-        "backend_reservation_snapshot": backend_reservation_snapshot,
-        "backend_reservation_error": backend_reservation_error,
-        "output_file_exists": output_exists,
-        "output_file_size_bytes": output_size_bytes,
-        "output_signature_count": output_signature_count,
-        "output_signature_snapshot": output_signature_snapshot,
-        "output_verification_snapshot": output_verification_snapshot,
-        "output_visible_appearance_snapshot": output_visible_appearance_snapshot,
-        "signed_output_render_snapshot": signed_output_render_snapshot,
-        "signed_output_preview_comparison": (
-            None
-            if signed_output_render_snapshot is None
-            else {
-                "page_render_path": signed_output_render_snapshot.get("page_render_path"),
-                "signature_crop_path": signed_output_render_snapshot.get(
-                    "signature_crop_path"
-                ),
-                "comparison_path": signed_output_render_snapshot.get("comparison_path"),
-                "preview_crop_bounds_px": signed_output_render_snapshot.get(
-                    "preview_crop_bounds_px"
-                ),
-                "signed_crop_bounds_px": signed_output_render_snapshot.get(
-                    "signed_crop_bounds_px"
-                ),
-                "preview_vs_signed_output_change_ratio": signed_output_render_snapshot.get(
-                    "preview_vs_signed_output_change_ratio"
-                ),
-                "preview_vs_signed_output_aspect_ratio_delta": signed_output_render_snapshot.get(
-                    "preview_vs_signed_output_aspect_ratio_delta"
-                ),
-                "preview_text_fragments_match_output": signed_output_render_snapshot.get(
-                    "preview_text_fragments_match_output"
-                ),
-                "annotation_rect_matches_request": signed_output_render_snapshot.get(
-                    "annotation_rect_matches_request"
-                ),
-                "output_text_bounds_match_preview": signed_output_render_snapshot.get(
-                    "output_text_bounds_match_preview"
-                ),
-                "output_image_presence_matches_preview": signed_output_render_snapshot.get(
-                    "output_image_presence_matches_preview"
-                ),
-                "preview_vs_signed_output_passed": signed_output_render_snapshot.get(
-                    "preview_vs_signed_output_passed"
-                ),
-                "preview_vs_signed_output_error": signed_output_render_snapshot.get(
-                    "comparison_error"
-                )
-                or signed_output_render_snapshot.get("signature_crop_error")
-                or signed_output_render_snapshot.get("page_render_error"),
-            }
-        ),
-        "preview_available": bool(preview_text.strip()),
-        "preview_text": preview_text,
-        "validation_text": validation_text,
-        "interaction_counts": session.interaction_counts,
-        "errors": session.errors,
-        "signed_runs": session.signed_runs,
-        "captured_states": tuple(session.captured_states + (session.final_state,)),
-    }
-    capture_payload["captured_state_transition_diagnostics"] = (
-        _analyze_capture_state_transitions(capture_payload["captured_states"])
-    )
-    return capture_payload
 
 
 def _build_phase3_harness_capture(
@@ -1037,6 +899,17 @@ def _build_phase3_harness_capture(
         captured_state_transition_diagnostics=capture_payload[
             "captured_state_transition_diagnostics"
         ],
+    )
+
+
+def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
+    return Phase3HarnessCaptureAssembler(
+        count_embedded_signatures=_count_embedded_signatures,
+        snapshot_output_signature=_snapshot_output_signature,
+        snapshot_output_verification=_snapshot_output_verification,
+        snapshot_visible_signature_appearance=_snapshot_visible_signature_appearance,
+        snapshot_signed_output_render=_snapshot_signed_output_render,
+        analyze_capture_state_transitions=_analyze_capture_state_transitions,
     )
 
 
@@ -1256,46 +1129,14 @@ def _build_signed_run_bundle(
     artifacts_dir: str | None,
     artifact_basename: str | None,
 ) -> dict[str, Any]:
-    bundle = {
-        "run_index": run_index,
-        "capture_label": sign_time_state.get("capture_label"),
-        "preview_snapshot": deepcopy(sign_time_state.get("preview_snapshot")),
-        "preview_text": sign_time_state.get("preview_text"),
-        "validation_text": sign_time_state.get("validation_text"),
-        "sign_request_snapshot": deepcopy(sign_time_state.get("sign_request_snapshot")),
-        "backend_reservation_snapshot": deepcopy(
-            sign_time_state.get("backend_reservation_snapshot")
-        ),
-        "backend_reservation_error": sign_time_state.get("backend_reservation_error"),
-        "signing_result": _snapshot_signing_result_payload(signing_result),
-        "output_pdf_path": request.output_pdf_path,
-        "output_file_exists": False,
-        "output_file_size_bytes": None,
-        "output_signature_count": None,
-        "output_signature_snapshot": None,
-        "output_verification_snapshot": None,
-        "output_visible_appearance_snapshot": None,
-        "signed_output_render_snapshot": None,
-        "signed_output_preview_comparison": None,
-    }
-    output_file = Path(request.output_pdf_path)
-    if signing_result.success and output_file.exists():
-        bundle.update(
-            _snapshot_successful_signed_output(
-                output_file=output_file,
-                page_index=(
-                    request.signature_rect.page_index
-                    if request.signature_rect is not None
-                    else None
-                ),
-                preview_snapshot=_mapping(sign_time_state.get("preview_snapshot")),
-                preview_text=str(sign_time_state.get("preview_text", "")),
-                trust_policy=request.trust_policy,
-                artifacts_dir=artifacts_dir,
-                artifact_basename=artifact_basename,
-            )
-        )
-    return bundle
+    return _build_phase3_harness_capture_assembler().build_signed_run_bundle(
+        run_index=run_index,
+        sign_time_state=sign_time_state,
+        request=request,
+        signing_result=signing_result,
+        artifacts_dir=artifacts_dir,
+        artifact_basename=artifact_basename,
+    )
 
 
 def run_phase3_preview_matrix(
