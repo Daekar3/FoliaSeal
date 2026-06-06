@@ -7,12 +7,10 @@ import importlib
 import json
 import re
 import shutil
-from collections import Counter
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from time import perf_counter
 from typing import Any
 
 from PIL import Image, ImageDraw
@@ -84,6 +82,11 @@ from foliaseal.presentation.qt.phase3_harness_reporting import (
     Phase3HarnessReportRequest,
     finalize_phase3_harness_report,
 )
+from foliaseal.presentation.qt.phase3_harness_session_runner import (
+    Phase3HarnessSessionResult,
+    Phase3HarnessSessionRunner,
+    _QtHarnessBindings,
+)
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
@@ -142,21 +145,6 @@ class Phase3HarnessCapture:
         """Return a stable JSON representation for later review."""
 
         return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
-
-
-@dataclass(frozen=True)
-class Phase3HarnessSessionResult:
-    """Raw interactive harness session state before report finalization."""
-
-    first_render_ms: float | None
-    sign_requests: tuple[SigningRequest, ...]
-    signed_runs: tuple[dict[str, Any], ...]
-    errors: tuple[str, ...]
-    interaction_counts: dict[str, int]
-    captured_states: tuple[dict[str, Any], ...]
-    final_state: dict[str, Any]
-    capture_request: SigningRequest | None
-    last_signing_result: SigningResult | None
 
 
 def build_phase3_checklist_results_markdown(
@@ -642,190 +630,15 @@ def _run_phase3_harness_session(
     sign_executor: Any,
     capture_assembler: Phase3HarnessCaptureAssembler,
 ) -> Phase3HarnessSessionResult:
-    sign_requests: list[SigningRequest] = []
-    signed_runs: list[dict[str, Any]] = []
-    errors: list[str] = []
-    interaction_counts: Counter[str] = Counter()
-
-    app = bindings.q_application.instance() or bindings.q_application([])
-    window = bindings.q_main_window()
-    window.setWindowTitle(f"FoliaSeal Phase 3 Harness - {source_path.name}")
-    window.resize(1440, 980)
-
-    central = bindings.q_widget()
-    layout = bindings.q_v_box_layout(central)
-    toolbar = bindings.q_h_box_layout()
-    layout.addLayout(toolbar)
-    body_layout = bindings.q_h_box_layout()
-    layout.addLayout(body_layout, 1)
-
-    window.setCentralWidget(central)
-
-    captured_states: list[dict[str, Any]] = []
-
-    def refocus_shell() -> None:
-        focus_setter = getattr(shell, "setFocus", None)
-        if callable(focus_setter):
-            focus_setter()
-
-    def on_sign_request(request: SigningRequest) -> None:
-        sign_requests.append(request)
-        signing_workflow.output_pdf_path = _default_harness_output_pdf_path(
-            pdf_path=str(source_path),
-            artifacts_dir=artifacts_dir,
-            sign_attempt_index=len(sign_requests) + 1,
-        )
-
-    def on_error(message: str) -> None:
-        errors.append(message)
-
-    def on_status_change(name: str) -> None:
-        interaction_counts[name] += 1
-        if name != "sign_success" or not sign_requests:
-            return
-        signing_result = getattr(_shell_compat_surface(shell), "last_signing_result", None)
-        if not isinstance(signing_result, SigningResult) or not signing_result.success:
-            return
-        request = sign_requests[-1]
-        run_index = len(signed_runs) + 1
-        sign_time_state = _capture_interactive_state(
-            shell=shell,
-            request=request,
-            artifacts_dir=artifacts_dir,
-            artifact_basename=(
-                f"signed_run_{run_index:02d}_preview" if artifacts_dir is not None else None
-            ),
-            capture_index=run_index,
-            capture_kind="signed_run",
-        )
-        signed_runs.append(
-            capture_assembler.build_signed_run_bundle(
-                run_index=run_index,
-                sign_time_state=sign_time_state,
-                request=request,
-                signing_result=signing_result,
-                artifacts_dir=artifacts_dir,
-                artifact_basename=(
-                    f"signed_run_{run_index:02d}_signed_output"
-                    if artifacts_dir is not None
-                    else None
-                ),
-            )
-        )
-
-    shell = build_qt_signing_shell(
+    return _build_phase3_harness_session_runner().run(
+        bindings=bindings,
+        source_path=source_path,
+        artifacts_dir=artifacts_dir,
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
-        preset_catalog_store=profile_store,
+        profile_store=profile_store,
         sign_executor=sign_executor,
-        on_sign_request=on_sign_request,
-        on_error=on_error,
-        on_status_change=on_status_change,
-    )
-    body_layout.addWidget(shell, 1)
-
-    def do_refresh() -> None:
-        _shell_compat_surface(shell).refresh_viewer()
-        refocus_shell()
-
-    def navigate(action_name: str) -> None:
-        action = getattr(_shell_compat_surface(shell).viewer_widget, action_name)
-        action()
-        refocus_shell()
-
-    controls = [
-        ("Refresh", do_refresh),
-        ("Prev Page", lambda: navigate("go_to_previous_page")),
-        ("Next Page", lambda: navigate("go_to_next_page")),
-        ("Reset Zoom", lambda: navigate("reset_zoom_view")),
-    ]
-    for label, callback in controls:
-        button = bindings.q_push_button(label)
-        button.clicked.connect(callback)
-        toolbar.addWidget(button)
-
-    capture_count_label = bindings.q_label("Captured states: 0")
-
-    def capture_current_state(
-        *,
-        capture_kind: str,
-        request: SigningRequest | None = None,
-    ) -> dict[str, Any]:
-        current_request = request
-        if current_request is None:
-            current_request = _snapshot_current_draft_request(
-                _shell_compat_surface(shell).properties_panel._workflow
-            )
-        capture_index = (
-            len(captured_states) + 1
-            if capture_kind == "manual"
-            else len(captured_states)
-        )
-        artifact_basename = None
-        if artifacts_dir is not None:
-            artifact_basename = (
-                f"interactive_state_{capture_index:02d}"
-                if capture_kind == "manual"
-                else "interactive_final"
-            )
-        return _capture_interactive_state(
-            shell=shell,
-            request=current_request,
-            artifacts_dir=artifacts_dir,
-            artifact_basename=artifact_basename,
-            capture_index=(capture_index if capture_kind == "manual" else len(captured_states) + 1),
-            capture_kind=capture_kind,
-        )
-
-    def update_capture_count_label() -> None:
-        capture_count_label.setText(f"Captured states: {len(captured_states)}")
-
-    def on_capture_state() -> None:
-        captured_states.append(capture_current_state(capture_kind="manual"))
-        update_capture_count_label()
-        refocus_shell()
-
-    capture_button = bindings.q_push_button("Capture State")
-    capture_button.clicked.connect(on_capture_state)
-    toolbar.addWidget(capture_button)
-
-    confirm_button = bindings.q_push_button("Confirm/Sign")
-    confirm_button.clicked.connect(shell.submit_sign_request)
-    toolbar.addWidget(confirm_button)
-
-    toolbar.addStretch(1)
-    toolbar.addWidget(capture_count_label)
-
-    start = perf_counter()
-    _shell_compat_surface(shell).refresh_viewer()
-    first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
-    _elapsed_ms = (perf_counter() - start) * 1000.0
-
-    window.show()
-    refocus_shell()
-    app.exec()
-
-    capture_request = (
-        sign_requests[-1]
-        if sign_requests
-        else _snapshot_current_draft_request(
-            _shell_compat_surface(shell).properties_panel._workflow
-        )
-    )
-    final_state = capture_current_state(capture_kind="final", request=capture_request)
-    last_signing_result = getattr(_shell_compat_surface(shell), "last_signing_result", None)
-    return Phase3HarnessSessionResult(
-        first_render_ms=first_render_ms,
-        sign_requests=tuple(sign_requests),
-        signed_runs=tuple(signed_runs),
-        errors=tuple(errors),
-        interaction_counts=dict(sorted(interaction_counts.items())),
-        captured_states=tuple(captured_states),
-        final_state=final_state,
-        capture_request=capture_request,
-        last_signing_result=(
-            last_signing_result if isinstance(last_signing_result, SigningResult) else None
-        ),
+        capture_assembler=capture_assembler,
     )
 
 
@@ -910,6 +723,16 @@ def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
         snapshot_visible_signature_appearance=_snapshot_visible_signature_appearance,
         snapshot_signed_output_render=_snapshot_signed_output_render,
         analyze_capture_state_transitions=_analyze_capture_state_transitions,
+    )
+
+
+def _build_phase3_harness_session_runner() -> Phase3HarnessSessionRunner:
+    return Phase3HarnessSessionRunner(
+        build_qt_signing_shell=build_qt_signing_shell,
+        snapshot_current_draft_request=_snapshot_current_draft_request,
+        capture_interactive_state=_capture_interactive_state,
+        default_harness_output_pdf_path=_default_harness_output_pdf_path,
+        compat_surface=_shell_compat_surface,
     )
 
 
@@ -1307,20 +1130,6 @@ def run_phase3_signed_acceptance_matrix(
         encoding="utf-8",
     )
     return summary
-
-
-@dataclass(frozen=True)
-class _QtHarnessBindings:
-    q_application: type[Any]
-    q_main_window: type[Any]
-    q_widget: type[Any]
-    q_v_box_layout: type[Any]
-    q_h_box_layout: type[Any]
-    q_group_box: type[Any]
-    q_push_button: type[Any]
-    q_label: type[Any]
-    q_plain_text_edit: type[Any]
-    qpdf_document: type[Any]
 
 
 def _load_qt_harness_bindings() -> _QtHarnessBindings:
