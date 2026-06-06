@@ -59,14 +59,12 @@ from foliaseal.presentation.qt.phase3_harness import (
     _capture_interactive_state,
     _default_harness_artifacts_dir,
     _default_harness_output_pdf_path,
-    _detect_text_content_bounds_in_preview,
     _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
     _preview_edge_distances,
     _preview_matrix_diagnostic_summary,
     _preview_matrix_error_result,
-    _project_content_bounds_to_preview,
     _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
     _snapshot_current_draft_request,
@@ -2160,16 +2158,6 @@ def test_analyze_stamp_source_image_reports_alpha_bounds(tmp_path: Path) -> None
     assert analysis["stamp_source_content_error"] is None
 
 
-def test_project_content_bounds_to_preview_scales_source_bounds() -> None:
-    projected = _project_content_bounds_to_preview(
-        source_image_size={"width": 20, "height": 10},
-        source_content_bounds={"x": 4, "y": 2, "width": 12, "height": 6},
-        pixmap_bounds={"x": 10, "y": 5, "width": 100, "height": 50},
-    )
-
-    assert projected == {"x": 30, "y": 15, "width": 60, "height": 30}
-
-
 def test_stamp_edge_diagnostics_flags_touching_but_not_one_pixel_clearance() -> None:
     preview = type(
         "_Preview",
@@ -2213,96 +2201,6 @@ def test_write_stamp_debug_overlay_writes_debug_crop(tmp_path: Path) -> None:
 
     assert error is None
     assert output_path.exists()
-
-
-def test_detect_text_content_bounds_in_preview_finds_rendered_pixels(tmp_path: Path) -> None:
-    preview_path = tmp_path / "preview.png"
-    image = Image.new("RGBA", (80, 40), color=(255, 255, 255, 255))
-    for x in range(18, 46):
-        for y in range(12, 21):
-            image.putpixel((x, y), (0, 0, 0, 255))
-    image.save(preview_path, format="PNG")
-
-    bounds, error = _detect_text_content_bounds_in_preview(
-        preview_image_path=str(preview_path),
-        text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
-        text_color_rgba=(0, 0, 0, 255),
-    )
-
-    assert error is None
-    assert bounds == {"x": 18, "y": 12, "width": 28, "height": 9}
-
-
-def test_detect_text_content_bounds_in_preview_captures_antialiased_text_edges(
-    tmp_path: Path,
-) -> None:
-    preview_path = tmp_path / "preview_antialias.png"
-    image = Image.new("RGBA", (80, 40), color=(255, 255, 255, 255))
-    # Dark core
-    for x in range(22, 40):
-        for y in range(12, 18):
-            image.putpixel((x, y), (0, 0, 0, 255))
-    # Gray anti-aliased fringe that should still count as text.
-    for x in range(20, 42):
-        image.putpixel((x, 11), (120, 120, 120, 255))
-        image.putpixel((x, 18), (120, 120, 120, 255))
-    image.putpixel((21, 12), (120, 120, 120, 255))
-    image.putpixel((40, 17), (120, 120, 120, 255))
-    image.save(preview_path, format="PNG")
-
-    bounds, error = _detect_text_content_bounds_in_preview(
-        preview_image_path=str(preview_path),
-        text_widget_bounds={"x": 10, "y": 8, "width": 40, "height": 20},
-        text_color_rgba=(0, 0, 0, 255),
-    )
-
-    assert error is None
-    assert bounds == {"x": 20, "y": 11, "width": 22, "height": 8}
-
-
-def test_detect_text_content_bounds_in_preview_ignores_border_strokes(
-    tmp_path: Path,
-) -> None:
-    preview_path = tmp_path / "preview_border.png"
-    image = Image.new("RGBA", (80, 40), color=(255, 255, 255, 255))
-    for x in range(10, 60):
-        image.putpixel((x, 27), (0, 0, 0, 255))
-    for x in range(22, 38):
-        for y in range(14, 19):
-            image.putpixel((x, y), (0, 0, 0, 255))
-    image.save(preview_path, format="PNG")
-
-    bounds, error = _detect_text_content_bounds_in_preview(
-        preview_image_path=str(preview_path),
-        text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
-        text_color_rgba=(0, 0, 0, 255),
-    )
-
-    assert error is None
-    assert bounds == {"x": 22, "y": 14, "width": 16, "height": 5}
-
-
-def test_detect_text_content_bounds_in_preview_uses_reference_envelope_to_reject_wide_noise(
-    tmp_path: Path,
-) -> None:
-    preview_path = tmp_path / "preview_reference_guided.png"
-    image = Image.new("RGBA", (120, 50), color=(255, 255, 255, 255))
-    for x in range(10, 110):
-        image.putpixel((x, 30), (0, 0, 0, 255))
-    for x in range(28, 52):
-        for y in range(16, 22):
-            image.putpixel((x, y), (0, 0, 0, 255))
-    image.save(preview_path, format="PNG")
-
-    bounds, error = _detect_text_content_bounds_in_preview(
-        preview_image_path=str(preview_path),
-        text_widget_bounds={"x": 10, "y": 10, "width": 100, "height": 24},
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds={"x": 28, "y": 16, "width": 28, "height": 10},
-    )
-
-    assert error is None
-    assert bounds == {"x": 28, "y": 16, "width": 24, "height": 6}
 
 
 def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
@@ -2557,16 +2455,6 @@ def test_analyze_stamp_source_image_reports_empty_alpha_as_error(tmp_path: Path)
     assert analysis["stamp_source_content_error"] == (
         "Stamp source image contains no non-transparent pixels."
     )
-
-
-def test_project_content_bounds_to_preview_scales_into_pixmap_bounds() -> None:
-    projected = _project_content_bounds_to_preview(
-        source_image_size={"width": 100, "height": 50},
-        source_content_bounds={"x": 10, "y": 5, "width": 60, "height": 20},
-        pixmap_bounds={"x": 40, "y": 12, "width": 80, "height": 40},
-    )
-
-    assert projected == {"x": 48, "y": 16, "width": 48, "height": 16}
 
 
 def test_stamp_edge_diagnostics_flags_touching_without_one_pixel_warning() -> None:
@@ -3256,6 +3144,68 @@ def test_snapshot_sign_time_fit_diagnostics_delegates_to_snapshotter(
     assert captured == {
         "preview_render_capture": {"preview": True},
         "backend_reservation_snapshot": {"backend": True},
+    }
+
+
+def test_project_content_bounds_to_preview_delegates_to_text_geometry_helper(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeHelper:
+        def project_content_bounds_to_preview(self, **kwargs):
+            captured.update(kwargs)
+            return "projected-bounds"
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_text_geometry_helper",
+        lambda: FakeHelper(),
+    )
+
+    summary = phase3_harness_module._project_content_bounds_to_preview(
+        source_image_size={"width": 20, "height": 10},
+        source_content_bounds={"x": 4, "y": 2, "width": 12, "height": 6},
+        pixmap_bounds={"x": 10, "y": 5, "width": 100, "height": 50},
+    )
+
+    assert summary == "projected-bounds"
+    assert captured == {
+        "source_image_size": {"width": 20, "height": 10},
+        "source_content_bounds": {"x": 4, "y": 2, "width": 12, "height": 6},
+        "pixmap_bounds": {"x": 10, "y": 5, "width": 100, "height": 50},
+    }
+
+
+def test_detect_text_content_bounds_in_preview_delegates_to_text_geometry_helper(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeHelper:
+        def detect_text_content_bounds_in_preview(self, **kwargs):
+            captured.update(kwargs)
+            return ({"x": 18, "y": 12, "width": 28, "height": 9}, None)
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_text_geometry_helper",
+        lambda: FakeHelper(),
+    )
+
+    summary = phase3_harness_module._detect_text_content_bounds_in_preview(
+        preview_image_path="preview.png",
+        text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
+        text_color_rgba=(0, 0, 0, 255),
+        reference_text_content_bounds={"x": 18, "y": 12, "width": 28, "height": 9},
+    )
+
+    assert summary == ({"x": 18, "y": 12, "width": 28, "height": 9}, None)
+    assert captured == {
+        "preview_image_path": "preview.png",
+        "text_widget_bounds": {"x": 10, "y": 8, "width": 50, "height": 20},
+        "text_color_rgba": (0, 0, 0, 255),
+        "reference_text_content_bounds": {"x": 18, "y": 12, "width": 28, "height": 9},
     }
 
 
