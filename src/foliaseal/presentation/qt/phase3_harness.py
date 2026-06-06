@@ -69,6 +69,9 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.infra.tsa import build_dummy_timestamper, build_timestamp_validation_context
+from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
+    Phase3AppearanceSnapshotter,
+)
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
 )
@@ -1034,6 +1037,18 @@ def _build_phase3_signed_output_render_snapshotter() -> (
     )
 
 
+def _build_phase3_appearance_snapshotter() -> Phase3AppearanceSnapshotter:
+    return Phase3AppearanceSnapshotter(
+        mapping=_mapping,
+        signature_text_style_from_snapshot=_signature_text_style_from_snapshot,
+        structural_line_bounds=_structural_line_bounds_px,
+        visible_appearance_image_xobjects=_snapshot_visible_appearance_image_xobjects,
+        visible_appearance_text_fragments=_snapshot_visible_appearance_text_fragments,
+        reconstruct_text_box_bounds=_reconstruct_text_box_bounds_px,
+        union_rectangles=_union_rectangles,
+    )
+
+
 def _load_qt_harness_bindings() -> _QtHarnessBindings:
     widgets = importlib.import_module("PySide6.QtWidgets")
     qtpdf = importlib.import_module("PySide6.QtPdf")
@@ -1456,75 +1471,8 @@ def _preview_appearance_snapshot_from_capture(
     *,
     preview_snapshot: dict[str, Any],
 ) -> SignatureAppearanceSnapshot:
-    render_capture = _mapping(preview_snapshot.get("render_capture"))
-    analysis_snapshot = _mapping(render_capture.get("analysis_appearance_snapshot"))
-    box_style = _mapping(preview_snapshot.get("box_style"))
-    if analysis_snapshot:
-        border_style = _mapping(analysis_snapshot.get("border_style")) or None
-        border_bounds = _mapping(analysis_snapshot.get("border_bounds_px")) or None
-        if border_style is None and box_style.get("show_border") is True:
-            border_style = {
-                "show_border": True,
-                "shape": "rounded",
-                "border_color_hex": box_style.get("border_color_hex"),
-                "border_width_pt": box_style.get("border_width_pt"),
-                "background_color_hex": box_style.get("background_color_hex"),
-            }
-            border_bounds = _mapping(analysis_snapshot.get("container_bounds_px")) or None
-        return SignatureAppearanceSnapshot(
-            image_path=analysis_snapshot.get("image_path"),
-            image_size_px=_mapping(analysis_snapshot.get("image_size_px")) or None,
-            container_bounds_px=_mapping(analysis_snapshot.get("container_bounds_px")) or None,
-            border_bounds_px=border_bounds,
-            border_style=border_style,
-            text_bounds_px=_mapping(analysis_snapshot.get("text_bounds_px")) or None,
-            stamp_bounds_px=_mapping(analysis_snapshot.get("stamp_bounds_px")) or None,
-            text_fragments=tuple(analysis_snapshot.get("text_fragments", ())),
-            line_bounds_px=tuple(analysis_snapshot.get("line_bounds_px", ())),
-        )
-    card_bounds = _mapping(render_capture.get("card_bounds_px"))
-    image_size = None
-    if card_bounds:
-        image_size = {"width": card_bounds["width"], "height": card_bounds["height"]}
-    border_style = None
-    if box_style.get("show_border") is True:
-        border_style = {
-            "show_border": True,
-            "shape": "rounded",
-            "border_color_hex": box_style.get("border_color_hex"),
-            "border_width_pt": box_style.get("border_width_pt"),
-            "background_color_hex": box_style.get("background_color_hex"),
-        }
-    text_fragments = tuple(
-        field.get("text", "").strip()
-        for field in preview_snapshot.get("fields", ())
-        if (
-            isinstance(field, dict)
-            and field.get("visible") is True
-            and field.get("text", "").strip()
-        )
-    )
-    text_style = _signature_text_style_from_snapshot(preview_snapshot.get("text_style"))
-    text_bounds = _mapping(render_capture.get("text_rendered_content_bounds_px")) or None
-    line_bounds = tuple(render_capture.get("text_rendered_line_bounds_px", ()))
-    if not line_bounds:
-        line_bounds = _structural_line_bounds_px(
-            text="\n".join(text_fragments),
-            text_fragments=text_fragments,
-            text_style=text_style,
-            text_bounds_px=text_bounds,
-        )
-    return SignatureAppearanceSnapshot(
-        image_path=render_capture.get("analysis_preview_image_path")
-        or render_capture.get("preview_image_path"),
-        image_size_px=image_size,
-        container_bounds_px=card_bounds or None,
-        border_bounds_px=(card_bounds or None) if border_style is not None else None,
-        border_style=border_style,
-        text_bounds_px=text_bounds,
-        stamp_bounds_px=_mapping(render_capture.get("stamp_rendered_content_bounds_px")) or None,
-        text_fragments=text_fragments,
-        line_bounds_px=line_bounds,
+    return _build_phase3_appearance_snapshotter().preview_appearance_snapshot_from_capture(
+        preview_snapshot=preview_snapshot
     )
 
 
@@ -1600,63 +1548,13 @@ def _signed_output_appearance_snapshot(
     visible_appearance_snapshot: dict[str, Any],
     preview_snapshot: dict[str, Any],
 ) -> SignatureAppearanceSnapshot:
-    preview_box_style = _mapping(preview_snapshot.get("box_style"))
-    border_shape = "rounded"
-    if visible_appearance_snapshot.get("appearance_uses_rounded_border") is False:
-        border_shape = "square"
-    elif visible_appearance_snapshot.get("appearance_uses_rounded_border") is None:
-        border_shape = "unknown"
-    border_style = None
-    if preview_box_style.get("show_border") is True:
-        border_style = {
-            "show_border": True,
-            "shape": border_shape,
-            "border_color_hex": preview_box_style.get("border_color_hex"),
-            "border_width_pt": preview_box_style.get("border_width_pt"),
-            "background_color_hex": preview_box_style.get("background_color_hex"),
-        }
-    container_bounds = {
-        "x": 0,
-        "y": 0,
-        "width": normalized_image_size["width"],
-        "height": normalized_image_size["height"],
-    }
-    stamp_bounds = None
-    if _snapshot_visible_appearance_image_xobjects(visible_appearance_snapshot):
-        preview_render_capture = _mapping(preview_snapshot.get("render_capture"))
-        analysis_snapshot = _mapping(preview_render_capture.get("analysis_appearance_snapshot"))
-        stamp_bounds = (
-            _mapping(analysis_snapshot.get("stamp_bounds_px"))
-            or _mapping(preview_render_capture.get("stamp_rendered_content_bounds_px"))
-            or None
-        )
-    text_fragments = tuple(_snapshot_visible_appearance_text_fragments(visible_appearance_snapshot))
-    text_style = _signature_text_style_from_snapshot(preview_snapshot.get("text_style"))
-    reconstructed_text_box_bounds = _reconstruct_text_box_bounds_px(
+    return _build_phase3_appearance_snapshotter().signed_output_appearance_snapshot(
+        normalized_image_path=normalized_image_path,
+        normalized_image_size=normalized_image_size,
+        text_bounds_px=text_bounds_px,
+        line_bounds_px=line_bounds_px,
+        visible_appearance_snapshot=visible_appearance_snapshot,
         preview_snapshot=preview_snapshot,
-        text_fragments=text_fragments,
-        container_bounds_px=container_bounds,
-    )
-    structural_line_bounds = _structural_line_bounds_px(
-        text="\n".join(text_fragments),
-        text_fragments=text_fragments,
-        text_style=text_style,
-        text_bounds_px=reconstructed_text_box_bounds or text_bounds_px,
-    )
-    return SignatureAppearanceSnapshot(
-        image_path=normalized_image_path,
-        image_size_px=normalized_image_size,
-        container_bounds_px=container_bounds,
-        border_bounds_px=container_bounds if border_style is not None else None,
-        border_style=border_style,
-        text_bounds_px=(
-            _union_rectangles(structural_line_bounds)
-            or reconstructed_text_box_bounds
-            or text_bounds_px
-        ),
-        stamp_bounds_px=stamp_bounds,
-        text_fragments=text_fragments,
-        line_bounds_px=structural_line_bounds or line_bounds_px,
     )
 
 

@@ -63,14 +63,12 @@ from foliaseal.presentation.qt.phase3_harness import (
     _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
-    _preview_appearance_snapshot_from_capture,
     _preview_edge_distances,
     _preview_matrix_diagnostic_summary,
     _preview_matrix_error_result,
     _project_content_bounds_to_preview,
     _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
-    _signed_output_appearance_snapshot,
     _snapshot_current_draft_request,
     _snapshot_output_verification,
     _snapshot_preview,
@@ -1167,85 +1165,6 @@ def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
     assert summary["successful_signing_run_count"] == 2
     assert summary["cryptographic_validation_failure_count"] == 1
     assert summary["preview_output_comparison_failure_count"] == 1
-
-
-def test_preview_appearance_snapshot_from_capture_restores_border_style_when_missing() -> None:
-    preview_snapshot = {
-        "box_style": {
-            "show_border": True,
-            "border_color_hex": "#000000",
-            "border_width_pt": 1.0,
-            "background_color_hex": "#FFFFFF",
-        },
-        "render_capture": {
-            "analysis_appearance_snapshot": {
-                "image_path": "analysis.png",
-                "image_size_px": {"width": 320, "height": 42},
-                "container_bounds_px": {"x": 0, "y": 0, "width": 320, "height": 42},
-                "border_bounds_px": None,
-                "border_style": None,
-                "text_bounds_px": {"x": 3, "y": 3, "width": 240, "height": 20},
-                "stamp_bounds_px": None,
-                "text_fragments": [
-                    "Digitally signed by",
-                    "Morgan Ellery | 2026-04-20 00:55:01 UTC",
-                ],
-                "line_bounds_px": [
-                    {"x": 3, "y": 3, "width": 240, "height": 8},
-                    {"x": 3, "y": 15, "width": 240, "height": 8},
-                ],
-            }
-        },
-    }
-
-    snapshot = _preview_appearance_snapshot_from_capture(preview_snapshot=preview_snapshot)
-
-    assert snapshot.border_style is not None
-    assert snapshot.border_style["shape"] == "rounded"
-    assert snapshot.border_bounds_px == {"x": 0, "y": 0, "width": 320, "height": 42}
-    assert snapshot.line_bounds_px == (
-        {"x": 3, "y": 3, "width": 240, "height": 8},
-        {"x": 3, "y": 15, "width": 240, "height": 8},
-    )
-
-
-def test_signed_output_appearance_snapshot_derives_structural_line_bounds() -> None:
-    snapshot = _signed_output_appearance_snapshot(
-        normalized_image_path="signed.png",
-        normalized_image_size={"width": 320, "height": 42},
-        text_bounds_px={"x": 4, "y": 3, "width": 250, "height": 20},
-        line_bounds_px=(
-            {"x": 4, "y": 3, "width": 120, "height": 8},
-            {"x": 4, "y": 15, "width": 250, "height": 8},
-        ),
-        visible_appearance_snapshot={
-            "appearance_uses_rounded_border": True,
-            "text_fragments": ["Digitally signed by", "Morgan Ellery"],
-            "image_xobject_count": 0,
-        },
-        preview_snapshot={
-            "text_style": {
-                "font_family": "Sans Serif",
-                "font_size_pt": 8.5,
-                "bold": False,
-                "italic": False,
-                "text_color_hex": "#000000",
-            },
-            "box_style": {
-                "show_border": True,
-                "border_color_hex": "#000000",
-                "border_width_pt": 1.0,
-                "background_color_hex": "#FFFFFF",
-            },
-            "render_capture": {},
-        },
-    )
-
-    assert len(snapshot.line_bounds_px) == 2
-    assert snapshot.line_bounds_px[0]["x"] == 4
-    assert snapshot.line_bounds_px[0]["y"] == 3
-    assert snapshot.line_bounds_px[1]["y"] > snapshot.line_bounds_px[0]["y"]
-    assert all(line["width"] > 0 for line in snapshot.line_bounds_px)
 
 
 def test_evaluate_signed_matrix_acceptance_expectations_flags_contract_failures() -> None:
@@ -3250,6 +3169,66 @@ def test_snapshot_signed_output_render_delegates_to_render_snapshotter(
         "output_visible_appearance_snapshot": {"annotation_rect": [1, 2, 3, 4]},
         "artifacts_dir": str(tmp_path),
         "artifact_basename": "signed_case",
+    }
+
+
+def test_preview_appearance_snapshot_from_capture_delegates_to_snapshotter(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeSnapshotter:
+        def preview_appearance_snapshot_from_capture(self, **kwargs):
+            captured.update(kwargs)
+            return "preview-snapshot"
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_appearance_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = phase3_harness_module._preview_appearance_snapshot_from_capture(
+        preview_snapshot={"preview": True}
+    )
+
+    assert summary == "preview-snapshot"
+    assert captured == {"preview_snapshot": {"preview": True}}
+
+
+def test_signed_output_appearance_snapshot_delegates_to_snapshotter(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeSnapshotter:
+        def signed_output_appearance_snapshot(self, **kwargs):
+            captured.update(kwargs)
+            return "signed-snapshot"
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_appearance_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = phase3_harness_module._signed_output_appearance_snapshot(
+        normalized_image_path="signed.png",
+        normalized_image_size={"width": 320, "height": 42},
+        text_bounds_px={"x": 1, "y": 2, "width": 3, "height": 4},
+        line_bounds_px=(),
+        visible_appearance_snapshot={"annotation_rect": [1, 2, 3, 4]},
+        preview_snapshot={"preview": True},
+    )
+
+    assert summary == "signed-snapshot"
+    assert captured == {
+        "normalized_image_path": "signed.png",
+        "normalized_image_size": {"width": 320, "height": 42},
+        "text_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+        "line_bounds_px": (),
+        "visible_appearance_snapshot": {"annotation_rect": [1, 2, 3, 4]},
+        "preview_snapshot": {"preview": True},
     }
 
 
