@@ -3461,6 +3461,47 @@ def test_run_phase3_signed_acceptance_matrix_delegates_to_signed_runner(
     }
 
 
+def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeExecutor:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return {"name": "Scenario A", "signing_result": {"success": True}}
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_signed_acceptance_scenario_executor",
+        lambda: FakeExecutor(),
+    )
+
+    summary = phase3_harness_module._execute_signed_acceptance_scenario(
+        shell="shell",
+        scenario={"name": "Scenario A"},
+        profile_store="profiles",
+        artifacts_dir=tmp_path,
+        base_input_path=tmp_path / "fixture.pdf",
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        sign_executor="executor",
+    )
+
+    assert summary == {"name": "Scenario A", "signing_result": {"success": True}}
+    assert captured == {
+        "shell": "shell",
+        "scenario": {"name": "Scenario A"},
+        "profile_store": "profiles",
+        "artifacts_dir": tmp_path,
+        "base_input_path": tmp_path / "fixture.pdf",
+        "certificate_path": str(tmp_path / "cert.p12"),
+        "passphrase": "secret",
+        "sign_executor": "executor",
+    }
+
+
 def test_capture_headless_preview_render_clears_top_stamp_edge_warning_for_sparse_multi_line(
     tmp_path: Path,
 ) -> None:

@@ -93,6 +93,9 @@ from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
     Phase3SignedAcceptanceMatrixRunner,
 )
+from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
+    Phase3SignedAcceptanceScenarioExecutor,
+)
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
@@ -1032,6 +1035,23 @@ def _build_phase3_signed_acceptance_matrix_runner() -> (
             _evaluate_signed_matrix_acceptance_expectations
         ),
         jsonable_capture=_jsonable_capture,
+    )
+
+
+def _build_phase3_signed_acceptance_scenario_executor() -> (
+    Phase3SignedAcceptanceScenarioExecutor
+):
+    return Phase3SignedAcceptanceScenarioExecutor(
+        apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
+        compat_surface=_shell_compat_surface,
+        snapshot_current_draft_request=_snapshot_current_draft_request,
+        build_backend_reservation_evidence=build_backend_reservation_evidence,
+        capture_preview_render=_capture_preview_render,
+        snapshot_preview=_snapshot_preview,
+        snapshot_signing_request=_snapshot_signing_request,
+        scenario_slug=_scenario_slug,
+        snapshot_signing_result_payload=_snapshot_signing_result_payload,
+        snapshot_successful_signed_output=_snapshot_successful_signed_output,
     )
 
 
@@ -2312,114 +2332,16 @@ def _execute_signed_acceptance_scenario(
     passphrase: str,
     sign_executor: Any,
 ) -> dict[str, Any]:
-    _apply_preview_matrix_scenario(
+    return _build_phase3_signed_acceptance_scenario_executor().run(
         shell=shell,
         scenario=scenario,
         profile_store=profile_store,
+        artifacts_dir=artifacts_dir,
+        base_input_path=base_input_path,
+        certificate_path=certificate_path,
+        passphrase=passphrase,
+        sign_executor=sign_executor,
     )
-    compat = _shell_compat_surface(shell)
-    preview = compat.properties_panel.refresh_preview()
-    preview_text = compat.properties_panel.preview_text()
-    validation_text = compat.properties_panel.validation_text()
-    request = _snapshot_current_draft_request(compat.properties_panel._workflow)
-    artifact_basename = _scenario_slug(str(scenario["name"]))
-    render_capture = _capture_preview_render(
-        shell=shell,
-        preview=preview,
-        artifacts_dir=str(artifacts_dir),
-        artifact_basename=artifact_basename,
-    )
-    preview_snapshot = _snapshot_preview(preview, render_capture=render_capture)
-    output_signature_count = None
-    output_signature_snapshot = None
-    output_verification_snapshot = None
-    output_visible_appearance_snapshot = None
-    signed_output_render_snapshot = None
-    output_file_exists = False
-    signing_result_payload = None
-
-    request_snapshot = _snapshot_signing_request(request)
-    backend_reservation = build_backend_reservation_evidence(request)
-    if request is not None:
-        scenario_output = artifacts_dir / f"{artifact_basename}_signed.pdf"
-        scenario_request = replace(
-            request,
-            input_pdf_path=str(base_input_path),
-            output_pdf_path=str(scenario_output),
-            certificate_path=certificate_path,
-            passphrase=passphrase,
-        )
-        signing_result = sign_executor.execute(scenario_request)
-        signing_result_payload = _snapshot_signing_result_payload(signing_result)
-        if signing_result.success:
-            output_file_exists = scenario_output.exists()
-            if output_file_exists:
-                output_snapshot = _snapshot_successful_signed_output(
-                    output_file=scenario_output,
-                    page_index=(
-                        scenario_request.signature_rect.page_index
-                        if scenario_request.signature_rect is not None
-                        else None
-                    ),
-                    preview_snapshot=preview_snapshot,
-                    preview_text=preview_text,
-                    trust_policy=scenario_request.trust_policy,
-                    artifacts_dir=str(artifacts_dir),
-                    artifact_basename=artifact_basename,
-                )
-                output_signature_count = output_snapshot["output_signature_count"]
-                output_signature_snapshot = output_snapshot["output_signature_snapshot"]
-                output_verification_snapshot = output_snapshot["output_verification_snapshot"]
-                output_visible_appearance_snapshot = output_snapshot[
-                    "output_visible_appearance_snapshot"
-                ]
-                signed_output_render_snapshot = output_snapshot[
-                    "signed_output_render_snapshot"
-                ]
-
-    return {
-        "name": scenario["name"],
-        "profile_name": scenario.get("profile_name"),
-        "expected_outcome": scenario.get("expected_outcome"),
-        "expected_failure_message_contains": scenario.get("expected_failure_message_contains"),
-        "preview_snapshot": preview_snapshot,
-        "preview_text": preview_text,
-        "validation_text": validation_text,
-        "sign_request_snapshot": request_snapshot,
-        "backend_reservation_snapshot": (
-            None if backend_reservation is None else backend_reservation.snapshot
-        ),
-        "signing_result": signing_result_payload,
-        "output_file_exists": output_file_exists,
-        "output_signature_count": output_signature_count,
-        "output_signature_snapshot": output_signature_snapshot,
-        "output_verification_snapshot": output_verification_snapshot,
-        "output_visible_appearance_snapshot": output_visible_appearance_snapshot,
-        "signed_output_render_snapshot": signed_output_render_snapshot,
-        "signed_output_preview_comparison": (
-            None
-            if signed_output_render_snapshot is None
-            else {
-                "preview_vs_signed_output_passed": signed_output_render_snapshot.get(
-                    "preview_vs_signed_output_passed"
-                ),
-                "annotation_rect_matches_request": signed_output_render_snapshot.get(
-                    "annotation_rect_matches_request"
-                ),
-                "output_text_bounds_match_preview": signed_output_render_snapshot.get(
-                    "output_text_bounds_match_preview"
-                ),
-                "output_image_presence_matches_preview": signed_output_render_snapshot.get(
-                    "output_image_presence_matches_preview"
-                ),
-                "page_render_path": signed_output_render_snapshot.get("page_render_path"),
-                "signature_crop_path": signed_output_render_snapshot.get(
-                    "signature_crop_path"
-                ),
-                "comparison_path": signed_output_render_snapshot.get("comparison_path"),
-            }
-        ),
-    }
 
 
 def _preview_matrix_error_result(*, scenario: dict[str, Any], error: Exception) -> dict[str, Any]:
