@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.domain.models import SigningRequest, SigningResult, TimestampTrustPolicy
+from foliaseal.presentation.qt.phase3_signed_output_snapshotter import (
+    Phase3SignedOutputSnapshotter,
+    signed_output_preview_comparison_snapshot,
+)
 
 CountEmbeddedSignatures = Callable[[Path], int | None]
 SnapshotOutputSignature = Callable[[Path], dict[str, Any] | None]
@@ -59,51 +63,6 @@ def _snapshot_signing_result_payload(signing_result: SigningResult) -> dict[str,
         "standards_summary": signing_result.standards_summary,
     }
 
-
-def _signed_output_preview_comparison_snapshot(
-    signed_output_render_snapshot: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    if signed_output_render_snapshot is None:
-        return None
-    return {
-        "page_render_path": signed_output_render_snapshot.get("page_render_path"),
-        "signature_crop_path": signed_output_render_snapshot.get("signature_crop_path"),
-        "normalized_signature_crop_path": signed_output_render_snapshot.get(
-            "normalized_signature_crop_path"
-        ),
-        "comparison_path": signed_output_render_snapshot.get("comparison_path"),
-        "preview_crop_bounds_px": signed_output_render_snapshot.get("preview_crop_bounds_px"),
-        "signed_crop_bounds_px": signed_output_render_snapshot.get("signed_crop_bounds_px"),
-        "preview_vs_signed_output_change_ratio": signed_output_render_snapshot.get(
-            "preview_vs_signed_output_change_ratio"
-        ),
-        "preview_vs_signed_output_aspect_ratio_delta": signed_output_render_snapshot.get(
-            "preview_vs_signed_output_aspect_ratio_delta"
-        ),
-        "preview_text_fragments_match_output": signed_output_render_snapshot.get(
-            "preview_text_fragments_match_output"
-        ),
-        "annotation_rect_matches_request": signed_output_render_snapshot.get(
-            "annotation_rect_matches_request"
-        ),
-        "output_text_bounds_match_preview": signed_output_render_snapshot.get(
-            "output_text_bounds_match_preview"
-        ),
-        "output_image_presence_matches_preview": signed_output_render_snapshot.get(
-            "output_image_presence_matches_preview"
-        ),
-        "preview_vs_signed_output_passed": signed_output_render_snapshot.get(
-            "preview_vs_signed_output_passed"
-        ),
-        "preview_vs_signed_output_error": signed_output_render_snapshot.get("comparison_error")
-        or signed_output_render_snapshot.get("signature_crop_error")
-        or signed_output_render_snapshot.get("page_render_error"),
-        "appearance_layer_comparison": signed_output_render_snapshot.get(
-            "appearance_layer_comparison"
-        ),
-    }
-
-
 @dataclass(frozen=True)
 class Phase3HarnessCaptureAssembler:
     """Turns raw session state into stable JSON-ready harness evidence."""
@@ -115,42 +74,14 @@ class Phase3HarnessCaptureAssembler:
     snapshot_signed_output_render: SnapshotSignedOutputRender
     analyze_capture_state_transitions: AnalyzeCaptureStateTransitions
 
-    def _snapshot_successful_signed_output(
-        self,
-        *,
-        output_file: Path,
-        page_index: int | None,
-        preview_snapshot: dict[str, Any],
-        preview_text: str,
-        trust_policy: TimestampTrustPolicy | None,
-        artifacts_dir: str | None,
-        artifact_basename: str | None,
-    ) -> dict[str, Any]:
-        output_signature_count = self.count_embedded_signatures(output_file)
-        output_signature_snapshot = self.snapshot_output_signature(output_file)
-        output_verification_snapshot = self.snapshot_output_verification(output_file, trust_policy)
-        output_visible_appearance_snapshot = self.snapshot_visible_signature_appearance(output_file)
-        signed_output_render_snapshot = self.snapshot_signed_output_render(
-            output_pdf_path=str(output_file),
-            page_index=page_index,
-            preview_snapshot=preview_snapshot,
-            preview_text=preview_text,
-            output_visible_appearance_snapshot=output_visible_appearance_snapshot,
-            artifacts_dir=artifacts_dir,
-            artifact_basename=artifact_basename,
+    def _signed_output_snapshotter(self) -> Phase3SignedOutputSnapshotter:
+        return Phase3SignedOutputSnapshotter(
+            count_embedded_signatures=self.count_embedded_signatures,
+            snapshot_output_signature=self.snapshot_output_signature,
+            snapshot_output_verification=self.snapshot_output_verification,
+            snapshot_visible_signature_appearance=self.snapshot_visible_signature_appearance,
+            snapshot_signed_output_render=self.snapshot_signed_output_render,
         )
-        return {
-            "output_file_exists": True,
-            "output_file_size_bytes": output_file.stat().st_size,
-            "output_signature_count": output_signature_count,
-            "output_signature_snapshot": output_signature_snapshot,
-            "output_verification_snapshot": output_verification_snapshot,
-            "output_visible_appearance_snapshot": output_visible_appearance_snapshot,
-            "signed_output_render_snapshot": signed_output_render_snapshot,
-            "signed_output_preview_comparison": _signed_output_preview_comparison_snapshot(
-                signed_output_render_snapshot
-            ),
-        }
 
     def build_signed_run_bundle(
         self,
@@ -187,7 +118,7 @@ class Phase3HarnessCaptureAssembler:
         output_file = Path(request.output_pdf_path)
         if signing_result.success and output_file.exists():
             bundle.update(
-                self._snapshot_successful_signed_output(
+                self._signed_output_snapshotter().snapshot_successful_signed_output(
                     output_file=output_file,
                     page_index=(
                         request.signature_rect.page_index
@@ -249,29 +180,32 @@ class Phase3HarnessCaptureAssembler:
             output_file = Path(output_path)
             output_exists = output_file.exists()
             if output_exists:
-                output_size_bytes = output_file.stat().st_size
-                output_signature_count = self.count_embedded_signatures(output_file)
-                output_signature_snapshot = self.snapshot_output_signature(output_file)
-                output_verification_snapshot = self.snapshot_output_verification(
-                    output_file,
-                    (
+                snapshotter = self._signed_output_snapshotter()
+                output_snapshot = snapshotter.snapshot_successful_signed_output(
+                    output_file=output_file,
+                    page_index=last_signature_page_index,
+                    preview_snapshot=session.final_state["preview_snapshot"],
+                    preview_text=preview_text,
+                    trust_policy=(
                         session.capture_request.trust_policy
                         if session.capture_request is not None
                         else None
                     ),
-                )
-                output_visible_appearance_snapshot = self.snapshot_visible_signature_appearance(
-                    output_file
-                )
-                signed_output_render_snapshot = self.snapshot_signed_output_render(
-                    output_pdf_path=str(output_file),
-                    page_index=last_signature_page_index,
-                    preview_snapshot=session.final_state["preview_snapshot"],
-                    preview_text=preview_text,
-                    output_visible_appearance_snapshot=output_visible_appearance_snapshot,
                     artifacts_dir=artifacts_dir,
                     artifact_basename="final_signed_output",
                 )
+                output_size_bytes = output_snapshot["output_file_size_bytes"]
+                output_signature_count = output_snapshot["output_signature_count"]
+                output_signature_snapshot = output_snapshot["output_signature_snapshot"]
+                output_verification_snapshot = output_snapshot[
+                    "output_verification_snapshot"
+                ]
+                output_visible_appearance_snapshot = output_snapshot[
+                    "output_visible_appearance_snapshot"
+                ]
+                signed_output_render_snapshot = output_snapshot[
+                    "signed_output_render_snapshot"
+                ]
 
         captured_states = list(session.captured_states) + [session.final_state]
         checklist_results_written = bool(checklist_results_path)
@@ -315,7 +249,7 @@ class Phase3HarnessCaptureAssembler:
             "output_verification_snapshot": output_verification_snapshot,
             "output_visible_appearance_snapshot": output_visible_appearance_snapshot,
             "signed_output_render_snapshot": signed_output_render_snapshot,
-            "signed_output_preview_comparison": _signed_output_preview_comparison_snapshot(
+            "signed_output_preview_comparison": signed_output_preview_comparison_snapshot(
                 signed_output_render_snapshot
             ),
             "signed_runs": list(session.signed_runs),

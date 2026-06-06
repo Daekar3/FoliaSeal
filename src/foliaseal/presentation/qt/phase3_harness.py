@@ -96,6 +96,9 @@ from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
 )
+from foliaseal.presentation.qt.phase3_signed_output_snapshotter import (
+    Phase3SignedOutputSnapshotter,
+)
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
@@ -868,50 +871,6 @@ def _snapshot_signing_result_payload(signing_result: SigningResult) -> dict[str,
     }
 
 
-def _signed_output_preview_comparison_snapshot(
-    signed_output_render_snapshot: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    if signed_output_render_snapshot is None:
-        return None
-    return {
-        "page_render_path": signed_output_render_snapshot.get("page_render_path"),
-        "signature_crop_path": signed_output_render_snapshot.get("signature_crop_path"),
-        "normalized_signature_crop_path": signed_output_render_snapshot.get(
-            "normalized_signature_crop_path"
-        ),
-        "comparison_path": signed_output_render_snapshot.get("comparison_path"),
-        "preview_crop_bounds_px": signed_output_render_snapshot.get("preview_crop_bounds_px"),
-        "signed_crop_bounds_px": signed_output_render_snapshot.get("signed_crop_bounds_px"),
-        "preview_vs_signed_output_change_ratio": signed_output_render_snapshot.get(
-            "preview_vs_signed_output_change_ratio"
-        ),
-        "preview_vs_signed_output_aspect_ratio_delta": signed_output_render_snapshot.get(
-            "preview_vs_signed_output_aspect_ratio_delta"
-        ),
-        "preview_text_fragments_match_output": signed_output_render_snapshot.get(
-            "preview_text_fragments_match_output"
-        ),
-        "annotation_rect_matches_request": signed_output_render_snapshot.get(
-            "annotation_rect_matches_request"
-        ),
-        "output_text_bounds_match_preview": signed_output_render_snapshot.get(
-            "output_text_bounds_match_preview"
-        ),
-        "output_image_presence_matches_preview": signed_output_render_snapshot.get(
-            "output_image_presence_matches_preview"
-        ),
-        "preview_vs_signed_output_passed": signed_output_render_snapshot.get(
-            "preview_vs_signed_output_passed"
-        ),
-        "preview_vs_signed_output_error": signed_output_render_snapshot.get("comparison_error")
-        or signed_output_render_snapshot.get("signature_crop_error")
-        or signed_output_render_snapshot.get("page_render_error"),
-        "appearance_layer_comparison": signed_output_render_snapshot.get(
-            "appearance_layer_comparison"
-        ),
-    }
-
-
 def _snapshot_successful_signed_output(
     *,
     output_file: Path,
@@ -922,34 +881,15 @@ def _snapshot_successful_signed_output(
     artifacts_dir: str | None,
     artifact_basename: str | None,
 ) -> dict[str, Any]:
-    output_signature_count = _count_embedded_signatures(output_file)
-    output_signature_snapshot = _snapshot_output_signature(output_file)
-    output_verification_snapshot = _snapshot_output_verification(
-        output_file,
-        trust_policy=trust_policy,
-    )
-    output_visible_appearance_snapshot = _snapshot_visible_signature_appearance(output_file)
-    signed_output_render_snapshot = _snapshot_signed_output_render(
-        output_pdf_path=str(output_file),
+    return _build_phase3_signed_output_snapshotter().snapshot_successful_signed_output(
+        output_file=output_file,
         page_index=page_index,
         preview_snapshot=preview_snapshot,
         preview_text=preview_text,
-        output_visible_appearance_snapshot=output_visible_appearance_snapshot,
+        trust_policy=trust_policy,
         artifacts_dir=artifacts_dir,
         artifact_basename=artifact_basename,
     )
-    return {
-        "output_file_exists": True,
-        "output_file_size_bytes": output_file.stat().st_size,
-        "output_signature_count": output_signature_count,
-        "output_signature_snapshot": output_signature_snapshot,
-        "output_verification_snapshot": output_verification_snapshot,
-        "output_visible_appearance_snapshot": output_visible_appearance_snapshot,
-        "signed_output_render_snapshot": signed_output_render_snapshot,
-        "signed_output_preview_comparison": _signed_output_preview_comparison_snapshot(
-            signed_output_render_snapshot
-        ),
-    }
 
 
 def _build_signed_run_bundle(
@@ -1052,6 +992,16 @@ def _build_phase3_signed_acceptance_scenario_executor() -> (
         scenario_slug=_scenario_slug,
         snapshot_signing_result_payload=_snapshot_signing_result_payload,
         snapshot_successful_signed_output=_snapshot_successful_signed_output,
+    )
+
+
+def _build_phase3_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
+    return Phase3SignedOutputSnapshotter(
+        count_embedded_signatures=_count_embedded_signatures,
+        snapshot_output_signature=_snapshot_output_signature,
+        snapshot_output_verification=_snapshot_output_verification,
+        snapshot_visible_signature_appearance=_snapshot_visible_signature_appearance,
+        snapshot_signed_output_render=_snapshot_signed_output_render,
     )
 
 

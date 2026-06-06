@@ -3502,6 +3502,47 @@ def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
     }
 
 
+def test_snapshot_successful_signed_output_delegates_to_shared_snapshotter(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+    output_file = tmp_path / "signed.pdf"
+    output_file.write_bytes(b"%PDF-1.7\n")
+
+    class FakeSnapshotter:
+        def snapshot_successful_signed_output(self, **kwargs):
+            captured.update(kwargs)
+            return {"output_file_exists": True, "output_signature_count": 1}
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_signed_output_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = phase3_harness_module._snapshot_successful_signed_output(
+        output_file=output_file,
+        page_index=2,
+        preview_snapshot={"preview": True},
+        preview_text="Preview text",
+        trust_policy=None,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_case",
+    )
+
+    assert summary == {"output_file_exists": True, "output_signature_count": 1}
+    assert captured == {
+        "output_file": output_file,
+        "page_index": 2,
+        "preview_snapshot": {"preview": True},
+        "preview_text": "Preview text",
+        "trust_policy": None,
+        "artifacts_dir": str(tmp_path),
+        "artifact_basename": "signed_case",
+    }
+
+
 def test_capture_headless_preview_render_clears_top_stamp_edge_warning_for_sparse_multi_line(
     tmp_path: Path,
 ) -> None:
