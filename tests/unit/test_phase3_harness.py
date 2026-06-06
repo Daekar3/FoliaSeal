@@ -3422,6 +3422,45 @@ def test_run_phase3_preview_matrix_delegates_to_preview_matrix_runner(
     }
 
 
+def test_run_phase3_signed_acceptance_matrix_delegates_to_signed_runner(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    manifest_path = tmp_path / "manifest.json"
+    artifacts_dir = tmp_path / "artifacts"
+    captured: dict[str, object] = {}
+
+    class FakeRunner:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return {"scenario_count": 2, "acceptance_expectations_passed": True}
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_signed_acceptance_matrix_runner",
+        lambda: FakeRunner(),
+    )
+
+    summary = phase3_harness_module.run_phase3_signed_acceptance_matrix(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(manifest_path),
+        artifacts_dir=str(artifacts_dir),
+    )
+
+    assert summary == {"scenario_count": 2, "acceptance_expectations_passed": True}
+    assert captured == {
+        "pdf_path": str(source_pdf),
+        "certificate_path": str(tmp_path / "cert.p12"),
+        "passphrase": "secret",
+        "scenario_manifest_path": str(manifest_path),
+        "artifacts_dir": str(artifacts_dir),
+    }
+
+
 def test_capture_headless_preview_render_clears_top_stamp_edge_warning_for_sparse_multi_line(
     tmp_path: Path,
 ) -> None:
