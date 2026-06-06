@@ -3383,40 +3383,25 @@ def test_stress_preview_manifests_exist_and_parse() -> None:
         assert manifest["scenarios"]
 
 
-def test_run_phase3_preview_matrix_writes_summary_for_small_batch(
+def test_run_phase3_preview_matrix_delegates_to_preview_matrix_runner(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     source_pdf = tmp_path / "fixture.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
     manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "scenarios": [
-                    {"name": "Scenario A"},
-                    {"name": "Scenario B"},
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
     artifacts_dir = tmp_path / "artifacts"
+    captured: dict[str, object] = {}
+
+    class FakeRunner:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return {"scenario_count": 1}
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "build_qt_signing_shell",
-        lambda **_kwargs: pytest.fail("preview matrix should not build the Qt shell"),
-    )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_execute_headless_preview_matrix_scenario",
-        lambda **kwargs: {
-            "scenario_name": kwargs["scenario"]["name"],
-            "preview": {"can_submit": True},
-            "render_capture": {},
-            "backend_reservation_snapshot": {"layout_template": "multi_line"},
-        },
+        "_build_phase3_preview_matrix_runner",
+        lambda: FakeRunner(),
     )
 
     summary = run_phase3_preview_matrix(
@@ -3427,119 +3412,14 @@ def test_run_phase3_preview_matrix_writes_summary_for_small_batch(
         artifacts_dir=str(artifacts_dir),
     )
 
-    summary_path = artifacts_dir / "summary.json"
-    assert summary_path.exists()
-    payload = json.loads(summary_path.read_text(encoding="utf-8"))
-    assert payload["scenario_count"] == 2
-    assert payload["successful_scenario_count"] == 2
-    assert [item["scenario_name"] for item in payload["results"]] == ["Scenario A", "Scenario B"]
-    assert summary["scenario_count"] == 2
-
-
-def test_run_phase3_preview_matrix_recycles_shell_for_long_batches(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    source_pdf = tmp_path / "fixture.pdf"
-    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(
-        json.dumps({"scenarios": [{"name": f"Scenario {index}"} for index in range(25)]}),
-        encoding="utf-8",
-    )
-    artifacts_dir = tmp_path / "artifacts"
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "build_qt_signing_shell",
-        lambda **_kwargs: pytest.fail("preview matrix should not build the Qt shell"),
-    )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_execute_headless_preview_matrix_scenario",
-        lambda **kwargs: {
-            "scenario_name": kwargs["scenario"]["name"],
-            "preview": {"can_submit": True},
-            "render_capture": {},
-            "backend_reservation_snapshot": {"layout_template": "multi_line"},
-        },
-    )
-
-    summary = run_phase3_preview_matrix(
-        pdf_path=str(source_pdf),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        scenario_manifest_path=str(manifest_path),
-        artifacts_dir=str(artifacts_dir),
-    )
-
-    assert summary["scenario_count"] == 25
-
-
-def test_run_phase3_preview_matrix_uses_canonical_render_capture_fields(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    source_pdf = tmp_path / "fixture.pdf"
-    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(
-        json.dumps({"scenarios": [{"name": "Scenario A"}]}),
-        encoding="utf-8",
-    )
-    artifacts_dir = tmp_path / "artifacts"
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "build_qt_signing_shell",
-        lambda **_kwargs: pytest.fail("preview matrix should not build the Qt shell"),
-    )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_execute_headless_preview_matrix_scenario",
-        lambda **_kwargs: {
-            "name": "Scenario A",
-            "preview_snapshot": {
-                "can_submit": True,
-                "render_capture": {
-                    "card_bounds_px": {"x": 0, "y": 0, "width": 320, "height": 120},
-                    "text_widget_bounds_px": {"x": 10, "y": 20, "width": 180, "height": 30},
-                    "stamp_band_bounds_px": {"x": 10, "y": 60, "width": 100, "height": 24},
-                    "text_rendered_content_bounds_px": {
-                        "x": 12,
-                        "y": 22,
-                        "width": 160,
-                        "height": 24,
-                    },
-                    "stamp_rendered_content_bounds_px": {
-                        "x": 14,
-                        "y": 62,
-                        "width": 72,
-                        "height": 18,
-                    },
-                },
-            },
-            "preview_text": "Ready",
-            "validation_text": "Ready to sign.",
-            "sign_request_snapshot": None,
-            "backend_reservation_snapshot": None,
-        },
-    )
-
-    summary = run_phase3_preview_matrix(
-        pdf_path=str(source_pdf),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        scenario_manifest_path=str(manifest_path),
-        artifacts_dir=str(artifacts_dir),
-    )
-
-    render_capture = summary["results"][0]["preview_snapshot"]["render_capture"]
-    assert render_capture["card_bounds_px"]["width"] == 320
-    assert render_capture["text_widget_bounds_px"]["height"] == 30
-    assert render_capture["stamp_band_bounds_px"]["height"] == 24
-    assert render_capture["text_rendered_content_bounds_px"]["width"] == 160
-    assert render_capture["stamp_rendered_content_bounds_px"]["width"] == 72
+    assert summary == {"scenario_count": 1}
+    assert captured == {
+        "pdf_path": str(source_pdf),
+        "certificate_path": str(tmp_path / "cert.p12"),
+        "passphrase": "secret",
+        "scenario_manifest_path": str(manifest_path),
+        "artifacts_dir": str(artifacts_dir),
+    }
 
 
 def test_capture_headless_preview_render_clears_top_stamp_edge_warning_for_sparse_multi_line(

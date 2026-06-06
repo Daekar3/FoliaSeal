@@ -87,6 +87,9 @@ from foliaseal.presentation.qt.phase3_harness_session_runner import (
     Phase3HarnessSessionRunner,
     _QtHarnessBindings,
 )
+from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
+    Phase3PreviewMatrixRunner,
+)
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
@@ -971,48 +974,23 @@ def run_phase3_preview_matrix(
     artifacts_dir: str,
 ) -> dict[str, Any]:
     """Run a repeatable preview-only scenario sweep and capture rendered artifacts."""
-
-    source_path = Path(pdf_path)
-    if not source_path.exists():
-        raise FileNotFoundError(f"PDF does not exist: {pdf_path}")
-
-    manifest = _load_preview_matrix_manifest(scenario_manifest_path)
-    scenarios = manifest["scenarios"]
-    artifact_root = Path(artifacts_dir)
-    artifact_root.mkdir(parents=True, exist_ok=True)
-
-    profile_store = SignaturePresetCatalogStore.default()
-    results: list[dict[str, Any]] = []
-    for scenario in scenarios:
-        try:
-            result = _execute_headless_preview_matrix_scenario(
-                source_path=source_path,
-                certificate_path=certificate_path,
-                passphrase=passphrase,
-                scenario=scenario,
-                profile_store=profile_store,
-                artifacts_dir=artifact_root,
-            )
-        except Exception as exc:
-            result = _preview_matrix_error_result(scenario=scenario, error=exc)
-        results.append(result)
-
-    summary = {
-        "pdf_path": str(source_path),
-        "scenario_manifest_path": scenario_manifest_path,
-        "artifacts_dir": str(artifact_root),
-        "scenario_count": len(results),
-        "successful_scenario_count": sum(1 for item in results if "error" not in item),
-        "error_scenario_count": sum(1 for item in results if "error" in item),
-        **_preview_matrix_diagnostic_summary(results),
-        "results": results,
-    }
-    summary_path = artifact_root / "summary.json"
-    summary_path.write_text(
-        json.dumps(_jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    return _build_phase3_preview_matrix_runner().run(
+        pdf_path=pdf_path,
+        certificate_path=certificate_path,
+        passphrase=passphrase,
+        scenario_manifest_path=scenario_manifest_path,
+        artifacts_dir=artifacts_dir,
     )
-    return summary
+
+
+def _build_phase3_preview_matrix_runner() -> Phase3PreviewMatrixRunner:
+    return Phase3PreviewMatrixRunner(
+        load_preview_matrix_manifest=_load_preview_matrix_manifest,
+        execute_headless_preview_matrix_scenario=_execute_headless_preview_matrix_scenario,
+        preview_matrix_error_result=_preview_matrix_error_result,
+        preview_matrix_diagnostic_summary=_preview_matrix_diagnostic_summary,
+        jsonable_capture=_jsonable_capture,
+    )
 
 
 def run_phase3_signed_acceptance_matrix(
