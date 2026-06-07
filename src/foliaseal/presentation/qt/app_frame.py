@@ -20,12 +20,15 @@ from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     AppSettings,
-    CertificateConfiguration,
     ConfigValidationError,
-    ManagedCertificate,
 )
 from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.infra.secret_storage import SecretToolCertificateSecretStore
+from foliaseal.presentation.qt.app_frame_certificate_management import (
+    AppFrameCertificateDialogService,
+    CertificateDialogCompatibilityState,
+    CertificateDialogPort,
+)
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
     QtPdfPageCountLoader,
@@ -74,48 +77,6 @@ class AppSettingsDialogControls:
     default_open_directory: Any
     default_output_directory: Any
     save_button: Any
-    cancel_button: Any
-
-
-@dataclass(frozen=True)
-class CertificateImportDialogControls:
-    """Controls used by the certificate import dialog."""
-
-    dialog: Any
-    certificate_path: Any
-    display_name: Any
-    passphrase: Any
-    save_password: Any
-    choose_button: Any
-    import_button: Any
-    cancel_button: Any
-
-
-@dataclass(frozen=True)
-class CertificateCreationDialogControls:
-    """Controls used by the certificate creation dialog."""
-
-    dialog: Any
-    display_name: Any
-    passphrase: Any
-    save_password: Any
-    create_button: Any
-    cancel_button: Any
-
-
-@dataclass(frozen=True)
-class CertificateConfigurationManagementDialogControls:
-    """Controls used by the certificate-configuration management dialog."""
-
-    dialog: Any
-    configuration_selector: Any
-    display_name: Any
-    notes: Any
-    managed_certificate_selector: Any
-    save_button: Any
-    delete_button: Any
-    export_certificate_button: Any
-    delete_certificate_button: Any
     cancel_button: Any
 
 
@@ -222,542 +183,6 @@ class AppSettingsDialog:
             warning(self.controls.dialog, "Settings error", message)
 
 
-class CertificateImportDialog:
-    """Small dialog for importing an existing PKCS#12 certificate."""
-
-    def __init__(
-        self,
-        *,
-        bindings: QtAppFrameBindings,
-        parent: Any,
-        lifecycle_service: CertificateLifecycleService,
-        on_import: Callable[[], None] | None = None,
-    ) -> None:
-        self._bindings = bindings
-        self._lifecycle_service = lifecycle_service
-        self._on_import = on_import
-        self.import_result = None
-        self.controls = self._build_controls(parent=parent)
-
-    def exec(self) -> Any | None:
-        dialog_exec = getattr(self.controls.dialog, "exec", None)
-        if callable(dialog_exec):
-            result = dialog_exec()
-            if result != self._accepted_dialog_code():
-                return None
-        return self.import_result
-
-    def choose_certificate_file(self) -> str | None:
-        selected = self._bindings.q_file_dialog.getOpenFileName(
-            self.controls.dialog,
-            "Import certificate",
-            "",
-            "PKCS#12 files (*.p12 *.pfx);;All files (*)",
-        )
-        selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
-        if not selected_path:
-            return None
-        self.controls.certificate_path.setText(selected_path)
-        if not self.controls.display_name.text().strip():
-            self.controls.display_name.setText(Path(selected_path).stem)
-        return selected_path
-
-    def import_certificate(self) -> Any | None:
-        source_path = self.controls.certificate_path.text().strip()
-        display_name = self.controls.display_name.text().strip() or Path(source_path).stem
-        passphrase = self.controls.passphrase.text()
-        save_password = bool(self.controls.save_password.isChecked())
-        try:
-            result = self._lifecycle_service.import_pkcs12(
-                source_path=source_path,
-                display_name=display_name,
-                passphrase=passphrase,
-                save_password=save_password,
-            )
-        except Exception as exc:
-            self._show_error(str(exc))
-            return None
-
-        self.import_result = result
-        if result.refresh_shell and self._on_import is not None:
-            self._on_import()
-        information = getattr(self._bindings.q_message_box, "information", None)
-        if callable(information):
-            information(
-                self.controls.dialog,
-                "Certificate imported",
-                result.user_message,
-            )
-        accept = getattr(self.controls.dialog, "accept", None)
-        if callable(accept):
-            accept()
-        return result
-
-    def cancel(self) -> None:
-        reject = getattr(self.controls.dialog, "reject", None)
-        if callable(reject):
-            reject()
-
-    def _build_controls(self, *, parent: Any) -> CertificateImportDialogControls:
-        dialog = self._bindings.q_dialog(parent)
-        if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Import certificate")
-        layout = self._bindings.q_form_layout(dialog)
-
-        certificate_path = self._bindings.q_line_edit("")
-        display_name = self._bindings.q_line_edit("")
-        passphrase = self._bindings.q_line_edit("")
-        save_password = self._bindings.q_check_box("Save password securely")
-        choose_button = self._bindings.q_push_button("Choose...")
-        import_button = self._bindings.q_push_button("Import")
-        cancel_button = self._bindings.q_push_button("Cancel")
-
-        layout.addRow("PKCS#12 file", certificate_path)
-        layout.addRow("", choose_button)
-        layout.addRow("Display name", display_name)
-        layout.addRow("Password", passphrase)
-        layout.addRow("", save_password)
-        layout.addRow("", import_button)
-        layout.addRow("", cancel_button)
-
-        choose_button.clicked.connect(self.choose_certificate_file)  # type: ignore[attr-defined]
-        import_button.clicked.connect(self.import_certificate)  # type: ignore[attr-defined]
-        cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
-
-        return CertificateImportDialogControls(
-            dialog=dialog,
-            certificate_path=certificate_path,
-            display_name=display_name,
-            passphrase=passphrase,
-            save_password=save_password,
-            choose_button=choose_button,
-            import_button=import_button,
-            cancel_button=cancel_button,
-        )
-
-    def _accepted_dialog_code(self) -> Any:
-        accepted = getattr(self._bindings.q_dialog, "Accepted", None)
-        if accepted is not None:
-            return accepted
-        dialog_code = getattr(self._bindings.q_dialog, "DialogCode", None)
-        accepted = getattr(dialog_code, "Accepted", None)
-        if accepted is not None:
-            return accepted
-        return 1
-
-    def _show_error(self, message: str) -> None:
-        warning = getattr(self._bindings.q_message_box, "warning", None)
-        if callable(warning):
-            warning(self.controls.dialog, "Certificate import error", message)
-
-
-class CertificateCreationDialog:
-    """Small dialog for creating a self-signed managed certificate."""
-
-    def __init__(
-        self,
-        *,
-        bindings: QtAppFrameBindings,
-        parent: Any,
-        lifecycle_service: CertificateLifecycleService,
-        on_create: Callable[[], None] | None = None,
-    ) -> None:
-        self._bindings = bindings
-        self._lifecycle_service = lifecycle_service
-        self._on_create = on_create
-        self.creation_result = None
-        self.controls = self._build_controls(parent=parent)
-
-    def exec(self) -> Any | None:
-        dialog_exec = getattr(self.controls.dialog, "exec", None)
-        if callable(dialog_exec):
-            result = dialog_exec()
-            if result != self._accepted_dialog_code():
-                return None
-        return self.creation_result
-
-    def create_certificate(self) -> Any | None:
-        display_name = self.controls.display_name.text().strip()
-        passphrase = self.controls.passphrase.text()
-        save_password = bool(self.controls.save_password.isChecked())
-        try:
-            result = self._lifecycle_service.create_self_signed_certificate(
-                display_name=display_name,
-                passphrase=passphrase,
-                save_password=save_password,
-            )
-        except Exception as exc:
-            self._show_error(str(exc))
-            return None
-
-        self.creation_result = result
-        if result.refresh_shell and self._on_create is not None:
-            self._on_create()
-        information = getattr(self._bindings.q_message_box, "information", None)
-        if callable(information):
-            information(
-                self.controls.dialog,
-                "Certificate created",
-                result.user_message,
-            )
-        accept = getattr(self.controls.dialog, "accept", None)
-        if callable(accept):
-            accept()
-        return result
-
-    def cancel(self) -> None:
-        reject = getattr(self.controls.dialog, "reject", None)
-        if callable(reject):
-            reject()
-
-    def _build_controls(self, *, parent: Any) -> CertificateCreationDialogControls:
-        dialog = self._bindings.q_dialog(parent)
-        if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Create certificate")
-        layout = self._bindings.q_form_layout(dialog)
-
-        display_name = self._bindings.q_line_edit("")
-        passphrase = self._bindings.q_line_edit("")
-        save_password = self._bindings.q_check_box("Save password securely")
-        create_button = self._bindings.q_push_button("Create")
-        cancel_button = self._bindings.q_push_button("Cancel")
-
-        layout.addRow("Display name", display_name)
-        layout.addRow("Password", passphrase)
-        layout.addRow("", save_password)
-        layout.addRow(create_button, cancel_button)
-
-        create_button.clicked.connect(self.create_certificate)  # type: ignore[attr-defined]
-        cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
-
-        return CertificateCreationDialogControls(
-            dialog=dialog,
-            display_name=display_name,
-            passphrase=passphrase,
-            save_password=save_password,
-            create_button=create_button,
-            cancel_button=cancel_button,
-        )
-
-    def _accepted_dialog_code(self) -> Any:
-        accepted = getattr(self._bindings.q_dialog, "Accepted", None)
-        if accepted is not None:
-            return accepted
-        dialog_code = getattr(self._bindings.q_dialog, "DialogCode", None)
-        accepted = getattr(dialog_code, "Accepted", None)
-        if accepted is not None:
-            return accepted
-        return 1
-
-    def _show_error(self, message: str) -> None:
-        warning = getattr(self._bindings.q_message_box, "warning", None)
-        if callable(warning):
-            warning(self.controls.dialog, "Certificate creation error", message)
-
-
-class CertificateConfigurationManagementDialog:
-    """Small dialog for renaming, annotating, and deleting configurations."""
-
-    def __init__(
-        self,
-        *,
-        bindings: QtAppFrameBindings,
-        parent: Any,
-        lifecycle_service: CertificateLifecycleService,
-        on_change: Callable[[], None] | None = None,
-    ) -> None:
-        self._bindings = bindings
-        self._lifecycle_service = lifecycle_service
-        self._on_change = on_change
-        self._configurations_by_id: dict[str, CertificateConfiguration] = {}
-        self._managed_certificates_by_id: dict[str, ManagedCertificate] = {}
-        self.controls = self._build_controls(parent=parent)
-        self.reload_configurations()
-
-    def exec(self) -> Any | None:
-        dialog_exec = getattr(self.controls.dialog, "exec", None)
-        if callable(dialog_exec):
-            return dialog_exec()
-        return None
-
-    def reload_configurations(self) -> None:
-        catalog = self._lifecycle_service.load_catalog()
-        configurations = catalog.certificate_configurations
-        managed_certificates = catalog.managed_certificates
-        self._configurations_by_id = {
-            configuration.certificate_configuration_id: configuration
-            for configuration in configurations
-        }
-        self._managed_certificates_by_id = {
-            certificate.managed_certificate_id: certificate
-            for certificate in managed_certificates
-        }
-        selector = self.controls.configuration_selector
-        clear = getattr(selector, "clear", None)
-        if callable(clear):
-            clear()
-        for configuration in configurations:
-            self._add_selector_item(
-                configuration.display_name,
-                configuration.certificate_configuration_id,
-            )
-        certificate_selector = self.controls.managed_certificate_selector
-        clear_certificates = getattr(certificate_selector, "clear", None)
-        if callable(clear_certificates):
-            clear_certificates()
-        for certificate in managed_certificates:
-            self._add_certificate_selector_item(
-                certificate.display_name,
-                certificate.managed_certificate_id,
-            )
-        self.load_selected_configuration()
-
-    def load_selected_configuration(self, *_args: Any) -> CertificateConfiguration | None:
-        configuration_id = self._selected_configuration_id()
-        configuration = (
-            self._configurations_by_id.get(configuration_id)
-            if configuration_id is not None
-            else None
-        )
-        if configuration is None:
-            self.controls.display_name.setText("")
-            self.controls.notes.setText("")
-            return None
-        self.controls.display_name.setText(configuration.display_name)
-        self.controls.notes.setText(configuration.notes or "")
-        return configuration
-
-    def save_selected_configuration(self) -> CertificateConfiguration | None:
-        configuration_id = self._selected_configuration_id()
-        configuration = (
-            self._configurations_by_id.get(configuration_id)
-            if configuration_id is not None
-            else None
-        )
-        if configuration is None:
-            self._show_error("Select a certificate configuration to save.")
-            return None
-        try:
-            result = self._lifecycle_service.save_configuration(
-                configuration_id=configuration.certificate_configuration_id,
-                display_name=self.controls.display_name.text(),
-                notes=self.controls.notes.text(),
-            )
-        except (Exception,) as exc:
-            self._show_error(str(exc))
-            return None
-
-        self.reload_configurations()
-        updated = result.certificate_configuration
-        if updated is None:
-            self._show_error("Certificate configuration was not saved.")
-            return None
-        self._select_configuration(updated.certificate_configuration_id)
-        self.load_selected_configuration()
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
-        return updated
-
-    def delete_selected_configuration(self) -> bool:
-        configuration_id = self._selected_configuration_id()
-        if configuration_id is None:
-            self._show_error("Select a certificate configuration to delete.")
-            return False
-        configuration = self._configurations_by_id.get(configuration_id)
-        if configuration is None:
-            self._show_error("Select a certificate configuration to delete.")
-            self.reload_configurations()
-            return False
-        try:
-            result = self._lifecycle_service.delete_configuration(configuration_id)
-        except (Exception,) as exc:
-            self._show_error(str(exc))
-            self.reload_configurations()
-            return False
-
-        self.reload_configurations()
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
-        return True
-
-    def delete_selected_managed_certificate(self) -> bool:
-        certificate_id = self._selected_managed_certificate_id()
-        if certificate_id is None:
-            self._show_error("Select a managed certificate to delete.")
-            return False
-        try:
-            result = self._lifecycle_service.delete_managed_certificate(certificate_id)
-        except (Exception,) as exc:
-            self._show_error(str(exc))
-            self.reload_configurations()
-            return False
-
-        self.reload_configurations()
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
-        return True
-
-    def export_selected_managed_certificate(self) -> Path | None:
-        certificate_id = self._selected_managed_certificate_id()
-        if certificate_id is None:
-            self._show_error("Select a managed certificate to export.")
-            return None
-        certificate = self._managed_certificates_by_id.get(certificate_id)
-        if certificate is None:
-            self._show_error("Select a managed certificate to export.")
-            self.reload_configurations()
-            return None
-        selected = self._bindings.q_file_dialog.getSaveFileName(
-            self.controls.dialog,
-            "Export managed certificate",
-            certificate.storage_filename,
-            "PKCS#12 files (*.p12 *.pfx);;All files (*)",
-        )
-        selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
-        if not selected_path:
-            return None
-        try:
-            result = self._lifecycle_service.export_managed_certificate(
-                certificate_id=certificate_id,
-                destination_path=selected_path,
-            )
-        except (Exception,) as exc:
-            self._show_error(str(exc))
-            self.reload_configurations()
-            return None
-
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
-        return result.exported_path
-
-    def cancel(self) -> None:
-        reject = getattr(self.controls.dialog, "reject", None)
-        if callable(reject):
-            reject()
-
-    def _build_controls(
-        self,
-        *,
-        parent: Any,
-    ) -> CertificateConfigurationManagementDialogControls:
-        dialog = self._bindings.q_dialog(parent)
-        if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Manage certificate configurations")
-        layout = self._bindings.q_form_layout(dialog)
-
-        configuration_selector = self._bindings.q_combo_box()
-        display_name = self._bindings.q_line_edit("")
-        notes = self._bindings.q_line_edit("")
-        managed_certificate_selector = self._bindings.q_combo_box()
-        save_button = self._bindings.q_push_button("Save")
-        delete_button = self._bindings.q_push_button("Delete")
-        export_certificate_button = self._bindings.q_push_button("Export certificate")
-        delete_certificate_button = self._bindings.q_push_button("Delete certificate")
-        cancel_button = self._bindings.q_push_button("Cancel")
-
-        layout.addRow("Configuration", configuration_selector)
-        layout.addRow("Display name", display_name)
-        layout.addRow("Notes", notes)
-        layout.addRow("Managed certificate", managed_certificate_selector)
-        layout.addRow("", save_button)
-        layout.addRow("", delete_button)
-        layout.addRow("", export_certificate_button)
-        layout.addRow("", delete_certificate_button)
-        layout.addRow("", cancel_button)
-
-        index_changed = getattr(configuration_selector, "currentIndexChanged", None)
-        if hasattr(index_changed, "connect"):
-            index_changed.connect(self.load_selected_configuration)
-        save_button.clicked.connect(self.save_selected_configuration)  # type: ignore[attr-defined]
-        delete_button.clicked.connect(self.delete_selected_configuration)  # type: ignore[attr-defined]
-        export_certificate_button.clicked.connect(self.export_selected_managed_certificate)  # type: ignore[attr-defined]
-        delete_certificate_button.clicked.connect(self.delete_selected_managed_certificate)  # type: ignore[attr-defined]
-        cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
-
-        return CertificateConfigurationManagementDialogControls(
-            dialog=dialog,
-            configuration_selector=configuration_selector,
-            display_name=display_name,
-            notes=notes,
-            managed_certificate_selector=managed_certificate_selector,
-            save_button=save_button,
-            delete_button=delete_button,
-            export_certificate_button=export_certificate_button,
-            delete_certificate_button=delete_certificate_button,
-            cancel_button=cancel_button,
-        )
-
-    def _add_selector_item(self, text: str, configuration_id: str) -> None:
-        add_item = getattr(self.controls.configuration_selector, "addItem", None)
-        if callable(add_item):
-            add_item(text, configuration_id)
-
-    def _add_certificate_selector_item(self, text: str, certificate_id: str) -> None:
-        add_item = getattr(self.controls.managed_certificate_selector, "addItem", None)
-        if callable(add_item):
-            add_item(text, certificate_id)
-
-    def _selected_configuration_id(self) -> str | None:
-        selector = self.controls.configuration_selector
-        current_data = getattr(selector, "currentData", None)
-        if callable(current_data):
-            selected = current_data()
-            return str(selected) if selected else None
-        current_index = getattr(selector, "currentIndex", None)
-        item_data = getattr(selector, "itemData", None)
-        if callable(current_index) and callable(item_data):
-            selected = item_data(current_index())
-            return str(selected) if selected else None
-        return None
-
-    def _selected_managed_certificate_id(self) -> str | None:
-        selector = self.controls.managed_certificate_selector
-        current_data = getattr(selector, "currentData", None)
-        if callable(current_data):
-            selected = current_data()
-            return str(selected) if selected else None
-        current_index = getattr(selector, "currentIndex", None)
-        item_data = getattr(selector, "itemData", None)
-        if callable(current_index) and callable(item_data):
-            selected = item_data(current_index())
-            return str(selected) if selected else None
-        return None
-
-    def _select_configuration(self, configuration_id: str) -> None:
-        selector = self.controls.configuration_selector
-        count = getattr(selector, "count", None)
-        item_data = getattr(selector, "itemData", None)
-        set_current_index = getattr(selector, "setCurrentIndex", None)
-        if not (callable(count) and callable(item_data) and callable(set_current_index)):
-            return
-        for index in range(count()):
-            if item_data(index) == configuration_id:
-                set_current_index(index)
-                return
-
-    def _emit_changed(self) -> None:
-        if self._on_change is not None:
-            self._on_change()
-
-    def _emit_changed_if_needed(self, refresh_shell: bool) -> None:
-        if refresh_shell:
-            self._emit_changed()
-
-    def _show_error(self, message: str) -> None:
-        warning = getattr(self._bindings.q_message_box, "warning", None)
-        if callable(warning):
-            warning(self.controls.dialog, "Certificate configuration error", message)
-
-    def _show_information(self, message: str) -> None:
-        information = getattr(self._bindings.q_message_box, "information", None)
-        if callable(information):
-            information(
-                self.controls.dialog,
-                "Certificate configuration",
-                message,
-            )
-
-
 class FoliaSealAppFrame:
     """Application frame that owns top-level menus and document opening."""
 
@@ -811,15 +236,21 @@ class FoliaSealAppFrame:
         self._current_viewer_workflow: ViewerWorkflow | None = None
         self._current_signing_workflow: SigningDraftWorkflow | None = None
         self._settings_dialog: AppSettingsDialog | None = None
-        self._certificate_import_dialog: CertificateImportDialog | None = None
-        self._certificate_management_dialog: (
-            CertificateConfigurationManagementDialog | None
-        ) = None
         self._open_action: Any | None = None
         self._save_as_action: Any | None = None
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
+        self._certificate_dialog_port: CertificateDialogPort = (
+            AppFrameCertificateDialogService(
+                bindings=self._bindings,
+                parent=self.window,
+                lifecycle_service=self._certificate_lifecycle_service,
+                refresh_shell_certificate_configurations=(
+                    self._refresh_shell_certificate_configurations
+                ),
+            )
+        )
         self._install_menus()
         self._set_placeholder()
 
@@ -833,6 +264,9 @@ class FoliaSealAppFrame:
         self.window.current_shell = None  # type: ignore[attr-defined]
         self.window.current_viewer_workflow = None  # type: ignore[attr-defined]
         self.window.current_signing_workflow = None  # type: ignore[attr-defined]
+        self.window.certificate_import_dialog = None  # type: ignore[attr-defined]
+        self.window.certificate_creation_dialog = None  # type: ignore[attr-defined]
+        self.window.certificate_management_dialog = None  # type: ignore[attr-defined]
         self.window._foliaseal_app_frame = self  # type: ignore[attr-defined]
 
     @property
@@ -916,37 +350,19 @@ class FoliaSealAppFrame:
         return settings
 
     def show_certificate_import(self) -> Any | None:
-        dialog = CertificateImportDialog(
-            bindings=self._bindings,
-            parent=self.window,
-            lifecycle_service=self._certificate_lifecycle_service,
-            on_import=self._refresh_shell_certificate_configurations,
-        )
-        self._certificate_import_dialog = dialog
-        self.window.certificate_import_dialog = dialog  # type: ignore[attr-defined]
-        return dialog.exec()
+        outcome = self._certificate_dialog_port.show_import_dialog()
+        self._apply_certificate_dialog_compatibility(outcome.compatibility)
+        return outcome.result
 
     def show_certificate_creation(self) -> Any | None:
-        dialog = CertificateCreationDialog(
-            bindings=self._bindings,
-            parent=self.window,
-            lifecycle_service=self._certificate_lifecycle_service,
-            on_create=self._refresh_shell_certificate_configurations,
-        )
-        self._certificate_creation_dialog = dialog
-        self.window.certificate_creation_dialog = dialog  # type: ignore[attr-defined]
-        return dialog.exec()
+        outcome = self._certificate_dialog_port.show_creation_dialog()
+        self._apply_certificate_dialog_compatibility(outcome.compatibility)
+        return outcome.result
 
     def show_certificate_management(self) -> Any | None:
-        dialog = CertificateConfigurationManagementDialog(
-            bindings=self._bindings,
-            parent=self.window,
-            lifecycle_service=self._certificate_lifecycle_service,
-            on_change=self._refresh_shell_certificate_configurations,
-        )
-        self._certificate_management_dialog = dialog
-        self.window.certificate_management_dialog = dialog  # type: ignore[attr-defined]
-        return dialog.exec()
+        outcome = self._certificate_dialog_port.show_management_dialog()
+        self._apply_certificate_dialog_compatibility(outcome.compatibility)
+        return outcome.result
 
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
@@ -1013,6 +429,17 @@ class FoliaSealAppFrame:
         set_enabled = getattr(action, "setEnabled", None)
         if callable(set_enabled):
             set_enabled(enabled)
+
+    def _apply_certificate_dialog_compatibility(
+        self,
+        compatibility: CertificateDialogCompatibilityState,
+    ) -> None:
+        if compatibility.import_dialog is not None:
+            self.window.certificate_import_dialog = compatibility.import_dialog  # type: ignore[attr-defined]
+        if compatibility.creation_dialog is not None:
+            self.window.certificate_creation_dialog = compatibility.creation_dialog  # type: ignore[attr-defined]
+        if compatibility.management_dialog is not None:
+            self.window.certificate_management_dialog = compatibility.management_dialog  # type: ignore[attr-defined]
 
     def _set_placeholder(self) -> None:
         label = self._bindings.q_label("Open a PDF to begin signing.")
