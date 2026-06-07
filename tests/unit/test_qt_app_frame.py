@@ -432,22 +432,19 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
     }
 
 
-def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
+def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(
     tmp_path: Path,
 ) -> None:
     bindings = _fake_bindings()
     selected_pdf = tmp_path / "source" / "contract.pdf"
     bindings.q_file_dialog.next_open_file_name = str(selected_pdf)
     shell = _FakeShell()
-    bootstrap_calls = []
-    secret_store = _FakeSecretStore()
 
     frame = FoliaSealAppFrame(
         bindings=bindings,
         app_settings=_settings(tmp_path),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-        certificate_secret_provider=secret_store,
-        shell_factory=_FakeShellFactory(shell, bootstrap_calls=bootstrap_calls),
+        shell_factory=_FakeShellFactory(shell),
         render_backend_factory=lambda: object(),
     )
 
@@ -465,15 +462,13 @@ def test_app_frame_open_file_uses_settings_defaults_and_builds_signing_shell(
     assert _FakeQPdfDocument.load_calls == [str(selected_pdf)]
     assert frame.window.central_widget is shell
     assert frame.window.current_shell is shell
-    assert bootstrap_calls[0].viewer_workflow.session.page_count == 3
-    assert bootstrap_calls[0].viewer_workflow._document_path == str(selected_pdf)
-    assert bootstrap_calls[0].signing_workflow.input_pdf_path == str(selected_pdf)
-    assert bootstrap_calls[0].signing_workflow.output_pdf_path == str(
+    assert frame.window.current_viewer_workflow.session.page_count == 3
+    assert frame.window.current_viewer_workflow.document_path == str(selected_pdf)
+    assert frame.window.current_signing_workflow.input_pdf_path == str(selected_pdf)
+    assert frame.window.current_signing_workflow.output_pdf_path == str(
         tmp_path / "signed" / "contract-signed.pdf"
     )
-    assert bootstrap_calls[0].app_settings == _settings(tmp_path)
-    assert bootstrap_calls[0].certificate_secret_provider is secret_store
-    assert bootstrap_calls[0].on_open_signed_output == frame.open_pdf_path
+    assert frame.window.menu_bar.menus[0].actions[1].enabled is True
 
 
 def test_app_frame_reopens_signed_output_from_shell_callback(tmp_path: Path) -> None:

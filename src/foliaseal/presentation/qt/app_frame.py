@@ -12,9 +12,7 @@ from typing import Any
 from foliaseal.application import (
     CertificateLifecycleService,
     SigningDraftWorkflow,
-    suggest_signed_output_path,
 )
-from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -28,12 +26,18 @@ from foliaseal.infra.config.schemas import (
 )
 from foliaseal.infra.render import QtPdfRenderBackend
 from foliaseal.infra.secret_storage import SecretToolCertificateSecretStore
+from foliaseal.presentation.qt.app_frame_workspace_open import (
+    OpenWorkspaceCommand,
+    QtPdfPageCountLoader,
+    SigningWorkspaceCompositionService,
+    WorkspaceOpenPort,
+    WorkspaceOpenService,
+)
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
 )
 from foliaseal.presentation.qt.signing_shell_port import (
     QtSigningWorkspaceFactory,
-    SigningWorkspaceBootstrap,
     SigningWorkspaceFactory,
     SigningWorkspacePort,
 )
@@ -796,6 +800,13 @@ class FoliaSealAppFrame:
         self._on_sign_request = on_sign_request
         self._on_error = on_error
         self._on_status_change = on_status_change
+        self._workspace_open_port: WorkspaceOpenPort = WorkspaceOpenService(
+            page_count_port=QtPdfPageCountLoader(bindings.qpdf_document),
+            composition_port=SigningWorkspaceCompositionService(
+                render_backend_factory=self._render_backend_factory,
+                shell_factory=self._shell_factory,
+            ),
+        )
         self._current_shell_port: SigningWorkspacePort | None = None
         self._current_viewer_workflow: ViewerWorkflow | None = None
         self._current_signing_workflow: SigningDraftWorkflow | None = None
@@ -854,59 +865,39 @@ class FoliaSealAppFrame:
         return selected_path
 
     def open_pdf_path(self, pdf_path: str | Path) -> Any | None:
-        source_path = Path(pdf_path)
         try:
-            page_count = self._load_page_count(source_path)
-            viewer_workflow = ViewerWorkflow(
-                document_path=str(source_path),
-                render_backend=self._render_backend_factory(),
-                session=ViewerSession(page_count=page_count),
-            )
-            signing_workflow = SigningDraftWorkflow(
-                input_pdf_path=str(source_path),
-                output_pdf_path=str(
-                    suggest_signed_output_path(
-                        input_pdf_path=source_path,
-                        default_output_directory=(
-                            self._app_settings.default_output_directory
-                        ),
-                    )
-                ),
-                certificate_path="",
-                passphrase="",
-                tsa_url="",
-                timestamp_required=False,
-            )
-            shell_port = self._shell_factory.create(
-                SigningWorkspaceBootstrap(
-                    viewer_workflow=viewer_workflow,
-                    signing_workflow=signing_workflow,
+            outcome = self._workspace_open_port.open_workspace(
+                OpenWorkspaceCommand(
+                    source_pdf=Path(pdf_path),
+                    app_settings=self._app_settings,
+                    app_settings_store=self._app_settings_store,
                     certificate_catalog_store=self._certificate_catalog_store,
                     certificate_secret_provider=self._certificate_secret_provider,
                     preset_catalog_store=self._preset_catalog_store,
-                    app_settings=self._app_settings,
-                    app_settings_store=self._app_settings_store,
                     sign_executor=self._sign_executor,
                     on_sign_request=self._on_sign_request,
-                    on_open_signed_output=self.open_pdf_path,
+                    reopen_target=self.open_pdf_path,
                     on_error=self._emit_error,
                     on_status_change=self._on_status_change,
                 )
             )
-            shell = shell_port.widget()
         except Exception as exc:
             self._emit_error(f"Unable to open PDF: {exc}")
             return None
 
-        self._current_shell_port = shell_port
-        self._current_viewer_workflow = viewer_workflow
-        self._current_signing_workflow = signing_workflow
-        self.window.current_shell = shell  # type: ignore[attr-defined]
-        self.window.current_viewer_workflow = viewer_workflow  # type: ignore[attr-defined]
-        self.window.current_signing_workflow = signing_workflow  # type: ignore[attr-defined]
-        self.window.setCentralWidget(shell)
+        self._current_shell_port = outcome.shell_port
+        self._current_viewer_workflow = outcome.compatibility.viewer_workflow
+        self._current_signing_workflow = outcome.compatibility.signing_workflow
+        self.window.current_shell = outcome.compatibility.shell_widget  # type: ignore[attr-defined]
+        self.window.current_viewer_workflow = (  # type: ignore[attr-defined]
+            outcome.compatibility.viewer_workflow
+        )
+        self.window.current_signing_workflow = (  # type: ignore[attr-defined]
+            outcome.compatibility.signing_workflow
+        )
+        self.window.setCentralWidget(outcome.compatibility.shell_widget)
         self._set_save_as_enabled(True)
-        return shell
+        return outcome.compatibility.shell_widget
 
     def show_app_settings(self) -> AppSettings | None:
         dialog = AppSettingsDialog(
@@ -1029,16 +1020,6 @@ class FoliaSealAppFrame:
             label.setWordWrap(True)
         self.window.setCentralWidget(label)
         self._set_save_as_enabled(False)
-
-    def _load_page_count(self, pdf_path: Path) -> int:
-        document = self._bindings.qpdf_document()
-        status = document.load(str(pdf_path))
-        if status != self._bindings.qpdf_document.Error.None_:
-            raise RuntimeError(f"Failed to load PDF document: {pdf_path}")
-        page_count = int(document.pageCount())
-        if page_count <= 0:
-            raise RuntimeError(f"PDF has no pages: {pdf_path}")
-        return page_count
 
     def _emit_error(self, message: str) -> None:
         if self._on_error is not None:
