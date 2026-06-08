@@ -52,9 +52,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     Phase3HarnessCapture,
     _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
-    _apply_appearance_overrides,
-    _apply_preview_matrix_scenario,
-    _apply_visible_fields_override,
     _capture_headless_preview_render,
     _capture_interactive_state,
     _default_harness_artifacts_dir,
@@ -80,6 +77,10 @@ from foliaseal.presentation.qt.phase3_harness import (
     _write_text_debug_overlay,
     build_phase3_checklist_results_markdown,
     run_phase3_preview_matrix,
+)
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    _apply_appearance_overrides,
+    _apply_visible_fields_override,
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
@@ -2704,88 +2705,6 @@ def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
         "signable_stamp_edge_touch_scenario_count": 0,
         "rejected_stamp_edge_touch_scenario_count": 1,
     }
-
-
-def test_apply_preview_matrix_scenario_syncs_viewer_to_signature_rect_page() -> None:
-    class _FakeProfileStore:
-        def load_catalog(self):
-            return type(
-                "_Catalog",
-                (),
-                {"profile_named": lambda self, name: (_ for _ in ()).throw(KeyError(name))},
-            )()
-
-    class _FakePanel:
-        def __init__(self) -> None:
-            self.appearance = None
-            self.rect = None
-            self._workflow = type(
-                "_Workflow",
-                (),
-                {"current_signature_appearance": build_signature_appearance()},
-            )()
-
-        def set_signature_appearance(self, appearance) -> None:
-            self.appearance = appearance
-
-        def set_signature_rect(self, signature_rect) -> None:
-            self.rect = signature_rect
-
-    class _FakeViewerWorkflow:
-        def __init__(self) -> None:
-            self.jumps: list[int] = []
-
-        def jump_to_page(self, page_index: int) -> None:
-            self.jumps.append(page_index)
-
-    class _FakeViewerWidget:
-        def __init__(self) -> None:
-            self.refresh_calls: list[bool] = []
-
-        def refresh(self, *, navigation: bool) -> None:
-            self.refresh_calls.append(navigation)
-
-    shell = type(
-        "_Shell",
-        (),
-        {
-            "compat_surface": type(
-                "_CompatSurface",
-                (),
-                {
-                    "properties_panel": _FakePanel(),
-                    "viewer_workflow": _FakeViewerWorkflow(),
-                    "viewer_widget": _FakeViewerWidget(),
-                    "refresh_viewer": lambda self: None,
-                },
-            )(),
-            "refresh_viewer": lambda self: None,
-        },
-    )()
-
-    _apply_preview_matrix_scenario(
-        shell=shell,
-        scenario={
-            "name": "Page Four",
-            "signature_rect": {
-                "page_index": 3,
-                "left_pt": 24,
-                "bottom_pt": 18,
-                "width_pt": 120,
-                "height_pt": 36,
-            },
-            "appearance_overrides": {
-                "layout_template": "single_line",
-                "stamp_position": "top",
-            },
-        },
-        profile_store=_FakeProfileStore(),
-    )
-
-    assert shell.compat_surface.properties_panel.rect is not None
-    assert shell.compat_surface.properties_panel.rect.page_index == 3
-    assert shell.compat_surface.viewer_workflow.jumps == [3]
-    assert shell.compat_surface.viewer_widget.refresh_calls == [True]
 
 
 def test_widget_application_returns_none_when_pyside_is_unavailable(

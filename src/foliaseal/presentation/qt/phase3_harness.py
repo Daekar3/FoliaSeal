@@ -26,9 +26,6 @@ from foliaseal.application.phase3_signing_backend import (
     build_phase3_signing_executor,
 )
 from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
-from foliaseal.application.qa_preview_stress_fixtures import (
-    apply_preview_stress_fixture_profile,
-)
 from foliaseal.application.signature_font_registry import preview_font_family_supported
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
@@ -50,14 +47,10 @@ from foliaseal.application.visible_signature_layout import (
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
-    SignatureFieldBinding,
-    SignatureFieldKey,
-    SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
     SignatureTextStyle,
-    SignatureTimezoneDisplayMode,
     SigningRequest,
     SigningResult,
     TimestampTrustPolicy,
@@ -81,6 +74,11 @@ from foliaseal.presentation.qt.phase3_harness_session_runner import (
     Phase3HarnessSessionResult,
     Phase3HarnessSessionRunner,
     _QtHarnessBindings,
+)
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    HeadlessPhase3HarnessWorkspaceAdapter,
+    Phase3HarnessScenarioCommand,
+    QtPhase3HarnessWorkspaceAdapter,
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
@@ -1734,11 +1732,10 @@ def _execute_preview_matrix_scenario(
     profile_store: SignaturePresetCatalogStore,
     artifacts_dir: Path,
 ) -> dict[str, Any]:
-    _apply_preview_matrix_scenario(
+    QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
-        scenario=scenario,
         profile_store=profile_store,
-    )
+    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
     compat = _shell_compat_surface(shell)
     preview = compat.properties_panel.refresh_preview()
     preview_text = compat.properties_panel.preview_text()
@@ -1779,11 +1776,10 @@ def _execute_headless_preview_matrix_scenario(
         certificate_path=certificate_path,
         passphrase=passphrase,
     )
-    _apply_preview_matrix_scenario_to_workflow(
+    HeadlessPhase3HarnessWorkspaceAdapter(
         workflow=workflow,
-        scenario=scenario,
         profile_store=profile_store,
-    )
+    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
     preview = workflow.preview()
     preview_text = _headless_preview_text(preview)
     validation_text = _headless_validation_text(preview)
@@ -1825,33 +1821,6 @@ def _build_headless_preview_matrix_workflow(
     if workflow.signature_appearance is None:
         workflow.set_signature_appearance(SignatureAppearance())
     return workflow
-
-
-def _apply_preview_matrix_scenario_to_workflow(
-    *,
-    workflow: SigningDraftWorkflow,
-    scenario: dict[str, Any],
-    profile_store: SignaturePresetCatalogStore,
-) -> None:
-    catalog = profile_store.load_catalog()
-    profile_name = scenario.get("profile_name")
-    if profile_name is not None:
-        if not isinstance(profile_name, str) or not profile_name.strip():
-            raise ValueError("Scenario 'profile_name' must be a non-empty string.")
-        preset = catalog.preset_named(profile_name)
-        base_appearance = preset.appearance
-    else:
-        base_appearance = workflow.current_signature_appearance or SignatureAppearance()
-    appearance = _apply_appearance_overrides(
-        base_appearance,
-        scenario.get("appearance_overrides"),
-    )
-    workflow.set_signature_appearance(appearance)
-    if "timestamp_required" in scenario:
-        workflow.timestamp_required = bool(scenario["timestamp_required"])
-    signature_rect_payload = scenario.get("signature_rect")
-    if signature_rect_payload is not None:
-        workflow.set_signature_rect(_signature_rect_from_payload(signature_rect_payload))
 
 
 def _headless_preview_text(preview: Any) -> str:
@@ -2120,180 +2089,10 @@ def _apply_preview_matrix_scenario(
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
 ) -> None:
-    catalog = profile_store.load_catalog()
-    compat = _shell_compat_surface(shell)
-    profile_name = scenario.get("profile_name")
-    if profile_name is not None:
-        if not isinstance(profile_name, str) or not profile_name.strip():
-            raise ValueError("Scenario 'profile_name' must be a non-empty string.")
-        preset = catalog.preset_named(profile_name)
-        base_appearance = preset.appearance
-    else:
-        base_appearance = (
-            compat.properties_panel._workflow.current_signature_appearance
-            or SignatureAppearance()
-        )
-    appearance = _apply_appearance_overrides(
-        base_appearance,
-        scenario.get("appearance_overrides"),
-    )
-    compat.properties_panel.set_signature_appearance(appearance)
-    if "timestamp_required" in scenario:
-        compat.properties_panel._workflow.timestamp_required = bool(
-            scenario["timestamp_required"]
-        )
-    signature_rect_payload = scenario.get("signature_rect")
-    if signature_rect_payload is not None:
-        signature_rect = _signature_rect_from_payload(signature_rect_payload)
-        compat.properties_panel.set_signature_rect(signature_rect)
-        viewer_workflow = getattr(compat, "viewer_workflow", None)
-        viewer_widget = getattr(compat, "viewer_widget", None)
-        if viewer_workflow is not None and hasattr(viewer_workflow, "jump_to_page"):
-            viewer_workflow.jump_to_page(signature_rect.page_index)
-        refresh = getattr(viewer_widget, "refresh", None)
-        if callable(refresh):
-            refresh(navigation=True)
-        sync_placement = getattr(compat, "sync_placement_context_from_viewer", None)
-        if callable(sync_placement):
-            sync_placement()
-        sync_overlay = getattr(compat, "sync_signature_overlay", None)
-        if callable(sync_overlay):
-            sync_overlay()
-        refresh_sign_button = getattr(compat, "refresh_sign_button_state", None)
-        if callable(refresh_sign_button):
-            refresh_sign_button()
-    compat.refresh_viewer()
-    app = _widget_application(shell)
-    if app is not None and hasattr(app, "processEvents"):
-        app.processEvents()
-
-
-def _signature_rect_from_payload(payload: object) -> SignatureRect:
-    if not isinstance(payload, dict):
-        raise ValueError("Scenario 'signature_rect' must be an object.")
-    return SignatureRect(
-        page_index=int(payload["page_index"]),
-        left_pt=float(payload["left_pt"]),
-        bottom_pt=float(payload["bottom_pt"]),
-        width_pt=float(payload["width_pt"]),
-        height_pt=float(payload["height_pt"]),
-    )
-
-
-def _apply_appearance_overrides(
-    appearance: SignatureAppearance,
-    overrides: object,
-) -> SignatureAppearance:
-    if overrides is None:
-        return appearance
-    if not isinstance(overrides, dict):
-        raise ValueError("Scenario 'appearance_overrides' must be an object.")
-
-    updated = appearance
-    direct_updates: dict[str, Any] = {}
-    enum_mappings = {
-        "layout_template": SignatureLayoutTemplate,
-        "stamp_position": SignatureStampPosition,
-        "timezone_display_mode": SignatureTimezoneDisplayMode,
-    }
-    fixture_profile = overrides.get("fixture_profile")
-    if fixture_profile is not None:
-        if not isinstance(fixture_profile, str) or not fixture_profile.strip():
-            raise ValueError("Scenario 'fixture_profile' must be a non-empty string.")
-        updated = apply_preview_stress_fixture_profile(
-            appearance=updated,
-            profile_name=fixture_profile,
-        )
-
-    for key in (
-        "signer_label_prefix",
-        "show_field_names",
-        "datetime_format",
-        "image_stamp_path",
-    ):
-        if key in overrides:
-            direct_updates[key] = overrides[key]
-    for key, enum_cls in enum_mappings.items():
-        if key in overrides:
-            direct_updates[key] = enum_cls(str(overrides[key]))
-    if direct_updates:
-        updated = replace(updated, **direct_updates)
-    if "text_style" in overrides:
-        updated = replace(
-            updated,
-            text_style=_apply_text_style_overrides(updated.text_style, overrides["text_style"]),
-        )
-    if "box_style" in overrides:
-        updated = replace(
-            updated,
-            box_style=_apply_box_style_overrides(updated.box_style, overrides["box_style"]),
-        )
-    if "visible_fields" in overrides:
-        updated = _apply_visible_fields_override(updated, overrides["visible_fields"])
-    return updated
-
-
-def _apply_text_style_overrides(style: SignatureTextStyle, overrides: object) -> SignatureTextStyle:
-    if not isinstance(overrides, dict):
-        raise ValueError("Scenario 'text_style' overrides must be an object.")
-    allowed: dict[str, Any] = {}
-    for key in ("font_family", "font_size_pt", "bold", "italic", "text_color_hex"):
-        if key in overrides:
-            allowed[key] = overrides[key]
-    return replace(style, **allowed)
-
-
-def _apply_box_style_overrides(style: SignatureBoxStyle, overrides: object) -> SignatureBoxStyle:
-    if not isinstance(overrides, dict):
-        raise ValueError("Scenario 'box_style' overrides must be an object.")
-    allowed: dict[str, Any] = {}
-    for key in ("show_border", "border_color_hex", "border_width_pt", "background_color_hex"):
-        if key in overrides:
-            allowed[key] = overrides[key]
-    return replace(style, **allowed)
-
-
-def _apply_visible_fields_override(
-    appearance: SignatureAppearance,
-    visible_fields: object,
-) -> SignatureAppearance:
-    if not isinstance(visible_fields, list) or not visible_fields:
-        raise ValueError("Scenario 'visible_fields' must be a non-empty array.")
-
-    visible_keys = {
-        _signature_field_key_from_manifest_value(value)
-        for value in visible_fields
-    }
-    updates: dict[str, Any] = {}
-    for field_key in appearance.field_order:
-        binding = appearance.binding_for(field_key)
-        if field_key in visible_keys:
-            source = binding.source
-            if source == SignatureFieldSource.HIDDEN:
-                source = SignatureFieldSource.DERIVED
-            updates[field_key.value] = SignatureFieldBinding(
-                source=source,
-                show_in_visible_appearance=True,
-                override_text=(
-                    binding.override_text
-                    if source == SignatureFieldSource.OVERRIDE
-                    else None
-                ),
-                display_label=binding.display_label,
-            )
-            continue
-        updates[field_key.value] = SignatureFieldBinding(
-            source=SignatureFieldSource.HIDDEN,
-            show_in_visible_appearance=False,
-            display_label=binding.display_label,
-        )
-    return replace(appearance, **updates)
-
-
-def _signature_field_key_from_manifest_value(value: object) -> SignatureFieldKey:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError("Scenario field names must be non-empty strings.")
-    return SignatureFieldKey(value)
+    QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=profile_store,
+    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
 
 
 def _capture_preview_render(
