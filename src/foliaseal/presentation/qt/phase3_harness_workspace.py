@@ -327,6 +327,31 @@ class QtPhase3HarnessWorkspaceAdapter:
         }
 
 
+def capture_qt_preview_render(
+    *,
+    shell: Any,
+    preview: Any,
+    artifacts_dir: str | None,
+    artifact_basename: str,
+    build_preview_render_capture_payload: Callable[..., dict[str, Any]],
+) -> dict[str, Any]:
+    """Capture the live Qt preview by reading shell anatomy only inside the workspace seam."""
+
+    compat = _compat_surface(shell)
+    properties_panel = compat.properties_panel
+    return build_preview_render_capture_payload(
+        preview_controls=properties_panel.preview_controls,
+        canonical_preview_render_backend=getattr(
+            properties_panel,
+            "_canonical_preview_render_backend",
+            None,
+        ),
+        preview=preview,
+        artifacts_dir=artifacts_dir,
+        artifact_basename=artifact_basename,
+    )
+
+
 def snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:
     """Read the current draft signing request from workflow state when placement exists."""
 

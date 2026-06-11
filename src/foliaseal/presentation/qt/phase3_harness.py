@@ -8,6 +8,7 @@ import re
 import shutil
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessScenarioCommand,
     Phase3HarnessWorkspacePort,
     QtPhase3HarnessWorkspaceAdapter,
+    capture_qt_preview_render,
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
@@ -788,7 +790,10 @@ def _build_qt_phase3_harness_workspace(shell: Any) -> Phase3HarnessWorkspacePort
     return QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=object(),
-        capture_preview_render=_capture_preview_render,
+        capture_preview_render=partial(
+            capture_qt_preview_render,
+            build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
+        ),
         snapshot_preview=_snapshot_preview,
         snapshot_signing_request=_snapshot_signing_request,
         build_backend_reservation_evidence=build_backend_reservation_evidence,
@@ -805,7 +810,10 @@ def _build_preview_matrix_qt_workspace(
     return QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=profile_store,
-        capture_preview_render=_capture_preview_render,
+        capture_preview_render=partial(
+            capture_qt_preview_render,
+            build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
+        ),
         snapshot_preview=_snapshot_preview,
         snapshot_signing_request=_snapshot_signing_request,
         build_backend_reservation_evidence=build_backend_reservation_evidence,
@@ -2077,22 +2085,21 @@ def _apply_preview_matrix_scenario(
     ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
 
 
-def _capture_preview_render(
+def _build_qt_preview_render_capture_payload(
     *,
-    shell: Any,
+    preview_controls: Any,
+    canonical_preview_render_backend: Any,
     preview: Any,
     artifacts_dir: str | None,
     artifact_basename: str,
 ) -> dict[str, Any]:
-    compat = _shell_compat_surface(shell)
-    controls = compat.properties_panel.preview_controls
-    card_container = controls.card_container
-    single_body = controls.single_body_container
-    multi_body = controls.multi_body_container
-    detail_label = controls.detail_label
-    stamp_label = controls.stamp_label
-    multi_detail = controls.multi_detail_label
-    multi_stamp = controls.multi_stamp_label
+    card_container = preview_controls.card_container
+    single_body = preview_controls.single_body_container
+    multi_body = preview_controls.multi_body_container
+    detail_label = preview_controls.detail_label
+    stamp_label = preview_controls.stamp_label
+    multi_detail = preview_controls.multi_detail_label
+    multi_stamp = preview_controls.multi_stamp_label
     canonical_snapshot = getattr(card_container, "_canonical_preview_snapshot", None)
     analysis_snapshot = None
     image_path = None
@@ -2109,11 +2116,7 @@ def _capture_preview_render(
             analysis_snapshot = render_canonical_signature_preview(
                 preview,
                 zoom=1.0,
-                render_backend=getattr(
-                    compat.properties_panel,
-                    "_canonical_preview_render_backend",
-                    None,
-                ),
+                render_backend=canonical_preview_render_backend,
                 include_border=True,
                 flatten_to_white=True,
             )
