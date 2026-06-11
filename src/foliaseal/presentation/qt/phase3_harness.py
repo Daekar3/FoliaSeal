@@ -81,7 +81,6 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessScenarioCommand,
     Phase3HarnessWorkspacePort,
     QtPhase3HarnessWorkspaceAdapter,
-    snapshot_current_draft_request,
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
@@ -982,12 +981,7 @@ def _build_phase3_signed_acceptance_scenario_executor() -> (
 ):
     return Phase3SignedAcceptanceScenarioExecutor(
         apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
-        compat_surface=_shell_compat_surface,
-        snapshot_current_draft_request=snapshot_current_draft_request,
-        build_backend_reservation_evidence=build_backend_reservation_evidence,
-        capture_preview_render=_capture_preview_render,
-        snapshot_preview=_snapshot_preview,
-        snapshot_signing_request=_snapshot_signing_request,
+        build_workspace=_build_preview_matrix_qt_workspace,
         scenario_slug=_scenario_slug,
         snapshot_signing_result_payload=_snapshot_signing_result_payload,
         snapshot_successful_signed_output=_snapshot_successful_signed_output,

@@ -7,13 +7,13 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    Phase3HarnessCaptureCommand,
+    Phase3HarnessWorkspacePort,
+)
+
 ApplyPreviewMatrixScenario = Callable[..., None]
-CompatSurface = Callable[[Any], Any]
-SnapshotCurrentDraftRequest = Callable[[Any], Any]
-BuildBackendReservationEvidence = Callable[[Any], Any]
-CapturePreviewRender = Callable[..., dict[str, Any]]
-SnapshotPreview = Callable[..., dict[str, Any]]
-SnapshotSigningRequest = Callable[[Any], dict[str, Any] | None]
+BuildHarnessWorkspace = Callable[..., Phase3HarnessWorkspacePort]
 ScenarioSlug = Callable[[str], str]
 SnapshotSigningResultPayload = Callable[[Any], dict[str, Any]]
 SnapshotSuccessfulSignedOutput = Callable[..., dict[str, Any]]
@@ -24,12 +24,7 @@ class Phase3SignedAcceptanceScenarioExecutor:
     """Own one signed-acceptance scenario row from preview to signed output."""
 
     apply_preview_matrix_scenario: ApplyPreviewMatrixScenario
-    compat_surface: CompatSurface
-    snapshot_current_draft_request: SnapshotCurrentDraftRequest
-    build_backend_reservation_evidence: BuildBackendReservationEvidence
-    capture_preview_render: CapturePreviewRender
-    snapshot_preview: SnapshotPreview
-    snapshot_signing_request: SnapshotSigningRequest
+    build_workspace: BuildHarnessWorkspace
     scenario_slug: ScenarioSlug
     snapshot_signing_result_payload: SnapshotSigningResultPayload
     snapshot_successful_signed_output: SnapshotSuccessfulSignedOutput
@@ -51,20 +46,18 @@ class Phase3SignedAcceptanceScenarioExecutor:
             scenario=scenario,
             profile_store=profile_store,
         )
-        compat = self.compat_surface(shell)
-        preview = compat.properties_panel.refresh_preview()
-        preview_text = compat.properties_panel.preview_text()
-        validation_text = compat.properties_panel.validation_text()
-        request = self.snapshot_current_draft_request(compat.properties_panel._workflow)
+        workspace = self.build_workspace(shell=shell, profile_store=profile_store)
         artifact_basename = self.scenario_slug(str(scenario["name"]))
-        render_capture = self.capture_preview_render(
-            shell=shell,
-            preview=preview,
-            artifacts_dir=str(artifacts_dir),
-            artifact_basename=artifact_basename,
+        request = workspace.current_request()
+        capture = workspace.capture_state(
+            Phase3HarnessCaptureCommand(
+                request=request,
+                artifacts_dir=str(artifacts_dir),
+                artifact_basename=artifact_basename,
+                capture_index=1,
+                capture_kind="signed_acceptance_preview",
+            )
         )
-        preview_snapshot = self.snapshot_preview(preview, render_capture=render_capture)
-        backend_reservation = self.build_backend_reservation_evidence(request)
 
         result = {
             "name": scenario["name"],
@@ -73,13 +66,11 @@ class Phase3SignedAcceptanceScenarioExecutor:
             "expected_failure_message_contains": scenario.get(
                 "expected_failure_message_contains"
             ),
-            "preview_snapshot": preview_snapshot,
-            "preview_text": preview_text,
-            "validation_text": validation_text,
-            "sign_request_snapshot": self.snapshot_signing_request(request),
-            "backend_reservation_snapshot": (
-                None if backend_reservation is None else backend_reservation.snapshot
-            ),
+            "preview_snapshot": capture["preview_snapshot"],
+            "preview_text": capture["preview_text"],
+            "validation_text": capture["validation_text"],
+            "sign_request_snapshot": capture["sign_request_snapshot"],
+            "backend_reservation_snapshot": capture["backend_reservation_snapshot"],
             "signing_result": None,
             "output_file_exists": False,
             "output_signature_count": None,
@@ -112,8 +103,8 @@ class Phase3SignedAcceptanceScenarioExecutor:
                         if scenario_request.signature_rect is not None
                         else None
                     ),
-                    preview_snapshot=preview_snapshot,
-                    preview_text=preview_text,
+                    preview_snapshot=capture["preview_snapshot"],
+                    preview_text=capture["preview_text"],
                     trust_policy=scenario_request.trust_policy,
                     artifacts_dir=str(artifacts_dir),
                     artifact_basename=artifact_basename,

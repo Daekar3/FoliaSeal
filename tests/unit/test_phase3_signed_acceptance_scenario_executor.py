@@ -3,44 +3,46 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    Phase3HarnessCaptureCommand,
+)
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
 )
 from tests.support.phase3_builders import build_signature_rect, build_signing_request
 
 
-class _FakePropertiesPanel:
-    def __init__(self, *, workflow=object()) -> None:
-        self._workflow = workflow
-        self.preview = {"preview": True}
-
-    def refresh_preview(self):
-        return self.preview
-
-    def preview_text(self) -> str:
-        return "Preview text"
-
-    def validation_text(self) -> str:
-        return "Ready to sign."
-
-
 class _FakeShell:
-    def __init__(self, *, workflow=object()) -> None:
-        self.properties_panel = _FakePropertiesPanel(workflow=workflow)
+    pass
+
+
+class _FakeWorkspace:
+    def __init__(self, *, request=None, capture=None) -> None:
+        self._request = request
+        self._capture = capture or {
+            "preview_snapshot": {"render_capture": {"rendered": True}},
+            "preview_text": "Preview text",
+            "validation_text": "Ready to sign.",
+            "sign_request_snapshot": None if request is None else {"request": True},
+            "backend_reservation_snapshot": None,
+        }
+        self.capture_commands: list[Phase3HarnessCaptureCommand] = []
+
+    def current_request(self):
+        return self._request
+
+    def last_signing_result(self):
+        return None
+
+    def capture_state(self, command: Phase3HarnessCaptureCommand):
+        self.capture_commands.append(command)
+        return self._capture
 
 
 def _executor(**overrides) -> Phase3SignedAcceptanceScenarioExecutor:
     defaults = {
         "apply_preview_matrix_scenario": lambda **_kwargs: None,
-        "compat_surface": lambda shell: shell,
-        "snapshot_current_draft_request": lambda _workflow: None,
-        "build_backend_reservation_evidence": lambda _request: None,
-        "capture_preview_render": lambda **_kwargs: {"rendered": True},
-        "snapshot_preview": lambda preview, render_capture: {
-            "preview": preview,
-            "render_capture": render_capture,
-        },
-        "snapshot_signing_request": lambda request: None if request is None else {"request": True},
+        "build_workspace": lambda **_kwargs: _FakeWorkspace(),
         "scenario_slug": lambda name: name.lower().replace(" ", "-"),
         "snapshot_signing_result_payload": lambda result: {"success": result.success},
         "snapshot_successful_signed_output": lambda **_kwargs: {
@@ -61,7 +63,8 @@ def test_signed_acceptance_scenario_executor_returns_preview_only_result_without
     tmp_path: Path,
 ) -> None:
     shell = _FakeShell()
-    executor = _executor()
+    workspace = _FakeWorkspace()
+    executor = _executor(build_workspace=lambda **_kwargs: workspace)
     execute_calls: list[object] = []
     sign_executor = SimpleNamespace(execute=lambda request: execute_calls.append(request))
 
@@ -86,6 +89,15 @@ def test_signed_acceptance_scenario_executor_returns_preview_only_result_without
     assert result["signing_result"] is None
     assert result["output_file_exists"] is False
     assert execute_calls == []
+    assert workspace.capture_commands == [
+        Phase3HarnessCaptureCommand(
+            request=None,
+            artifacts_dir=str(tmp_path),
+            artifact_basename="scenario-a",
+            capture_index=1,
+            capture_kind="signed_acceptance_preview",
+        )
+    ]
 
 
 def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_snapshot(
@@ -100,10 +112,23 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
         timestamp_required=False,
         signature_rect=build_signature_rect(page_index=2, width_pt=240.0, height_pt=72.0),
     )
-    shell = _FakeShell(workflow=object())
+    shell = _FakeShell()
     snapshot_calls: list[dict[str, object]] = []
     sign_requests: list[object] = []
     scenario_output = tmp_path / "scenario-b_signed.pdf"
+    workspace = _FakeWorkspace(
+        request=request,
+        capture={
+            "preview_snapshot": {"render_capture": {"rendered": True}},
+            "preview_text": "Preview text",
+            "validation_text": "Ready to sign.",
+            "sign_request_snapshot": {
+                "input_pdf_path": request.input_pdf_path,
+                "output_pdf_path": request.output_pdf_path,
+            },
+            "backend_reservation_snapshot": {"reserved": True},
+        },
+    )
 
     def execute(request_obj):
         sign_requests.append(request_obj)
@@ -111,14 +136,7 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
         return SimpleNamespace(success=True)
 
     executor = _executor(
-        snapshot_current_draft_request=lambda _workflow: request,
-        build_backend_reservation_evidence=lambda _request: SimpleNamespace(
-            snapshot={"reserved": True}
-        ),
-        snapshot_signing_request=lambda current: {
-            "input_pdf_path": current.input_pdf_path,
-            "output_pdf_path": current.output_pdf_path,
-        },
+        build_workspace=lambda **_kwargs: workspace,
         snapshot_signing_result_payload=lambda result: {"success": result.success},
         snapshot_successful_signed_output=lambda **kwargs: snapshot_calls.append(kwargs)
         or {
@@ -159,6 +177,15 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
     assert snapshot_calls[0]["output_file"] == scenario_output
     assert snapshot_calls[0]["page_index"] == 2
     assert snapshot_calls[0]["preview_text"] == "Preview text"
+    assert workspace.capture_commands == [
+        Phase3HarnessCaptureCommand(
+            request=request,
+            artifacts_dir=str(tmp_path),
+            artifact_basename="scenario-b",
+            capture_index=1,
+            capture_kind="signed_acceptance_preview",
+        )
+    ]
 
     assert result["profile_name"] == "Default"
     assert result["expected_outcome"] == "success"
