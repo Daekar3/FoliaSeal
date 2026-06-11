@@ -77,8 +77,11 @@ from foliaseal.presentation.qt.phase3_harness_session_runner import (
 )
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     HeadlessPhase3HarnessWorkspaceAdapter,
+    Phase3HarnessCaptureCommand,
     Phase3HarnessScenarioCommand,
+    Phase3HarnessWorkspacePort,
     QtPhase3HarnessWorkspaceAdapter,
+    snapshot_current_draft_request,
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
@@ -746,10 +749,8 @@ def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
 def _build_phase3_harness_session_runner() -> Phase3HarnessSessionRunner:
     return Phase3HarnessSessionRunner(
         build_qt_signing_shell=build_qt_signing_shell,
-        snapshot_current_draft_request=_snapshot_current_draft_request,
-        capture_interactive_state=_capture_interactive_state,
+        build_workspace=_build_qt_phase3_harness_workspace,
         default_harness_output_pdf_path=_default_harness_output_pdf_path,
-        compat_surface=_shell_compat_surface,
     )
 
 
@@ -784,58 +785,51 @@ def _shell_compat_surface(shell: Any) -> Any:
     return getattr(shell, "compat_surface", shell)
 
 
-def _capture_interactive_state(
+def _build_qt_phase3_harness_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
+    return QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=object(),
+        capture_preview_render=_capture_preview_render,
+        snapshot_preview=_snapshot_preview,
+        snapshot_signing_request=_snapshot_signing_request,
+        build_backend_reservation_evidence=build_backend_reservation_evidence,
+        snapshot_sign_time_fit_diagnostics=_snapshot_sign_time_fit_diagnostics,
+        interactive_capture_label=_interactive_capture_label,
+    )
+
+
+def _build_preview_matrix_qt_workspace(
     *,
     shell: Any,
-    request: SigningRequest | None,
-    artifacts_dir: str | None,
-    artifact_basename: str | None,
-    capture_index: int,
-    capture_kind: str,
-) -> dict[str, Any]:
-    compat = _shell_compat_surface(shell)
-    preview = compat.properties_panel.refresh_preview()
-    app = _widget_application(shell)
-    if app is not None and hasattr(app, "processEvents"):
-        app.processEvents()
-    preview_text = compat.properties_panel.preview_text()
-    validation_text = compat.properties_panel.validation_text()
-    render_capture = _capture_preview_render(
+    profile_store: SignaturePresetCatalogStore,
+) -> Phase3HarnessWorkspacePort:
+    return QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
-        preview=preview,
-        artifacts_dir=artifacts_dir,
-        artifact_basename=artifact_basename,
+        profile_store=profile_store,
+        capture_preview_render=_capture_preview_render,
+        snapshot_preview=_snapshot_preview,
+        snapshot_signing_request=_snapshot_signing_request,
+        build_backend_reservation_evidence=build_backend_reservation_evidence,
+        snapshot_sign_time_fit_diagnostics=_snapshot_sign_time_fit_diagnostics,
+        interactive_capture_label=_interactive_capture_label,
     )
-    backend_reservation = build_backend_reservation_evidence(request)
-    backend_reservation_snapshot = (
-        None if backend_reservation is None else backend_reservation.snapshot
+
+
+def _build_preview_matrix_headless_workspace(
+    *,
+    workflow: SigningDraftWorkflow,
+    profile_store: SignaturePresetCatalogStore,
+) -> Phase3HarnessWorkspacePort:
+    return HeadlessPhase3HarnessWorkspaceAdapter(
+        workflow=workflow,
+        profile_store=profile_store,
+        headless_preview_text=_headless_preview_text,
+        headless_validation_text=_headless_validation_text,
+        capture_headless_preview_render=_capture_headless_preview_render,
+        snapshot_preview=_snapshot_preview,
+        snapshot_signing_request=_snapshot_signing_request,
+        build_backend_reservation_evidence=build_backend_reservation_evidence,
     )
-    sign_time_diagnostics = _snapshot_sign_time_fit_diagnostics(
-        preview_render_capture=render_capture,
-        backend_reservation_snapshot=backend_reservation_snapshot,
-    )
-    capture_label = _interactive_capture_label(
-        preview=preview,
-        capture_index=capture_index,
-        capture_kind=capture_kind,
-    )
-    return {
-        "capture_index": capture_index,
-        "capture_kind": capture_kind,
-        "capture_label": capture_label,
-        "preview_snapshot": _snapshot_preview(
-            preview,
-            render_capture=render_capture,
-            sign_time_diagnostics=sign_time_diagnostics,
-        ),
-        "preview_text": preview_text,
-        "validation_text": validation_text,
-        "sign_request_snapshot": _snapshot_signing_request(request),
-        "backend_reservation_snapshot": backend_reservation_snapshot,
-        "backend_reservation_error": (
-            None if backend_reservation is None else backend_reservation.error
-        ),
-    }
 
 
 def _interactive_capture_label(*, preview, capture_index: int, capture_kind: str) -> str:
@@ -989,7 +983,7 @@ def _build_phase3_signed_acceptance_scenario_executor() -> (
     return Phase3SignedAcceptanceScenarioExecutor(
         apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
         compat_surface=_shell_compat_surface,
-        snapshot_current_draft_request=_snapshot_current_draft_request,
+        snapshot_current_draft_request=snapshot_current_draft_request,
         build_backend_reservation_evidence=build_backend_reservation_evidence,
         capture_preview_render=_capture_preview_render,
         snapshot_preview=_snapshot_preview,
@@ -1732,33 +1726,29 @@ def _execute_preview_matrix_scenario(
     profile_store: SignaturePresetCatalogStore,
     artifacts_dir: Path,
 ) -> dict[str, Any]:
-    QtPhase3HarnessWorkspaceAdapter(
+    workspace = _build_preview_matrix_qt_workspace(
         shell=shell,
         profile_store=profile_store,
-    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
-    compat = _shell_compat_surface(shell)
-    preview = compat.properties_panel.refresh_preview()
-    preview_text = compat.properties_panel.preview_text()
-    validation_text = compat.properties_panel.validation_text()
-    request = _snapshot_current_draft_request(compat.properties_panel._workflow)
-    backend_reservation = build_backend_reservation_evidence(request)
+    )
+    workspace.apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
     artifact_basename = _scenario_slug(str(scenario["name"]))
-    render_capture = _capture_preview_render(
-        shell=shell,
-        preview=preview,
-        artifacts_dir=str(artifacts_dir),
-        artifact_basename=artifact_basename,
+    capture = workspace.capture_state(
+        Phase3HarnessCaptureCommand(
+            request=None,
+            artifacts_dir=str(artifacts_dir),
+            artifact_basename=artifact_basename,
+            capture_index=1,
+            capture_kind="preview_matrix",
+        )
     )
     return {
         "name": scenario["name"],
         "profile_name": scenario.get("profile_name"),
-        "preview_snapshot": _snapshot_preview(preview, render_capture=render_capture),
-        "preview_text": preview_text,
-        "validation_text": validation_text,
-        "sign_request_snapshot": _snapshot_signing_request(request),
-        "backend_reservation_snapshot": (
-            None if backend_reservation is None else backend_reservation.snapshot
-        ),
+        "preview_snapshot": capture["preview_snapshot"],
+        "preview_text": capture["preview_text"],
+        "validation_text": capture["validation_text"],
+        "sign_request_snapshot": capture["sign_request_snapshot"],
+        "backend_reservation_snapshot": capture["backend_reservation_snapshot"],
     }
 
 
@@ -1776,31 +1766,29 @@ def _execute_headless_preview_matrix_scenario(
         certificate_path=certificate_path,
         passphrase=passphrase,
     )
-    HeadlessPhase3HarnessWorkspaceAdapter(
+    workspace = _build_preview_matrix_headless_workspace(
         workflow=workflow,
         profile_store=profile_store,
-    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
-    preview = workflow.preview()
-    preview_text = _headless_preview_text(preview)
-    validation_text = _headless_validation_text(preview)
-    request = _snapshot_current_draft_request(workflow)
-    backend_reservation = build_backend_reservation_evidence(request)
+    )
+    workspace.apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
     artifact_basename = _scenario_slug(str(scenario["name"]))
-    render_capture = _capture_headless_preview_render(
-        preview=preview,
-        artifacts_dir=str(artifacts_dir),
-        artifact_basename=artifact_basename,
+    capture = workspace.capture_state(
+        Phase3HarnessCaptureCommand(
+            request=None,
+            artifacts_dir=str(artifacts_dir),
+            artifact_basename=artifact_basename,
+            capture_index=1,
+            capture_kind="preview_matrix",
+        )
     )
     return {
         "name": scenario["name"],
         "profile_name": scenario.get("profile_name"),
-        "preview_snapshot": _snapshot_preview(preview, render_capture=render_capture),
-        "preview_text": preview_text,
-        "validation_text": validation_text,
-        "sign_request_snapshot": _snapshot_signing_request(request),
-        "backend_reservation_snapshot": (
-            None if backend_reservation is None else backend_reservation.snapshot
-        ),
+        "preview_snapshot": capture["preview_snapshot"],
+        "preview_text": capture["preview_text"],
+        "validation_text": capture["validation_text"],
+        "sign_request_snapshot": capture["sign_request_snapshot"],
+        "backend_reservation_snapshot": capture["backend_reservation_snapshot"],
     }
 
 
@@ -4130,27 +4118,6 @@ def _snapshot_signing_request(request: SigningRequest | None) -> dict[str, Any] 
             None if appearance is None else _snapshot_signing_appearance(appearance)
         ),
     }
-
-
-def _snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:
-    signature_rect = workflow.current_signature_rect
-    signature_appearance = workflow.current_signature_appearance
-    if signature_rect is None or signature_appearance is None:
-        return None
-    return SigningRequest(
-        input_pdf_path=workflow.input_pdf_path,
-        output_pdf_path=workflow.output_pdf_path,
-        certificate_path=workflow.certificate_path,
-        passphrase=workflow.passphrase,
-        tsa_url=workflow.tsa_url,
-        timestamp_required=workflow.timestamp_required,
-        trust_policy=workflow.trust_policy,
-        certificate_alias=workflow.certificate_alias,
-        signature_rect=signature_rect,
-        signature_appearance=signature_appearance,
-    )
-
-
 def _snapshot_layout_rule(layout_rule) -> dict[str, Any] | None:
     if layout_rule is None:
         return None

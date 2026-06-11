@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
@@ -21,6 +22,8 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
+    SigningRequest,
+    SigningResult,
 )
 
 
@@ -73,18 +76,73 @@ class Phase3HarnessScenarioCommand:
         )
 
 
+@dataclass(frozen=True)
+class Phase3HarnessCaptureCommand:
+    """Normalized capture inputs for live-shell and headless workspace snapshots."""
+
+    request: SigningRequest | None
+    artifacts_dir: str | None
+    artifact_basename: str | None
+    capture_index: int
+    capture_kind: str
+
+
 class Phase3HarnessWorkspacePort(Protocol):
-    """Narrow scenario-application boundary for the harness."""
+    """Narrow workspace boundary for Phase 3 harness scenario and capture flows."""
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None: ...
+    def current_request(self) -> SigningRequest | None: ...
+    def last_signing_result(self) -> SigningResult | None: ...
+    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]: ...
 
 
 class HeadlessPhase3HarnessWorkspaceAdapter:
     """Apply preview scenarios directly to a headless signing workflow."""
 
-    def __init__(self, *, workflow: SigningDraftWorkflow, profile_store: Any) -> None:
+    def __init__(
+        self,
+        *,
+        workflow: SigningDraftWorkflow,
+        profile_store: Any,
+        headless_preview_text: Callable[[Any], str] | None = None,
+        headless_validation_text: Callable[[Any], str] | None = None,
+        capture_headless_preview_render: Callable[..., dict[str, Any] | None] | None = None,
+        snapshot_preview: Callable[..., dict[str, Any]] | None = None,
+        snapshot_signing_request: (
+            Callable[[SigningRequest | None], dict[str, Any] | None] | None
+        ) = None,
+        build_backend_reservation_evidence: Callable[[SigningRequest | None], Any] | None = None,
+    ) -> None:
         self._workflow = workflow
         self._profile_store = profile_store
+        self._headless_preview_text = (
+            headless_preview_text if headless_preview_text is not None else lambda _preview: ""
+        )
+        self._headless_validation_text = (
+            headless_validation_text
+            if headless_validation_text is not None
+            else lambda _preview: ""
+        )
+        self._capture_headless_preview_render = (
+            capture_headless_preview_render
+            if capture_headless_preview_render is not None
+            else lambda **_kwargs: None
+        )
+        self._snapshot_preview = (
+            snapshot_preview
+            if snapshot_preview is not None
+            else lambda _preview, **_kwargs: {}
+        )
+        self._snapshot_signing_request = (
+            snapshot_signing_request
+            if snapshot_signing_request is not None
+            else lambda _request: None
+        )
+        self._build_backend_reservation_evidence = (
+            build_backend_reservation_evidence
+            if build_backend_reservation_evidence is not None
+            else lambda _request: None
+        )
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
         base_appearance = _base_appearance(
@@ -102,13 +160,82 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
         if command.signature_rect is not None:
             self._workflow.set_signature_rect(command.signature_rect)
 
+    def current_request(self) -> SigningRequest | None:
+        return snapshot_current_draft_request(self._workflow)
+
+    def last_signing_result(self) -> SigningResult | None:
+        return None
+
+    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
+        request = command.request if command.request is not None else self.current_request()
+        preview = self._workflow.preview()
+        render_capture = self._capture_headless_preview_render(
+            preview=preview,
+            artifacts_dir=command.artifacts_dir,
+            artifact_basename=command.artifact_basename,
+        )
+        backend_reservation = self._build_backend_reservation_evidence(request)
+        return {
+            "capture_index": command.capture_index,
+            "capture_kind": command.capture_kind,
+            "preview_snapshot": self._snapshot_preview(preview, render_capture=render_capture),
+            "preview_text": self._headless_preview_text(preview),
+            "validation_text": self._headless_validation_text(preview),
+            "sign_request_snapshot": self._snapshot_signing_request(request),
+            "backend_reservation_snapshot": (
+                None if backend_reservation is None else backend_reservation.snapshot
+            ),
+            "backend_reservation_error": (
+                None if backend_reservation is None else backend_reservation.error
+            ),
+        }
+
 
 class QtPhase3HarnessWorkspaceAdapter:
     """Apply preview scenarios to a live signing shell through private shell anatomy."""
 
-    def __init__(self, *, shell: Any, profile_store: Any) -> None:
+    def __init__(
+        self,
+        *,
+        shell: Any,
+        profile_store: Any,
+        capture_preview_render: Callable[..., dict[str, Any] | None] | None = None,
+        snapshot_preview: Callable[..., dict[str, Any]] | None = None,
+        snapshot_signing_request: (
+            Callable[[SigningRequest | None], dict[str, Any] | None] | None
+        ) = None,
+        build_backend_reservation_evidence: Callable[[SigningRequest | None], Any] | None = None,
+        snapshot_sign_time_fit_diagnostics: Callable[..., dict[str, Any] | None] | None = None,
+        interactive_capture_label: Callable[..., str] | None = None,
+    ) -> None:
         self._shell = shell
         self._profile_store = profile_store
+        self._capture_preview_render = (
+            capture_preview_render if capture_preview_render is not None else lambda **_kwargs: None
+        )
+        self._snapshot_preview = (
+            snapshot_preview if snapshot_preview is not None else lambda _preview, **_kwargs: {}
+        )
+        self._snapshot_signing_request = (
+            snapshot_signing_request
+            if snapshot_signing_request is not None
+            else lambda _request: None
+        )
+        self._build_backend_reservation_evidence = (
+            build_backend_reservation_evidence
+            if build_backend_reservation_evidence is not None
+            else lambda _request: None
+        )
+        self._snapshot_sign_time_fit_diagnostics = (
+            snapshot_sign_time_fit_diagnostics
+            if snapshot_sign_time_fit_diagnostics is not None
+            else lambda **_kwargs: None
+        )
+        self._interactive_capture_label = (
+            interactive_capture_label
+            if interactive_capture_label is not None
+            else lambda **_kwargs: ""
+        )
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
         compat = _compat_surface(self._shell)
@@ -147,6 +274,78 @@ class QtPhase3HarnessWorkspaceAdapter:
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
+
+    def current_request(self) -> SigningRequest | None:
+        workflow = _compat_surface(self._shell).properties_panel._workflow
+        return snapshot_current_draft_request(workflow)
+
+    def last_signing_result(self) -> SigningResult | None:
+        signing_result = getattr(_compat_surface(self._shell), "last_signing_result", None)
+        return signing_result if isinstance(signing_result, SigningResult) else None
+
+    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
+        compat = _compat_surface(self._shell)
+        request = command.request if command.request is not None else self.current_request()
+        preview = compat.properties_panel.refresh_preview()
+        app = _widget_application(self._shell)
+        if app is not None and hasattr(app, "processEvents"):
+            app.processEvents()
+        render_capture = self._capture_preview_render(
+            shell=self._shell,
+            preview=preview,
+            artifacts_dir=command.artifacts_dir,
+            artifact_basename=command.artifact_basename,
+        )
+        backend_reservation = self._build_backend_reservation_evidence(request)
+        backend_reservation_snapshot = (
+            None if backend_reservation is None else backend_reservation.snapshot
+        )
+        sign_time_diagnostics = self._snapshot_sign_time_fit_diagnostics(
+            preview_render_capture=render_capture,
+            backend_reservation_snapshot=backend_reservation_snapshot,
+        )
+        return {
+            "capture_index": command.capture_index,
+            "capture_kind": command.capture_kind,
+            "capture_label": self._interactive_capture_label(
+                preview=preview,
+                capture_index=command.capture_index,
+                capture_kind=command.capture_kind,
+            ),
+            "preview_snapshot": self._snapshot_preview(
+                preview,
+                render_capture=render_capture,
+                sign_time_diagnostics=sign_time_diagnostics,
+            ),
+            "preview_text": compat.properties_panel.preview_text(),
+            "validation_text": compat.properties_panel.validation_text(),
+            "sign_request_snapshot": self._snapshot_signing_request(request),
+            "backend_reservation_snapshot": backend_reservation_snapshot,
+            "backend_reservation_error": (
+                None if backend_reservation is None else backend_reservation.error
+            ),
+        }
+
+
+def snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:
+    """Read the current draft signing request from workflow state when placement exists."""
+
+    signature_rect = workflow.current_signature_rect
+    signature_appearance = workflow.current_signature_appearance
+    if signature_rect is None or signature_appearance is None:
+        return None
+    return SigningRequest(
+        input_pdf_path=workflow.input_pdf_path,
+        output_pdf_path=workflow.output_pdf_path,
+        certificate_path=workflow.certificate_path,
+        passphrase=workflow.passphrase,
+        tsa_url=workflow.tsa_url,
+        timestamp_required=workflow.timestamp_required,
+        trust_policy=workflow.trust_policy,
+        certificate_alias=workflow.certificate_alias,
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+    )
 
 
 def _base_appearance(

@@ -1,11 +1,23 @@
+from pathlib import Path
+
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
+from foliaseal.domain.models import (
+    SignatureLayoutTemplate,
+    SignatureStampPosition,
+    SigningResult,
+)
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     HeadlessPhase3HarnessWorkspaceAdapter,
+    Phase3HarnessCaptureCommand,
     Phase3HarnessScenarioCommand,
     QtPhase3HarnessWorkspaceAdapter,
+    snapshot_current_draft_request,
 )
-from tests.support.phase3_builders import build_signature_appearance, build_signature_rect
+from tests.support.phase3_builders import (
+    build_signature_appearance,
+    build_signature_rect,
+    build_signing_request,
+)
 
 
 class _FakePreset:
@@ -132,6 +144,109 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
     assert compat.viewer_refreshes == 1
 
 
+def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signing_result() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "title": "Digitally signed by",
+            "signer_label_prefix": "Digitally signed by",
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "timezone_display_mode": None,
+            "show_field_names": False,
+            "datetime_format": "%Y-%m-%d %H:%M",
+            "image_stamp_path": None,
+            "signature_rect": build_signature_rect(page_index=1, width_pt=180.0, height_pt=32.0),
+            "text_style": None,
+            "box_style": None,
+            "fields": (),
+            "issues": (),
+            "can_submit": True,
+        },
+    )()
+    request = build_signing_request(
+        Path("/tmp"),
+        signature_rect=preview.signature_rect,
+        signature_appearance=build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+        ),
+    )
+
+    class _FakePanel:
+        def __init__(self) -> None:
+            self._workflow = SigningDraftWorkflow.from_signing_request(request)
+
+        def refresh_preview(self):
+            return preview
+
+        def preview_text(self) -> str:
+            return "Preview text"
+
+        def validation_text(self) -> str:
+            return "Ready to sign."
+
+    class _FakeCompat:
+        def __init__(self) -> None:
+            self.properties_panel = _FakePanel()
+            self.last_signing_result = SigningResult(success=True, failure_code=None, message="ok")
+
+    compat = _FakeCompat()
+    shell = type("_Shell", (), {"compat_surface": compat})()
+    adapter = QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=object(),
+        capture_preview_render=lambda **_kwargs: {"preview_image_path": "artifacts/preview.png"},
+        snapshot_preview=lambda preview, **kwargs: {
+            "title": preview.title,
+            "render_capture": kwargs["render_capture"],
+            "sign_time_diagnostics": kwargs["sign_time_diagnostics"],
+        },
+        snapshot_signing_request=lambda current_request: (
+            None
+            if current_request is None
+            else {"layout_template": current_request.signature_appearance.layout_template.value}
+        ),
+        build_backend_reservation_evidence=lambda current_request: type(
+            "_Reservation",
+            (),
+            {
+                "snapshot": {
+                    "layout_template": current_request.signature_appearance.layout_template.value
+                },
+                "error": None,
+            },
+        )(),
+        snapshot_sign_time_fit_diagnostics=lambda **_kwargs: {"fit": "ok"},
+        interactive_capture_label=lambda **kwargs: (
+            f"{kwargs['capture_kind']}_{kwargs['capture_index']:02d}"
+        ),
+    )
+
+    capture = adapter.capture_state(
+        Phase3HarnessCaptureCommand(
+            request=None,
+            artifacts_dir="artifacts/debug",
+            artifact_basename="interactive_state_01",
+            capture_index=1,
+            capture_kind="manual",
+        )
+    )
+
+    assert adapter.current_request() == request
+    assert adapter.last_signing_result() == compat.last_signing_result
+    assert capture["capture_label"] == "manual_01"
+    assert capture["preview_text"] == "Preview text"
+    assert capture["validation_text"] == "Ready to sign."
+    assert capture["sign_request_snapshot"] == {"layout_template": "single_line"}
+    assert capture["backend_reservation_snapshot"] == {"layout_template": "single_line"}
+    assert capture["preview_snapshot"]["render_capture"] == {
+        "preview_image_path": "artifacts/preview.png"
+    }
+    assert capture["preview_snapshot"]["sign_time_diagnostics"] == {"fit": "ok"}
+
+
 def test_headless_phase3_harness_workspace_adapter_applies_same_scenario_fields() -> None:
     workflow = SigningDraftWorkflow(
         input_pdf_path="input.pdf",
@@ -176,3 +291,59 @@ def test_headless_phase3_harness_workspace_adapter_applies_same_scenario_fields(
     assert workflow.timestamp_required is False
     assert workflow.current_signature_rect is not None
     assert workflow.current_signature_rect.page_index == 2
+
+
+def test_headless_phase3_harness_workspace_adapter_captures_preview_state() -> None:
+    request = build_signing_request(Path("/tmp"))
+    workflow = SigningDraftWorkflow.from_signing_request(request)
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "title": "Headless preview",
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.BOTTOM,
+        },
+    )()
+    adapter = HeadlessPhase3HarnessWorkspaceAdapter(
+        workflow=workflow,
+        profile_store=object(),
+        headless_preview_text=lambda _preview: "Preview text",
+        headless_validation_text=lambda _preview: "Ready to sign.",
+        capture_headless_preview_render=lambda **_kwargs: {"preview_image_path": "headless.png"},
+        snapshot_preview=lambda current_preview, **kwargs: {
+            "title": current_preview.title,
+            "render_capture": kwargs["render_capture"],
+        },
+        snapshot_signing_request=lambda current_request: (
+            None
+            if current_request is None
+            else {"output_pdf_path": current_request.output_pdf_path}
+        ),
+        build_backend_reservation_evidence=lambda current_request: type(
+            "_Reservation",
+            (),
+            {"snapshot": {"output_pdf_path": current_request.output_pdf_path}, "error": None},
+        )(),
+    )
+    workflow.preview = lambda: preview  # type: ignore[method-assign]
+
+    capture = adapter.capture_state(
+        Phase3HarnessCaptureCommand(
+            request=None,
+            artifacts_dir="artifacts/debug",
+            artifact_basename="scenario",
+            capture_index=1,
+            capture_kind="preview_matrix",
+        )
+    )
+
+    assert snapshot_current_draft_request(workflow) == request
+    assert adapter.current_request() == request
+    assert adapter.last_signing_result() is None
+    assert capture["capture_index"] == 1
+    assert capture["preview_snapshot"]["render_capture"] == {"preview_image_path": "headless.png"}
+    assert capture["preview_text"] == "Preview text"
+    assert capture["validation_text"] == "Ready to sign."
+    assert capture["sign_request_snapshot"] == {"output_pdf_path": request.output_pdf_path}
+    assert capture["backend_reservation_snapshot"] == {"output_pdf_path": request.output_pdf_path}

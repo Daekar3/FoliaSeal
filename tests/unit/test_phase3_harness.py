@@ -18,7 +18,6 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.phase3_signing_backend import (
-    BackendReservationEvidence,
     build_phase3_signing_executor,
 )
 from foliaseal.application.qa_evidence_contract import (
@@ -53,7 +52,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
     _capture_headless_preview_render,
-    _capture_interactive_state,
     _default_harness_artifacts_dir,
     _default_harness_output_pdf_path,
     _evaluate_signed_matrix_acceptance_expectations,
@@ -64,7 +62,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     _preview_matrix_error_result,
     _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
-    _snapshot_current_draft_request,
     _snapshot_output_verification,
     _snapshot_preview,
     _snapshot_visible_signature_appearance,
@@ -1360,79 +1357,6 @@ def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
     assert label == "manual_03_single_line_bottom"
 
 
-def test_capture_interactive_state_collects_preview_and_backend_snapshots(monkeypatch) -> None:
-    preview = type(
-        "_Preview",
-        (),
-        {
-            "title": "Inkslapped by",
-            "signer_label_prefix": "Inkslapped by",
-            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
-            "stamp_position": SignatureStampPosition.TOP,
-            "timezone_display_mode": SignatureTimezoneDisplayMode.LOCAL,
-            "show_field_names": False,
-            "datetime_format": "%Y-%m-%d %H:%M",
-            "image_stamp_path": None,
-            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=30.0),
-            "text_style": None,
-            "box_style": None,
-            "fields": (),
-            "issues": (),
-            "can_submit": True,
-        },
-    )()
-
-    class _FakePanel:
-        def refresh_preview(self):
-            return preview
-
-        def preview_text(self) -> str:
-            return "Preview text"
-
-        def validation_text(self) -> str:
-            return "Ready to sign."
-
-    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
-
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._capture_preview_render",
-        lambda **_kwargs: {"preview_image_path": "artifacts/preview.png"},
-    )
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness.build_backend_reservation_evidence",
-        lambda request: BackendReservationEvidence(
-            snapshot={"layout_template": request.signature_appearance.layout_template.value},
-            error=None,
-        ),
-    )
-
-    request = build_signing_request(
-        Path("/tmp"),
-        signature_appearance=build_signature_appearance(
-            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-            stamp_position=SignatureStampPosition.TOP,
-        ),
-    )
-    state = _capture_interactive_state(
-        shell=shell,
-        request=request,
-        artifacts_dir="artifacts/debug",
-        artifact_basename="interactive_state_01",
-        capture_index=1,
-        capture_kind="manual",
-    )
-
-    assert state["capture_index"] == 1
-    assert state["capture_kind"] == "manual"
-    assert state["capture_label"] == "manual_01_single_line_top"
-    assert state["preview_text"] == "Preview text"
-    assert state["validation_text"] == "Ready to sign."
-    assert state["preview_snapshot"]["render_capture"] == {
-        "preview_image_path": "artifacts/preview.png"
-    }
-    assert state["backend_reservation_snapshot"] == {"layout_template": "single_line"}
-
-
 def test_capture_preview_render_preserves_gui_preview_and_bordered_analysis_preview(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -2025,88 +1949,6 @@ def test_analyze_capture_state_transitions_ignores_signing_time_differences(
 
     assert len(diagnostics) == 1
     assert diagnostics[0]["issue_code"] == "font_size_change_had_negligible_visual_effect"
-
-
-def test_capture_interactive_state_preserves_render_artifacts_when_preview_capture_succeeds(
-    monkeypatch,
-) -> None:
-    preview = type(
-        "_Preview",
-        (),
-        {
-            "title": "Digitally signed by",
-            "signer_label_prefix": "Digitally signed by",
-            "layout_template": SignatureLayoutTemplate.MULTI_LINE,
-            "stamp_position": SignatureStampPosition.TOP,
-            "timezone_display_mode": SignatureTimezoneDisplayMode.UTC,
-            "show_field_names": False,
-            "datetime_format": "%Y-%m-%d %H:%M",
-            "image_stamp_path": None,
-            "signature_rect": build_signature_rect(page_index=0, width_pt=260.0, height_pt=46.0),
-            "text_style": None,
-            "box_style": None,
-            "fields": (),
-            "issues": (),
-            "can_submit": True,
-        },
-    )()
-
-    class _FakePanel:
-        def refresh_preview(self):
-            return preview
-
-        def preview_text(self) -> str:
-            return "Preview text"
-
-        def validation_text(self) -> str:
-            return "Ready to sign."
-
-    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
-
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness._capture_preview_render",
-        lambda **_kwargs: {
-            "preview_image_path": "artifacts/debug/state.png",
-            "text_debug_image_path": "artifacts/debug/state_text_debug.png",
-            "stamp_debug_image_path": "artifacts/debug/state_stamp_debug.png",
-            "text_rendered_content_bounds_px": {"x": 10, "y": 12, "width": 80, "height": 18},
-            "stamp_rendered_content_bounds_px": {"x": 20, "y": 4, "width": 60, "height": 10},
-        },
-    )
-    monkeypatch.setattr(
-        "foliaseal.presentation.qt.phase3_harness.build_backend_reservation_evidence",
-        lambda request: BackendReservationEvidence(
-            snapshot={"layout_template": request.signature_appearance.layout_template.value},
-            error=None,
-        ),
-    )
-
-    request = build_signing_request(
-        Path("/tmp"),
-        signature_appearance=build_signature_appearance(
-            layout_template=SignatureLayoutTemplate.MULTI_LINE,
-            stamp_position=SignatureStampPosition.TOP,
-        ),
-    )
-    state = _capture_interactive_state(
-        shell=shell,
-        request=request,
-        artifacts_dir="artifacts/debug",
-        artifact_basename="interactive_state_02",
-        capture_index=2,
-        capture_kind="manual",
-    )
-
-    render_capture = state["preview_snapshot"]["render_capture"]
-    assert render_capture["preview_image_path"] == "artifacts/debug/state.png"
-    assert render_capture["text_debug_image_path"] == "artifacts/debug/state_text_debug.png"
-    assert render_capture["stamp_debug_image_path"] == "artifacts/debug/state_stamp_debug.png"
-    assert render_capture["text_rendered_content_bounds_px"] == {
-        "x": 10,
-        "y": 12,
-        "width": 80,
-        "height": 18,
-    }
 
 
 def test_snapshot_preview_includes_render_capture_payload() -> None:
@@ -3657,33 +3499,6 @@ def test_apply_visible_fields_override_rejects_empty_or_unknown_values() -> None
         _apply_visible_fields_override(appearance, [])
     with pytest.raises(ValueError):
         _apply_visible_fields_override(appearance, ["not_a_field"])
-
-
-def test_snapshot_current_draft_request_uses_workflow_state(tmp_path: Path) -> None:
-    request = build_signing_request(
-        tmp_path,
-        input_name="input.pdf",
-        output_name="output.pdf",
-        certificate_name="cert.p12",
-        passphrase="secret",
-        timestamp_required=False,
-        signature_rect=build_signature_rect(page_index=1, width_pt=320.0, height_pt=64.0),
-        signature_appearance=build_signature_appearance(
-            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-            stamp_position=SignatureStampPosition.LEFT,
-        ),
-    )
-
-    draft_request = _snapshot_current_draft_request(
-        SigningDraftWorkflow.from_signing_request(request)
-    )
-
-    assert draft_request is not None
-    assert draft_request.input_pdf_path == request.input_pdf_path
-    assert draft_request.output_pdf_path == request.output_pdf_path
-    assert draft_request.certificate_path == request.certificate_path
-    assert draft_request.signature_rect == request.signature_rect
-    assert draft_request.signature_appearance == request.signature_appearance
 
 
 def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(

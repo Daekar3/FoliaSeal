@@ -2,16 +2,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import foliaseal.presentation.qt.phase3_harness_session_runner as runner_module
-from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningResult
+from foliaseal.presentation.qt.phase3_harness_workspace import Phase3HarnessCaptureCommand
 from tests.support.phase3_builders import build_signing_request
 
 
 def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) -> None:
     input_pdf = tmp_path / "input.pdf"
-    cert_path = tmp_path / "cert.p12"
     request = build_signing_request(
         tmp_path,
         input_name="input.pdf",
@@ -118,7 +117,6 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
             self._on_sign_request = kwargs["on_sign_request"]
             self._on_error = kwargs["on_error"]
             self._on_status_change = kwargs["on_status_change"]
-            self.properties_panel = SimpleNamespace(_workflow=object())
             self.viewer_widget = _FakeViewerWidget()
             self.last_signing_result = None
 
@@ -142,21 +140,39 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
         shell_holder["shell"] = shell
         return shell
 
-    def fake_capture_interactive_state(*, capture_kind: str, **_kwargs):
-        titles = {
-            "manual": "Manual preview",
-            "signed_run": "Sign-time preview",
-            "final": "Final preview",
-        }
-        return {
-            "capture_kind": capture_kind,
-            "preview_snapshot": {"title": titles[capture_kind]},
-            "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
-            "backend_reservation_snapshot": {"layout_template": "single_line"},
-            "backend_reservation_error": None,
-            "preview_text": f"{capture_kind} preview",
-            "validation_text": f"{capture_kind} validation",
-        }
+    class _FakeWorkspace:
+        def __init__(self, shell) -> None:
+            self._shell = shell
+
+        def current_request(self):
+            return request
+
+        def last_signing_result(self):
+            return self._shell.last_signing_result
+
+        def capture_state(self, command: Phase3HarnessCaptureCommand):
+            capture_kind = command.capture_kind
+            assert command.request == request
+            if capture_kind == "manual":
+                assert command.artifact_basename == "interactive_state_01"
+            if capture_kind == "final":
+                assert command.artifact_basename == "interactive_final"
+            titles = {
+                "manual": "Manual preview",
+                "signed_run": "Sign-time preview",
+                "final": "Final preview",
+            }
+            return {
+                "capture_kind": capture_kind,
+                "preview_snapshot": {"title": titles[capture_kind]},
+                "sign_request_snapshot": {
+                    "signature_appearance": {"layout_template": "single_line"}
+                },
+                "backend_reservation_snapshot": {"layout_template": "single_line"},
+                "backend_reservation_error": None,
+                "preview_text": f"{capture_kind} preview",
+                "validation_text": f"{capture_kind} validation",
+            }
 
     fake_capture_assembler = SimpleNamespace(
         build_signed_run_bundle=lambda **kwargs: {
@@ -189,31 +205,21 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
         render_backend=object(),
         session=ViewerSession(page_count=1),
     )
-    signing_workflow = SigningDraftWorkflow(
-        input_pdf_path=str(input_pdf),
-        output_pdf_path=str(tmp_path / "output.pdf"),
-        certificate_path=str(cert_path),
-        passphrase="secret",
-        tsa_url="https://tsa.example.invalid",
-        timestamp_required=False,
-    )
 
     result = runner_module.Phase3HarnessSessionRunner(
         build_qt_signing_shell=fake_build_qt_signing_shell,
-        snapshot_current_draft_request=lambda _workflow: request,
-        capture_interactive_state=fake_capture_interactive_state,
+        build_workspace=lambda shell: _FakeWorkspace(shell),
         default_harness_output_pdf_path=(
             lambda **kwargs: str(
                 tmp_path / f"{Path(kwargs['pdf_path']).stem}_{kwargs['sign_attempt_index']}.pdf"
             )
         ),
-        compat_surface=lambda shell: shell,
     ).run(
         bindings=bindings,
         source_path=input_pdf,
         artifacts_dir=str(tmp_path / "artifacts"),
         viewer_workflow=viewer_workflow,
-        signing_workflow=signing_workflow,
+        signing_workflow=SimpleNamespace(output_pdf_path=str(tmp_path / "output.pdf")),
         profile_store=object(),
         sign_executor=object(),
         capture_assembler=fake_capture_assembler,

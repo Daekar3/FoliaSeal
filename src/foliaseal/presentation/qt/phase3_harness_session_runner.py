@@ -14,12 +14,14 @@ from foliaseal.domain.models import SigningRequest, SigningResult
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
 )
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    Phase3HarnessCaptureCommand,
+    Phase3HarnessWorkspacePort,
+)
 
 BuildQtSigningShell = Callable[..., Any]
-CaptureInteractiveState = Callable[..., dict[str, Any]]
+BuildWorkspace = Callable[[Any], Phase3HarnessWorkspacePort]
 DefaultHarnessOutputPdfPath = Callable[..., str]
-SnapshotCurrentDraftRequest = Callable[[SigningDraftWorkflow], SigningRequest | None]
-CompatSurface = Callable[[Any], Any]
 
 
 @dataclass(frozen=True)
@@ -56,10 +58,8 @@ class Phase3HarnessSessionRunner:
     """Own the Qt lifecycle and callback cluster for one interactive harness run."""
 
     build_qt_signing_shell: BuildQtSigningShell
-    snapshot_current_draft_request: SnapshotCurrentDraftRequest
-    capture_interactive_state: CaptureInteractiveState
+    build_workspace: BuildWorkspace
     default_harness_output_pdf_path: DefaultHarnessOutputPdfPath
-    compat_surface: CompatSurface
 
     def run(
         self,
@@ -95,6 +95,7 @@ class Phase3HarnessSessionRunner:
         captured_states: list[dict[str, Any]] = []
 
         shell: Any
+        workspace: Phase3HarnessWorkspacePort
 
         def refocus_shell() -> None:
             focus_setter = getattr(shell, "setFocus", None)
@@ -116,20 +117,23 @@ class Phase3HarnessSessionRunner:
             interaction_counts[name] += 1
             if name != "sign_success" or not sign_requests:
                 return
-            signing_result = getattr(self.compat_surface(shell), "last_signing_result", None)
-            if not isinstance(signing_result, SigningResult) or not signing_result.success:
+            signing_result = workspace.last_signing_result()
+            if signing_result is None or not signing_result.success:
                 return
             request = sign_requests[-1]
             run_index = len(signed_runs) + 1
-            sign_time_state = self.capture_interactive_state(
-                shell=shell,
-                request=request,
-                artifacts_dir=artifacts_dir,
-                artifact_basename=(
-                    f"signed_run_{run_index:02d}_preview" if artifacts_dir is not None else None
-                ),
-                capture_index=run_index,
-                capture_kind="signed_run",
+            sign_time_state = workspace.capture_state(
+                Phase3HarnessCaptureCommand(
+                    request=request,
+                    artifacts_dir=artifacts_dir,
+                    artifact_basename=(
+                        f"signed_run_{run_index:02d}_preview"
+                        if artifacts_dir is not None
+                        else None
+                    ),
+                    capture_index=run_index,
+                    capture_kind="signed_run",
+                )
             )
             signed_runs.append(
                 capture_assembler.build_signed_run_bundle(
@@ -155,14 +159,15 @@ class Phase3HarnessSessionRunner:
             on_error=on_error,
             on_status_change=on_status_change,
         )
+        workspace = self.build_workspace(shell)
         body_layout.addWidget(shell, 1)
 
         def do_refresh() -> None:
-            self.compat_surface(shell).refresh_viewer()
+            shell.refresh_viewer()
             refocus_shell()
 
         def navigate(action_name: str) -> None:
-            action = getattr(self.compat_surface(shell).viewer_widget, action_name)
+            action = getattr(shell.viewer_widget, action_name)
             action()
             refocus_shell()
 
@@ -184,11 +189,7 @@ class Phase3HarnessSessionRunner:
             capture_kind: str,
             request: SigningRequest | None = None,
         ) -> dict[str, Any]:
-            current_request = request
-            if current_request is None:
-                current_request = self.snapshot_current_draft_request(
-                    self.compat_surface(shell).properties_panel._workflow
-                )
+            current_request = request if request is not None else workspace.current_request()
             capture_index = (
                 len(captured_states) + 1 if capture_kind == "manual" else len(captured_states)
             )
@@ -199,15 +200,16 @@ class Phase3HarnessSessionRunner:
                     if capture_kind == "manual"
                     else "interactive_final"
                 )
-            return self.capture_interactive_state(
-                shell=shell,
-                request=current_request,
-                artifacts_dir=artifacts_dir,
-                artifact_basename=artifact_basename,
-                capture_index=(
-                    capture_index if capture_kind == "manual" else len(captured_states) + 1
-                ),
-                capture_kind=capture_kind,
+            return workspace.capture_state(
+                Phase3HarnessCaptureCommand(
+                    request=current_request,
+                    artifacts_dir=artifacts_dir,
+                    artifact_basename=artifact_basename,
+                    capture_index=(
+                        capture_index if capture_kind == "manual" else len(captured_states) + 1
+                    ),
+                    capture_kind=capture_kind,
+                )
             )
 
         def update_capture_count_label() -> None:
@@ -229,7 +231,7 @@ class Phase3HarnessSessionRunner:
         toolbar.addStretch(1)
         toolbar.addWidget(capture_count_label)
 
-        self.compat_surface(shell).refresh_viewer()
+        shell.refresh_viewer()
         first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
 
         window.show()
@@ -239,12 +241,10 @@ class Phase3HarnessSessionRunner:
         capture_request = (
             sign_requests[-1]
             if sign_requests
-            else self.snapshot_current_draft_request(
-                self.compat_surface(shell).properties_panel._workflow
-            )
+            else workspace.current_request()
         )
         final_state = capture_current_state(capture_kind="final", request=capture_request)
-        last_signing_result = getattr(self.compat_surface(shell), "last_signing_result", None)
+        last_signing_result = workspace.last_signing_result()
         return Phase3HarnessSessionResult(
             first_render_ms=first_render_ms,
             sign_requests=tuple(sign_requests),
@@ -254,7 +254,5 @@ class Phase3HarnessSessionRunner:
             captured_states=tuple(captured_states),
             final_state=final_state,
             capture_request=capture_request,
-            last_signing_result=(
-                last_signing_result if isinstance(last_signing_result, SigningResult) else None
-            ),
+            last_signing_result=last_signing_result,
         )
