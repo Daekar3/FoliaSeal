@@ -2,7 +2,7 @@ from pathlib import Path
 
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import AppSettings
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.presentation.qt import app_frame as app_frame_module
 from foliaseal.presentation.qt import signing_shell_port as signing_shell_port_module
 from foliaseal.presentation.qt.app_frame import (
@@ -10,6 +10,7 @@ from foliaseal.presentation.qt.app_frame import (
     QtAppFrameBindings,
 )
 from foliaseal.presentation.qt.signing_shell_port import (
+    QtSigningWorkspacePort,
     SigningWorkspaceBootstrap,
 )
 
@@ -266,14 +267,16 @@ class _FakeShell:
         self.applied_settings = []
         self.output_dialog_defaults = []
         self.choose_output_pdf_path_calls = 0
+        self.certificate_catalog = CertificateCatalog(schema_version=1)
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
         self.applied_settings.append(settings)
         self.output_dialog_defaults.append(settings.default_output_directory)
 
-    def refresh_certificate_configurations(self) -> None:
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
         self.refresh_certificate_configurations_calls += 1
+        return self.certificate_catalog
 
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
@@ -293,8 +296,8 @@ class _FakeShellPort:
     def apply_app_settings(self, settings) -> None:
         self.shell_widget.apply_app_settings(settings)
 
-    def refresh_certificate_configurations(self) -> None:
-        self.shell_widget.refresh_certificate_configurations()
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
+        return self.shell_widget.refresh_certificate_configurations()
 
 
 class _FakeShellFactory:
@@ -424,6 +427,26 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
         "on_error": bootstrap.on_error,
         "on_status_change": bootstrap.on_status_change,
     }
+
+
+def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path) -> None:
+    shell = _FakeShell()
+    port = QtSigningWorkspacePort(shell_widget=shell)
+    settings = _settings(tmp_path)
+
+    assert port.widget() is shell
+    assert port.choose_output_pdf_path() == "/tmp/signed-output.pdf"
+
+    port.apply_app_settings(settings)
+
+    assert shell.applied_settings == [settings]
+    assert shell.output_dialog_defaults == [settings.default_output_directory]
+    assert shell.app_settings == settings
+
+    catalog = port.refresh_certificate_configurations()
+
+    assert catalog is shell.certificate_catalog
+    assert shell.refresh_certificate_configurations_calls == 1
 
 
 def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(

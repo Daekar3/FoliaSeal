@@ -4,7 +4,7 @@ import pytest
 
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import AppSettings
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
     QtPdfPageCountLoader,
@@ -38,8 +38,9 @@ class _FakeShell:
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
 
-    def refresh_certificate_configurations(self) -> None:
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
         self.refresh_calls = getattr(self, "refresh_calls", 0) + 1
+        return CertificateCatalog(schema_version=1)
 
 
 class _FakeShellPort:
@@ -55,8 +56,8 @@ class _FakeShellPort:
     def apply_app_settings(self, settings) -> None:
         self.shell_widget.apply_app_settings(settings)
 
-    def refresh_certificate_configurations(self) -> None:
-        self.shell_widget.refresh_certificate_configurations()
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
+        return self.shell_widget.refresh_certificate_configurations()
 
 
 class _FakeShellFactory:

@@ -13,7 +13,7 @@ from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import AppSettings
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
     build_qt_signing_shell,
@@ -50,7 +50,7 @@ class SigningWorkspacePort(Protocol):
     def apply_app_settings(self, settings: AppSettings) -> None:
         """Apply updated app settings to the live shell."""
 
-    def refresh_certificate_configurations(self) -> None:
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Refresh live certificate configuration choices."""
 
 
@@ -76,8 +76,8 @@ class QtSigningWorkspacePort:
     def apply_app_settings(self, settings: AppSettings) -> None:
         self.shell_widget.apply_app_settings(settings)
 
-    def refresh_certificate_configurations(self) -> None:
-        self.shell_widget.refresh_certificate_configurations()
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
+        return self.shell_widget.refresh_certificate_configurations()
 
 
 class QtSigningWorkspaceFactory:
