@@ -53,17 +53,16 @@ class _FakeBindings:
     q_main_window = _FakeWindow
 
 
-class _FakeCompatSurface:
+class _FakeShell:
+    pass
+
+
+class _FakeWorkspace:
     def __init__(self) -> None:
         self.refresh_calls = 0
 
     def refresh_viewer(self) -> None:
         self.refresh_calls += 1
-
-
-class _FakeShell:
-    def __init__(self) -> None:
-        self.compat_surface = _FakeCompatSurface()
 
 
 class _FakeBackend:
@@ -82,6 +81,7 @@ def _runner(
     expectation_result: tuple[bool, list[str]] = (True, []),
     build_dummy_timestamper=None,
     build_signing_executor=None,
+    build_workspace=None,
 ) -> Phase3SignedAcceptanceMatrixRunner:
     return Phase3SignedAcceptanceMatrixRunner(
         load_qt_harness_bindings=lambda: _FakeBindings(),
@@ -91,7 +91,7 @@ def _runner(
         build_dummy_timestamper=build_dummy_timestamper or (lambda: object()),
         load_page_count=lambda **_kwargs: 1,
         build_qt_signing_shell=lambda **_kwargs: _FakeShell(),
-        compat_surface=lambda shell: shell.compat_surface,
+        build_workspace=build_workspace or (lambda **_kwargs: _FakeWorkspace()),
         execute_signed_acceptance_scenario=scenario_executor,
         preview_matrix_error_result=lambda **kwargs: {
             "name": kwargs["scenario"]["name"],
@@ -124,6 +124,8 @@ def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
     artifacts_dir = tmp_path / "artifacts"
     dummy_calls: list[str] = []
     executor_calls: list[dict[str, object]] = []
+    workspace_calls: list[dict[str, object]] = []
+    workspace = _FakeWorkspace()
 
     monkeypatch.setattr(runner_module, "QtPdfRenderBackend", _FakeBackend)
 
@@ -140,6 +142,7 @@ def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
         expectation_result=(False, ["expected mismatch"]),
         build_dummy_timestamper=lambda: dummy_calls.append("dummy") or object(),
         build_signing_executor=lambda **kwargs: executor_calls.append(kwargs) or {"executor": True},
+        build_workspace=lambda **kwargs: workspace_calls.append(kwargs) or workspace,
     )
 
     summary = runner.run(
@@ -163,6 +166,9 @@ def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
     executor_calls[0]["timestamper_factory"]("ignored")
     assert dummy_calls == ["dummy"]
     assert summary["acceptance_expectations_passed"] is False
+    assert workspace.refresh_calls == 1
+    assert workspace_calls[0]["shell"] is not None
+    assert workspace_calls[0]["profile_store"] is not None
 
 
 def test_signed_acceptance_matrix_runner_records_error_results(

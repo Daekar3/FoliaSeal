@@ -782,10 +782,6 @@ def _default_harness_output_pdf_path(
     return str(target_dir / f"{source_path.stem}_harness_signed_{sign_attempt_index:03d}.pdf")
 
 
-def _shell_compat_surface(shell: Any) -> Any:
-    return getattr(shell, "compat_surface", shell)
-
-
 def _build_qt_phase3_harness_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
     return QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
@@ -973,7 +969,7 @@ def _build_phase3_signed_acceptance_matrix_runner() -> (
         build_dummy_timestamper=build_dummy_timestamper,
         load_page_count=_load_page_count,
         build_qt_signing_shell=build_qt_signing_shell,
-        compat_surface=_shell_compat_surface,
+        build_workspace=_build_preview_matrix_qt_workspace,
         execute_signed_acceptance_scenario=_execute_signed_acceptance_scenario,
         preview_matrix_error_result=_preview_matrix_error_result,
         signed_matrix_diagnostic_summary=_signed_matrix_diagnostic_summary,

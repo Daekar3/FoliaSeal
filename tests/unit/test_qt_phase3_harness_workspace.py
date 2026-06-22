@@ -150,6 +150,25 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
     assert compat.viewer_refreshes == 1
 
 
+def test_qt_phase3_harness_workspace_adapter_refreshes_viewer_directly() -> None:
+    class _FakeCompat:
+        def __init__(self) -> None:
+            self.viewer_refreshes = 0
+
+        def refresh_viewer(self) -> None:
+            self.viewer_refreshes += 1
+
+    compat = _FakeCompat()
+    shell = type("_Shell", (), {"compat_surface": compat})()
+
+    QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=object(),
+    ).refresh_viewer()
+
+    assert compat.viewer_refreshes == 1
+
+
 def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signing_result() -> None:
     preview = type(
         "_Preview",
@@ -785,3 +804,17 @@ def test_headless_phase3_harness_workspace_adapter_captures_preview_state() -> N
     assert capture["validation_text"] == "Ready to sign."
     assert capture["sign_request_snapshot"] == {"output_pdf_path": request.output_pdf_path}
     assert capture["backend_reservation_snapshot"] == {"output_pdf_path": request.output_pdf_path}
+
+
+def test_headless_phase3_harness_workspace_adapter_refresh_viewer_is_no_op() -> None:
+    request = build_signing_request(Path("/tmp"))
+    workflow = SigningDraftWorkflow.from_signing_request(request)
+    adapter = HeadlessPhase3HarnessWorkspaceAdapter(
+        workflow=workflow,
+        profile_store=object(),
+    )
+
+    adapter.refresh_viewer()
+
+    assert adapter.current_request() == request
+    assert adapter.last_signing_result() is None

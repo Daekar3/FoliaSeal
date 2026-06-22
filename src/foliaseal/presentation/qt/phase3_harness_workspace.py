@@ -90,6 +90,7 @@ class Phase3HarnessCaptureCommand:
 class Phase3HarnessWorkspacePort(Protocol):
     """Narrow workspace boundary for Phase 3 harness scenario and capture flows."""
 
+    def refresh_viewer(self) -> None: ...
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None: ...
     def current_request(self) -> SigningRequest | None: ...
     def last_signing_result(self) -> SigningResult | None: ...
@@ -159,6 +160,9 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
             self._workflow.timestamp_required = command.timestamp_required
         if command.signature_rect is not None:
             self._workflow.set_signature_rect(command.signature_rect)
+
+    def refresh_viewer(self) -> None:
+        return None
 
     def current_request(self) -> SigningRequest | None:
         return snapshot_current_draft_request(self._workflow)
@@ -270,10 +274,13 @@ class QtPhase3HarnessWorkspaceAdapter:
             refresh_sign_button = getattr(compat, "refresh_sign_button_state", None)
             if callable(refresh_sign_button):
                 refresh_sign_button()
-        compat.refresh_viewer()
+        self.refresh_viewer()
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
+
+    def refresh_viewer(self) -> None:
+        _compat_surface(self._shell).refresh_viewer()
 
     def current_request(self) -> SigningRequest | None:
         workflow = _compat_surface(self._shell).properties_panel._workflow

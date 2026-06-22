@@ -13,6 +13,9 @@ from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    Phase3HarnessWorkspacePort,
+)
 
 LoadQtHarnessBindings = Callable[[], Any]
 LoadPreviewMatrixManifest = Callable[[str], dict[str, Any]]
@@ -20,7 +23,7 @@ BuildPhase3SigningExecutor = Callable[..., Any]
 BuildDummyTimestamper = Callable[[], Any]
 LoadPageCount = Callable[..., int]
 BuildQtSigningShell = Callable[..., Any]
-CompatSurface = Callable[[Any], Any]
+BuildWorkspace = Callable[..., Phase3HarnessWorkspacePort]
 ExecuteSignedAcceptanceScenario = Callable[..., dict[str, Any]]
 PreviewMatrixErrorResult = Callable[..., dict[str, Any]]
 SignedMatrixDiagnosticSummary = Callable[[list[dict[str, Any]]], dict[str, int]]
@@ -38,7 +41,7 @@ class Phase3SignedAcceptanceMatrixRunner:
     build_dummy_timestamper: BuildDummyTimestamper
     load_page_count: LoadPageCount
     build_qt_signing_shell: BuildQtSigningShell
-    compat_surface: CompatSurface
+    build_workspace: BuildWorkspace
     execute_signed_acceptance_scenario: ExecuteSignedAcceptanceScenario
     preview_matrix_error_result: PreviewMatrixErrorResult
     signed_matrix_diagnostic_summary: SignedMatrixDiagnosticSummary
@@ -111,7 +114,8 @@ class Phase3SignedAcceptanceMatrixRunner:
         )
         window.setCentralWidget(shell)
         window.show()
-        self.compat_surface(shell).refresh_viewer()
+        workspace = self.build_workspace(shell=shell, profile_store=profile_store)
+        workspace.refresh_viewer()
         app.processEvents()
 
         results: list[dict[str, Any]] = []
