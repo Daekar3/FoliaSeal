@@ -61,6 +61,9 @@ class SigningWorkspaceCompatibilitySurface:
         viewer_interaction_session: ViewerInteractionSession,
         workspace_interaction_session: WorkspaceInteractionSession,
         interaction_bridge: SigningWorkspaceInteractionBridge,
+        sync_placement_context_from_viewer: Callable[[], None],
+        sync_signature_overlay: Callable[[], None],
+        refresh_sign_button_state: Callable[[], None],
     ) -> None:
         self._widget = widget
         self._properties_panel = properties_panel
@@ -78,6 +81,9 @@ class SigningWorkspaceCompatibilitySurface:
         self._viewer_interaction_session = viewer_interaction_session
         self._workspace_interaction_session = workspace_interaction_session
         self._interaction_bridge = interaction_bridge
+        self._sync_placement_context_from_viewer = sync_placement_context_from_viewer
+        self._sync_signature_overlay = sync_signature_overlay
+        self._refresh_sign_button_state = refresh_sign_button_state
 
     @property
     def properties_panel(self) -> SignaturePropertiesPanel:
@@ -215,6 +221,18 @@ class SigningWorkspaceCompatibilitySurface:
             self._workspace_interaction_session.refresh_after_panel_change()
         )
         return signature_rect
+
+    def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
+        self._properties_panel.set_signature_rect(signature_rect)
+        jump_to_page = getattr(self._viewer_workflow, "jump_to_page", None)
+        if callable(jump_to_page):
+            jump_to_page(signature_rect.page_index)
+        refresh = getattr(self._viewer_widget, "refresh", None)
+        if callable(refresh):
+            refresh(navigation=True)
+        self._sync_placement_context_from_viewer()
+        self._sync_signature_overlay()
+        self._refresh_sign_button_state()
 
     def signature_rect(self) -> SignatureRect | None:
         return self._draft_workflow.signature_rect

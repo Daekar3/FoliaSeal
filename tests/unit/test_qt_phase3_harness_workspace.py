@@ -125,6 +125,14 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
         def refresh_viewer(self) -> None:
             self.viewer_refreshes += 1
 
+        def apply_signature_rect_placement(self, signature_rect) -> None:
+            self.properties_panel.set_signature_rect(signature_rect)
+            self.viewer_workflow.jump_to_page(signature_rect.page_index)
+            self.viewer_widget.refresh(navigation=True)
+            self.sync_placement_context_from_viewer()
+            self.sync_signature_overlay()
+            self.refresh_sign_button_state()
+
     compat = _FakeCompat()
     shell = type("_Shell", (), {"compat_surface": compat})()
 

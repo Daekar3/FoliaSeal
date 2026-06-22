@@ -257,23 +257,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         if command.timestamp_required is not None:
             workflow.timestamp_required = command.timestamp_required
         if command.signature_rect is not None:
-            compat.properties_panel.set_signature_rect(command.signature_rect)
-            viewer_workflow = getattr(compat, "viewer_workflow", None)
-            viewer_widget = getattr(compat, "viewer_widget", None)
-            if viewer_workflow is not None and hasattr(viewer_workflow, "jump_to_page"):
-                viewer_workflow.jump_to_page(command.signature_rect.page_index)
-            refresh = getattr(viewer_widget, "refresh", None)
-            if callable(refresh):
-                refresh(navigation=True)
-            sync_placement = getattr(compat, "sync_placement_context_from_viewer", None)
-            if callable(sync_placement):
-                sync_placement()
-            sync_overlay = getattr(compat, "sync_signature_overlay", None)
-            if callable(sync_overlay):
-                sync_overlay()
-            refresh_sign_button = getattr(compat, "refresh_sign_button_state", None)
-            if callable(refresh_sign_button):
-                refresh_sign_button()
+            compat.apply_signature_rect_placement(command.signature_rect)
         self.refresh_viewer()
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):

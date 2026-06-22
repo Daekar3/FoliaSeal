@@ -289,6 +289,11 @@ def build_signing_workspace_composition(
         viewer_interaction_session=viewer_interaction_session,
         workspace_interaction_session=workspace_interaction_session,
         interaction_bridge=interaction_bridge,
+        sync_placement_context_from_viewer=lambda: runtime.apply_placement_context(
+            viewer_interaction_session.current_placement_context().placement_context
+        ),
+        sync_signature_overlay=runtime.sync_signature_overlay,
+        refresh_sign_button_state=action_bridge.reload_state,
     )
     shell_surface = SigningWorkspaceShellSurface(
         widget=widget,
