@@ -247,6 +247,10 @@ class SigningWorkspaceCompatibilitySurface:
     def signature_appearance(self) -> SignatureAppearance | None:
         return self._draft_workflow.signature_appearance
 
+    def set_timestamp_required(self, required: bool) -> None:
+        self._draft_workflow.timestamp_required = required
+        self._properties_panel.load_from_workflow()
+
     def is_sign_action_enabled(self) -> bool:
         is_enabled = getattr(self._sign_button, "isEnabled", None)
         if callable(is_enabled):

@@ -409,6 +409,9 @@ class SigningWorkspaceWidget:
     def signature_appearance(self) -> SignatureAppearance | None:
         return self._compatibility_surface.signature_appearance()
 
+    def set_timestamp_required(self, required: bool) -> None:
+        self._compatibility_surface.set_timestamp_required(required)
+
     def is_sign_action_enabled(self) -> bool:
         return self._compatibility_surface.is_sign_action_enabled()
 

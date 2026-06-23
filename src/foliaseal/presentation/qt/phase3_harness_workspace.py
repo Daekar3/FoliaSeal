@@ -243,11 +243,10 @@ class QtPhase3HarnessWorkspaceAdapter:
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
         compat = _compat_surface(self._shell)
-        workflow = compat.properties_panel._workflow
         base_appearance = _base_appearance(
             profile_store=self._profile_store,
             profile_name=command.profile_name,
-            fallback=workflow.current_signature_appearance or SignatureAppearance(),
+            fallback=compat.signature_appearance() or SignatureAppearance(),
         )
         appearance = _apply_appearance_overrides(
             base_appearance,
@@ -255,7 +254,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         )
         compat.properties_panel.set_signature_appearance(appearance)
         if command.timestamp_required is not None:
-            workflow.timestamp_required = command.timestamp_required
+            compat.set_timestamp_required(command.timestamp_required)
         if command.signature_rect is not None:
             compat.apply_signature_rect_placement(command.signature_rect)
         self.refresh_viewer()

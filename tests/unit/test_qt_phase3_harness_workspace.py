@@ -73,15 +73,6 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
         def __init__(self) -> None:
             self.appearance = None
             self.rect = None
-            self.refresh_calls = 0
-            self._workflow = type(
-                "_Workflow",
-                (),
-                {
-                    "current_signature_appearance": build_signature_appearance(),
-                    "timestamp_required": True,
-                },
-            )()
 
         def set_signature_appearance(self, appearance) -> None:
             self.appearance = appearance
@@ -108,10 +99,18 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
             self.properties_panel = _FakePanel()
             self.viewer_workflow = _FakeViewerWorkflow()
             self.viewer_widget = _FakeViewerWidget()
+            self._signature_appearance = build_signature_appearance()
+            self.timestamp_required = True
             self.placement_syncs = 0
             self.overlay_syncs = 0
             self.sign_button_refreshes = 0
             self.viewer_refreshes = 0
+
+        def signature_appearance(self):
+            return self._signature_appearance
+
+        def set_timestamp_required(self, required: bool) -> None:
+            self.timestamp_required = required
 
         def sync_placement_context_from_viewer(self) -> None:
             self.placement_syncs += 1
@@ -147,7 +146,7 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
         == SignatureLayoutTemplate.SINGLE_LINE
     )
     assert compat.properties_panel.appearance.stamp_position == SignatureStampPosition.TOP
-    assert compat.properties_panel._workflow.timestamp_required is False
+    assert compat.timestamp_required is False
     assert compat.properties_panel.rect is not None
     assert compat.properties_panel.rect.page_index == 3
     assert compat.viewer_workflow.jumps == [3]
