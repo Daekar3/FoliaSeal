@@ -608,7 +608,7 @@ class SignaturePropertiesPanel:
         self._notify_change()
         return state
 
-    def delete_current_signature_preset(self) -> SignaturePresetCatalog | None:
+    def delete_current_signature_preset(self) -> SignaturePropertiesViewState | None:
         selected_name = _combo_text(self._signature_preset_controls.preset_combo)
         normalized_name = (
             "" if selected_name == SIGNATURE_PRESET_PLACEHOLDER else selected_name
@@ -640,7 +640,7 @@ class SignaturePropertiesPanel:
             return None
         self._apply_coordinator_state(state)
         self._notify_change()
-        return self._coordinator.preset_catalog
+        return state
 
     def apply_selected_certificate_configuration(self) -> bool:
         selected_name = _combo_text(self._certificate_controls.configuration_combo)

@@ -4447,7 +4447,7 @@ def test_signing_shell_signature_preset_delete_requires_confirmation_and_refresh
     result = panel.delete_current_signature_preset()
 
     assert result is not None
-    assert result.preset_names() == ("Default",)
+    assert result.selected_signature_preset_name is None
     assert store.load_catalog().preset_names() == ("Default",)
     assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
     assert panel._signature_preset_controls.preset_combo.findText("Compact") == -1

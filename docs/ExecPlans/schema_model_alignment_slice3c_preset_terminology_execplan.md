@@ -134,8 +134,8 @@ At the end of this slice, these interfaces should exist:
 - `SignaturePresetCatalog.remove_preset(name: str) -> SignaturePresetCatalog`
 - `SignaturePresetCatalogStore.save_preset(preset: ResolvedSignaturePreset) -> SignaturePresetCatalog`
 - `SignaturePresetCatalogStore.delete_preset(name: str) -> SignaturePresetCatalog`
-- `SignaturePropertiesPanel.save_current_signature_preset() -> ResolvedSignaturePreset | None`
-- `SignaturePropertiesPanel.delete_current_signature_preset() -> SignaturePresetCatalog | None`
+- `SignaturePropertiesPanel.save_current_signature_preset() -> SignaturePropertiesViewState | None`
+- `SignaturePropertiesPanel.delete_current_signature_preset() -> SignaturePropertiesViewState | None`
 
 No new third-party dependencies are needed.
 
