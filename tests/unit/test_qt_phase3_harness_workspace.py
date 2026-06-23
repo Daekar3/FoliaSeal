@@ -207,9 +207,6 @@ def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signin
     )
 
     class _FakePanel:
-        def __init__(self) -> None:
-            self._workflow = SigningDraftWorkflow.from_signing_request(request)
-
         def refresh_preview(self):
             return preview
 
@@ -222,7 +219,11 @@ def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signin
     class _FakeCompat:
         def __init__(self) -> None:
             self.properties_panel = _FakePanel()
+            self._current_request = request
             self.last_signing_result = SigningResult(success=True, failure_code=None, message="ok")
+
+        def current_request(self):
+            return self._current_request
 
     compat = _FakeCompat()
     shell = type("_Shell", (), {"compat_surface": compat})()

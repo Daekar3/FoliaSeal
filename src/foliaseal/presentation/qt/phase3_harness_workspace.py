@@ -266,8 +266,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         _compat_surface(self._shell).refresh_viewer()
 
     def current_request(self) -> SigningRequest | None:
-        workflow = _compat_surface(self._shell).properties_panel._workflow
-        return snapshot_current_draft_request(workflow)
+        return _compat_surface(self._shell).current_request()
 
     def last_signing_result(self) -> SigningResult | None:
         signing_result = getattr(_compat_surface(self._shell), "last_signing_result", None)

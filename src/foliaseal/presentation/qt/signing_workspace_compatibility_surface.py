@@ -22,6 +22,7 @@ from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureRect,
+    SigningRequest,
 )
 from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
     SigningWorkspaceInteractionBridge,
@@ -37,6 +38,25 @@ from foliaseal.presentation.qt.signing_workspace_review_bridge import (
 def _text(line_edit: Any) -> str:
     text = getattr(line_edit, "text", None)
     return text() if callable(text) else ""
+
+
+def _snapshot_current_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:
+    signature_rect = workflow.current_signature_rect
+    signature_appearance = workflow.current_signature_appearance
+    if signature_rect is None or signature_appearance is None:
+        return None
+    return SigningRequest(
+        input_pdf_path=workflow.input_pdf_path,
+        output_pdf_path=workflow.output_pdf_path,
+        certificate_path=workflow.certificate_path,
+        passphrase=workflow.passphrase,
+        tsa_url=workflow.tsa_url,
+        timestamp_required=workflow.timestamp_required,
+        trust_policy=workflow.trust_policy,
+        certificate_alias=workflow.certificate_alias,
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+    )
 
 
 class SigningWorkspaceCompatibilitySurface:
@@ -250,6 +270,9 @@ class SigningWorkspaceCompatibilitySurface:
     def set_timestamp_required(self, required: bool) -> None:
         self._draft_workflow.timestamp_required = required
         self._properties_panel.load_from_workflow()
+
+    def current_request(self) -> SigningRequest | None:
+        return _snapshot_current_request(self._draft_workflow)
 
     def is_sign_action_enabled(self) -> bool:
         is_enabled = getattr(self._sign_button, "isEnabled", None)

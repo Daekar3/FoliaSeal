@@ -412,6 +412,9 @@ class SigningWorkspaceWidget:
     def set_timestamp_required(self, required: bool) -> None:
         self._compatibility_surface.set_timestamp_required(required)
 
+    def current_request(self) -> SigningRequest | None:
+        return self._compatibility_surface.current_request()
+
     def is_sign_action_enabled(self) -> bool:
         return self._compatibility_surface.is_sign_action_enabled()
 

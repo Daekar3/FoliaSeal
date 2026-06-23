@@ -8,7 +8,7 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 After this slice, Phase 3 harness scenario application will still be able to load a saved appearance profile, apply appearance overrides, flip the timestamp-required flag, place a signature rectangle, refresh the viewer, and continue capture or signing without any user-visible behavior change.
 
-The architectural win is narrower ownership. `src/foliaseal/presentation/qt/phase3_harness_workspace.py` should stop reaching through `compat.properties_panel._workflow` during live-shell scenario application. The adapter will instead read the current appearance from an existing public accessor and set timestamp-required through one new narrow compatibility-shell verb. The proof is focused unit coverage plus unchanged harness behavior.
+The architectural win is narrower ownership. `src/foliaseal/presentation/qt/phase3_harness_workspace.py` no longer reaches through `compat.properties_panel._workflow` during live-shell scenario application, and `current_request()` now delegates through the shell-compatibility boundary. The adapter reads the current appearance from an existing public accessor and sets timestamp-required through one narrow compatibility-shell verb. The proof is focused unit coverage plus unchanged harness behavior.
 
 ## Child ExecPlan Dependencies
 
@@ -34,8 +34,8 @@ The architectural win is narrower ownership. `src/foliaseal/presentation/qt/phas
 - Observation: the remaining `apply_scenario(...)` leak is smaller than the earlier rect-priming seam because half of the needed boundary already exists.
   Evidence: `SigningWorkspaceCompatibilitySurface.signature_appearance()` already exposes the current appearance, so the only missing verb for `apply_scenario(...)` is a timestamp setter.
 
-- Observation: `current_request()` still reads the private workflow directly after this planned slice.
-  Evidence: `QtPhase3HarnessWorkspaceAdapter.current_request()` still calls `snapshot_current_draft_request(compat.properties_panel._workflow)`, so this ExecPlan must stay limited to scenario application and leave request extraction for a follow-on slice.
+- Observation: `current_request()` now delegates through the compatibility surface boundary instead of reading the private workflow directly.
+  Evidence: `QtPhase3HarnessWorkspaceAdapter.current_request()` calls `_compat_surface(self._shell).current_request()`, which proxies the shell-facing compatibility surface rather than reaching into `properties_panel._workflow`.
 
 ## Decision Log
 
@@ -51,13 +51,13 @@ The architectural win is narrower ownership. `src/foliaseal/presentation/qt/phas
 
 Implementation and review are complete. `QtPhase3HarnessWorkspaceAdapter.apply_scenario(...)` no longer reaches into `properties_panel._workflow`; it now reads the fallback appearance through `signature_appearance()` and mutates timestamp-required through the new narrow `set_timestamp_required(...)` verb.
 
-The slice stayed narrow. It did not change `Phase3HarnessWorkspacePort`, the headless adapter, session-runner ownership, or the separate `current_request()` private-workflow seam. The architecture/spec compliance review found no mismatch, so no `docs/ARCHITECTURE.md` edit was required for this pass. Only the final commit remains.
+The slice stayed narrow. It did not change `Phase3HarnessWorkspacePort`, the headless adapter, or session-runner ownership, and the separate `current_request()` seam remains delegated through the compatibility-surface boundary. The architecture/spec compliance review found the docs needed a small wording update, which is recorded here and in `docs/ARCHITECTURE.md`. Only the final commit remains.
 
 ## Context and Orientation
 
 The Phase 3 harness is the Qt-side evidence runner for preview and signed-output scenarios. Its shared workspace boundary lives in `src/foliaseal/presentation/qt/phase3_harness_workspace.py`. That module normalizes scenario inputs, applies them against either a live Qt signing shell or a headless `SigningDraftWorkflow`, refreshes the viewer when needed, and captures the raw state that later reporting helpers turn into evidence.
 
-The live adapter currently uses `_compat_surface(self._shell)` to reach the shell’s broad compatibility surface when available. That surface intentionally owns deeper widget and workflow helpers for harness and testing code. After the previous slice, it already owns signature-rect priming choreography and current appearance access. The remaining problem is that `QtPhase3HarnessWorkspaceAdapter.apply_scenario(...)` still grabs `compat.properties_panel._workflow` directly to read the fallback appearance and write `timestamp_required`. The harness boundary should ask for those behaviors through explicit verbs instead of touching the private workflow object.
+The live adapter currently uses `_compat_surface(self._shell)` to reach the shell’s broad compatibility surface when available. That surface intentionally owns deeper widget and workflow helpers for harness and testing code. After the previous slice, it already owns signature-rect priming choreography and current appearance access, and `QtPhase3HarnessWorkspaceAdapter.current_request()` delegates through the shell-compatible `current_request()` boundary instead of reaching into `properties_panel._workflow`. The harness boundary should continue to ask for those behaviors through explicit verbs instead of touching the private workflow object.
 
 The key files for this slice are `src/foliaseal/presentation/qt/phase3_harness_workspace.py`, `src/foliaseal/presentation/qt/signing_workspace_compatibility_surface.py`, `src/foliaseal/presentation/qt/signing_shell.py`, `tests/unit/test_qt_phase3_harness_workspace.py`, and `docs/ARCHITECTURE.md`. The headless adapter in `phase3_harness_workspace.py` is already clean and should not change.
 
