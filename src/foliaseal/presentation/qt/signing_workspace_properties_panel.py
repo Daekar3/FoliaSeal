@@ -28,7 +28,6 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     AppSettings,
     CertificateCatalog,
-    ResolvedSignaturePreset,
     SignaturePresetCatalog,
 )
 from foliaseal.presentation.qt.signature_preview_layout import (
@@ -576,7 +575,7 @@ class SignaturePropertiesPanel:
         self._apply_coordinator_state(state)
         self._notify_change()
 
-    def save_current_signature_preset(self) -> ResolvedSignaturePreset | None:
+    def save_current_signature_preset(self) -> SignaturePropertiesViewState | None:
         name = _text(self._signature_preset_controls.preset_name).strip()
         existing = name and name in self._setup_session.load(
             control_issue=self._control_issue
@@ -607,7 +606,7 @@ class SignaturePropertiesPanel:
             return None
         self._apply_coordinator_state(state)
         self._notify_change()
-        return self._coordinator.preset_catalog.preset_named(name)
+        return state
 
     def delete_current_signature_preset(self) -> SignaturePresetCatalog | None:
         selected_name = _combo_text(self._signature_preset_controls.preset_combo)

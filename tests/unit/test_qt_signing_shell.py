@@ -3662,7 +3662,7 @@ def test_signing_shell_signature_preset_save_uses_setup_session_entrypoint(
     result = panel.save_current_signature_preset()
 
     assert result is not None
-    assert result.name == "Team Standard"
+    assert result.selected_signature_preset_name == "Team Standard"
     assert calls == [("Team Standard", False)]
 
 
@@ -4518,7 +4518,7 @@ def test_signing_shell_signature_preset_overwrite_requires_confirmation(
     result = panel.save_current_signature_preset()
 
     assert result is not None
-    assert result.name == "Team Standard"
+    assert result.selected_signature_preset_name == "Team Standard"
     assert store.load_catalog().preset_named("Team Standard").appearance.signer_label_prefix == (
         "Signed by Current Draft"
     )
