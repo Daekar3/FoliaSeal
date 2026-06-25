@@ -156,6 +156,11 @@ class SignaturePropertiesCoordinator(Protocol):
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState: ...
 
+    def certificate_configuration_name_for_preset(
+        self,
+        preset_name: str,
+    ) -> str | None: ...
+
     def reconcile(
         self,
         command: SignaturePropertiesCommand,
@@ -285,6 +290,22 @@ class DefaultSignaturePropertiesCoordinator:
             )
         )
         return self.load(control_issue=control_issue)
+
+    def certificate_configuration_name_for_preset(
+        self,
+        preset_name: str,
+    ) -> str | None:
+        try:
+            preset = self.preset_catalog.preset_named(preset_name)
+        except KeyError:
+            return None
+        configuration_id = preset.preset.certificate_configuration_id
+        if configuration_id is None:
+            return None
+        try:
+            return self.certificate_catalog.configuration_by_id(configuration_id).display_name
+        except KeyError:
+            return None
 
     def _apply_visible_signature_setup(self, command: ApplyVisibleSignatureSetup) -> None:
         self.workflow.set_signature_appearance(command.draft.appearance)

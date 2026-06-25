@@ -75,7 +75,9 @@ class SigningSetupSession:
         *,
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SigningSetupSelectionOutcome:
-        configuration_name = self._certificate_configuration_name_for_preset(selected_name)
+        configuration_name = self.coordinator.certificate_configuration_name_for_preset(
+            selected_name
+        )
         prompt_label = (
             f"Enter the certificate password for '{configuration_name}'."
             if configuration_name
@@ -191,21 +193,6 @@ class SigningSetupSession:
         if cache_key is not None and prompted_passphrase:
             self._session_certificate_passphrases[cache_key] = prompted_passphrase
         return SigningSetupSelectionOutcome(state=state, applied=True)
-
-    def _certificate_configuration_name_for_preset(self, preset_name: str) -> str | None:
-        try:
-            preset = self.coordinator.preset_catalog.preset_named(preset_name)
-        except KeyError:
-            return None
-        configuration_id = preset.preset.certificate_configuration_id
-        if configuration_id is None:
-            return None
-        try:
-            return self.coordinator.certificate_catalog.configuration_by_id(
-                configuration_id
-            ).display_name
-        except KeyError:
-            return None
 
 
 def _should_prompt_for_certificate_password(message: str) -> bool:

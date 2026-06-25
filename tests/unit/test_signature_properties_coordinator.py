@@ -212,6 +212,35 @@ def test_coordinator_apply_visible_signature_setup_updates_workflow_and_clears_p
     assert state.visible_signature_setup_draft.placement.enabled is True
 
 
+def test_coordinator_reports_certificate_configuration_name_for_preset(
+    tmp_path: Path,
+) -> None:
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(
+            profiles=(
+                build_signature_preset(
+                    name="Certificate Backed",
+                    certificate_configuration_id="cert-config-default",
+                ),
+                build_signature_preset(name="Compact"),
+                build_signature_preset(
+                    name="Broken Certificate Link",
+                    certificate_configuration_id="cert-config-missing",
+                ),
+            )
+        ),
+    )
+
+    assert coordinator.certificate_configuration_name_for_preset("Certificate Backed") == (
+        "Corporate Records Signing"
+    )
+    assert coordinator.certificate_configuration_name_for_preset("Compact") is None
+    assert coordinator.certificate_configuration_name_for_preset("Broken Certificate Link") is None
+    assert coordinator.certificate_configuration_name_for_preset("Missing") is None
+
+
 def test_coordinator_apply_visible_setup_wrapper_updates_workflow_and_state(
     tmp_path: Path,
 ) -> None:
