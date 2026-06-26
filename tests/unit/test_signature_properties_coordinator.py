@@ -784,8 +784,14 @@ def test_coordinator_applies_preset_with_certificate_material(tmp_path: Path) ->
     assert workflow.passphrase == "alternate-secret"
 
 
-def test_coordinator_save_current_preset_persists_and_selects_it(tmp_path: Path) -> None:
-    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+def test_coordinator_save_current_preset_persists_and_selects_it(
+    tmp_path: Path,
+) -> None:
+    class _NoSavePresetStore(SignaturePresetCatalogStore):
+        def save_preset(self, _preset):  # type: ignore[override]
+            raise AssertionError("coordinator save path should not call store save_preset helper")
+
+    store = _NoSavePresetStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
     workflow = _ready_workflow(tmp_path)
     workflow.selected_certificate_configuration_id = "cert-config-default"
 

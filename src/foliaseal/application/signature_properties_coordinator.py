@@ -398,7 +398,7 @@ class DefaultSignaturePropertiesCoordinator:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
         self.preset_catalog = self.preset_catalog.upsert_preset(preset)
         if self.preset_catalog_store is not None:
-            self.preset_catalog_store.save_preset(preset)
+            self.preset_catalog_store.save_catalog(self.preset_catalog)
         self._selected_signature_preset_name = preset.name
 
     def _build_current_preset(self, name: str) -> ResolvedSignaturePreset:

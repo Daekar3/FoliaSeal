@@ -793,7 +793,7 @@ The canonical repository document split is:
 3. Saving creates or replaces a resolved preset, which stores separate `AppearanceProfile`, optional `PlacementProfile`, and reference-only `SignaturePreset` entries in `SignaturePresetCatalog`.
 4. Store writes indented sorted JSON to a `.tmp` file and replaces `profiles.json`.
 5. Delete rewrites the catalog without the named preset.
-6. The coordinator calls canonical draft methods `capture_current_signature_setup()` and `apply_signature_preset_values()` on the live apply path, with `apply_resolved_signature_preset()` retained as a compatibility wrapper, and uses preset-oriented catalog/store methods such as `preset_named()`, `upsert_preset()`, `save_preset()`, and `delete_preset()`.
+6. The coordinator calls canonical draft methods `capture_current_signature_setup()` and `apply_signature_preset_values()` on the live apply path, with `apply_resolved_signature_preset()` retained as a compatibility wrapper, and on the live save path now persists the already-updated catalog through `save_catalog(self.preset_catalog)` while `save_preset()` remains a compatibility helper alongside preset-oriented catalog/store methods such as `preset_named()`, `upsert_preset()`, and `delete_preset()`.
 
 ### Certificate configuration selection
 
