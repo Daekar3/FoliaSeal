@@ -16,12 +16,17 @@ from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialResolver,
     SigningMaterialResolutionError,
 )
-from foliaseal.domain.models import SignatureAppearance, SignatureRect
+from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignaturePlacementDefaults,
+    SignatureRect,
+)
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     CertificateCatalog,
     CertificateConfiguration,
+    ResolvedSignaturePreset,
     SignaturePreset,
     SignaturePresetCatalog,
 )
@@ -388,13 +393,32 @@ class DefaultSignaturePropertiesCoordinator:
                 f"Signature preset '{name}' already exists."
             )
         try:
-            preset = self.workflow.capture_current_signature_setup(name)
+            preset = self._build_current_preset(name)
         except ValueError as exc:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
         self.preset_catalog = self.preset_catalog.upsert_preset(preset)
         if self.preset_catalog_store is not None:
             self.preset_catalog_store.save_preset(preset)
         self._selected_signature_preset_name = preset.name
+
+    def _build_current_preset(self, name: str) -> ResolvedSignaturePreset:
+        appearance = self.workflow.current_signature_appearance
+        if appearance is None:
+            raise ValueError(
+                "A signature appearance must exist before saving a signature preset."
+            )
+        placement_defaults = self.workflow.signature_placement_defaults
+        if placement_defaults is None and self.workflow.signature_rect is not None:
+            placement_defaults = SignaturePlacementDefaults(
+                width_pt=self.workflow.signature_rect.width_pt,
+                height_pt=self.workflow.signature_rect.height_pt,
+            )
+        return ResolvedSignaturePreset.from_parts(
+            name=name,
+            appearance=appearance,
+            placement_defaults=placement_defaults,
+            certificate_configuration_id=self.workflow.selected_certificate_configuration_id,
+        )
 
     def _delete_preset(self, command: DeletePreset) -> None:
         name = _require_name(command.name, "Select a signature preset before deleting it.")

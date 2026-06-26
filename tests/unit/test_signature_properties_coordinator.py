@@ -787,6 +787,12 @@ def test_coordinator_applies_preset_with_certificate_material(tmp_path: Path) ->
 def test_coordinator_save_current_preset_persists_and_selects_it(tmp_path: Path) -> None:
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
     workflow = _ready_workflow(tmp_path)
+    workflow.selected_certificate_configuration_id = "cert-config-default"
+
+    def _fail_capture(_name: str, **_kwargs) -> None:
+        raise AssertionError("coordinator save path should not call workflow capture helper")
+
+    workflow.capture_current_signature_setup = _fail_capture  # type: ignore[method-assign]
     coordinator = DefaultSignaturePropertiesCoordinator(
         workflow=workflow,
         certificate_catalog=CertificateCatalog(schema_version=1),
@@ -794,9 +800,16 @@ def test_coordinator_save_current_preset_persists_and_selects_it(tmp_path: Path)
     )
 
     state = coordinator.reconcile(SaveCurrentPreset(name="Team Standard"))
+    saved = store.load_catalog().preset_named("Team Standard")
 
     assert state.selected_signature_preset_name == "Team Standard"
     assert "Team Standard" in store.load_catalog().preset_names()
+    assert saved.appearance == workflow.current_signature_appearance
+    assert saved.placement_defaults == SignaturePlacementDefaults(
+        width_pt=180.0,
+        height_pt=48.0,
+    )
+    assert saved.preset.certificate_configuration_id == "cert-config-default"
 
 
 def test_coordinator_delete_preset_removes_it_and_clears_selection(tmp_path: Path) -> None:
