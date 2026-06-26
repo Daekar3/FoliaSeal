@@ -713,6 +713,9 @@ def test_coordinator_apply_signature_preset_wrapper_applies_certificate_material
     assert workflow.selected_certificate_configuration_id == "cert-config-alt"
     assert workflow.certificate_path == str(alternate_path)
     assert workflow.passphrase == "alternate-secret"
+    assert workflow.selected_signature_preset_id == "preset-alternate-preset"
+    assert workflow.selected_appearance_profile_id == "appearance-alternate-preset"
+    assert workflow.selected_placement_profile_id == "placement-alternate-preset"
 
 
 def test_coordinator_applies_preset_with_certificate_material(tmp_path: Path) -> None:

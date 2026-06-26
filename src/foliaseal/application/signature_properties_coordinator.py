@@ -365,7 +365,14 @@ class DefaultSignaturePropertiesCoordinator:
             )
             self.workflow.apply_certificate_configuration(configuration, signing_material)
             self._selected_certificate_configuration_name = configuration.display_name
-        self.workflow.apply_resolved_signature_preset(preset)
+        self.workflow.apply_signature_preset_values(
+            appearance=preset.appearance,
+            placement_defaults=preset.placement_defaults,
+            signature_preset_id=preset.preset.signature_preset_id,
+            appearance_profile_id=preset.preset.appearance_profile_id,
+            placement_profile_id=preset.preset.placement_profile_id,
+            certificate_configuration_id=preset.preset.certificate_configuration_id,
+        )
         self._selected_signature_preset_name = preset.name
 
     def _save_current_preset(self, command: SaveCurrentPreset) -> None:

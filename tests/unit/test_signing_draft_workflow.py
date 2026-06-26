@@ -502,6 +502,34 @@ def test_workflow_preserves_certificate_selection_for_partial_preset(
     assert workflow.selected_certificate_configuration_id == "cert-config-current"
 
 
+def test_workflow_apply_signature_preset_values_updates_ids_and_preserves_certificate(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = _appearance()
+    placement_defaults = SignaturePlacementDefaults(
+        width_pt=180.0,
+        height_pt=72.0,
+    )
+    workflow.selected_certificate_configuration_id = "cert-config-current"
+
+    workflow.apply_signature_preset_values(
+        appearance=appearance,
+        placement_defaults=placement_defaults,
+        signature_preset_id="preset-team-standard",
+        appearance_profile_id="appearance-team-standard",
+        placement_profile_id="placement-team-standard",
+        certificate_configuration_id=None,
+    )
+
+    assert workflow.current_signature_appearance == appearance
+    assert workflow.signature_placement_defaults == placement_defaults
+    assert workflow.selected_signature_preset_id == "preset-team-standard"
+    assert workflow.selected_certificate_configuration_id == "cert-config-current"
+    assert workflow.selected_appearance_profile_id == "appearance-team-standard"
+    assert workflow.selected_placement_profile_id == "placement-team-standard"
+
+
 def test_workflow_captures_placement_defaults_from_current_rectangle(
     tmp_path: Path,
 ) -> None:

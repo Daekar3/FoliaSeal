@@ -326,15 +326,33 @@ class SigningDraftWorkflow:
 
     def apply_resolved_signature_preset(self, preset: ResolvedSignaturePreset) -> None:
         """Apply a resolved reusable signature preset to the current draft."""
-        self.signature_appearance = preset.appearance
-        self.signature_placement_defaults = preset.placement_defaults
-        self.selected_signature_preset_id = preset.preset.signature_preset_id
-        if preset.preset.certificate_configuration_id is not None:
-            self.selected_certificate_configuration_id = (
-                preset.preset.certificate_configuration_id
-            )
-        self.selected_appearance_profile_id = preset.preset.appearance_profile_id
-        self.selected_placement_profile_id = preset.preset.placement_profile_id
+        self.apply_signature_preset_values(
+            appearance=preset.appearance,
+            placement_defaults=preset.placement_defaults,
+            signature_preset_id=preset.preset.signature_preset_id,
+            appearance_profile_id=preset.preset.appearance_profile_id,
+            placement_profile_id=preset.preset.placement_profile_id,
+            certificate_configuration_id=preset.preset.certificate_configuration_id,
+        )
+
+    def apply_signature_preset_values(
+        self,
+        *,
+        appearance: SignatureAppearance,
+        placement_defaults: SignaturePlacementDefaults | None,
+        signature_preset_id: str | None,
+        appearance_profile_id: str | None,
+        placement_profile_id: str | None,
+        certificate_configuration_id: str | None,
+    ) -> None:
+        """Apply draft-facing signature preset values without requiring a schema DTO."""
+        self.signature_appearance = appearance
+        self.signature_placement_defaults = placement_defaults
+        self.selected_signature_preset_id = signature_preset_id
+        if certificate_configuration_id is not None:
+            self.selected_certificate_configuration_id = certificate_configuration_id
+        self.selected_appearance_profile_id = appearance_profile_id
+        self.selected_placement_profile_id = placement_profile_id
 
     def apply_certificate_configuration(
         self,
