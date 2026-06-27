@@ -6,7 +6,8 @@ import importlib
 import json
 import re
 import shutil
-from dataclasses import dataclass, fields, is_dataclass, replace
+from collections.abc import Callable
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
@@ -116,6 +117,8 @@ DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_result
 # keeps the canonical preview sweep from accumulating Qt state across hundreds of runs.
 _PREVIEW_MATRIX_SHELL_RECYCLE_INTERVAL = 1
 
+BuildPhase3PreviewMatrixRunner = Callable[[], Phase3PreviewMatrixRunner]
+
 
 @dataclass(frozen=True)
 class Phase3HarnessCapture:
@@ -166,6 +169,51 @@ class Phase3HarnessCapture:
         """Return a stable JSON representation for later review."""
 
         return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
+
+
+@dataclass(frozen=True)
+class Phase3HarnessRequest:
+    """Caller-facing request for Phase 3 harness facade operations."""
+
+    pdf_path: str
+    certificate_path: str = "demo-cert.p12"
+    passphrase: str = "demo-passphrase"
+    summary_json_path: str | None = None
+    checklist_results_path: str = DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH
+    checklist_template_path: str = DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH
+    artifacts_dir: str | None = None
+    scenario_manifest_path: str | None = None
+
+
+@dataclass(frozen=True)
+class Phase3HarnessDependencies:
+    """Injectable collaborators for the Phase 3 harness facade."""
+
+    build_preview_matrix_runner: BuildPhase3PreviewMatrixRunner
+
+    @classmethod
+    def default(cls) -> Phase3HarnessDependencies:
+        return cls(build_preview_matrix_runner=_build_phase3_preview_matrix_runner)
+
+
+@dataclass(frozen=True)
+class Phase3Harness:
+    """Common-caller facade over Phase 3 harness execution modes."""
+
+    deps: Phase3HarnessDependencies = field(default_factory=Phase3HarnessDependencies.default)
+
+    def run_preview_matrix(self, request: Phase3HarnessRequest) -> dict[str, Any]:
+        if request.scenario_manifest_path is None:
+            raise ValueError("'scenario_manifest_path' is required for preview matrix runs.")
+        if request.artifacts_dir is None:
+            raise ValueError("'artifacts_dir' is required for preview matrix runs.")
+        return self.deps.build_preview_matrix_runner().run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
 
 
 def build_phase3_checklist_results_markdown(
@@ -922,12 +970,14 @@ def run_phase3_preview_matrix(
     artifacts_dir: str,
 ) -> dict[str, Any]:
     """Run a repeatable preview-only scenario sweep and capture rendered artifacts."""
-    return _build_phase3_preview_matrix_runner().run(
-        pdf_path=pdf_path,
-        certificate_path=certificate_path,
-        passphrase=passphrase,
-        scenario_manifest_path=scenario_manifest_path,
-        artifacts_dir=artifacts_dir,
+    return Phase3Harness().run_preview_matrix(
+        Phase3HarnessRequest(
+            pdf_path=pdf_path,
+            certificate_path=certificate_path,
+            passphrase=passphrase,
+            scenario_manifest_path=scenario_manifest_path,
+            artifacts_dir=artifacts_dir,
+        )
     )
 
 
