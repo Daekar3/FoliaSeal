@@ -118,6 +118,7 @@ DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_result
 _PREVIEW_MATRIX_SHELL_RECYCLE_INTERVAL = 1
 
 BuildPhase3PreviewMatrixRunner = Callable[[], Phase3PreviewMatrixRunner]
+BuildPhase3SignedAcceptanceMatrixRunner = Callable[[], Phase3SignedAcceptanceMatrixRunner]
 
 
 @dataclass(frozen=True)
@@ -190,10 +191,14 @@ class Phase3HarnessDependencies:
     """Injectable collaborators for the Phase 3 harness facade."""
 
     build_preview_matrix_runner: BuildPhase3PreviewMatrixRunner
+    build_signed_acceptance_matrix_runner: BuildPhase3SignedAcceptanceMatrixRunner
 
     @classmethod
     def default(cls) -> Phase3HarnessDependencies:
-        return cls(build_preview_matrix_runner=_build_phase3_preview_matrix_runner)
+        return cls(
+            build_preview_matrix_runner=_build_phase3_preview_matrix_runner,
+            build_signed_acceptance_matrix_runner=_build_phase3_signed_acceptance_matrix_runner,
+        )
 
 
 @dataclass(frozen=True)
@@ -208,6 +213,19 @@ class Phase3Harness:
         if request.artifacts_dir is None:
             raise ValueError("'artifacts_dir' is required for preview matrix runs.")
         return self.deps.build_preview_matrix_runner().run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+    def run_signed_acceptance_matrix(self, request: Phase3HarnessRequest) -> dict[str, Any]:
+        if request.scenario_manifest_path is None:
+            raise ValueError("'scenario_manifest_path' is required for signed acceptance runs.")
+        if request.artifacts_dir is None:
+            raise ValueError("'artifacts_dir' is required for signed acceptance runs.")
+        return self.deps.build_signed_acceptance_matrix_runner().run(
             pdf_path=request.pdf_path,
             certificate_path=request.certificate_path,
             passphrase=request.passphrase,
@@ -1000,12 +1018,14 @@ def run_phase3_signed_acceptance_matrix(
     artifacts_dir: str,
 ) -> dict[str, Any]:
     """Run a repeatable signed-output acceptance sweep over representative cases."""
-    return _build_phase3_signed_acceptance_matrix_runner().run(
-        pdf_path=pdf_path,
-        certificate_path=certificate_path,
-        passphrase=passphrase,
-        scenario_manifest_path=scenario_manifest_path,
-        artifacts_dir=artifacts_dir,
+    return Phase3Harness().run_signed_acceptance_matrix(
+        Phase3HarnessRequest(
+            pdf_path=pdf_path,
+            certificate_path=certificate_path,
+            passphrase=passphrase,
+            scenario_manifest_path=scenario_manifest_path,
+            artifacts_dir=artifacts_dir,
+        )
     )
 
 
