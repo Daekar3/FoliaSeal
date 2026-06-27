@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from foliaseal.application import (
@@ -4168,6 +4169,94 @@ def test_signing_shell_apply_changes_maps_form_value_error_to_validation_issue(
     assert panel._control_issue is not None
     assert panel._control_issue.code == "signature_appearance_invalid"
     assert "Appearance is invalid." in panel.validation_text()
+
+
+def test_signing_shell_apply_changes_does_not_rewrite_session_value_error_as_form_issue(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    panel = widget.properties_panel
+
+    original_draft = panel._setup_form.build_draft()
+
+    def _raise_session_value_error(_draft, *, control_issue=None):
+        raise ValueError("session path should not be rewritten")
+
+    monkeypatch.setattr(panel._setup_form, "build_draft", lambda: original_draft)
+    monkeypatch.setattr(
+        panel._setup_session,
+        "apply_visible_setup",
+        _raise_session_value_error,
+    )
+
+    with pytest.raises(ValueError, match="session path should not be rewritten"):
+        panel.apply_changes()
+
+    assert panel._control_issue is None
+
+
+def test_signing_shell_apply_changes_recovers_from_invalid_form_issue_on_next_success(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    panel = widget.properties_panel
+    original_build_draft = panel._setup_form.build_draft
+
+    def _raise_invalid_draft() -> None:
+        raise ValueError("Appearance is invalid.")
+
+    monkeypatch.setattr(panel._setup_form, "build_draft", _raise_invalid_draft)
+
+    invalid_preview = panel.apply_changes()
+
+    assert invalid_preview == panel.preview
+    assert panel._control_issue is not None
+    assert panel._control_issue.code == "signature_appearance_invalid"
+    assert "Appearance is invalid." in panel.validation_text()
+
+    monkeypatch.setattr(panel._setup_form, "build_draft", original_build_draft)
+
+    recovered_preview = panel.apply_changes()
+
+    assert recovered_preview == panel.preview
+    assert panel._control_issue is None
+    assert "Appearance is invalid." not in panel.validation_text()
+
+    refreshed_preview = panel.refresh_preview()
+
+    assert refreshed_preview == panel.preview
+    assert panel._control_issue is None
+    assert "Appearance is invalid." not in panel.validation_text()
 
 
 def test_signing_shell_signature_preset_selection_error_reloads_current_state(

@@ -400,31 +400,38 @@ class SignaturePropertiesPanel:
         return _preview_stamp_text(preview).strip()
 
     def refresh_preview(self) -> SigningDraftPreview:
-        state = self._setup_session.load(control_issue=self._control_issue)
-        return self._apply_coordinator_state(state)
+        return self._render_setup_state()
 
     def load_from_workflow(self) -> None:
-        state = self._setup_session.load(control_issue=self._control_issue)
-        self._apply_coordinator_state(state)
+        self._render_setup_state()
 
     def apply_changes(self) -> SigningDraftPreview:
         self._control_issue = None
         try:
-            state = self._setup_session.apply_visible_setup(
-                self._setup_form.build_draft(),
-                control_issue=self._control_issue,
-            )
+            draft = self._setup_form.build_draft()
         except ValueError as exc:
             self._control_issue = _build_preview_issue(
                 code="signature_appearance_invalid",
                 message=str(exc),
                 field_name="signature_appearance",
             )
-            preview = self.refresh_preview()
+            preview = self._render_setup_state()
         else:
-            preview = self._apply_coordinator_state(state)
+            state = self._setup_session.apply_visible_setup(
+                draft,
+                control_issue=self._control_issue,
+            )
+            preview = self._render_setup_state(state)
         self._notify_change()
         return preview
+
+    def _render_setup_state(
+        self,
+        state: SignaturePropertiesViewState | None = None,
+    ) -> SigningDraftPreview:
+        if state is None:
+            state = self._setup_session.load(control_issue=self._control_issue)
+        return self._apply_coordinator_state(state)
 
     def _build_preview_controls(self) -> PreviewControls:
         bindings = self._bindings
