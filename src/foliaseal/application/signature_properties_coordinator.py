@@ -118,8 +118,16 @@ class ApplyVisibleSignatureSetup:
     draft: VisibleSignatureSetupDraft
 
 
+@dataclass(frozen=True)
+class SetSignatureAppearance:
+    """Apply a signature appearance without mutating placement state."""
+
+    signature_appearance: SignatureAppearance | None
+
+
 SignaturePropertiesCommand = (
     ApplyVisibleSignatureSetup
+    | SetSignatureAppearance
     | ApplyCertificateConfiguration
     | ApplySignaturePreset
     | SaveCurrentPreset
@@ -141,6 +149,13 @@ class SignaturePropertiesCoordinator(Protocol):
     def apply_visible_setup(
         self,
         draft: VisibleSignatureSetupDraft,
+        *,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState: ...
+
+    def set_signature_appearance(
+        self,
+        signature_appearance: SignatureAppearance | None,
         *,
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState: ...
@@ -241,6 +256,8 @@ class DefaultSignaturePropertiesCoordinator:
     ) -> SignaturePropertiesViewState:
         if isinstance(command, ApplyVisibleSignatureSetup):
             self._apply_visible_signature_setup(command)
+        elif isinstance(command, SetSignatureAppearance):
+            self._apply_signature_appearance(command)
         elif isinstance(command, ApplyCertificateConfiguration):
             self._apply_certificate_configuration(command)
         elif isinstance(command, ApplySignaturePreset):
@@ -264,6 +281,17 @@ class DefaultSignaturePropertiesCoordinator:
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState:
         self._apply_visible_signature_setup(ApplyVisibleSignatureSetup(draft=draft))
+        return self.load(control_issue=control_issue)
+
+    def set_signature_appearance(
+        self,
+        signature_appearance: SignatureAppearance | None,
+        *,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        self._apply_signature_appearance(
+            SetSignatureAppearance(signature_appearance=signature_appearance)
+        )
         return self.load(control_issue=control_issue)
 
     def apply_signature_preset(
@@ -325,6 +353,11 @@ class DefaultSignaturePropertiesCoordinator:
                     height_pt=placement.height_pt,
                 )
             )
+        if self._selected_signature_preset_name is not None:
+            self._selected_signature_preset_name = None
+
+    def _apply_signature_appearance(self, command: SetSignatureAppearance) -> None:
+        self.workflow.set_signature_appearance(command.signature_appearance)
         if self._selected_signature_preset_name is not None:
             self._selected_signature_preset_name = None
 

@@ -1,8 +1,10 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator,
     SignaturePropertiesCoordinatorError,
+    SignaturePropertiesViewState,
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
@@ -31,6 +33,27 @@ class _FakePrompter:
     def prompt(self, label: str) -> str | None:
         self.calls.append(label)
         return self._responses.pop(0) if self._responses else None
+
+
+class _WorkflowAccessExplodes:
+    def set_signature_appearance(self, _signature_appearance) -> None:
+        raise AssertionError("SigningSetupSession should not mutate coordinator.workflow directly.")
+
+
+class _FakeCoordinatorForAppearanceDelegation:
+    def __init__(self, returned_state: SignaturePropertiesViewState) -> None:
+        self.workflow = _WorkflowAccessExplodes()
+        self.returned_state = returned_state
+        self.calls: list[tuple[object, object | None]] = []
+
+    def set_signature_appearance(
+        self,
+        signature_appearance,
+        *,
+        control_issue=None,
+    ) -> SignaturePropertiesViewState:
+        self.calls.append((signature_appearance, control_issue))
+        return self.returned_state
 
 
 def test_signing_setup_session_retries_certificate_selection_and_caches_passphrase(
@@ -342,6 +365,51 @@ def test_signing_setup_session_set_signature_appearance_clears_selected_preset(
 
     assert state.selected_signature_preset_name is None
     assert coordinator.workflow.signature_appearance == updated_appearance
+
+
+def test_signing_setup_session_set_signature_appearance_delegates_to_coordinator_boundary(
+) -> None:
+    returned_state = SignaturePropertiesViewState(
+        selected_certificate_configuration_name="Corporate Records Signing",
+        selected_signature_preset_name=None,
+        certificate_configuration_names=("Corporate Records Signing",),
+        signature_preset_names=("Default", "Compact"),
+        visible_signature_setup_draft=VisibleSignatureSetupDraft(
+            appearance=build_signature_appearance(
+                signer_label_prefix="Delegated",
+                show_field_names=True,
+            ),
+            placement=VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=48.0,
+                enabled=True,
+            ),
+        ),
+        validation_text="Ready to sign.",
+        ready_to_sign=True,
+        preview=_ready_workflow(Path("/tmp")).preview(),
+    )
+    coordinator = _FakeCoordinatorForAppearanceDelegation(returned_state)
+    session = SigningSetupSession(
+        coordinator=coordinator,  # type: ignore[arg-type]
+        passphrase_prompter=_FakePrompter([]),
+    )
+    updated_appearance = build_signature_appearance(
+        signer_label_prefix="Delegated",
+        show_field_names=True,
+    )
+    control_issue = SimpleNamespace(code="issue")
+
+    state = session.set_signature_appearance(
+        updated_appearance,
+        control_issue=control_issue,  # type: ignore[arg-type]
+    )
+
+    assert state is returned_state
+    assert coordinator.calls == [(updated_appearance, control_issue)]
 
 
 def test_signing_setup_session_save_preset_persists_and_selects_it(

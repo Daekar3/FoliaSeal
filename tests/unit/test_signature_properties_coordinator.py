@@ -15,6 +15,7 @@ from foliaseal.application.signature_properties_coordinator import (
     DeletePreset,
     RefreshCatalogs,
     SaveCurrentPreset,
+    SetSignatureAppearance,
     SignaturePropertiesCoordinatorError,
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
@@ -210,6 +211,80 @@ def test_coordinator_apply_visible_signature_setup_updates_workflow_and_clears_p
     assert workflow.selected_signature_preset_id is None
     assert state.selected_signature_preset_name is None
     assert state.visible_signature_setup_draft.placement.enabled is True
+
+
+def test_coordinator_set_signature_appearance_updates_workflow_and_clears_preset(
+    tmp_path: Path,
+) -> None:
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+    updated_appearance = build_signature_appearance(
+        signer_label_prefix="Programmatic Boundary",
+        show_field_names=True,
+    )
+
+    state = coordinator.set_signature_appearance(updated_appearance)
+
+    assert workflow.signature_appearance == updated_appearance
+    assert workflow.selected_signature_preset_id is None
+    assert state.selected_signature_preset_name is None
+    assert state.visible_signature_setup_draft.appearance == updated_appearance
+
+
+def test_coordinator_reconcile_set_signature_appearance_updates_workflow_and_clears_preset(
+    tmp_path: Path,
+) -> None:
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+    updated_appearance = build_signature_appearance(
+        signer_label_prefix="Command Path",
+        show_field_names=False,
+    )
+
+    state = coordinator.reconcile(
+        SetSignatureAppearance(signature_appearance=updated_appearance)
+    )
+
+    assert workflow.signature_appearance == updated_appearance
+    assert workflow.selected_signature_preset_id is None
+    assert state.selected_signature_preset_name is None
+    assert state.visible_signature_setup_draft.appearance == updated_appearance
+
+
+def test_coordinator_set_signature_appearance_preserves_control_issue_folding(
+    tmp_path: Path,
+) -> None:
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Control Issue",
+            show_field_names=True,
+        ),
+        control_issue=SigningDraftValidationIssue(
+            code="preview_warning",
+            message="Preview is stale but still usable.",
+            field_name="signature_appearance",
+            severity=SigningDraftValidationSeverity.WARNING,
+        ),
+    )
+
+    assert state.ready_to_sign is True
+    assert state.validation_text == "Ready to sign."
 
 
 def test_coordinator_reports_certificate_configuration_name_for_preset(

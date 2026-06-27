@@ -66,8 +66,10 @@ class SigningSetupSession:
         *,
         control_issue: SigningDraftValidationIssue | None = None,
     ) -> SignaturePropertiesViewState:
-        self.coordinator.workflow.set_signature_appearance(signature_appearance)
-        return self.clear_selected_signature_preset(control_issue=control_issue)
+        return self.coordinator.set_signature_appearance(
+            signature_appearance,
+            control_issue=control_issue,
+        )
 
     def select_signature_preset(
         self,
