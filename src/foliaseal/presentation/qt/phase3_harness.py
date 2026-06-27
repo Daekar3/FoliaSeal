@@ -233,6 +233,90 @@ class Phase3Harness:
             artifacts_dir=request.artifacts_dir,
         )
 
+    def run_signing_harness(self, request: Phase3HarnessRequest) -> Phase3HarnessCapture:
+        bindings = _load_qt_harness_bindings()
+        source_path = Path(request.pdf_path)
+        if not source_path.exists():
+            raise FileNotFoundError(f"PDF does not exist: {request.pdf_path}")
+        artifacts_dir = _default_harness_artifacts_dir(
+            summary_json_path=request.summary_json_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+        page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
+        backend = QtPdfRenderBackend()
+        diagnostic = backend.diagnostics()
+        if not diagnostic.available:
+            raise RuntimeError(diagnostic.message)
+
+        viewer_workflow = ViewerWorkflow(
+            document_path=str(source_path),
+            render_backend=backend,
+            session=ViewerSession(page_count=page_count),
+        )
+        signing_workflow = SigningDraftWorkflow(
+            input_pdf_path=str(source_path),
+            output_pdf_path=_default_harness_output_pdf_path(
+                pdf_path=str(source_path),
+                artifacts_dir=artifacts_dir,
+                sign_attempt_index=1,
+            ),
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            tsa_url="https://tsa.example.invalid",
+            timestamp_required=False,
+        )
+        profile_store = SignaturePresetCatalogStore.default()
+        sign_executor = build_phase3_signing_executor()
+        capture_assembler = _build_phase3_harness_capture_assembler()
+        session = _run_phase3_harness_session(
+            bindings=bindings,
+            source_path=source_path,
+            artifacts_dir=artifacts_dir,
+            viewer_workflow=viewer_workflow,
+            signing_workflow=signing_workflow,
+            profile_store=profile_store,
+            sign_executor=sign_executor,
+            capture_assembler=capture_assembler,
+        )
+        capture_payload = _build_phase3_harness_capture_payload(
+            source_path=source_path,
+            summary_json_path=request.summary_json_path,
+            checklist_results_path=request.checklist_results_path,
+            artifacts_dir=artifacts_dir,
+            session=session,
+            capture_assembler=capture_assembler,
+        )
+        report = finalize_phase3_harness_report(
+            Phase3HarnessReportRequest(
+                capture_payload=capture_payload,
+                summary_json_path=request.summary_json_path,
+                checklist_results_path=request.checklist_results_path,
+                checklist_template_path=request.checklist_template_path,
+            ),
+            contract_evaluator=evaluate_phase3_evidence_contract,
+            capture_factory=_build_phase3_harness_capture,
+            checklist_renderer=build_phase3_checklist_results_markdown,
+            text_writer=_write_optional_text,
+        )
+        capture = report.capture
+        if request.summary_json_path is None:
+            print("Phase 3 harness capture")
+            print(capture.to_json())
+            print()
+        else:
+            print("Phase 3 harness capture written")
+            print(f"- summary json: {request.summary_json_path}")
+            print(f"- acceptance tier: {capture.acceptance_tier}")
+            print(f"- gate verdict: {capture.gate_verdict}")
+            print(f"- validation: {capture.validation_text}")
+            print(f"- captured states: {len(capture.captured_states)}")
+            print()
+        print(f"Checklist results file: {request.checklist_results_path}")
+        print("Review the pre-checked items, complete the remaining manual-only checks, and")
+        print("use the generated file as the acceptance worksheet for Phase 3.")
+        return capture
+
 
 def build_phase3_checklist_results_markdown(
     capture: Phase3HarnessCapture,
@@ -621,89 +705,17 @@ def run_phase3_signing_harness(
     artifacts_dir: str | None = None,
 ) -> Phase3HarnessCapture:
     """Launch an interactive Qt signing-shell harness for Phase 3 acceptance."""
-
-    bindings = _load_qt_harness_bindings()
-    source_path = Path(pdf_path)
-    if not source_path.exists():
-        raise FileNotFoundError(f"PDF does not exist: {pdf_path}")
-    artifacts_dir = _default_harness_artifacts_dir(
-        summary_json_path=summary_json_path,
-        artifacts_dir=artifacts_dir,
-    )
-
-    page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
-    backend = QtPdfRenderBackend()
-    diagnostic = backend.diagnostics()
-    if not diagnostic.available:
-        raise RuntimeError(diagnostic.message)
-
-    viewer_workflow = ViewerWorkflow(
-        document_path=str(source_path),
-        render_backend=backend,
-        session=ViewerSession(page_count=page_count),
-    )
-    signing_workflow = SigningDraftWorkflow(
-        input_pdf_path=str(source_path),
-        output_pdf_path=_default_harness_output_pdf_path(
-            pdf_path=str(source_path),
-            artifacts_dir=artifacts_dir,
-            sign_attempt_index=1,
-        ),
-        certificate_path=certificate_path,
-        passphrase=passphrase,
-        tsa_url="https://tsa.example.invalid",
-        timestamp_required=False,
-    )
-    profile_store = SignaturePresetCatalogStore.default()
-    sign_executor = build_phase3_signing_executor()
-    capture_assembler = _build_phase3_harness_capture_assembler()
-    session = _run_phase3_harness_session(
-        bindings=bindings,
-        source_path=source_path,
-        artifacts_dir=artifacts_dir,
-        viewer_workflow=viewer_workflow,
-        signing_workflow=signing_workflow,
-        profile_store=profile_store,
-        sign_executor=sign_executor,
-        capture_assembler=capture_assembler,
-    )
-    capture_payload = _build_phase3_harness_capture_payload(
-        source_path=source_path,
-        summary_json_path=summary_json_path,
-        checklist_results_path=checklist_results_path,
-        artifacts_dir=artifacts_dir,
-        session=session,
-        capture_assembler=capture_assembler,
-    )
-    report = finalize_phase3_harness_report(
-        Phase3HarnessReportRequest(
-            capture_payload=capture_payload,
+    return Phase3Harness().run_signing_harness(
+        Phase3HarnessRequest(
+            pdf_path=pdf_path,
+            certificate_path=certificate_path,
+            passphrase=passphrase,
             summary_json_path=summary_json_path,
             checklist_results_path=checklist_results_path,
             checklist_template_path=checklist_template_path,
-        ),
-        contract_evaluator=evaluate_phase3_evidence_contract,
-        capture_factory=_build_phase3_harness_capture,
-        checklist_renderer=build_phase3_checklist_results_markdown,
-        text_writer=_write_optional_text,
+            artifacts_dir=artifacts_dir,
+        )
     )
-    capture = report.capture
-    if summary_json_path is None:
-        print("Phase 3 harness capture")
-        print(capture.to_json())
-        print()
-    else:
-        print("Phase 3 harness capture written")
-        print(f"- summary json: {summary_json_path}")
-        print(f"- acceptance tier: {capture.acceptance_tier}")
-        print(f"- gate verdict: {capture.gate_verdict}")
-        print(f"- validation: {capture.validation_text}")
-        print(f"- captured states: {len(capture.captured_states)}")
-        print()
-    print(f"Checklist results file: {checklist_results_path}")
-    print("Review the pre-checked items, complete the remaining manual-only checks, and")
-    print("use the generated file as the acceptance worksheet for Phase 3.")
-    return capture
 
 
 def _run_phase3_harness_session(

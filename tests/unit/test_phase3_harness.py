@@ -76,6 +76,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _write_text_debug_overlay,
     build_phase3_checklist_results_markdown,
     run_phase3_preview_matrix,
+    run_phase3_signing_harness,
 )
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     _apply_appearance_overrides,
@@ -1338,6 +1339,153 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
     assert captured["payload"]["selection_count"] == 1
     assert captured["payload"]["captured_states"][-1]["capture_kind"] == "final"
     assert captured["payload"]["preview_snapshot"]["title"] == "Final preview"
+
+
+def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_reporting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+    )
+    captured = {}
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_load_qt_harness_bindings",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_load_page_count",
+        lambda **_kwargs: 1,
+    )
+
+    class _FakeBackend:
+        def diagnostics(self):
+            return type("_Diag", (), {"available": True, "message": "ok"})()
+
+    monkeypatch.setattr(phase3_harness_module, "QtPdfRenderBackend", _FakeBackend)
+    monkeypatch.setattr(
+        phase3_harness_module.SignaturePresetCatalogStore,
+        "default",
+        staticmethod(lambda: object()),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "build_phase3_signing_executor",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_run_phase3_harness_session",
+        lambda **_kwargs: phase3_harness_module.Phase3HarnessSessionResult(
+            first_render_ms=12.5,
+            sign_requests=(request,),
+            signed_runs=(),
+            errors=(),
+            interaction_counts={"selection_success": 1},
+            captured_states=({"capture_kind": "manual"},),
+            final_state={
+                "capture_kind": "final",
+                "preview_snapshot": {"title": "Final preview"},
+                "sign_request_snapshot": {
+                    "signature_appearance": {"layout_template": "single_line"}
+                },
+                "backend_reservation_snapshot": {"layout_template": "single_line"},
+                "backend_reservation_error": None,
+                "preview_text": "Final preview",
+                "validation_text": "Ready to sign.",
+            },
+            capture_request=request,
+            last_signing_result=None,
+        ),
+    )
+
+    def fake_finalize(request_obj, **_kwargs):
+        captured["payload"] = request_obj.capture_payload
+        return SimpleNamespace(
+            capture=SimpleNamespace(
+                acceptance_tier="gate_candidate",
+                gate_verdict="gate_candidate",
+                validation_text="Ready to sign.",
+                captured_states=(
+                    {"capture_kind": "manual"},
+                    {"capture_kind": "final"},
+                ),
+            )
+        )
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "finalize_phase3_harness_report",
+        fake_finalize,
+    )
+
+    capture = Phase3Harness().run_signing_harness(
+        Phase3HarnessRequest(
+            pdf_path=str(input_pdf),
+            certificate_path=str(cert_path),
+            passphrase="secret",
+            summary_json_path=str(tmp_path / "summary.json"),
+            checklist_results_path=str(tmp_path / "results.md"),
+            checklist_template_path=str(tmp_path / "template.md"),
+        )
+    )
+
+    assert capture.acceptance_tier == "gate_candidate"
+    assert captured["payload"]["sign_request_count"] == 1
+    assert captured["payload"]["selection_count"] == 1
+    assert captured["payload"]["captured_states"][-1]["capture_kind"] == "final"
+    assert captured["payload"]["preview_snapshot"]["title"] == "Final preview"
+
+
+def test_run_phase3_signing_harness_delegates_to_facade(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    captured: dict[str, object] = {}
+    expected_capture = SimpleNamespace(acceptance_tier="gate_candidate")
+
+    def fake_run_signing_harness(self, request):
+        captured["request"] = request
+        return expected_capture
+
+    monkeypatch.setattr(Phase3Harness, "run_signing_harness", fake_run_signing_harness)
+
+    result = run_phase3_signing_harness(
+        pdf_path=str(input_pdf),
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        summary_json_path=str(tmp_path / "summary.json"),
+        checklist_results_path=str(tmp_path / "results.md"),
+        checklist_template_path=str(tmp_path / "template.md"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+    )
+
+    assert result is expected_capture
+    assert captured["request"] == Phase3HarnessRequest(
+        pdf_path=str(input_pdf),
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        summary_json_path=str(tmp_path / "summary.json"),
+        checklist_results_path=str(tmp_path / "results.md"),
+        checklist_template_path=str(tmp_path / "template.md"),
+        artifacts_dir=str(tmp_path / "artifacts"),
+    )
 
 
 def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
