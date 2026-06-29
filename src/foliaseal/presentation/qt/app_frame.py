@@ -33,6 +33,7 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
     QtPdfPageCountLoader,
     SigningWorkspaceCompositionService,
+    WorkspaceCompatibilityState,
     WorkspaceOpenPort,
     WorkspaceOpenService,
 )
@@ -233,8 +234,7 @@ class FoliaSealAppFrame:
             ),
         )
         self._current_shell_port: SigningWorkspacePort | None = None
-        self._current_viewer_workflow: ViewerWorkflow | None = None
-        self._current_signing_workflow: SigningDraftWorkflow | None = None
+        self._current_workspace: WorkspaceCompatibilityState | None = None
         self._settings_dialog: AppSettingsDialog | None = None
         self._open_action: Any | None = None
         self._save_as_action: Any | None = None
@@ -261,9 +261,6 @@ class FoliaSealAppFrame:
         self.window.show_certificate_import = self.show_certificate_import  # type: ignore[attr-defined]
         self.window.show_certificate_management = self.show_certificate_management  # type: ignore[attr-defined]
         self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
-        self.window.current_shell = None  # type: ignore[attr-defined]
-        self.window.current_viewer_workflow = None  # type: ignore[attr-defined]
-        self.window.current_signing_workflow = None  # type: ignore[attr-defined]
         self.window.certificate_import_dialog = None  # type: ignore[attr-defined]
         self.window.certificate_creation_dialog = None  # type: ignore[attr-defined]
         self.window.certificate_management_dialog = None  # type: ignore[attr-defined]
@@ -278,8 +275,23 @@ class FoliaSealAppFrame:
         return self._app_settings
 
     @property
+    def current_workspace(self) -> WorkspaceCompatibilityState | None:
+        return self._current_workspace
+
+    @property
+    def current_shell(self) -> Any | None:
+        workspace = self._current_workspace
+        return None if workspace is None else workspace.shell_widget
+
+    @property
+    def current_viewer_workflow(self) -> ViewerWorkflow | None:
+        workspace = self._current_workspace
+        return None if workspace is None else workspace.viewer_workflow
+
+    @property
     def current_signing_workflow(self) -> SigningDraftWorkflow | None:
-        return self._current_signing_workflow
+        workspace = self._current_workspace
+        return None if workspace is None else workspace.signing_workflow
 
     def choose_open_pdf(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
@@ -320,15 +332,7 @@ class FoliaSealAppFrame:
             return None
 
         self._current_shell_port = outcome.shell_port
-        self._current_viewer_workflow = outcome.compatibility.viewer_workflow
-        self._current_signing_workflow = outcome.compatibility.signing_workflow
-        self.window.current_shell = outcome.compatibility.shell_widget  # type: ignore[attr-defined]
-        self.window.current_viewer_workflow = (  # type: ignore[attr-defined]
-            outcome.compatibility.viewer_workflow
-        )
-        self.window.current_signing_workflow = (  # type: ignore[attr-defined]
-            outcome.compatibility.signing_workflow
-        )
+        self._current_workspace = outcome.compatibility
         self.window.setCentralWidget(outcome.compatibility.shell_widget)
         self._set_save_as_enabled(True)
         return outcome.compatibility.shell_widget

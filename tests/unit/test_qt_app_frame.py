@@ -478,11 +478,12 @@ def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(
     ]
     assert _FakeQPdfDocument.load_calls == [str(selected_pdf)]
     assert frame.window.central_widget is shell
-    assert frame.window.current_shell is shell
-    assert frame.window.current_viewer_workflow.session.page_count == 3
-    assert frame.window.current_viewer_workflow.document_path == str(selected_pdf)
-    assert frame.window.current_signing_workflow.input_pdf_path == str(selected_pdf)
-    assert frame.window.current_signing_workflow.output_pdf_path == str(
+    assert frame.current_shell is shell
+    assert frame.current_workspace is not None
+    assert frame.current_viewer_workflow.session.page_count == 3
+    assert frame.current_viewer_workflow.document_path == str(selected_pdf)
+    assert frame.current_signing_workflow.input_pdf_path == str(selected_pdf)
+    assert frame.current_signing_workflow.output_pdf_path == str(
         tmp_path / "signed" / "contract-signed.pdf"
     )
     assert frame.window.menu_bar.menus[0].actions[1].enabled is True
@@ -508,7 +509,7 @@ def test_app_frame_reopens_signed_output_from_shell_callback(tmp_path: Path) -> 
     reopened = shell_callback(tmp_path / "signed" / "contract-signed.pdf")
     opened_paths.append(bootstrap_calls[1].viewer_workflow._document_path)
 
-    assert reopened is frame.window.current_shell
+    assert reopened is frame.current_shell
     assert opened_paths == [
         str(tmp_path / "source" / "contract.pdf"),
         str(tmp_path / "signed" / "contract-signed.pdf"),
@@ -718,7 +719,7 @@ def test_app_frame_reports_open_errors(tmp_path: Path) -> None:
     assert result is None
     assert errors and errors[0].startswith("Unable to open PDF:")
     assert bindings.q_message_box.warning_calls
-    assert frame.window.current_shell is None
+    assert frame.current_shell is None
 
 
 def test_build_qt_app_frame_uses_adapter_bindings(monkeypatch, tmp_path: Path) -> None:

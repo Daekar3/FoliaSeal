@@ -42,7 +42,7 @@ class OpenWorkspaceCommand:
 
 @dataclass(frozen=True)
 class WorkspaceCompatibilityState:
-    """Compatibility payload the frame still mirrors onto the window."""
+    """Compatibility payload owned by the frame snapshot."""
 
     shell_widget: Any
     viewer_workflow: ViewerWorkflow
