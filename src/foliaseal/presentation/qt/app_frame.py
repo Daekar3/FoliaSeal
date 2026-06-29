@@ -235,7 +235,6 @@ class FoliaSealAppFrame:
         )
         self._current_shell_port: SigningWorkspacePort | None = None
         self._current_workspace: WorkspaceCompatibilityState | None = None
-        self._settings_dialog: AppSettingsDialog | None = None
         self._open_action: Any | None = None
         self._save_as_action: Any | None = None
 
@@ -264,7 +263,6 @@ class FoliaSealAppFrame:
         self.window.certificate_import_dialog = None  # type: ignore[attr-defined]
         self.window.certificate_creation_dialog = None  # type: ignore[attr-defined]
         self.window.certificate_management_dialog = None  # type: ignore[attr-defined]
-        self.window._foliaseal_app_frame = self  # type: ignore[attr-defined]
 
     @property
     def container(self) -> Any:
@@ -345,7 +343,6 @@ class FoliaSealAppFrame:
             settings_store=self._app_settings_store,
             on_save=self._apply_app_settings,
         )
-        self._settings_dialog = dialog
         self.window.settings_dialog = dialog  # type: ignore[attr-defined]
         settings = dialog.exec()
         if settings is None:

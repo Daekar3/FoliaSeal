@@ -540,6 +540,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Import certificate...",
         "Manage certificate configurations...",
     ]
+    assert not hasattr(frame.window, "_foliaseal_app_frame")
 
     frame.window.menu_bar.menus[1].actions[0].trigger()
 
