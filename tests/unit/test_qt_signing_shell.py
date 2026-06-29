@@ -2503,15 +2503,25 @@ def test_signing_shell_installs_named_compatibility_surface(
         "build_qt_pdf_viewer_widget",
         lambda **kwargs: _FakeViewerWidget(**kwargs),
     )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
-        signing_workflow=_ready_workflow(output_pdf_path=str(tmp_path / "signed.pdf")),
+        signing_workflow=_ready_workflow(tmp_path),
     )
 
     assert widget.compat_surface.properties_panel is widget.properties_panel
     assert widget.compat_surface.viewer_widget is widget.viewer_widget
     assert widget.compat_surface.sidebar_surface is widget.sidebar_surface
-    assert widget.compat_surface.refresh_viewer is widget.refresh_viewer
+    assert widget.compat_surface.refresh_viewer.__self__ is widget.compat_surface
+    assert widget.refresh_viewer.__self__ is widget.compat_surface
+    assert widget.testing_adapter is not widget.compat_surface
+    assert widget.testing_adapter.properties_panel is widget.properties_panel
+    assert widget.testing_adapter.current_request() == widget.compat_surface.current_request()
+    assert widget.testing_adapter.last_signing_result() == widget.last_signing_result
 
 
 def test_signing_shell_visible_text_field_checkboxes_control_preview_visibility(

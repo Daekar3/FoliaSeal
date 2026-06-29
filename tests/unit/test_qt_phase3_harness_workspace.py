@@ -157,7 +157,90 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
     assert compat.viewer_refreshes == 1
 
 
+def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter() -> None:
+    command = Phase3HarnessScenarioCommand(
+        profile_name=None,
+        appearance_overrides=None,
+        timestamp_required=True,
+        signature_rect=build_signature_rect(page_index=1, width_pt=144.0, height_pt=36.0),
+    )
+
+    class _FakeTestingAdapter:
+        def __init__(self) -> None:
+            self._signature_appearance = build_signature_appearance()
+            self.properties_panel = type("_Panel", (), {"set_signature_appearance_calls": []})()
+            self.timestamp_required = None
+            self.placement_calls = []
+            self.viewer_refreshes = 0
+
+        def signature_appearance(self):
+            return self._signature_appearance
+
+        def set_timestamp_required(self, required: bool) -> None:
+            self.timestamp_required = required
+
+        def apply_signature_rect_placement(self, signature_rect) -> None:
+            self.placement_calls.append(signature_rect)
+
+        def refresh_viewer(self) -> None:
+            self.viewer_refreshes += 1
+
+    class _FakeCompat:
+        def __init__(self) -> None:
+            self.used = False
+
+        def signature_appearance(self):
+            self.used = True
+            return build_signature_appearance()
+
+    testing_adapter = _FakeTestingAdapter()
+
+    def _set_signature_appearance(appearance) -> None:
+        testing_adapter.properties_panel.set_signature_appearance_calls.append(appearance)
+
+    testing_adapter.properties_panel.set_signature_appearance = _set_signature_appearance
+    shell = type(
+        "_Shell",
+        (),
+        {
+            "testing_adapter": testing_adapter,
+            "compat_surface": _FakeCompat(),
+        },
+    )()
+
+    QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=object(),
+    ).apply_scenario(command)
+
+    assert testing_adapter.properties_panel.set_signature_appearance_calls
+    assert testing_adapter.timestamp_required is True
+    assert len(testing_adapter.placement_calls) == 1
+    assert testing_adapter.viewer_refreshes == 1
+    assert shell.compat_surface.used is False
+
+
 def test_qt_phase3_harness_workspace_adapter_refreshes_viewer_directly() -> None:
+    class _FakeCompat:
+        def __init__(self) -> None:
+            self.viewer_refreshes = 0
+
+        def refresh_viewer(self) -> None:
+            self.viewer_refreshes += 1
+
+    compat = _FakeCompat()
+    shell = type("_Shell", (), {"compat_surface": compat})()
+
+    QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=object(),
+    ).refresh_viewer()
+
+    assert compat.viewer_refreshes == 1
+
+
+def test_qt_phase3_harness_workspace_adapter_falls_back_to_compat_surface(
+) -> None:
     class _FakeCompat:
         def __init__(self) -> None:
             self.viewer_refreshes = 0

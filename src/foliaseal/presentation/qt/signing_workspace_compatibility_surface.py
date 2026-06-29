@@ -23,6 +23,7 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureRect,
     SigningRequest,
+    SigningResult,
 )
 from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
     SigningWorkspaceInteractionBridge,
@@ -104,6 +105,7 @@ class SigningWorkspaceCompatibilitySurface:
         self._sync_placement_context_from_viewer = sync_placement_context_from_viewer
         self._sync_signature_overlay = sync_signature_overlay
         self._refresh_sign_button_state = refresh_sign_button_state
+        self._testing_adapter = SigningWorkspaceTestingAdapter(self)
 
     @property
     def properties_panel(self) -> SignaturePropertiesPanel:
@@ -125,8 +127,13 @@ class SigningWorkspaceCompatibilitySurface:
     def last_signing_result(self) -> Any:
         return getattr(self._widget, "last_signing_result", None)
 
+    @property
+    def testing_adapter(self) -> SigningWorkspaceTestingAdapter:
+        return self._testing_adapter
+
     def install_widget_exports(self) -> None:
         self._widget.compat_surface = self  # type: ignore[attr-defined]
+        self._widget.testing_adapter = self._testing_adapter  # type: ignore[attr-defined]
         self._widget.properties_panel = self._properties_panel  # type: ignore[attr-defined]
         self._widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
         self._widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
@@ -281,3 +288,33 @@ class SigningWorkspaceCompatibilitySurface:
         if hasattr(self._sign_button, "_enabled"):
             return bool(self._sign_button._enabled)  # type: ignore[attr-defined]
         return bool(getattr(self._sign_button, "enabled", False))
+
+
+class SigningWorkspaceTestingAdapter:
+    """Dedicated harness/testing adapter over the broader compatibility surface."""
+
+    def __init__(self, compatibility_surface: SigningWorkspaceCompatibilitySurface) -> None:
+        self._compatibility_surface = compatibility_surface
+
+    @property
+    def properties_panel(self) -> SignaturePropertiesPanel:
+        return self._compatibility_surface.properties_panel
+
+    def signature_appearance(self) -> SignatureAppearance | None:
+        return self._compatibility_surface.signature_appearance()
+
+    def set_timestamp_required(self, required: bool) -> None:
+        self._compatibility_surface.set_timestamp_required(required)
+
+    def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
+        self._compatibility_surface.apply_signature_rect_placement(signature_rect)
+
+    def refresh_viewer(self) -> None:
+        self._compatibility_surface.refresh_viewer()
+
+    def current_request(self) -> SigningRequest | None:
+        return self._compatibility_surface.current_request()
+
+    def last_signing_result(self) -> SigningResult | None:
+        signing_result = self._compatibility_surface.last_signing_result
+        return signing_result if isinstance(signing_result, SigningResult) else None

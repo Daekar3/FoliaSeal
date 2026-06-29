@@ -27,7 +27,10 @@ from foliaseal.domain.models import (
 )
 
 
-def _compat_surface(shell: Any) -> Any:
+def _testing_surface(shell: Any) -> Any:
+    testing_adapter = getattr(shell, "testing_adapter", None)
+    if testing_adapter is not None:
+        return testing_adapter
     compat = getattr(shell, "compat_surface", None)
     return compat if compat is not None else shell
 
@@ -196,7 +199,7 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
 
 
 class QtPhase3HarnessWorkspaceAdapter:
-    """Apply preview scenarios to a live signing shell through private shell anatomy."""
+    """Apply preview scenarios to a live signing shell through the testing seam."""
 
     def __init__(
         self,
@@ -242,40 +245,45 @@ class QtPhase3HarnessWorkspaceAdapter:
         )
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
-        compat = _compat_surface(self._shell)
+        testing_surface = _testing_surface(self._shell)
         base_appearance = _base_appearance(
             profile_store=self._profile_store,
             profile_name=command.profile_name,
-            fallback=compat.signature_appearance() or SignatureAppearance(),
+            fallback=testing_surface.signature_appearance() or SignatureAppearance(),
         )
         appearance = _apply_appearance_overrides(
             base_appearance,
             command.appearance_overrides,
         )
-        compat.properties_panel.set_signature_appearance(appearance)
+        testing_surface.properties_panel.set_signature_appearance(appearance)
         if command.timestamp_required is not None:
-            compat.set_timestamp_required(command.timestamp_required)
+            testing_surface.set_timestamp_required(command.timestamp_required)
         if command.signature_rect is not None:
-            compat.apply_signature_rect_placement(command.signature_rect)
+            testing_surface.apply_signature_rect_placement(command.signature_rect)
         self.refresh_viewer()
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
 
     def refresh_viewer(self) -> None:
-        _compat_surface(self._shell).refresh_viewer()
+        _testing_surface(self._shell).refresh_viewer()
 
     def current_request(self) -> SigningRequest | None:
-        return _compat_surface(self._shell).current_request()
+        return _testing_surface(self._shell).current_request()
 
     def last_signing_result(self) -> SigningResult | None:
-        signing_result = getattr(_compat_surface(self._shell), "last_signing_result", None)
+        testing_surface = _testing_surface(self._shell)
+        last_signing_result = getattr(testing_surface, "last_signing_result", None)
+        if callable(last_signing_result):
+            signing_result = last_signing_result()
+        else:
+            signing_result = last_signing_result
         return signing_result if isinstance(signing_result, SigningResult) else None
 
     def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
-        compat = _compat_surface(self._shell)
+        testing_surface = _testing_surface(self._shell)
         request = command.request if command.request is not None else self.current_request()
-        preview = compat.properties_panel.refresh_preview()
+        preview = testing_surface.properties_panel.refresh_preview()
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
@@ -306,8 +314,8 @@ class QtPhase3HarnessWorkspaceAdapter:
                 render_capture=render_capture,
                 sign_time_diagnostics=sign_time_diagnostics,
             ),
-            "preview_text": compat.properties_panel.preview_text(),
-            "validation_text": compat.properties_panel.validation_text(),
+            "preview_text": testing_surface.properties_panel.preview_text(),
+            "validation_text": testing_surface.properties_panel.validation_text(),
             "sign_request_snapshot": self._snapshot_signing_request(request),
             "backend_reservation_snapshot": backend_reservation_snapshot,
             "backend_reservation_error": (
@@ -326,8 +334,8 @@ def capture_qt_preview_render(
 ) -> dict[str, Any]:
     """Capture the live Qt preview by reading shell anatomy only inside the workspace seam."""
 
-    compat = _compat_surface(shell)
-    properties_panel = compat.properties_panel
+    testing_surface = _testing_surface(shell)
+    properties_panel = testing_surface.properties_panel
     return build_preview_render_capture_payload(
         preview_controls=properties_panel.preview_controls,
         canonical_preview_render_backend=getattr(
