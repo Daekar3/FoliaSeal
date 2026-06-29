@@ -81,6 +81,16 @@ class AppSettingsDialogControls:
     cancel_button: Any
 
 
+@dataclass(frozen=True)
+class AppFrameDialogCompatibilityState:
+    """Frame-owned dialog exposure retained for tests and compatibility callers."""
+
+    settings_dialog: Any | None = None
+    certificate_import_dialog: Any | None = None
+    certificate_creation_dialog: Any | None = None
+    certificate_management_dialog: Any | None = None
+
+
 class AppSettingsDialog:
     """Small dialog for editing app-wide directory defaults."""
 
@@ -235,6 +245,7 @@ class FoliaSealAppFrame:
         )
         self._current_shell_port: SigningWorkspacePort | None = None
         self._current_workspace: WorkspaceCompatibilityState | None = None
+        self._dialog_compatibility = AppFrameDialogCompatibilityState()
         self._open_action: Any | None = None
         self._save_as_action: Any | None = None
 
@@ -260,9 +271,6 @@ class FoliaSealAppFrame:
         self.window.show_certificate_import = self.show_certificate_import  # type: ignore[attr-defined]
         self.window.show_certificate_management = self.show_certificate_management  # type: ignore[attr-defined]
         self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
-        self.window.certificate_import_dialog = None  # type: ignore[attr-defined]
-        self.window.certificate_creation_dialog = None  # type: ignore[attr-defined]
-        self.window.certificate_management_dialog = None  # type: ignore[attr-defined]
 
     @property
     def container(self) -> Any:
@@ -290,6 +298,26 @@ class FoliaSealAppFrame:
     def current_signing_workflow(self) -> SigningDraftWorkflow | None:
         workspace = self._current_workspace
         return None if workspace is None else workspace.signing_workflow
+
+    @property
+    def dialog_compatibility(self) -> AppFrameDialogCompatibilityState:
+        return self._dialog_compatibility
+
+    @property
+    def settings_dialog(self) -> Any | None:
+        return self._dialog_compatibility.settings_dialog
+
+    @property
+    def certificate_import_dialog(self) -> Any | None:
+        return self._dialog_compatibility.certificate_import_dialog
+
+    @property
+    def certificate_creation_dialog(self) -> Any | None:
+        return self._dialog_compatibility.certificate_creation_dialog
+
+    @property
+    def certificate_management_dialog(self) -> Any | None:
+        return self._dialog_compatibility.certificate_management_dialog
 
     def choose_open_pdf(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
@@ -343,7 +371,12 @@ class FoliaSealAppFrame:
             settings_store=self._app_settings_store,
             on_save=self._apply_app_settings,
         )
-        self.window.settings_dialog = dialog  # type: ignore[attr-defined]
+        self._dialog_compatibility = AppFrameDialogCompatibilityState(
+            settings_dialog=dialog,
+            certificate_import_dialog=self.certificate_import_dialog,
+            certificate_creation_dialog=self.certificate_creation_dialog,
+            certificate_management_dialog=self.certificate_management_dialog,
+        )
         settings = dialog.exec()
         if settings is None:
             return None
@@ -435,12 +468,24 @@ class FoliaSealAppFrame:
         self,
         compatibility: CertificateDialogCompatibilityState,
     ) -> None:
-        if compatibility.import_dialog is not None:
-            self.window.certificate_import_dialog = compatibility.import_dialog  # type: ignore[attr-defined]
-        if compatibility.creation_dialog is not None:
-            self.window.certificate_creation_dialog = compatibility.creation_dialog  # type: ignore[attr-defined]
-        if compatibility.management_dialog is not None:
-            self.window.certificate_management_dialog = compatibility.management_dialog  # type: ignore[attr-defined]
+        self._dialog_compatibility = AppFrameDialogCompatibilityState(
+            settings_dialog=self.settings_dialog,
+            certificate_import_dialog=(
+                compatibility.import_dialog
+                if compatibility.import_dialog is not None
+                else self.certificate_import_dialog
+            ),
+            certificate_creation_dialog=(
+                compatibility.creation_dialog
+                if compatibility.creation_dialog is not None
+                else self.certificate_creation_dialog
+            ),
+            certificate_management_dialog=(
+                compatibility.management_dialog
+                if compatibility.management_dialog is not None
+                else self.certificate_management_dialog
+            ),
+        )
 
     def _set_placeholder(self) -> None:
         label = self._bindings.q_label("Open a PDF to begin signing.")

@@ -544,9 +544,9 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
 
     frame.window.menu_bar.menus[1].actions[0].trigger()
 
-    assert frame.window.settings_dialog.controls.dialog.title == "Application settings"
+    assert frame.settings_dialog.controls.dialog.title == "Application settings"
     assert (
-        frame.window.settings_dialog.controls.default_open_directory.text()
+        frame.settings_dialog.controls.default_open_directory.text()
         == str(tmp_path / "source")
     )
 
@@ -592,8 +592,8 @@ def test_app_frame_certificate_creation_routes_to_dialog_port(
     result = frame.show_certificate_creation()
 
     assert result is None
-    assert frame.window.certificate_creation_dialog is not None
-    assert frame.window.certificate_creation_dialog.controls.dialog.parent is frame.window
+    assert frame.certificate_creation_dialog is not None
+    assert frame.certificate_creation_dialog.controls.dialog.parent is frame.window
 
 
 def test_app_frame_certificate_import_routes_to_dialog_port(
@@ -611,8 +611,8 @@ def test_app_frame_certificate_import_routes_to_dialog_port(
     result = frame.show_certificate_import()
 
     assert result is None
-    assert frame.window.certificate_import_dialog is not None
-    assert frame.window.certificate_import_dialog.controls.dialog.parent is frame.window
+    assert frame.certificate_import_dialog is not None
+    assert frame.certificate_import_dialog.controls.dialog.parent is frame.window
 
 
 def test_app_frame_certificate_management_routes_to_dialog_port(
@@ -633,10 +633,8 @@ def test_app_frame_certificate_management_routes_to_dialog_port(
     result = frame.show_certificate_management()
 
     assert result == _FakeDialog.Rejected
-    assert frame.window.certificate_management_dialog is not None
-    assert (
-        frame.window.certificate_management_dialog.controls.dialog.parent is frame.window
-    )
+    assert frame.certificate_management_dialog is not None
+    assert frame.certificate_management_dialog.controls.dialog.parent is frame.window
 
 
 def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
@@ -655,7 +653,7 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
     next_output_dir = tmp_path / "next-signed"
 
     frame.show_app_settings()
-    dialog = frame.window.settings_dialog
+    dialog = frame.settings_dialog
     dialog.controls.default_open_directory.setText(str(next_open_dir))
     dialog.controls.default_output_directory.setText(str(next_output_dir))
     saved = dialog.save()
@@ -691,7 +689,7 @@ def test_app_frame_settings_dialog_refreshes_loaded_shell_settings(
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
 
     frame.show_app_settings()
-    dialog = frame.window.settings_dialog
+    dialog = frame.settings_dialog
     dialog.controls.default_open_directory.setText(str(tmp_path / "updated-open"))
     dialog.controls.default_output_directory.setText(str(tmp_path / "updated-output"))
     saved = dialog.save()
