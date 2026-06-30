@@ -667,8 +667,37 @@ def build_qt_app_frame(
 ) -> Any:
     """Build a QMainWindow for the FoliaSeal signing GUI."""
 
+    return build_qt_app_frame_host(
+        app_settings=app_settings,
+        app_settings_store=app_settings_store,
+        certificate_catalog_store=certificate_catalog_store,
+        certificate_secret_provider=certificate_secret_provider,
+        preset_catalog_store=preset_catalog_store,
+        sign_executor=sign_executor,
+        shell_factory=shell_factory,
+        on_sign_request=on_sign_request,
+        on_error=on_error,
+        on_status_change=on_status_change,
+    ).container
+
+
+def build_qt_app_frame_host(
+    *,
+    app_settings: AppSettings | None = None,
+    app_settings_store: AppSettingsStore | None = None,
+    certificate_catalog_store: CertificateCatalogStore | None = None,
+    certificate_secret_provider: Any | None = None,
+    preset_catalog_store: SignaturePresetCatalogStore | None = None,
+    sign_executor: SigningRequestExecutor | None = None,
+    shell_factory: SigningWorkspaceFactory | None = None,
+    on_sign_request: Callable[[SigningRequest], None] | None = None,
+    on_error: Callable[[str], None] | None = None,
+    on_status_change: Callable[[str], None] | None = None,
+) -> FoliaSealAppFrame:
+    """Build the real FoliaSeal app-frame host."""
+
     adapter = QtAppFrameAdapter()
-    return adapter.create(
+    return adapter.create_frame(
         app_settings=app_settings,
         app_settings_store=app_settings_store,
         certificate_catalog_store=certificate_catalog_store,
