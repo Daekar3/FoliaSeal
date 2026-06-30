@@ -263,13 +263,6 @@ class FoliaSealAppFrame:
         )
         self._install_menus()
         self._set_placeholder()
-
-        self.window.open_file = self.choose_open_pdf  # type: ignore[attr-defined]
-        self.window.open_pdf_path = self.open_pdf_path  # type: ignore[attr-defined]
-        self.window.show_app_settings = self.show_app_settings  # type: ignore[attr-defined]
-        self.window.show_certificate_creation = self.show_certificate_creation  # type: ignore[attr-defined]
-        self.window.show_certificate_import = self.show_certificate_import  # type: ignore[attr-defined]
-        self.window.show_certificate_management = self.show_certificate_management  # type: ignore[attr-defined]
         self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
 
     @property

@@ -541,6 +541,12 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Manage certificate configurations...",
     ]
     assert not hasattr(frame.window, "_foliaseal_app_frame")
+    assert not hasattr(frame.window, "open_file")
+    assert not hasattr(frame.window, "open_pdf_path")
+    assert not hasattr(frame.window, "show_app_settings")
+    assert not hasattr(frame.window, "show_certificate_creation")
+    assert not hasattr(frame.window, "show_certificate_import")
+    assert not hasattr(frame.window, "show_certificate_management")
 
     frame.window.menu_bar.menus[1].actions[0].trigger()
 
@@ -736,6 +742,9 @@ def test_build_qt_app_frame_uses_adapter_bindings(monkeypatch, tmp_path: Path) -
 
     assert isinstance(window, _FakeMainWindow)
     assert window.title == "FoliaSeal"
+    assert not hasattr(window, "open_file")
+    assert not hasattr(window, "open_pdf_path")
+    assert not hasattr(window, "show_app_settings")
 
 
 def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_pdf(
