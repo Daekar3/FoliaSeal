@@ -263,7 +263,6 @@ class FoliaSealAppFrame:
         )
         self._install_menus()
         self._set_placeholder()
-        self.window.app_settings = self._app_settings  # type: ignore[attr-defined]
 
     @property
     def container(self) -> Any:
@@ -496,7 +495,6 @@ class FoliaSealAppFrame:
 
     def _apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
-        self.window.app_settings = settings  # type: ignore[attr-defined]
         self._with_current_shell_port(
             lambda shell_port: shell_port.apply_app_settings(settings)
         )

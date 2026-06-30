@@ -541,6 +541,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Manage certificate configurations...",
     ]
     assert not hasattr(frame.window, "_foliaseal_app_frame")
+    assert not hasattr(frame.window, "app_settings")
     assert not hasattr(frame.window, "open_file")
     assert not hasattr(frame.window, "open_pdf_path")
     assert not hasattr(frame.window, "show_app_settings")
@@ -674,7 +675,7 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
     )
     assert settings_store.load_settings() == saved
     assert frame.app_settings == saved
-    assert frame.window.app_settings == saved
+    assert not hasattr(frame.window, "app_settings")
     bindings.q_file_dialog.next_open_file_name = ""
     frame.choose_open_pdf()
     assert bindings.q_file_dialog.open_calls[-1][2] == str(next_open_dir)
@@ -742,6 +743,7 @@ def test_build_qt_app_frame_uses_adapter_bindings(monkeypatch, tmp_path: Path) -
 
     assert isinstance(window, _FakeMainWindow)
     assert window.title == "FoliaSeal"
+    assert not hasattr(window, "app_settings")
     assert not hasattr(window, "open_file")
     assert not hasattr(window, "open_pdf_path")
     assert not hasattr(window, "show_app_settings")
