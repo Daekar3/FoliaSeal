@@ -3,7 +3,6 @@
 from .app_frame import (
     QtAppFrameAdapter,
     QtAppFrameBindingsUnavailable,
-    build_qt_app_frame,
     build_qt_app_frame_host,
     launch_qt_app_frame,
 )
@@ -40,7 +39,6 @@ __all__ = [
     "QtViewerBindingsUnavailable",
     "SigningShellAdapter",
     "build_qt_pdf_viewer_widget",
-    "build_qt_app_frame",
     "build_qt_app_frame_host",
     "launch_qt_app_frame",
     "build_qt_signing_shell",

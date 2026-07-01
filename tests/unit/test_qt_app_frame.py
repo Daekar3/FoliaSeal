@@ -728,25 +728,8 @@ def test_app_frame_reports_open_errors(tmp_path: Path) -> None:
     assert frame.current_shell is None
 
 
-def test_build_qt_app_frame_uses_adapter_bindings(monkeypatch, tmp_path: Path) -> None:
-    bindings = _fake_bindings()
-    monkeypatch.setattr(
-        app_frame_module.QtAppFrameAdapter,
-        "_load_bindings",
-        lambda self: bindings,
-    )
-
-    window = app_frame_module.build_qt_app_frame(
-        app_settings=_settings(tmp_path),
-        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
-    )
-
-    assert isinstance(window, _FakeMainWindow)
-    assert window.title == "FoliaSeal"
-    assert not hasattr(window, "app_settings")
-    assert not hasattr(window, "open_file")
-    assert not hasattr(window, "open_pdf_path")
-    assert not hasattr(window, "show_app_settings")
+def test_qt_app_frame_module_no_longer_exposes_raw_window_helper() -> None:
+    assert not hasattr(app_frame_module, "build_qt_app_frame")
 
 
 def test_qt_app_frame_adapter_create_frame_returns_frame_host(
