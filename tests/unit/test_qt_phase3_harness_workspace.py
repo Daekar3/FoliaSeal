@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
@@ -564,7 +565,13 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
             )()
             self._canonical_preview_render_backend = object()
 
-    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
+    shell = type(
+        "_Shell",
+        (),
+        {
+            "compat_surface": type("_Compat", (), {"properties_panel": _FakePanel()})(),
+        },
+    )()
     monkeypatch.setattr(phase3_harness_module, "_widget_is_visible", lambda widget: True)
     monkeypatch.setattr(
         phase3_harness_module,
@@ -781,7 +788,13 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
             )()
             self._canonical_preview_render_backend = object()
 
-    shell = type("_Shell", (), {"properties_panel": _FakePanel()})()
+    shell = type(
+        "_Shell",
+        (),
+        {
+            "compat_surface": type("_Compat", (), {"properties_panel": _FakePanel()})(),
+        },
+    )()
     monkeypatch.setattr(phase3_harness_module, "_widget_is_visible", lambda widget: True)
     monkeypatch.setattr(
         phase3_harness_module,
@@ -850,6 +863,19 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
     assert detector_calls
     assert detector_calls[-1]["preview_image_path"].endswith("_analysis.png")
     assert detector_calls[-1]["text_widget_bounds"] == {"x": 1, "y": 2, "width": 48, "height": 20}
+
+
+def test_qt_phase3_harness_workspace_adapter_rejects_raw_shell_fallback() -> None:
+    adapter = QtPhase3HarnessWorkspaceAdapter(
+        shell=type("_Shell", (), {})(),
+        profile_store=object(),
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="must expose 'testing_adapter' or 'compat_surface'",
+    ):
+        adapter.refresh_viewer()
 
 
 def test_headless_phase3_harness_workspace_adapter_applies_same_scenario_fields() -> None:

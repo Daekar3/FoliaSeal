@@ -80,7 +80,9 @@ def _testing_surface(shell: Any) -> SigningWorkspaceTestingPort:
     compat = getattr(shell, "compat_surface", None)
     if compat is not None:
         return _CompatibilityTestingPort(compat)
-    return _CompatibilityTestingPort(shell)
+    raise TypeError(
+        "Phase 3 harness shells must expose 'testing_adapter' or 'compat_surface'."
+    )
 
 
 def _widget_application(widget: Any) -> Any | None:
