@@ -548,35 +548,6 @@ class QtAppFrameAdapter:
             on_status_change=on_status_change,
         )
 
-    def create(
-        self,
-        *,
-        app_settings: AppSettings | None = None,
-        app_settings_store: AppSettingsStore | None = None,
-        certificate_catalog_store: CertificateCatalogStore | None = None,
-        certificate_secret_provider: Any | None = None,
-        preset_catalog_store: SignaturePresetCatalogStore | None = None,
-        sign_executor: SigningRequestExecutor | None = None,
-        shell_factory: SigningWorkspaceFactory | None = None,
-        on_sign_request: Callable[[SigningRequest], None] | None = None,
-        on_error: Callable[[str], None] | None = None,
-        on_status_change: Callable[[str], None] | None = None,
-    ) -> Any:
-        """Build and return the raw Qt window for compatibility callers."""
-
-        return self.create_frame(
-            app_settings=app_settings,
-            app_settings_store=app_settings_store,
-            certificate_catalog_store=certificate_catalog_store,
-            certificate_secret_provider=certificate_secret_provider,
-            preset_catalog_store=preset_catalog_store,
-            sign_executor=sign_executor,
-            shell_factory=shell_factory,
-            on_sign_request=on_sign_request,
-            on_error=on_error,
-            on_status_change=on_status_change,
-        ).container
-
     def launch(
         self,
         *,

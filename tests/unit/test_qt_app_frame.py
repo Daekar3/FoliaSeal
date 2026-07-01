@@ -771,6 +771,10 @@ def test_qt_app_frame_adapter_create_frame_returns_frame_host(
     assert frame.window.title == "FoliaSeal"
 
 
+def test_qt_app_frame_adapter_no_longer_exposes_raw_window_create() -> None:
+    assert not hasattr(app_frame_module.QtAppFrameAdapter, "create")
+
+
 def test_build_qt_app_frame_host_returns_frame_host(monkeypatch, tmp_path: Path) -> None:
     bindings = _fake_bindings()
     monkeypatch.setattr(
