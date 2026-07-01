@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 from foliaseal.application import (
     SigningDraftWorkflow,
@@ -318,3 +318,17 @@ class SigningWorkspaceTestingAdapter:
     def last_signing_result(self) -> SigningResult | None:
         signing_result = self._compatibility_surface.last_signing_result
         return signing_result if isinstance(signing_result, SigningResult) else None
+
+
+class SigningWorkspaceTestingPort(Protocol):
+    """Explicit non-production harness/testing contract for the signing workspace."""
+
+    @property
+    def properties_panel(self) -> SignaturePropertiesPanel: ...
+
+    def signature_appearance(self) -> SignatureAppearance | None: ...
+    def set_timestamp_required(self, required: bool) -> None: ...
+    def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None: ...
+    def refresh_viewer(self) -> None: ...
+    def current_request(self) -> SigningRequest | None: ...
+    def last_signing_result(self) -> SigningResult | None: ...

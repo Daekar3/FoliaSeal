@@ -259,6 +259,63 @@ def test_qt_phase3_harness_workspace_adapter_falls_back_to_compat_surface(
     assert compat.viewer_refreshes == 1
 
 
+def test_qt_phase3_harness_workspace_adapter_wraps_compat_surface_as_testing_port(
+    tmp_path: Path,
+) -> None:
+    request = build_signing_request(
+        base_path=tmp_path,
+        signature_rect=build_signature_rect(page_index=0),
+        signature_appearance=build_signature_appearance(),
+    )
+    result = SigningResult(
+        success=True,
+        failure_code=None,
+        message="ok",
+    )
+
+    class _FakePanel:
+        def refresh_preview(self):
+            return object()
+
+        def preview_text(self) -> str:
+            return "preview"
+
+        def validation_text(self) -> str:
+            return "valid"
+
+    class _FakeCompat:
+        def __init__(self) -> None:
+            self.properties_panel = _FakePanel()
+            self.timestamp_required = None
+            self.placement_calls = []
+
+        def signature_appearance(self):
+            return build_signature_appearance()
+
+        def set_timestamp_required(self, required: bool) -> None:
+            self.timestamp_required = required
+
+        def apply_signature_rect_placement(self, signature_rect) -> None:
+            self.placement_calls.append(signature_rect)
+
+        def refresh_viewer(self) -> None:
+            return None
+
+        def current_request(self):
+            return request
+
+        @property
+        def last_signing_result(self):
+            return result
+
+    compat = _FakeCompat()
+    shell = type("_Shell", (), {"compat_surface": compat})()
+    adapter = QtPhase3HarnessWorkspaceAdapter(shell=shell, profile_store=object())
+
+    assert adapter.current_request() is request
+    assert adapter.last_signing_result() is result
+
+
 def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signing_result() -> None:
     preview = type(
         "_Preview",

@@ -25,14 +25,62 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
+    SigningWorkspaceTestingPort,
+)
 
 
-def _testing_surface(shell: Any) -> Any:
+class _CompatibilityTestingPort:
+    """Adapt older compatibility-surface or shell shapes to the testing-port contract."""
+
+    def __init__(self, surface: Any) -> None:
+        self._surface = surface
+
+    @property
+    def properties_panel(self) -> Any:
+        return getattr(self._surface, "properties_panel")
+
+    def signature_appearance(self) -> SignatureAppearance | None:
+        method = getattr(self._surface, "signature_appearance")
+        return method() if callable(method) else None
+
+    def set_timestamp_required(self, required: bool) -> None:
+        method = getattr(self._surface, "set_timestamp_required")
+        if callable(method):
+            method(required)
+
+    def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
+        method = getattr(self._surface, "apply_signature_rect_placement")
+        if callable(method):
+            method(signature_rect)
+
+    def refresh_viewer(self) -> None:
+        method = getattr(self._surface, "refresh_viewer")
+        if callable(method):
+            method()
+
+    def current_request(self) -> SigningRequest | None:
+        method = getattr(self._surface, "current_request", None)
+        if callable(method):
+            request = method()
+            return request if isinstance(request, SigningRequest) else None
+        return None
+
+    def last_signing_result(self) -> SigningResult | None:
+        signing_result = getattr(self._surface, "last_signing_result", None)
+        if callable(signing_result):
+            signing_result = signing_result()
+        return signing_result if isinstance(signing_result, SigningResult) else None
+
+
+def _testing_surface(shell: Any) -> SigningWorkspaceTestingPort:
     testing_adapter = getattr(shell, "testing_adapter", None)
     if testing_adapter is not None:
         return testing_adapter
     compat = getattr(shell, "compat_surface", None)
-    return compat if compat is not None else shell
+    if compat is not None:
+        return _CompatibilityTestingPort(compat)
+    return _CompatibilityTestingPort(shell)
 
 
 def _widget_application(widget: Any) -> Any | None:
