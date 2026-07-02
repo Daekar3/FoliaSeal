@@ -95,7 +95,7 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
         def refresh(self, *, navigation: bool) -> None:
             self.refresh_calls.append(navigation)
 
-    class _FakeCompat:
+    class _FakeTestingAdapter:
         def __init__(self) -> None:
             self.properties_panel = _FakePanel()
             self.viewer_workflow = _FakeViewerWorkflow()
@@ -133,29 +133,29 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
             self.sync_signature_overlay()
             self.refresh_sign_button_state()
 
-    compat = _FakeCompat()
-    shell = type("_Shell", (), {"compat_surface": compat})()
+    testing_adapter = _FakeTestingAdapter()
+    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
 
     QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=profile_store,
     ).apply_scenario(command)
 
-    assert compat.properties_panel.appearance.signer_label_prefix == "Saved Profile"
+    assert testing_adapter.properties_panel.appearance.signer_label_prefix == "Saved Profile"
     assert (
-        compat.properties_panel.appearance.layout_template
+        testing_adapter.properties_panel.appearance.layout_template
         == SignatureLayoutTemplate.SINGLE_LINE
     )
-    assert compat.properties_panel.appearance.stamp_position == SignatureStampPosition.TOP
-    assert compat.timestamp_required is False
-    assert compat.properties_panel.rect is not None
-    assert compat.properties_panel.rect.page_index == 3
-    assert compat.viewer_workflow.jumps == [3]
-    assert compat.viewer_widget.refresh_calls == [True]
-    assert compat.placement_syncs == 1
-    assert compat.overlay_syncs == 1
-    assert compat.sign_button_refreshes == 1
-    assert compat.viewer_refreshes == 1
+    assert testing_adapter.properties_panel.appearance.stamp_position == SignatureStampPosition.TOP
+    assert testing_adapter.timestamp_required is False
+    assert testing_adapter.properties_panel.rect is not None
+    assert testing_adapter.properties_panel.rect.page_index == 3
+    assert testing_adapter.viewer_workflow.jumps == [3]
+    assert testing_adapter.viewer_widget.refresh_calls == [True]
+    assert testing_adapter.placement_syncs == 1
+    assert testing_adapter.overlay_syncs == 1
+    assert testing_adapter.sign_button_refreshes == 1
+    assert testing_adapter.viewer_refreshes == 1
 
 
 def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter() -> None:
@@ -222,6 +222,25 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
 
 
 def test_qt_phase3_harness_workspace_adapter_refreshes_viewer_directly() -> None:
+    class _FakeTestingAdapter:
+        def __init__(self) -> None:
+            self.viewer_refreshes = 0
+
+        def refresh_viewer(self) -> None:
+            self.viewer_refreshes += 1
+
+    testing_adapter = _FakeTestingAdapter()
+    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
+
+    QtPhase3HarnessWorkspaceAdapter(
+        shell=shell,
+        profile_store=object(),
+    ).refresh_viewer()
+
+    assert testing_adapter.viewer_refreshes == 1
+
+
+def test_qt_phase3_harness_workspace_adapter_rejects_compat_surface_only_shell() -> None:
     class _FakeCompat:
         def __init__(self) -> None:
             self.viewer_refreshes = 0
@@ -232,35 +251,19 @@ def test_qt_phase3_harness_workspace_adapter_refreshes_viewer_directly() -> None
     compat = _FakeCompat()
     shell = type("_Shell", (), {"compat_surface": compat})()
 
-    QtPhase3HarnessWorkspaceAdapter(
+    adapter = QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=object(),
-    ).refresh_viewer()
+    )
 
-    assert compat.viewer_refreshes == 1
-
-
-def test_qt_phase3_harness_workspace_adapter_falls_back_to_compat_surface(
-) -> None:
-    class _FakeCompat:
-        def __init__(self) -> None:
-            self.viewer_refreshes = 0
-
-        def refresh_viewer(self) -> None:
-            self.viewer_refreshes += 1
-
-    compat = _FakeCompat()
-    shell = type("_Shell", (), {"compat_surface": compat})()
-
-    QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
-        profile_store=object(),
-    ).refresh_viewer()
-
-    assert compat.viewer_refreshes == 1
+    with pytest.raises(
+        TypeError,
+        match="must expose 'testing_adapter'",
+    ):
+        adapter.refresh_viewer()
 
 
-def test_qt_phase3_harness_workspace_adapter_wraps_compat_surface_as_testing_port(
+def test_qt_phase3_harness_workspace_adapter_reads_request_and_result_from_testing_adapter(
     tmp_path: Path,
 ) -> None:
     request = build_signing_request(
@@ -284,7 +287,7 @@ def test_qt_phase3_harness_workspace_adapter_wraps_compat_surface_as_testing_por
         def validation_text(self) -> str:
             return "valid"
 
-    class _FakeCompat:
+    class _FakeTestingAdapter:
         def __init__(self) -> None:
             self.properties_panel = _FakePanel()
             self.timestamp_required = None
@@ -309,8 +312,8 @@ def test_qt_phase3_harness_workspace_adapter_wraps_compat_surface_as_testing_por
         def last_signing_result(self):
             return result
 
-    compat = _FakeCompat()
-    shell = type("_Shell", (), {"compat_surface": compat})()
+    testing_adapter = _FakeTestingAdapter()
+    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
     adapter = QtPhase3HarnessWorkspaceAdapter(shell=shell, profile_store=object())
 
     assert adapter.current_request() is request
@@ -357,7 +360,7 @@ def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signin
         def validation_text(self) -> str:
             return "Ready to sign."
 
-    class _FakeCompat:
+    class _FakeTestingAdapter:
         def __init__(self) -> None:
             self.properties_panel = _FakePanel()
             self._current_request = request
@@ -366,8 +369,8 @@ def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signin
         def current_request(self):
             return self._current_request
 
-    compat = _FakeCompat()
-    shell = type("_Shell", (), {"compat_surface": compat})()
+    testing_adapter = _FakeTestingAdapter()
+    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
     adapter = QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=object(),
@@ -409,7 +412,7 @@ def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signin
     )
 
     assert adapter.current_request() == request
-    assert adapter.last_signing_result() == compat.last_signing_result
+    assert adapter.last_signing_result() == testing_adapter.last_signing_result
     assert capture["capture_label"] == "manual_01"
     assert capture["preview_text"] == "Preview text"
     assert capture["validation_text"] == "Ready to sign."
@@ -569,7 +572,11 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
         "_Shell",
         (),
         {
-            "compat_surface": type("_Compat", (), {"properties_panel": _FakePanel()})(),
+            "testing_adapter": type(
+                "_TestingAdapter",
+                (),
+                {"properties_panel": _FakePanel()},
+            )(),
         },
     )()
     monkeypatch.setattr(phase3_harness_module, "_widget_is_visible", lambda widget: True)
@@ -792,7 +799,11 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
         "_Shell",
         (),
         {
-            "compat_surface": type("_Compat", (), {"properties_panel": _FakePanel()})(),
+            "testing_adapter": type(
+                "_TestingAdapter",
+                (),
+                {"properties_panel": _FakePanel()},
+            )(),
         },
     )()
     monkeypatch.setattr(phase3_harness_module, "_widget_is_visible", lambda widget: True)
@@ -865,7 +876,7 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
     assert detector_calls[-1]["text_widget_bounds"] == {"x": 1, "y": 2, "width": 48, "height": 20}
 
 
-def test_qt_phase3_harness_workspace_adapter_rejects_raw_shell_fallback() -> None:
+def test_qt_phase3_harness_workspace_adapter_rejects_missing_testing_adapter() -> None:
     adapter = QtPhase3HarnessWorkspaceAdapter(
         shell=type("_Shell", (), {})(),
         profile_store=object(),
@@ -873,7 +884,7 @@ def test_qt_phase3_harness_workspace_adapter_rejects_raw_shell_fallback() -> Non
 
     with pytest.raises(
         TypeError,
-        match="must expose 'testing_adapter' or 'compat_surface'",
+        match="must expose 'testing_adapter'",
     ):
         adapter.refresh_viewer()
 
