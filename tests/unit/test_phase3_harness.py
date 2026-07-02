@@ -885,6 +885,72 @@ def test_default_harness_output_pdf_path_falls_back_to_source_directory() -> Non
     assert output_path == "/tmp/input-signed.pdf"
 
 
+def test_build_live_phase3_harness_workspace_wires_shared_qt_adapter_dependencies() -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        pass
+
+    def _fake_adapter(**kwargs):
+        captured.update(kwargs)
+        return _FakeWorkspace()
+
+    original_adapter = phase3_harness_module.QtPhase3HarnessWorkspaceAdapter
+    phase3_harness_module.QtPhase3HarnessWorkspaceAdapter = _fake_adapter
+    try:
+        shell = object()
+        profile_store = object()
+        workspace = phase3_harness_module._build_live_phase3_harness_workspace(
+            shell=shell,
+            profile_store=profile_store,
+        )
+    finally:
+        phase3_harness_module.QtPhase3HarnessWorkspaceAdapter = original_adapter
+
+    assert isinstance(workspace, _FakeWorkspace)
+    assert captured["shell"] is shell
+    assert captured["profile_store"] is profile_store
+    assert callable(captured["capture_preview_render"])
+    assert captured["snapshot_preview"] is phase3_harness_module._snapshot_preview
+    assert captured["snapshot_signing_request"] is phase3_harness_module._snapshot_signing_request
+    assert (
+        captured["build_backend_reservation_evidence"]
+        is phase3_harness_module.build_backend_reservation_evidence
+    )
+    assert (
+        captured["snapshot_sign_time_fit_diagnostics"]
+        is phase3_harness_module._snapshot_sign_time_fit_diagnostics
+    )
+    assert captured["interactive_capture_label"] is phase3_harness_module._interactive_capture_label
+
+
+def test_qt_phase3_harness_workspace_wrappers_delegate_to_shared_live_builder() -> None:
+    calls: list[dict[str, object]] = []
+
+    def _fake_builder(*, shell, profile_store):
+        calls.append({"shell": shell, "profile_store": profile_store})
+        return object()
+
+    original_builder = phase3_harness_module._build_live_phase3_harness_workspace
+    phase3_harness_module._build_live_phase3_harness_workspace = _fake_builder
+    try:
+        harness_shell = object()
+        preview_shell = object()
+        preview_store = object()
+        phase3_harness_module._build_qt_phase3_harness_workspace(harness_shell)
+        phase3_harness_module._build_preview_matrix_qt_workspace(
+            shell=preview_shell,
+            profile_store=preview_store,
+        )
+    finally:
+        phase3_harness_module._build_live_phase3_harness_workspace = original_builder
+
+    assert len(calls) == 2
+    assert calls[0]["shell"] is harness_shell
+    assert calls[0]["profile_store"] is not preview_store
+    assert calls[1] == {"shell": preview_shell, "profile_store": preview_store}
+
+
 def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

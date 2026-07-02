@@ -499,26 +499,10 @@ def _default_harness_output_pdf_path(
     return str(target_dir / f"{source_path.stem}_harness_signed_{sign_attempt_index:03d}.pdf")
 
 
-def _build_qt_phase3_harness_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
-    return QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
-        profile_store=object(),
-        capture_preview_render=partial(
-            capture_qt_preview_render,
-            build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
-        ),
-        snapshot_preview=_snapshot_preview,
-        snapshot_signing_request=_snapshot_signing_request,
-        build_backend_reservation_evidence=build_backend_reservation_evidence,
-        snapshot_sign_time_fit_diagnostics=_snapshot_sign_time_fit_diagnostics,
-        interactive_capture_label=_interactive_capture_label,
-    )
-
-
-def _build_preview_matrix_qt_workspace(
+def _build_live_phase3_harness_workspace(
     *,
     shell: Any,
-    profile_store: SignaturePresetCatalogStore,
+    profile_store: Any,
 ) -> Phase3HarnessWorkspacePort:
     return QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
@@ -532,6 +516,24 @@ def _build_preview_matrix_qt_workspace(
         build_backend_reservation_evidence=build_backend_reservation_evidence,
         snapshot_sign_time_fit_diagnostics=_snapshot_sign_time_fit_diagnostics,
         interactive_capture_label=_interactive_capture_label,
+    )
+
+
+def _build_qt_phase3_harness_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
+    return _build_live_phase3_harness_workspace(
+        shell=shell,
+        profile_store=object(),
+    )
+
+
+def _build_preview_matrix_qt_workspace(
+    *,
+    shell: Any,
+    profile_store: SignaturePresetCatalogStore,
+) -> Phase3HarnessWorkspacePort:
+    return _build_live_phase3_harness_workspace(
+        shell=shell,
+        profile_store=profile_store,
     )
 
 
