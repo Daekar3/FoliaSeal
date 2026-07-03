@@ -94,6 +94,38 @@ class Phase3HarnessCaptureCommand:
     capture_kind: str
 
 
+@dataclass(frozen=True)
+class Phase3HarnessWorkspaceSnapshot:
+    """Structured workspace capture shared by live-shell and headless harness paths."""
+
+    current_request: SigningRequest | None
+    last_signing_result: SigningResult | None
+    capture_index: int
+    capture_kind: str
+    capture_label: str | None
+    preview_snapshot: dict[str, Any]
+    preview_text: str
+    validation_text: str
+    sign_request_snapshot: dict[str, Any] | None
+    backend_reservation_snapshot: dict[str, Any] | None
+    backend_reservation_error: str | None
+
+    def as_mapping(self) -> dict[str, Any]:
+        payload = {
+            "capture_index": self.capture_index,
+            "capture_kind": self.capture_kind,
+            "preview_snapshot": self.preview_snapshot,
+            "preview_text": self.preview_text,
+            "validation_text": self.validation_text,
+            "sign_request_snapshot": self.sign_request_snapshot,
+            "backend_reservation_snapshot": self.backend_reservation_snapshot,
+            "backend_reservation_error": self.backend_reservation_error,
+        }
+        if self.capture_label is not None:
+            payload["capture_label"] = self.capture_label
+        return payload
+
+
 class Phase3HarnessWorkspacePort(Protocol):
     """Narrow workspace boundary for Phase 3 harness scenario and capture flows."""
 
@@ -101,6 +133,9 @@ class Phase3HarnessWorkspacePort(Protocol):
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None: ...
     def current_request(self) -> SigningRequest | None: ...
     def last_signing_result(self) -> SigningResult | None: ...
+    def capture_snapshot(
+        self, command: Phase3HarnessCaptureCommand
+    ) -> Phase3HarnessWorkspaceSnapshot: ...
     def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]: ...
 
 
@@ -177,7 +212,9 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
     def last_signing_result(self) -> SigningResult | None:
         return None
 
-    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
+    def capture_snapshot(
+        self, command: Phase3HarnessCaptureCommand
+    ) -> Phase3HarnessWorkspaceSnapshot:
         request = command.request if command.request is not None else self.current_request()
         preview = self._workflow.preview()
         render_capture = self._capture_headless_preview_render(
@@ -186,20 +223,26 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
             artifact_basename=command.artifact_basename,
         )
         backend_reservation = self._build_backend_reservation_evidence(request)
-        return {
-            "capture_index": command.capture_index,
-            "capture_kind": command.capture_kind,
-            "preview_snapshot": self._snapshot_preview(preview, render_capture=render_capture),
-            "preview_text": self._headless_preview_text(preview),
-            "validation_text": self._headless_validation_text(preview),
-            "sign_request_snapshot": self._snapshot_signing_request(request),
-            "backend_reservation_snapshot": (
+        return Phase3HarnessWorkspaceSnapshot(
+            current_request=request,
+            last_signing_result=self.last_signing_result(),
+            capture_index=command.capture_index,
+            capture_kind=command.capture_kind,
+            capture_label=None,
+            preview_snapshot=self._snapshot_preview(preview, render_capture=render_capture),
+            preview_text=self._headless_preview_text(preview),
+            validation_text=self._headless_validation_text(preview),
+            sign_request_snapshot=self._snapshot_signing_request(request),
+            backend_reservation_snapshot=(
                 None if backend_reservation is None else backend_reservation.snapshot
             ),
-            "backend_reservation_error": (
+            backend_reservation_error=(
                 None if backend_reservation is None else backend_reservation.error
             ),
-        }
+        )
+
+    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
+        return self.capture_snapshot(command).as_mapping()
 
 
 class QtPhase3HarnessWorkspaceAdapter:
@@ -284,7 +327,9 @@ class QtPhase3HarnessWorkspaceAdapter:
             signing_result = last_signing_result
         return signing_result if isinstance(signing_result, SigningResult) else None
 
-    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
+    def capture_snapshot(
+        self, command: Phase3HarnessCaptureCommand
+    ) -> Phase3HarnessWorkspaceSnapshot:
         testing_surface = _testing_surface(self._shell)
         request = command.request if command.request is not None else self.current_request()
         preview = testing_surface.properties_panel.refresh_preview()
@@ -305,27 +350,32 @@ class QtPhase3HarnessWorkspaceAdapter:
             preview_render_capture=render_capture,
             backend_reservation_snapshot=backend_reservation_snapshot,
         )
-        return {
-            "capture_index": command.capture_index,
-            "capture_kind": command.capture_kind,
-            "capture_label": self._interactive_capture_label(
+        return Phase3HarnessWorkspaceSnapshot(
+            current_request=request,
+            last_signing_result=self.last_signing_result(),
+            capture_index=command.capture_index,
+            capture_kind=command.capture_kind,
+            capture_label=self._interactive_capture_label(
                 preview=preview,
                 capture_index=command.capture_index,
                 capture_kind=command.capture_kind,
             ),
-            "preview_snapshot": self._snapshot_preview(
+            preview_snapshot=self._snapshot_preview(
                 preview,
                 render_capture=render_capture,
                 sign_time_diagnostics=sign_time_diagnostics,
             ),
-            "preview_text": testing_surface.properties_panel.preview_text(),
-            "validation_text": testing_surface.properties_panel.validation_text(),
-            "sign_request_snapshot": self._snapshot_signing_request(request),
-            "backend_reservation_snapshot": backend_reservation_snapshot,
-            "backend_reservation_error": (
+            preview_text=testing_surface.properties_panel.preview_text(),
+            validation_text=testing_surface.properties_panel.validation_text(),
+            sign_request_snapshot=self._snapshot_signing_request(request),
+            backend_reservation_snapshot=backend_reservation_snapshot,
+            backend_reservation_error=(
                 None if backend_reservation is None else backend_reservation.error
             ),
-        }
+        )
+
+    def capture_state(self, command: Phase3HarnessCaptureCommand) -> dict[str, Any]:
+        return self.capture_snapshot(command).as_mapping()
 
 
 def capture_qt_preview_render(
