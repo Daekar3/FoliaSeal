@@ -427,11 +427,11 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py`
 - Responsibility: Execute one signed-acceptance scenario row from live shell state through optional signed-output capture.
-- Owns: `Phase3SignedAcceptanceScenarioExecutor`, scenario application, preview refresh, preview-render capture, request snapshotting, backend reservation evidence, signing submission, successful-output snapshotting, and final result-row shaping.
+- Owns: `Phase3SignedAcceptanceScenarioExecutor`, scenario application, workspace snapshot capture consumption, signing submission, successful-output snapshotting, and final result-row shaping.
 - Does not own: matrix-level iteration, exception mapping, acceptance-expectation evaluation, or summary writing.
 - Key collaborators: `phase3_harness.py`, `phase3_harness_workspace.py`, `_apply_preview_matrix_scenario()`, `_capture_preview_render()`, `phase3_signed_output_snapshotter.py`, `Phase3SignedAcceptanceMatrixRunner`.
 - Main entry points: `Phase3SignedAcceptanceScenarioExecutor.run()`, `phase3_harness.py::_execute_signed_acceptance_scenario()`.
-- Known constraints: The executor intentionally keeps the per-scenario preview and signing flow together because the result-row contract spans both preview evidence and optional signed-output evidence. `phase3_harness_workspace.py` now owns the workspace reads for the scenario row, and `phase3_harness.py` remains the composition root that wires the real scenario-application, workspace, snapshot, and output-capture helpers into the executor, while successful-output evidence shaping itself now lives in the shared snapshotter boundary.
+- Known constraints: The executor intentionally keeps the per-scenario preview and signing flow together because the result-row contract spans both preview evidence and optional signed-output evidence. `phase3_harness_workspace.py` now owns the workspace reads for the scenario row, `phase3_signed_acceptance_matrix_runner.py` still owns the pre-scenario viewer refresh, and `phase3_harness.py` remains the composition root that wires the real scenario-application, workspace, snapshot, and output-capture helpers into the executor, while successful-output evidence shaping itself now lives in the shared snapshotter boundary.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 signed-output snapshotter

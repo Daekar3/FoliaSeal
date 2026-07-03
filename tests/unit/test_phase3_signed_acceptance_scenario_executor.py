@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessCaptureCommand,
+    Phase3HarnessWorkspaceSnapshot,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
@@ -26,17 +27,34 @@ class _FakeWorkspace:
             "sign_request_snapshot": None if request is None else {"request": True},
             "backend_reservation_snapshot": None,
         }
-        self.capture_commands: list[Phase3HarnessCaptureCommand] = []
+        self.capture_snapshot_commands: list[Phase3HarnessCaptureCommand] = []
 
     def current_request(self):
-        return self._request
+        raise AssertionError("executor should read request from capture_snapshot()")
 
     def last_signing_result(self):
         return None
 
     def capture_state(self, command: Phase3HarnessCaptureCommand):
-        self.capture_commands.append(command)
-        return self._capture
+        raise AssertionError("executor should not call capture_state()")
+
+    def capture_snapshot(
+        self, command: Phase3HarnessCaptureCommand
+    ) -> Phase3HarnessWorkspaceSnapshot:
+        self.capture_snapshot_commands.append(command)
+        return Phase3HarnessWorkspaceSnapshot(
+            current_request=self._request,
+            last_signing_result=None,
+            capture_index=command.capture_index,
+            capture_kind=command.capture_kind,
+            capture_label=None,
+            preview_snapshot=self._capture["preview_snapshot"],
+            preview_text=self._capture["preview_text"],
+            validation_text=self._capture["validation_text"],
+            sign_request_snapshot=self._capture["sign_request_snapshot"],
+            backend_reservation_snapshot=self._capture["backend_reservation_snapshot"],
+            backend_reservation_error=self._capture.get("backend_reservation_error"),
+        )
 
 
 def _executor(**overrides) -> Phase3SignedAcceptanceScenarioExecutor:
@@ -89,7 +107,7 @@ def test_signed_acceptance_scenario_executor_returns_preview_only_result_without
     assert result["signing_result"] is None
     assert result["output_file_exists"] is False
     assert execute_calls == []
-    assert workspace.capture_commands == [
+    assert workspace.capture_snapshot_commands == [
         Phase3HarnessCaptureCommand(
             request=None,
             artifacts_dir=str(tmp_path),
@@ -177,9 +195,9 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
     assert snapshot_calls[0]["output_file"] == scenario_output
     assert snapshot_calls[0]["page_index"] == 2
     assert snapshot_calls[0]["preview_text"] == "Preview text"
-    assert workspace.capture_commands == [
+    assert workspace.capture_snapshot_commands == [
         Phase3HarnessCaptureCommand(
-            request=request,
+            request=None,
             artifacts_dir=str(tmp_path),
             artifact_basename="scenario-b",
             capture_index=1,

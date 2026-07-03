@@ -48,16 +48,16 @@ class Phase3SignedAcceptanceScenarioExecutor:
         )
         workspace = self.build_workspace(shell=shell, profile_store=profile_store)
         artifact_basename = self.scenario_slug(str(scenario["name"]))
-        request = workspace.current_request()
-        capture = workspace.capture_state(
+        snapshot = workspace.capture_snapshot(
             Phase3HarnessCaptureCommand(
-                request=request,
+                request=None,
                 artifacts_dir=str(artifacts_dir),
                 artifact_basename=artifact_basename,
                 capture_index=1,
                 capture_kind="signed_acceptance_preview",
             )
         )
+        request = snapshot.current_request
 
         result = {
             "name": scenario["name"],
@@ -66,11 +66,11 @@ class Phase3SignedAcceptanceScenarioExecutor:
             "expected_failure_message_contains": scenario.get(
                 "expected_failure_message_contains"
             ),
-            "preview_snapshot": capture["preview_snapshot"],
-            "preview_text": capture["preview_text"],
-            "validation_text": capture["validation_text"],
-            "sign_request_snapshot": capture["sign_request_snapshot"],
-            "backend_reservation_snapshot": capture["backend_reservation_snapshot"],
+            "preview_snapshot": snapshot.preview_snapshot,
+            "preview_text": snapshot.preview_text,
+            "validation_text": snapshot.validation_text,
+            "sign_request_snapshot": snapshot.sign_request_snapshot,
+            "backend_reservation_snapshot": snapshot.backend_reservation_snapshot,
             "signing_result": None,
             "output_file_exists": False,
             "output_signature_count": None,
@@ -103,8 +103,8 @@ class Phase3SignedAcceptanceScenarioExecutor:
                         if scenario_request.signature_rect is not None
                         else None
                     ),
-                    preview_snapshot=capture["preview_snapshot"],
-                    preview_text=capture["preview_text"],
+                    preview_snapshot=snapshot.preview_snapshot,
+                    preview_text=snapshot.preview_text,
                     trust_policy=scenario_request.trust_policy,
                     artifacts_dir=str(artifacts_dir),
                     artifact_basename=artifact_basename,
