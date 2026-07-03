@@ -951,6 +951,46 @@ def test_qt_phase3_harness_workspace_wrappers_delegate_to_shared_live_builder() 
     assert calls[1] == {"shell": preview_shell, "profile_store": preview_store}
 
 
+def test_apply_preview_matrix_scenario_uses_preview_matrix_workspace_builder() -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        def apply_scenario(self, command) -> None:
+            captured["command"] = command
+
+    def _fake_builder(*, shell, profile_store):
+        captured["shell"] = shell
+        captured["profile_store"] = profile_store
+        return _FakeWorkspace()
+
+    original_builder = phase3_harness_module._build_preview_matrix_qt_workspace
+    phase3_harness_module._build_preview_matrix_qt_workspace = _fake_builder
+    try:
+        scenario = {
+            "name": "Scenario A",
+            "profile_name": "Saved Profile",
+            "timestamp_required": False,
+        }
+        shell = object()
+        profile_store = object()
+        phase3_harness_module._apply_preview_matrix_scenario(
+            shell=shell,
+            scenario=scenario,
+            profile_store=profile_store,
+        )
+    finally:
+        phase3_harness_module._build_preview_matrix_qt_workspace = original_builder
+
+    assert captured["shell"] is shell
+    assert captured["profile_store"] is profile_store
+    assert captured["command"] == phase3_harness_module.Phase3HarnessScenarioCommand(
+        profile_name="Saved Profile",
+        appearance_overrides=None,
+        timestamp_required=False,
+        signature_rect=None,
+    )
+
+
 def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

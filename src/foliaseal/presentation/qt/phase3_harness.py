@@ -1798,7 +1798,7 @@ def _apply_preview_matrix_scenario(
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
 ) -> None:
-    QtPhase3HarnessWorkspaceAdapter(
+    _build_preview_matrix_qt_workspace(
         shell=shell,
         profile_store=profile_store,
     ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))

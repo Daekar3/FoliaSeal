@@ -32,8 +32,8 @@ You can verify the change by running the focused Phase 3 harness and workspace t
 - Observation: the builder extraction did not require a first-pass architecture-doc edit because runtime behavior and public caller-facing boundaries stayed the same.
   Evidence: focused validation passed after touching only `phase3_harness.py`, `test_phase3_harness.py`, and this ExecPlan.
 
-- Observation: one separate direct `QtPhase3HarnessWorkspaceAdapter` construction still exists in `_apply_preview_matrix_scenario()`, but it does not conflict with this slice’s shared-builder goal.
-  Evidence: the compliance review flagged `src/foliaseal/presentation/qt/phase3_harness.py#L1801` as a follow-on seam rather than a blocker.
+- Observation: the last direct `QtPhase3HarnessWorkspaceAdapter` construction in `_apply_preview_matrix_scenario()` was small enough to remove as a narrow follow-on slice without reopening the broader hybrid.
+  Evidence: the follow-on refactor now routes `_apply_preview_matrix_scenario()` through `_build_preview_matrix_qt_workspace(...)`, and the focused harness tests stayed green.
 
 ## Decision Log
 
@@ -43,7 +43,7 @@ You can verify the change by running the focused Phase 3 harness and workspace t
 
 ## Outcomes & Retrospective
 
-This slice leaves the live harness builder on one shared construction path while preserving the current dict-shaped capture API. The accepted hybrid now has a low-risk first landing point that reduces duplication without forcing downstream payload churn. The next likely seam is removing the remaining direct adapter construction in `_apply_preview_matrix_scenario()` or, after that, tackling the snapshot payload conversion with a smaller caller set.
+This slice leaves the live harness builder on one shared construction path while preserving the current dict-shaped capture API. The accepted hybrid now has a low-risk landing point that reduces duplication without forcing downstream payload churn. After the follow-on removal of the last direct adapter construction in `_apply_preview_matrix_scenario()`, the next likely seam is the snapshot payload conversion with a smaller caller set.
 
 ## Context and Orientation
 
