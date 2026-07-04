@@ -31,7 +31,7 @@ The user-visible behavior must stay the same. The commands `foliaseal phase3-sig
 - [x] (2026-07-04 00:00Z) `docs/ARCHITECTURE.md` and the stale ExecPlan notes were reconciled with the final ownership split.
 - [x] (2026-07-04 00:00Z) Focused validation passed: `.venv/bin/python -m pytest -q tests/unit/test_phase3_evidence_service.py tests/unit/test_phase3_harness.py tests/unit/test_main_cli.py tests/unit/test_qa_signed_acceptance_evidence.py`, `.venv/bin/python -m ruff check ...`, and `git diff --check`.
 - [x] (2026-07-04 00:00Z) Completed the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan. Reviewer findings exposed one real CLI wiring bug (signed-acceptance evidence passphrase forwarding), one remaining Qt export/helper leak, and one stale architecture type-table row; all were fixed in the same pass and the focused validation suite stayed green.
-- [ ] Create the required git commit after the compliance review is complete.
+- [x] (2026-07-04 00:00Z) Created the required git commit after the compliance review was complete: `2366544b8d6a84d34351120bee2c10f795a88cb5` (`Collapse Phase 3 hybrid contract`).
 
 ## Surprises & Discoveries
 
@@ -60,7 +60,7 @@ The user-visible behavior must stay the same. The commands `foliaseal phase3-sig
 
 ## Outcomes & Retrospective
 
-Implementation and compliance review have landed. The current outcome is a single caller-facing Phase 3 contract in `src/foliaseal/application/phase3_evidence_service.py`, a thinner Qt-backed adapter layer in `src/foliaseal/presentation/qt/phase3_harness.py`, smaller CLI dispatch helpers, updated focused tests, and reconciled documentation with no known stale references to the intermediate facade/shim state. The remaining work is the final commit.
+Implementation, compliance review, and the final commit have landed. The outcome is a single caller-facing Phase 3 contract in `src/foliaseal/application/phase3_evidence_service.py`, a thinner Qt-backed adapter layer in `src/foliaseal/presentation/qt/phase3_harness.py`, smaller CLI dispatch helpers, updated focused tests, and reconciled documentation with no known stale references to the intermediate facade/shim state.
 
 ## Context and Orientation
 
