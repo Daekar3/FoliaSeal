@@ -78,6 +78,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     run_phase3_signing_harness,
 )
 from foliaseal.presentation.qt.phase3_harness_workspace import (
+    Phase3HarnessWorkspaceSnapshot,
     _apply_appearance_overrides,
     _apply_visible_fields_override,
 )
@@ -988,6 +989,139 @@ def test_apply_preview_matrix_scenario_uses_preview_matrix_workspace_builder() -
         appearance_overrides=None,
         timestamp_required=False,
         signature_rect=None,
+    )
+
+
+def test_execute_preview_matrix_scenario_uses_workspace_snapshot_capture(
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        def apply_scenario(self, command) -> None:
+            captured["command"] = command
+
+        def capture_state(self, command) -> None:
+            raise AssertionError("preview matrix helper should not call capture_state()")
+
+        def capture_snapshot(self, command):
+            captured["capture_command"] = command
+            return Phase3HarnessWorkspaceSnapshot(
+                current_request=None,
+                last_signing_result=None,
+                capture_index=command.capture_index,
+                capture_kind=command.capture_kind,
+                capture_label=None,
+                preview_snapshot={"title": "Live preview"},
+                preview_text="Preview text",
+                validation_text="Ready to sign.",
+                sign_request_snapshot={"signature_appearance": {"layout_template": "single_line"}},
+                backend_reservation_snapshot={"layout_template": "single_line"},
+                backend_reservation_error=None,
+            )
+
+    original_builder = phase3_harness_module._build_preview_matrix_qt_workspace
+    phase3_harness_module._build_preview_matrix_qt_workspace = (
+        lambda **_kwargs: _FakeWorkspace()
+    )
+    try:
+        result = phase3_harness_module._execute_preview_matrix_scenario(
+            shell=object(),
+            scenario={"name": "Scenario A", "profile_name": "Saved Profile"},
+            profile_store=object(),
+            artifacts_dir=tmp_path,
+        )
+    finally:
+        phase3_harness_module._build_preview_matrix_qt_workspace = original_builder
+
+    assert result == {
+        "name": "Scenario A",
+        "profile_name": "Saved Profile",
+        "preview_snapshot": {"title": "Live preview"},
+        "preview_text": "Preview text",
+        "validation_text": "Ready to sign.",
+        "sign_request_snapshot": {
+            "signature_appearance": {"layout_template": "single_line"}
+        },
+        "backend_reservation_snapshot": {"layout_template": "single_line"},
+    }
+    assert captured["capture_command"] == phase3_harness_module.Phase3HarnessCaptureCommand(
+        request=None,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="scenario_a",
+        capture_index=1,
+        capture_kind="preview_matrix",
+    )
+
+
+def test_execute_headless_preview_matrix_scenario_uses_workspace_snapshot_capture(
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        def apply_scenario(self, command) -> None:
+            captured["command"] = command
+
+        def capture_state(self, command) -> None:
+            raise AssertionError("preview matrix helper should not call capture_state()")
+
+        def capture_snapshot(self, command):
+            captured["capture_command"] = command
+            return Phase3HarnessWorkspaceSnapshot(
+                current_request=None,
+                last_signing_result=None,
+                capture_index=command.capture_index,
+                capture_kind=command.capture_kind,
+                capture_label=None,
+                preview_snapshot={"title": "Headless preview"},
+                preview_text="Preview text",
+                validation_text="Ready to sign.",
+                sign_request_snapshot={"signature_appearance": {"layout_template": "single_line"}},
+                backend_reservation_snapshot={"layout_template": "single_line"},
+                backend_reservation_error=None,
+            )
+
+    original_workflow_builder = phase3_harness_module._build_headless_preview_matrix_workflow
+    original_workspace_builder = phase3_harness_module._build_preview_matrix_headless_workspace
+    phase3_harness_module._build_headless_preview_matrix_workflow = lambda **_kwargs: object()
+    phase3_harness_module._build_preview_matrix_headless_workspace = (
+        lambda **_kwargs: _FakeWorkspace()
+    )
+    try:
+        result = phase3_harness_module._execute_headless_preview_matrix_scenario(
+            source_path=tmp_path / "fixture.pdf",
+            certificate_path=str(tmp_path / "cert.p12"),
+            passphrase="secret",
+            scenario={"name": "Scenario B", "profile_name": "Headless"},
+            profile_store=object(),
+            artifacts_dir=tmp_path,
+        )
+    finally:
+        phase3_harness_module._build_headless_preview_matrix_workflow = (
+            original_workflow_builder
+        )
+        phase3_harness_module._build_preview_matrix_headless_workspace = (
+            original_workspace_builder
+        )
+
+    assert result == {
+        "name": "Scenario B",
+        "profile_name": "Headless",
+        "preview_snapshot": {"title": "Headless preview"},
+        "preview_text": "Preview text",
+        "validation_text": "Ready to sign.",
+        "sign_request_snapshot": {
+            "signature_appearance": {"layout_template": "single_line"}
+        },
+        "backend_reservation_snapshot": {"layout_template": "single_line"},
+    }
+    assert captured["capture_command"] == phase3_harness_module.Phase3HarnessCaptureCommand(
+        request=None,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="scenario_b",
+        capture_index=1,
+        capture_kind="preview_matrix",
     )
 
 

@@ -1453,7 +1453,7 @@ def _execute_preview_matrix_scenario(
     )
     workspace.apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
     artifact_basename = _scenario_slug(str(scenario["name"]))
-    capture = workspace.capture_state(
+    capture = workspace.capture_snapshot(
         Phase3HarnessCaptureCommand(
             request=None,
             artifacts_dir=str(artifacts_dir),
@@ -1461,7 +1461,7 @@ def _execute_preview_matrix_scenario(
             capture_index=1,
             capture_kind="preview_matrix",
         )
-    )
+    ).as_mapping()
     return {
         "name": scenario["name"],
         "profile_name": scenario.get("profile_name"),
@@ -1493,7 +1493,7 @@ def _execute_headless_preview_matrix_scenario(
     )
     workspace.apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
     artifact_basename = _scenario_slug(str(scenario["name"]))
-    capture = workspace.capture_state(
+    capture = workspace.capture_snapshot(
         Phase3HarnessCaptureCommand(
             request=None,
             artifacts_dir=str(artifacts_dir),
@@ -1501,7 +1501,7 @@ def _execute_headless_preview_matrix_scenario(
             capture_index=1,
             capture_kind="preview_matrix",
         )
-    )
+    ).as_mapping()
     return {
         "name": scenario["name"],
         "profile_name": scenario.get("profile_name"),
