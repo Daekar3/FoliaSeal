@@ -149,15 +149,6 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
             self._shell = shell
             self.capture_snapshot_commands = []
 
-        def current_request(self):
-            raise AssertionError("runner should read request from capture_snapshot()")
-
-        def last_signing_result(self):
-            raise AssertionError("runner should read signing result from capture_snapshot()")
-
-        def capture_state(self, command: Phase3HarnessCaptureCommand):
-            raise AssertionError("runner should not call capture_state()")
-
         def capture_snapshot(self, command: Phase3HarnessCaptureCommand):
             self.capture_snapshot_commands.append(command)
             capture_kind = command.capture_kind

@@ -1001,9 +1001,6 @@ def test_execute_preview_matrix_scenario_uses_workspace_snapshot_capture(
         def apply_scenario(self, command) -> None:
             captured["command"] = command
 
-        def capture_state(self, command) -> None:
-            raise AssertionError("preview matrix helper should not call capture_state()")
-
         def capture_snapshot(self, command):
             captured["capture_command"] = command
             return Phase3HarnessWorkspaceSnapshot(
@@ -1062,9 +1059,6 @@ def test_execute_headless_preview_matrix_scenario_uses_workspace_snapshot_captur
     class _FakeWorkspace:
         def apply_scenario(self, command) -> None:
             captured["command"] = command
-
-        def capture_state(self, command) -> None:
-            raise AssertionError("preview matrix helper should not call capture_state()")
 
         def capture_snapshot(self, command):
             captured["capture_command"] = command

@@ -263,65 +263,7 @@ def test_qt_phase3_harness_workspace_adapter_rejects_compat_surface_only_shell()
     ):
         adapter.refresh_viewer()
 
-
-def test_qt_phase3_harness_workspace_adapter_reads_request_and_result_from_testing_adapter(
-    tmp_path: Path,
-) -> None:
-    request = build_signing_request(
-        base_path=tmp_path,
-        signature_rect=build_signature_rect(page_index=0),
-        signature_appearance=build_signature_appearance(),
-    )
-    result = SigningResult(
-        success=True,
-        failure_code=None,
-        message="ok",
-    )
-
-    class _FakePanel:
-        def refresh_preview(self):
-            return object()
-
-        def preview_text(self) -> str:
-            return "preview"
-
-        def validation_text(self) -> str:
-            return "valid"
-
-    class _FakeTestingAdapter:
-        def __init__(self) -> None:
-            self.properties_panel = _FakePanel()
-            self.timestamp_required = None
-            self.placement_calls = []
-
-        def signature_appearance(self):
-            return build_signature_appearance()
-
-        def set_timestamp_required(self, required: bool) -> None:
-            self.timestamp_required = required
-
-        def apply_signature_rect_placement(self, signature_rect) -> None:
-            self.placement_calls.append(signature_rect)
-
-        def refresh_viewer(self) -> None:
-            return None
-
-        def current_request(self):
-            return request
-
-        @property
-        def last_signing_result(self):
-            return result
-
-    testing_adapter = _FakeTestingAdapter()
-    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
-    adapter = QtPhase3HarnessWorkspaceAdapter(shell=shell, profile_store=object())
-
-    assert adapter.current_request() is request
-    assert adapter.last_signing_result() is result
-
-
-def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signing_result() -> None:
+def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_result() -> None:
     preview = type(
         "_Preview",
         (),
@@ -402,97 +344,6 @@ def test_qt_phase3_harness_workspace_adapter_captures_current_request_and_signin
         ),
     )
 
-    capture = adapter.capture_state(
-        Phase3HarnessCaptureCommand(
-            request=None,
-            artifacts_dir="artifacts/debug",
-            artifact_basename="interactive_state_01",
-            capture_index=1,
-            capture_kind="manual",
-        )
-    )
-
-    assert adapter.current_request() == request
-    assert adapter.last_signing_result() == testing_adapter.last_signing_result
-    assert capture["capture_label"] == "manual_01"
-    assert capture["preview_text"] == "Preview text"
-    assert capture["validation_text"] == "Ready to sign."
-    assert capture["sign_request_snapshot"] == {"layout_template": "single_line"}
-    assert capture["backend_reservation_snapshot"] == {"layout_template": "single_line"}
-    assert capture["preview_snapshot"]["render_capture"] == {
-        "preview_image_path": "artifacts/preview.png"
-    }
-    assert capture["preview_snapshot"]["sign_time_diagnostics"] == {"fit": "ok"}
-
-
-def test_qt_phase3_harness_workspace_adapter_returns_snapshot() -> None:
-    preview = type(
-        "_Preview",
-        (),
-        {
-            "title": "Digitally signed by",
-            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
-            "stamp_position": SignatureStampPosition.TOP,
-        },
-    )()
-    request = build_signing_request(
-        Path("/tmp"),
-        signature_rect=build_signature_rect(page_index=1, width_pt=180.0, height_pt=32.0),
-        signature_appearance=build_signature_appearance(
-            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
-            stamp_position=SignatureStampPosition.TOP,
-        ),
-    )
-
-    class _FakePanel:
-        def refresh_preview(self):
-            return preview
-
-        def preview_text(self) -> str:
-            return "Preview text"
-
-        def validation_text(self) -> str:
-            return "Ready to sign."
-
-    class _FakeTestingAdapter:
-        def __init__(self) -> None:
-            self.properties_panel = _FakePanel()
-            self._current_request = request
-            self.last_signing_result = SigningResult(success=True, failure_code=None, message="ok")
-
-        def current_request(self):
-            return self._current_request
-
-    adapter = QtPhase3HarnessWorkspaceAdapter(
-        shell=type("_Shell", (), {"testing_adapter": _FakeTestingAdapter()})(),
-        profile_store=object(),
-        capture_preview_render=lambda **_kwargs: {"preview_image_path": "artifacts/preview.png"},
-        snapshot_preview=lambda current_preview, **kwargs: {
-            "title": current_preview.title,
-            "render_capture": kwargs["render_capture"],
-            "sign_time_diagnostics": kwargs["sign_time_diagnostics"],
-        },
-        snapshot_signing_request=lambda current_request: (
-            None
-            if current_request is None
-            else {"layout_template": current_request.signature_appearance.layout_template.value}
-        ),
-        build_backend_reservation_evidence=lambda current_request: type(
-            "_Reservation",
-            (),
-            {
-                "snapshot": {
-                    "layout_template": current_request.signature_appearance.layout_template.value
-                },
-                "error": None,
-            },
-        )(),
-        snapshot_sign_time_fit_diagnostics=lambda **_kwargs: {"fit": "ok"},
-        interactive_capture_label=lambda **kwargs: (
-            f"{kwargs['capture_kind']}_{kwargs['capture_index']:02d}"
-        ),
-    )
-
     snapshot = adapter.capture_snapshot(
         Phase3HarnessCaptureCommand(
             request=None,
@@ -505,13 +356,16 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot() -> None:
 
     assert isinstance(snapshot, Phase3HarnessWorkspaceSnapshot)
     assert snapshot.current_request == request
-    assert snapshot.last_signing_result is not None
+    assert snapshot.last_signing_result == testing_adapter.last_signing_result
     assert snapshot.capture_label == "manual_01"
+    assert snapshot.preview_text == "Preview text"
+    assert snapshot.validation_text == "Ready to sign."
+    assert snapshot.sign_request_snapshot == {"layout_template": "single_line"}
+    assert snapshot.backend_reservation_snapshot == {"layout_template": "single_line"}
     assert snapshot.preview_snapshot["render_capture"] == {
         "preview_image_path": "artifacts/preview.png"
     }
-    assert snapshot.sign_request_snapshot == {"layout_template": "single_line"}
-    assert snapshot.backend_reservation_snapshot == {"layout_template": "single_line"}
+    assert snapshot.preview_snapshot["sign_time_diagnostics"] == {"fit": "ok"}
 
 
 def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_preview(
@@ -1060,25 +914,7 @@ def test_headless_phase3_harness_workspace_adapter_captures_preview_state() -> N
     )
     workflow.preview = lambda: preview  # type: ignore[method-assign]
 
-    capture = adapter.capture_state(
-        Phase3HarnessCaptureCommand(
-            request=None,
-            artifacts_dir="artifacts/debug",
-            artifact_basename="scenario",
-            capture_index=1,
-            capture_kind="preview_matrix",
-        )
-    )
-
     assert snapshot_current_draft_request(workflow) == request
-    assert adapter.current_request() == request
-    assert adapter.last_signing_result() is None
-    assert capture["capture_index"] == 1
-    assert capture["preview_snapshot"]["render_capture"] == {"preview_image_path": "headless.png"}
-    assert capture["preview_text"] == "Preview text"
-    assert capture["validation_text"] == "Ready to sign."
-    assert capture["sign_request_snapshot"] == {"output_pdf_path": request.output_pdf_path}
-    assert capture["backend_reservation_snapshot"] == {"output_pdf_path": request.output_pdf_path}
 
     snapshot = adapter.capture_snapshot(
         Phase3HarnessCaptureCommand(
@@ -1108,5 +944,4 @@ def test_headless_phase3_harness_workspace_adapter_refresh_viewer_is_no_op() -> 
 
     adapter.refresh_viewer()
 
-    assert adapter.current_request() == request
-    assert adapter.last_signing_result() is None
+    assert snapshot_current_draft_request(workflow) == request

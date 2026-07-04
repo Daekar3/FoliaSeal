@@ -29,15 +29,6 @@ class _FakeWorkspace:
         }
         self.capture_snapshot_commands: list[Phase3HarnessCaptureCommand] = []
 
-    def current_request(self):
-        raise AssertionError("executor should read request from capture_snapshot()")
-
-    def last_signing_result(self):
-        return None
-
-    def capture_state(self, command: Phase3HarnessCaptureCommand):
-        raise AssertionError("executor should not call capture_state()")
-
     def capture_snapshot(
         self, command: Phase3HarnessCaptureCommand
     ) -> Phase3HarnessWorkspaceSnapshot:
