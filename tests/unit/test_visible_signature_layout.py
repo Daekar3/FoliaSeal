@@ -22,7 +22,6 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
     _background_layout_for_stamp,
-    _ensure_layout_can_fit,
 )
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -1050,11 +1049,9 @@ def test_layout_boundary_rejects_text_that_exceeds_reserved_height() -> None:
         )
     )
 
-    with pytest.raises(ValueError, match="Visible signature content does not fit"):
-        _ensure_layout_can_fit(
-            plan.backend_reservation,
-            has_visible_stamp_image=plan.has_visible_stamp_image,
-        )
+    assert plan.fit_issues
+    assert plan.fit_issues[0].code == "visible_signature_layout_unavailable"
+    assert "Visible signature content does not fit" in plan.fit_issues[0].message
 
 
 def _backend_appearance(

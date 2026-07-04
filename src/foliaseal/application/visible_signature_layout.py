@@ -508,7 +508,6 @@ class SignatureLayoutPlan:
     background_text_box_width_pt: int
     ink_reservation: HorizontalInkReservation | None
     fit_issues: tuple[VisibleSignatureFitIssue, ...]
-    backend_reservation: object
     stamp_image: ImageMetrics | None
 
 
@@ -737,7 +736,6 @@ class VisibleSignatureLayoutEngine:
             background_text_box_width_pt=background_text_box_width,
             ink_reservation=_public_ink_reservation(ink_reservation),
             fit_issues=fit_issues,
-            backend_reservation=placement_reservation,
             stamp_image=stamp_image,
         )
 

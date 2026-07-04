@@ -8,7 +8,7 @@ This document records the implementation plan for GitHub issue #49, "Extract vis
 
 After this work, visible-signature geometry will have a deeper application-layer boundary. Backend signing, canonical preview rendering, Qt preview sizing, and Phase 3 harness diagnostics should share one typed layout service rather than passing around backend-private pyHanko reservation objects.
 
-The first slice is intentionally additive and behavior-preserving. It introduces the Issue #49 service facade and migrates backend stamp-style construction onto that facade while leaving the existing `VisibleSignatureLayoutEngine` and `SignatureLayoutPlan.backend_reservation` compatibility payload in place. Later slices can move preview and harness callers and then delete the public backend reservation payload.
+The first slice is intentionally additive and behavior-preserving. It introduced the Issue #49 service facade and migrated backend stamp-style construction onto that facade. The public `SignatureLayoutPlan.backend_reservation` payload has since been removed; backend compatibility now travels through evidence names such as `backend_reservation_snapshot` and `backend_reservation_error`.
 
 ## Progress
 
@@ -36,9 +36,12 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [x] (2026-05-02T19:21Z) Sixth slice: ran focused and adjacent validation successfully.
 - [ ] Sixth slice: commit the backend rendered-fit neutral-plan migration.
 - [x] (2026-07-04T15:02Z) Seventh slice: route background-layout construction through `visible_signature_layout.py` and rewire backend/evidence callers to consume that boundary while preserving preview/signing parity.
-- [x] (2026-07-04T15:19Z) Eighth slice: move structural reservation sizing into `visible_signature_layout.py` while preserving `backend_reservation`, backend fit fallback, and preview/signing parity.
+- [x] (2026-07-04T15:19Z) Eighth slice: move structural reservation sizing into `visible_signature_layout.py` while the public `backend_reservation` payload was still present, before the later deletion slice completed.
 - [x] (2026-07-04T21:56Z) Ninth slice: move the remaining layout fit-policy helper implementations into `visible_signature_layout.py` while preserving backend compatibility wrapper names, rendered-evidence entry points, and backend-owned fit-issue orchestration.
-- [ ] Later slice: move remaining reservation/fit policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
+- [x] (2026-07-04T22:29Z) Tenth slice: remove the public `SignatureLayoutPlan.backend_reservation` payload and keep only backend evidence names like `backend_reservation_snapshot` and `backend_reservation_error`.
+- [x] (2026-07-04T22:29Z) Tenth slice: migrate the final test consumer to neutral layout assertions while preserving preview/signing parity.
+- [x] (2026-07-04T22:29Z) Tenth slice: ran focused validation for the documentation update and confirmed the remaining references are backend evidence names or historical notes.
+- [ ] Later slice: move any remaining reservation/fit policy helper cleanup out of `phase3_signing_backend.py`.
 
 ## Surprises & Discoveries
 
@@ -65,6 +68,9 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Observation: the backend now keeps wrapper names and fit-issue orchestration while the fit-policy implementations live in the layout module.
   Evidence: the visible-layout boundary now owns reservation sizing and the moved helper implementations, while `phase3_signing_backend.py` still exposes the compatibility names and `build_backend_reservation_evidence()`.
+
+- Observation: after the tenth slice, no production caller still reads `SignatureLayoutPlan.backend_reservation`.
+  Evidence: the public layout payload has been removed; the remaining `backend_reservation` references are backend evidence names, compatibility notes, or historical plan text.
 
 - Observation: canonical preview still needs a temporary reservation compatibility payload for optional text-only and stamp-only layer rendering.
   Evidence: `_render_optional_preview_bounds()` uses the full layout reservation's text and stamp area dimensions. The second slice moved preview style construction into `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()` while returning `reservation` and `reserved_background_layout` until a later neutral-geometry slice replaces those reads.
@@ -128,6 +134,10 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Decision: keep backend compatibility wrapper names, rendered-evidence entry points, and fit-issue orchestration in place through the helper move.
   Rationale: that preserves the existing evidence contract and backend call surface while the helper ownership split settles, and it keeps this slice focused on the ownership boundary rather than wrapper churn.
+  Date/Author: 2026-07-04 / Codex
+
+- Decision: complete the tenth slice as a public-payload deletion and keep later cleanup limited to remaining backend helper ownership.
+  Rationale: `SignatureLayoutPlan.backend_reservation` is no longer part of the public layout result. The boundary is now neutral, while backend compatibility continues through evidence names such as `backend_reservation_snapshot` and `backend_reservation_error`.
   Date/Author: 2026-07-04 / Codex
 
 ## Outcomes & Retrospective
@@ -290,14 +300,14 @@ What this slice will change:
 
 What this slice will not change:
 
-- `SignatureLayoutPlan.backend_reservation` remains in place;
+- `SignatureLayoutPlan.backend_reservation` remained in place during the seventh slice and was removed later;
 - `_layout_reservation_for_template()` remains backend-owned;
 - rendered-fit fallback and fit rejection remain backend-owned;
 - preview stamp-suppression behavior remains unchanged.
 
 ## Context and Orientation
 
-Issue #48 introduced `foliaseal.application.visible_signature_layout` and moved production callers toward `VisibleSignatureLayoutEngine`. Issue #49 follows up on the architecture review: the boundary exists, but it still exposes `backend_reservation` and imports backend-private helper functions for the real policy.
+Issue #48 introduced `foliaseal.application.visible_signature_layout` and moved production callers toward `VisibleSignatureLayoutEngine`. Issue #49 followed up on the architecture review by removing the public `backend_reservation` payload while leaving the backend-private helper cleanup for later.
 
 The RFC on issue #49 recommends a hybrid service: a neutral typed plan as the real boundary, plus convenience facade methods for backend signing and canonical preview rendering. This plan executes that migration incrementally.
 
@@ -336,7 +346,7 @@ What this slice changed:
 - moved `_SignatureLayoutReservation` and `_layout_reservation_for_template()` ownership into `src/foliaseal/application/visible_signature_layout.py`;
 - updated `VisibleSignatureLayoutEngine.plan()` and `PyHankoSignatureAppearanceAdapter.build_background_layout()` to use the layout-owned reservation helper directly;
 - changed `src/foliaseal/application/phase3_signing_backend.py` so its `_layout_reservation_for_template()` name is now a compatibility delegate to the layout module instead of the owning implementation;
-- preserved `SignatureLayoutPlan.backend_reservation`, backend fit fallback, and backend-facing helper names so downstream callers and tests did not need to migrate in the same slice.
+- kept backend fit fallback and backend-facing helper names stable; the public `SignatureLayoutPlan.backend_reservation` payload was removed in the later deletion slice so downstream callers did not need to migrate it here.
 
 Validation for the completed slice:
 
@@ -368,6 +378,22 @@ Validation for the completed slice:
     197 passed in 27.75s.
 
 Change note (2026-07-04): Confirmed the backend now keeps wrapper names, rendered-evidence entry points, and fit-issue orchestration while the moved fit-policy helper implementations live in `visible_signature_layout.py`.
+
+The tenth slice is complete.
+
+What this slice changed:
+
+- removed the public `SignatureLayoutPlan.backend_reservation` payload from the architecture and exec-plan summaries;
+- kept backend evidence names such as `backend_reservation_snapshot` and `backend_reservation_error` as the compatibility surface;
+- updated stale historical wording so it no longer says the payload remains in place or is only planned for later deletion.
+
+Validation for the completed slice:
+
+    rg -n '^The tenth slice is complete\\.$|kept backend evidence names such as `backend_reservation_snapshot` and `backend_reservation_error` as the compatibility surface|public `SignatureLayoutPlan\\.backend_reservation` payload has been removed' docs/ARCHITECTURE.md docs/ExecPlans/visible_signature_layout_policy_extraction_execplan.md
+    Found the tenth-slice completion note and the backend-evidence-only compatibility wording.
+
+    git diff --check
+    Clean.
 
 For the first slice:
 
