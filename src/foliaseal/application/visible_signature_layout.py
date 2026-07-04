@@ -7,7 +7,8 @@ existing backend layout helpers; later slices can move the policy here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from math import ceil
 from typing import Literal, Protocol
 
 from PIL import Image
@@ -690,7 +691,6 @@ class PyHankoSignatureAppearanceAdapter:
 
         from foliaseal.application.phase3_signing_backend import (
             RoundedBorderTextStampStyle,
-            _background_layout_for_stamp,
             _build_text_box_style,
             _hex_to_rgb,
             _solid_background_for_color,
@@ -708,14 +708,11 @@ class PyHankoSignatureAppearanceAdapter:
             else None
         )
         text_box_style = _build_text_box_style(appearance.text_style)
-        background_layout = _background_layout_for_stamp(
-            appearance.layout_template,
-            stamp_position=appearance.stamp_position,
+        background_layout = self.build_background_layout(
+            appearance=appearance,
             stamp_background=stamp_background,
             signature_rect=signature_rect,
-            text_box_width=layout_plan.background_text_box_width_pt,
-            text_box_height=layout_plan.text_box.height_pt,
-            box_style=appearance.box_style,
+            layout_plan=layout_plan,
         )
         return RoundedBorderTextStampStyle(
             border_width=border_width,
@@ -728,6 +725,254 @@ class PyHankoSignatureAppearanceAdapter:
             stamp_text=stamp_text,
             timestamp_format=appearance.datetime_format,
         )
+
+    def build_background_layout(
+        self,
+        *,
+        appearance: SigningBackendAppearance,
+        stamp_background: object | None,
+        signature_rect: SignatureRect,
+        layout_plan: SignatureLayoutPlan,
+    ) -> object:
+        """Return the fitted pyHanko background layout for one stamp style."""
+
+        from pyhanko.pdf_utils.layout import InnerScaling, Margins
+
+        from foliaseal.application.phase3_signing_backend import (
+            _layout_reservation_for_template,
+        )
+
+        reservation = _layout_reservation_for_template(
+            appearance.layout_template,
+            stamp_position=appearance.stamp_position,
+            signature_rect=signature_rect,
+            text_box_width=layout_plan.background_text_box_width_pt,
+            text_box_height=layout_plan.text_box.height_pt,
+            box_style=appearance.box_style,
+            has_visible_stamp_image=stamp_background is not None,
+            stamp_aspect_ratio=None
+            if layout_plan.stamp_image is None
+            else layout_plan.stamp_image.aspect_ratio,
+        )
+        if stamp_background is None:
+            return reservation.background_layout
+
+        background_layout = replace(
+            reservation.background_layout,
+            inner_content_scaling=InnerScaling.SHRINK_TO_FIT,
+        )
+        if layout_plan.stamp_image is None:
+            return background_layout
+
+        area_width = max(1, reservation.stamp_area_width_pt)
+        area_height = max(1, reservation.stamp_area_height_pt)
+        content_inset = 0
+        if appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+            content_inset = _single_line_stamp_content_inset(
+                stamp_position=appearance.stamp_position,
+                box_width=max(1, int(round(signature_rect.width_pt))),
+                box_height=max(1, int(round(signature_rect.height_pt))),
+                reserved_width=area_width,
+                reserved_height=area_height,
+            )
+        horizontal_single_line_vertical_inset = content_inset
+        if (
+            appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and appearance.stamp_position
+            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+        ):
+            horizontal_single_line_vertical_inset = (
+                _single_line_horizontal_stamp_vertical_inset(
+                    box_style=appearance.box_style,
+                    content_inset=content_inset,
+                )
+            )
+        fit_width = max(1, area_width - content_inset * 2)
+        fit_height = max(1, area_height - horizontal_single_line_vertical_inset * 2)
+        border_gap = _border_facing_stamp_inset(
+            layout_template=appearance.layout_template,
+            stamp_position=appearance.stamp_position,
+            box_style=appearance.box_style,
+        )
+        if (
+            appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and appearance.stamp_position
+            in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+        ):
+            border_gap = _single_line_vertical_stamp_border_gap(
+                box_style=appearance.box_style
+            )
+            fit_height = max(1, fit_height - border_gap)
+        elif appearance.stamp_position in {
+            SignatureStampPosition.TOP,
+            SignatureStampPosition.BOTTOM,
+        }:
+            border_gap = _top_stamp_border_facing_inset(
+                box_style=appearance.box_style
+            )
+            fit_height = max(1, fit_height - border_gap)
+        elif appearance.stamp_position == SignatureStampPosition.RIGHT:
+            fit_width = max(1, fit_width - border_gap)
+        aspect_ratio = layout_plan.stamp_image.aspect_ratio
+        target_width = fit_width
+        target_height = max(1, int(round(target_width / aspect_ratio)))
+        if target_height > fit_height:
+            target_height = fit_height
+            target_width = max(1, int(round(target_height * aspect_ratio)))
+
+        if (
+            appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and appearance.stamp_position
+            in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+        ):
+            remaining_y = max(0, area_height - target_height)
+            centered_extra_y = max(0, remaining_y - border_gap) // 2
+            extra_x_left = 0
+            extra_x_right = max(0, area_width - target_width)
+            if appearance.stamp_position == SignatureStampPosition.TOP:
+                extra_y_top = min(border_gap, remaining_y) + centered_extra_y
+                extra_y_bottom = centered_extra_y
+            else:
+                extra_y_top = centered_extra_y
+                extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
+        elif (
+            appearance.stamp_position
+            in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
+            and border_gap > 0
+        ):
+            remaining_y = max(0, area_height - target_height)
+            centered_extra_y = max(0, remaining_y - border_gap) // 2
+            centered_extra_x = max(0, area_width - target_width) // 2
+            extra_x_left = centered_extra_x
+            extra_x_right = centered_extra_x
+            if appearance.stamp_position == SignatureStampPosition.TOP:
+                extra_y_top = min(border_gap, remaining_y) + centered_extra_y
+                extra_y_bottom = centered_extra_y
+            else:
+                extra_y_top = centered_extra_y
+                extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
+        elif appearance.stamp_position == SignatureStampPosition.RIGHT and border_gap > 0:
+            remaining_x = max(0, area_width - target_width)
+            centered_extra_x = max(0, remaining_x - border_gap) // 2
+            extra_x_left = centered_extra_x
+            extra_x_right = min(border_gap, remaining_x) + centered_extra_x
+            extra_y_top = max(0, area_height - target_height) // 2
+            extra_y_bottom = extra_y_top
+        elif appearance.stamp_position == SignatureStampPosition.LEFT and border_gap > 0:
+            max_content_width = max(1, fit_width - border_gap)
+            if target_width > max_content_width:
+                target_width = max_content_width
+                target_height = max(1, int(round(target_width / aspect_ratio)))
+            remaining_x = max(0, area_width - target_width)
+            centered_extra_x = max(0, remaining_x - border_gap) // 2
+            extra_x_left = min(border_gap, remaining_x) + centered_extra_x
+            extra_x_right = centered_extra_x
+            extra_y_top = max(0, area_height - target_height) // 2
+            extra_y_bottom = extra_y_top
+        elif (
+            appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and appearance.stamp_position == SignatureStampPosition.LEFT
+        ):
+            extra_x_left = max(0, area_width - target_width)
+            extra_x_right = 0
+            extra_y_top = max(0, area_height - target_height) // 2
+            extra_y_bottom = extra_y_top
+        else:
+            centered_extra_x = max(0, area_width - target_width) // 2
+            extra_x_left = centered_extra_x
+            extra_x_right = centered_extra_x
+            extra_y_top = max(0, area_height - target_height) // 2
+            extra_y_bottom = extra_y_top
+        margins = background_layout.margins
+        return replace(
+            background_layout,
+            margins=Margins(
+                left=margins.left + extra_x_left,
+                right=margins.right + extra_x_right,
+                top=margins.top + extra_y_top,
+                bottom=margins.bottom + extra_y_bottom,
+            ),
+        )
+
+
+def _border_safe_inset(box_style: SignatureBoxStyle | None) -> int:
+    if box_style is None or not box_style.show_border:
+        return 0
+    return max(0, int(ceil(box_style.border_width_pt / 2.0)) + 1)
+
+
+def _single_line_stamp_content_inset(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_width: int,
+    box_height: int,
+    reserved_width: int | None = None,
+    reserved_height: int | None = None,
+) -> int:
+    effective_width = (
+        reserved_width
+        if isinstance(reserved_width, int) and reserved_width > 0
+        else box_width
+    )
+    effective_height = (
+        reserved_height if isinstance(reserved_height, int) and reserved_height > 0 else box_height
+    )
+    shortest_edge = max(1, min(effective_width, effective_height))
+    if stamp_position in {
+        SignatureStampPosition.TOP,
+        SignatureStampPosition.BOTTOM,
+    }:
+        return max(0, min(2, int(shortest_edge * 0.08)))
+    if stamp_position in {
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.RIGHT,
+    }:
+        return max(0, min(1, int(round(shortest_edge * 0.03))))
+    return 0
+
+
+def _single_line_vertical_stamp_border_gap(
+    *,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    if box_style is None or not box_style.show_border:
+        return 0
+    return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
+
+
+def _single_line_horizontal_stamp_vertical_inset(
+    *,
+    box_style: SignatureBoxStyle | None,
+    content_inset: int,
+) -> int:
+    return max(content_inset, _border_safe_inset(box_style))
+
+
+def _top_stamp_border_facing_inset(
+    *,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    if box_style is None or not box_style.show_border:
+        return 1
+    return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
+
+
+def _border_facing_stamp_inset(
+    *,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+        return 0
+    if stamp_position in {
+        SignatureStampPosition.LEFT,
+        SignatureStampPosition.TOP,
+        SignatureStampPosition.BOTTOM,
+        SignatureStampPosition.RIGHT,
+    }:
+        return _top_stamp_border_facing_inset(box_style=box_style)
+    return 0
 
 
 def _public_ink_reservation(reservation: object | None) -> HorizontalInkReservation | None:

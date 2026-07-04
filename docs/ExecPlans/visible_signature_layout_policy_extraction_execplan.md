@@ -35,7 +35,8 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [x] (2026-05-02T19:21Z) Sixth slice: moved backend rendered-fit fallback from `_SignatureLayoutReservation` to `SignatureLayoutPlan`.
 - [x] (2026-05-02T19:21Z) Sixth slice: ran focused and adjacent validation successfully.
 - [ ] Sixth slice: commit the backend rendered-fit neutral-plan migration.
-- [ ] Later slice: move private layout policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
+- [x] (2026-07-04T15:02Z) Seventh slice: route background-layout construction through `visible_signature_layout.py` and rewire backend/evidence callers to consume that boundary while preserving preview/signing parity.
+- [ ] Later slice: move remaining reservation/fit policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
 
 ## Surprises & Discoveries
 
@@ -44,6 +45,12 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Observation: the repository does not currently have the `PLANS.md` file referenced by the write-execplan skill.
   Evidence: `rg --files -g 'PLANS.md' -g 'plans.md' -g '*PLANS*'` returned no matches.
+
+- Observation: the next safe deepening slice is smaller than the originally implied “delete backend reservation” endgame.
+  Evidence: the 2026-07-04 dev-loop explorer review found that background-layout construction can move first, while `_layout_reservation_for_template()`, fit validation, and `backend_reservation` still couple to rendered-fit fallback and evidence callers.
+
+- Observation: reconstructing background-layout fitting directly from the final neutral `SignatureLayoutPlan` changed single-line left/right preview spacing.
+  Evidence: `tests/unit/test_signing_preview_renderer.py` failed on the single-line left/right gap assertions until `PyHankoSignatureAppearanceAdapter.build_background_layout()` switched back to using backend reservation sizing as the structural input for this slice.
 
 - Observation: backend stamp-style construction can move behind the service facade without moving the backend rendered-fit fallback.
   Evidence: `tests/unit/test_phase3_signing_backend.py` passed after `_build_stamp_style()` switched to `VisibleSignatureLayoutService.pyhanko_style_for_signing()`.
@@ -95,6 +102,10 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - Decision: keep the backend fallback function in `phase3_signing_backend.py` while changing its input contract.
   Rationale: the fallback still performs backend-specific rendered checks and cleanup. Moving it wholesale into the layout module would mix signing/rendered-output concerns into the neutral policy boundary. Accepting `SignatureLayoutPlan` removes the reservation dependency without changing ownership prematurely.
   Date/Author: 2026-05-02 / Codex
+
+- Decision: split the remaining helper extraction into a background-layout slice and a later reservation/fit slice.
+  Rationale: moving background-layout construction behind the application boundary materially removes legacy geometry cruft without risking a larger parity regression in fit rejection, evidence, or preview stamp-suppression behavior. This keeps the current slice SPEC-safe and restartable.
+  Date/Author: 2026-07-04 / Codex
 
 ## Outcomes & Retrospective
 
@@ -245,13 +256,55 @@ Validation:
     .venv/bin/pytest -q tests/unit/test_phase3_harness.py
     95 passed, 1 warning in 1.43s.
 
+The seventh slice is complete.
+
+What this slice will change:
+
+- host public background-layout construction in `src/foliaseal/application/visible_signature_layout.py` so callers enter the layout boundary for pyHanko background-layout assembly;
+- rewire backend `_build_stamp_style()` and backend reservation evidence assembly to consume that boundary instead of calling backend-private `_background_layout_for_stamp()` directly;
+- migrate generic background-layout assertions from `tests/unit/test_phase3_signing_backend.py` into `tests/unit/test_visible_signature_layout.py`;
+- keep preview/backend parity coverage in `tests/unit/test_signing_preview_renderer.py` and keep rendered-fit fallback ownership in `src/foliaseal/application/phase3_signing_backend.py`.
+
+What this slice will not change:
+
+- `SignatureLayoutPlan.backend_reservation` remains in place;
+- `_layout_reservation_for_template()` remains backend-owned;
+- rendered-fit fallback and fit rejection remain backend-owned;
+- preview stamp-suppression behavior remains unchanged.
+
 ## Context and Orientation
 
 Issue #48 introduced `foliaseal.application.visible_signature_layout` and moved production callers toward `VisibleSignatureLayoutEngine`. Issue #49 follows up on the architecture review: the boundary exists, but it still exposes `backend_reservation` and imports backend-private helper functions for the real policy.
 
 The RFC on issue #49 recommends a hybrid service: a neutral typed plan as the real boundary, plus convenience facade methods for backend signing and canonical preview rendering. This plan executes that migration incrementally.
 
+As of 2026-07-04, most neutral-plan migration work is already landed. The remaining legacy geometry cruft is concentrated in `src/foliaseal/application/phase3_signing_backend.py`, where reservation sizing, fit validation, and rendered-fit fallback still own the structural geometry inputs that pyHanko style assembly depends on. Before this slice, `_background_layout_for_stamp()` also owned the public call path for stamp/background placement math. The canonical preview path in `src/foliaseal/application/signing_preview_renderer.py` already goes through the layout service and must stay pixel-parity aligned with backend signing because `docs/SPEC.md` treats preview/output trust as a product principle.
+
 ## Plan of Work
+
+For the seventh slice:
+
+1. In `src/foliaseal/application/visible_signature_layout.py`, add a service-owned background-layout construction path that takes the meaningful inputs the backend currently uses: layout template, stamp position, optional image background, signature rectangle, text box dimensions, and box style. Keep the pyHanko-specific return type behind the layout service boundary. For this slice, allow the implementation to keep using backend reservation sizing as its structural input so long as the caller-facing ownership moves to the layout boundary.
+
+2. In `PyHankoSignatureAppearanceAdapter.build_stamp_style()`, stop importing backend-private `_background_layout_for_stamp()` and instead call the new local background-layout helper. This is the core behavior change for the slice: backend stamp-style assembly should still happen, but the geometry policy should come from the layout boundary.
+
+3. In `src/foliaseal/application/phase3_signing_backend.py`, rewire `_build_stamp_style()` and `build_backend_reservation_evidence()` so they no longer call `_background_layout_for_stamp()` directly. If the backend still needs a compatibility wrapper for internal callers, keep it as a thin pass-through to the layout boundary and mark it as transitional in comments only if the flow would otherwise be unclear.
+
+4. In `tests/unit/test_visible_signature_layout.py`, add boundary tests that assert background-layout behavior for representative layout-template and stamp-position combinations. These tests should become the primary proof of background-layout math. In `tests/unit/test_phase3_signing_backend.py`, trim generic geometry assertions so the backend tests focus on backend-specific behavior: fit rejection, rounded-border style selection, rendered-fit fallback, and service wiring.
+
+5. In `tests/unit/test_signing_preview_renderer.py`, keep the existing preview/backend parity assertions intact or strengthen them if necessary so that any accidental drift between preview and backend output remains visible during validation.
+
+6. Update `docs/ARCHITECTURE.md` after the code lands so the visible-layout boundary description says background-layout construction now routes through the layout service, while reservation sizing and fit helpers remain backend-owned. Do not claim the broader reservation/fit extraction is done; this slice is only a call-path ownership move.
+
+Validation for the completed slice:
+
+    .venv/bin/python -m ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/phase3_signing_backend.py tests/unit/test_visible_signature_layout.py tests/unit/test_signing_preview_renderer.py
+    All checks passed.
+
+    .venv/bin/python -m pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    195 passed in 28.07s.
+
+Change note (2026-07-04): Revised the seventh-slice language after compliance review to describe the landed behavior accurately. The call path now enters the layout boundary for background-layout construction, but the implementation still uses backend reservation geometry and therefore does not complete the broader helper extraction.
 
 For the first slice:
 

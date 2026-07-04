@@ -768,6 +768,150 @@ def test_layout_service_builds_backend_signing_style_from_public_facade(tmp_path
     assert _style_snapshot(service_result.stamp_style) == _style_snapshot(expected_style)
 
 
+@pytest.mark.parametrize(
+    ("layout_template", "stamp_position", "expected_x_align", "expected_y_align"),
+    [
+        (
+            SignatureLayoutTemplate.SINGLE_LINE,
+            SignatureStampPosition.TOP,
+            "ALIGN_MID",
+            "ALIGN_MAX",
+        ),
+        (
+            SignatureLayoutTemplate.MULTI_LINE,
+            SignatureStampPosition.LEFT,
+            "ALIGN_MIN",
+            "ALIGN_MID",
+        ),
+        (
+            SignatureLayoutTemplate.WRAPPED_BLOCK,
+            SignatureStampPosition.BOTTOM,
+            "ALIGN_MID",
+            "ALIGN_MIN",
+        ),
+    ],
+)
+def test_layout_service_exposes_background_layout_policy_through_public_facade(
+    tmp_path,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    expected_x_align: str,
+    expected_y_align: str,
+) -> None:
+    stamp_path = _write_stamp(tmp_path)
+    appearance = _backend_appearance(
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        image_stamp_path=stamp_path,
+        show_border=True,
+    )
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=320.0,
+        height_pt=120.0,
+    )
+
+    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+        appearance=appearance,
+        stamp_text="Digitally signed by\nMorgan Ellery\nFoliaSeal",
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(),
+    )
+
+    assert service_result.background_layout.x_align.name == expected_x_align
+    assert service_result.background_layout.y_align.name == expected_y_align
+    assert (
+        service_result.background_layout.inner_content_scaling.name
+        == "SHRINK_TO_FIT"
+    )
+
+
+def test_layout_service_keeps_distinct_top_and_bottom_single_line_stamp_layouts(
+    tmp_path,
+) -> None:
+    stamp_path = _write_stamp(tmp_path)
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=260.0,
+        height_pt=40.0,
+    )
+
+    top_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+        appearance=_backend_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            image_stamp_path=stamp_path,
+            show_border=True,
+        ),
+        stamp_text="Digitally signed by\nMorgan Ellery",
+        stamp_background=_stamp_background(stamp_path),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(),
+    )
+    bottom_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+        appearance=_backend_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.BOTTOM,
+            image_stamp_path=stamp_path,
+            show_border=True,
+        ),
+        stamp_text="Digitally signed by\nMorgan Ellery",
+        stamp_background=_stamp_background(stamp_path),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(),
+    )
+
+    assert top_result.background_layout.y_align != bottom_result.background_layout.y_align
+    assert (
+        top_result.background_layout.margins.top
+        < top_result.background_layout.margins.bottom
+    )
+    assert (
+        bottom_result.background_layout.margins.bottom
+        < bottom_result.background_layout.margins.top
+    )
+
+
+def test_layout_service_keeps_horizontal_single_line_stamp_inside_reserved_lane(
+    tmp_path,
+) -> None:
+    stamp_path = _write_stamp(tmp_path)
+    appearance = _backend_appearance(
+        layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.LEFT,
+        image_stamp_path=stamp_path,
+        show_border=True,
+    )
+    signature_rect = SignatureRect(
+        page_index=3,
+        left_pt=36.86,
+        bottom_pt=429.5,
+        width_pt=384.506,
+        height_pt=28.678,
+    )
+
+    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+        appearance=appearance,
+        stamp_text="Digitally signed by\nMorgan Ellery | FoliaSeal",
+        stamp_background=_stamp_background(appearance.image_stamp_path),
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(),
+    )
+
+    fitted_height = (
+        service_result.layout_plan.container_height_pt
+        - service_result.background_layout.margins.top
+        - service_result.background_layout.margins.bottom
+    )
+
+    assert fitted_height <= service_result.layout_plan.stamp_area_height_pt - 4
+
+
 def test_layout_service_builds_canonical_preview_style_from_public_facade(tmp_path) -> None:
     stamp_path = _write_stamp(tmp_path)
     appearance = _backend_appearance(

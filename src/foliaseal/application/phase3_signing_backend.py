@@ -2150,17 +2150,14 @@ def build_backend_reservation_evidence(
             signature_rect=request.signature_rect,
         )
         stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
-        layout_plan = VisibleSignatureLayoutEngine().plan(
-            LayoutRequest(
-                signature_rect=request.signature_rect,
-                layout_template=appearance.layout_template,
-                stamp_position=appearance.stamp_position,
-                text_style=appearance.text_style,
-                box_style=appearance.box_style,
-                stamp_text=stamp_text,
-                image_stamp_path=appearance.image_stamp_path,
-            )
+        style_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=request.signature_rect,
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
         )
+        layout_plan = style_result.layout_plan
         text_box_width = layout_plan.text_box.width_pt
         text_box_height = layout_plan.text_box.height_pt
         fit_gate_width_limit = layout_plan.text_area_width_pt + 1
@@ -2168,15 +2165,6 @@ def build_backend_reservation_evidence(
         fit_gate_passed = not layout_plan.fit_issues
         if layout_plan.fit_issues:
             snapshot["error"] = layout_plan.fit_issues[0].message
-        background_layout = _background_layout_for_stamp(
-            appearance.layout_template,
-            stamp_position=appearance.stamp_position,
-            stamp_background=stamp_background,
-            signature_rect=request.signature_rect,
-            text_box_width=text_box_width,
-            text_box_height=text_box_height,
-            box_style=appearance.box_style,
-        )
         snapshot.update(
             {
                 "stamp_text": stamp_text,
@@ -2207,7 +2195,7 @@ def build_backend_reservation_evidence(
                 }
                 if appearance.box_style is not None
                 else None,
-                "background_layout": _snapshot_layout_rule(background_layout),
+                "background_layout": _snapshot_layout_rule(style_result.background_layout),
                 "content_layout": _snapshot_layout_rule(layout_plan.text_layout),
             }
         )
