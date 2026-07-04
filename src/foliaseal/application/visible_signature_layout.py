@@ -12,6 +12,12 @@ from math import ceil
 from typing import Literal, Protocol
 
 from PIL import Image
+from pyhanko.pdf_utils.layout import (
+    AxisAlignment,
+    InnerScaling,
+    Margins,
+    SimpleBoxLayoutRule,
+)
 
 from foliaseal.application.horizontal_signature_reservation import (
     build_horizontal_single_line_ink_reservation,
@@ -118,6 +124,323 @@ class LayoutRuleSpec:
     y_align: str
     margins: LayoutMargins
     scaling: str
+
+
+@dataclass(frozen=True)
+class _SignatureLayoutReservation:
+    """Explicit split of reserved stamp and text space inside the rectangle."""
+
+    layout_template: SignatureLayoutTemplate
+    stamp_position: SignatureStampPosition
+    container_width_pt: int
+    container_height_pt: int
+    text_box_width_pt: int
+    text_box_height_pt: int
+    reserved_primary_extent_pt: int
+    stamp_area_width_pt: int
+    stamp_area_height_pt: int
+    text_area_width_pt: int
+    text_area_height_pt: int
+    background_layout: SimpleBoxLayoutRule
+    inner_content_layout: SimpleBoxLayoutRule
+
+
+def _base_layout_spacing(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_height: int,
+) -> tuple[int, int]:
+    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        edge_margin = max(2, min(4, int(round(box_height * 0.08))))
+        gap = max(1, min(6, int(round(box_height * 0.14)) - 2))
+        return edge_margin, gap
+    return 4, 6
+
+
+def _effective_layout_edge_margin(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_height: int,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    base_edge_margin, _gap = _base_layout_spacing(
+        stamp_position=stamp_position,
+        box_height=box_height,
+    )
+    return max(base_edge_margin, _border_safe_inset(box_style))
+
+
+def _single_line_vertical_outer_margin(
+    *,
+    box_height: int,
+    box_style: SignatureBoxStyle | None,
+) -> int:
+    return _effective_layout_edge_margin(
+        stamp_position=SignatureStampPosition.TOP,
+        box_height=box_height,
+        box_style=box_style,
+    )
+
+
+def _single_line_no_stamp_vertical_optical_shift(
+    *,
+    available_height: int,
+    text_box_height: int,
+    outer_margin: int,
+) -> int:
+    free_height = max(0, available_height - text_box_height)
+    return min(free_height, max(0, outer_margin))
+
+
+def _effective_horizontal_text_reservation_width(
+    *,
+    layout_template: SignatureLayoutTemplate,
+    stamp_position: SignatureStampPosition,
+    text_box_width: int,
+) -> int:
+    if (
+        layout_template == SignatureLayoutTemplate.SINGLE_LINE
+        and stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
+    ):
+        return text_box_width
+    return max(text_box_width, int(round(text_box_width * 0.95)))
+
+
+def _layout_reservation_for_template(
+    layout_template: SignatureLayoutTemplate,
+    *,
+    stamp_position: SignatureStampPosition,
+    signature_rect: SignatureRect,
+    text_box_width: int,
+    text_box_height: int,
+    box_style: SignatureBoxStyle | None = None,
+    has_visible_stamp_image: bool = True,
+    stamp_aspect_ratio: float | None = None,
+) -> _SignatureLayoutReservation:
+    box_width = max(1, int(round(signature_rect.width_pt)))
+    box_height = max(1, int(round(signature_rect.height_pt)))
+    base_edge_margin, gap = _base_layout_spacing(
+        stamp_position=stamp_position,
+        box_height=box_height,
+    )
+    edge_margin = max(base_edge_margin, _border_safe_inset(box_style))
+    available_width = max(box_width - edge_margin * 2, 0)
+    available_height = max(box_height - edge_margin * 2, 0)
+
+    if layout_template == SignatureLayoutTemplate.SINGLE_LINE and not has_visible_stamp_image:
+        vertical_margin = edge_margin
+        if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+            vertical_margin = _single_line_vertical_outer_margin(
+                box_height=box_height,
+                box_style=box_style,
+            )
+            available_height = max(box_height - vertical_margin * 2, 0)
+        optical_shift = _single_line_no_stamp_vertical_optical_shift(
+            available_height=available_height,
+            text_box_height=text_box_height,
+            outer_margin=vertical_margin,
+        )
+        full_margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=max(0, vertical_margin - optical_shift),
+            bottom=vertical_margin + optical_shift,
+        )
+        return _SignatureLayoutReservation(
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            container_width_pt=box_width,
+            container_height_pt=box_height,
+            text_box_width_pt=text_box_width,
+            text_box_height_pt=text_box_height,
+            reserved_primary_extent_pt=0,
+            stamp_area_width_pt=0,
+            stamp_area_height_pt=0,
+            text_area_width_pt=available_width,
+            text_area_height_pt=available_height,
+            background_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MID,
+                AxisAlignment.ALIGN_MID,
+                margins=full_margins,
+                inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+            ),
+            inner_content_layout=SimpleBoxLayoutRule(
+                AxisAlignment.ALIGN_MIN
+                if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.LEFT}
+                else AxisAlignment.ALIGN_MID,
+                AxisAlignment.ALIGN_MAX,
+                margins=full_margins,
+                inner_content_scaling=InnerScaling.NO_SCALING,
+            ),
+        )
+
+    if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
+        text_area_width = min(
+            _effective_horizontal_text_reservation_width(
+                layout_template=layout_template,
+                stamp_position=stamp_position,
+                text_box_width=text_box_width,
+            ),
+            available_width,
+        )
+        remaining_width = max(available_width - text_area_width, 0)
+        separator_width = min(gap, remaining_width)
+        stamp_area_width = max(remaining_width - separator_width, 0)
+        reserved_primary_extent = stamp_area_width
+        stamp_area_height = available_height
+        text_area_height = available_height
+
+        if stamp_position == SignatureStampPosition.LEFT:
+            background_margins = Margins(
+                left=edge_margin,
+                right=text_area_width + separator_width + edge_margin,
+                top=edge_margin,
+                bottom=edge_margin,
+            )
+            text_margins = Margins(
+                left=stamp_area_width + separator_width + edge_margin,
+                right=edge_margin,
+                top=edge_margin,
+                bottom=edge_margin,
+            )
+            background_alignment = AxisAlignment.ALIGN_MIN
+            text_alignment = AxisAlignment.ALIGN_MAX
+        else:
+            background_margins = Margins(
+                left=text_area_width + separator_width + edge_margin,
+                right=edge_margin,
+                top=edge_margin,
+                bottom=edge_margin,
+            )
+            text_margins = Margins(
+                left=edge_margin,
+                right=stamp_area_width + separator_width + edge_margin,
+                top=edge_margin,
+                bottom=edge_margin,
+            )
+            background_alignment = AxisAlignment.ALIGN_MAX
+            text_alignment = AxisAlignment.ALIGN_MIN
+
+        return _SignatureLayoutReservation(
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            container_width_pt=box_width,
+            container_height_pt=box_height,
+            text_box_width_pt=text_box_width,
+            text_box_height_pt=text_box_height,
+            reserved_primary_extent_pt=reserved_primary_extent,
+            stamp_area_width_pt=stamp_area_width,
+            stamp_area_height_pt=stamp_area_height,
+            text_area_width_pt=text_area_width,
+            text_area_height_pt=text_area_height,
+            background_layout=SimpleBoxLayoutRule(
+                background_alignment,
+                AxisAlignment.ALIGN_MID,
+                margins=background_margins,
+                inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+            ),
+            inner_content_layout=SimpleBoxLayoutRule(
+                text_alignment,
+                AxisAlignment.ALIGN_MID,
+                margins=text_margins,
+                inner_content_scaling=InnerScaling.NO_SCALING,
+            ),
+        )
+
+    vertical_top_margin = edge_margin
+    vertical_bottom_margin = edge_margin
+    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+        vertical_top_margin = _single_line_vertical_outer_margin(
+            box_height=box_height,
+            box_style=box_style,
+        )
+        vertical_bottom_margin = vertical_top_margin
+        available_width = max(box_width - edge_margin * 2, 0)
+        available_height = max(box_height - vertical_top_margin - vertical_bottom_margin, 0)
+    text_area_height = min(text_box_height, available_height)
+    remaining_height = max(available_height - text_area_height, 0)
+    separator_height = min(gap, remaining_height)
+    text_area_width = available_width
+    stamp_area_width = available_width
+    stamp_area_height = max(remaining_height - separator_height, 0)
+    reserved_primary_extent = stamp_area_height
+
+    if stamp_position == SignatureStampPosition.TOP:
+        background_margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=vertical_top_margin,
+            bottom=text_area_height + separator_height + vertical_bottom_margin,
+        )
+        text_margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=stamp_area_height + separator_height + vertical_top_margin,
+            bottom=vertical_bottom_margin,
+        )
+        background_alignment = AxisAlignment.ALIGN_MID
+        text_alignment = (
+            AxisAlignment.ALIGN_MIN
+            if layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and has_visible_stamp_image
+            and stamp_aspect_ratio is not None
+            else AxisAlignment.ALIGN_MID
+        )
+        background_y_alignment = AxisAlignment.ALIGN_MAX
+        text_y_alignment = AxisAlignment.ALIGN_MIN
+    else:
+        background_margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=text_area_height + separator_height + vertical_top_margin,
+            bottom=vertical_bottom_margin,
+        )
+        text_margins = Margins(
+            left=edge_margin,
+            right=edge_margin,
+            top=vertical_top_margin,
+            bottom=stamp_area_height + separator_height + vertical_bottom_margin,
+        )
+        background_alignment = AxisAlignment.ALIGN_MID
+        text_alignment = (
+            AxisAlignment.ALIGN_MIN
+            if layout_template == SignatureLayoutTemplate.SINGLE_LINE
+            and has_visible_stamp_image
+            and stamp_aspect_ratio is not None
+            else AxisAlignment.ALIGN_MID
+        )
+        if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
+            background_y_alignment = AxisAlignment.ALIGN_MID
+            text_y_alignment = AxisAlignment.ALIGN_MID
+        else:
+            background_y_alignment = AxisAlignment.ALIGN_MIN
+            text_y_alignment = AxisAlignment.ALIGN_MAX
+
+    return _SignatureLayoutReservation(
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        container_width_pt=box_width,
+        container_height_pt=box_height,
+        text_box_width_pt=text_box_width,
+        text_box_height_pt=text_box_height,
+        reserved_primary_extent_pt=reserved_primary_extent,
+        stamp_area_width_pt=stamp_area_width,
+        stamp_area_height_pt=stamp_area_height,
+        text_area_width_pt=text_area_width,
+        text_area_height_pt=text_area_height,
+        background_layout=SimpleBoxLayoutRule(
+            background_alignment,
+            background_y_alignment,
+            margins=background_margins,
+            inner_content_scaling=InnerScaling.STRETCH_TO_FIT,
+        ),
+        inner_content_layout=SimpleBoxLayoutRule(
+            text_alignment,
+            text_y_alignment,
+            margins=text_margins,
+            inner_content_scaling=InnerScaling.NO_SCALING,
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -350,11 +673,9 @@ class VisibleSignatureLayoutEngine:
 
         from foliaseal.application.phase3_signing_backend import (
             _apply_horizontal_single_line_ink_text_alignment,
-            _effective_layout_edge_margin,
             _ensure_layout_can_fit,
             _horizontal_single_line_background_text_width,
             _horizontal_single_line_ink_validation_reservation,
-            _layout_reservation_for_template,
         )
 
         structural_reservation = _layout_reservation_for_template(
