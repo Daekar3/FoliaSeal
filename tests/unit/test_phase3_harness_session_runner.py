@@ -5,7 +5,10 @@ import foliaseal.presentation.qt.phase3_harness_session_runner as runner_module
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningResult
-from foliaseal.presentation.qt.phase3_harness_workspace import Phase3HarnessCaptureCommand
+from foliaseal.presentation.qt.phase3_harness_workspace import (
+    Phase3HarnessCaptureCommand,
+    Phase3HarnessWorkspaceSnapshot,
+)
 from tests.support.phase3_builders import build_signing_request
 
 
@@ -21,6 +24,7 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
     )
     button_registry = {}
     shell_holder = {}
+    workspace_holder = {}
 
     class _FakeSignal:
         def __init__(self) -> None:
@@ -143,36 +147,50 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
     class _FakeWorkspace:
         def __init__(self, shell) -> None:
             self._shell = shell
+            self.capture_snapshot_commands = []
 
         def current_request(self):
-            return request
+            raise AssertionError("runner should read request from capture_snapshot()")
 
         def last_signing_result(self):
-            return self._shell.last_signing_result
+            raise AssertionError("runner should read signing result from capture_snapshot()")
 
         def capture_state(self, command: Phase3HarnessCaptureCommand):
+            raise AssertionError("runner should not call capture_state()")
+
+        def capture_snapshot(self, command: Phase3HarnessCaptureCommand):
+            self.capture_snapshot_commands.append(command)
             capture_kind = command.capture_kind
-            assert command.request == request
             if capture_kind == "manual":
+                assert command.request is None
                 assert command.artifact_basename == "interactive_state_01"
+            if capture_kind == "signed_run":
+                assert command.request == request
+                assert command.artifact_basename == "signed_run_01_preview"
             if capture_kind == "final":
+                assert command.request == request
                 assert command.artifact_basename == "interactive_final"
             titles = {
                 "manual": "Manual preview",
                 "signed_run": "Sign-time preview",
                 "final": "Final preview",
             }
-            return {
-                "capture_kind": capture_kind,
-                "preview_snapshot": {"title": titles[capture_kind]},
-                "sign_request_snapshot": {
+            current_request = request if command.request is None else command.request
+            return Phase3HarnessWorkspaceSnapshot(
+                current_request=current_request,
+                last_signing_result=self._shell.last_signing_result,
+                capture_index=command.capture_index,
+                capture_kind=capture_kind,
+                capture_label=None,
+                preview_snapshot={"title": titles[capture_kind]},
+                sign_request_snapshot={
                     "signature_appearance": {"layout_template": "single_line"}
                 },
-                "backend_reservation_snapshot": {"layout_template": "single_line"},
-                "backend_reservation_error": None,
-                "preview_text": f"{capture_kind} preview",
-                "validation_text": f"{capture_kind} validation",
-            }
+                backend_reservation_snapshot={"layout_template": "single_line"},
+                backend_reservation_error=None,
+                preview_text=f"{capture_kind} preview",
+                validation_text=f"{capture_kind} validation",
+            )
 
     fake_capture_assembler = SimpleNamespace(
         build_signed_run_bundle=lambda **kwargs: {
@@ -208,7 +226,9 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
 
     result = runner_module.Phase3HarnessSessionRunner(
         build_qt_signing_shell=fake_build_qt_signing_shell,
-        build_workspace=lambda shell: _FakeWorkspace(shell),
+        build_workspace=lambda shell: workspace_holder.setdefault(
+            "workspace", _FakeWorkspace(shell)
+        ),
         default_harness_output_pdf_path=(
             lambda **kwargs: str(
                 tmp_path / f"{Path(kwargs['pdf_path']).stem}_{kwargs['sign_attempt_index']}.pdf"
@@ -237,5 +257,6 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
     assert result.captured_states[0]["capture_kind"] == "manual"
     assert result.final_state["capture_kind"] == "final"
     assert result.final_state["preview_snapshot"]["title"] == "Final preview"
+    assert len(workspace_holder["workspace"].capture_snapshot_commands) == 3
     assert result.last_signing_result is not None
     assert result.last_signing_result.success is True

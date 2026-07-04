@@ -383,11 +383,11 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/presentation/qt/phase3_harness_session_runner.py`
 - Responsibility: Run the interactive Qt session for Phase 3 and collect raw state before capture assembly.
-- Owns: `Phase3HarnessSessionResult`, `_QtHarnessBindings`, `Phase3HarnessSessionRunner`, session-level sign request/error/state tracking, toolbar wiring, and final-state capture inputs.
+- Owns: `Phase3HarnessSessionResult`, `_QtHarnessBindings`, `Phase3HarnessSessionRunner`, session-level sign request/error/state tracking, toolbar wiring, workspace-snapshot capture orchestration, and final-state capture inputs.
 - Does not own: report finalization, JSON serialization, checklist rendering, matrix execution, or evidence-contract evaluation.
 - Key collaborators: `phase3_harness.py`, `phase3_harness_capture_assembler.py`, `phase3_harness_reporting.py`, `build_qt_signing_shell()`, `SigningDraftWorkflow`, `ViewerWorkflow`.
 - Main entry points: `Phase3HarnessSessionRunner.run()`, `phase3_harness.py::_run_phase3_harness_session()`, `phase3_harness.py::Phase3Harness.run_signing_harness()`, `phase3_harness.py::run_phase3_signing_harness()` compatibility shim.
-- Known constraints: The helper keeps the interactive shell flow Qt-bound, but the collected session result must stay stable enough for later payload assembly and report finalization. The new `phase3_harness_workspace.py` boundary intentionally does not absorb this session lifecycle; `phase3_harness.py` still owns the top-level harness entry point and wires the real shell/capture callables into the runner so focused tests can exercise the runner boundary directly without patching unrelated harness helpers.
+- Known constraints: The helper keeps the interactive shell flow Qt-bound, but the collected session result must stay stable enough for later payload assembly and report finalization. The runner now consumes `Phase3HarnessWorkspaceSnapshot` and adapts it back to the legacy dict payload expected by `phase3_harness_capture_assembler.py`; `phase3_harness_workspace.py` still intentionally does not absorb the session lifecycle itself. `phase3_harness.py` remains the top-level harness entry point and wires the real shell/capture callables into the runner so focused tests can exercise the runner boundary directly without patching unrelated harness helpers.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 harness workspace boundary
