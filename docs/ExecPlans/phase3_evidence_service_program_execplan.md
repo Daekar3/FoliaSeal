@@ -31,7 +31,7 @@ The practical outcome is that future automatic acceptance work no longer require
   Evidence: `run_phase3_signing_harness()` in `src/foliaseal/presentation/qt/phase3_harness.py` still assembles payloads, evaluates the evidence contract, constructs `Phase3HarnessCapture`, writes JSON, writes the checklist Markdown, and prints summaries in one path.
 
 - Observation: the harness is part of the supported automated evidence path, not just developer scratch tooling.
-  Evidence: `src/foliaseal/__main__.py` exposes dedicated Phase 3 commands, `README.md` documents them, `src/foliaseal/application/phase3_evidence_service.py` now owns the CLI-facing evidence verbs, and `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is a thin wrapper/client around that service.
+  Evidence: `src/foliaseal/__main__.py` exposes dedicated Phase 3 commands, `README.md` documents them, `src/foliaseal/application/phase3_evidence_service.py` now owns the CLI-facing evidence verbs, and `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is an internal helper module for default service wiring and runtime-noise suppression.
 
 ## Decision Log
 
@@ -43,17 +43,17 @@ The practical outcome is that future automatic acceptance work no longer require
   Rationale: contract evaluation, checklist rendering, and artifact writing are already mostly pure and already have focused tests, so that seam can move first without touching JSON shape or matrix summaries.
   Date/Author: 2026-06-03 / Codex
 
-- Decision: finish the final child plan by making the application layer the explicit service boundary and leaving `phase3_signed_acceptance_evidence.py` as a thin wrapper/client.
+- Decision: finish the final child plan by making the application layer the explicit service boundary and leaving `phase3_signed_acceptance_evidence.py` as a helper module for default wiring and chatter suppression.
   Rationale: the CLI-facing workflows needed one stable orchestration seam, but the existing command names, artifact paths, and summary shape were already good contracts.
   Date/Author: 2026-06-03 / Codex
 
 ## Outcomes & Retrospective
 
-This program plan is complete. The reporting-boundary child plan, the interactive harness session-runner child plan, and the matrix/evidence service and CLI child plan all landed, leaving a smaller and testable Phase 3 evidence stack with the same documented command surface.
+This program plan is complete. The reporting-boundary child plan, the interactive harness session-runner child plan, and the matrix/evidence service and CLI child plan all landed, leaving a smaller and testable Phase 3 evidence stack with the same documented command surface. The later hybrid contract collapse then removed the old Qt-side public request/shim contract so the application service is now the only caller-facing Phase 3 surface, and `phase3_signed_acceptance_evidence.py` is only a default-wiring/noise-suppression helper now.
 
 ## Context and Orientation
 
-The current Phase 3 evidence path is spread across four key files. `src/foliaseal/presentation/qt/phase3_harness.py` contains the interactive signing harness, the session-runner boundary, the capture-payload assembler, the preview matrix runner, the signed-acceptance matrix runner, and many helper functions for snapshotting rendered output, serializing summary payloads, and writing artifacts. `src/foliaseal/application/phase3_evidence_service.py` owns the CLI-facing service boundary and the signed-acceptance evidence summary assembly. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is the thin wrapper/client that provides noise filtering and default service wiring. `src/foliaseal/application/qa_evidence_contract.py` validates saved capture payloads and determines whether they are engineering-only, gate-candidate, or release-gating evidence. `src/foliaseal/__main__.py` exposes the relevant commands and dispatches through the service boundary.
+The current Phase 3 evidence path is spread across four key files. `src/foliaseal/presentation/qt/phase3_harness.py` contains the interactive signing harness, the session-runner boundary, the capture-payload assembler, the preview matrix runner, the signed-acceptance matrix runner, and many helper functions for snapshotting rendered output, serializing summary payloads, and writing artifacts. `src/foliaseal/application/phase3_evidence_service.py` owns the CLI-facing service boundary and the signed-acceptance evidence summary assembly. `src/foliaseal/presentation/qt/phase3_signed_acceptance_evidence.py` is the internal helper module that provides noise filtering and default service wiring. `src/foliaseal/application/qa_evidence_contract.py` validates saved capture payloads and determines whether they are engineering-only, gate-candidate, or release-gating evidence. `src/foliaseal/__main__.py` exposes the relevant commands and dispatches through the service boundary.
 
 The architectural problem that motivated this program has been resolved. The caller-facing workflows now go through one explicit service instead of reaching into a large presentation module whose public functions co-own Qt bootstrapping, capture finalization, contract evaluation, artifact writing, matrix loops, and summary formatting.
 

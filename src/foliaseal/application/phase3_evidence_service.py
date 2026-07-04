@@ -21,8 +21,8 @@ CRITICAL_ZERO_COUNTERS = (
     "annotation_rect_mismatch_count",
 )
 
-HarnessCaptureRunner = Callable[..., Any]
-MatrixRunner = Callable[..., dict[str, Any]]
+HarnessCaptureRunner = Callable[["Phase3HarnessCaptureRequest"], Any]
+MatrixRunner = Callable[["Phase3MatrixRequest"], dict[str, Any]]
 AssetGenerator = Callable[..., GeneratedSignedAcceptanceAssets]
 CaptureContractEvaluator = Callable[[dict[str, Any]], EvidenceContractEvaluation]
 TextWriter = Callable[[Path, str], None]
@@ -160,36 +160,16 @@ class Phase3EvidenceService:
         self._capture_loader = capture_loader or _load_capture_json
 
     def capture_harness(self, request: Phase3HarnessCaptureRequest) -> Any:
-        return self._harness_runner(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            summary_json_path=request.summary_json_path,
-            checklist_results_path=request.checklist_results_path,
-            checklist_template_path=request.checklist_template_path,
-            artifacts_dir=request.artifacts_dir,
-        )
+        return self._harness_runner(request)
 
     def run_preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self._preview_matrix_runner(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
+        return self._preview_matrix_runner(request)
 
     def run_signed_acceptance_matrix(
         self,
         request: Phase3MatrixRequest,
     ) -> dict[str, Any]:
-        return self._signed_acceptance_matrix_runner(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
+        return self._signed_acceptance_matrix_runner(request)
 
     def validate_harness_capture(
         self,
@@ -221,11 +201,13 @@ class Phase3EvidenceService:
             try:
                 with chatter_context:
                     summary = self._signed_acceptance_matrix_runner(
-                        pdf_path=str(assets.fixture_pdf),
-                        certificate_path=str(assets.identity_p12),
-                        passphrase=request.passphrase,
-                        scenario_manifest_path=spec["manifest_path"],
-                        artifacts_dir=spec["artifacts_dir"],
+                        Phase3MatrixRequest(
+                            pdf_path=str(assets.fixture_pdf),
+                            certificate_path=str(assets.identity_p12),
+                            passphrase=request.passphrase,
+                            scenario_manifest_path=spec["manifest_path"],
+                            artifacts_dir=spec["artifacts_dir"],
+                        )
                     )
             except Exception as exc:
                 row = _matrix_exception_row(spec["name"], spec["artifacts_dir"], exc)

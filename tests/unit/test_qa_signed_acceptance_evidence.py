@@ -3,11 +3,22 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.phase3_evidence_service import (
+    Phase3MatrixRequest,
+    Phase3SignedAcceptanceEvidenceRequest,
+)
+from foliaseal.application.qa_signed_acceptance_assets import (
+    SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
+    SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
+    SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
+)
 from foliaseal.application.qa_signed_acceptance_generation import (
+    SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
     GeneratedSignedAcceptanceAssets,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
-    run_signed_acceptance_evidence,
+    DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
+    build_default_phase3_evidence_service,
     validate_signed_acceptance_matrix_summary,
 )
 
@@ -46,28 +57,57 @@ def _passing_summary(*, artifacts_dir: str, scenario_count: int = 3) -> dict[str
     }
 
 
+def _run_signed_acceptance_evidence(
+    *,
+    artifacts_root: Path,
+    asset_generator,
+    matrix_runner,
+    suppress_known_runtime_chatter: bool = True,
+):
+    service = build_default_phase3_evidence_service(
+        asset_generator=asset_generator,
+        matrix_runner=matrix_runner,
+    )
+    return service.run_signed_acceptance_evidence(
+        Phase3SignedAcceptanceEvidenceRequest(
+            artifacts_root=artifacts_root,
+            summary_markdown_path=(
+                artifacts_root / DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH
+            ),
+            passphrase=SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE.decode("utf-8"),
+            suppress_known_runtime_chatter=suppress_known_runtime_chatter,
+            required_manifests=(
+                SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
+                SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
+                SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
+            ),
+            default_summary_relative_path=DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
+        )
+    )
+
+
 def test_run_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_writes_summary(
     tmp_path: Path,
 ) -> None:
     generated_roots: list[Path] = []
-    matrix_calls: list[dict[str, str]] = []
+    matrix_calls: list[Phase3MatrixRequest] = []
 
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         generated_roots.append(root)
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
-        matrix_calls.append(kwargs)
-        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+        matrix_calls.append(request)
+        return _passing_summary(artifacts_dir=request.artifacts_dir)
 
-    evidence = run_signed_acceptance_evidence(
+    evidence = _run_signed_acceptance_evidence(
         artifacts_root=tmp_path,
         asset_generator=fake_asset_generator,
         matrix_runner=fake_matrix_runner,
-    )
+    ).as_dict()
 
     assert generated_roots == [tmp_path]
-    assert [Path(call["scenario_manifest_path"]).name for call in matrix_calls] == [
+    assert [Path(call.scenario_manifest_path).name for call in matrix_calls] == [
         "signed_acceptance_matrix.json",
         "signed_preview_parity_matrix.json",
         "signed_fit_rejection_matrix.json",
@@ -90,10 +130,10 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
         nonlocal call_count
         call_count += 1
-        summary = _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        summary = _passing_summary(artifacts_dir=request.artifacts_dir)
         if call_count == 2:
             summary["preview_output_comparison_failure_count"] = 1
             summary["acceptance_expectations_passed"] = False
@@ -103,7 +143,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
         return summary
 
     with pytest.raises(RuntimeError, match="signed_preview_parity_matrix"):
-        run_signed_acceptance_evidence(
+        _run_signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -125,15 +165,15 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raise
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
         nonlocal call_count
         call_count += 1
         if call_count == 2:
             raise RuntimeError("Qt renderer unavailable")
-        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        return _passing_summary(artifacts_dir=request.artifacts_dir)
 
     with pytest.raises(RuntimeError, match="Qt renderer unavailable"):
-        run_signed_acceptance_evidence(
+        _run_signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -157,16 +197,16 @@ def test_run_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+    def fake_matrix_runner(_request: Phase3MatrixRequest) -> dict[str, object]:
         logger.warning(
             "Validation error [cert context: Common Name: FoliaSeal TSA, "
             "Organization: FoliaSeal, Country: US]: The X.509 certificate "
             "provided is self-signed - test"
         )
-        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        return _passing_summary(artifacts_dir="artifacts/run")
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LOGGER_NAME):
-        run_signed_acceptance_evidence(
+        _run_signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -184,12 +224,12 @@ def test_run_signed_acceptance_evidence_keeps_unmatched_pyhanko_warning(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+    def fake_matrix_runner(_request: Phase3MatrixRequest) -> dict[str, object]:
         logger.warning("Validation error [cert context: Real TSA]: network timeout")
-        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        return _passing_summary(artifacts_dir="artifacts/run")
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LOGGER_NAME):
-        run_signed_acceptance_evidence(
+        _run_signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -207,16 +247,16 @@ def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
-        if Path(kwargs["scenario_manifest_path"]).name == "signed_fit_rejection_matrix.json":
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+        if Path(request.scenario_manifest_path).name == "signed_fit_rejection_matrix.json":
             logger.warning(
                 "Content box width/height 397 is too wide for container size 170 "
                 "with margins (4, 4); post_margin will be ignored"
             )
-        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        return _passing_summary(artifacts_dir=request.artifacts_dir)
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
-        run_signed_acceptance_evidence(
+        _run_signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -234,16 +274,16 @@ def test_run_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_m
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
-        if Path(kwargs["scenario_manifest_path"]).name == "signed_acceptance_matrix.json":
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+        if Path(request.scenario_manifest_path).name == "signed_acceptance_matrix.json":
             logger.warning(
                 "Content box width/height 397 is too wide for container size 170 "
                 "with margins (4, 4); post_margin will be ignored"
             )
-        return _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        return _passing_summary(artifacts_dir=request.artifacts_dir)
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
-        run_signed_acceptance_evidence(
+        _run_signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,

@@ -61,10 +61,10 @@ def _service(
     capture_loader=None,
 ) -> Phase3EvidenceService:
     return Phase3EvidenceService(
-        harness_runner=harness_runner or (lambda **kwargs: kwargs),
-        preview_matrix_runner=preview_matrix_runner or (lambda **kwargs: kwargs),
+        harness_runner=harness_runner or (lambda request: request),
+        preview_matrix_runner=preview_matrix_runner or (lambda request: request),
         signed_acceptance_matrix_runner=signed_acceptance_matrix_runner
-        or (lambda **kwargs: kwargs),
+        or (lambda request: request),
         asset_generator=asset_generator or (lambda *, root: _assets(root)),
         capture_contract_evaluator=capture_contract_evaluator or (lambda payload: payload),
         text_writer=text_writer
@@ -84,11 +84,11 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
     captured: dict[str, object] = {}
 
     service = _service(
-        harness_runner=lambda **kwargs: captured.setdefault("harness", kwargs),
-        preview_matrix_runner=lambda **kwargs: captured.setdefault("preview", kwargs),
-        signed_acceptance_matrix_runner=lambda **kwargs: captured.setdefault(
+        harness_runner=lambda request: captured.setdefault("harness", request),
+        preview_matrix_runner=lambda request: captured.setdefault("preview", request),
+        signed_acceptance_matrix_runner=lambda request: captured.setdefault(
             "acceptance",
-            kwargs,
+            request,
         ),
     )
 
@@ -123,41 +123,42 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
     )
 
     assert captured == {
-        "harness": {
-            "pdf_path": "input.pdf",
-            "certificate_path": "cert.p12",
-            "passphrase": "secret",
-            "summary_json_path": "summary.json",
-            "checklist_results_path": "results.md",
-            "checklist_template_path": "template.md",
-            "artifacts_dir": "artifacts",
-        },
-        "preview": {
-            "pdf_path": "input.pdf",
-            "certificate_path": "cert.p12",
-            "passphrase": "secret",
-            "scenario_manifest_path": "preview.json",
-            "artifacts_dir": "artifacts/preview",
-        },
-        "acceptance": {
-            "pdf_path": "input.pdf",
-            "certificate_path": "cert.p12",
-            "passphrase": "secret",
-            "scenario_manifest_path": "acceptance.json",
-            "artifacts_dir": "artifacts/acceptance",
-        },
+        "harness": Phase3HarnessCaptureRequest(
+            pdf_path="input.pdf",
+            certificate_path="cert.p12",
+            passphrase="secret",
+            summary_json_path="summary.json",
+            checklist_results_path="results.md",
+            checklist_template_path="template.md",
+            artifacts_dir="artifacts",
+        ),
+        "preview": Phase3MatrixRequest(
+            pdf_path="input.pdf",
+            certificate_path="cert.p12",
+            passphrase="secret",
+            scenario_manifest_path="preview.json",
+            artifacts_dir="artifacts/preview",
+        ),
+        "acceptance": Phase3MatrixRequest(
+            pdf_path="input.pdf",
+            certificate_path="cert.p12",
+            passphrase="secret",
+            scenario_manifest_path="acceptance.json",
+            artifacts_dir="artifacts/acceptance",
+        ),
     }
 
 
 def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
     tmp_path: Path,
 ) -> None:
-    matrix_calls: list[dict[str, str]] = []
+    matrix_calls: list[Phase3MatrixRequest] = []
     context_names: list[str] = []
 
     service = _service(
-        signed_acceptance_matrix_runner=lambda **kwargs: (
-            matrix_calls.append(kwargs) or _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        signed_acceptance_matrix_runner=lambda request: (
+            matrix_calls.append(request)
+            or _passing_summary(artifacts_dir=request.artifacts_dir)
         ),
         matrix_runtime_context_factory=lambda name: (
             context_names.append(name) or nullcontext()
@@ -173,7 +174,7 @@ def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
         )
     )
 
-    assert [Path(call["scenario_manifest_path"]).name for call in matrix_calls] == [
+    assert [Path(call.scenario_manifest_path).name for call in matrix_calls] == [
         "signed_acceptance_matrix.json",
         "signed_preview_parity_matrix.json",
         "signed_fit_rejection_matrix.json",
@@ -195,10 +196,10 @@ def test_phase3_evidence_service_writes_failure_summary_before_raising(
 ) -> None:
     call_count = 0
 
-    def fake_matrix_runner(**kwargs: str) -> dict[str, object]:
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
         nonlocal call_count
         call_count += 1
-        summary = _passing_summary(artifacts_dir=kwargs["artifacts_dir"])
+        summary = _passing_summary(artifacts_dir=request.artifacts_dir)
         if call_count == 2:
             summary["preview_output_comparison_failure_count"] = 1
             summary["acceptance_expectations_passed"] = False

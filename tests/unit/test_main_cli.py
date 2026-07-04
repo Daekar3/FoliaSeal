@@ -517,6 +517,7 @@ def test_main_phase3_signed_acceptance_evidence_dispatches_to_service(
         def run_signed_acceptance_evidence(self, request):
             captured["artifacts_root"] = str(request.artifacts_root)
             captured["summary_markdown_path"] = request.summary_markdown_path
+            captured["passphrase"] = request.passphrase
             return _FakeEvidence()
 
     monkeypatch.setattr(
@@ -537,6 +538,7 @@ def test_main_phase3_signed_acceptance_evidence_dispatches_to_service(
     assert captured == {
         "artifacts_root": "/tmp/foliaseal-evidence",
         "summary_markdown_path": "/tmp/foliaseal-evidence/summary.md",
+        "passphrase": "secret",
     }
     output = capsys.readouterr().out
     assert "Phase 3 signed acceptance evidence" in output

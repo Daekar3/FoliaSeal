@@ -6,7 +6,7 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-This slice unified all three public Phase 3 harness entrypoints behind the same `Phase3Harness` facade shape. The interactive signing harness path now uses `Phase3Harness.run_signing_harness()`, while the legacy free function `run_phase3_signing_harness()` remains available as a thin compatibility shim.
+This slice was the interim facade tracer bullet for the interactive signing harness path. It unified the harness entrypoint behind the same `Phase3Harness` shape at the time, and the later hybrid contract collapse moved the caller-facing Phase 3 contract into `Phase3EvidenceService` while leaving `Phase3Harness` as a Qt-backed adapter/composition root.
 
 The user-visible behavior does not change. The proof is architectural and testable: preview-matrix, signed-acceptance matrix, and interactive signing-harness callers all use one request-based facade, while the existing Qt session runner, capture assembly, and report finalization boundaries remain intact.
 
@@ -25,11 +25,12 @@ The user-visible behavior does not change. The proof is architectural and testab
 - [x] (2026-06-27 00:00Z) Extended `Phase3Harness` with `run_signing_harness()` in `src/foliaseal/presentation/qt/phase3_harness.py`.
 - [x] (2026-06-27 00:00Z) Converted `run_phase3_signing_harness()` into a thin compatibility shim over the facade while preserving behavior and payload shape.
 - [x] (2026-06-27 00:00Z) Reconciled `docs/ARCHITECTURE.md` and this ExecPlan so the completed slice is documented consistently.
+- [x] (2026-07-04 00:00Z) The later hybrid contract collapse retired this interim public facade surface and moved the caller-facing contract into `Phase3EvidenceService`.
 
 ## Surprises & Discoveries
 
 - Observation: the interactive signing harness no longer owns the whole flow inline.
-  Evidence: `Phase3Harness.run_signing_harness()` now fronts the interactive path, and `run_phase3_signing_harness()` is retained only as a compatibility shim.
+  Evidence: `Phase3Harness.run_signing_harness()` fronted the interactive path for this slice, and the later hybrid collapse moved the caller-facing contract into `Phase3EvidenceService`.
 
 ## Decision Log
 
@@ -38,16 +39,16 @@ The user-visible behavior does not change. The proof is architectural and testab
   Date/Author: 2026-06-27 / Codex
 
 - Decision: reuse `Phase3HarnessRequest` for the interactive path instead of introducing a second interactive-only request type.
-  Rationale: the existing request fields already cover the interactive harness inputs. Reusing the request object preserves the common-caller shape across all three harness modes.
+  Rationale: the existing request fields already covered the interactive harness inputs for this interim slice. The later hybrid collapse replaced that public request type with application-layer request dataclasses consumed by `Phase3Harness`.
   Date/Author: 2026-06-27 / Codex
 
 ## Outcomes & Retrospective
 
 Completed.
 
-The interactive signing-harness caller surface now routes through `Phase3Harness.run_signing_harness()`, matching the preview-matrix and signed-acceptance matrix facade shape. The legacy `run_phase3_signing_harness()` function remains as a thin shim, and the added direct facade-delegation test closes the behavioral gap without changing the capture payload or report-finalization contract.
+The interactive signing-harness caller surface routed through `Phase3Harness.run_signing_harness()` for this interim slice, and the added direct facade-delegation test closed the behavioral gap without changing the capture payload or report-finalization contract. The later hybrid collapse removed the old public shim surface and made `Phase3EvidenceService` the only caller-facing Phase 3 contract.
 
-The architecture doc now records the completed three-mode facade split, so the doc set is aligned with the current implementation rather than the earlier two-mode tracer bullet.
+The architecture doc now records the final ownership split, so the doc set is aligned with the current implementation rather than the earlier tracer-bullet state.
 
 ## Context and Orientation
 
@@ -146,6 +147,6 @@ At the end of the slice, the public shape should look approximately like:
             request: Phase3HarnessRequest,
         ) -> Phase3HarnessCapture: ...
 
-The request object should remain the common caller-facing contract. The free function `run_phase3_signing_harness()` remains as a compatibility wrapper in this tracer bullet.
+The request object was the common caller-facing contract for this slice. The later hybrid collapse replaced that public request type with application-layer request dataclasses consumed by `Phase3Harness`, and the free function `run_phase3_signing_harness()` is no longer treated as a stable public seam.
 
 Revision note: Created on 2026-06-27 by Codex after the required dev-loop explorer selected the next Phase 3 harness hybrid tracer bullet: move the interactive signing-harness caller surface behind the existing `Phase3Harness` facade without widening into a new session-runner or reporting refactor.

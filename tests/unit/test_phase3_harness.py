@@ -17,6 +17,10 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.phase3_evidence_service import (
+    Phase3HarnessCaptureRequest,
+    Phase3MatrixRequest,
+)
 from foliaseal.application.phase3_signing_backend import (
     build_phase3_signing_executor,
 )
@@ -50,7 +54,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     Phase3Harness,
     Phase3HarnessCapture,
     Phase3HarnessDependencies,
-    Phase3HarnessRequest,
     _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
     _capture_headless_preview_render,
@@ -74,8 +77,6 @@ from foliaseal.presentation.qt.phase3_harness import (
     _widget_is_visible,
     _write_stamp_debug_overlay,
     _write_text_debug_overlay,
-    run_phase3_preview_matrix,
-    run_phase3_signing_harness,
 )
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
@@ -1209,13 +1210,16 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         fake_finalize,
     )
 
-    capture = phase3_harness_module.run_phase3_signing_harness(
-        pdf_path=str(input_pdf),
-        certificate_path=str(cert_path),
-        passphrase="secret",
-        summary_json_path=str(tmp_path / "summary.json"),
-        checklist_results_path=str(tmp_path / "results.md"),
-        checklist_template_path=str(tmp_path / "template.md"),
+    capture = Phase3Harness().run_signing_harness(
+        Phase3HarnessCaptureRequest(
+            pdf_path=str(input_pdf),
+            certificate_path=str(cert_path),
+            passphrase="secret",
+            summary_json_path=str(tmp_path / "summary.json"),
+            checklist_results_path=str(tmp_path / "results.md"),
+            checklist_template_path=str(tmp_path / "template.md"),
+            artifacts_dir=None,
+        )
     )
 
     assert capture.acceptance_tier == "gate_candidate"
@@ -1316,13 +1320,14 @@ def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_repo
     )
 
     capture = Phase3Harness().run_signing_harness(
-        Phase3HarnessRequest(
+        Phase3HarnessCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),
             passphrase="secret",
             summary_json_path=str(tmp_path / "summary.json"),
             checklist_results_path=str(tmp_path / "results.md"),
             checklist_template_path=str(tmp_path / "template.md"),
+            artifacts_dir=None,
         )
     )
 
@@ -1331,45 +1336,6 @@ def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_repo
     assert captured["payload"]["selection_count"] == 1
     assert captured["payload"]["captured_states"][-1]["capture_kind"] == "final"
     assert captured["payload"]["preview_snapshot"]["title"] == "Final preview"
-
-
-def test_run_phase3_signing_harness_delegates_to_facade(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    input_pdf = tmp_path / "input.pdf"
-    cert_path = tmp_path / "cert.p12"
-    _write_test_pdf(input_pdf)
-    _write_test_pkcs12(cert_path, passphrase="secret")
-    captured: dict[str, object] = {}
-    expected_capture = SimpleNamespace(acceptance_tier="gate_candidate")
-
-    def fake_run_signing_harness(self, request):
-        captured["request"] = request
-        return expected_capture
-
-    monkeypatch.setattr(Phase3Harness, "run_signing_harness", fake_run_signing_harness)
-
-    result = run_phase3_signing_harness(
-        pdf_path=str(input_pdf),
-        certificate_path=str(cert_path),
-        passphrase="secret",
-        summary_json_path=str(tmp_path / "summary.json"),
-        checklist_results_path=str(tmp_path / "results.md"),
-        checklist_template_path=str(tmp_path / "template.md"),
-        artifacts_dir=str(tmp_path / "artifacts"),
-    )
-
-    assert result is expected_capture
-    assert captured["request"] == Phase3HarnessRequest(
-        pdf_path=str(input_pdf),
-        certificate_path=str(cert_path),
-        passphrase="secret",
-        summary_json_path=str(tmp_path / "summary.json"),
-        checklist_results_path=str(tmp_path / "results.md"),
-        checklist_template_path=str(tmp_path / "template.md"),
-        artifacts_dir=str(tmp_path / "artifacts"),
-    )
 
 
 def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
@@ -2229,45 +2195,6 @@ def test_stress_preview_manifests_exist_and_parse() -> None:
         assert manifest["scenarios"]
 
 
-def test_run_phase3_preview_matrix_delegates_to_preview_matrix_runner(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    source_pdf = tmp_path / "fixture.pdf"
-    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
-    manifest_path = tmp_path / "manifest.json"
-    artifacts_dir = tmp_path / "artifacts"
-    captured: dict[str, object] = {}
-
-    class FakeRunner:
-        def run(self, **kwargs):
-            captured.update(kwargs)
-            return {"scenario_count": 1}
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_build_phase3_preview_matrix_runner",
-        lambda: FakeRunner(),
-    )
-
-    summary = run_phase3_preview_matrix(
-        pdf_path=str(source_pdf),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        scenario_manifest_path=str(manifest_path),
-        artifacts_dir=str(artifacts_dir),
-    )
-
-    assert summary == {"scenario_count": 1}
-    assert captured == {
-        "pdf_path": str(source_pdf),
-        "certificate_path": str(tmp_path / "cert.p12"),
-        "passphrase": "secret",
-        "scenario_manifest_path": str(manifest_path),
-        "artifacts_dir": str(artifacts_dir),
-    }
-
-
 def test_phase3_harness_facade_run_preview_matrix_delegates_to_runner(tmp_path: Path) -> None:
     source_pdf = tmp_path / "fixture.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
@@ -2288,7 +2215,7 @@ def test_phase3_harness_facade_run_preview_matrix_delegates_to_runner(tmp_path: 
     )
 
     summary = harness.run_preview_matrix(
-        Phase3HarnessRequest(
+        Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
             passphrase="secret",
@@ -2329,7 +2256,7 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
     )
 
     summary = Phase3Harness().run_preview_matrix(
-        Phase3HarnessRequest(
+        Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
             passphrase="secret",
@@ -2339,72 +2266,6 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
     )
 
     assert summary == {"scenario_count": 5}
-    assert captured == {
-        "pdf_path": str(source_pdf),
-        "certificate_path": str(tmp_path / "cert.p12"),
-        "passphrase": "secret",
-        "scenario_manifest_path": str(manifest_path),
-        "artifacts_dir": str(artifacts_dir),
-    }
-
-
-@pytest.mark.parametrize(
-    ("harness_request", "expected_message"),
-    [
-        (
-            Phase3HarnessRequest(
-                pdf_path="fixture.pdf",
-                artifacts_dir="artifacts",
-            ),
-            "'scenario_manifest_path' is required for preview matrix runs.",
-        ),
-        (
-            Phase3HarnessRequest(
-                pdf_path="fixture.pdf",
-                scenario_manifest_path="manifest.json",
-            ),
-            "'artifacts_dir' is required for preview matrix runs.",
-        ),
-    ],
-)
-def test_phase3_harness_run_preview_matrix_requires_manifest_and_artifacts(
-    harness_request: Phase3HarnessRequest,
-    expected_message: str,
-) -> None:
-    with pytest.raises(ValueError, match=expected_message):
-        Phase3Harness().run_preview_matrix(harness_request)
-
-
-def test_run_phase3_signed_acceptance_matrix_delegates_to_signed_runner(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    source_pdf = tmp_path / "fixture.pdf"
-    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
-    manifest_path = tmp_path / "manifest.json"
-    artifacts_dir = tmp_path / "artifacts"
-    captured: dict[str, object] = {}
-
-    class FakeRunner:
-        def run(self, **kwargs):
-            captured.update(kwargs)
-            return {"scenario_count": 2, "acceptance_expectations_passed": True}
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_build_phase3_signed_acceptance_matrix_runner",
-        lambda: FakeRunner(),
-    )
-
-    summary = phase3_harness_module.run_phase3_signed_acceptance_matrix(
-        pdf_path=str(source_pdf),
-        certificate_path=str(tmp_path / "cert.p12"),
-        passphrase="secret",
-        scenario_manifest_path=str(manifest_path),
-        artifacts_dir=str(artifacts_dir),
-    )
-
-    assert summary == {"scenario_count": 2, "acceptance_expectations_passed": True}
     assert captured == {
         "pdf_path": str(source_pdf),
         "certificate_path": str(tmp_path / "cert.p12"),
@@ -2436,7 +2297,7 @@ def test_phase3_harness_facade_run_signed_acceptance_matrix_delegates_to_runner(
     )
 
     summary = harness.run_signed_acceptance_matrix(
-        Phase3HarnessRequest(
+        Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
             passphrase="secret",
@@ -2477,7 +2338,7 @@ def test_phase3_harness_default_dependencies_use_signed_acceptance_runner_builde
     )
 
     summary = Phase3Harness().run_signed_acceptance_matrix(
-        Phase3HarnessRequest(
+        Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
             passphrase="secret",
@@ -2494,33 +2355,6 @@ def test_phase3_harness_default_dependencies_use_signed_acceptance_runner_builde
         "scenario_manifest_path": str(manifest_path),
         "artifacts_dir": str(artifacts_dir),
     }
-
-
-@pytest.mark.parametrize(
-    ("harness_request", "expected_message"),
-    [
-        (
-            Phase3HarnessRequest(
-                pdf_path="fixture.pdf",
-                artifacts_dir="artifacts",
-            ),
-            "'scenario_manifest_path' is required for signed acceptance runs.",
-        ),
-        (
-            Phase3HarnessRequest(
-                pdf_path="fixture.pdf",
-                scenario_manifest_path="manifest.json",
-            ),
-            "'artifacts_dir' is required for signed acceptance runs.",
-        ),
-    ],
-)
-def test_phase3_harness_run_signed_acceptance_matrix_requires_manifest_and_artifacts(
-    harness_request: Phase3HarnessRequest,
-    expected_message: str,
-) -> None:
-    with pytest.raises(ValueError, match=expected_message):
-        Phase3Harness().run_signed_acceptance_matrix(harness_request)
 
 
 def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(

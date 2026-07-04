@@ -21,6 +21,10 @@ from pyhanko.sign import validation
 from pyhanko_certvalidator import ValidationContext
 
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.phase3_evidence_service import (
+    Phase3HarnessCaptureRequest,
+    Phase3MatrixRequest,
+)
 from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
     _single_line_vertical_outer_margin,
@@ -176,20 +180,6 @@ class Phase3HarnessCapture:
 
 
 @dataclass(frozen=True)
-class Phase3HarnessRequest:
-    """Caller-facing request for Phase 3 harness facade operations."""
-
-    pdf_path: str
-    certificate_path: str = "demo-cert.p12"
-    passphrase: str = "demo-passphrase"
-    summary_json_path: str | None = None
-    checklist_results_path: str = DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH
-    checklist_template_path: str = DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH
-    artifacts_dir: str | None = None
-    scenario_manifest_path: str | None = None
-
-
-@dataclass(frozen=True)
 class Phase3HarnessDependencies:
     """Injectable collaborators for the Phase 3 harness facade."""
 
@@ -206,15 +196,11 @@ class Phase3HarnessDependencies:
 
 @dataclass(frozen=True)
 class Phase3Harness:
-    """Common-caller facade over Phase 3 harness execution modes."""
+    """Qt-backed adapter for Phase 3 evidence service requests."""
 
     deps: Phase3HarnessDependencies = field(default_factory=Phase3HarnessDependencies.default)
 
-    def run_preview_matrix(self, request: Phase3HarnessRequest) -> dict[str, Any]:
-        if request.scenario_manifest_path is None:
-            raise ValueError("'scenario_manifest_path' is required for preview matrix runs.")
-        if request.artifacts_dir is None:
-            raise ValueError("'artifacts_dir' is required for preview matrix runs.")
+    def run_preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
         return self.deps.build_preview_matrix_runner().run(
             pdf_path=request.pdf_path,
             certificate_path=request.certificate_path,
@@ -223,11 +209,7 @@ class Phase3Harness:
             artifacts_dir=request.artifacts_dir,
         )
 
-    def run_signed_acceptance_matrix(self, request: Phase3HarnessRequest) -> dict[str, Any]:
-        if request.scenario_manifest_path is None:
-            raise ValueError("'scenario_manifest_path' is required for signed acceptance runs.")
-        if request.artifacts_dir is None:
-            raise ValueError("'artifacts_dir' is required for signed acceptance runs.")
+    def run_signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
         return self.deps.build_signed_acceptance_matrix_runner().run(
             pdf_path=request.pdf_path,
             certificate_path=request.certificate_path,
@@ -236,7 +218,10 @@ class Phase3Harness:
             artifacts_dir=request.artifacts_dir,
         )
 
-    def run_signing_harness(self, request: Phase3HarnessRequest) -> Phase3HarnessCapture:
+    def run_signing_harness(
+        self,
+        request: Phase3HarnessCaptureRequest,
+    ) -> Phase3HarnessCapture:
         bindings = _load_qt_harness_bindings()
         source_path = Path(request.pdf_path)
         if not source_path.exists():
@@ -319,44 +304,6 @@ class Phase3Harness:
         print("Review the pre-checked items, complete the remaining manual-only checks, and")
         print("use the generated file as the acceptance worksheet for Phase 3.")
         return capture
-
-
-def build_phase3_checklist_results_markdown(
-    capture: Phase3HarnessCapture,
-    *,
-    checklist_template_path: str = DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
-) -> str:
-    """Compatibility wrapper over the reporting-owned checklist renderer."""
-
-    return render_phase3_checklist_results_markdown(
-        capture,
-        checklist_template_path=checklist_template_path,
-    )
-
-def run_phase3_signing_harness(
-    *,
-    pdf_path: str,
-    certificate_path: str = "demo-cert.p12",
-    passphrase: str = "demo-passphrase",
-    summary_json_path: str | None = None,
-    checklist_results_path: str = DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
-    checklist_template_path: str = DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
-    artifacts_dir: str | None = None,
-) -> Phase3HarnessCapture:
-    """Launch an interactive Qt signing-shell harness for Phase 3 acceptance."""
-    return Phase3Harness().run_signing_harness(
-        Phase3HarnessRequest(
-            pdf_path=pdf_path,
-            certificate_path=certificate_path,
-            passphrase=passphrase,
-            summary_json_path=summary_json_path,
-            checklist_results_path=checklist_results_path,
-            checklist_template_path=checklist_template_path,
-            artifacts_dir=artifacts_dir,
-        )
-    )
-
-
 def _run_phase3_harness_session(
     *,
     bindings: _QtHarnessBindings,
@@ -632,26 +579,6 @@ def _build_signed_run_bundle(
     )
 
 
-def run_phase3_preview_matrix(
-    *,
-    pdf_path: str,
-    certificate_path: str,
-    passphrase: str,
-    scenario_manifest_path: str,
-    artifacts_dir: str,
-) -> dict[str, Any]:
-    """Run a repeatable preview-only scenario sweep and capture rendered artifacts."""
-    return Phase3Harness().run_preview_matrix(
-        Phase3HarnessRequest(
-            pdf_path=pdf_path,
-            certificate_path=certificate_path,
-            passphrase=passphrase,
-            scenario_manifest_path=scenario_manifest_path,
-            artifacts_dir=artifacts_dir,
-        )
-    )
-
-
 def _build_phase3_preview_matrix_runner() -> Phase3PreviewMatrixRunner:
     return Phase3PreviewMatrixRunner(
         load_preview_matrix_manifest=_load_preview_matrix_manifest,
@@ -659,26 +586,6 @@ def _build_phase3_preview_matrix_runner() -> Phase3PreviewMatrixRunner:
         preview_matrix_error_result=_preview_matrix_error_result,
         preview_matrix_diagnostic_summary=_preview_matrix_diagnostic_summary,
         jsonable_capture=_jsonable_capture,
-    )
-
-
-def run_phase3_signed_acceptance_matrix(
-    *,
-    pdf_path: str,
-    certificate_path: str,
-    passphrase: str,
-    scenario_manifest_path: str,
-    artifacts_dir: str,
-) -> dict[str, Any]:
-    """Run a repeatable signed-output acceptance sweep over representative cases."""
-    return Phase3Harness().run_signed_acceptance_matrix(
-        Phase3HarnessRequest(
-            pdf_path=pdf_path,
-            certificate_path=certificate_path,
-            passphrase=passphrase,
-            scenario_manifest_path=scenario_manifest_path,
-            artifacts_dir=artifacts_dir,
-        )
     )
 
 

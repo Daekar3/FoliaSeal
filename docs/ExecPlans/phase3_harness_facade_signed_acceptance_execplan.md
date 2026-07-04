@@ -6,7 +6,7 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-This slice extends the `Phase3Harness` facade introduced for preview-matrix runs so it also owns the signed-acceptance matrix caller surface. Callers use one request-based harness object for both non-interactive Phase 3 matrix modes, while the legacy free function `run_phase3_signed_acceptance_matrix()` remains available as a thin compatibility shim.
+This slice was the interim signed-acceptance facade tracer bullet. It extended the `Phase3Harness` shape for the matrix runs at the time, and the later hybrid contract collapse moved the caller-facing Phase 3 contract into `Phase3EvidenceService` while leaving `Phase3Harness` as a Qt-backed adapter/composition root.
 
 The user-visible behavior does not change. The gain is architectural and observable through tests: the same `Phase3HarnessRequest` request object and dependency bundle will drive both matrix-style harness flows, while the deeper signed-acceptance runner and executor internals stay untouched.
 
@@ -25,16 +25,17 @@ The user-visible behavior does not change. The gain is architectural and observa
 - [x] (2026-06-27 00:00Z) Converted `run_phase3_signed_acceptance_matrix()` into a thin compatibility shim over the facade while preserving current behavior and payload shape.
 - [x] (2026-06-27 00:00Z) Completed focused validation, the required compliance review, and the doc reconciliation for `docs/ARCHITECTURE.md` and this ExecPlan.
 - [x] (2026-06-27 00:00Z) Reconciled docs and prepared the slice for the required commit step in the larger dev-loop.
+- [x] (2026-07-04 00:00Z) The later hybrid contract collapse retired this interim public facade surface and moved the caller-facing contract into `Phase3EvidenceService`.
 
 ## Surprises & Discoveries
 
 - Observation: the signed-acceptance matrix path is the next safest seam because its deeper lifecycle already sits behind `Phase3SignedAcceptanceMatrixRunner`.
-  Evidence: `run_phase3_signed_acceptance_matrix()` in `src/foliaseal/presentation/qt/phase3_harness.py` already delegates almost entirely to `_build_phase3_signed_acceptance_matrix_runner().run(...)`, while the interactive signing harness still spans Qt session lifecycle, capture assembly, and reporting.
+  Evidence: `run_phase3_signed_acceptance_matrix()` in `src/foliaseal/presentation/qt/phase3_harness.py` already delegated almost entirely to `_build_phase3_signed_acceptance_matrix_runner().run(...)`, while the later hybrid collapse moved the caller-facing contract into `Phase3EvidenceService`.
 
 ## Decision Log
 
 - Decision: extend the existing `Phase3HarnessRequest` object instead of creating a second signed-acceptance-specific request type.
-  Rationale: the current signed-acceptance free function uses the same caller inputs as the preview-matrix path, so reusing the existing request object keeps the facade small and reinforces the common-caller hybrid shape.
+  Rationale: the current signed-acceptance free function used the same caller inputs as the preview-matrix path, so reusing the existing request object kept the interim facade small and reinforced the common-caller hybrid shape. The later hybrid collapse replaced that public request type with application-layer request dataclasses consumed by `Phase3Harness`.
   Date/Author: 2026-06-27 / Codex
 
 - Decision: keep `run_phase3_signed_acceptance_matrix()` as a compatibility wrapper in this slice.
@@ -43,7 +44,9 @@ The user-visible behavior does not change. The gain is architectural and observa
 
 ## Outcomes & Retrospective
 
-The signed-acceptance matrix caller surface now routes through `Phase3Harness`, so preview-matrix and signed-acceptance callers share one request-based facade. `run_phase3_signed_acceptance_matrix()` remains as a compatibility shim, and the architecture document now describes that split explicitly.
+The signed-acceptance matrix caller surface routed through `Phase3Harness` for this interim slice, and `run_phase3_signed_acceptance_matrix()` remained as a compatibility shim. The later hybrid collapse removed that shim from the public contract and made `Phase3EvidenceService` the only caller-facing Phase 3 surface.
+
+The architecture document now describes the final ownership split explicitly.
 
 ## Context and Orientation
 
@@ -156,6 +159,6 @@ At the end of the slice, the public shape should look approximately like:
             request: Phase3HarnessRequest,
         ) -> dict[str, Any]: ...
 
-The exact internal type alias spelling may vary slightly, but the end result must preserve one common facade object and one common request object for both matrix-style harness flows.
+The exact internal type alias spelling may vary slightly, but the end result for this slice preserved one common facade object and one common request object for both matrix-style harness flows. The later hybrid collapse replaced that public request object with application-layer request dataclasses consumed by `Phase3Harness`.
 
 Revision note: Created on 2026-06-27 by Codex after the required dev-loop explorer selected the next Phase 3 harness hybrid tracer bullet: move the signed-acceptance matrix caller surface behind the existing `Phase3Harness` facade without widening into the interactive Qt harness path.

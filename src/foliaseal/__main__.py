@@ -21,6 +21,9 @@ from foliaseal.application.phase3_evidence_service import (
     Phase3MatrixRequest,
     Phase3SignedAcceptanceEvidenceRequest,
 )
+from foliaseal.application.qa_signed_acceptance_generation import (
+    SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
+)
 from foliaseal.application.runtime_metrics import (
     RuntimeFootprintSnapshot,
     collect_runtime_footprint_snapshot,
@@ -463,6 +466,40 @@ def _build_phase3_evidence_service():
     return build_default_phase3_evidence_service()
 
 
+def _build_phase3_harness_capture_request(
+    args: argparse.Namespace,
+) -> Phase3HarnessCaptureRequest:
+    return Phase3HarnessCaptureRequest(
+        pdf_path=args.pdf_path,
+        certificate_path=args.certificate_path,
+        passphrase=args.passphrase,
+        summary_json_path=args.summary_json_path,
+        checklist_results_path=args.checklist_results_path,
+        checklist_template_path=args.checklist_template_path,
+        artifacts_dir=args.artifacts_dir,
+    )
+
+
+def _build_phase3_matrix_request(args: argparse.Namespace) -> Phase3MatrixRequest:
+    return Phase3MatrixRequest(
+        pdf_path=args.pdf_path,
+        certificate_path=args.certificate_path,
+        passphrase=args.passphrase,
+        scenario_manifest_path=args.scenario_manifest_path,
+        artifacts_dir=args.artifacts_dir,
+    )
+
+
+def _build_phase3_signed_acceptance_evidence_request(
+    args: argparse.Namespace,
+) -> Phase3SignedAcceptanceEvidenceRequest:
+    return Phase3SignedAcceptanceEvidenceRequest(
+        artifacts_root=args.artifacts_root,
+        summary_markdown_path=args.summary_markdown_path,
+        passphrase=SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE.decode("utf-8"),
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run command-line helpers for local development workflows."""
     parser = _build_parser()
@@ -482,15 +519,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "phase3-signing-harness":
         _build_phase3_evidence_service().capture_harness(
-            Phase3HarnessCaptureRequest(
-                pdf_path=args.pdf_path,
-                certificate_path=args.certificate_path,
-                passphrase=args.passphrase,
-                summary_json_path=args.summary_json_path,
-                checklist_results_path=args.checklist_results_path,
-                checklist_template_path=args.checklist_template_path,
-                artifacts_dir=args.artifacts_dir,
-            )
+            _build_phase3_harness_capture_request(args)
         )
         return 0
     if args.command == "gui":
@@ -501,13 +530,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "phase3-signing-preview-matrix":
         summary = _build_phase3_evidence_service().run_preview_matrix(
-            Phase3MatrixRequest(
-                pdf_path=args.pdf_path,
-                certificate_path=args.certificate_path,
-                passphrase=args.passphrase,
-                scenario_manifest_path=args.scenario_manifest_path,
-                artifacts_dir=args.artifacts_dir,
-            )
+            _build_phase3_matrix_request(args)
         )
         print("Phase 3 preview matrix")
         print(f"- scenarios executed: {summary['scenario_count']}")
@@ -516,13 +539,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "phase3-signing-acceptance-matrix":
         summary = _build_phase3_evidence_service().run_signed_acceptance_matrix(
-            Phase3MatrixRequest(
-                pdf_path=args.pdf_path,
-                certificate_path=args.certificate_path,
-                passphrase=args.passphrase,
-                scenario_manifest_path=args.scenario_manifest_path,
-                artifacts_dir=args.artifacts_dir,
-            )
+            _build_phase3_matrix_request(args)
         )
         print("Phase 3 signed acceptance matrix")
         print(f"- scenarios executed: {summary['scenario_count']}")
@@ -532,10 +549,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "phase3-signing-acceptance-evidence":
         evidence = _build_phase3_evidence_service().run_signed_acceptance_evidence(
-            Phase3SignedAcceptanceEvidenceRequest(
-                artifacts_root=args.artifacts_root,
-                summary_markdown_path=args.summary_markdown_path,
-            )
+            _build_phase3_signed_acceptance_evidence_request(args)
         )
         print("Phase 3 signed acceptance evidence")
         print(f"- summary markdown: {evidence.summary_markdown_path}")

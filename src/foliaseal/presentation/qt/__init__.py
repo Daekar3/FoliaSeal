@@ -15,8 +15,6 @@ from .phase3_harness import (
     DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
     DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
     Phase3HarnessCapture,
-    build_phase3_checklist_results_markdown,
-    run_phase3_signing_harness,
 )
 from .signing_shell import (
     QtSigningBindingsUnavailable,
@@ -43,9 +41,7 @@ __all__ = [
     "launch_qt_app_frame",
     "build_qt_signing_shell",
     "build_phase2_evidence_command",
-    "build_phase3_checklist_results_markdown",
     "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH",
     "DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH",
     "run_phase2_viewer_harness",
-    "run_phase3_signing_harness",
 ]

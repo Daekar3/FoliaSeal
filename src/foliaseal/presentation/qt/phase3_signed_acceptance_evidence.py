@@ -12,26 +12,15 @@ from foliaseal.application.phase3_evidence_service import (
     AssetGenerator,
     MatrixRunner,
     Phase3EvidenceService,
-    Phase3SignedAcceptanceEvidenceRequest,
     validate_signed_acceptance_matrix_summary,
 )
 from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
 )
-from foliaseal.application.qa_signed_acceptance_assets import (
-    SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
-    SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
-    SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
-)
 from foliaseal.application.qa_signed_acceptance_generation import (
-    SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
     generate_signed_acceptance_assets,
 )
-from foliaseal.presentation.qt.phase3_harness import (
-    run_phase3_preview_matrix,
-    run_phase3_signed_acceptance_matrix,
-    run_phase3_signing_harness,
-)
+from foliaseal.presentation.qt.phase3_harness import Phase3Harness
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
     "artifacts/phase3_signed_acceptance_evidence_summary.md"
@@ -40,7 +29,6 @@ DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
 __all__ = [
     "DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH",
     "build_default_phase3_evidence_service",
-    "run_signed_acceptance_evidence",
     "validate_signed_acceptance_matrix_summary",
 ]
 
@@ -120,12 +108,6 @@ def _suppress_known_qt_runtime_chatter():
         yield
     finally:
         QtCore.qInstallMessageHandler(previous_handler)
-
-
-def _default_summary_path(root: Path) -> Path:
-    return root / DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH
-
-
 def _write_evidence_markdown(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -134,52 +116,23 @@ def _write_evidence_markdown(path: Path, text: str) -> None:
 def build_default_phase3_evidence_service(
     *,
     asset_generator: AssetGenerator = generate_signed_acceptance_assets,
-    matrix_runner: MatrixRunner = run_phase3_signed_acceptance_matrix,
+    matrix_runner: MatrixRunner | None = None,
 ) -> Phase3EvidenceService:
+    harness = Phase3Harness()
+
     def matrix_runtime_context(name: str):
         return _suppress_known_signed_evidence_runtime_chatter(
             suppress_layout_warnings=name == "signed_fit_rejection_matrix"
         )
 
     return Phase3EvidenceService(
-        harness_runner=run_phase3_signing_harness,
-        preview_matrix_runner=run_phase3_preview_matrix,
-        signed_acceptance_matrix_runner=matrix_runner,
+        harness_runner=harness.run_signing_harness,
+        preview_matrix_runner=harness.run_preview_matrix,
+        signed_acceptance_matrix_runner=(
+            matrix_runner or harness.run_signed_acceptance_matrix
+        ),
         asset_generator=asset_generator,
         capture_contract_evaluator=evaluate_phase3_evidence_contract,
         text_writer=_write_evidence_markdown,
         matrix_runtime_context_factory=matrix_runtime_context,
     )
-
-
-def run_signed_acceptance_evidence(
-    *,
-    artifacts_root: str | Path = ".",
-    summary_markdown_path: str | Path | None = None,
-    suppress_known_runtime_chatter: bool = True,
-    asset_generator: AssetGenerator = generate_signed_acceptance_assets,
-    matrix_runner: MatrixRunner = run_phase3_signed_acceptance_matrix,
-) -> dict[str, Any]:
-    service = build_default_phase3_evidence_service(
-        asset_generator=asset_generator,
-        matrix_runner=matrix_runner,
-    )
-    evidence = service.run_signed_acceptance_evidence(
-        Phase3SignedAcceptanceEvidenceRequest(
-            artifacts_root=artifacts_root,
-            summary_markdown_path=(
-                summary_markdown_path
-                if summary_markdown_path is not None
-                else str(_default_summary_path(Path(artifacts_root)))
-            ),
-            passphrase=SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE.decode("utf-8"),
-            suppress_known_runtime_chatter=suppress_known_runtime_chatter,
-            required_manifests=(
-                SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
-                SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
-                SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
-            ),
-            default_summary_relative_path=DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
-        )
-    )
-    return evidence.as_dict()
