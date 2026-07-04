@@ -37,6 +37,7 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - [ ] Sixth slice: commit the backend rendered-fit neutral-plan migration.
 - [x] (2026-07-04T15:02Z) Seventh slice: route background-layout construction through `visible_signature_layout.py` and rewire backend/evidence callers to consume that boundary while preserving preview/signing parity.
 - [x] (2026-07-04T15:19Z) Eighth slice: move structural reservation sizing into `visible_signature_layout.py` while preserving `backend_reservation`, backend fit fallback, and preview/signing parity.
+- [x] (2026-07-04T21:56Z) Ninth slice: move the remaining layout fit-policy helper implementations into `visible_signature_layout.py` while preserving backend compatibility wrapper names, rendered-evidence entry points, and backend-owned fit-issue orchestration.
 - [ ] Later slice: move remaining reservation/fit policy helpers out of `phase3_signing_backend.py` and delete `SignatureLayoutPlan.backend_reservation` from the public result.
 
 ## Surprises & Discoveries
@@ -56,8 +57,14 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 - Observation: the structural reservation helper has more callers than the public layout engine alone.
   Evidence: `rg -n "_layout_reservation_for_template\\(" src tests` showed live backend callers in `_build_stamp_style()` support paths, fit helpers, and multiple backend tests, so the ownership move needs a compatibility re-export rather than a hard delete in one cut.
 
+- Observation: the layout engine still imports fit-policy helpers back from `phase3_signing_backend.py` even after reservation sizing moved.
+  Evidence: `VisibleSignatureLayoutEngine.plan()` still imports `_horizontal_single_line_ink_validation_reservation()`, `_apply_horizontal_single_line_ink_text_alignment()`, `_horizontal_single_line_background_text_width()`, and `_ensure_layout_can_fit()` from the backend module, so the dependency direction remains inverted until those implementations move.
+
 - Observation: backend stamp-style construction can move behind the service facade without moving the backend rendered-fit fallback.
   Evidence: `tests/unit/test_phase3_signing_backend.py` passed after `_build_stamp_style()` switched to `VisibleSignatureLayoutService.pyhanko_style_for_signing()`.
+
+- Observation: the backend now keeps wrapper names and fit-issue orchestration while the fit-policy implementations live in the layout module.
+  Evidence: the visible-layout boundary now owns reservation sizing and the moved helper implementations, while `phase3_signing_backend.py` still exposes the compatibility names and `build_backend_reservation_evidence()`.
 
 - Observation: canonical preview still needs a temporary reservation compatibility payload for optional text-only and stamp-only layer rendering.
   Evidence: `_render_optional_preview_bounds()` uses the full layout reservation's text and stamp area dimensions. The second slice moved preview style construction into `VisibleSignatureLayoutService.pyhanko_style_for_canonical_preview()` while returning `reservation` and `reserved_background_layout` until a later neutral-geometry slice replaces those reads.
@@ -113,6 +120,14 @@ The first slice is intentionally additive and behavior-preserving. It introduces
 
 - Decision: make the next slice a structural-reservation ownership move only, not a full fit-policy extraction.
   Rationale: `VisibleSignatureLayoutEngine.plan()` still imports `_layout_reservation_for_template()` from the backend, so that is the next real architectural seam. Moving reservation sizing first deepens the layout boundary without forcing the backend rendered-fit fallback or `backend_reservation` consumers to migrate in the same commit.
+  Date/Author: 2026-07-04 / Codex
+
+- Decision: make the ninth slice a helper-implementation move with backend compatibility delegates, not a `backend_reservation` deletion.
+  Rationale: the remaining architectural problem is dependency direction and helper ownership, not the temporary public payload itself. Moving the implementations into `visible_signature_layout.py` removes the inverted dependency and backend-private layout cruft while keeping backend callers and evidence fixtures stable for one more slice.
+  Date/Author: 2026-07-04 / Codex
+
+- Decision: keep backend compatibility wrapper names, rendered-evidence entry points, and fit-issue orchestration in place through the helper move.
+  Rationale: that preserves the existing evidence contract and backend call surface while the helper ownership split settles, and it keeps this slice focused on the ownership boundary rather than wrapper churn.
   Date/Author: 2026-07-04 / Codex
 
 ## Outcomes & Retrospective
@@ -335,6 +350,24 @@ Validation for the completed slice:
     156 passed in 27.93s.
 
 Change note (2026-07-04): Added the eighth-slice completion notes after compliance review confirmed that structural reservation sizing now lives in `visible_signature_layout.py` while backend compatibility wrappers and fit fallbacks remain intentionally in place.
+
+The ninth slice is complete.
+
+What this slice changed:
+
+- moved the remaining fit-policy helper implementations into `src/foliaseal/application/visible_signature_layout.py`;
+- kept backend compatibility wrapper names, `build_backend_reservation_evidence()`, and fit-issue orchestration in `src/foliaseal/application/phase3_signing_backend.py`;
+- updated `docs/ARCHITECTURE.md` so the visible-layout boundary and backend module descriptions match the landed ownership split.
+
+Validation for the completed slice:
+
+    .venv/bin/python -m ruff check src/foliaseal/application/visible_signature_layout.py src/foliaseal/application/phase3_signing_backend.py tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    All checks passed.
+
+    .venv/bin/python -m pytest -q tests/unit/test_visible_signature_layout.py tests/unit/test_phase3_signing_backend.py tests/unit/test_signing_preview_renderer.py
+    197 passed in 27.75s.
+
+Change note (2026-07-04): Confirmed the backend now keeps wrapper names, rendered-evidence entry points, and fit-issue orchestration while the moved fit-policy helper implementations live in `visible_signature_layout.py`.
 
 For the first slice:
 

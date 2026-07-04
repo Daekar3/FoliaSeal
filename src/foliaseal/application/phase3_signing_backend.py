@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import re
-import shutil
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from fractions import Fraction
 from io import BytesIO
@@ -34,6 +33,8 @@ from pyhanko.sign.timestamps.common_utils import TimestampRequestError
 from pyhanko.stamp import TextStamp, TextStampStyle
 from pyhanko_certvalidator import ValidationContext
 
+from foliaseal.application import text_raster_analysis as _text_raster_analysis
+from foliaseal.application import visible_signature_layout as _visible_layout
 from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     build_horizontal_single_line_ink_reservation,
@@ -50,7 +51,6 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
 )
-from foliaseal.application.text_raster_analysis import detect_text_content_bounds_in_image
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
@@ -61,9 +61,6 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
     _SignatureLayoutReservation,
-)
-from foliaseal.application.visible_signature_layout import (
-    _layout_reservation_for_template as _layout_reservation_for_template_impl,
 )
 from foliaseal.application.visible_signature_semantics import (
     CertificateFieldValues,
@@ -96,9 +93,10 @@ from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validati
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 _SIG_FIELD_NAME = "Signature1"
-_SINGLE_LINE_RENDERED_INK_FIT_CACHE: dict[tuple[object, ...], bool] = {}
-
-
+_SINGLE_LINE_RENDERED_INK_FIT_CACHE = _visible_layout._SINGLE_LINE_RENDERED_INK_FIT_CACHE
+detect_text_content_bounds_in_image = (
+    _text_raster_analysis.detect_text_content_bounds_in_image
+)
 @dataclass(frozen=True)
 class BackendReservationEvidence:
     """JSON-ready backend reservation evidence for a signing request."""
@@ -792,7 +790,7 @@ def _layout_reservation_for_template(
     has_visible_stamp_image: bool = True,
     stamp_aspect_ratio: float | None = None,
 ) -> _SignatureLayoutReservation:
-    return _layout_reservation_for_template_impl(
+    return _visible_layout._layout_reservation_for_template(
         layout_template,
         stamp_position=stamp_position,
         signature_rect=signature_rect,
@@ -813,25 +811,10 @@ def _horizontal_single_line_ink_validation_reservation(
     has_visible_stamp_image: bool,
     stamp_aspect_ratio: float | None,
 ) -> _SignatureLayoutReservation:
-    """Return an ink-informed reservation for validation without changing placement."""
-
-    if (
-        ink_reservation is None
-        or not has_visible_stamp_image
-        or structural_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or structural_reservation.stamp_position
-        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        return structural_reservation
-    if ink_reservation.lane_width_pt >= structural_reservation.text_area_width_pt:
-        return structural_reservation
-
-    return _layout_reservation_for_template(
-        structural_reservation.layout_template,
-        stamp_position=structural_reservation.stamp_position,
+    return _visible_layout._horizontal_single_line_ink_validation_reservation(
+        structural_reservation,
+        ink_reservation=ink_reservation,
         signature_rect=signature_rect,
-        text_box_width=ink_reservation.lane_width_pt,
-        text_box_height=structural_reservation.text_box_height_pt,
         box_style=box_style,
         has_visible_stamp_image=has_visible_stamp_image,
         stamp_aspect_ratio=stamp_aspect_ratio,
@@ -843,51 +826,9 @@ def _apply_horizontal_single_line_ink_text_alignment(
     *,
     ink_reservation: HorizontalSingleLineInkReservation | None,
 ) -> _SignatureLayoutReservation:
-    """Optically align horizontal single-line text ink without changing fit policy.
-
-    pyHanko positions text by font advance width, not by visible glyph ink. In
-    narrow horizontal single-line layouts, side bearings can leave visible glyphs
-    far from the border even when the natural text box is aligned correctly.
-    This adjusts only final text placement by measured side bearing; fit
-    decisions and reserved lane sizes still come from the reservation model.
-    """
-
-    if (
-        ink_reservation is None
-        or reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or reservation.stamp_position
-        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        return reservation
-
-    layout_rule = reservation.inner_content_layout
-    margins = layout_rule.margins
-    if reservation.stamp_position == SignatureStampPosition.LEFT:
-        if ink_reservation.ink_right_slack_pt <= 0:
-            return reservation
-        adjusted_margins = Margins(
-            left=margins.left,
-            right=margins.right - ink_reservation.ink_right_slack_pt,
-            top=margins.top,
-            bottom=margins.bottom,
-        )
-    else:
-        if ink_reservation.ink_left_offset_pt <= 0:
-            return reservation
-        adjusted_margins = Margins(
-            left=margins.left - ink_reservation.ink_left_offset_pt,
-            right=margins.right,
-            top=margins.top,
-            bottom=margins.bottom,
-        )
-    return replace(
+    return _visible_layout._apply_horizontal_single_line_ink_text_alignment(
         reservation,
-        inner_content_layout=SimpleBoxLayoutRule(
-            layout_rule.x_align,
-            layout_rule.y_align,
-            margins=adjusted_margins,
-            inner_content_scaling=layout_rule.inner_content_scaling,
-        ),
+        ink_reservation=ink_reservation,
     )
 
 
@@ -899,32 +840,12 @@ def _horizontal_single_line_background_text_width(
     fallback_text_box_width: int,
     ink_reservation: HorizontalSingleLineInkReservation | None,
 ) -> int:
-    """Text width to reserve when sizing the horizontal single-line stamp image.
-
-    The visible text already uses the full structural text box plus an optical
-    side-bearing translation. The stamp image should instead yield to rendered
-    ink plus the explicit stamp-facing guard. `_layout_reservation_for_template`
-    also inserts the base separator between stamp and text, so subtract that
-    separator here to avoid counting the gap twice.
-    """
-
-    if (
-        ink_reservation is None
-        or layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or stamp_position
-        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        return fallback_text_box_width
-
-    _edge_margin, separator_width = _base_layout_spacing(
+    return _visible_layout._horizontal_single_line_background_text_width(
+        layout_template=layout_template,
         stamp_position=stamp_position,
         box_height=box_height,
-    )
-    return max(
-        1,
-        ink_reservation.ink_width_pt
-        + ink_reservation.stamp_facing_padding_pt
-        - separator_width,
+        fallback_text_box_width=fallback_text_box_width,
+        ink_reservation=ink_reservation,
     )
 
 
@@ -984,145 +905,15 @@ def _background_layout_for_stamp(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
-    reservation = _layout_reservation_for_template(
+    return _visible_layout._background_layout_for_stamp(
         layout_template,
         stamp_position=stamp_position,
+        stamp_background=stamp_background,
         signature_rect=signature_rect,
         text_box_width=text_box_width,
         text_box_height=text_box_height,
         box_style=box_style,
-        has_visible_stamp_image=stamp_background is not None,
         stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
-    )
-    if stamp_background is None:
-        return reservation.background_layout
-    background_layout = replace(
-        reservation.background_layout,
-        inner_content_scaling=InnerScaling.SHRINK_TO_FIT,
-    )
-    image = getattr(stamp_background, "image", None)
-    if image is None or not hasattr(image, "size"):
-        return background_layout
-
-    image_width, image_height = image.size
-    if image_height <= 0:
-        return background_layout
-
-    area_width = max(1, reservation.stamp_area_width_pt)
-    area_height = max(1, reservation.stamp_area_height_pt)
-    content_inset = 0
-    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        content_inset = _single_line_stamp_content_inset(
-            stamp_position=stamp_position,
-            box_width=max(1, int(round(signature_rect.width_pt))),
-            box_height=max(1, int(round(signature_rect.height_pt))),
-            reserved_width=area_width,
-            reserved_height=area_height,
-        )
-    horizontal_single_line_vertical_inset = content_inset
-    if (
-        layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        horizontal_single_line_vertical_inset = _single_line_horizontal_stamp_vertical_inset(
-            box_style=box_style,
-            content_inset=content_inset,
-        )
-    fit_width = max(1, area_width - content_inset * 2)
-    fit_height = max(1, area_height - horizontal_single_line_vertical_inset * 2)
-    border_gap = _border_facing_stamp_inset(
-        layout_template=layout_template,
-        stamp_position=stamp_position,
-        box_style=box_style,
-    )
-    if (
-        layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-    ):
-        border_gap = _single_line_vertical_stamp_border_gap(box_style=box_style)
-        fit_height = max(1, fit_height - border_gap)
-    elif stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
-        border_gap = _top_stamp_border_facing_inset(box_style=box_style)
-        fit_height = max(1, fit_height - border_gap)
-    elif stamp_position == SignatureStampPosition.RIGHT:
-        fit_width = max(1, fit_width - border_gap)
-    aspect_ratio = image_width / image_height
-    target_width = fit_width
-    target_height = max(1, int(round(target_width / aspect_ratio)))
-    if target_height > fit_height:
-        target_height = fit_height
-        target_width = max(1, int(round(target_height * aspect_ratio)))
-
-    if (
-        layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-    ):
-        remaining_y = max(0, area_height - target_height)
-        centered_extra_y = max(0, remaining_y - border_gap) // 2
-        extra_x_left = 0
-        extra_x_right = max(0, area_width - target_width)
-        if stamp_position == SignatureStampPosition.TOP:
-            extra_y_top = min(border_gap, remaining_y) + centered_extra_y
-            extra_y_bottom = centered_extra_y
-        else:
-            extra_y_top = centered_extra_y
-            extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
-    elif (
-        stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
-        and border_gap > 0
-    ):
-        remaining_y = max(0, area_height - target_height)
-        centered_extra_y = max(0, remaining_y - border_gap) // 2
-        centered_extra_x = max(0, area_width - target_width) // 2
-        extra_x_left = centered_extra_x
-        extra_x_right = centered_extra_x
-        if stamp_position == SignatureStampPosition.TOP:
-            extra_y_top = min(border_gap, remaining_y) + centered_extra_y
-            extra_y_bottom = centered_extra_y
-        else:
-            extra_y_top = centered_extra_y
-            extra_y_bottom = min(border_gap, remaining_y) + centered_extra_y
-    elif stamp_position == SignatureStampPosition.RIGHT and border_gap > 0:
-        remaining_x = max(0, area_width - target_width)
-        centered_extra_x = max(0, remaining_x - border_gap) // 2
-        extra_x_left = centered_extra_x
-        extra_x_right = min(border_gap, remaining_x) + centered_extra_x
-        extra_y_top = max(0, area_height - target_height) // 2
-        extra_y_bottom = extra_y_top
-    elif stamp_position == SignatureStampPosition.LEFT and border_gap > 0:
-        max_content_width = max(1, fit_width - border_gap)
-        if target_width > max_content_width:
-            target_width = max_content_width
-            target_height = max(1, int(round(target_width / aspect_ratio)))
-        remaining_x = max(0, area_width - target_width)
-        centered_extra_x = max(0, remaining_x - border_gap) // 2
-        extra_x_left = min(border_gap, remaining_x) + centered_extra_x
-        extra_x_right = centered_extra_x
-        extra_y_top = max(0, area_height - target_height) // 2
-        extra_y_bottom = extra_y_top
-    elif (
-        layout_template == SignatureLayoutTemplate.SINGLE_LINE
-        and stamp_position == SignatureStampPosition.LEFT
-    ):
-        extra_x_left = max(0, area_width - target_width)
-        extra_x_right = 0
-        extra_y_top = max(0, area_height - target_height) // 2
-        extra_y_bottom = extra_y_top
-    else:
-        centered_extra_x = max(0, area_width - target_width) // 2
-        extra_x_left = centered_extra_x
-        extra_x_right = centered_extra_x
-        extra_y_top = max(0, area_height - target_height) // 2
-        extra_y_bottom = extra_y_top
-    margins = background_layout.margins
-    return replace(
-        background_layout,
-        margins=Margins(
-            left=margins.left + extra_x_left,
-            right=margins.right + extra_x_right,
-            top=margins.top + extra_y_top,
-            bottom=margins.bottom + extra_y_bottom,
-        ),
     )
 
 
@@ -1194,177 +985,28 @@ def _visible_signature_fit_issues_for_stamp_text(
     return ()
 
 
-def _single_line_text_only_ink_bounds(
-    *,
-    preview: SigningDraftPreview,
-    output_path: Path,
-    canonical_layout: Callable[..., object],
-    optional_bounds_renderer: Callable[..., dict[str, int] | None],
-) -> dict[str, int] | None:
-    layout = canonical_layout(
-        preview,
-        include_text=True,
-        include_stamp=True,
-        include_border=True,
-    )
-    return optional_bounds_renderer(
-        preview=preview,
-        layout=layout,
-        zoom=1.0,
-        output_path=output_path,
-        include_text=True,
-        include_stamp=False,
-        render_backend=None,
-        flatten_to_white=True,
-    )
-
-
 def _single_line_rendered_ink_fits_reservation(
     *,
     signature_rect: SignatureRect,
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
 ) -> bool:
-    if signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE:
-        return False
-    cache_key = _single_line_rendered_ink_fit_cache_key(
+    return _visible_layout._single_line_rendered_ink_fits_reservation(
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,
         stamp_text=stamp_text,
     )
-    cached = _SINGLE_LINE_RENDERED_INK_FIT_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-    snapshot = None
-    reference_snapshot = None
-    try:
-        from foliaseal.application.signing_preview_renderer import (
-            _canonical_preview_layout,
-            _render_optional_preview_bounds,
-            render_canonical_signature_preview,
-        )
 
-        preview = _signing_draft_preview_for_stamp_text(
-            signature_rect=signature_rect,
-            signature_appearance=signature_appearance,
-            stamp_text=stamp_text,
-        )
-        snapshot = render_canonical_signature_preview(
-            preview,
-            zoom=1.0,
-            include_border=True,
-            flatten_to_white=True,
-        )
-        if snapshot is None or snapshot.text_area_bounds_px is None:
-            return False
-        if (
-            signature_appearance.image_stamp_path is not None
-            and signature_appearance.stamp_position
-            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-            and (
-                snapshot.stamp_area_bounds_px is None
-                or snapshot.stamp_bounds_px is None
-            )
-        ):
-            return False
-        nominal_width_overflow = (
-            (snapshot.text_bounds_px["width"] - snapshot.text_area_bounds_px["width"])
-            if snapshot.text_bounds_px is not None
-            else 0
-        )
-        if nominal_width_overflow > 16:
-            return False
-        text_bounds = _single_line_text_only_ink_bounds(
-            preview=preview,
-            output_path=Path(snapshot.image_path).parent / "fit-text-only.png",
-            canonical_layout=_canonical_preview_layout,
-            optional_bounds_renderer=_render_optional_preview_bounds,
-        )
-        if text_bounds is None:
-            return False
-        if not _horizontal_single_line_text_ink_inside_border(
-            text_bounds=text_bounds,
-            preview_width_px=snapshot.width_px,
-            preview_height_px=snapshot.height_px,
-            signature_appearance=signature_appearance,
-        ):
-            return False
-        enforce_reference_ink_preservation = (
-            signature_appearance.image_stamp_path is not None
-            and signature_appearance.stamp_position
-            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-        )
-        if enforce_reference_ink_preservation:
-            reference_rect = replace(
-                signature_rect,
-                width_pt=max(
-                    signature_rect.width_pt,
-                    signature_rect.width_pt
-                    + float((snapshot.text_bounds_px or {}).get("width", 0))
-                    + 64.0,
-                ),
-                height_pt=max(
-                    signature_rect.height_pt,
-                    float((snapshot.text_bounds_px or {}).get("height", 0)) + 64.0,
-                ),
-            )
-            reference_preview = _signing_draft_preview_for_stamp_text(
-                signature_rect=reference_rect,
-                signature_appearance=signature_appearance,
-                stamp_text=stamp_text,
-            )
-            reference_snapshot = render_canonical_signature_preview(
-                reference_preview,
-                zoom=1.0,
-                include_border=True,
-                flatten_to_white=True,
-            )
-            if (
-                reference_snapshot is None
-                or reference_snapshot.text_area_bounds_px is None
-            ):
-                return False
-            reference_text_bounds = _single_line_text_only_ink_bounds(
-                preview=reference_preview,
-                output_path=Path(reference_snapshot.image_path).parent
-                / "fit-reference-text-only.png",
-                canonical_layout=_canonical_preview_layout,
-                optional_bounds_renderer=_render_optional_preview_bounds,
-            )
-            if reference_text_bounds is None:
-                return False
-            reference_width_loss = max(
-                0,
-                reference_text_bounds["width"] - text_bounds["width"],
-            )
-            reference_height_loss = max(
-                0,
-                reference_text_bounds["height"] - text_bounds["height"],
-            )
-            # Detector antialias rows can vary with vertical centering between
-            # the selected box and roomy reference; anything larger indicates
-            # real visible-ink loss rather than raster noise.
-            if reference_width_loss > 3 or reference_height_loss > 3:
-                return False
-        # The rendered-ink fallback compares raster output, so allow the same
-        # 1px integer seam vertically that `_ensure_layout_can_fit` allows for
-        # nominal width. The reference-preservation check above still rejects
-        # real ink loss.
-        result = (
-            text_bounds["width"] <= snapshot.text_area_bounds_px["width"]
-            and text_bounds["height"] <= snapshot.text_area_bounds_px["height"] + 1
-        )
-        if len(_SINGLE_LINE_RENDERED_INK_FIT_CACHE) >= 256:
-            _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
-        _SINGLE_LINE_RENDERED_INK_FIT_CACHE[cache_key] = result
-        return result
-    except Exception:
-        return False
-    finally:
-        if snapshot is not None:
-            _cleanup_canonical_preview_snapshot(snapshot)
-        if reference_snapshot is not None:
-            _cleanup_canonical_preview_snapshot(reference_snapshot)
+
+def _single_line_text_only_ink_bounds(
+    *,
+    preview: SigningDraftPreview,
+    output_path: Path,
+) -> dict[str, int] | None:
+    return _visible_layout._single_line_text_only_ink_bounds(
+        preview=preview,
+        output_path=output_path,
+    )
 
 
 def _horizontal_multi_line_rendered_layout_fits_reservation(
@@ -1374,135 +1016,11 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
     stamp_text: str,
     layout_plan: SignatureLayoutPlan,
 ) -> bool:
-    if (
-        signature_appearance.layout_template != SignatureLayoutTemplate.MULTI_LINE
-        or signature_appearance.image_stamp_path is None
-        or signature_appearance.stamp_position
-        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        return False
-
-    width_overflow = layout_plan.text_box.width_pt - (layout_plan.text_area_width_pt + 1)
-    height_overflow = layout_plan.text_box.height_pt - layout_plan.text_area_height_pt
-    if width_overflow > 0 or height_overflow <= 0 or height_overflow > 6:
-        return False
-
-    snapshot = None
-    try:
-        from foliaseal.application.signing_preview_renderer import (
-            render_canonical_signature_preview,
-        )
-
-        preview = _signing_draft_preview_for_stamp_text(
-            signature_rect=signature_rect,
-            signature_appearance=signature_appearance,
-            stamp_text=stamp_text,
-        )
-        snapshot = render_canonical_signature_preview(
-            preview,
-            zoom=1.0,
-            include_border=True,
-            flatten_to_white=True,
-        )
-        if snapshot.text_area_bounds_px is None:
-            return False
-        rendered_text_bounds, _error = detect_text_content_bounds_in_image(
-            preview_image_path=snapshot.image_path,
-            text_widget_bounds=snapshot.text_area_bounds_px,
-            text_color_rgba=_text_style_color_rgba(signature_appearance.text_style),
-            reference_text_content_bounds=snapshot.text_bounds_px,
-        )
-        text_bounds = rendered_text_bounds
-        stamp_bounds = getattr(snapshot, "stamp_bounds_px", None)
-        if text_bounds is None or stamp_bounds is None:
-            return False
-        if stamp_bounds["width"] <= 0 or stamp_bounds["height"] <= 0:
-            return False
-        container = {"x": 0, "y": 0, "width": snapshot.width_px, "height": snapshot.height_px}
-        return (
-            _rect_inside_container(text_bounds, container)
-            and _rect_inside_container(stamp_bounds, container)
-            and not _rectangles_overlap(text_bounds, stamp_bounds)
-        )
-    except Exception:
-        return False
-    finally:
-        if snapshot is not None:
-            _cleanup_canonical_preview_snapshot(snapshot)
-
-
-def _rect_inside_container(
-    rect: dict[str, int],
-    container: dict[str, int],
-) -> bool:
-    return (
-        rect["x"] >= container["x"]
-        and rect["y"] >= container["y"]
-        and rect["x"] + rect["width"] <= container["x"] + container["width"]
-        and rect["y"] + rect["height"] <= container["y"] + container["height"]
-    )
-
-
-def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:
-    return (
-        first["x"] < second["x"] + second["width"]
-        and second["x"] < first["x"] + first["width"]
-        and first["y"] < second["y"] + second["height"]
-        and second["y"] < first["y"] + first["height"]
-    )
-
-
-def _horizontal_single_line_text_ink_inside_border(
-    *,
-    text_bounds: dict[str, int],
-    preview_width_px: int,
-    preview_height_px: int,
-    signature_appearance: SigningBackendAppearance,
-) -> bool:
-    if (
-        signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-        or signature_appearance.image_stamp_path is None
-        or signature_appearance.stamp_position
-        not in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-    ):
-        return True
-    guard_px = _border_safe_inset(signature_appearance.box_style)
-    if guard_px <= 0:
-        return True
-    container = {
-        "x": guard_px,
-        "y": guard_px,
-        "width": max(0, preview_width_px - guard_px * 2),
-        "height": max(0, preview_height_px - guard_px * 2),
-    }
-    return _rect_inside_container(text_bounds, container)
-
-
-def _single_line_rendered_ink_fit_cache_key(
-    *,
-    signature_rect: SignatureRect,
-    signature_appearance: SigningBackendAppearance,
-    stamp_text: str,
-) -> tuple[object, ...]:
-    box_style = signature_appearance.box_style
-    text_style = signature_appearance.text_style
-    return (
-        round(signature_rect.width_pt, 3),
-        round(signature_rect.height_pt, 3),
-        stamp_text,
-        signature_appearance.image_stamp_path,
-        signature_appearance.signer_label_prefix,
-        signature_appearance.datetime_format,
-        signature_appearance.show_field_names,
-        text_style.font_family,
-        round(text_style.font_size_pt, 3),
-        text_style.bold,
-        text_style.italic,
-        text_style.text_color_hex,
-        box_style.show_border,
-        box_style.border_color_hex,
-        round(box_style.border_width_pt, 3),
-        box_style.background_color_hex,
+    return _visible_layout._horizontal_multi_line_rendered_layout_fits_reservation(
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
+        layout_plan=layout_plan,
     )
 
 
@@ -1553,27 +1071,7 @@ def _stamp_text_preview_parts(
 
 
 def _text_style_color_rgba(text_style: SignatureTextStyle) -> tuple[int, int, int, int] | None:
-    normalized = text_style.text_color_hex.strip().lstrip("#")
-    if len(normalized) != 6:
-        return None
-    try:
-        return (
-            int(normalized[0:2], 16),
-            int(normalized[2:4], 16),
-            int(normalized[4:6], 16),
-            255,
-        )
-    except ValueError:
-        return None
-
-
-def _cleanup_canonical_preview_snapshot(snapshot: object) -> None:
-    image_path = getattr(snapshot, "image_path", None)
-    if not isinstance(image_path, str):
-        return
-    temp_dir = Path(image_path).parent
-    if temp_dir.name.startswith("foliaseal-canonical-preview-"):
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    return _visible_layout._text_style_color_rgba(text_style)
 
 
 def _ensure_layout_can_fit(
@@ -1581,46 +1079,10 @@ def _ensure_layout_can_fit(
     *,
     has_visible_stamp_image: bool = False,
 ) -> None:
-    """Validate fit after reservation with only a tiny numeric seam correction.
-
-    Policy note: our fit decisions should come from the geometry calculations,
-    not from percentage-based tolerance tuning. The only width allowance kept
-    here is a 1pt rounding correction for mixed integer seams between text
-    measurement and reservation math. Height remains strict because visible
-    vertical clipping is a real user-facing failure.
-
-    A selected horizontal visible stamp must retain real reserved width. A
-    0pt-wide image band means the image cannot be visible, even if the text
-    happens to fit.
-    """
-    # This is a numeric rounding correction, not a compactness policy.
-    max_text_width = layout_reservation.text_area_width_pt + 1
-    if (
-        has_visible_stamp_image
-        and (
-            layout_reservation.layout_template != SignatureLayoutTemplate.SINGLE_LINE
-            or layout_reservation.stamp_position
-            in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
-        )
-        and (
-        layout_reservation.stamp_area_width_pt <= 0
-        or layout_reservation.stamp_area_height_pt <= 0
-        )
-    ):
-        raise ValueError(
-            "Visible signature content does not fit inside the selected rectangle for the "
-            f"{layout_reservation.layout_template.value} template. "
-            "Enlarge the signature box or choose a more compact appearance."
-        )
-    if (
-        layout_reservation.text_box_width_pt > max_text_width
-        or layout_reservation.text_box_height_pt > layout_reservation.text_area_height_pt
-    ):
-        raise ValueError(
-            "Visible signature content does not fit inside the selected rectangle for the "
-            f"{layout_reservation.layout_template.value} template. "
-            "Enlarge the signature box or choose a more compact appearance."
-        )
+    _visible_layout._ensure_layout_can_fit(
+        layout_reservation,
+        has_visible_stamp_image=has_visible_stamp_image,
+    )
 
 
 def _build_stamp_text(

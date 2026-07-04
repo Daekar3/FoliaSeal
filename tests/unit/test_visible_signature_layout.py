@@ -21,6 +21,8 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutEngine,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
+    _background_layout_for_stamp,
+    _ensure_layout_can_fit,
 )
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -991,6 +993,68 @@ def test_layout_service_suppresses_collapsed_horizontal_preview_stamp() -> None:
     assert service_result.style.background is None
     assert service_result.layout_plan.has_visible_stamp_image is False
     assert service_result.layout_plan.stamp_area_width_pt == 0
+
+
+def test_background_layout_helper_adds_border_facing_inset_for_top_multi_line_stamp(
+    tmp_path,
+) -> None:
+    stamp_path = _write_stamp(tmp_path)
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=40.0,
+        width_pt=260.0,
+        height_pt=46.0,
+    )
+    appearance = _backend_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        stamp_position=SignatureStampPosition.TOP,
+        image_stamp_path=stamp_path,
+        show_border=True,
+    )
+
+    plan = VisibleSignatureLayoutEngine().plan(
+        _layout_request(
+            signature_rect=signature_rect,
+            appearance=appearance,
+            stamp_text="Digitally signed by\nMorgan Ellery",
+        )
+    )
+
+    background_layout = _background_layout_for_stamp(
+        appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        stamp_background=_stamp_background(stamp_path),
+        signature_rect=signature_rect,
+        text_box_width=plan.background_text_box_width_pt,
+        text_box_height=plan.text_box.height_pt,
+        box_style=appearance.box_style,
+        stamp_aspect_ratio=plan.stamp_image.aspect_ratio if plan.stamp_image else None,
+    )
+
+    assert background_layout.margins.top > plan.stamp_layout.margins.top
+
+
+def test_layout_boundary_rejects_text_that_exceeds_reserved_height() -> None:
+    plan = _engine(text_width=120, text_height=40).plan(
+        _request(
+            rect=SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=260.0,
+                height_pt=25.0,
+            ),
+            image_stamp_path=None,
+            stamp_position=SignatureStampPosition.TOP,
+        )
+    )
+
+    with pytest.raises(ValueError, match="Visible signature content does not fit"):
+        _ensure_layout_can_fit(
+            plan.backend_reservation,
+            has_visible_stamp_image=plan.has_visible_stamp_image,
+        )
 
 
 def _backend_appearance(
