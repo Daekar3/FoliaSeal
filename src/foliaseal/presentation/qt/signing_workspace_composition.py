@@ -109,7 +109,7 @@ class SigningWorkspaceComposition:
     def bootstrap(self) -> None:
         self.compatibility_surface.install_widget_exports()
         self.shell_surface.install_port_exports()
-        self.compatibility_surface.refresh_viewer()
+        self.runtime.refresh_viewer()
         self.review_bridge.apply_state(self.document_review_workspace.load())
         self.action_bridge.reload_state()
 
@@ -265,35 +265,26 @@ def build_signing_workspace_composition(
     )
     runtime.bind(
         viewer_interaction_session=viewer_interaction_session,
+        viewer_workflow=viewer_workflow,
         document_review_workspace=document_review_workspace,
         workspace_interaction_session=workspace_interaction_session,
         review_bridge=review_bridge,
         interaction_bridge=interaction_bridge,
+        properties_panel=properties_panel,
         viewer_widget=viewer_widget,
+        document_text_query_input=document_text_controls.query_input,
+        sign_button=sign_button,
+        refresh_sign_button_state=action_bridge.reload_state,
         result_label=result_label,
     )
     compatibility_surface = SigningWorkspaceCompatibilitySurface(
         widget=widget,
+        runtime=runtime,
         properties_panel=properties_panel,
         viewer_widget=viewer_widget,
         properties_scroll=properties_scroll,
         sidebar_container=sidebar.container,
         sidebar_surface=sidebar.surface,
-        sign_button=sign_button,
-        document_text_query_input=document_text_controls.query_input,
-        on_copy_text=on_copy_text,
-        draft_workflow=signing_workflow,
-        document_review_workspace=document_review_workspace,
-        review_bridge=review_bridge,
-        viewer_workflow=viewer_workflow,
-        viewer_interaction_session=viewer_interaction_session,
-        workspace_interaction_session=workspace_interaction_session,
-        interaction_bridge=interaction_bridge,
-        sync_placement_context_from_viewer=lambda: runtime.apply_placement_context(
-            viewer_interaction_session.current_placement_context().placement_context
-        ),
-        sync_signature_overlay=runtime.sync_signature_overlay,
-        refresh_sign_button_state=action_bridge.reload_state,
     )
     shell_surface = SigningWorkspaceShellSurface(
         widget=widget,

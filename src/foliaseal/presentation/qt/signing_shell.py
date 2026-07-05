@@ -260,6 +260,7 @@ class SigningWorkspaceWidget:
             self._app_settings = AppSettings.default()
         self._runtime = SigningWorkspaceRuntime(
             draft_workflow=signing_workflow,
+            on_copy_text=on_copy_text,
             on_error=on_error,
             on_status_change=on_status_change,
         )
@@ -345,40 +346,40 @@ class SigningWorkspaceWidget:
         return self._app_settings
 
     def refresh_viewer(self) -> None:
-        self._compatibility_surface.refresh_viewer()
+        self._runtime.refresh_viewer()
 
     def refresh_document_review(self) -> DocumentReviewSummary:
-        return self._compatibility_surface.refresh_document_review()
+        return self._runtime.refresh_document_review()
 
     def search_document_text(self) -> DocumentTextSearchState:
-        return self._compatibility_surface.search_document_text()
+        return self._runtime.search_document_text()
 
     def next_document_text_match(self) -> DocumentTextSearchState:
-        return self._compatibility_surface.next_document_text_match()
+        return self._runtime.next_document_text_match()
 
     def previous_document_text_match(self) -> DocumentTextSearchState:
-        return self._compatibility_surface.previous_document_text_match()
+        return self._runtime.previous_document_text_match()
 
     def copy_current_document_text_match(self) -> str | None:
-        return self._compatibility_surface.copy_current_document_text_match()
+        return self._runtime.copy_current_document_text_match()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
-        return self._compatibility_surface.set_document_text_selection_mode(enabled)
+        return self._runtime.set_document_text_selection_mode(enabled)
 
     def copy_selected_document_text(self) -> str | None:
-        return self._compatibility_surface.copy_selected_document_text()
+        return self._runtime.copy_selected_document_text()
 
     def clear_selected_document_text(self) -> DocumentTextSelectionState:
-        return self._compatibility_surface.clear_selected_document_text()
+        return self._runtime.clear_selected_document_text()
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         self._shell_surface.apply_app_settings(settings)
 
     def set_logical_page_index(self, page_index: int) -> None:
-        self._compatibility_surface.set_logical_page_index(page_index)
+        self._runtime.set_logical_page_index(page_index)
 
     def logical_page_index(self) -> int:
-        return self._compatibility_surface.logical_page_index()
+        return self._runtime.logical_page_index()
 
     def set_signature_rect(
         self,
@@ -389,7 +390,7 @@ class SigningWorkspaceWidget:
         width_pt: float,
         height_pt: float,
         ) -> SignatureRect:
-        return self._compatibility_surface.set_signature_rect(
+        return self._runtime.set_signature_rect(
             page_index=page_index,
             left_pt=left_pt,
             bottom_pt=bottom_pt,
@@ -398,25 +399,25 @@ class SigningWorkspaceWidget:
         )
 
     def signature_rect(self) -> SignatureRect | None:
-        return self._compatibility_surface.signature_rect()
+        return self._runtime.signature_rect()
 
     def set_selected_certificate_configuration_id(self, configuration_id: str | None) -> None:
-        self._compatibility_surface.set_selected_certificate_configuration_id(configuration_id)
+        self._runtime.set_selected_certificate_configuration_id(configuration_id)
 
     def selected_certificate_configuration_id(self) -> str | None:
-        return self._compatibility_surface.selected_certificate_configuration_id()
+        return self._runtime.selected_certificate_configuration_id()
 
     def signature_appearance(self) -> SignatureAppearance | None:
-        return self._compatibility_surface.signature_appearance()
+        return self._runtime.signature_appearance()
 
     def set_timestamp_required(self, required: bool) -> None:
-        self._compatibility_surface.set_timestamp_required(required)
+        self._runtime.set_timestamp_required(required)
 
     def current_request(self) -> SigningRequest | None:
-        return self._compatibility_surface.current_request()
+        return self._runtime.current_request()
 
     def is_sign_action_enabled(self) -> bool:
-        return self._compatibility_surface.is_sign_action_enabled()
+        return self._runtime.is_sign_action_enabled()
 
     def submit_sign_request(self) -> SigningRequest | None:
         return self._shell_surface.submit_sign_request()

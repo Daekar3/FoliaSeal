@@ -12,18 +12,54 @@ from foliaseal.application import (
     WorkspaceInteractionSession,
 )
 from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.document_review_workspace import (
     DocumentReviewWorkspaceSession,
 )
+from foliaseal.application.document_text_search import DocumentTextSearchState
+from foliaseal.application.document_text_selection import DocumentTextSelectionState
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
+)
+from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignatureRect,
+    SigningRequest,
 )
 from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
     SigningWorkspaceInteractionBridge,
 )
+from foliaseal.presentation.qt.signing_workspace_properties_panel import (
+    SignaturePropertiesPanel,
+)
 from foliaseal.presentation.qt.signing_workspace_review_bridge import (
     SigningWorkspaceReviewBridge,
 )
+
+
+def _text(line_edit: Any) -> str:
+    text = getattr(line_edit, "text", None)
+    return text() if callable(text) else ""
+
+
+def _snapshot_current_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:
+    signature_rect = workflow.current_signature_rect
+    signature_appearance = workflow.current_signature_appearance
+    if signature_rect is None or signature_appearance is None:
+        return None
+    return SigningRequest(
+        input_pdf_path=workflow.input_pdf_path,
+        output_pdf_path=workflow.output_pdf_path,
+        certificate_path=workflow.certificate_path,
+        passphrase=workflow.passphrase,
+        tsa_url=workflow.tsa_url,
+        timestamp_required=workflow.timestamp_required,
+        trust_policy=workflow.trust_policy,
+        certificate_alias=workflow.certificate_alias,
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+    )
 
 
 class SigningWorkspaceRuntime:
@@ -33,37 +69,54 @@ class SigningWorkspaceRuntime:
         self,
         *,
         draft_workflow: SigningDraftWorkflow,
+        on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> None:
         self._draft_workflow = draft_workflow
+        self._on_copy_text = on_copy_text
         self._on_error = on_error
         self._on_status_change = on_status_change
         self._viewer_interaction_session: ViewerInteractionSession | None = None
+        self._viewer_workflow: ViewerWorkflow | None = None
         self._document_review_workspace: DocumentReviewWorkspaceSession | None = None
         self._workspace_interaction_session: WorkspaceInteractionSession | None = None
         self._review_bridge: SigningWorkspaceReviewBridge | None = None
         self._interaction_bridge: SigningWorkspaceInteractionBridge | None = None
+        self._properties_panel: SignaturePropertiesPanel | None = None
         self._viewer_widget: Any = None
+        self._document_text_query_input: Any = None
+        self._sign_button: Any = None
+        self._refresh_sign_button_state: Callable[[], None] | None = None
         self._result_label: Any = None
 
     def bind(
         self,
         *,
         viewer_interaction_session: ViewerInteractionSession,
+        viewer_workflow: ViewerWorkflow,
         document_review_workspace: DocumentReviewWorkspaceSession,
         workspace_interaction_session: WorkspaceInteractionSession,
         review_bridge: SigningWorkspaceReviewBridge,
         interaction_bridge: SigningWorkspaceInteractionBridge,
+        properties_panel: SignaturePropertiesPanel,
         viewer_widget: Any,
+        document_text_query_input: Any,
+        sign_button: Any,
+        refresh_sign_button_state: Callable[[], None],
         result_label: Any,
     ) -> None:
         self._viewer_interaction_session = viewer_interaction_session
+        self._viewer_workflow = viewer_workflow
         self._document_review_workspace = document_review_workspace
         self._workspace_interaction_session = workspace_interaction_session
         self._review_bridge = review_bridge
         self._interaction_bridge = interaction_bridge
+        self._properties_panel = properties_panel
         self._viewer_widget = viewer_widget
+        self._document_text_query_input = document_text_query_input
+        self._sign_button = sign_button
+        self._refresh_sign_button_state = refresh_sign_button_state
         self._result_label = result_label
 
     def on_viewer_selection(self, pdf_rect: PdfRect) -> None:
@@ -90,6 +143,131 @@ class SigningWorkspaceRuntime:
 
     def on_document_review_signature_selected(self, index: int) -> None:
         self._review_bridge_required().select_review_signature(index)
+
+    def refresh_viewer(self) -> None:
+        self.apply_workspace_interaction_plan(
+            self._workspace_interaction_session_required().refresh_after_viewer_refresh()
+        )
+
+    def refresh_document_review(self) -> DocumentReviewSummary:
+        state = self._document_review_workspace_required().refresh_review()
+        self._review_bridge_required().apply_state(state)
+        return state.review.review_summary
+
+    def search_document_text(self) -> DocumentTextSearchState:
+        transition = self._document_review_workspace_required().search_text(
+            _text(self._document_text_query_input)
+        )
+        self._review_bridge_required().apply_transition(transition)
+        return transition.state.document_text.search_state
+
+    def next_document_text_match(self) -> DocumentTextSearchState:
+        transition = self._document_review_workspace_required().next_text_match()
+        self._review_bridge_required().apply_transition(transition)
+        return transition.state.document_text.search_state
+
+    def previous_document_text_match(self) -> DocumentTextSearchState:
+        transition = self._document_review_workspace_required().previous_text_match()
+        self._review_bridge_required().apply_transition(transition)
+        return transition.state.document_text.search_state
+
+    def copy_current_document_text_match(self) -> str | None:
+        copy_text = self._document_review_workspace_required().copy_current_text_match()
+        if copy_text is None or self._on_copy_text is None:
+            return None
+        self._on_copy_text(copy_text)
+        return copy_text
+
+    def set_document_text_selection_mode(self, enabled: bool) -> bool:
+        transition = self._document_review_workspace_required().set_text_selection_mode(enabled)
+        self._review_bridge_required().apply_transition(transition)
+        return transition.state.document_text.selection_mode_enabled
+
+    def copy_selected_document_text(self) -> str | None:
+        copy_text = self._document_review_workspace_required().copy_selected_text()
+        if copy_text is None or self._on_copy_text is None:
+            return None
+        self._on_copy_text(copy_text)
+        return copy_text
+
+    def clear_selected_document_text(self) -> DocumentTextSelectionState:
+        transition = self._document_review_workspace_required().clear_selected_text()
+        self._review_bridge_required().apply_transition(transition)
+        return transition.state.document_text.selection_state
+
+    def set_logical_page_index(self, page_index: int) -> None:
+        self._viewer_interaction_session_required().set_logical_page_index(page_index)
+
+    def logical_page_index(self) -> int:
+        return self._viewer_workflow_required().session.current_page
+
+    def set_signature_rect(
+        self,
+        *,
+        page_index: int,
+        left_pt: float,
+        bottom_pt: float,
+        width_pt: float,
+        height_pt: float,
+    ) -> SignatureRect:
+        signature_rect = SignatureRect(
+            page_index=page_index,
+            left_pt=left_pt,
+            bottom_pt=bottom_pt,
+            width_pt=width_pt,
+            height_pt=height_pt,
+        )
+        self._properties_panel_required().set_signature_rect(signature_rect, notify=False)
+        self.apply_workspace_interaction_plan(
+            self._workspace_interaction_session_required().refresh_after_panel_change()
+        )
+        return signature_rect
+
+    def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
+        self._properties_panel_required().set_signature_rect(signature_rect)
+        jump_to_page = getattr(self._viewer_workflow_required(), "jump_to_page", None)
+        if callable(jump_to_page):
+            jump_to_page(signature_rect.page_index)
+        refresh = getattr(self._viewer_widget_required(), "refresh", None)
+        if callable(refresh):
+            refresh(navigation=True)
+        placement_context = (
+            self._viewer_interaction_session_required()
+            .current_placement_context()
+            .placement_context
+        )
+        self.apply_placement_context(placement_context)
+        self.sync_signature_overlay()
+        self._refresh_sign_button_state_required()()
+
+    def signature_rect(self) -> SignatureRect | None:
+        return self._draft_workflow.signature_rect
+
+    def set_selected_certificate_configuration_id(self, configuration_id: str | None) -> None:
+        self._draft_workflow.selected_certificate_configuration_id = configuration_id
+        self._properties_panel_required().load_from_workflow()
+
+    def selected_certificate_configuration_id(self) -> str | None:
+        return self._draft_workflow.selected_certificate_configuration_id
+
+    def signature_appearance(self) -> SignatureAppearance | None:
+        return self._draft_workflow.signature_appearance
+
+    def set_timestamp_required(self, required: bool) -> None:
+        self._draft_workflow.timestamp_required = required
+        self._properties_panel_required().load_from_workflow()
+
+    def current_request(self) -> SigningRequest | None:
+        return _snapshot_current_request(self._draft_workflow)
+
+    def is_sign_action_enabled(self) -> bool:
+        sign_button = self._sign_button_required()
+        is_enabled = getattr(sign_button, "isEnabled", None)
+        if callable(is_enabled):
+            return bool(is_enabled())
+        if hasattr(sign_button, "_enabled"):
+            return bool(sign_button._enabled)  # type: ignore[attr-defined]
+        return bool(getattr(sign_button, "enabled", False))
 
     def apply_workspace_interaction_plan(self, plan: WorkspaceInteractionPlan) -> None:
         self._interaction_bridge_required().apply_plan(plan)
@@ -138,6 +316,25 @@ class SigningWorkspaceRuntime:
             raise RuntimeError("SigningWorkspaceRuntime is not bound to a workspace session.")
         return self._workspace_interaction_session
 
+    def _viewer_interaction_session_required(self) -> ViewerInteractionSession:
+        if self._viewer_interaction_session is None:
+            raise RuntimeError(
+                "SigningWorkspaceRuntime is not bound to a viewer interaction session."
+            )
+        return self._viewer_interaction_session
+
+    def _viewer_workflow_required(self) -> ViewerWorkflow:
+        if self._viewer_workflow is None:
+            raise RuntimeError("SigningWorkspaceRuntime is not bound to a viewer workflow.")
+        return self._viewer_workflow
+
+    def _document_review_workspace_required(self) -> DocumentReviewWorkspaceSession:
+        if self._document_review_workspace is None:
+            raise RuntimeError(
+                "SigningWorkspaceRuntime is not bound to a document review workspace."
+            )
+        return self._document_review_workspace
+
     def _review_bridge_required(self) -> SigningWorkspaceReviewBridge:
         if self._review_bridge is None:
             raise RuntimeError("SigningWorkspaceRuntime is not bound to a review bridge.")
@@ -152,6 +349,23 @@ class SigningWorkspaceRuntime:
         if self._viewer_widget is None:
             raise RuntimeError("SigningWorkspaceRuntime is not bound to a viewer widget.")
         return self._viewer_widget
+
+    def _properties_panel_required(self) -> SignaturePropertiesPanel:
+        if self._properties_panel is None:
+            raise RuntimeError("SigningWorkspaceRuntime is not bound to a properties panel.")
+        return self._properties_panel
+
+    def _sign_button_required(self) -> Any:
+        if self._sign_button is None:
+            raise RuntimeError("SigningWorkspaceRuntime is not bound to a sign button.")
+        return self._sign_button
+
+    def _refresh_sign_button_state_required(self) -> Callable[[], None]:
+        if self._refresh_sign_button_state is None:
+            raise RuntimeError(
+                "SigningWorkspaceRuntime is not bound to a sign-button refresh callback."
+            )
+        return self._refresh_sign_button_state
 
     def _result_label_required(self) -> Any:
         if self._result_label is None:

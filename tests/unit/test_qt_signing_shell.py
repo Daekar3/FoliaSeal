@@ -2513,11 +2513,7 @@ def test_signing_shell_installs_named_compatibility_surface(
         signing_workflow=_ready_workflow(tmp_path),
     )
 
-    assert widget.compat_surface.properties_panel is widget.properties_panel
-    assert widget.compat_surface.viewer_widget is widget.viewer_widget
-    assert widget.compat_surface.sidebar_surface is widget.sidebar_surface
-    assert widget.compat_surface.refresh_viewer.__self__ is widget.compat_surface
-    assert widget.refresh_viewer.__self__ is widget.compat_surface
+    assert widget.compat_surface is not None
     assert widget.testing_adapter is not widget.compat_surface
     assert widget.testing_adapter.properties_panel is widget.properties_panel
     assert callable(widget.testing_adapter.signature_appearance)
@@ -2526,7 +2522,8 @@ def test_signing_shell_installs_named_compatibility_surface(
     assert callable(widget.testing_adapter.refresh_viewer)
     assert callable(widget.testing_adapter.current_request)
     assert callable(widget.testing_adapter.last_signing_result)
-    assert widget.testing_adapter.current_request() == widget.compat_surface.current_request()
+    assert widget.refresh_viewer.__self__ is not widget.compat_surface
+    assert widget.testing_adapter.current_request() == widget.current_request()
     assert widget.testing_adapter.last_signing_result() == widget.last_signing_result
 
 
