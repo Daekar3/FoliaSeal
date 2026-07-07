@@ -5,6 +5,9 @@ import foliaseal.presentation.qt.phase3_harness_session_runner as runner_module
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningResult
+from foliaseal.presentation.qt.phase3_harness_session_runner import (
+    Phase3HarnessSessionRunnerDeps,
+)
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessCaptureCommand,
     Phase3HarnessWorkspaceSnapshot,
@@ -216,14 +219,17 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
     )
 
     result = runner_module.Phase3HarnessSessionRunner(
-        build_qt_signing_shell=fake_build_qt_signing_shell,
-        build_workspace=lambda shell: workspace_holder.setdefault(
-            "workspace", _FakeWorkspace(shell)
-        ),
-        default_harness_output_pdf_path=(
-            lambda **kwargs: str(
-                tmp_path / f"{Path(kwargs['pdf_path']).stem}_{kwargs['sign_attempt_index']}.pdf"
-            )
+        deps=Phase3HarnessSessionRunnerDeps(
+            build_qt_signing_shell=fake_build_qt_signing_shell,
+            build_workspace=lambda shell: workspace_holder.setdefault(
+                "workspace", _FakeWorkspace(shell)
+            ),
+            default_harness_output_pdf_path=(
+                lambda **kwargs: str(
+                    tmp_path
+                    / f"{Path(kwargs['pdf_path']).stem}_{kwargs['sign_attempt_index']}.pdf"
+                )
+            ),
         ),
     ).run(
         bindings=bindings,

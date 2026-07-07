@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,6 +10,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
+    Phase3SignedAcceptanceScenarioExecutorDeps,
 )
 from tests.support.phase3_builders import build_signature_rect, build_signing_request
 
@@ -49,12 +51,12 @@ class _FakeWorkspace:
 
 
 def _executor(**overrides) -> Phase3SignedAcceptanceScenarioExecutor:
-    defaults = {
-        "apply_preview_matrix_scenario": lambda **_kwargs: None,
-        "build_workspace": lambda **_kwargs: _FakeWorkspace(),
-        "scenario_slug": lambda name: name.lower().replace(" ", "-"),
-        "snapshot_signing_result_payload": lambda result: {"success": result.success},
-        "snapshot_successful_signed_output": lambda **_kwargs: {
+    deps = Phase3SignedAcceptanceScenarioExecutorDeps(
+        apply_preview_matrix_scenario=lambda **_kwargs: None,
+        build_workspace=lambda **_kwargs: _FakeWorkspace(),
+        scenario_slug=lambda name: name.lower().replace(" ", "-"),
+        snapshot_signing_result_payload=lambda result: {"success": result.success},
+        snapshot_successful_signed_output=lambda **_kwargs: {
             "output_file_exists": True,
             "output_signature_count": 1,
             "output_signature_snapshot": {"embedded": True},
@@ -63,9 +65,10 @@ def _executor(**overrides) -> Phase3SignedAcceptanceScenarioExecutor:
             "signed_output_render_snapshot": {"preview_vs_signed_output_passed": True},
             "signed_output_preview_comparison": {"preview_vs_signed_output_passed": True},
         },
-    }
-    defaults.update(overrides)
-    return Phase3SignedAcceptanceScenarioExecutor(**defaults)
+    )
+    if overrides:
+        deps = replace(deps, **overrides)
+    return Phase3SignedAcceptanceScenarioExecutor(deps=deps)
 
 
 def test_signed_acceptance_scenario_executor_returns_preview_only_result_without_request(

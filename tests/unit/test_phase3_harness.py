@@ -912,18 +912,19 @@ def test_build_live_phase3_harness_workspace_wires_shared_qt_adapter_dependencie
     assert isinstance(workspace, _FakeWorkspace)
     assert captured["shell"] is shell
     assert captured["profile_store"] is profile_store
-    assert callable(captured["capture_preview_render"])
-    assert captured["snapshot_preview"] is phase3_harness_module._snapshot_preview
-    assert captured["snapshot_signing_request"] is phase3_harness_module._snapshot_signing_request
+    deps = captured["deps"]
+    assert callable(deps.capture_preview_render)
+    assert deps.snapshot_preview is phase3_harness_module._snapshot_preview
+    assert deps.snapshot_signing_request is phase3_harness_module._snapshot_signing_request
     assert (
-        captured["build_backend_reservation_evidence"]
+        deps.build_backend_reservation_evidence
         is phase3_harness_module.build_backend_reservation_evidence
     )
     assert (
-        captured["snapshot_sign_time_fit_diagnostics"]
+        deps.snapshot_sign_time_fit_diagnostics
         is phase3_harness_module._snapshot_sign_time_fit_diagnostics
     )
-    assert captured["interactive_capture_label"] is phase3_harness_module._interactive_capture_label
+    assert deps.interactive_capture_label is phase3_harness_module._interactive_capture_label
 
 
 def test_qt_phase3_harness_workspace_wrappers_delegate_to_shared_live_builder() -> None:
@@ -1164,32 +1165,6 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         "build_phase3_signing_executor",
         lambda: object(),
     )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_run_phase3_harness_session",
-        lambda **_kwargs: phase3_harness_module.Phase3HarnessSessionResult(
-            first_render_ms=12.5,
-            sign_requests=(request,),
-            signed_runs=(),
-            errors=(),
-            interaction_counts={"selection_success": 1},
-            captured_states=({"capture_kind": "manual"},),
-            final_state={
-                "capture_kind": "final",
-                "preview_snapshot": {"title": "Final preview"},
-                "sign_request_snapshot": {
-                    "signature_appearance": {"layout_template": "single_line"}
-                },
-                "backend_reservation_snapshot": {"layout_template": "single_line"},
-                "backend_reservation_error": None,
-                "preview_text": "Final preview",
-                "validation_text": "Ready to sign.",
-            },
-            capture_request=request,
-            last_signing_result=None,
-        ),
-    )
-
     def fake_finalize(request_obj, **_kwargs):
         captured["payload"] = request_obj.capture_payload
         return SimpleNamespace(
@@ -1210,7 +1185,44 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         fake_finalize,
     )
 
-    capture = Phase3Harness().run_signing_harness(
+    runner = phase3_harness_module.Phase3InteractiveHarnessRunner(
+        load_qt_harness_bindings=phase3_harness_module._load_qt_harness_bindings,
+        load_page_count=phase3_harness_module._load_page_count,
+        render_backend_factory=phase3_harness_module.QtPdfRenderBackend,
+        profile_store_factory=phase3_harness_module.SignaturePresetCatalogStore.default,
+        build_phase3_signing_executor=phase3_harness_module.build_phase3_signing_executor,
+        session_runner=SimpleNamespace(
+            run=lambda **_kwargs: phase3_harness_module.Phase3HarnessSessionResult(
+                first_render_ms=12.5,
+                sign_requests=(request,),
+                signed_runs=(),
+                errors=(),
+                interaction_counts={"selection_success": 1},
+                captured_states=({"capture_kind": "manual"},),
+                final_state={
+                    "capture_kind": "final",
+                    "preview_snapshot": {"title": "Final preview"},
+                    "sign_request_snapshot": {
+                        "signature_appearance": {"layout_template": "single_line"}
+                    },
+                    "backend_reservation_snapshot": {"layout_template": "single_line"},
+                    "backend_reservation_error": None,
+                    "preview_text": "Final preview",
+                    "validation_text": "Ready to sign.",
+                },
+                capture_request=request,
+                last_signing_result=None,
+            )
+        ),
+        capture_assembler=phase3_harness_module._build_phase3_harness_capture_assembler(),
+        contract_evaluator=evaluate_phase3_evidence_contract,
+        capture_factory=phase3_harness_module._build_phase3_harness_capture,
+        checklist_renderer=phase3_harness_module.render_phase3_checklist_results_markdown,
+        text_writer=phase3_harness_module._write_optional_text,
+        report_finalizer=phase3_harness_module.finalize_phase3_harness_report,
+        default_harness_artifacts_dir=phase3_harness_module._default_harness_artifacts_dir,
+    )
+    capture = runner.run(
         Phase3HarnessCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),
@@ -1237,72 +1249,12 @@ def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_repo
     cert_path = tmp_path / "cert.p12"
     _write_test_pdf(input_pdf)
     _write_test_pkcs12(cert_path, passphrase="secret")
-    request = build_signing_request(
-        tmp_path,
-        input_name="input.pdf",
-        output_name="output.pdf",
-        certificate_name="cert.p12",
-        passphrase="secret",
-        timestamp_required=False,
-    )
     captured = {}
 
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_load_qt_harness_bindings",
-        lambda: object(),
-    )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_load_page_count",
-        lambda **_kwargs: 1,
-    )
-
-    class _FakeBackend:
-        def diagnostics(self):
-            return type("_Diag", (), {"available": True, "message": "ok"})()
-
-    monkeypatch.setattr(phase3_harness_module, "QtPdfRenderBackend", _FakeBackend)
-    monkeypatch.setattr(
-        phase3_harness_module.SignaturePresetCatalogStore,
-        "default",
-        staticmethod(lambda: object()),
-    )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "build_phase3_signing_executor",
-        lambda: object(),
-    )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_run_phase3_harness_session",
-        lambda **_kwargs: phase3_harness_module.Phase3HarnessSessionResult(
-            first_render_ms=12.5,
-            sign_requests=(request,),
-            signed_runs=(),
-            errors=(),
-            interaction_counts={"selection_success": 1},
-            captured_states=({"capture_kind": "manual"},),
-            final_state={
-                "capture_kind": "final",
-                "preview_snapshot": {"title": "Final preview"},
-                "sign_request_snapshot": {
-                    "signature_appearance": {"layout_template": "single_line"}
-                },
-                "backend_reservation_snapshot": {"layout_template": "single_line"},
-                "backend_reservation_error": None,
-                "preview_text": "Final preview",
-                "validation_text": "Ready to sign.",
-            },
-            capture_request=request,
-            last_signing_result=None,
-        ),
-    )
-
-    def fake_finalize(request_obj, **_kwargs):
-        captured["payload"] = request_obj.capture_payload
-        return SimpleNamespace(
-            capture=SimpleNamespace(
+    class _FakeInteractivePort:
+        def run(self, request_obj):
+            captured["request"] = request_obj
+            return SimpleNamespace(
                 acceptance_tier="gate_candidate",
                 gate_verdict="gate_candidate",
                 validation_text="Ready to sign.",
@@ -1311,15 +1263,14 @@ def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_repo
                     {"capture_kind": "final"},
                 ),
             )
+
+    capture = Phase3Harness(
+        deps=Phase3HarnessDependencies(
+            interactive=_FakeInteractivePort(),
+            preview_matrix=object(),
+            signed_acceptance_matrix=object(),
         )
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "finalize_phase3_harness_report",
-        fake_finalize,
-    )
-
-    capture = Phase3Harness().run_signing_harness(
+    ).run_signing_harness(
         Phase3HarnessCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),
@@ -1332,10 +1283,9 @@ def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_repo
     )
 
     assert capture.acceptance_tier == "gate_candidate"
-    assert captured["payload"]["sign_request_count"] == 1
-    assert captured["payload"]["selection_count"] == 1
-    assert captured["payload"]["captured_states"][-1]["capture_kind"] == "final"
-    assert captured["payload"]["preview_snapshot"]["title"] == "Final preview"
+    assert captured["request"].pdf_path == str(input_pdf)
+    assert captured["request"].certificate_path == str(cert_path)
+    assert captured["request"].passphrase == "secret"
 
 
 def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
@@ -2209,8 +2159,9 @@ def test_phase3_harness_facade_run_preview_matrix_delegates_to_runner(tmp_path: 
 
     harness = Phase3Harness(
         deps=Phase3HarnessDependencies(
-            build_preview_matrix_runner=lambda: FakeRunner(),
-            build_signed_acceptance_matrix_runner=lambda: None,
+            interactive=object(),
+            preview_matrix=phase3_harness_module.Phase3PreviewMatrixPort(runner=FakeRunner()),
+            signed_acceptance_matrix=object(),
         )
     )
 
@@ -2251,8 +2202,8 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_preview_matrix_runner",
-        lambda: FakeRunner(),
+        "_build_phase3_preview_matrix_port",
+        lambda: phase3_harness_module.Phase3PreviewMatrixPort(runner=FakeRunner()),
     )
 
     summary = Phase3Harness().run_preview_matrix(
@@ -2291,8 +2242,11 @@ def test_phase3_harness_facade_run_signed_acceptance_matrix_delegates_to_runner(
 
     harness = Phase3Harness(
         deps=Phase3HarnessDependencies(
-            build_preview_matrix_runner=lambda: None,
-            build_signed_acceptance_matrix_runner=lambda: FakeRunner(),
+            interactive=object(),
+            preview_matrix=object(),
+            signed_acceptance_matrix=phase3_harness_module.Phase3SignedAcceptanceMatrixPort(
+                runner=FakeRunner()
+            ),
         )
     )
 
@@ -2333,8 +2287,8 @@ def test_phase3_harness_default_dependencies_use_signed_acceptance_runner_builde
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_signed_acceptance_matrix_runner",
-        lambda: FakeRunner(),
+        "_build_phase3_signed_acceptance_matrix_port",
+        lambda: phase3_harness_module.Phase3SignedAcceptanceMatrixPort(runner=FakeRunner()),
     )
 
     summary = Phase3Harness().run_signed_acceptance_matrix(

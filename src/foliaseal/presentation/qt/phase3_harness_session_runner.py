@@ -55,12 +55,19 @@ class _QtHarnessBindings:
 
 
 @dataclass(frozen=True)
-class Phase3HarnessSessionRunner:
-    """Own the Qt lifecycle and callback cluster for one interactive harness run."""
+class Phase3HarnessSessionRunnerDeps:
+    """Typed collaborator bundle for one interactive harness session."""
 
     build_qt_signing_shell: BuildQtSigningShell
     build_workspace: BuildWorkspace
     default_harness_output_pdf_path: DefaultHarnessOutputPdfPath
+
+
+@dataclass(frozen=True)
+class Phase3HarnessSessionRunner:
+    """Own the Qt lifecycle and callback cluster for one interactive harness run."""
+
+    deps: Phase3HarnessSessionRunnerDeps
 
     def run(
         self,
@@ -105,7 +112,7 @@ class Phase3HarnessSessionRunner:
 
         def on_sign_request(request: SigningRequest) -> None:
             sign_requests.append(request)
-            signing_workflow.output_pdf_path = self.default_harness_output_pdf_path(
+            signing_workflow.output_pdf_path = self.deps.default_harness_output_pdf_path(
                 pdf_path=str(source_path),
                 artifacts_dir=artifacts_dir,
                 sign_attempt_index=len(sign_requests) + 1,
@@ -151,7 +158,7 @@ class Phase3HarnessSessionRunner:
                 )
             )
 
-        shell = self.build_qt_signing_shell(
+        shell = self.deps.build_qt_signing_shell(
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
             preset_catalog_store=profile_store,
@@ -160,7 +167,7 @@ class Phase3HarnessSessionRunner:
             on_error=on_error,
             on_status_change=on_status_change,
         )
-        workspace = self.build_workspace(shell)
+        workspace = self.deps.build_workspace(shell)
         body_layout.addWidget(shell, 1)
 
         def do_refresh() -> None:

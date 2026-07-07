@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner as runner_module
 from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
     Phase3SignedAcceptanceMatrixRunner,
+    Phase3SignedAcceptanceMatrixRunnerDeps,
 )
 
 
@@ -84,40 +84,43 @@ def _runner(
     build_workspace=None,
 ) -> Phase3SignedAcceptanceMatrixRunner:
     return Phase3SignedAcceptanceMatrixRunner(
-        load_qt_harness_bindings=lambda: _FakeBindings(),
-        load_preview_matrix_manifest=lambda _path: manifest,
-        build_phase3_signing_executor=build_signing_executor
-        or (lambda **kwargs: {"executor": kwargs}),
-        build_dummy_timestamper=build_dummy_timestamper or (lambda: object()),
-        load_page_count=lambda **_kwargs: 1,
-        build_qt_signing_shell=lambda **_kwargs: _FakeShell(),
-        build_workspace=build_workspace or (lambda **_kwargs: _FakeWorkspace()),
-        execute_signed_acceptance_scenario=scenario_executor,
-        preview_matrix_error_result=lambda **kwargs: {
-            "name": kwargs["scenario"]["name"],
-            "error": str(kwargs["error"]),
-            "error_type": type(kwargs["error"]).__name__,
-        },
-        signed_matrix_diagnostic_summary=lambda results: {
-            "successful_signing_run_count": sum(
-                1
-                for item in results
-                if isinstance(item.get("signing_result"), dict)
-                and item["signing_result"].get("success") is True
-            ),
-            "matched_expected_intentional_rejection_count": 0,
-            "expected_outcome_mismatch_count": 0,
-            "cryptographic_validation_failure_count": 0,
-            "preview_output_comparison_failure_count": 0,
-            "annotation_rect_mismatch_count": 0,
-        },
-        evaluate_signed_matrix_acceptance_expectations=lambda **_kwargs: expectation_result,
-        jsonable_capture=lambda payload: payload,
+        deps=Phase3SignedAcceptanceMatrixRunnerDeps(
+            load_qt_harness_bindings=lambda: _FakeBindings(),
+            load_preview_matrix_manifest=lambda _path: manifest,
+            build_phase3_signing_executor=build_signing_executor
+            or (lambda **kwargs: {"executor": kwargs}),
+            build_dummy_timestamper=build_dummy_timestamper or (lambda: object()),
+            load_page_count=lambda **_kwargs: 1,
+            build_qt_signing_shell=lambda **_kwargs: _FakeShell(),
+            build_workspace=build_workspace or (lambda **_kwargs: _FakeWorkspace()),
+            execute_signed_acceptance_scenario=scenario_executor,
+            preview_matrix_error_result=lambda **kwargs: {
+                "name": kwargs["scenario"]["name"],
+                "error": str(kwargs["error"]),
+                "error_type": type(kwargs["error"]).__name__,
+            },
+            signed_matrix_diagnostic_summary=lambda results: {
+                "successful_signing_run_count": sum(
+                    1
+                    for item in results
+                    if isinstance(item.get("signing_result"), dict)
+                    and item["signing_result"].get("success") is True
+                ),
+                "matched_expected_intentional_rejection_count": 0,
+                "expected_outcome_mismatch_count": 0,
+                "cryptographic_validation_failure_count": 0,
+                "preview_output_comparison_failure_count": 0,
+                "annotation_rect_mismatch_count": 0,
+            },
+            evaluate_signed_matrix_acceptance_expectations=lambda **_kwargs: expectation_result,
+            jsonable_capture=lambda payload: payload,
+            render_backend_factory=_FakeBackend,
+        )
     )
 
 
 def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
 ) -> None:
     source_pdf = tmp_path / "fixture.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
@@ -126,8 +129,6 @@ def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
     executor_calls: list[dict[str, object]] = []
     workspace_calls: list[dict[str, object]] = []
     workspace = _FakeWorkspace()
-
-    monkeypatch.setattr(runner_module, "QtPdfRenderBackend", _FakeBackend)
 
     runner = _runner(
         manifest={
@@ -171,14 +172,10 @@ def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
     assert workspace_calls[0]["profile_store"] is not None
 
 
-def test_signed_acceptance_matrix_runner_records_error_results(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_signed_acceptance_matrix_runner_records_error_results(tmp_path: Path) -> None:
     source_pdf = tmp_path / "fixture.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
     artifacts_dir = tmp_path / "artifacts"
-
-    monkeypatch.setattr(runner_module, "QtPdfRenderBackend", _FakeBackend)
 
     def execute(**kwargs):
         if kwargs["scenario"]["name"] == "Scenario B":

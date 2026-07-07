@@ -14,10 +14,12 @@ from foliaseal.domain.models import (
 )
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     HeadlessPhase3HarnessWorkspaceAdapter,
+    HeadlessPhase3HarnessWorkspaceDeps,
     Phase3HarnessCaptureCommand,
     Phase3HarnessScenarioCommand,
     Phase3HarnessWorkspaceSnapshot,
     QtPhase3HarnessWorkspaceAdapter,
+    QtPhase3HarnessWorkspaceDeps,
     capture_qt_preview_render,
     snapshot_current_draft_request,
 )
@@ -317,30 +319,36 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
     adapter = QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=object(),
-        capture_preview_render=lambda **_kwargs: {"preview_image_path": "artifacts/preview.png"},
-        snapshot_preview=lambda preview, **kwargs: {
-            "title": preview.title,
-            "render_capture": kwargs["render_capture"],
-            "sign_time_diagnostics": kwargs["sign_time_diagnostics"],
-        },
-        snapshot_signing_request=lambda current_request: (
-            None
-            if current_request is None
-            else {"layout_template": current_request.signature_appearance.layout_template.value}
-        ),
-        build_backend_reservation_evidence=lambda current_request: type(
-            "_Reservation",
-            (),
-            {
-                "snapshot": {
-                    "layout_template": current_request.signature_appearance.layout_template.value
-                },
-                "error": None,
+        deps=QtPhase3HarnessWorkspaceDeps(
+            capture_preview_render=lambda **_kwargs: {
+                "preview_image_path": "artifacts/preview.png"
             },
-        )(),
-        snapshot_sign_time_fit_diagnostics=lambda **_kwargs: {"fit": "ok"},
-        interactive_capture_label=lambda **kwargs: (
-            f"{kwargs['capture_kind']}_{kwargs['capture_index']:02d}"
+            snapshot_preview=lambda preview, **kwargs: {
+                "title": preview.title,
+                "render_capture": kwargs["render_capture"],
+                "sign_time_diagnostics": kwargs["sign_time_diagnostics"],
+            },
+            snapshot_signing_request=lambda current_request: (
+                None
+                if current_request is None
+                else {"layout_template": current_request.signature_appearance.layout_template.value}
+            ),
+            build_backend_reservation_evidence=lambda current_request: type(
+                "_Reservation",
+                (),
+                {
+                    "snapshot": {
+                        "layout_template": (
+                            current_request.signature_appearance.layout_template.value
+                        )
+                    },
+                    "error": None,
+                },
+            )(),
+            snapshot_sign_time_fit_diagnostics=lambda **_kwargs: {"fit": "ok"},
+            interactive_capture_label=lambda **kwargs: (
+                f"{kwargs['capture_kind']}_{kwargs['capture_index']:02d}"
+            ),
         ),
     )
 
@@ -936,23 +944,27 @@ def test_headless_phase3_harness_workspace_adapter_captures_preview_state() -> N
     adapter = HeadlessPhase3HarnessWorkspaceAdapter(
         workflow=workflow,
         profile_store=object(),
-        headless_preview_text=lambda _preview: "Preview text",
-        headless_validation_text=lambda _preview: "Ready to sign.",
-        capture_headless_preview_render=lambda **_kwargs: {"preview_image_path": "headless.png"},
-        snapshot_preview=lambda current_preview, **kwargs: {
-            "title": current_preview.title,
-            "render_capture": kwargs["render_capture"],
-        },
-        snapshot_signing_request=lambda current_request: (
-            None
-            if current_request is None
-            else {"output_pdf_path": current_request.output_pdf_path}
+        deps=HeadlessPhase3HarnessWorkspaceDeps(
+            headless_preview_text=lambda _preview: "Preview text",
+            headless_validation_text=lambda _preview: "Ready to sign.",
+            capture_headless_preview_render=lambda **_kwargs: {
+                "preview_image_path": "headless.png"
+            },
+            snapshot_preview=lambda current_preview, **kwargs: {
+                "title": current_preview.title,
+                "render_capture": kwargs["render_capture"],
+            },
+            snapshot_signing_request=lambda current_request: (
+                None
+                if current_request is None
+                else {"output_pdf_path": current_request.output_pdf_path}
+            ),
+            build_backend_reservation_evidence=lambda current_request: type(
+                "_Reservation",
+                (),
+                {"snapshot": {"output_pdf_path": current_request.output_pdf_path}, "error": None},
+            )(),
         ),
-        build_backend_reservation_evidence=lambda current_request: type(
-            "_Reservation",
-            (),
-            {"snapshot": {"output_pdf_path": current_request.output_pdf_path}, "error": None},
-        )(),
     )
     workflow.preview = lambda: preview  # type: ignore[method-assign]
 

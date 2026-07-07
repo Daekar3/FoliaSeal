@@ -12,7 +12,6 @@ from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspacePort,
 )
@@ -32,8 +31,8 @@ JsonableCapture = Callable[[Any], Any]
 
 
 @dataclass(frozen=True)
-class Phase3SignedAcceptanceMatrixRunner:
-    """Own one signed-output acceptance sweep and summary artifact."""
+class Phase3SignedAcceptanceMatrixRunnerDeps:
+    """Typed collaborator bundle for the signed-acceptance matrix runner."""
 
     load_qt_harness_bindings: LoadQtHarnessBindings
     load_preview_matrix_manifest: LoadPreviewMatrixManifest
@@ -49,6 +48,14 @@ class Phase3SignedAcceptanceMatrixRunner:
         EvaluateSignedMatrixAcceptanceExpectations
     )
     jsonable_capture: JsonableCapture
+    render_backend_factory: Callable[[], Any]
+
+
+@dataclass(frozen=True)
+class Phase3SignedAcceptanceMatrixRunner:
+    """Own one signed-output acceptance sweep and summary artifact."""
+
+    deps: Phase3SignedAcceptanceMatrixRunnerDeps
 
     def run(
         self,
@@ -59,28 +66,28 @@ class Phase3SignedAcceptanceMatrixRunner:
         scenario_manifest_path: str,
         artifacts_dir: str,
     ) -> dict[str, Any]:
-        bindings = self.load_qt_harness_bindings()
+        bindings = self.deps.load_qt_harness_bindings()
         source_path = Path(pdf_path)
         if not source_path.exists():
             raise FileNotFoundError(f"PDF does not exist: {pdf_path}")
 
-        manifest = self.load_preview_matrix_manifest(scenario_manifest_path)
+        manifest = self.deps.load_preview_matrix_manifest(scenario_manifest_path)
         scenarios = manifest["scenarios"]
         artifact_root = Path(artifacts_dir)
         artifact_root.mkdir(parents=True, exist_ok=True)
         timestamping_mode = manifest.get("timestamping_mode", "real")
         if timestamping_mode not in {"real", "dummy"}:
             raise ValueError("'timestamping_mode' must be one of 'real' or 'dummy'.")
-        sign_executor = self.build_phase3_signing_executor(
+        sign_executor = self.deps.build_phase3_signing_executor(
             timestamper_factory=(
-                (lambda _tsa_url: self.build_dummy_timestamper())
+                (lambda _tsa_url: self.deps.build_dummy_timestamper())
                 if timestamping_mode == "dummy"
                 else None
             )
         )
 
-        page_count = self.load_page_count(bindings=bindings, pdf_path=str(source_path))
-        backend = QtPdfRenderBackend()
+        page_count = self.deps.load_page_count(bindings=bindings, pdf_path=str(source_path))
+        backend = self.deps.render_backend_factory()
         diagnostic = backend.diagnostics()
         if not diagnostic.available:
             raise RuntimeError(diagnostic.message)
@@ -106,7 +113,7 @@ class Phase3SignedAcceptanceMatrixRunner:
             f"FoliaSeal Phase 3 Signed Acceptance Matrix - {source_path.name}"
         )
         window.resize(1440, 980)
-        shell = self.build_qt_signing_shell(
+        shell = self.deps.build_qt_signing_shell(
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
             preset_catalog_store=profile_store,
@@ -114,14 +121,14 @@ class Phase3SignedAcceptanceMatrixRunner:
         )
         window.setCentralWidget(shell)
         window.show()
-        workspace = self.build_workspace(shell=shell, profile_store=profile_store)
+        workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
         workspace.refresh_viewer()
         app.processEvents()
 
         results: list[dict[str, Any]] = []
         for scenario in scenarios:
             try:
-                result = self.execute_signed_acceptance_scenario(
+                result = self.deps.execute_signed_acceptance_scenario(
                     shell=shell,
                     scenario=scenario,
                     profile_store=profile_store,
@@ -132,7 +139,7 @@ class Phase3SignedAcceptanceMatrixRunner:
                     sign_executor=sign_executor,
                 )
             except Exception as exc:
-                result = self.preview_matrix_error_result(scenario=scenario, error=exc)
+                result = self.deps.preview_matrix_error_result(scenario=scenario, error=exc)
             results.append(result)
             app.processEvents()
 
@@ -151,14 +158,14 @@ class Phase3SignedAcceptanceMatrixRunner:
                 if _mapping(item.get("signing_result")).get("success") is True
             ),
             "error_scenario_count": sum(1 for item in results if "error" in item),
-            **self.signed_matrix_diagnostic_summary(results),
+            **self.deps.signed_matrix_diagnostic_summary(results),
             "results": results,
         }
         if "acceptance_expectations" in manifest:
             summary["acceptance_expectations"] = manifest["acceptance_expectations"]
         summary["timestamping_mode"] = timestamping_mode
         expectations_passed, expectation_errors = (
-            self.evaluate_signed_matrix_acceptance_expectations(
+            self.deps.evaluate_signed_matrix_acceptance_expectations(
                 summary=summary,
                 manifest_expectations=_mapping(manifest.get("acceptance_expectations")),
             )
@@ -167,7 +174,7 @@ class Phase3SignedAcceptanceMatrixRunner:
         summary["acceptance_expectation_errors"] = expectation_errors
         summary_path = artifact_root / "summary.json"
         summary_path.write_text(
-            json.dumps(self.jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
+            json.dumps(self.deps.jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         return summary

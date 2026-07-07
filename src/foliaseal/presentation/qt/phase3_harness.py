@@ -11,7 +11,7 @@ from dataclasses import dataclass, field, fields, is_dataclass, replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from PIL import Image, ImageDraw
 from pyhanko.pdf_utils import generic
@@ -82,14 +82,17 @@ from foliaseal.presentation.qt.phase3_harness_reporting import (
 from foliaseal.presentation.qt.phase3_harness_session_runner import (
     Phase3HarnessSessionResult,
     Phase3HarnessSessionRunner,
+    Phase3HarnessSessionRunnerDeps,
     _QtHarnessBindings,
 )
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     HeadlessPhase3HarnessWorkspaceAdapter,
+    HeadlessPhase3HarnessWorkspaceDeps,
     Phase3HarnessCaptureCommand,
     Phase3HarnessScenarioCommand,
     Phase3HarnessWorkspacePort,
     QtPhase3HarnessWorkspaceAdapter,
+    QtPhase3HarnessWorkspaceDeps,
     capture_qt_preview_render,
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
@@ -97,15 +100,18 @@ from foliaseal.presentation.qt.phase3_image_comparison_helper import (
 )
 from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
     Phase3PreviewMatrixRunner,
+    Phase3PreviewMatrixRunnerDeps,
 )
 from foliaseal.presentation.qt.phase3_sign_time_diagnostics_snapshotter import (
     Phase3SignTimeDiagnosticsSnapshotter,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
     Phase3SignedAcceptanceMatrixRunner,
+    Phase3SignedAcceptanceMatrixRunnerDeps,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
+    Phase3SignedAcceptanceScenarioExecutorDeps,
 )
 from foliaseal.presentation.qt.phase3_signed_output_render_snapshotter import (
     Phase3SignedOutputRenderSnapshotter,
@@ -126,6 +132,18 @@ _PREVIEW_MATRIX_SHELL_RECYCLE_INTERVAL = 1
 
 BuildPhase3PreviewMatrixRunner = Callable[[], Phase3PreviewMatrixRunner]
 BuildPhase3SignedAcceptanceMatrixRunner = Callable[[], Phase3SignedAcceptanceMatrixRunner]
+
+
+class Phase3HarnessInteractivePort(Protocol):
+    """Run one interactive Phase 3 harness capture."""
+
+    def run(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture: ...
+
+
+class Phase3HarnessMatrixPort(Protocol):
+    """Run one non-interactive Phase 3 matrix flow."""
+
+    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True)
@@ -183,14 +201,16 @@ class Phase3HarnessCapture:
 class Phase3HarnessDependencies:
     """Injectable collaborators for the Phase 3 harness facade."""
 
-    build_preview_matrix_runner: BuildPhase3PreviewMatrixRunner
-    build_signed_acceptance_matrix_runner: BuildPhase3SignedAcceptanceMatrixRunner
+    interactive: Phase3HarnessInteractivePort
+    preview_matrix: Phase3HarnessMatrixPort
+    signed_acceptance_matrix: Phase3HarnessMatrixPort
 
     @classmethod
     def default(cls) -> Phase3HarnessDependencies:
         return cls(
-            build_preview_matrix_runner=_build_phase3_preview_matrix_runner,
-            build_signed_acceptance_matrix_runner=_build_phase3_signed_acceptance_matrix_runner,
+            interactive=_build_phase3_interactive_harness_runner(),
+            preview_matrix=_build_phase3_preview_matrix_port(),
+            signed_acceptance_matrix=_build_phase3_signed_acceptance_matrix_port(),
         )
 
 
@@ -200,39 +220,96 @@ class Phase3Harness:
 
     deps: Phase3HarnessDependencies = field(default_factory=Phase3HarnessDependencies.default)
 
+    def preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        return self.deps.preview_matrix.run(request)
+
     def run_preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.deps.build_preview_matrix_runner().run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
+        return self.preview_matrix(request)
+
+    def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        return self.deps.signed_acceptance_matrix.run(request)
 
     def run_signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.deps.build_signed_acceptance_matrix_runner().run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
+        return self.signed_acceptance_matrix(request)
+
+    def capture(
+        self,
+        request: Phase3HarnessCaptureRequest,
+    ) -> Phase3HarnessCapture:
+        return self.deps.interactive.run(request)
 
     def run_signing_harness(
         self,
         request: Phase3HarnessCaptureRequest,
     ) -> Phase3HarnessCapture:
-        bindings = _load_qt_harness_bindings()
+        return self.capture(request)
+
+
+@dataclass(frozen=True)
+class Phase3PreviewMatrixPort:
+    """Thin gateway from the harness facade to the preview-matrix runner."""
+
+    runner: Phase3PreviewMatrixRunner
+
+    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        return self.runner.run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+
+@dataclass(frozen=True)
+class Phase3SignedAcceptanceMatrixPort:
+    """Thin gateway from the harness facade to the signed-acceptance runner."""
+
+    runner: Phase3SignedAcceptanceMatrixRunner
+
+    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        return self.runner.run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+
+@dataclass(frozen=True)
+class Phase3InteractiveHarnessRunner:
+    """Interactive capture gateway that hides session and reporting choreography."""
+
+    load_qt_harness_bindings: Callable[[], _QtHarnessBindings]
+    load_page_count: Callable[..., int]
+    render_backend_factory: Callable[[], Any]
+    profile_store_factory: Callable[[], Any]
+    build_phase3_signing_executor: Callable[[], Any]
+    session_runner: Phase3HarnessSessionRunner
+    capture_assembler: Phase3HarnessCaptureAssembler
+    contract_evaluator: Callable[..., Any]
+    capture_factory: Callable[..., Phase3HarnessCapture]
+    checklist_renderer: Callable[..., str]
+    text_writer: Callable[..., None]
+    report_finalizer: Callable[..., Any]
+    default_harness_artifacts_dir: Callable[..., str | None]
+
+    def run(
+        self,
+        request: Phase3HarnessCaptureRequest,
+    ) -> Phase3HarnessCapture:
+        bindings = self.load_qt_harness_bindings()
         source_path = Path(request.pdf_path)
         if not source_path.exists():
             raise FileNotFoundError(f"PDF does not exist: {request.pdf_path}")
-        artifacts_dir = _default_harness_artifacts_dir(
+        artifacts_dir = self.default_harness_artifacts_dir(
             summary_json_path=request.summary_json_path,
             artifacts_dir=request.artifacts_dir,
         )
 
-        page_count = _load_page_count(bindings=bindings, pdf_path=str(source_path))
-        backend = QtPdfRenderBackend()
+        page_count = self.load_page_count(bindings=bindings, pdf_path=str(source_path))
+        backend = self.render_backend_factory()
         diagnostic = backend.diagnostics()
         if not diagnostic.available:
             raise RuntimeError(diagnostic.message)
@@ -254,10 +331,9 @@ class Phase3Harness:
             tsa_url="https://tsa.example.invalid",
             timestamp_required=False,
         )
-        profile_store = SignaturePresetCatalogStore.default()
-        sign_executor = build_phase3_signing_executor()
-        capture_assembler = _build_phase3_harness_capture_assembler()
-        session = _run_phase3_harness_session(
+        profile_store = self.profile_store_factory()
+        sign_executor = self.build_phase3_signing_executor()
+        session = self.session_runner.run(
             bindings=bindings,
             source_path=source_path,
             artifacts_dir=artifacts_dir,
@@ -265,27 +341,26 @@ class Phase3Harness:
             signing_workflow=signing_workflow,
             profile_store=profile_store,
             sign_executor=sign_executor,
-            capture_assembler=capture_assembler,
+            capture_assembler=self.capture_assembler,
         )
-        capture_payload = _build_phase3_harness_capture_payload(
+        capture_payload = self.capture_assembler.build_capture_payload(
             source_path=source_path,
             summary_json_path=request.summary_json_path,
             checklist_results_path=request.checklist_results_path,
             artifacts_dir=artifacts_dir,
             session=session,
-            capture_assembler=capture_assembler,
         )
-        report = finalize_phase3_harness_report(
+        report = self.report_finalizer(
             Phase3HarnessReportRequest(
                 capture_payload=capture_payload,
                 summary_json_path=request.summary_json_path,
                 checklist_results_path=request.checklist_results_path,
                 checklist_template_path=request.checklist_template_path,
             ),
-            contract_evaluator=evaluate_phase3_evidence_contract,
-            capture_factory=_build_phase3_harness_capture,
-            checklist_renderer=render_phase3_checklist_results_markdown,
-            text_writer=_write_optional_text,
+            contract_evaluator=self.contract_evaluator,
+            capture_factory=self.capture_factory,
+            checklist_renderer=self.checklist_renderer,
+            text_writer=self.text_writer,
         )
         capture = report.capture
         if request.summary_json_path is None:
@@ -304,6 +379,36 @@ class Phase3Harness:
         print("Review the pre-checked items, complete the remaining manual-only checks, and")
         print("use the generated file as the acceptance worksheet for Phase 3.")
         return capture
+
+
+def _build_phase3_interactive_harness_runner() -> Phase3InteractiveHarnessRunner:
+    return Phase3InteractiveHarnessRunner(
+        load_qt_harness_bindings=_load_qt_harness_bindings,
+        load_page_count=_load_page_count,
+        render_backend_factory=QtPdfRenderBackend,
+        profile_store_factory=SignaturePresetCatalogStore.default,
+        build_phase3_signing_executor=build_phase3_signing_executor,
+        session_runner=_build_phase3_harness_session_runner(),
+        capture_assembler=_build_phase3_harness_capture_assembler(),
+        contract_evaluator=evaluate_phase3_evidence_contract,
+        capture_factory=_build_phase3_harness_capture,
+        checklist_renderer=render_phase3_checklist_results_markdown,
+        text_writer=_write_optional_text,
+        report_finalizer=finalize_phase3_harness_report,
+        default_harness_artifacts_dir=_default_harness_artifacts_dir,
+    )
+
+
+def _build_phase3_preview_matrix_port() -> Phase3PreviewMatrixPort:
+    return Phase3PreviewMatrixPort(runner=_build_phase3_preview_matrix_runner())
+
+
+def _build_phase3_signed_acceptance_matrix_port() -> Phase3SignedAcceptanceMatrixPort:
+    return Phase3SignedAcceptanceMatrixPort(
+        runner=_build_phase3_signed_acceptance_matrix_runner()
+    )
+
+
 def _run_phase3_harness_session(
     *,
     bindings: _QtHarnessBindings,
@@ -413,9 +518,11 @@ def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
 
 def _build_phase3_harness_session_runner() -> Phase3HarnessSessionRunner:
     return Phase3HarnessSessionRunner(
-        build_qt_signing_shell=build_qt_signing_shell,
-        build_workspace=_build_qt_phase3_harness_workspace,
-        default_harness_output_pdf_path=_default_harness_output_pdf_path,
+        deps=Phase3HarnessSessionRunnerDeps(
+            build_qt_signing_shell=build_qt_signing_shell,
+            build_workspace=_build_qt_phase3_harness_workspace,
+            default_harness_output_pdf_path=_default_harness_output_pdf_path,
+        )
     )
 
 
@@ -454,15 +561,17 @@ def _build_live_phase3_harness_workspace(
     return QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=profile_store,
-        capture_preview_render=partial(
-            capture_qt_preview_render,
-            build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
+        deps=QtPhase3HarnessWorkspaceDeps(
+            capture_preview_render=partial(
+                capture_qt_preview_render,
+                build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
+            ),
+            snapshot_preview=_snapshot_preview,
+            snapshot_signing_request=_snapshot_signing_request,
+            build_backend_reservation_evidence=build_backend_reservation_evidence,
+            snapshot_sign_time_fit_diagnostics=_snapshot_sign_time_fit_diagnostics,
+            interactive_capture_label=_interactive_capture_label,
         ),
-        snapshot_preview=_snapshot_preview,
-        snapshot_signing_request=_snapshot_signing_request,
-        build_backend_reservation_evidence=build_backend_reservation_evidence,
-        snapshot_sign_time_fit_diagnostics=_snapshot_sign_time_fit_diagnostics,
-        interactive_capture_label=_interactive_capture_label,
     )
 
 
@@ -492,12 +601,14 @@ def _build_preview_matrix_headless_workspace(
     return HeadlessPhase3HarnessWorkspaceAdapter(
         workflow=workflow,
         profile_store=profile_store,
-        headless_preview_text=_headless_preview_text,
-        headless_validation_text=_headless_validation_text,
-        capture_headless_preview_render=_capture_headless_preview_render,
-        snapshot_preview=_snapshot_preview,
-        snapshot_signing_request=_snapshot_signing_request,
-        build_backend_reservation_evidence=build_backend_reservation_evidence,
+        deps=HeadlessPhase3HarnessWorkspaceDeps(
+            headless_preview_text=_headless_preview_text,
+            headless_validation_text=_headless_validation_text,
+            capture_headless_preview_render=_capture_headless_preview_render,
+            snapshot_preview=_snapshot_preview,
+            snapshot_signing_request=_snapshot_signing_request,
+            build_backend_reservation_evidence=build_backend_reservation_evidence,
+        ),
     )
 
 
@@ -581,11 +692,14 @@ def _build_signed_run_bundle(
 
 def _build_phase3_preview_matrix_runner() -> Phase3PreviewMatrixRunner:
     return Phase3PreviewMatrixRunner(
-        load_preview_matrix_manifest=_load_preview_matrix_manifest,
-        execute_headless_preview_matrix_scenario=_execute_headless_preview_matrix_scenario,
-        preview_matrix_error_result=_preview_matrix_error_result,
-        preview_matrix_diagnostic_summary=_preview_matrix_diagnostic_summary,
-        jsonable_capture=_jsonable_capture,
+        deps=Phase3PreviewMatrixRunnerDeps(
+            load_preview_matrix_manifest=_load_preview_matrix_manifest,
+            execute_headless_preview_matrix_scenario=_execute_headless_preview_matrix_scenario,
+            preview_matrix_error_result=_preview_matrix_error_result,
+            preview_matrix_diagnostic_summary=_preview_matrix_diagnostic_summary,
+            jsonable_capture=_jsonable_capture,
+            profile_store_factory=SignaturePresetCatalogStore.default,
+        )
     )
 
 
@@ -593,20 +707,23 @@ def _build_phase3_signed_acceptance_matrix_runner() -> (
     Phase3SignedAcceptanceMatrixRunner
 ):
     return Phase3SignedAcceptanceMatrixRunner(
-        load_qt_harness_bindings=_load_qt_harness_bindings,
-        load_preview_matrix_manifest=_load_preview_matrix_manifest,
-        build_phase3_signing_executor=build_phase3_signing_executor,
-        build_dummy_timestamper=build_dummy_timestamper,
-        load_page_count=_load_page_count,
-        build_qt_signing_shell=build_qt_signing_shell,
-        build_workspace=_build_preview_matrix_qt_workspace,
-        execute_signed_acceptance_scenario=_execute_signed_acceptance_scenario,
-        preview_matrix_error_result=_preview_matrix_error_result,
-        signed_matrix_diagnostic_summary=_signed_matrix_diagnostic_summary,
-        evaluate_signed_matrix_acceptance_expectations=(
-            _evaluate_signed_matrix_acceptance_expectations
-        ),
-        jsonable_capture=_jsonable_capture,
+        deps=Phase3SignedAcceptanceMatrixRunnerDeps(
+            load_qt_harness_bindings=_load_qt_harness_bindings,
+            load_preview_matrix_manifest=_load_preview_matrix_manifest,
+            build_phase3_signing_executor=build_phase3_signing_executor,
+            build_dummy_timestamper=build_dummy_timestamper,
+            load_page_count=_load_page_count,
+            build_qt_signing_shell=build_qt_signing_shell,
+            build_workspace=_build_preview_matrix_qt_workspace,
+            execute_signed_acceptance_scenario=_execute_signed_acceptance_scenario,
+            preview_matrix_error_result=_preview_matrix_error_result,
+            signed_matrix_diagnostic_summary=_signed_matrix_diagnostic_summary,
+            evaluate_signed_matrix_acceptance_expectations=(
+                _evaluate_signed_matrix_acceptance_expectations
+            ),
+            jsonable_capture=_jsonable_capture,
+            render_backend_factory=QtPdfRenderBackend,
+        )
     )
 
 
@@ -614,11 +731,13 @@ def _build_phase3_signed_acceptance_scenario_executor() -> (
     Phase3SignedAcceptanceScenarioExecutor
 ):
     return Phase3SignedAcceptanceScenarioExecutor(
-        apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
-        build_workspace=_build_preview_matrix_qt_workspace,
-        scenario_slug=_scenario_slug,
-        snapshot_signing_result_payload=_snapshot_signing_result_payload,
-        snapshot_successful_signed_output=_snapshot_successful_signed_output,
+        deps=Phase3SignedAcceptanceScenarioExecutorDeps(
+            apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
+            build_workspace=_build_preview_matrix_qt_workspace,
+            scenario_slug=_scenario_slug,
+            snapshot_signing_result_payload=_snapshot_signing_result_payload,
+            snapshot_successful_signed_output=_snapshot_successful_signed_output,
+        )
     )
 
 

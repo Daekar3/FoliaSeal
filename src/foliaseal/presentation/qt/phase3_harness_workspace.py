@@ -136,6 +136,18 @@ class Phase3HarnessWorkspacePort(Protocol):
     ) -> Phase3HarnessWorkspaceSnapshot: ...
 
 
+@dataclass(frozen=True)
+class HeadlessPhase3HarnessWorkspaceDeps:
+    """Typed collaborator bundle for the headless harness workspace."""
+
+    headless_preview_text: Callable[[Any], str]
+    headless_validation_text: Callable[[Any], str]
+    capture_headless_preview_render: Callable[..., dict[str, Any] | None]
+    snapshot_preview: Callable[..., dict[str, Any]]
+    snapshot_signing_request: Callable[[SigningRequest | None], dict[str, Any] | None]
+    build_backend_reservation_evidence: Callable[[SigningRequest | None], Any]
+
+
 class HeadlessPhase3HarnessWorkspaceAdapter:
     """Apply preview scenarios directly to a headless signing workflow."""
 
@@ -144,44 +156,17 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
         *,
         workflow: SigningDraftWorkflow,
         profile_store: Any,
-        headless_preview_text: Callable[[Any], str] | None = None,
-        headless_validation_text: Callable[[Any], str] | None = None,
-        capture_headless_preview_render: Callable[..., dict[str, Any] | None] | None = None,
-        snapshot_preview: Callable[..., dict[str, Any]] | None = None,
-        snapshot_signing_request: (
-            Callable[[SigningRequest | None], dict[str, Any] | None] | None
-        ) = None,
-        build_backend_reservation_evidence: Callable[[SigningRequest | None], Any] | None = None,
+        deps: HeadlessPhase3HarnessWorkspaceDeps | None = None,
     ) -> None:
         self._workflow = workflow
         self._profile_store = profile_store
-        self._headless_preview_text = (
-            headless_preview_text if headless_preview_text is not None else lambda _preview: ""
-        )
-        self._headless_validation_text = (
-            headless_validation_text
-            if headless_validation_text is not None
-            else lambda _preview: ""
-        )
-        self._capture_headless_preview_render = (
-            capture_headless_preview_render
-            if capture_headless_preview_render is not None
-            else lambda **_kwargs: None
-        )
-        self._snapshot_preview = (
-            snapshot_preview
-            if snapshot_preview is not None
-            else lambda _preview, **_kwargs: {}
-        )
-        self._snapshot_signing_request = (
-            snapshot_signing_request
-            if snapshot_signing_request is not None
-            else lambda _request: None
-        )
-        self._build_backend_reservation_evidence = (
-            build_backend_reservation_evidence
-            if build_backend_reservation_evidence is not None
-            else lambda _request: None
+        self._deps = deps or HeadlessPhase3HarnessWorkspaceDeps(
+            headless_preview_text=lambda _preview: "",
+            headless_validation_text=lambda _preview: "",
+            capture_headless_preview_render=lambda **_kwargs: None,
+            snapshot_preview=lambda _preview, **_kwargs: {},
+            snapshot_signing_request=lambda _request: None,
+            build_backend_reservation_evidence=lambda _request: None,
         )
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
@@ -212,22 +197,22 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
             else snapshot_current_draft_request(self._workflow)
         )
         preview = self._workflow.preview()
-        render_capture = self._capture_headless_preview_render(
+        render_capture = self._deps.capture_headless_preview_render(
             preview=preview,
             artifacts_dir=command.artifacts_dir,
             artifact_basename=command.artifact_basename,
         )
-        backend_reservation = self._build_backend_reservation_evidence(request)
+        backend_reservation = self._deps.build_backend_reservation_evidence(request)
         return Phase3HarnessWorkspaceSnapshot(
             current_request=request,
             last_signing_result=None,
             capture_index=command.capture_index,
             capture_kind=command.capture_kind,
             capture_label=None,
-            preview_snapshot=self._snapshot_preview(preview, render_capture=render_capture),
-            preview_text=self._headless_preview_text(preview),
-            validation_text=self._headless_validation_text(preview),
-            sign_request_snapshot=self._snapshot_signing_request(request),
+            preview_snapshot=self._deps.snapshot_preview(preview, render_capture=render_capture),
+            preview_text=self._deps.headless_preview_text(preview),
+            validation_text=self._deps.headless_validation_text(preview),
+            sign_request_snapshot=self._deps.snapshot_signing_request(request),
             backend_reservation_snapshot=(
                 None if backend_reservation is None else backend_reservation.snapshot
             ),
@@ -235,6 +220,18 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
                 None if backend_reservation is None else backend_reservation.error
             ),
         )
+
+
+@dataclass(frozen=True)
+class QtPhase3HarnessWorkspaceDeps:
+    """Typed collaborator bundle for the live Qt harness workspace."""
+
+    capture_preview_render: Callable[..., dict[str, Any] | None]
+    snapshot_preview: Callable[..., dict[str, Any]]
+    snapshot_signing_request: Callable[[SigningRequest | None], dict[str, Any] | None]
+    build_backend_reservation_evidence: Callable[[SigningRequest | None], Any]
+    snapshot_sign_time_fit_diagnostics: Callable[..., dict[str, Any] | None]
+    interactive_capture_label: Callable[..., str]
 
 
 class QtPhase3HarnessWorkspaceAdapter:
@@ -245,42 +242,17 @@ class QtPhase3HarnessWorkspaceAdapter:
         *,
         shell: Any,
         profile_store: Any,
-        capture_preview_render: Callable[..., dict[str, Any] | None] | None = None,
-        snapshot_preview: Callable[..., dict[str, Any]] | None = None,
-        snapshot_signing_request: (
-            Callable[[SigningRequest | None], dict[str, Any] | None] | None
-        ) = None,
-        build_backend_reservation_evidence: Callable[[SigningRequest | None], Any] | None = None,
-        snapshot_sign_time_fit_diagnostics: Callable[..., dict[str, Any] | None] | None = None,
-        interactive_capture_label: Callable[..., str] | None = None,
+        deps: QtPhase3HarnessWorkspaceDeps | None = None,
     ) -> None:
         self._shell = shell
         self._profile_store = profile_store
-        self._capture_preview_render = (
-            capture_preview_render if capture_preview_render is not None else lambda **_kwargs: None
-        )
-        self._snapshot_preview = (
-            snapshot_preview if snapshot_preview is not None else lambda _preview, **_kwargs: {}
-        )
-        self._snapshot_signing_request = (
-            snapshot_signing_request
-            if snapshot_signing_request is not None
-            else lambda _request: None
-        )
-        self._build_backend_reservation_evidence = (
-            build_backend_reservation_evidence
-            if build_backend_reservation_evidence is not None
-            else lambda _request: None
-        )
-        self._snapshot_sign_time_fit_diagnostics = (
-            snapshot_sign_time_fit_diagnostics
-            if snapshot_sign_time_fit_diagnostics is not None
-            else lambda **_kwargs: None
-        )
-        self._interactive_capture_label = (
-            interactive_capture_label
-            if interactive_capture_label is not None
-            else lambda **_kwargs: ""
+        self._deps = deps or QtPhase3HarnessWorkspaceDeps(
+            capture_preview_render=lambda **_kwargs: None,
+            snapshot_preview=lambda _preview, **_kwargs: {},
+            snapshot_signing_request=lambda _request: None,
+            build_backend_reservation_evidence=lambda _request: None,
+            snapshot_sign_time_fit_diagnostics=lambda **_kwargs: None,
+            interactive_capture_label=lambda **_kwargs: "",
         )
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
@@ -326,17 +298,17 @@ class QtPhase3HarnessWorkspaceAdapter:
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
-        render_capture = self._capture_preview_render(
+        render_capture = self._deps.capture_preview_render(
             shell=self._shell,
             preview=preview,
             artifacts_dir=command.artifacts_dir,
             artifact_basename=command.artifact_basename,
         )
-        backend_reservation = self._build_backend_reservation_evidence(request)
+        backend_reservation = self._deps.build_backend_reservation_evidence(request)
         backend_reservation_snapshot = (
             None if backend_reservation is None else backend_reservation.snapshot
         )
-        sign_time_diagnostics = self._snapshot_sign_time_fit_diagnostics(
+        sign_time_diagnostics = self._deps.snapshot_sign_time_fit_diagnostics(
             preview_render_capture=render_capture,
             backend_reservation_snapshot=backend_reservation_snapshot,
         )
@@ -345,19 +317,19 @@ class QtPhase3HarnessWorkspaceAdapter:
             last_signing_result=signing_result,
             capture_index=command.capture_index,
             capture_kind=command.capture_kind,
-            capture_label=self._interactive_capture_label(
+            capture_label=self._deps.interactive_capture_label(
                 preview=preview,
                 capture_index=command.capture_index,
                 capture_kind=command.capture_kind,
             ),
-            preview_snapshot=self._snapshot_preview(
+            preview_snapshot=self._deps.snapshot_preview(
                 preview,
                 render_capture=render_capture,
                 sign_time_diagnostics=sign_time_diagnostics,
             ),
             preview_text=testing_surface.panel.preview_text(),
             validation_text=testing_surface.panel.validation_text(),
-            sign_request_snapshot=self._snapshot_signing_request(request),
+            sign_request_snapshot=self._deps.snapshot_signing_request(request),
             backend_reservation_snapshot=backend_reservation_snapshot,
             backend_reservation_error=(
                 None if backend_reservation is None else backend_reservation.error

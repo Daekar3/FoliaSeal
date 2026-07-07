@@ -20,14 +20,21 @@ SnapshotSuccessfulSignedOutput = Callable[..., dict[str, Any]]
 
 
 @dataclass(frozen=True)
-class Phase3SignedAcceptanceScenarioExecutor:
-    """Own one signed-acceptance scenario row from preview to signed output."""
+class Phase3SignedAcceptanceScenarioExecutorDeps:
+    """Typed collaborator bundle for one signed-acceptance scenario row."""
 
     apply_preview_matrix_scenario: ApplyPreviewMatrixScenario
     build_workspace: BuildHarnessWorkspace
     scenario_slug: ScenarioSlug
     snapshot_signing_result_payload: SnapshotSigningResultPayload
     snapshot_successful_signed_output: SnapshotSuccessfulSignedOutput
+
+
+@dataclass(frozen=True)
+class Phase3SignedAcceptanceScenarioExecutor:
+    """Own one signed-acceptance scenario row from preview to signed output."""
+
+    deps: Phase3SignedAcceptanceScenarioExecutorDeps
 
     def run(
         self,
@@ -41,13 +48,13 @@ class Phase3SignedAcceptanceScenarioExecutor:
         passphrase: str,
         sign_executor: Any,
     ) -> dict[str, Any]:
-        self.apply_preview_matrix_scenario(
+        self.deps.apply_preview_matrix_scenario(
             shell=shell,
             scenario=scenario,
             profile_store=profile_store,
         )
-        workspace = self.build_workspace(shell=shell, profile_store=profile_store)
-        artifact_basename = self.scenario_slug(str(scenario["name"]))
+        workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
+        artifact_basename = self.deps.scenario_slug(str(scenario["name"]))
         snapshot = workspace.capture_snapshot(
             Phase3HarnessCaptureCommand(
                 request=None,
@@ -93,10 +100,10 @@ class Phase3SignedAcceptanceScenarioExecutor:
             passphrase=passphrase,
         )
         signing_result = sign_executor.execute(scenario_request)
-        result["signing_result"] = self.snapshot_signing_result_payload(signing_result)
+        result["signing_result"] = self.deps.snapshot_signing_result_payload(signing_result)
         if signing_result.success and scenario_output.exists():
             result.update(
-                self.snapshot_successful_signed_output(
+                self.deps.snapshot_successful_signed_output(
                     output_file=scenario_output,
                     page_index=(
                         scenario_request.signature_rect.page_index
