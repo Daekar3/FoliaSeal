@@ -98,7 +98,7 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
 
     class _FakeTestingAdapter:
         def __init__(self) -> None:
-            self.properties_panel = _FakePanel()
+            self.panel = _FakePanel()
             self.viewer_workflow = _FakeViewerWorkflow()
             self.viewer_widget = _FakeViewerWidget()
             self._signature_appearance = build_signature_appearance()
@@ -127,7 +127,7 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
             self.viewer_refreshes += 1
 
         def apply_signature_rect_placement(self, signature_rect) -> None:
-            self.properties_panel.set_signature_rect(signature_rect)
+            self.panel.set_signature_rect(signature_rect)
             self.viewer_workflow.jump_to_page(signature_rect.page_index)
             self.viewer_widget.refresh(navigation=True)
             self.sync_placement_context_from_viewer()
@@ -142,15 +142,15 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
         profile_store=profile_store,
     ).apply_scenario(command)
 
-    assert testing_adapter.properties_panel.appearance.signer_label_prefix == "Saved Profile"
+    assert testing_adapter.panel.appearance.signer_label_prefix == "Saved Profile"
     assert (
-        testing_adapter.properties_panel.appearance.layout_template
+        testing_adapter.panel.appearance.layout_template
         == SignatureLayoutTemplate.SINGLE_LINE
     )
-    assert testing_adapter.properties_panel.appearance.stamp_position == SignatureStampPosition.TOP
+    assert testing_adapter.panel.appearance.stamp_position == SignatureStampPosition.TOP
     assert testing_adapter.timestamp_required is False
-    assert testing_adapter.properties_panel.rect is not None
-    assert testing_adapter.properties_panel.rect.page_index == 3
+    assert testing_adapter.panel.rect is not None
+    assert testing_adapter.panel.rect.page_index == 3
     assert testing_adapter.viewer_workflow.jumps == [3]
     assert testing_adapter.viewer_widget.refresh_calls == [True]
     assert testing_adapter.placement_syncs == 1
@@ -170,7 +170,7 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
     class _FakeTestingAdapter:
         def __init__(self) -> None:
             self._signature_appearance = build_signature_appearance()
-            self.properties_panel = type("_Panel", (), {"set_signature_appearance_calls": []})()
+            self.panel = type("_Panel", (), {"set_signature_appearance_calls": []})()
             self.timestamp_required = None
             self.placement_calls = []
             self.viewer_refreshes = 0
@@ -198,9 +198,9 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
     testing_adapter = _FakeTestingAdapter()
 
     def _set_signature_appearance(appearance) -> None:
-        testing_adapter.properties_panel.set_signature_appearance_calls.append(appearance)
+        testing_adapter.panel.set_signature_appearance_calls.append(appearance)
 
-    testing_adapter.properties_panel.set_signature_appearance = _set_signature_appearance
+    testing_adapter.panel.set_signature_appearance = _set_signature_appearance
     shell = type(
         "_Shell",
         (),
@@ -215,7 +215,7 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
         profile_store=object(),
     ).apply_scenario(command)
 
-    assert testing_adapter.properties_panel.set_signature_appearance_calls
+    assert testing_adapter.panel.set_signature_appearance_calls
     assert testing_adapter.timestamp_required is True
     assert len(testing_adapter.placement_calls) == 1
     assert testing_adapter.viewer_refreshes == 1
@@ -305,7 +305,7 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
 
     class _FakeTestingAdapter:
         def __init__(self) -> None:
-            self.properties_panel = _FakePanel()
+            self.panel = _FakePanel()
             self._current_request = request
             self.last_signing_result = SigningResult(success=True, failure_code=None, message="ok")
 
@@ -512,6 +512,7 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
             )()
             self._canonical_preview_render_backend = object()
 
+    fake_panel = _FakePanel()
     shell = type(
         "_Shell",
         (),
@@ -519,7 +520,27 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
             "testing_adapter": type(
                 "_TestingAdapter",
                 (),
-                {"properties_panel": _FakePanel()},
+                {
+                    "panel": type(
+                        "_PanelPort",
+                        (),
+                        {
+                            "capture_preview_render": (
+                                lambda self, **kwargs: kwargs[
+                                    "build_preview_render_capture_payload"
+                                ](
+                                    preview_controls=fake_panel.preview_controls,
+                                    canonical_preview_render_backend=(
+                                        fake_panel._canonical_preview_render_backend
+                                    ),
+                                    preview=kwargs["preview"],
+                                    artifacts_dir=kwargs["artifacts_dir"],
+                                    artifact_basename=kwargs["artifact_basename"],
+                                )
+                            ),
+                        },
+                    )(),
+                },
             )(),
         },
     )()
@@ -739,6 +760,7 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
             )()
             self._canonical_preview_render_backend = object()
 
+    fake_panel = _FakePanel()
     shell = type(
         "_Shell",
         (),
@@ -746,7 +768,27 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
             "testing_adapter": type(
                 "_TestingAdapter",
                 (),
-                {"properties_panel": _FakePanel()},
+                {
+                    "panel": type(
+                        "_PanelPort",
+                        (),
+                        {
+                            "capture_preview_render": (
+                                lambda self, **kwargs: kwargs[
+                                    "build_preview_render_capture_payload"
+                                ](
+                                    preview_controls=fake_panel.preview_controls,
+                                    canonical_preview_render_backend=(
+                                        fake_panel._canonical_preview_render_backend
+                                    ),
+                                    preview=kwargs["preview"],
+                                    artifacts_dir=kwargs["artifacts_dir"],
+                                    artifact_basename=kwargs["artifact_basename"],
+                                )
+                            ),
+                        },
+                    )(),
+                },
             )(),
         },
     )()

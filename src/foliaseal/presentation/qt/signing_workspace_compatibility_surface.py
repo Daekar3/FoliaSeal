@@ -118,10 +118,13 @@ class SigningWorkspaceTestingAdapter:
 
     def __init__(self, compatibility_surface: SigningWorkspaceCompatibilitySurface) -> None:
         self._compatibility_surface = compatibility_surface
+        self._panel = SigningWorkspaceTestingPanelAdapter(
+            compatibility_surface.properties_panel
+        )
 
     @property
-    def properties_panel(self) -> SignaturePropertiesPanel:
-        return self._compatibility_surface.properties_panel
+    def panel(self) -> SigningWorkspaceTestingPanelPort:
+        return self._panel
 
     def signature_appearance(self) -> SignatureAppearance | None:
         return self._compatibility_surface._runtime.signature_appearance()
@@ -143,11 +146,81 @@ class SigningWorkspaceTestingAdapter:
         return signing_result if isinstance(signing_result, SigningResult) else None
 
 
+class SigningWorkspaceTestingPanelPort(Protocol):
+    """Narrow harness-facing subset of the signature-properties panel."""
+
+    def set_signature_appearance(self, appearance: SignatureAppearance) -> None: ...
+    def set_signature_rect(
+        self,
+        signature_rect: SignatureRect,
+        *,
+        notify: bool = True,
+    ) -> None: ...
+    def refresh_preview(self) -> Any: ...
+    def preview_text(self) -> str: ...
+    def validation_text(self) -> str: ...
+    def capture_preview_render(
+        self,
+        *,
+        preview: Any,
+        artifacts_dir: str | None,
+        artifact_basename: str,
+        build_preview_render_capture_payload: Any,
+    ) -> dict[str, Any]: ...
+
+
+class SigningWorkspaceTestingPanelAdapter:
+    """Wrap the live properties panel behind a smaller testing-oriented port."""
+
+    def __init__(self, properties_panel: SignaturePropertiesPanel) -> None:
+        self._properties_panel = properties_panel
+
+    def set_signature_appearance(self, appearance: SignatureAppearance) -> None:
+        self._properties_panel.set_signature_appearance(appearance)
+
+    def set_signature_rect(
+        self,
+        signature_rect: SignatureRect,
+        *,
+        notify: bool = True,
+    ) -> None:
+        self._properties_panel.set_signature_rect(signature_rect, notify=notify)
+
+    def refresh_preview(self) -> Any:
+        return self._properties_panel.refresh_preview()
+
+    def preview_text(self) -> str:
+        return self._properties_panel.preview_text()
+
+    def validation_text(self) -> str:
+        return self._properties_panel.validation_text()
+
+    def capture_preview_render(
+        self,
+        *,
+        preview: Any,
+        artifacts_dir: str | None,
+        artifact_basename: str,
+        build_preview_render_capture_payload: Any,
+    ) -> dict[str, Any]:
+        return build_preview_render_capture_payload(
+            preview_controls=self._properties_panel.preview_controls,
+            canonical_preview_render_backend=getattr(
+                self._properties_panel,
+                "_canonical_preview_render_backend",
+                None,
+            ),
+            preview=preview,
+            artifacts_dir=artifacts_dir,
+            artifact_basename=artifact_basename,
+        )
+
+
 class SigningWorkspaceTestingPort(Protocol):
     """Explicit non-production harness/testing contract for the signing workspace."""
 
     @property
-    def properties_panel(self) -> SignaturePropertiesPanel: ...
+    def panel(self) -> SigningWorkspaceTestingPanelPort: ...
 
     def signature_appearance(self) -> SignatureAppearance | None: ...
     def set_timestamp_required(self, required: bool) -> None: ...

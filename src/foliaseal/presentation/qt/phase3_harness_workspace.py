@@ -294,7 +294,7 @@ class QtPhase3HarnessWorkspaceAdapter:
             base_appearance,
             command.appearance_overrides,
         )
-        testing_surface.properties_panel.set_signature_appearance(appearance)
+        testing_surface.panel.set_signature_appearance(appearance)
         if command.timestamp_required is not None:
             testing_surface.set_timestamp_required(command.timestamp_required)
         if command.signature_rect is not None:
@@ -322,7 +322,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         else:
             signing_result = last_signing_result
         signing_result = signing_result if isinstance(signing_result, SigningResult) else None
-        preview = testing_surface.properties_panel.refresh_preview()
+        preview = testing_surface.panel.refresh_preview()
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
@@ -355,8 +355,8 @@ class QtPhase3HarnessWorkspaceAdapter:
                 render_capture=render_capture,
                 sign_time_diagnostics=sign_time_diagnostics,
             ),
-            preview_text=testing_surface.properties_panel.preview_text(),
-            validation_text=testing_surface.properties_panel.validation_text(),
+            preview_text=testing_surface.panel.preview_text(),
+            validation_text=testing_surface.panel.validation_text(),
             sign_request_snapshot=self._snapshot_signing_request(request),
             backend_reservation_snapshot=backend_reservation_snapshot,
             backend_reservation_error=(
@@ -376,17 +376,11 @@ def capture_qt_preview_render(
     """Capture the live Qt preview by reading shell anatomy only inside the workspace seam."""
 
     testing_surface = _testing_surface(shell)
-    properties_panel = testing_surface.properties_panel
-    return build_preview_render_capture_payload(
-        preview_controls=properties_panel.preview_controls,
-        canonical_preview_render_backend=getattr(
-            properties_panel,
-            "_canonical_preview_render_backend",
-            None,
-        ),
+    return testing_surface.panel.capture_preview_render(
         preview=preview,
         artifacts_dir=artifacts_dir,
         artifact_basename=artifact_basename,
+        build_preview_render_capture_payload=build_preview_render_capture_payload,
     )
 
 

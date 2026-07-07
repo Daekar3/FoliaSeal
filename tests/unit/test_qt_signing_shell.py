@@ -45,6 +45,7 @@ from tests.support.phase3_builders import (
     build_signature_field_binding,
     build_signature_preset,
     build_signature_preset_catalog,
+    build_signature_rect,
 )
 from tests.unit.test_signature_properties_coordinator import _ready_workflow
 
@@ -2515,16 +2516,89 @@ def test_signing_shell_installs_named_compatibility_surface(
 
     assert widget.compat_surface is not None
     assert widget.testing_adapter is not widget.compat_surface
-    assert widget.testing_adapter.properties_panel is widget.properties_panel
+    assert widget.testing_adapter.panel is not widget.properties_panel
     assert callable(widget.testing_adapter.signature_appearance)
     assert callable(widget.testing_adapter.set_timestamp_required)
     assert callable(widget.testing_adapter.apply_signature_rect_placement)
     assert callable(widget.testing_adapter.refresh_viewer)
     assert callable(widget.testing_adapter.current_request)
     assert callable(widget.testing_adapter.last_signing_result)
+    assert callable(widget.testing_adapter.panel.set_signature_appearance)
+    assert callable(widget.testing_adapter.panel.refresh_preview)
+    assert callable(widget.testing_adapter.panel.preview_text)
+    assert callable(widget.testing_adapter.panel.validation_text)
+    assert callable(widget.testing_adapter.panel.capture_preview_render)
     assert widget.refresh_viewer.__self__ is not widget.compat_surface
     assert widget.testing_adapter.current_request() == widget.current_request()
     assert widget.testing_adapter.last_signing_result() == widget.last_signing_result
+
+
+def test_signing_shell_testing_adapter_panel_forwards_notify_flag(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_ready_workflow(tmp_path),
+    )
+    rect = build_signature_rect(page_index=1, width_pt=144.0, height_pt=36.0)
+    calls: list[tuple[object, bool]] = []
+
+    def _record_set_signature_rect(signature_rect, *, notify: bool = True) -> None:
+        calls.append((signature_rect, notify))
+
+    monkeypatch.setattr(widget.properties_panel, "set_signature_rect", _record_set_signature_rect)
+
+    widget.testing_adapter.panel.set_signature_rect(rect, notify=False)
+
+    assert calls == [(rect, False)]
+
+
+def test_signing_shell_testing_adapter_panel_bridges_preview_render_capture(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_ready_workflow(tmp_path),
+    )
+    preview = object()
+    payload = widget.testing_adapter.panel.capture_preview_render(
+        preview=preview,
+        artifacts_dir="artifacts/debug",
+        artifact_basename="interactive_state_01",
+        build_preview_render_capture_payload=lambda **kwargs: kwargs,
+    )
+
+    assert payload["preview"] is preview
+    assert payload["artifacts_dir"] == "artifacts/debug"
+    assert payload["artifact_basename"] == "interactive_state_01"
+    assert payload["preview_controls"] is widget.properties_panel.preview_controls
+    assert payload["canonical_preview_render_backend"] is getattr(
+        widget.properties_panel,
+        "_canonical_preview_render_backend",
+        None,
+    )
 
 
 def test_signing_shell_visible_text_field_checkboxes_control_preview_visibility(
