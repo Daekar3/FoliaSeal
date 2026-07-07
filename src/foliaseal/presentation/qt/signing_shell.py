@@ -327,7 +327,7 @@ class SigningWorkspaceWidget:
         self._signing_action_coordinator = composition.signing_action_coordinator
         self._signing_action_boundary = composition.signing_action_boundary
         self._action_bridge = composition.action_bridge
-        self._interaction_bridge = composition.interaction_bridge
+        self._orchestrator = composition.orchestrator
         self._runtime = composition.runtime
         self._compatibility_surface = composition.compatibility_surface
         self._shell_surface = composition.shell_surface

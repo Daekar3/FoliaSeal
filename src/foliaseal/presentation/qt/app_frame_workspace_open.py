@@ -131,7 +131,7 @@ class SigningWorkspaceCompositionService:
             tsa_url="",
             timestamp_required=False,
         )
-        shell_port = self.shell_factory.create(
+        bundle = self.shell_factory.create(
             SigningWorkspaceBootstrap(
                 viewer_workflow=viewer_workflow,
                 signing_workflow=signing_workflow,
@@ -147,6 +147,7 @@ class SigningWorkspaceCompositionService:
                 on_status_change=command.on_status_change,
             )
         )
+        shell_port = bundle.port
         shell_widget = shell_port.widget()
         return OpenWorkspaceOutcome(
             shell_port=shell_port,

@@ -12,6 +12,7 @@ from foliaseal.presentation.qt.app_frame import (
 from foliaseal.presentation.qt.signing_shell_port import (
     QtSigningWorkspacePort,
     SigningWorkspaceBootstrap,
+    SigningWorkspaceBundle,
 )
 
 
@@ -268,6 +269,7 @@ class _FakeShell:
         self.output_dialog_defaults = []
         self.choose_output_pdf_path_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
+        self.testing_adapter = object()
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -307,7 +309,10 @@ class _FakeShellFactory:
 
     def create(self, bootstrap: SigningWorkspaceBootstrap):
         self.bootstrap_calls.append(bootstrap)
-        return _FakeShellPort(self.shell_widget)
+        return SigningWorkspaceBundle(
+            port=_FakeShellPort(self.shell_widget),
+            testing_adapter=self.shell_widget.testing_adapter,
+        )
 
 
 class _FakeSecretStore:
@@ -410,9 +415,10 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
         on_status_change=lambda status: None,
     )
 
-    port = signing_shell_port_module.QtSigningWorkspaceFactory().create(bootstrap)
+    bundle = signing_shell_port_module.QtSigningWorkspaceFactory().create(bootstrap)
 
-    assert port.widget() is shell
+    assert bundle.port.widget() is shell
+    assert bundle.testing_adapter is shell.testing_adapter
     assert captured == {
         "viewer_workflow": bootstrap.viewer_workflow,
         "signing_workflow": bootstrap.signing_workflow,

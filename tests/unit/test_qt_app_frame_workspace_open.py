@@ -11,7 +11,10 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     SigningWorkspaceCompositionService,
     WorkspaceOpenService,
 )
-from foliaseal.presentation.qt.signing_shell_port import SigningWorkspaceBootstrap
+from foliaseal.presentation.qt.signing_shell_port import (
+    SigningWorkspaceBootstrap,
+    SigningWorkspaceBundle,
+)
 
 
 class _FakeQPdfDocument:
@@ -32,6 +35,9 @@ class _FakeQPdfDocument:
 
 
 class _FakeShell:
+    def __init__(self) -> None:
+        self.testing_adapter = object()
+
     def choose_output_pdf_path(self):
         return "/tmp/signed-output.pdf"
 
@@ -67,7 +73,10 @@ class _FakeShellFactory:
 
     def create(self, bootstrap: SigningWorkspaceBootstrap):
         self.bootstrap_calls.append(bootstrap)
-        return _FakeShellPort(self.shell_widget)
+        return SigningWorkspaceBundle(
+            port=_FakeShellPort(self.shell_widget),
+            testing_adapter=self.shell_widget.testing_adapter,
+        )
 
 
 def _settings(tmp_path: Path) -> AppSettings:

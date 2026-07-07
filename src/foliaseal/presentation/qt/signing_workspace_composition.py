@@ -57,6 +57,9 @@ from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
 from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
     SigningWorkspaceInteractionBridge,
 )
+from foliaseal.presentation.qt.signing_workspace_orchestrator import (
+    SigningWorkspaceOrchestrator,
+)
 from foliaseal.presentation.qt.signing_workspace_properties_panel import (
     SignaturePropertiesPanel,
 )
@@ -101,17 +104,14 @@ class SigningWorkspaceComposition:
     signing_action_boundary: SigningActionBoundary
     action_bridge: SigningWorkspaceActionBridge
     interaction_bridge: SigningWorkspaceInteractionBridge
+    orchestrator: SigningWorkspaceOrchestrator
     runtime: SigningWorkspaceRuntime
     compatibility_surface: SigningWorkspaceCompatibilitySurface
     shell_surface: SigningWorkspaceShellSurface
     main_row: Any
 
     def bootstrap(self) -> None:
-        self.compatibility_surface.install_widget_exports()
-        self.shell_surface.install_port_exports()
-        self.runtime.refresh_viewer()
-        self.review_bridge.apply_state(self.document_review_workspace.load())
-        self.action_bridge.reload_state()
+        self.orchestrator.bootstrap()
 
 
 def build_signing_workspace_composition(
@@ -263,20 +263,6 @@ def build_signing_workspace_composition(
         invalidate_signing_action_state=action_bridge.invalidate_state,
         emit_error=runtime.emit_error,
     )
-    runtime.bind(
-        viewer_interaction_session=viewer_interaction_session,
-        viewer_workflow=viewer_workflow,
-        document_review_workspace=document_review_workspace,
-        workspace_interaction_session=workspace_interaction_session,
-        review_bridge=review_bridge,
-        interaction_bridge=interaction_bridge,
-        properties_panel=properties_panel,
-        viewer_widget=viewer_widget,
-        document_text_query_input=document_text_controls.query_input,
-        sign_button=sign_button,
-        refresh_sign_button_state=action_bridge.reload_state,
-        result_label=result_label,
-    )
     compatibility_surface = SigningWorkspaceCompatibilitySurface(
         widget=widget,
         runtime=runtime,
@@ -291,6 +277,29 @@ def build_signing_workspace_composition(
         set_app_settings=set_app_settings,
         action_bridge=action_bridge,
         initial_app_settings=app_settings,
+    )
+    orchestrator = SigningWorkspaceOrchestrator(
+        interaction_bridge=interaction_bridge,
+        compatibility_surface=compatibility_surface,
+        shell_surface=shell_surface,
+        review_bridge=review_bridge,
+        document_review_workspace=document_review_workspace,
+        action_bridge=action_bridge,
+        refresh_viewer=runtime.refresh_viewer,
+    )
+    runtime.bind(
+        viewer_interaction_session=viewer_interaction_session,
+        viewer_workflow=viewer_workflow,
+        document_review_workspace=document_review_workspace,
+        workspace_interaction_session=workspace_interaction_session,
+        review_bridge=review_bridge,
+        orchestrator=orchestrator,
+        properties_panel=properties_panel,
+        viewer_widget=viewer_widget,
+        document_text_query_input=document_text_controls.query_input,
+        sign_button=sign_button,
+        refresh_sign_button_state=action_bridge.reload_state,
+        result_label=result_label,
     )
     main_row = bindings.q_hbox_layout()
     main_row.setContentsMargins(0, 0, 0, 0)
@@ -315,6 +324,7 @@ def build_signing_workspace_composition(
         signing_action_boundary=signing_action_boundary,
         action_bridge=action_bridge,
         interaction_bridge=interaction_bridge,
+        orchestrator=orchestrator,
         runtime=runtime,
         compatibility_surface=compatibility_surface,
         shell_surface=shell_surface,

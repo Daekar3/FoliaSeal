@@ -36,12 +36,12 @@ class _FakeWorkspaceInteractionSession:
         return self.refresh_plan
 
 
-class _FakeInteractionBridge:
+class _FakeOrchestrator:
     def __init__(self, order=None) -> None:
         self.plans = []
         self._order = order
 
-    def apply_plan(self, plan) -> None:
+    def apply(self, plan) -> None:
         if self._order is not None:
             self._order.append(("apply_plan", plan))
         self.plans.append(plan)
@@ -234,7 +234,7 @@ def _bind_runtime(
     viewer_workflow = _FakeViewerWorkflow(order)
     document_review_workspace = _FakeDocumentReviewWorkspace()
     interaction_session = _FakeWorkspaceInteractionSession()
-    interaction_bridge = _FakeInteractionBridge(order)
+    orchestrator = _FakeOrchestrator(order)
     review_bridge = _FakeReviewBridge()
     properties_panel = _FakePropertiesPanel(order)
     viewer_widget = _FakeViewerWidget(order)
@@ -247,7 +247,7 @@ def _bind_runtime(
         document_review_workspace=document_review_workspace,
         workspace_interaction_session=interaction_session,
         review_bridge=review_bridge,
-        interaction_bridge=interaction_bridge,
+        orchestrator=orchestrator,
         properties_panel=properties_panel,
         viewer_widget=viewer_widget,
         document_text_query_input=_FakeLineEdit("Alice"),
@@ -265,7 +265,7 @@ def _bind_runtime(
         viewer_workflow=viewer_workflow,
         document_review_workspace=document_review_workspace,
         interaction_session=interaction_session,
-        interaction_bridge=interaction_bridge,
+        orchestrator=orchestrator,
         review_bridge=review_bridge,
         properties_panel=properties_panel,
         viewer_widget=viewer_widget,
@@ -283,7 +283,7 @@ def test_signing_workspace_runtime_routes_viewer_selection_through_workspace_ses
     bound.runtime.on_viewer_selection(pdf_rect)
 
     assert bound.interaction_session.selection_rects == [pdf_rect]
-    assert bound.interaction_bridge.plans == [bound.interaction_session.select_plan]
+    assert bound.orchestrator.plans == [bound.interaction_session.select_plan]
 
 
 def test_signing_workspace_runtime_routes_panel_page_and_refresh_changes() -> None:
@@ -293,7 +293,7 @@ def test_signing_workspace_runtime_routes_panel_page_and_refresh_changes() -> No
     bound.runtime.on_page_change(3)
     bound.runtime.refresh_viewer()
 
-    assert bound.interaction_bridge.plans == [
+    assert bound.orchestrator.plans == [
         bound.interaction_session.panel_plan,
         bound.interaction_session.page_plan,
         bound.interaction_session.refresh_plan,
@@ -383,7 +383,7 @@ def test_signing_workspace_runtime_owns_page_rect_and_current_request_helpers() 
 
     assert isinstance(rect, SignatureRect)
     assert bound.properties_panel.set_signature_rect_calls == [(rect, False)]
-    assert bound.interaction_bridge.plans == [bound.interaction_session.panel_plan]
+    assert bound.orchestrator.plans == [bound.interaction_session.panel_plan]
     assert bound.viewer_interaction_session.logical_page_indexes == [4]
     assert bound.runtime.logical_page_index() == 1
     assert bound.runtime.signature_rect() == rect
@@ -412,7 +412,10 @@ def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_
     assert bound.properties_panel.set_signature_rect_calls == [(rect, True)]
     assert bound.viewer_workflow.jump_calls == [3]
     assert bound.viewer_widget.refresh_calls == [True]
-    assert bound.draft_workflow.placement_context == bound.viewer_interaction_session.current_placement
+    assert (
+        bound.draft_workflow.placement_context
+        == bound.viewer_interaction_session.current_placement
+    )
     assert bound.viewer_widget.overlays == [bound.draft_workflow.signature_rect]
     assert bound.refresh_sign_button_state_calls == ["refresh"]
     assert bound.draft_workflow.selected_certificate_configuration_id == "cert-1"

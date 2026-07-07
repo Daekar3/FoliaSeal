@@ -27,8 +27,8 @@ from foliaseal.domain.models import (
     SignatureRect,
     SigningRequest,
 )
-from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
-    SigningWorkspaceInteractionBridge,
+from foliaseal.presentation.qt.signing_workspace_orchestrator import (
+    SigningWorkspaceOrchestrator,
 )
 from foliaseal.presentation.qt.signing_workspace_properties_panel import (
     SignaturePropertiesPanel,
@@ -82,7 +82,7 @@ class SigningWorkspaceRuntime:
         self._document_review_workspace: DocumentReviewWorkspaceSession | None = None
         self._workspace_interaction_session: WorkspaceInteractionSession | None = None
         self._review_bridge: SigningWorkspaceReviewBridge | None = None
-        self._interaction_bridge: SigningWorkspaceInteractionBridge | None = None
+        self._orchestrator: SigningWorkspaceOrchestrator | None = None
         self._properties_panel: SignaturePropertiesPanel | None = None
         self._viewer_widget: Any = None
         self._document_text_query_input: Any = None
@@ -98,7 +98,7 @@ class SigningWorkspaceRuntime:
         document_review_workspace: DocumentReviewWorkspaceSession,
         workspace_interaction_session: WorkspaceInteractionSession,
         review_bridge: SigningWorkspaceReviewBridge,
-        interaction_bridge: SigningWorkspaceInteractionBridge,
+        orchestrator: SigningWorkspaceOrchestrator,
         properties_panel: SignaturePropertiesPanel,
         viewer_widget: Any,
         document_text_query_input: Any,
@@ -111,7 +111,7 @@ class SigningWorkspaceRuntime:
         self._document_review_workspace = document_review_workspace
         self._workspace_interaction_session = workspace_interaction_session
         self._review_bridge = review_bridge
-        self._interaction_bridge = interaction_bridge
+        self._orchestrator = orchestrator
         self._properties_panel = properties_panel
         self._viewer_widget = viewer_widget
         self._document_text_query_input = document_text_query_input
@@ -270,7 +270,7 @@ class SigningWorkspaceRuntime:
         return bool(getattr(sign_button, "enabled", False))
 
     def apply_workspace_interaction_plan(self, plan: WorkspaceInteractionPlan) -> None:
-        self._interaction_bridge_required().apply_plan(plan)
+        self._orchestrator_required().apply(plan)
 
     def apply_placement_context(
         self,
@@ -340,10 +340,10 @@ class SigningWorkspaceRuntime:
             raise RuntimeError("SigningWorkspaceRuntime is not bound to a review bridge.")
         return self._review_bridge
 
-    def _interaction_bridge_required(self) -> SigningWorkspaceInteractionBridge:
-        if self._interaction_bridge is None:
-            raise RuntimeError("SigningWorkspaceRuntime is not bound to an interaction bridge.")
-        return self._interaction_bridge
+    def _orchestrator_required(self) -> SigningWorkspaceOrchestrator:
+        if self._orchestrator is None:
+            raise RuntimeError("SigningWorkspaceRuntime is not bound to an orchestrator.")
+        return self._orchestrator
 
     def _viewer_widget_required(self) -> Any:
         if self._viewer_widget is None:

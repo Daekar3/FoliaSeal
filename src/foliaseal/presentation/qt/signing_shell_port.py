@@ -18,6 +18,9 @@ from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
     build_qt_signing_shell,
 )
+from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
+    SigningWorkspaceTestingPort,
+)
 
 
 @dataclass(frozen=True)
@@ -57,8 +60,16 @@ class SigningWorkspacePort(Protocol):
 class SigningWorkspaceFactory(Protocol):
     """Create a live signing workspace from typed bootstrap inputs."""
 
-    def create(self, bootstrap: SigningWorkspaceBootstrap) -> SigningWorkspacePort:
+    def create(self, bootstrap: SigningWorkspaceBootstrap) -> SigningWorkspaceBundle:
         """Build and return the active workspace port."""
+
+
+@dataclass(frozen=True)
+class SigningWorkspaceBundle:
+    """Caller-facing bundle for one live workspace instance."""
+
+    port: SigningWorkspacePort
+    testing_adapter: SigningWorkspaceTestingPort
 
 
 @dataclass(frozen=True)
@@ -83,7 +94,7 @@ class QtSigningWorkspacePort:
 class QtSigningWorkspaceFactory:
     """Production factory that wraps the Qt signing shell behind a port."""
 
-    def create(self, bootstrap: SigningWorkspaceBootstrap) -> SigningWorkspacePort:
+    def create(self, bootstrap: SigningWorkspaceBootstrap) -> SigningWorkspaceBundle:
         shell_widget = build_qt_signing_shell(
             viewer_workflow=bootstrap.viewer_workflow,
             signing_workflow=bootstrap.signing_workflow,
@@ -98,4 +109,12 @@ class QtSigningWorkspaceFactory:
             on_error=bootstrap.on_error,
             on_status_change=bootstrap.on_status_change,
         )
-        return QtSigningWorkspacePort(shell_widget=shell_widget)
+        testing_adapter = getattr(shell_widget, "testing_adapter", None)
+        if testing_adapter is None:
+            raise TypeError(
+                "Qt signing shell widgets must expose 'testing_adapter'."
+            )
+        return SigningWorkspaceBundle(
+            port=QtSigningWorkspacePort(shell_widget=shell_widget),
+            testing_adapter=testing_adapter,
+        )
