@@ -25,7 +25,7 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
-from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
+from foliaseal.presentation.qt.signing_workspace_testing_port import (
     SigningWorkspaceTestingPort,
 )
 

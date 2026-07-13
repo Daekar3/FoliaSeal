@@ -88,6 +88,7 @@ class SigningWorkspaceRuntime:
         self._document_text_query_input: Any = None
         self._sign_button: Any = None
         self._refresh_sign_button_state: Callable[[], None] | None = None
+        self._refresh_page_navigation_state: Callable[[], None] | None = None
         self._result_label: Any = None
 
     def bind(
@@ -104,6 +105,7 @@ class SigningWorkspaceRuntime:
         document_text_query_input: Any,
         sign_button: Any,
         refresh_sign_button_state: Callable[[], None],
+        refresh_page_navigation_state: Callable[[], None],
         result_label: Any,
     ) -> None:
         self._viewer_interaction_session = viewer_interaction_session
@@ -117,6 +119,7 @@ class SigningWorkspaceRuntime:
         self._document_text_query_input = document_text_query_input
         self._sign_button = sign_button
         self._refresh_sign_button_state = refresh_sign_button_state
+        self._refresh_page_navigation_state = refresh_page_navigation_state
         self._result_label = result_label
 
     def on_viewer_selection(self, pdf_rect: PdfRect) -> None:
@@ -128,6 +131,10 @@ class SigningWorkspaceRuntime:
         self.emit_error(message)
 
     def on_viewer_interaction(self, name: str) -> None:
+        if name == "navigation_changed":
+            self._refresh_page_navigation_state_required()()
+        if name == "text_selection_clear_requested":
+            self.clear_selected_document_text()
         if self._on_status_change is not None:
             self._on_status_change(name)
 
@@ -140,6 +147,7 @@ class SigningWorkspaceRuntime:
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().change_page(page_number),
         )
+        self._refresh_page_navigation_state_required()()
 
     def on_document_review_signature_selected(self, index: int) -> None:
         self._review_bridge_required().select_review_signature(index)
@@ -148,6 +156,7 @@ class SigningWorkspaceRuntime:
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_after_viewer_refresh()
         )
+        self._refresh_page_navigation_state_required()()
 
     def refresh_document_review(self) -> DocumentReviewSummary:
         state = self._document_review_workspace_required().refresh_review()
@@ -197,6 +206,7 @@ class SigningWorkspaceRuntime:
 
     def set_logical_page_index(self, page_index: int) -> None:
         self._viewer_interaction_session_required().set_logical_page_index(page_index)
+        self._refresh_page_navigation_state_required()()
 
     def logical_page_index(self) -> int:
         return self._viewer_workflow_required().session.current_page
@@ -291,6 +301,7 @@ class SigningWorkspaceRuntime:
                 page_index
             ),
         )
+        self._refresh_page_navigation_state_required()()
 
     def emit_error(self, message: str) -> None:
         self._set_sign_result_text(message, success=False)
@@ -371,3 +382,10 @@ class SigningWorkspaceRuntime:
         if self._result_label is None:
             raise RuntimeError("SigningWorkspaceRuntime is not bound to a result label.")
         return self._result_label
+
+    def _refresh_page_navigation_state_required(self) -> Callable[[], None]:
+        if self._refresh_page_navigation_state is None:
+            raise RuntimeError(
+                "SigningWorkspaceRuntime is not bound to a page-navigation refresh callback."
+            )
+        return self._refresh_page_navigation_state

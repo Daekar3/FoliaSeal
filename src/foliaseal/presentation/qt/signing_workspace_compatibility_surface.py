@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any
 
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -16,6 +16,9 @@ from foliaseal.presentation.qt.signing_workspace_properties_panel import (
 from foliaseal.presentation.qt.signing_workspace_runtime import (
     SigningWorkspaceRuntime,
 )
+from foliaseal.presentation.qt.signing_workspace_testing_port import (
+    SigningWorkspaceTestingPanelPort,
+)
 
 
 class SigningWorkspaceCompatibilitySurface:
@@ -28,6 +31,7 @@ class SigningWorkspaceCompatibilitySurface:
         runtime: SigningWorkspaceRuntime,
         properties_panel: SignaturePropertiesPanel,
         viewer_widget: Any,
+        viewer_navigation_controls: Any,
         properties_scroll: Any,
         sidebar_container: Any,
         sidebar_surface: Any,
@@ -36,6 +40,7 @@ class SigningWorkspaceCompatibilitySurface:
         self._runtime = runtime
         self._properties_panel = properties_panel
         self._viewer_widget = viewer_widget
+        self._viewer_navigation_controls = viewer_navigation_controls
         self._properties_scroll = properties_scroll
         self._sidebar_container = sidebar_container
         self._sidebar_surface = sidebar_surface
@@ -66,6 +71,7 @@ class SigningWorkspaceCompatibilitySurface:
         self._widget.testing_adapter = self._testing_adapter  # type: ignore[attr-defined]
         self._widget.properties_panel = self._properties_panel  # type: ignore[attr-defined]
         self._widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
+        self._widget.viewer_navigation_controls = self._viewer_navigation_controls  # type: ignore[attr-defined]
         self._widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
         self._widget.sidebar = self._sidebar_container  # type: ignore[attr-defined]
         self._widget.sidebar_surface = self._sidebar_surface  # type: ignore[attr-defined]
@@ -146,29 +152,6 @@ class SigningWorkspaceTestingAdapter:
         return signing_result if isinstance(signing_result, SigningResult) else None
 
 
-class SigningWorkspaceTestingPanelPort(Protocol):
-    """Narrow harness-facing subset of the signature-properties panel."""
-
-    def set_signature_appearance(self, appearance: SignatureAppearance) -> None: ...
-    def set_signature_rect(
-        self,
-        signature_rect: SignatureRect,
-        *,
-        notify: bool = True,
-    ) -> None: ...
-    def refresh_preview(self) -> Any: ...
-    def preview_text(self) -> str: ...
-    def validation_text(self) -> str: ...
-    def capture_preview_render(
-        self,
-        *,
-        preview: Any,
-        artifacts_dir: str | None,
-        artifact_basename: str,
-        build_preview_render_capture_payload: Any,
-    ) -> dict[str, Any]: ...
-
-
 class SigningWorkspaceTestingPanelAdapter:
     """Wrap the live properties panel behind a smaller testing-oriented port."""
 
@@ -214,17 +197,3 @@ class SigningWorkspaceTestingPanelAdapter:
             artifacts_dir=artifacts_dir,
             artifact_basename=artifact_basename,
         )
-
-
-class SigningWorkspaceTestingPort(Protocol):
-    """Explicit non-production harness/testing contract for the signing workspace."""
-
-    @property
-    def panel(self) -> SigningWorkspaceTestingPanelPort: ...
-
-    def signature_appearance(self) -> SignatureAppearance | None: ...
-    def set_timestamp_required(self, required: bool) -> None: ...
-    def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None: ...
-    def refresh_viewer(self) -> None: ...
-    def current_request(self) -> SigningRequest | None: ...
-    def last_signing_result(self) -> SigningResult | None: ...

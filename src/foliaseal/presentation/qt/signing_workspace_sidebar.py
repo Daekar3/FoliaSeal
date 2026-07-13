@@ -114,6 +114,7 @@ class SigningWorkspaceSidebar:
     ) -> None:
         self._bindings = bindings
         self._updating_document_review_selector = False
+        self._updating_text_selection_mode_checkbox = False
         self.container = bindings.q_widget()
         self._layout = bindings.q_vbox_layout(self.container)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -275,7 +276,11 @@ class SigningWorkspaceSidebar:
             callable(is_checked)
             and bool(is_checked()) != document_text_state.selection_mode_enabled
         ):
-            checkbox.setChecked(document_text_state.selection_mode_enabled)
+            self._updating_text_selection_mode_checkbox = True
+            try:
+                checkbox.setChecked(document_text_state.selection_mode_enabled)
+            finally:
+                self._updating_text_selection_mode_checkbox = False
         self.document_text_controls.status_label.setText(document_text_state.status_text)
         self.document_text_controls.detail_label.setText(document_text_state.detail_text)
         self.document_text_controls.previous_button.setEnabled(
@@ -409,6 +414,8 @@ class SigningWorkspaceSidebar:
         previous_button = self._bindings.q_push_button("Previous")
         next_button = self._bindings.q_push_button("Next")
         copy_button = self._bindings.q_push_button("Copy result")
+        # Keep a hidden checkbox as a state mirror so existing shell render wiring
+        # can stay narrow while the real user-facing mode command moves to Edit.
         select_mode_checkbox = self._bindings.q_check_box("Select text")
         copy_selection_button = self._bindings.q_push_button("Copy selection")
         clear_selection_button = self._bindings.q_push_button("Clear selection")
@@ -425,9 +432,14 @@ class SigningWorkspaceSidebar:
             next_button,
             copy_button,
         )
+        if hasattr(select_mode_checkbox, "setVisible"):
+            select_mode_checkbox.setVisible(False)
+        if hasattr(copy_selection_button, "setVisible"):
+            copy_selection_button.setVisible(False)
+        if hasattr(clear_selection_button, "setVisible"):
+            clear_selection_button.setVisible(False)
         selection_row = _compose_row(
             self._bindings,
-            select_mode_checkbox,
             copy_selection_button,
             clear_selection_button,
         )
@@ -445,7 +457,10 @@ class SigningWorkspaceSidebar:
         next_button.clicked.connect(on_next_text_match)  # type: ignore[attr-defined]
         copy_button.clicked.connect(on_copy_text_match)  # type: ignore[attr-defined]
         select_mode_checkbox.stateChanged.connect(  # type: ignore[attr-defined]
-            lambda state: on_text_selection_mode_changed(bool(state))
+            lambda state: self._handle_text_selection_mode_changed(
+                state,
+                on_text_selection_mode_changed=on_text_selection_mode_changed,
+            )
         )
         copy_selection_button.clicked.connect(on_copy_selected_text)  # type: ignore[attr-defined]
         clear_selection_button.clicked.connect(on_clear_selected_text)  # type: ignore[attr-defined]
@@ -476,6 +491,16 @@ class SigningWorkspaceSidebar:
         if self._updating_document_review_selector:
             return
         on_review_signature_selected(index)
+
+    def _handle_text_selection_mode_changed(
+        self,
+        state: Any,
+        *,
+        on_text_selection_mode_changed: Callable[[bool], Any],
+    ) -> None:
+        if self._updating_text_selection_mode_checkbox:
+            return
+        on_text_selection_mode_changed(bool(state))
 
 
 def _compose_row(bindings: Any, *widgets: Any) -> Any:

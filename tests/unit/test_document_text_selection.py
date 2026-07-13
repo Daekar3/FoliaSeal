@@ -130,9 +130,20 @@ class _FakeQPdfDocument:
 
     last_selection_call = None
 
+    class _FakePageSize:
+        def __init__(self, width: float, height: float) -> None:
+            self._width = width
+            self._height = height
+
+        def toTuple(self):
+            return (self._width, self._height)
+
     def load(self, file_name: str):
         self.loaded = file_name
         return self.Error.None_
+
+    def pagePointSize(self, page_index: int):  # noqa: N802
+        return self._FakePageSize(72.0, 100.0)
 
     def getSelection(self, page_index: int, start: _FakeQPointF, end: _FakeQPointF):
         type(self).last_selection_call = (page_index, start, end)
@@ -203,12 +214,12 @@ def test_qt_pdf_document_text_selection_engine_returns_text_and_highlights(
     assert selection.page_index == 2
     assert selection.text == "Alice Example"
     assert len(selection.highlight_rects) == 1
-    assert selection.highlight_rects[0] == PdfRect(x1=10.0, y1=12.0, x2=22.0, y2=16.0)
+    assert selection.highlight_rects[0] == PdfRect(x1=10.0, y1=84.0, x2=22.0, y2=88.0)
     assert _FakeQPdfDocument.last_selection_call[0] == 2
     assert _FakeQPdfDocument.last_selection_call[1].x_value == 10.0
-    assert _FakeQPdfDocument.last_selection_call[1].y_value == 12.0
+    assert _FakeQPdfDocument.last_selection_call[1].y_value == 70.0
     assert _FakeQPdfDocument.last_selection_call[2].x_value == 40.0
-    assert _FakeQPdfDocument.last_selection_call[2].y_value == 30.0
+    assert _FakeQPdfDocument.last_selection_call[2].y_value == 88.0
 
 
 def test_qt_pdf_document_text_selection_engine_reports_missing_file(tmp_path: Path) -> None:

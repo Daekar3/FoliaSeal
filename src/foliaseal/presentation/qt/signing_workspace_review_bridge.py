@@ -10,6 +10,7 @@ from foliaseal.application.document_review_workspace import (
     DocumentReviewWorkspaceState,
     DocumentReviewWorkspaceTransition,
     DocumentReviewWorkspaceViewerEffects,
+    DocumentTextWorkspaceState,
 )
 
 
@@ -24,18 +25,22 @@ class SigningWorkspaceReviewBridge:
         document_review_workspace: DocumentReviewWorkspaceSession,
         on_jump_to_page_index: Callable[[int], Any],
         can_copy_text: bool,
+        on_document_text_state_changed: Callable[[DocumentTextWorkspaceState], Any] | None = None,
     ) -> None:
         self._sidebar = sidebar
         self._viewer_widget = viewer_widget
         self._document_review_workspace = document_review_workspace
         self._on_jump_to_page_index = on_jump_to_page_index
         self._can_copy_text = can_copy_text
+        self._on_document_text_state_changed = on_document_text_state_changed
 
     def apply_state(self, state: DocumentReviewWorkspaceState) -> None:
         self._sidebar.apply_document_review_workspace_state(
             state,
             can_copy_text=self._can_copy_text,
         )
+        if self._on_document_text_state_changed is not None:
+            self._on_document_text_state_changed(state.document_text)
 
     def select_review_signature(self, index: int) -> None:
         state = self._document_review_workspace.select_review_signature(index)

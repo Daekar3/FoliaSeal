@@ -209,6 +209,17 @@ def test_certificate_management_dialog_saves_and_refreshes(tmp_path: Path) -> No
     assert dialog.controls.managed_certificate_selector.items == [
         ("Board Secretary 2026", "managed-cert-default")
     ]
+    assert "reusable signing identities" in dialog.controls.introduction_label.text
+    assert (
+        dialog.controls.configuration_helper_label.text
+        == "Certificate configurations are the saved signing identities shown "
+        "in the main window."
+    )
+    assert (
+        dialog.controls.managed_certificate_helper_label.text
+        == "Managed certificates are the stored certificate files used by "
+        "those configurations."
+    )
     assert dialog.controls.display_name.text() == "Corporate Records Signing"
     assert dialog.controls.notes.text() == "Default signing identity"
     dialog.controls.display_name.setText("Board Records Signing")
@@ -389,6 +400,16 @@ def test_certificate_management_dialog_handles_empty_catalog(tmp_path: Path) -> 
     bindings, _, _, _, service = _build_service(tmp_path)
 
     dialog = service.show_management_dialog().compatibility.management_dialog
+    assert (
+        dialog.controls.configuration_helper_label.text
+        == "No certificate configurations yet. Create or import a certificate "
+        "to make one available for signing."
+    )
+    assert (
+        dialog.controls.managed_certificate_helper_label.text
+        == "No managed certificates are stored yet. Import or create one to "
+        "back a certificate configuration."
+    )
     saved = dialog.save_selected_configuration()
     deleted = dialog.delete_selected_configuration()
     exported = dialog.export_selected_managed_certificate()

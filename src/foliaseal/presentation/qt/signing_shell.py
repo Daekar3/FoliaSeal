@@ -88,8 +88,8 @@ from foliaseal.presentation.qt.viewer_widget import (
     build_qt_pdf_viewer_widget as _build_qt_pdf_viewer_widget,
 )
 
-SIGNATURE_PRESET_PLACEHOLDER = "Current signature setup"
-CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Current certificate"
+SIGNATURE_PRESET_PLACEHOLDER = "Current document setup"
+CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate configuration"
 SigningDraftPreview = _SigningDraftPreview
 SignatureFieldKey = _SignatureFieldKey
 SignatureFieldSource = _SignatureFieldSource
@@ -127,6 +127,7 @@ class QtSigningWidgetBindings:
     q_file_dialog: Any
     q_input_dialog: Any
     q_message_box: type[Any]
+    q_icon: type[Any]
     q_pixmap: type[Any]
     q_double_spin_box: type[Any]
     q_spin_box: type[Any]
@@ -316,6 +317,7 @@ class SigningWorkspaceWidget:
         self._viewer_interaction_session = composition.viewer_interaction_session
         self._document_review_workspace = composition.document_review_workspace
         self._workspace_interaction_session = composition.workspace_interaction_session
+        self._viewer_navigation_controls = composition.viewer_navigation_controls
         self._viewer_widget = composition.viewer_widget
         self.properties_panel = composition.properties_panel
         self._sidebar = composition.sidebar
@@ -340,6 +342,10 @@ class SigningWorkspaceWidget:
     @property
     def viewer_widget(self) -> Any:
         return self._viewer_widget
+
+    @property
+    def viewer_navigation_controls(self) -> Any:
+        return self._viewer_navigation_controls
 
     @property
     def app_settings(self) -> AppSettings:
@@ -513,6 +519,7 @@ class SigningShellAdapter:
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
             q_input_dialog=getattr(qt_widgets, "QInputDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),
+            q_icon=getattr(qt_gui, "QIcon"),
             q_pixmap=getattr(qt_gui, "QPixmap"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
             q_spin_box=getattr(qt_widgets, "QSpinBox"),

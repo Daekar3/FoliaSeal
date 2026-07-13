@@ -53,10 +53,13 @@ class CertificateConfigurationManagementDialogControls:
     """Controls used by the certificate-configuration management dialog."""
 
     dialog: Any
+    introduction_label: Any
     configuration_selector: Any
+    configuration_helper_label: Any
     display_name: Any
     notes: Any
     managed_certificate_selector: Any
+    managed_certificate_helper_label: Any
     save_button: Any
     delete_button: Any
     export_certificate_button: Any
@@ -169,6 +172,11 @@ class CertificateImportDialog:
             dialog.setWindowTitle("Import certificate")
         layout = self._bindings.q_form_layout(dialog)
 
+        introduction_label = self._bindings.q_label(
+            "Import a PKCS#12 file to store it as a managed certificate and "
+            "create a reusable certificate configuration for signing."
+        )
+        introduction_label.setWordWrap(True)
         certificate_path = self._bindings.q_line_edit("")
         display_name = self._bindings.q_line_edit("")
         passphrase = self._bindings.q_line_edit("")
@@ -177,6 +185,7 @@ class CertificateImportDialog:
         import_button = self._bindings.q_push_button("Import")
         cancel_button = self._bindings.q_push_button("Cancel")
 
+        layout.addRow("", introduction_label)
         layout.addRow("PKCS#12 file", certificate_path)
         layout.addRow("", choose_button)
         layout.addRow("Display name", display_name)
@@ -267,12 +276,18 @@ class CertificateCreationDialog:
             dialog.setWindowTitle("Create certificate")
         layout = self._bindings.q_form_layout(dialog)
 
+        introduction_label = self._bindings.q_label(
+            "Create a managed certificate and a matching certificate "
+            "configuration for the main signing workflow."
+        )
+        introduction_label.setWordWrap(True)
         display_name = self._bindings.q_line_edit("")
         passphrase = self._bindings.q_line_edit("")
         save_password = self._bindings.q_check_box("Save password securely")
         create_button = self._bindings.q_push_button("Create")
         cancel_button = self._bindings.q_push_button("Cancel")
 
+        layout.addRow("", introduction_label)
         layout.addRow("Display name", display_name)
         layout.addRow("Password", passphrase)
         layout.addRow("", save_password)
@@ -351,6 +366,20 @@ class CertificateConfigurationManagementDialog:
                 certificate.display_name,
                 certificate.managed_certificate_id,
             )
+        self.controls.configuration_helper_label.setText(
+            "Certificate configurations are the saved signing identities shown "
+            "in the main window."
+            if configurations
+            else "No certificate configurations yet. Create or import a "
+            "certificate to make one available for signing."
+        )
+        self.controls.managed_certificate_helper_label.setText(
+            "Managed certificates are the stored certificate files used by "
+            "those configurations."
+            if managed_certificates
+            else "No managed certificates are stored yet. Import or create one "
+            "to back a certificate configuration."
+        )
         self.load_selected_configuration()
 
     def load_selected_configuration(self, *_args: Any) -> CertificateConfiguration | None:
@@ -486,20 +515,33 @@ class CertificateConfigurationManagementDialog:
             dialog.setWindowTitle("Manage certificate configurations")
         layout = self._bindings.q_form_layout(dialog)
 
+        introduction_label = self._bindings.q_label(
+            "Certificate configurations are the reusable signing identities "
+            "shown in the main window. Each one points to a managed "
+            "certificate stored by the app."
+        )
+        introduction_label.setWordWrap(True)
         configuration_selector = self._bindings.q_combo_box()
+        configuration_helper_label = self._bindings.q_label("")
+        configuration_helper_label.setWordWrap(True)
         display_name = self._bindings.q_line_edit("")
         notes = self._bindings.q_line_edit("")
         managed_certificate_selector = self._bindings.q_combo_box()
+        managed_certificate_helper_label = self._bindings.q_label("")
+        managed_certificate_helper_label.setWordWrap(True)
         save_button = self._bindings.q_push_button("Save")
         delete_button = self._bindings.q_push_button("Delete")
         export_certificate_button = self._bindings.q_push_button("Export certificate")
         delete_certificate_button = self._bindings.q_push_button("Delete certificate")
         cancel_button = self._bindings.q_push_button("Cancel")
 
-        layout.addRow("Configuration", configuration_selector)
+        layout.addRow("", introduction_label)
+        layout.addRow("Certificate configuration", configuration_selector)
+        layout.addRow("", configuration_helper_label)
         layout.addRow("Display name", display_name)
         layout.addRow("Notes", notes)
         layout.addRow("Managed certificate", managed_certificate_selector)
+        layout.addRow("", managed_certificate_helper_label)
         layout.addRow("", save_button)
         layout.addRow("", delete_button)
         layout.addRow("", export_certificate_button)
@@ -517,10 +559,13 @@ class CertificateConfigurationManagementDialog:
 
         return CertificateConfigurationManagementDialogControls(
             dialog=dialog,
+            introduction_label=introduction_label,
             configuration_selector=configuration_selector,
+            configuration_helper_label=configuration_helper_label,
             display_name=display_name,
             notes=notes,
             managed_certificate_selector=managed_certificate_selector,
+            managed_certificate_helper_label=managed_certificate_helper_label,
             save_button=save_button,
             delete_button=delete_button,
             export_certificate_button=export_certificate_button,

@@ -55,6 +55,8 @@ class _FakeQt:
     LeftButton = 1
     MiddleButton = 2
     NoModifier = 0
+    IBeamCursor = "ibeam"
+    CrossCursor = "cross"
     Key_Plus = 10
     Key_Equal = 11
     Key_Minus = 12
@@ -182,6 +184,7 @@ class _FakeWidget:
         self.mouse_grabbed = False
         self.minimum_size = None
         self.size = None
+        self.cursor = None
 
     def update(self):
         self.update_calls += 1
@@ -197,6 +200,9 @@ class _FakeWidget:
 
     def releaseMouse(self):  # noqa: N802
         self.mouse_grabbed = False
+
+    def setCursor(self, cursor):  # noqa: N802
+        self.cursor = cursor
 
     def mousePressEvent(self, event):  # noqa: N802
         return None
@@ -500,6 +506,22 @@ def test_text_interaction_mode_ignores_signature_overlay_resize_handles(monkeypa
     assert normalized.y1 == 22.0
     assert normalized.x2 == 30.0
     assert normalized.y2 == 30.0
+
+
+def test_set_interaction_mode_changes_cursor(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    preview = PdfViewerWidgetAdapter().create(workflow=_build_workflow())
+
+    assert preview.cursor is None
+
+    preview.set_interaction_mode("text")
+
+    assert preview.cursor == _FakeQt.IBeamCursor
+
+    preview.set_interaction_mode("signature")
+
+    assert preview.cursor == _FakeQt.CrossCursor
 
 
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):

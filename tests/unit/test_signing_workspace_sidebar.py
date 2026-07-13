@@ -130,7 +130,11 @@ def _build_empty_workspace_state() -> DocumentReviewWorkspaceState:
     )
 
 
-def _build_sidebar(*, on_review_signature_selected=None) -> SigningWorkspaceSidebar:
+def _build_sidebar(
+    *,
+    on_review_signature_selected=None,
+    on_text_selection_mode_changed=None,
+) -> SigningWorkspaceSidebar:
     bindings = _fake_bindings()
     callbacks = {
         "on_choose_output": lambda: None,
@@ -141,7 +145,9 @@ def _build_sidebar(*, on_review_signature_selected=None) -> SigningWorkspaceSide
         "on_next_text_match": lambda: None,
         "on_copy_text_match": lambda: None,
         "on_review_signature_selected": on_review_signature_selected or (lambda index: None),
-        "on_text_selection_mode_changed": lambda enabled: None,
+        "on_text_selection_mode_changed": (
+            on_text_selection_mode_changed or (lambda enabled: None)
+        ),
         "on_copy_selected_text": lambda: None,
         "on_clear_selected_text": lambda: None,
     }
@@ -239,3 +245,27 @@ def test_signing_workspace_sidebar_renders_empty_review_state_and_checkbox_state
     assert sidebar.document_text_controls.copy_button._enabled is False
     assert sidebar.document_text_controls.copy_selection_button._enabled is False
     assert sidebar.document_text_controls.clear_selection_button._enabled is False
+
+
+def test_signing_workspace_sidebar_hides_text_selection_checkbox() -> None:
+    sidebar = _build_sidebar()
+
+    assert sidebar.document_text_controls.select_mode_checkbox.visible is False
+    assert sidebar.document_text_controls.copy_selection_button.visible is False
+    assert sidebar.document_text_controls.clear_selection_button.visible is False
+
+
+def test_signing_workspace_sidebar_does_not_reemit_hidden_checkbox_sync() -> None:
+    calls = []
+    sidebar = _build_sidebar(on_text_selection_mode_changed=calls.append)
+
+    sidebar.apply_document_review_workspace_state(
+        _build_empty_workspace_state(),
+        can_copy_text=False,
+    )
+
+    assert calls == []
+
+    sidebar._handle_text_selection_mode_changed(1, on_text_selection_mode_changed=calls.append)
+
+    assert calls == [True]

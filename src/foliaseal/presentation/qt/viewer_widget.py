@@ -122,7 +122,14 @@ class PdfViewerWidgetAdapter:
                             painter.drawRect(highlight_rect.normalized())
 
                     if self._selection_rect is not None:
-                        painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
+                        if self._interaction_mode == "text" and callable(fill_rect):
+                            fill_rect(
+                                self._selection_rect.normalized(),
+                                bindings.q_color(255, 235, 59, 80),
+                            )
+                            painter.setPen(bindings.q_pen(bindings.q_color(245, 158, 11), 1))
+                        else:
+                            painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
                         painter.drawRect(self._selection_rect.normalized())
 
                     overlay_rect = self._current_overlay_qrect()
@@ -332,6 +339,8 @@ class PdfViewerWidgetAdapter:
                 if not self._is_selection_drag(self._drag_origin, current):
                     self._selection_rect = None
                     self._drag_origin = None
+                    if self._interaction_mode == "text":
+                        self._emit_interaction("text_selection_clear_requested")
                     self.update()
                     event.accept()
                     return
@@ -386,6 +395,15 @@ class PdfViewerWidgetAdapter:
                 if mode not in {"signature", "text"}:
                     raise ValueError(f"Unsupported viewer interaction mode: {mode}")
                 self._interaction_mode = mode
+                set_cursor = getattr(self, "setCursor", None)
+                if callable(set_cursor):
+                    cursor = (
+                        getattr(bindings.qt, "IBeamCursor", None)
+                        if mode == "text"
+                        else getattr(bindings.qt, "CrossCursor", None)
+                    )
+                    if cursor is not None:
+                        set_cursor(cursor)
 
             def attach_scroll_container(self, scroll_container: Any) -> None:
                 self._scroll_container = scroll_container
@@ -431,6 +449,7 @@ class PdfViewerWidgetAdapter:
                 measured_ms = (perf_counter() - start_time) * 1000.0
                 self._record_timing(measured_ms=measured_ms, navigation=True)
                 self._apply_render_result(result)
+                self._emit_interaction("navigation_changed")
 
             def go_to_next_page(self) -> None:
                 self._navigate(

@@ -34,16 +34,18 @@ class QtPdfDocumentTextSelectionEngine:
                     f"{self._describe_load_error(load_error)}"
                 )
             normalized_rect = selection_rect.normalized()
+            _page_width, page_height = self._page_dimensions(document, page_index)
             selection = document.getSelection(
                 page_index,
-                QPointF(normalized_rect.x1, normalized_rect.y1),
-                QPointF(normalized_rect.x2, normalized_rect.y2),
+                QPointF(normalized_rect.x1, page_height - normalized_rect.y2),
+                QPointF(normalized_rect.x2, page_height - normalized_rect.y1),
             )
             selected_text = selection.text()
             if not selected_text.strip():
                 return None
             highlight_rects = tuple(
-                self._polygon_to_pdf_rect(polygon) for polygon in selection.bounds()
+                self._polygon_to_pdf_rect(polygon, page_height=page_height)
+                for polygon in selection.bounds()
             )
             if not highlight_rects:
                 highlight_rects = (selection_rect.normalized(),)
@@ -55,12 +57,24 @@ class QtPdfDocumentTextSelectionEngine:
         finally:
             document.close()
 
-    def _polygon_to_pdf_rect(self, polygon: object) -> PdfRect:
+    def _page_dimensions(self, document: QPdfDocument, page_index: int) -> tuple[float, float]:
+        page_size = document.pagePointSize(page_index)
+        to_tuple = getattr(page_size, "toTuple", None)
+        if callable(to_tuple):
+            width_value, height_value = to_tuple()
+            return float(width_value), float(height_value)
+        width = getattr(page_size, "width", None)
+        height = getattr(page_size, "height", None)
+        if callable(width) and callable(height):
+            return float(width()), float(height())
+        raise RuntimeError("Unable to read PDF page dimensions for text selection.")
+
+    def _polygon_to_pdf_rect(self, polygon: object, *, page_height: float) -> PdfRect:
         points = tuple(polygon)
         if not points:
             raise ValueError("QtPdf returned an empty selection polygon.")
         xs = [float(point.x()) for point in points]
-        ys = [float(point.y()) for point in points]
+        ys = [page_height - float(point.y()) for point in points]
         return PdfRect(
             x1=min(xs),
             y1=min(ys),

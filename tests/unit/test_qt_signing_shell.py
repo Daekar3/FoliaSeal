@@ -254,6 +254,7 @@ class _FakeLineEdit(_FakeWidget):
         super().__init__()
         self._text = text
         self.textChanged = _FakeSignal()
+        self.returnPressed = _FakeSignal()
         self.placeholder = ""
 
     def setText(self, text):  # noqa: N802
@@ -265,6 +266,9 @@ class _FakeLineEdit(_FakeWidget):
 
     def setPlaceholderText(self, text):  # noqa: N802
         self.placeholder = text
+
+    def emit_return_pressed(self):
+        self.returnPressed.emit()
 
 
 class _FakeCheckBox(_FakeWidget):
@@ -403,12 +407,33 @@ class _FakePushButton(_FakeWidget):
         super().__init__()
         self._text = text
         self._enabled = True
+        self._checkable = False
+        self._checked = False
+        self.icon = None
+        self.tooltip = None
         self.clicked = _FakeSignal()
 
     def setEnabled(self, value):  # noqa: N802
         self._enabled = bool(value)
 
+    def setCheckable(self, value):  # noqa: N802
+        self._checkable = bool(value)
+
+    def setChecked(self, value):  # noqa: N802
+        self._checked = bool(value)
+
+    def isChecked(self):  # noqa: N802
+        return self._checked
+
+    def setIcon(self, icon):  # noqa: N802
+        self.icon = icon
+
+    def setToolTip(self, text):  # noqa: N802
+        self.tooltip = text
+
     def click(self):
+        if self._checkable:
+            self._checked = not self._checked
         self.clicked.emit()
 
 
@@ -432,6 +457,11 @@ class _FakePixmap:
             scaled_width = width
             scaled_height = max(1, int(width / aspect))
         return _FakePixmap(self.path, scaled_width, scaled_height)
+
+
+class _FakeIcon:
+    def __init__(self, path: str = "") -> None:
+        self.path = path
 
 
 class _FakeScrollArea(_FakeWidget):
@@ -516,6 +546,20 @@ class _FakeViewerWidget(_FakeWidget):
     def set_interaction_mode(self, mode):
         self.interaction_mode = mode
 
+    def go_to_next_page(self):
+        self.workflow.go_next_page()
+        if self.on_interaction is not None:
+            self.on_interaction("navigation_changed")
+
+    def go_to_previous_page(self):
+        self.workflow.go_previous_page()
+        if self.on_interaction is not None:
+            self.on_interaction("navigation_changed")
+
+    def emit_interaction(self, name):
+        if self.on_interaction is not None:
+            self.on_interaction(name)
+
 
 class _FakeSigningExecutor:
     def __init__(self, result: SigningResult) -> None:
@@ -587,6 +631,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_file_dialog=_FakeFileDialog(),
         q_input_dialog=_FakeInputDialog(),
         q_message_box=_FakeMessageBox(),
+        q_icon=_FakeIcon,
         q_double_spin_box=_FakeDoubleSpinBox,
         q_spin_box=_FakeSpinBox,
         q_push_button=_FakePushButton,
@@ -1318,6 +1363,66 @@ def test_signing_shell_selection_uses_rendered_snapshot_page_for_validation(
     assert widget.viewer_widget.overlay_signature_rect.page_index == 0
 
 
+def test_signing_shell_document_review_page_navigation_buttons_track_viewer_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    controls = widget.viewer_navigation_controls
+
+    assert controls["page_input"].text() == "1"
+    assert controls["page_input"].fixed_width == 44
+    assert controls["total_pages_label"].text() == "of 3"
+    assert controls["previous_page_button"].fixed_width == 28
+    assert controls["next_page_button"].fixed_width == 28
+    assert controls["text_selection_button"].fixed_width == 32
+    assert controls["copy_selection_button"].fixed_width == 32
+    assert controls["text_selection_button"].icon.path.endswith("text-select.svg")
+    assert controls["copy_selection_button"].icon.path.endswith("copy.svg")
+    assert controls["text_selection_button"].tooltip == "Text selection mode"
+    assert controls["copy_selection_button"].tooltip == "Copy selected text"
+    assert controls["previous_page_button"]._enabled is False
+    assert controls["next_page_button"]._enabled is True
+
+    controls["next_page_button"].click()
+
+    assert widget.logical_page_index() == 1
+    assert controls["page_input"].text() == "2"
+    assert controls["total_pages_label"].text() == "of 3"
+    assert controls["previous_page_button"]._enabled is True
+    assert controls["next_page_button"]._enabled is True
+
+    widget.viewer_widget.go_to_next_page()
+
+    assert widget.logical_page_index() == 2
+    assert controls["page_input"].text() == "3"
+    assert controls["previous_page_button"]._enabled is True
+    assert controls["next_page_button"]._enabled is False
+
+    controls["page_input"].setText("1")
+    controls["page_input"].emit_return_pressed()
+
+    assert widget.logical_page_index() == 0
+    assert controls["page_input"].text() == "1"
+    assert controls["previous_page_button"]._enabled is False
+    assert controls["next_page_button"]._enabled is True
+
+
 def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     monkeypatch,
     tmp_path: Path,
@@ -2024,10 +2129,12 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
         document_text_selection_engine=selection_engine,
         on_copy_text=copied_text.append,
     )
+    controls = widget.viewer_navigation_controls
 
-    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(True)
+    controls["text_selection_button"].click()
 
     assert widget.viewer_widget.interaction_mode == "text"
+    assert controls["text_selection_button"].isChecked() is True
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
 
@@ -2040,21 +2147,23 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
     assert widget.viewer_widget.text_highlight_rects == (
         PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),
     )
+    assert controls["copy_selection_button"]._enabled is True
 
-    widget.sidebar_surface.document_text_copy_selection_button.click()
+    controls["copy_selection_button"].click()
 
     assert copied_text == ["Alice Example"]
 
-    widget.sidebar_surface.document_text_clear_selection_button.click()
+    widget.viewer_widget.emit_interaction("text_selection_clear_requested")
 
     assert widget.viewer_widget.text_highlight_page_index is None
     assert widget.viewer_widget.text_highlight_rects == ()
-    assert widget.sidebar_surface.document_text_copy_selection_button._enabled is False
+    assert controls["copy_selection_button"]._enabled is False
 
-    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(False)
+    controls["text_selection_button"].click()
     widget.viewer_widget.emit_selection(PdfRect(x1=1.0, y1=2.0, x2=3.0, y2=4.0))
 
     assert widget.viewer_widget.interaction_mode == "signature"
+    assert controls["text_selection_button"].isChecked() is False
     assert widget.signature_rect() is not None
     assert widget.signature_rect().left_pt == 1.0
 
@@ -2085,12 +2194,14 @@ def test_signing_shell_document_text_selection_consumes_drag_before_signature_pl
         signing_workflow=_workflow(tmp_path),
         document_text_selection_engine=selection_engine,
     )
+    controls = widget.viewer_navigation_controls
 
-    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(True)
+    controls["text_selection_button"].click()
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
 
     assert widget.signature_rect() is None
     assert widget.viewer_widget.interaction_mode == "text"
+    assert controls["text_selection_button"].isChecked() is True
     assert widget.viewer_widget.text_highlight_page_index == 0
     assert widget.viewer_widget.text_highlight_rects == (
         PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),
@@ -2137,15 +2248,16 @@ def test_signing_shell_restores_search_state_when_text_selection_mode_is_disable
         document_text_search_engine=search_engine,
         document_text_selection_engine=selection_engine,
     )
+    controls = widget.viewer_navigation_controls
 
     widget.sidebar_surface.document_text_query_input.setText("Alice")
     widget.sidebar_surface.document_text_find_button.click()
-    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(True)
+    controls["text_selection_button"].click()
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
 
     assert widget.sidebar_surface.document_text_status_label.text() == "Selected text on page 2."
 
-    widget.sidebar_surface.document_text_select_mode_checkbox.setChecked(False)
+    controls["text_selection_button"].click()
 
     assert widget.sidebar_surface.document_text_status_label.text() == (
         "Found 1 matches for 'Alice'."
@@ -2442,7 +2554,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.properties_panel.container.layout.items[1][0]
         is widget.properties_panel._certificate_controls.container
     )
-    assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 2
+    assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 3
     assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
@@ -3557,7 +3669,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     )
 
     panel._appearance_controls.signer_label_prefix.setText("Temporary Draft")
-    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current document setup"
     workflow.selected_certificate_configuration_id = None
 
     panel._signature_preset_controls.preset_combo.setCurrentText("My Preset")
@@ -3583,7 +3695,7 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     assert relaunch_panel._signature_preset_controls.preset_combo.findText("My Preset") != -1
     assert (
         relaunch_panel._signature_preset_controls.preset_combo.currentText()
-        == "Current signature setup"
+        == "Current document setup"
     )
 
 
@@ -3834,7 +3946,7 @@ def test_signing_shell_set_signature_appearance_uses_setup_session_entrypoint(
     panel.set_signature_appearance(appearance)
 
     assert calls == [appearance]
-    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current document setup"
 
 
 def test_signing_shell_viewer_selection_uses_workspace_interaction_session_entrypoint(
@@ -4183,12 +4295,12 @@ def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(
         _spy_clear_selected_signature_preset,
     )
 
-    panel._signature_preset_controls.preset_combo._current = "Current signature setup"
+    panel._signature_preset_controls.preset_combo._current = "Current document setup"
     panel._on_signature_preset_selected()
 
     assert calls == []
     assert cleared == ["cleared"]
-    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current document setup"
 
 
 def test_signing_shell_visible_setup_edit_clears_selected_preset_and_keeps_validation(
@@ -4219,7 +4331,7 @@ def test_signing_shell_visible_setup_edit_clears_selected_preset_and_keeps_valid
 
     panel._appearance_controls.signer_label_prefix.setText("Signed by Product")
 
-    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current document setup"
     assert panel.validation_text() == "Place a signature on the page to continue."
     assert panel.preview_text()
 
@@ -4391,7 +4503,7 @@ def test_signing_shell_signature_preset_selection_error_reloads_current_state(
     panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
 
     assert load_calls
-    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current document setup"
     assert errors == []
     assert fake_bindings.q_message_box.calls[-1][1:] == (
         "Signature preset error",
@@ -4625,7 +4737,7 @@ def test_signing_shell_signature_preset_delete_requires_confirmation_and_refresh
     assert result is not None
     assert result.selected_signature_preset_name is None
     assert store.load_catalog().preset_names() == ("Default",)
-    assert panel._signature_preset_controls.preset_combo.currentText() == "Current signature setup"
+    assert panel._signature_preset_controls.preset_combo.currentText() == "Current document setup"
     assert panel._signature_preset_controls.preset_combo.findText("Compact") == -1
 
     relaunched_widget = build_qt_signing_shell(

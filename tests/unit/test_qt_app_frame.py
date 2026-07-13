@@ -23,9 +23,9 @@ class _FakeSignal:
     def connect(self, callback):
         self._callbacks.append(callback)
 
-    def emit(self):
+    def emit(self, *args):
         for callback in list(self._callbacks):
-            callback()
+            callback(*args)
 
 
 class _FakeAction:
@@ -35,6 +35,9 @@ class _FakeAction:
         self.triggered = _FakeSignal()
         self.shortcut = None
         self.enabled = True
+        self.checkable = False
+        self.checked = False
+        self.icon = None
 
     def setShortcut(self, shortcut):  # noqa: N802
         self.shortcut = shortcut
@@ -42,7 +45,21 @@ class _FakeAction:
     def setEnabled(self, enabled):  # noqa: N802
         self.enabled = bool(enabled)
 
+    def setIcon(self, icon):  # noqa: N802
+        self.icon = icon
+
+    def setCheckable(self, checkable):  # noqa: N802
+        self.checkable = bool(checkable)
+
+    def setChecked(self, checked):  # noqa: N802
+        self.checked = bool(checked)
+
+    def isChecked(self):  # noqa: N802
+        return self.checked
+
     def trigger(self) -> None:
+        if self.checkable:
+            self.checked = not self.checked
         self.triggered.emit()
 
 
@@ -89,6 +106,9 @@ class _FakeLabel:
     def __init__(self, text="") -> None:
         self.text = text
         self.word_wrap = False
+
+    def setText(self, text):  # noqa: N802
+        self.text = text
 
     def setWordWrap(self, value):  # noqa: N802
         self.word_wrap = bool(value)
@@ -192,17 +212,32 @@ class _FakePushButton:
     def __init__(self, text="") -> None:
         self.text = text
         self.clicked = _FakeSignal()
+        self.icon = None
+        self.tooltip = None
 
     def click(self) -> None:
         self.clicked.emit()
+
+    def setIcon(self, icon):  # noqa: N802
+        self.icon = icon
+
+    def setToolTip(self, text):  # noqa: N802
+        self.tooltip = text
+
+
+class _FakeIcon:
+    def __init__(self, path="") -> None:
+        self.path = path
 
 
 class _FakeFileDialog:
     def __init__(self) -> None:
         self.open_calls = []
         self.save_calls = []
+        self.directory_calls = []
         self.next_open_file_name = ""
         self.next_save_file_name = ""
+        self.next_directory = ""
 
     def getOpenFileName(self, parent, title, directory, file_filter):  # noqa: N802
         self.open_calls.append((parent, title, directory, file_filter))
@@ -211,6 +246,10 @@ class _FakeFileDialog:
     def getSaveFileName(self, parent, title, directory, file_filter):  # noqa: N802
         self.save_calls.append((parent, title, directory, file_filter))
         return (self.next_save_file_name, file_filter)
+
+    def getExistingDirectory(self, parent, title, directory):  # noqa: N802
+        self.directory_calls.append((parent, title, directory))
+        return self.next_directory
 
 
 class _FakeMessageBox:
@@ -268,6 +307,8 @@ class _FakeShell:
         self.applied_settings = []
         self.output_dialog_defaults = []
         self.choose_output_pdf_path_calls = 0
+        self.set_document_text_selection_mode_calls = []
+        self.copy_selected_document_text_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
         self.testing_adapter = object()
 
@@ -283,6 +324,14 @@ class _FakeShell:
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
         return "/tmp/signed-output.pdf"
+
+    def set_document_text_selection_mode(self, enabled: bool) -> bool:
+        self.set_document_text_selection_mode_calls.append(bool(enabled))
+        return bool(enabled)
+
+    def copy_selected_document_text(self) -> str | None:
+        self.copy_selected_document_text_calls += 1
+        return "Alice Example"
 
 
 class _FakeShellPort:
@@ -300,6 +349,12 @@ class _FakeShellPort:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self.shell_widget.refresh_certificate_configurations()
+
+    def set_document_text_selection_mode(self, enabled: bool) -> bool:
+        return self.shell_widget.set_document_text_selection_mode(enabled)
+
+    def copy_selected_document_text(self) -> str | None:
+        return self.shell_widget.copy_selected_document_text()
 
 
 class _FakeShellFactory:
@@ -368,6 +423,7 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_file_dialog=file_dialog,
         q_message_box=message_box,
         q_action=_FakeAction,
+        q_icon=_FakeIcon,
         q_application=_FakeQApplication,
         qpdf_document=_FakeQPdfDocument,
     )
@@ -453,6 +509,10 @@ def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path
 
     assert catalog is shell.certificate_catalog
     assert shell.refresh_certificate_configurations_calls == 1
+    assert port.set_document_text_selection_mode(True) is True
+    assert shell.set_document_text_selection_mode_calls == [True]
+    assert port.copy_selected_document_text() == "Alice Example"
+    assert shell.copy_selected_document_text_calls == 1
 
 
 def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(
@@ -532,7 +592,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         render_backend_factory=lambda: object(),
     )
 
-    assert [menu.title for menu in frame.window.menu_bar.menus] == ["File", "Settings"]
+    assert [menu.title for menu in frame.window.menu_bar.menus] == ["File", "Edit", "Settings"]
     assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
         "Open file",
         "Save As...",
@@ -541,6 +601,15 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert frame.window.menu_bar.menus[0].actions[1].shortcut == "Ctrl+Shift+S"
     assert frame.window.menu_bar.menus[0].actions[1].enabled is False
     assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
+        "Text selection mode",
+        "Copy selected text",
+    ]
+    assert frame.window.menu_bar.menus[1].actions[0].checkable is True
+    assert frame.window.menu_bar.menus[1].actions[0].enabled is False
+    assert frame.window.menu_bar.menus[1].actions[1].enabled is False
+    assert frame.window.menu_bar.menus[1].actions[0].icon.path.endswith("text-select.svg")
+    assert frame.window.menu_bar.menus[1].actions[1].icon.path.endswith("copy.svg")
+    assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
         "Application settings",
         "Create certificate...",
         "Import certificate...",
@@ -555,7 +624,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert not hasattr(frame.window, "show_certificate_import")
     assert not hasattr(frame.window, "show_certificate_management")
 
-    frame.window.menu_bar.menus[1].actions[0].trigger()
+    frame.window.menu_bar.menus[2].actions[0].trigger()
 
     assert frame.settings_dialog.controls.dialog.title == "Application settings"
     assert (
@@ -578,16 +647,29 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     )
 
     save_as_action = frame.window.menu_bar.menus[0].actions[1]
+    text_selection_action = frame.window.menu_bar.menus[1].actions[0]
+    copy_selection_action = frame.window.menu_bar.menus[1].actions[1]
 
     assert save_as_action.enabled is False
+    assert text_selection_action.enabled is False
+    assert text_selection_action.checked is False
+    assert copy_selection_action.enabled is False
 
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
 
     assert save_as_action.enabled is True
+    assert text_selection_action.enabled is True
+    assert text_selection_action.checked is False
+    assert copy_selection_action.enabled is True
 
     save_as_action.trigger()
+    text_selection_action.trigger()
+    copy_selection_action.trigger()
 
     assert shell.choose_output_pdf_path_calls == 1
+    assert shell.set_document_text_selection_mode_calls == [True]
+    assert shell.copy_selected_document_text_calls == 1
+    assert text_selection_action.checked is True
 
 
 def test_app_frame_certificate_creation_routes_to_dialog_port(
@@ -685,6 +767,43 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
     bindings.q_file_dialog.next_open_file_name = ""
     frame.choose_open_pdf()
     assert bindings.q_file_dialog.open_calls[-1][2] == str(next_open_dir)
+
+
+def test_app_frame_settings_dialog_browse_buttons_choose_directories(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_app_settings()
+    dialog = frame.settings_dialog
+    bindings.q_file_dialog.next_directory = str(tmp_path / "browse-open")
+    dialog.controls.default_open_directory_browse_button.click()
+    bindings.q_file_dialog.next_directory = str(tmp_path / "browse-output")
+    dialog.controls.default_output_directory_browse_button.click()
+
+    assert dialog.controls.default_open_directory.text() == str(tmp_path / "browse-open")
+    assert dialog.controls.default_output_directory.text() == str(
+        tmp_path / "browse-output"
+    )
+    assert bindings.q_file_dialog.directory_calls == [
+        (
+            dialog.controls.dialog,
+            "Choose default open folder",
+            str(tmp_path / "source"),
+        ),
+        (
+            dialog.controls.dialog,
+            "Choose default output folder",
+            str(tmp_path / "signed"),
+        ),
+    ]
 
 
 def test_app_frame_settings_dialog_refreshes_loaded_shell_settings(

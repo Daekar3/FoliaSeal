@@ -18,7 +18,7 @@ from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
     build_qt_signing_shell,
 )
-from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
+from foliaseal.presentation.qt.signing_workspace_testing_port import (
     SigningWorkspaceTestingPort,
 )
 
@@ -56,6 +56,12 @@ class SigningWorkspacePort(Protocol):
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Refresh live certificate configuration choices."""
 
+    def set_document_text_selection_mode(self, enabled: bool) -> bool:
+        """Toggle document text-selection mode for the live shell."""
+
+    def copy_selected_document_text(self) -> str | None:
+        """Copy the current arbitrary text selection, if any."""
+
 
 class SigningWorkspaceFactory(Protocol):
     """Create a live signing workspace from typed bootstrap inputs."""
@@ -89,6 +95,12 @@ class QtSigningWorkspacePort:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self.shell_widget.refresh_certificate_configurations()
+
+    def set_document_text_selection_mode(self, enabled: bool) -> bool:
+        return self.shell_widget.set_document_text_selection_mode(enabled)
+
+    def copy_selected_document_text(self) -> str | None:
+        return self.shell_widget.copy_selected_document_text()
 
 
 class QtSigningWorkspaceFactory:

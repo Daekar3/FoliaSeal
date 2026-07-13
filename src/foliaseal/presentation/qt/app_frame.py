@@ -45,6 +45,7 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceFactory,
     SigningWorkspacePort,
 )
+from foliaseal.resources.icons import icon_path
 
 
 class QtAppFrameBindingsUnavailable(RuntimeError):
@@ -66,6 +67,7 @@ class QtAppFrameBindings:
     q_file_dialog: Any
     q_message_box: Any
     q_action: type[Any]
+    q_icon: type[Any]
     q_application: type[Any]
     qpdf_document: type[Any]
 
@@ -76,7 +78,9 @@ class AppSettingsDialogControls:
 
     dialog: Any
     default_open_directory: Any
+    default_open_directory_browse_button: Any
     default_output_directory: Any
+    default_output_directory_browse_button: Any
     save_button: Any
     cancel_button: Any
 
@@ -156,27 +160,57 @@ class AppSettingsDialog:
         default_open_directory = self._bindings.q_line_edit(
             self._settings.default_open_directory
         )
+        default_open_directory_browse_button = self._bindings.q_push_button("Browse...")
         default_output_directory = self._bindings.q_line_edit(
             self._settings.default_output_directory
         )
+        default_output_directory_browse_button = self._bindings.q_push_button("Browse...")
         save_button = self._bindings.q_push_button("Save")
         cancel_button = self._bindings.q_push_button("Cancel")
 
         layout.addRow("Default open folder", default_open_directory)
+        layout.addRow("", default_open_directory_browse_button)
         layout.addRow("Default output folder", default_output_directory)
+        layout.addRow("", default_output_directory_browse_button)
         layout.addRow("", save_button)
         layout.addRow("", cancel_button)
 
+        default_open_directory_browse_button.clicked.connect(  # type: ignore[attr-defined]
+            lambda: self._choose_directory(
+                title="Choose default open folder",
+                current_path=default_open_directory.text().strip(),
+                target=default_open_directory,
+            )
+        )
+        default_output_directory_browse_button.clicked.connect(  # type: ignore[attr-defined]
+            lambda: self._choose_directory(
+                title="Choose default output folder",
+                current_path=default_output_directory.text().strip(),
+                target=default_output_directory,
+            )
+        )
         save_button.clicked.connect(self.save)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
 
         return AppSettingsDialogControls(
             dialog=dialog,
             default_open_directory=default_open_directory,
+            default_open_directory_browse_button=default_open_directory_browse_button,
             default_output_directory=default_output_directory,
+            default_output_directory_browse_button=default_output_directory_browse_button,
             save_button=save_button,
             cancel_button=cancel_button,
         )
+
+    def _choose_directory(self, *, title: str, current_path: str, target: Any) -> None:
+        selected = self._bindings.q_file_dialog.getExistingDirectory(
+            self.controls.dialog,
+            title,
+            current_path or str(Path.home()),
+        )
+        selected_path = str(selected).strip()
+        if selected_path:
+            target.setText(selected_path)
 
     def _accepted_dialog_code(self) -> Any:
         accepted = getattr(self._bindings.q_dialog, "Accepted", None)
@@ -248,6 +282,8 @@ class FoliaSealAppFrame:
         self._dialog_compatibility = AppFrameDialogCompatibilityState()
         self._open_action: Any | None = None
         self._save_as_action: Any | None = None
+        self._text_selection_mode_action: Any | None = None
+        self._copy_selected_text_action: Any | None = None
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
@@ -353,6 +389,9 @@ class FoliaSealAppFrame:
         self._current_workspace = outcome.compatibility
         self.window.setCentralWidget(outcome.compatibility.shell_widget)
         self._set_save_as_enabled(True)
+        self._set_text_selection_action_enabled(True)
+        self._set_text_selection_action_checked(False)
+        self._set_copy_selected_text_action_enabled(True)
         return outcome.compatibility.shell_widget
 
     def show_app_settings(self) -> AppSettings | None:
@@ -406,6 +445,22 @@ class FoliaSealAppFrame:
             enabled=False,
         )
         file_menu.addAction(self._save_as_action)
+        edit_menu = menu_bar.addMenu("Edit")
+        self._text_selection_mode_action = self._action(
+            "Text selection mode",
+            self._toggle_text_selection_mode_from_action,
+            enabled=False,
+            checkable=True,
+            icon_name="text-select.svg",
+        )
+        edit_menu.addAction(self._text_selection_mode_action)
+        self._copy_selected_text_action = self._action(
+            "Copy selected text",
+            self._copy_selected_text_from_action,
+            enabled=False,
+            icon_name="copy.svg",
+        )
+        edit_menu.addAction(self._copy_selected_text_action)
         settings_menu = menu_bar.addMenu("Settings")
         settings_menu.addAction(
             self._action("Application settings", self.show_app_settings)
@@ -430,8 +485,14 @@ class FoliaSealAppFrame:
         *,
         shortcut: str | None = None,
         enabled: bool = True,
+        checkable: bool = False,
+        icon_name: str | None = None,
     ) -> Any:
         action = self._bindings.q_action(text, self.window)
+        if icon_name is not None:
+            set_icon = getattr(action, "setIcon", None)
+            if callable(set_icon):
+                set_icon(self._bindings.q_icon(icon_path(icon_name)))
         triggered = getattr(action, "triggered", None)
         if hasattr(triggered, "connect"):
             triggered.connect(callback)
@@ -441,6 +502,9 @@ class FoliaSealAppFrame:
         set_enabled = getattr(action, "setEnabled", None)
         if callable(set_enabled):
             set_enabled(enabled)
+        set_checkable = getattr(action, "setCheckable", None)
+        if callable(set_checkable):
+            set_checkable(checkable)
         return action
 
     def _choose_save_as(self) -> str | None:
@@ -455,6 +519,48 @@ class FoliaSealAppFrame:
         set_enabled = getattr(action, "setEnabled", None)
         if callable(set_enabled):
             set_enabled(enabled)
+
+    def _set_text_selection_action_enabled(self, enabled: bool) -> None:
+        action = self._text_selection_mode_action
+        if action is None:
+            return
+        set_enabled = getattr(action, "setEnabled", None)
+        if callable(set_enabled):
+            set_enabled(enabled)
+
+    def _set_text_selection_action_checked(self, checked: bool) -> None:
+        action = self._text_selection_mode_action
+        if action is None:
+            return
+        set_checked = getattr(action, "setChecked", None)
+        if callable(set_checked):
+            set_checked(checked)
+
+    def _set_copy_selected_text_action_enabled(self, enabled: bool) -> None:
+        action = self._copy_selected_text_action
+        if action is None:
+            return
+        set_enabled = getattr(action, "setEnabled", None)
+        if callable(set_enabled):
+            set_enabled(enabled)
+
+    def _toggle_text_selection_mode_from_action(self) -> bool | None:
+        action = self._text_selection_mode_action
+        if action is None:
+            return None
+        is_checked = getattr(action, "isChecked", None)
+        enabled = bool(is_checked()) if callable(is_checked) else False
+        result = self._with_current_shell_port(
+            lambda shell_port: shell_port.set_document_text_selection_mode(enabled)
+        )
+        if isinstance(result, bool):
+            self._set_text_selection_action_checked(result)
+        return result
+
+    def _copy_selected_text_from_action(self) -> str | None:
+        return self._with_current_shell_port(
+            lambda shell_port: shell_port.copy_selected_document_text()
+        )
 
     def _apply_certificate_dialog_compatibility(
         self,
@@ -485,6 +591,9 @@ class FoliaSealAppFrame:
             label.setWordWrap(True)
         self.window.setCentralWidget(label)
         self._set_save_as_enabled(False)
+        self._set_text_selection_action_enabled(False)
+        self._set_text_selection_action_checked(False)
+        self._set_copy_selected_text_action_enabled(False)
 
     def _emit_error(self, message: str) -> None:
         if self._on_error is not None:
@@ -618,6 +727,7 @@ class QtAppFrameAdapter:
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),
             q_action=getattr(qt_gui, "QAction"),
+            q_icon=getattr(qt_gui, "QIcon"),
             q_application=getattr(qt_widgets, "QApplication"),
             qpdf_document=getattr(qtpdf, "QPdfDocument"),
         )

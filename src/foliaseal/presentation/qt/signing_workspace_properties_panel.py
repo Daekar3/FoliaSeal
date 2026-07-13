@@ -42,8 +42,8 @@ from foliaseal.presentation.qt.visible_signature_setup_form import (
     QtVisibleSignatureSetupForm,
 )
 
-SIGNATURE_PRESET_PLACEHOLDER = "Current signature setup"
-CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Current certificate"
+SIGNATURE_PRESET_PLACEHOLDER = "Current document setup"
+CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate configuration"
 
 
 @dataclass(frozen=True)
@@ -689,9 +689,15 @@ class SignaturePropertiesPanel:
         layout.setSpacing(4)
 
         configuration_combo = bindings.q_combo_box()
-        apply_button = bindings.q_push_button("Apply certificate")
+        helper_label = bindings.q_label(
+            "Certificate configurations are saved signing identities. "
+            "Choose one to use its managed certificate for this PDF."
+        )
+        helper_label.setWordWrap(True)
+        apply_button = bindings.q_push_button("Use for this PDF")
 
-        layout.addRow("Saved certificate", configuration_combo)
+        layout.addRow("Certificate configuration", configuration_combo)
+        layout.addRow("", helper_label)
         layout.addRow("", apply_button)
 
         apply_button.clicked.connect(  # type: ignore[attr-defined]
@@ -706,18 +712,24 @@ class SignaturePropertiesPanel:
 
     def _build_signature_preset_controls(self) -> SignaturePresetControls:
         bindings = self._bindings
-        container = bindings.q_group_box("Signature presets")
+        container = bindings.q_group_box("Signature preset")
         layout = bindings.q_form_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
         preset_combo = bindings.q_combo_box()
+        helper_label = bindings.q_label(
+            "Signature presets reuse saved appearance and placement choices. "
+            "A preset may leave the current certificate unchanged."
+        )
+        helper_label.setWordWrap(True)
         preset_name = bindings.q_line_edit()
         preset_name.setPlaceholderText("Enter a preset name")
         save_button = bindings.q_push_button("Save preset")
         delete_button = bindings.q_push_button("Delete preset")
 
-        layout.addRow("Saved preset", preset_combo)
+        layout.addRow("Signature preset", preset_combo)
+        layout.addRow("", helper_label)
         layout.addRow("Preset name", preset_name)
         layout.addRow("", _compose_row(bindings, save_button, delete_button))
 
