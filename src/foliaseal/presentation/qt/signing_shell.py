@@ -127,6 +127,7 @@ class QtSigningWidgetBindings:
     q_file_dialog: Any
     q_input_dialog: Any
     q_message_box: type[Any]
+    q_dialog: type[Any]
     q_icon: type[Any]
     q_pixmap: type[Any]
     q_double_spin_box: type[Any]
@@ -442,6 +443,10 @@ class SigningWorkspaceWidget:
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self._shell_surface.refresh_certificate_configurations()
 
+    def refresh_signature_profiles(self) -> None:
+        """Refresh reusable signing-profile selectors after Settings changes."""
+        self._shell_surface.refresh_signature_profiles()
+
 
 class SigningShellAdapter:
     """Factory for the FoliaSeal Qt signing shell."""
@@ -519,6 +524,7 @@ class SigningShellAdapter:
             q_file_dialog=getattr(qt_widgets, "QFileDialog"),
             q_input_dialog=getattr(qt_widgets, "QInputDialog"),
             q_message_box=getattr(qt_widgets, "QMessageBox"),
+            q_dialog=getattr(qt_widgets, "QDialog"),
             q_icon=getattr(qt_gui, "QIcon"),
             q_pixmap=getattr(qt_gui, "QPixmap"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),

@@ -374,6 +374,35 @@ class _FakeFileDialog:
         return (self.next_save_file_name, file_filter)
 
 
+class _FakeDialog(_FakeWidget):
+    Accepted = 1
+    Rejected = 0
+    next_on_exec = None
+    instances = []
+
+    def __init__(self, parent=None) -> None:
+        super().__init__()
+        self.parent = parent
+        self.title = ""
+        self.result = self.Rejected
+        self.on_exec = type(self).next_on_exec
+        type(self).instances.append(self)
+
+    def setWindowTitle(self, title):  # noqa: N802
+        self.title = title
+
+    def exec(self):
+        if callable(self.on_exec):
+            self.on_exec(self)
+        return self.result
+
+    def accept(self) -> None:
+        self.result = self.Accepted
+
+    def reject(self) -> None:
+        self.result = self.Rejected
+
+
 class _FakeSpinBox(_FakeWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -617,6 +646,8 @@ class _FakeClipboard:
 
 
 def _fake_bindings() -> QtSigningWidgetBindings:
+    _FakeDialog.next_on_exec = None
+    _FakeDialog.instances = []
     return QtSigningWidgetBindings(
         q_widget=_FakeWidget,
         q_vbox_layout=_FakeLayout,
@@ -631,6 +662,7 @@ def _fake_bindings() -> QtSigningWidgetBindings:
         q_file_dialog=_FakeFileDialog(),
         q_input_dialog=_FakeInputDialog(),
         q_message_box=_FakeMessageBox(),
+        q_dialog=_FakeDialog,
         q_icon=_FakeIcon,
         q_double_spin_box=_FakeDoubleSpinBox,
         q_spin_box=_FakeSpinBox,
@@ -718,7 +750,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
         lambda **kwargs: _FakeViewerWidget(**kwargs),
     )
     bindings = _fake_bindings()
-    bindings.q_message_box.next_result = bindings.q_message_box.No
+    bindings.q_message_box.next_result = bindings.q_message_box.Yes
     monkeypatch.setattr(
         signing_shell_module.SigningShellAdapter,
         "_load_bindings",
@@ -746,6 +778,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     original_output_path = workflow.output_pdf_path
     original_result_label = widget.sidebar_surface.sign_result_label.text()
 
+    bindings.q_message_box.next_result = bindings.q_message_box.No
     result = widget.choose_output_pdf_path()
 
     assert result is None
@@ -753,7 +786,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     assert widget.last_signing_result is not None
     assert widget.last_signing_result is not None
     assert widget.sidebar_surface.sign_result_label.text() == original_result_label
-    assert bindings.q_message_box.calls == [
+    assert bindings.q_message_box.calls[-1:] == [
         (
             widget,
             "Overwrite signed PDF?",
@@ -791,7 +824,7 @@ def test_signing_shell_output_path_overwrite_cancel_prompts_for_current_path(
 
     assert result is None
     assert workflow.output_pdf_path == str(current_output_path)
-    assert bindings.q_message_box.calls == [
+    assert bindings.q_message_box.calls[-1:] == [
         (
             widget,
             "Overwrite signed PDF?",
@@ -874,7 +907,7 @@ def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
     assert widget.sidebar_surface.sign_result_label.text() == (
         f"Output will be saved to: {existing_output_path}"
     )
-    assert bindings.q_message_box.calls == [
+    assert bindings.q_message_box.calls[-1:] == [
         (
             widget,
             "Overwrite signed PDF?",
@@ -943,10 +976,8 @@ def test_signing_shell_applies_selected_certificate_configuration(
     )
 
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     fake_bindings.q_input_dialog.next_text = "typed-secret"
-
-    assert panel.apply_selected_certificate_configuration() is True
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
 
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
@@ -1005,10 +1036,8 @@ def test_signing_shell_certificate_selection_uses_explicit_coordinator_entrypoin
         "apply_certificate_configuration",
         _spy_apply_certificate_configuration,
     )
-    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     fake_bindings.q_input_dialog.next_text = "typed-secret"
-
-    assert panel.apply_selected_certificate_configuration() is True
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     assert calls == [
         ("Corporate Records Signing", None),
         ("Corporate Records Signing", "typed-secret"),
@@ -1053,8 +1082,6 @@ def test_signing_shell_certificate_selection_empty_password_uses_saved_secret(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-
-    assert panel.apply_selected_certificate_configuration() is True
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "stored-secret"
@@ -1095,8 +1122,6 @@ def test_signing_shell_certificate_selection_prompt_can_be_canceled(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-
-    assert panel.apply_selected_certificate_configuration() is False
     assert workflow.selected_certificate_configuration_id is None
     assert workflow.certificate_path == str(tmp_path / "cert.p12")
     assert workflow.passphrase == "secret"
@@ -1140,14 +1165,12 @@ def test_signing_shell_certificate_selection_reuses_session_passphrase_cache(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-
-    assert panel.apply_selected_certificate_configuration() is True
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "typed-secret"
     assert len(bindings.q_input_dialog.calls) == 1
 
-    assert panel.apply_selected_certificate_configuration() is True
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(cert_file)
     assert workflow.passphrase == "typed-secret"
@@ -1181,8 +1204,6 @@ def test_signing_shell_reports_certificate_configuration_resolution_errors(
 
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
-
-    assert panel.apply_selected_certificate_configuration() is False
     assert errors
     assert "managed certificate file is missing" in errors[-1]
     assert bindings.q_message_box.calls[-1][1] == "Certificate configuration error"
@@ -1470,7 +1491,7 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     )
     assert "No timestamp token was found." in widget.sidebar_surface.sign_result_label.text()
     assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
-    assert "Open or verify the signed PDF" in widget.sidebar_surface.flow_detail_label.text()
+    assert "review its local verification status" in widget.sidebar_surface.flow_detail_label.text()
     assert widget.sidebar_surface.open_signed_output_button._enabled is False
 
 
@@ -2545,7 +2566,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
-    assert len(widget.properties_panel.container.layout.items) == 5
+    assert len(widget.properties_panel.container.layout.items) == 4
     assert (
         widget.properties_panel.container.layout.items[0][0]
         is widget.properties_panel._signature_preset_controls.container
@@ -2554,8 +2575,12 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.properties_panel.container.layout.items[1][0]
         is widget.properties_panel._certificate_controls.container
     )
-    assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 3
-    assert len(widget.properties_panel._visible_signature_controls.container.layout.items) == 3
+    assert (
+        widget.properties_panel.container.layout.items[3][0]
+        is widget.properties_panel._refinement_controls.container
+    )
+    assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 2
+    assert widget.properties_panel._visible_signature_controls.container.parent is None
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
     assert (
@@ -2566,14 +2591,10 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
         == 4
     )
-    assert len(widget.properties_panel._placement_controls.form_container.layout.rows) == 3
+    assert widget.properties_panel._placement_controls.container.parent is None
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
     assert widget.properties_panel._appearance_controls.stamp_position.currentText() == "Top"
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
-    assert (
-        widget.properties_panel._visible_signature_controls.summary_label.text()
-        == "Start from a signature preset, then adjust the visible approval signature as needed."
-    )
     assert (
         widget.properties_panel._appearance_controls.summary_label.text()
         == "Refine the preset's visible signature with the bounded choices used by the MVP."
@@ -2583,12 +2604,203 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         == "Use the preset's standard signing details, and hide fields only when needed."
     )
     assert (
-        widget.properties_panel._visible_text_controls.detail_label.text()
-        == "Showing 8 of 8 standard signing fields with labels off."
+        widget.properties_panel._refinement_controls.helper_label.text()
+        == "Adjust appearance or placement for this PDF in a separate dialog."
+    )
+
+
+def test_signing_shell_refinement_dialog_applies_current_pdf_setup(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+
+    def _accept_with_changes(dialog):
+        panel = widget.properties_panel
+        active = panel._active_refinement_dialog
+        assert active is not None
+        active.setup_form.appearance_controls.signer_label_prefix.setText("Reviewed by")
+        active.setup_form.placement_controls.page_spin.setValue(2)
+        active.setup_form.placement_controls.width_spin.setValue(144.0)
+        active.setup_form.placement_controls.height_spin.setValue(36.0)
+        active.apply_button.click()
+
+    _FakeDialog.next_on_exec = _accept_with_changes
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    applied = widget.properties_panel.open_refinement_dialog()
+
+    assert applied is True
+    assert widget.properties_panel._active_refinement_dialog is None
+    assert widget.properties_panel._appearance_controls.signer_label_prefix.text() == "Reviewed by"
+    assert widget.properties_panel._placement_controls.page_spin.value() == 2
+    assert widget.properties_panel._placement_controls.width_spin.value() == 144.0
+    assert widget.properties_panel._placement_controls.height_spin.value() == 36.0
+
+
+def test_signing_shell_refinement_dialog_cancel_keeps_current_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+
+    def _cancel(dialog):
+        panel = widget.properties_panel
+        active = panel._active_refinement_dialog
+        assert active is not None
+        active.setup_form.appearance_controls.signer_label_prefix.setText("Should not apply")
+        active.cancel_button.click()
+
+    _FakeDialog.next_on_exec = _cancel
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    original_prefix = (
+        widget.properties_panel._appearance_controls.signer_label_prefix.text()
+    )
+
+    applied = widget.properties_panel.open_refinement_dialog()
+
+    assert applied is False
+    assert widget.properties_panel._active_refinement_dialog is None
+    assert (
+        widget.properties_panel._appearance_controls.signer_label_prefix.text()
+        == original_prefix
+    )
+
+
+def test_signing_shell_refinement_dialog_saves_appearance_without_applying_draft(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_input_dialog.next_text = "Contract approval"
+
+    def _save_then_cancel(dialog):
+        panel = widget.properties_panel
+        active = panel._active_refinement_dialog
+        assert active is not None
+        active.setup_form.appearance_controls.signer_label_prefix.setText("Reviewed by")
+        active.save_appearance_button.click()
+        assert panel._active_refinement_dialog is active
+        active.cancel_button.click()
+
+    _FakeDialog.next_on_exec = _save_then_cancel
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+    original_prefix = widget.properties_panel._appearance_controls.signer_label_prefix.text()
+
+    applied = widget.properties_panel.open_refinement_dialog()
+
+    assert applied is False
+    assert (
+        store.load_catalog()
+        .appearance_profile_named("Contract approval")
+        .appearance.signer_label_prefix
+        == "Reviewed by"
     )
     assert (
-        widget.properties_panel._placement_controls.summary_label.text()
-        == "Drag on the PDF, or fine-tune the page, position, and size here."
+        widget.properties_panel._appearance_controls.signer_label_prefix.text()
+        == original_prefix
+    )
+    assert bindings.q_input_dialog.calls[0][1:3] == (
+        "Save appearance profile",
+        "Profile name",
+    )
+
+
+def test_signing_shell_refinement_dialog_saves_placement_profile_without_applying_draft(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_input_dialog.next_text = "Bottom right"
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+
+    def _save_then_cancel(dialog):
+        panel = widget.properties_panel
+        active = panel._active_refinement_dialog
+        assert active is not None
+        active.setup_form.set_placement_enabled(True)
+        active.setup_form.placement_controls.left_spin.setValue(11.0)
+        active.setup_form.placement_controls.bottom_spin.setValue(12.0)
+        active.setup_form.placement_controls.width_spin.setValue(130.0)
+        active.setup_form.placement_controls.height_spin.setValue(44.0)
+        active.save_placement_button.click()
+        assert panel._active_refinement_dialog is active
+        active.cancel_button.click()
+
+    _FakeDialog.next_on_exec = _save_then_cancel
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+
+    applied = widget.properties_panel.open_refinement_dialog()
+
+    saved = store.load_catalog().placement_profile_named("Bottom right")
+    assert applied is False
+    assert saved.page_selection_mode == "current_page"
+    assert saved.rect.width_pt == 130.0
+    assert widget.properties_panel._setup_form.build_draft().placement.enabled is False
+    assert bindings.q_input_dialog.calls[0][1:3] == (
+        "Save placement profile",
+        "Profile name",
+    )
+    assert (
+        widget.properties_panel._visible_text_controls.detail_label.text()
+        == "Showing 8 of 8 standard signing fields with labels off."
     )
     assert (
         widget.properties_panel.preview_controls.summary_label.text()
@@ -2605,6 +2817,60 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert not hasattr(widget.properties_panel._appearance_controls, "background_color")
     assert not hasattr(widget.properties_panel._appearance_controls, "border_show")
     assert not hasattr(widget.properties_panel._certificate_controls, "password_input")
+
+
+def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    bindings.q_input_dialog.next_text = "Contract signing"
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    appearance = build_signature_appearance()
+    store.save_appearance_profile("Approval appearance", appearance)
+    store.save_placement_profile(
+        "Bottom right",
+        left_pt=11.0,
+        bottom_pt=12.0,
+        width_pt=130.0,
+        height_pt=44.0,
+    )
+
+    def _save_then_cancel(dialog):
+        active = widget.properties_panel._active_refinement_dialog
+        assert active is not None
+        assert active.appearance_profile_combo._items == ["Approval appearance"]
+        assert active.placement_profile_combo._items == [
+            "No saved placement profile",
+            "Bottom right",
+        ]
+        active.appearance_profile_combo.setCurrentText("Approval appearance")
+        active.placement_profile_combo.setCurrentText("Bottom right")
+        active.save_preset_button.click()
+        active.cancel_button.click()
+
+    _FakeDialog.next_on_exec = _save_then_cancel
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog_store=store,
+    )
+
+    assert widget.properties_panel.open_refinement_dialog() is False
+    saved = store.load_catalog().preset_named("Contract signing")
+    assert saved.preset.appearance_profile_id == "appearance-approval-appearance"
+    assert saved.preset.placement_profile_id == "placement-bottom-right"
+    assert len(bindings.q_input_dialog.calls) == 1
 
 
 def test_signing_shell_installs_named_compatibility_surface(
@@ -3644,9 +3910,8 @@ def test_signing_shell_signature_preset_save_and_reload_round_trip(
     )
 
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     fake_bindings.q_input_dialog.next_text = "typed-secret"
-    assert panel.apply_selected_certificate_configuration() is True
+    panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     panel._signature_preset_controls.preset_name.setText("My Preset")
     panel._appearance_controls.signer_label_prefix.setText("Signed by Me")
     panel._appearance_controls.show_field_names.setChecked(True)
@@ -4572,10 +4837,8 @@ def test_signing_shell_signature_preset_selection_applies_certificate_material(
         preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
     )
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText("Default Signing")
     fake_bindings.q_input_dialog.next_text = "default-secret"
-
-    assert panel.apply_selected_certificate_configuration() is True
+    panel._certificate_controls.configuration_combo.setCurrentText("Default Signing")
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(default_path)
     assert workflow.passphrase == "default-secret"
@@ -4649,10 +4912,8 @@ def test_signing_shell_signature_preset_selection_cancel_reloads_current_state(
         preset_catalog=build_signature_preset_catalog(profiles=(preset,)),
     )
     panel = widget.properties_panel
-    panel._certificate_controls.configuration_combo.setCurrentText("Default Signing")
     fake_bindings.q_input_dialog.next_text = "default-secret"
-
-    assert panel.apply_selected_certificate_configuration() is True
+    panel._certificate_controls.configuration_combo.setCurrentText("Default Signing")
     assert workflow.selected_certificate_configuration_id == "cert-config-default"
     assert workflow.certificate_path == str(default_path)
 

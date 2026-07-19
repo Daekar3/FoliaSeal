@@ -56,6 +56,9 @@ class SigningWorkspacePort(Protocol):
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         """Refresh live certificate configuration choices."""
 
+    def refresh_signature_profiles(self) -> None:
+        """Refresh reusable signing-profile and preset choices."""
+
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         """Toggle document text-selection mode for the live shell."""
 
@@ -95,6 +98,9 @@ class QtSigningWorkspacePort:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self.shell_widget.refresh_certificate_configurations()
+
+    def refresh_signature_profiles(self) -> None:
+        self.shell_widget.refresh_signature_profiles()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self.shell_widget.set_document_text_selection_mode(enabled)

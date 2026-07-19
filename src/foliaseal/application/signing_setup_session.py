@@ -7,12 +7,16 @@ from typing import Protocol
 
 from foliaseal.application.signature_properties_coordinator import (
     ClearSelectedSignaturePreset,
+    ComposeSignaturePreset,
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
     RefreshCatalogs,
+    SaveCurrentAppearanceProfile,
+    SaveCurrentPlacementProfile,
     SaveCurrentPreset,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
+    VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
 from foliaseal.application.signing_draft_workflow import SigningDraftValidationIssue
@@ -147,6 +151,53 @@ class SigningSetupSession:
     ) -> SignaturePropertiesViewState:
         return self.coordinator.reconcile(
             SaveCurrentPreset(name=name, overwrite=overwrite),
+            control_issue=control_issue,
+        )
+
+    def save_appearance_profile(
+        self, name: str, appearance: SignatureAppearance | None = None, *, overwrite: bool = False,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        return self.coordinator.reconcile(
+            SaveCurrentAppearanceProfile(name=name, appearance=appearance, overwrite=overwrite),
+            control_issue=control_issue,
+        )
+
+    def compose_signature_preset(
+        self,
+        name: str,
+        appearance_profile_name: str,
+        *,
+        placement_profile_name: str | None = None,
+        certificate_configuration_id: str | None = None,
+        overwrite: bool = False,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        return self.coordinator.reconcile(
+            ComposeSignaturePreset(
+                name=name,
+                appearance_profile_name=appearance_profile_name,
+                placement_profile_name=placement_profile_name,
+                certificate_configuration_id=certificate_configuration_id,
+                overwrite=overwrite,
+            ),
+            control_issue=control_issue,
+        )
+
+    def save_placement_profile(
+        self,
+        name: str,
+        placement: VisibleSignaturePlacementDraft,
+        *,
+        overwrite: bool = False,
+        control_issue: SigningDraftValidationIssue | None = None,
+    ) -> SignaturePropertiesViewState:
+        return self.coordinator.reconcile(
+            SaveCurrentPlacementProfile(
+                name=name,
+                placement=placement,
+                overwrite=overwrite,
+            ),
             control_issue=control_issue,
         )
 

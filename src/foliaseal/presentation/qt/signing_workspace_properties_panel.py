@@ -24,7 +24,6 @@ from foliaseal.domain.models import (
     SignatureRect,
 )
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     AppSettings,
     CertificateCatalog,
@@ -63,7 +62,6 @@ class CertificateConfigurationControls:
 
     container: Any
     configuration_combo: Any
-    apply_button: Any
 
 
 @dataclass(frozen=True)
@@ -84,6 +82,30 @@ class PreviewControls:
     multi_detail_label: Any
     multi_render_label: Any
     footer_label: Any
+
+
+@dataclass(frozen=True)
+class RefinementControls:
+    """Compact controls that open the manual refinement dialog."""
+
+    container: Any
+    helper_label: Any
+    refine_button: Any
+
+
+@dataclass(frozen=True)
+class RefinementDialogState:
+    """Ephemeral dialog state retained only while the refinement dialog is open."""
+
+    dialog: Any
+    setup_form: QtVisibleSignatureSetupForm
+    apply_button: Any
+    save_appearance_button: Any
+    save_placement_button: Any
+    save_preset_button: Any
+    appearance_profile_combo: Any
+    placement_profile_combo: Any
+    cancel_button: Any
 
 
 class _QtCertificatePassphrasePrompter:
@@ -303,7 +325,7 @@ class SignaturePropertiesPanel:
         certificate_catalog_store: CertificateCatalogStore | None = None,
         certificate_secret_provider: CertificateSecretProvider | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
-        preset_catalog_store: SignaturePresetCatalogStore | None = None,
+        preset_catalog_store: Any | None = None,
         app_settings: AppSettings | None = None,
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
@@ -313,7 +335,6 @@ class SignaturePropertiesPanel:
         _ensure_preview_fonts_registered()
         self._workflow = workflow
         self._certificate_catalog_store = certificate_catalog_store
-        self._preset_catalog_store = preset_catalog_store
         self._coordinator = DefaultSignaturePropertiesCoordinator(
             workflow=workflow,
             certificate_catalog=certificate_catalog,
@@ -363,14 +384,15 @@ class SignaturePropertiesPanel:
         self._visible_text_controls = self._setup_form.visible_text_controls
         self._visible_signature_controls = self._setup_form.visible_signature_controls
         self._preview_controls = self._build_preview_controls()
+        self._refinement_controls = self._build_refinement_controls()
         self.preview_controls = self._preview_controls
         self._validation_text = ""
+        self._active_refinement_dialog: Any | None = None
 
         self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._certificate_controls.container)
-        self._layout.addWidget(self._visible_signature_controls.container)
-        self._layout.addWidget(self._placement_controls.container)
         self._layout.addWidget(self._preview_controls.container)
+        self._layout.addWidget(self._refinement_controls.container)
 
         if self._workflow.signature_appearance is None:
             self._workflow.set_signature_appearance(SignatureAppearance())
@@ -554,6 +576,29 @@ class SignaturePropertiesPanel:
             footer_label=footer_label,
         )
 
+    def _build_refinement_controls(self) -> RefinementControls:
+        bindings = self._bindings
+        container = bindings.q_group_box("Manual refinement")
+        layout = bindings.q_vbox_layout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        helper_label = bindings.q_label(
+            "Adjust appearance or placement for this PDF in a separate dialog."
+        )
+        if hasattr(helper_label, "setWordWrap"):
+            helper_label.setWordWrap(True)
+        refine_button = bindings.q_push_button("Refine current setup...")
+        refine_button.clicked.connect(  # type: ignore[attr-defined]
+            self.open_refinement_dialog
+        )
+        layout.addWidget(helper_label)
+        layout.addWidget(refine_button)
+        return RefinementControls(
+            container=container,
+            helper_label=helper_label,
+            refine_button=refine_button,
+        )
+
     def set_signature_rect(
         self,
         signature_rect: SignatureRect | None,
@@ -581,6 +626,22 @@ class SignaturePropertiesPanel:
         )
         self._apply_coordinator_state(state)
         self._notify_change()
+
+    def refresh_certificate_configurations(self) -> CertificateCatalog:
+        """Reload certificate configurations from storage and refresh the selector."""
+        state = self._setup_session.refresh_catalogs(
+            control_issue=self._control_issue,
+        )
+        self._apply_coordinator_state(state)
+        return self._coordinator.certificate_catalog
+
+    def refresh_signature_profiles(self) -> SignaturePropertiesViewState:
+        """Reload reusable profiles and presets, then refresh live selectors."""
+        state = self._setup_session.refresh_catalogs(
+            control_issue=self._control_issue,
+        )
+        self._apply_coordinator_state(state)
+        return state
 
     def save_current_signature_preset(self) -> SignaturePropertiesViewState | None:
         name = _text(self._signature_preset_controls.preset_name).strip()
@@ -669,17 +730,188 @@ class SignaturePropertiesPanel:
         self._notify_change()
         return True
 
-    def refresh_certificate_configurations(self) -> CertificateCatalog:
-        """Reload certificate configurations from storage and refresh the selector."""
-        state = self._setup_session.refresh_catalogs(
+    def open_refinement_dialog(self) -> bool:
+        draft = self._setup_session.load(
+            control_issue=self._control_issue
+        ).visible_signature_setup_draft
+        dialog = self._bindings.q_dialog(self.widget)
+        if hasattr(dialog, "setWindowTitle"):
+            dialog.setWindowTitle("Refine current PDF setup")
+        layout = self._bindings.q_vbox_layout(dialog)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        helper_label = self._bindings.q_label(
+            "Use this dialog to adjust the current PDF's visible signature "
+            "without reopening the old inline editor in the main window."
+        )
+        if hasattr(helper_label, "setWordWrap"):
+            helper_label.setWordWrap(True)
+        layout.addWidget(helper_label)
+
+        setup_form = QtVisibleSignatureSetupForm(bindings=self._bindings)
+        setup_form.load(draft)
+        layout.addWidget(setup_form.visible_signature_controls.container)
+        layout.addWidget(setup_form.placement_controls.container)
+
+        profile_state = self._setup_session.load(control_issue=self._control_issue)
+        appearance_profile_combo = self._bindings.q_combo_box()
+        appearance_profile_combo.addItems(profile_state.appearance_profile_names)
+        placement_profile_combo = self._bindings.q_combo_box()
+        placement_profile_combo.addItem("No saved placement profile")
+        placement_profile_combo.addItems(profile_state.placement_profile_names)
+        profile_row = _compose_row(
+            self._bindings,
+            self._bindings.q_label("Appearance profile"),
+            appearance_profile_combo,
+            self._bindings.q_label("Placement profile"),
+            placement_profile_combo,
+        )
+        layout.addWidget(profile_row)
+
+        def _refresh_profile_choices(state: SignaturePropertiesViewState) -> None:
+            appearance_profile_combo.clear()
+            appearance_profile_combo.addItems(state.appearance_profile_names)
+            placement_profile_combo.clear()
+            placement_profile_combo.addItem("No saved placement profile")
+            placement_profile_combo.addItems(state.placement_profile_names)
+
+        apply_button = self._bindings.q_push_button("Apply")
+        save_appearance_button = self._bindings.q_push_button("Save appearance for reuse...")
+        save_placement_button = self._bindings.q_push_button("Save placement for reuse...")
+        save_preset_button = self._bindings.q_push_button("Save signature preset for reuse...")
+        cancel_button = self._bindings.q_push_button("Cancel")
+        action_row = _compose_row(
+            self._bindings,
+            save_appearance_button,
+            save_placement_button,
+            save_preset_button,
+            apply_button,
+            cancel_button,
+        )
+        layout.addWidget(action_row)
+
+        def _accept() -> None:
+            dialog._selected_draft = setup_form.build_draft()  # type: ignore[attr-defined]
+            accept = getattr(dialog, "accept", None)
+            if callable(accept):
+                accept()
+
+        def _reject() -> None:
+            reject = getattr(dialog, "reject", None)
+            if callable(reject):
+                reject()
+
+        apply_button.clicked.connect(_accept)  # type: ignore[attr-defined]
+
+        def _save_appearance() -> None:
+            get_text = getattr(self._bindings.q_input_dialog, "getText", None)
+            if not callable(get_text):
+                return
+            name, accepted = get_text(dialog, "Save appearance profile", "Profile name")
+            if not accepted:
+                return
+            try:
+                state = self._setup_session.save_appearance_profile(
+                    str(name),
+                    setup_form.build_draft().appearance,
+                    control_issue=self._control_issue,
+                )
+                _refresh_profile_choices(state)
+            except SignaturePropertiesCoordinatorError as exc:
+                self._show_signature_preset_error(str(exc))
+
+        save_appearance_button.clicked.connect(_save_appearance)  # type: ignore[attr-defined]
+
+        def _save_placement() -> None:
+            get_text = getattr(self._bindings.q_input_dialog, "getText", None)
+            if not callable(get_text):
+                return
+            name, accepted = get_text(dialog, "Save placement profile", "Profile name")
+            if not accepted:
+                return
+            try:
+                state = self._setup_session.save_placement_profile(
+                    str(name),
+                    setup_form.build_draft().placement,
+                    control_issue=self._control_issue,
+                )
+                _refresh_profile_choices(state)
+            except SignaturePropertiesCoordinatorError as exc:
+                self._show_signature_preset_error(str(exc))
+
+        save_placement_button.clicked.connect(_save_placement)  # type: ignore[attr-defined]
+
+        def _save_preset() -> None:
+            appearance_name = _combo_text(appearance_profile_combo).strip()
+            if not appearance_name:
+                self._show_signature_preset_error(
+                    "Save an appearance profile before composing a signature preset."
+                )
+                return
+            get_text = getattr(self._bindings.q_input_dialog, "getText", None)
+            if not callable(get_text):
+                return
+            name, accepted = get_text(dialog, "Save signature preset", "Preset name")
+            if not accepted:
+                return
+            placement_name = _combo_text(placement_profile_combo).strip()
+            if placement_name == "No saved placement profile":
+                placement_name = ""
+            try:
+                state = self._setup_session.compose_signature_preset(
+                    str(name),
+                    appearance_name,
+                    placement_profile_name=placement_name or None,
+                    certificate_configuration_id=self._coordinator.workflow.selected_certificate_configuration_id,
+                    control_issue=self._control_issue,
+                )
+                self._apply_coordinator_state(state)
+            except SignaturePropertiesCoordinatorError as exc:
+                self._show_signature_preset_error(str(exc))
+
+        save_preset_button.clicked.connect(_save_preset)  # type: ignore[attr-defined]
+        cancel_button.clicked.connect(_reject)  # type: ignore[attr-defined]
+
+        self._active_refinement_dialog = RefinementDialogState(
+            dialog=dialog,
+            setup_form=setup_form,
+            apply_button=apply_button,
+            save_appearance_button=save_appearance_button,
+            save_placement_button=save_placement_button,
+            save_preset_button=save_preset_button,
+            appearance_profile_combo=appearance_profile_combo,
+            placement_profile_combo=placement_profile_combo,
+            cancel_button=cancel_button,
+        )
+
+        dialog_exec = getattr(dialog, "exec", None)
+        result = dialog_exec() if callable(dialog_exec) else None
+        self._active_refinement_dialog = None
+        if result != self._accepted_dialog_code():
+            return False
+
+        selected_draft = getattr(dialog, "_selected_draft", None)
+        if selected_draft is None:
+            return False
+        state = self._setup_session.apply_visible_setup(
+            selected_draft,
             control_issue=self._control_issue,
         )
         self._apply_coordinator_state(state)
-        return self._coordinator.certificate_catalog
+        self._notify_change()
+        return True
 
     @property
     def app_settings(self) -> AppSettings:
         return self._app_settings
+
+    def _accepted_dialog_code(self) -> Any:
+        accepted = getattr(self._bindings.q_dialog, "Accepted", None)
+        if accepted is not None:
+            return accepted
+        dialog_code = getattr(self._bindings.q_dialog, "DialogCode", None)
+        return getattr(dialog_code, "Accepted", None)
 
     def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
         bindings = self._bindings
@@ -691,23 +923,19 @@ class SignaturePropertiesPanel:
         configuration_combo = bindings.q_combo_box()
         helper_label = bindings.q_label(
             "Certificate configurations are saved signing identities. "
-            "Choose one to use its managed certificate for this PDF."
+            "Choosing one immediately activates its managed certificate for this PDF."
         )
         helper_label.setWordWrap(True)
-        apply_button = bindings.q_push_button("Use for this PDF")
 
         layout.addRow("Certificate configuration", configuration_combo)
         layout.addRow("", helper_label)
-        layout.addRow("", apply_button)
 
-        apply_button.clicked.connect(  # type: ignore[attr-defined]
-            self.apply_selected_certificate_configuration
+        configuration_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
+            lambda _text: self._on_certificate_configuration_selected()
         )
-
         return CertificateConfigurationControls(
             container=container,
             configuration_combo=configuration_combo,
-            apply_button=apply_button,
         )
 
     def _build_signature_preset_controls(self) -> SignaturePresetControls:
@@ -730,8 +958,6 @@ class SignaturePropertiesPanel:
 
         layout.addRow("Signature preset", preset_combo)
         layout.addRow("", helper_label)
-        layout.addRow("Preset name", preset_name)
-        layout.addRow("", _compose_row(bindings, save_button, delete_button))
 
         preset_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
             lambda _text: self._on_signature_preset_selected()
@@ -838,6 +1064,31 @@ class SignaturePropertiesPanel:
             return
         self._apply_coordinator_state(outcome.state)
         if outcome.applied:
+            self._notify_change()
+
+    def _on_certificate_configuration_selected(self) -> None:
+        if self._suspend_updates:
+            return
+        selected_name = _combo_text(self._certificate_controls.configuration_combo)
+        normalized_name = (
+            "" if selected_name == CERTIFICATE_CONFIGURATION_PLACEHOLDER else selected_name
+        )
+        if not normalized_name.strip():
+            return
+        try:
+            state = self._setup_session.select_certificate_configuration(
+                normalized_name,
+                control_issue=self._control_issue,
+            )
+        except SignaturePropertiesCoordinatorError as exc:
+            self._show_certificate_configuration_error(str(exc))
+            self._apply_coordinator_state(
+                self._setup_session.load(control_issue=self._control_issue)
+            )
+            self._notify_change()
+            return
+        self._apply_coordinator_state(state.state)
+        if state.applied:
             self._notify_change()
 
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:

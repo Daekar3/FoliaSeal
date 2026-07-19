@@ -38,6 +38,10 @@ from foliaseal.application.phase3_signing_backend import (
     BackendReservationEvidence,
     build_backend_reservation_evidence,
 )
+from foliaseal.application.signature_profile_library import (
+    SignatureProfileLibrary,
+    SignatureProfileLibraryItem,
+)
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
@@ -236,6 +240,8 @@ __all__ = [
     "SignaturePropertiesViewState",
     "SigningSetupSelectionOutcome",
     "SigningSetupSession",
+    "SignatureProfileLibrary",
+    "SignatureProfileLibraryItem",
     "VisibleSignaturePlacementDraft",
     "VisibleSignatureSetupDraft",
     "SigningClock",

@@ -14,6 +14,8 @@ from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator,
     DeletePreset,
     RefreshCatalogs,
+    SaveCurrentAppearanceProfile,
+    SaveCurrentPlacementProfile,
     SaveCurrentPreset,
     SetSignatureAppearance,
     SignaturePropertiesCoordinatorError,
@@ -891,6 +893,106 @@ def test_coordinator_save_current_preset_persists_and_selects_it(
         height_pt=48.0,
     )
     assert saved.preset.certificate_configuration_id == "cert-config-default"
+
+
+def test_coordinator_save_current_appearance_profile_persists_without_mutating_workflow(
+    tmp_path: Path,
+) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    workflow = _ready_workflow(tmp_path)
+    original_rect = workflow.signature_rect
+    original_certificate_id = workflow.selected_certificate_configuration_id
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog_store=store,
+    )
+
+    state = coordinator.reconcile(
+        SaveCurrentAppearanceProfile(name="Contract approval")
+    )
+
+    saved = store.load_catalog().appearance_profile_named("Contract approval")
+    assert saved.appearance == workflow.current_signature_appearance
+    assert workflow.signature_rect == original_rect
+    assert workflow.selected_certificate_configuration_id == original_certificate_id
+    assert state.selected_signature_preset_name is None
+
+
+def test_coordinator_save_current_appearance_profile_rejects_blank_and_duplicate_names(
+    tmp_path: Path,
+) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog_store=store,
+    )
+
+    with pytest.raises(SignaturePropertiesCoordinatorError, match="name is required"):
+        coordinator.reconcile(SaveCurrentAppearanceProfile(name="  "))
+
+    coordinator.reconcile(SaveCurrentAppearanceProfile(name="Contract approval"))
+    with pytest.raises(SignaturePropertiesCoordinatorError, match="already exists"):
+        coordinator.reconcile(SaveCurrentAppearanceProfile(name="Contract approval"))
+
+
+def test_coordinator_save_current_placement_profile_persists_rectangle_as_current_page(
+    tmp_path: Path,
+) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_ready_workflow(tmp_path),
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog_store=store,
+    )
+
+    coordinator.reconcile(
+        SaveCurrentPlacementProfile(
+            name="Bottom right",
+            placement=VisibleSignaturePlacementDraft(
+                page_number=9,
+                left_pt=11.0,
+                bottom_pt=12.0,
+                width_pt=130.0,
+                height_pt=44.0,
+                enabled=True,
+            ),
+        )
+    )
+
+    saved = store.load_catalog().placement_profile_named("Bottom right")
+    assert saved.page_selection_mode == "current_page"
+    assert saved.rect.left_pt == 11.0
+    assert saved.rect.bottom_pt == 12.0
+    assert saved.rect.width_pt == 130.0
+    assert saved.rect.height_pt == 44.0
+
+
+def test_coordinator_save_current_placement_profile_rejects_disabled_placement(
+    tmp_path: Path,
+) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog_store=store,
+    )
+
+    with pytest.raises(SignaturePropertiesCoordinatorError, match="Place a signature"):
+        coordinator.reconcile(
+            SaveCurrentPlacementProfile(
+                name="Bottom right",
+                placement=VisibleSignaturePlacementDraft(
+                    page_number=1,
+                    left_pt=11.0,
+                    bottom_pt=12.0,
+                    width_pt=130.0,
+                    height_pt=44.0,
+                    enabled=False,
+                ),
+            )
+        )
 
 
 def test_coordinator_delete_preset_removes_it_and_clears_selection(tmp_path: Path) -> None:

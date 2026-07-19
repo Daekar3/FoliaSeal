@@ -611,6 +611,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert frame.window.menu_bar.menus[1].actions[1].icon.path.endswith("copy.svg")
     assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
         "Application settings",
+        "Manage signing profiles...",
         "Create certificate...",
         "Import certificate...",
         "Manage certificate configurations...",

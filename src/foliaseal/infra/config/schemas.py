@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -137,9 +137,7 @@ def _enum_from_str(value: str, field: str, enum_cls: type[Enum]) -> Enum:
         return enum_cls(value)
     except ValueError as exc:
         allowed = ", ".join(member.value for member in enum_cls)
-        raise ConfigValidationError(
-            f"Field '{field}' must be one of: {allowed}."
-        ) from exc
+        raise ConfigValidationError(f"Field '{field}' must be one of: {allowed}.") from exc
 
 
 def _require_enum(payload: dict[str, Any], field: str, enum_cls: type[Enum]) -> Enum:
@@ -511,13 +509,16 @@ class ManagedCertificate:
             self.storage_filename,
             "storage_filename",
         )
-        if "/" in storage_filename or "\\" in storage_filename or storage_filename in {
-            ".",
-            "..",
-        }:
-            raise ConfigValidationError(
-                "Field 'storage_filename' must be a filename, not a path."
-            )
+        if (
+            "/" in storage_filename
+            or "\\" in storage_filename
+            or storage_filename
+            in {
+                ".",
+                "..",
+            }
+        ):
+            raise ConfigValidationError("Field 'storage_filename' must be a filename, not a path.")
         object.__setattr__(self, "storage_filename", storage_filename)
         source_kind = _require_non_empty_str_value(self.source_kind, "source_kind")
         if source_kind not in {"created", "imported"}:
@@ -708,9 +709,7 @@ class CertificateCatalog:
                 )
             object_id = getattr(value, id_field_name)
             if object_id in seen_ids:
-                raise ConfigValidationError(
-                    f"Field '{field_name}' must not contain duplicate ids."
-                )
+                raise ConfigValidationError(f"Field '{field_name}' must not contain duplicate ids.")
             seen_ids.add(object_id)
 
     @classmethod
@@ -753,8 +752,7 @@ class CertificateCatalog:
                 certificate.to_dict() for certificate in self.managed_certificates
             ],
             "certificate_configurations": [
-                configuration.to_dict()
-                for configuration in self.certificate_configurations
+                configuration.to_dict() for configuration in self.certificate_configurations
             ],
         }
 
@@ -838,9 +836,7 @@ class CertificateCatalog:
     ) -> CertificateCatalog:
         """Return a catalog with a certificate configuration inserted or replaced."""
         if not isinstance(configuration, CertificateConfiguration):
-            raise ConfigValidationError(
-                "configuration must be a CertificateConfiguration value."
-            )
+            raise ConfigValidationError("configuration must be a CertificateConfiguration value.")
         return CertificateCatalog(
             schema_version=self.schema_version,
             managed_certificates=self.managed_certificates,
@@ -1058,8 +1054,7 @@ class PlacementProfile:
         """Build a placement profile from the old width/height default shape."""
         return cls(
             schema_version=schema_version,
-            placement_profile_id=placement_profile_id
-            or _stable_id("placement", display_name),
+            placement_profile_id=placement_profile_id or _stable_id("placement", display_name),
             display_name=display_name,
             page_selection_mode="current_page",
             rect=PlacementProfileRect(
@@ -1311,9 +1306,7 @@ class SignaturePresetCatalog:
                 )
             object_id = getattr(value, id_field_name)
             if object_id in seen_ids:
-                raise ConfigValidationError(
-                    f"Field '{field_name}' must not contain duplicate ids."
-                )
+                raise ConfigValidationError(f"Field '{field_name}' must not contain duplicate ids.")
             seen_ids.add(object_id)
 
     @classmethod
@@ -1340,16 +1333,12 @@ class SignaturePresetCatalog:
         placement_profiles: list[PlacementProfile] = []
         for entry in raw_placement_profiles:
             if not isinstance(entry, dict):
-                raise ConfigValidationError(
-                    "Field 'placement_profiles' must contain objects only."
-                )
+                raise ConfigValidationError("Field 'placement_profiles' must contain objects only.")
             placement_profiles.append(PlacementProfile.from_dict(entry))
         signature_presets: list[SignaturePreset] = []
         for entry in raw_signature_presets:
             if not isinstance(entry, dict):
-                raise ConfigValidationError(
-                    "Field 'signature_presets' must contain objects only."
-                )
+                raise ConfigValidationError("Field 'signature_presets' must contain objects only.")
             signature_presets.append(SignaturePreset.from_dict(entry))
         return cls(
             schema_version=_require_int(payload, "schema_version"),
@@ -1362,12 +1351,8 @@ class SignaturePresetCatalog:
         """Convert to a persisted mapping."""
         return {
             "schema_version": self.schema_version,
-            "appearance_profiles": [
-                profile.to_dict() for profile in self.appearance_profiles
-            ],
-            "placement_profiles": [
-                profile.to_dict() for profile in self.placement_profiles
-            ],
+            "appearance_profiles": [profile.to_dict() for profile in self.appearance_profiles],
+            "placement_profiles": [profile.to_dict() for profile in self.placement_profiles],
             "signature_presets": [preset.to_dict() for preset in self.signature_presets],
         }
 
@@ -1463,6 +1448,47 @@ class SignaturePresetCatalog:
             signature_presets=tuple(updated_presets),
         )
 
+    def upsert_reference_preset(self, preset: SignaturePreset) -> SignaturePresetCatalog:
+        """Upsert a reference-only preset without changing component profiles."""
+        if not isinstance(preset, SignaturePreset):
+            raise ConfigValidationError("preset must be a SignaturePreset value.")
+        values = [
+            item for item in self.signature_presets if item.display_name != preset.display_name
+        ]
+        values.append(preset)
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            appearance_profiles=self.appearance_profiles,
+            placement_profiles=self.placement_profiles,
+            signature_presets=tuple(values),
+        )
+
+    def upsert_appearance_profile(self, profile: AppearanceProfile) -> SignaturePresetCatalog:
+        """Return a catalog with an independently managed appearance profile upserted."""
+        if not isinstance(profile, AppearanceProfile):
+            raise ConfigValidationError("profile must be an AppearanceProfile value.")
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            appearance_profiles=tuple(
+                self._upsert_by_id(list(self.appearance_profiles), profile, "appearance_profile_id")
+            ),
+            placement_profiles=self.placement_profiles,
+            signature_presets=self.signature_presets,
+        )
+
+    def upsert_placement_profile(self, profile: PlacementProfile) -> SignaturePresetCatalog:
+        """Return a catalog with an independently managed placement profile upserted."""
+        if not isinstance(profile, PlacementProfile):
+            raise ConfigValidationError("profile must be a PlacementProfile value.")
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            appearance_profiles=self.appearance_profiles,
+            placement_profiles=tuple(
+                self._upsert_by_id(list(self.placement_profiles), profile, "placement_profile_id")
+            ),
+            signature_presets=self.signature_presets,
+        )
+
     @staticmethod
     def _upsert_by_id(values: list[Any], replacement: Any, id_field_name: str) -> list[Any]:
         updated: list[Any] = []
@@ -1490,31 +1516,93 @@ class SignaturePresetCatalog:
                 updated_presets.append(preset)
         if preset_to_remove is None:
             raise KeyError(normalized_name)
-        referenced_appearance_ids = {
-            preset.appearance_profile_id
-            for preset in updated_presets
-            if preset.appearance_profile_id is not None
-        }
-        referenced_placement_ids = {
-            preset.placement_profile_id
-            for preset in updated_presets
-            if preset.placement_profile_id is not None
-        }
-        appearance_profiles = tuple(
-            profile
-            for profile in self.appearance_profiles
-            if profile.appearance_profile_id in referenced_appearance_ids
-            or profile.appearance_profile_id != preset_to_remove.appearance_profile_id
-        )
-        placement_profiles = tuple(
-            profile
-            for profile in self.placement_profiles
-            if profile.placement_profile_id in referenced_placement_ids
-            or profile.placement_profile_id != preset_to_remove.placement_profile_id
-        )
         return SignaturePresetCatalog(
             schema_version=self.schema_version,
-            appearance_profiles=appearance_profiles,
-            placement_profiles=placement_profiles,
+            appearance_profiles=self.appearance_profiles,
+            placement_profiles=self.placement_profiles,
             signature_presets=tuple(updated_presets),
         )
+
+    def remove_appearance_profile(self, name: str) -> SignaturePresetCatalog:
+        """Remove an appearance profile unless a preset still references it."""
+        profile = self.appearance_profile_named(name)
+        if any(
+            p.appearance_profile_id == profile.appearance_profile_id for p in self.signature_presets
+        ):
+            raise ConfigValidationError(
+                f"Appearance profile '{profile.display_name}' is referenced by signature preset(s)."
+            )
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            appearance_profiles=tuple(
+                p
+                for p in self.appearance_profiles
+                if p.appearance_profile_id != profile.appearance_profile_id
+            ),
+            placement_profiles=self.placement_profiles,
+            signature_presets=self.signature_presets,
+        )
+
+    def remove_placement_profile(self, name: str) -> SignaturePresetCatalog:
+        """Remove a placement profile unless a preset still references it."""
+        profile = self.placement_profile_named(name)
+        if any(
+            p.placement_profile_id == profile.placement_profile_id for p in self.signature_presets
+        ):
+            raise ConfigValidationError(
+                f"Placement profile '{profile.display_name}' is referenced by signature preset(s)."
+            )
+        return SignaturePresetCatalog(
+            schema_version=self.schema_version,
+            appearance_profiles=self.appearance_profiles,
+            placement_profiles=tuple(
+                p
+                for p in self.placement_profiles
+                if p.placement_profile_id != profile.placement_profile_id
+            ),
+            signature_presets=self.signature_presets,
+        )
+
+    def rename_preset(self, name: str, new_name: str) -> SignaturePresetCatalog:
+        """Rename a preset without changing its component references."""
+        return self._renamed_catalog(name, new_name, "preset")
+
+    def rename_appearance_profile(self, name: str, new_name: str) -> SignaturePresetCatalog:
+        """Rename an appearance profile while preserving its stable identifier."""
+        return self._renamed_catalog(name, new_name, "appearance")
+
+    def rename_placement_profile(self, name: str, new_name: str) -> SignaturePresetCatalog:
+        """Rename a placement profile while preserving its stable identifier."""
+        return self._renamed_catalog(name, new_name, "placement")
+
+    def _renamed_catalog(self, name: str, new_name: str, kind: str) -> SignaturePresetCatalog:
+        normalized_name = _require_non_empty_str_value(name, "name")
+        normalized_new_name = _require_non_empty_str_value(new_name, "new_name")
+        attribute = {
+            "preset": "signature_presets",
+            "appearance": "appearance_profiles",
+            "placement": "placement_profiles",
+        }[kind]
+        entries = getattr(self, attribute)
+        if normalized_name == normalized_new_name:
+            return self
+        if any(entry.display_name == normalized_new_name for entry in entries):
+            raise ConfigValidationError(
+                f"{kind.title()} profile '{normalized_new_name}' already exists."
+            )
+        renamed = tuple(
+            replace(entry, display_name=normalized_new_name)
+            if entry.display_name == normalized_name
+            else entry
+            for entry in entries
+        )
+        if renamed == entries:
+            raise KeyError(normalized_name)
+        kwargs = {
+            "schema_version": self.schema_version,
+            "appearance_profiles": self.appearance_profiles,
+            "placement_profiles": self.placement_profiles,
+            "signature_presets": self.signature_presets,
+        }
+        kwargs[attribute] = renamed
+        return SignaturePresetCatalog(**kwargs)

@@ -47,9 +47,37 @@ class SigningWorkspaceActionBridge:
         )
 
     def submit_sign_request(self) -> SigningRequest | None:
+        if not self._confirm_signing_request():
+            return None
         result = self._signing_action_boundary.submit()
         self._apply_signing_action_state(result.state)
         return result.request
+
+    def _confirm_signing_request(self) -> bool:
+        state = self._signing_action_boundary.load()
+        if not state.can_sign:
+            return True
+        setup = self._properties_panel._setup_session.load()
+        certificate = setup.selected_certificate_configuration_name or "No certificate selected"
+        preset = setup.selected_signature_preset_name or "Current-document custom setup"
+        message_box = self._bindings.q_message_box
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return False
+        yes_value = getattr(message_box, "Yes", None)
+        if yes_value is None:
+            yes_value = getattr(getattr(message_box, "StandardButton", None), "Yes", None)
+        result = question(
+            self._widget,
+            "Confirm signing",
+            "You are about to create an irreversible signed PDF.\n\n"
+            f"Output: {self._draft_workflow.output_pdf_path}\n"
+            f"Certificate: {certificate}\n"
+            f"Setup: {preset}\n\n"
+            f"Readiness: {state.detail_text}\n\n"
+            "Review the preview and any caveats, then choose Yes to sign.",
+        )
+        return result == yes_value
 
     def open_signed_output(self) -> str | None:
         result = self._signing_action_boundary.open_signed_output()
@@ -81,6 +109,11 @@ class SigningWorkspaceActionBridge:
         catalog = self._properties_panel.refresh_certificate_configurations()
         self.reload_state()
         return catalog
+
+    def refresh_signature_profiles(self) -> None:
+        """Reload reusable profiles and presets in the mounted shell."""
+        self._properties_panel.refresh_signature_profiles()
+        self.reload_state()
 
     def _apply_signing_action_state(self, state: SigningActionState) -> None:
         self._widget.last_signing_result = state.last_signing_result

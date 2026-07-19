@@ -166,8 +166,9 @@ class SigningActionCoordinator:
         ):
             stage_text = "Signed"
             detail_text = (
-                "Open or verify the signed PDF, then add another approval signature "
-                "later if the document permits it."
+                "Open the signed PDF, review its local verification status, and keep any "
+                "trust caveats in mind. Add another approval signature only if document "
+                "permissions permit it."
             )
         elif can_sign:
             stage_text = "Confirm/sign"

@@ -64,6 +64,8 @@ class SignaturePropertiesViewState:
     selected_signature_preset_name: str | None
     certificate_configuration_names: tuple[str, ...]
     signature_preset_names: tuple[str, ...]
+    appearance_profile_names: tuple[str, ...]
+    placement_profile_names: tuple[str, ...]
     visible_signature_setup_draft: VisibleSignatureSetupDraft
     validation_text: str
     ready_to_sign: bool
@@ -91,6 +93,35 @@ class SaveCurrentPreset:
     """Persist the current draft as a reusable signature preset."""
 
     name: str
+    overwrite: bool = False
+
+
+@dataclass(frozen=True)
+class SaveCurrentAppearanceProfile:
+    """Persist the current appearance as a named reusable profile."""
+
+    name: str
+    appearance: SignatureAppearance | None = None
+    overwrite: bool = False
+
+
+@dataclass(frozen=True)
+class ComposeSignaturePreset:
+    """Persist a preset that references existing reusable component profiles."""
+
+    name: str
+    appearance_profile_name: str
+    placement_profile_name: str | None = None
+    certificate_configuration_id: str | None = None
+    overwrite: bool = False
+
+
+@dataclass(frozen=True)
+class SaveCurrentPlacementProfile:
+    """Persist a reusable rectangle from the contextual placement draft."""
+
+    name: str
+    placement: VisibleSignaturePlacementDraft
     overwrite: bool = False
 
 
@@ -131,6 +162,9 @@ SignaturePropertiesCommand = (
     | ApplyCertificateConfiguration
     | ApplySignaturePreset
     | SaveCurrentPreset
+    | SaveCurrentAppearanceProfile
+    | ComposeSignaturePreset
+    | SaveCurrentPlacementProfile
     | DeletePreset
     | RefreshCatalogs
     | ClearSelectedSignaturePreset
@@ -239,6 +273,12 @@ class DefaultSignaturePropertiesCoordinator:
                 for configuration in self.certificate_catalog.certificate_configurations
             ),
             signature_preset_names=self.preset_catalog.preset_names(),
+            appearance_profile_names=tuple(
+                profile.display_name for profile in self.preset_catalog.appearance_profiles
+            ),
+            placement_profile_names=tuple(
+                profile.display_name for profile in self.preset_catalog.placement_profiles
+            ),
             visible_signature_setup_draft=self._current_visible_signature_setup_draft(),
             validation_text=_format_validation_text(
                 preview,
@@ -264,6 +304,12 @@ class DefaultSignaturePropertiesCoordinator:
             self._apply_signature_preset(command)
         elif isinstance(command, SaveCurrentPreset):
             self._save_current_preset(command)
+        elif isinstance(command, SaveCurrentAppearanceProfile):
+            self._save_current_appearance_profile(command)
+        elif isinstance(command, ComposeSignaturePreset):
+            self._compose_signature_preset(command)
+        elif isinstance(command, SaveCurrentPlacementProfile):
+            self._save_current_placement_profile(command)
         elif isinstance(command, DeletePreset):
             self._delete_preset(command)
         elif isinstance(command, RefreshCatalogs):
@@ -433,6 +479,77 @@ class DefaultSignaturePropertiesCoordinator:
         if self.preset_catalog_store is not None:
             self.preset_catalog_store.save_catalog(self.preset_catalog)
         self._selected_signature_preset_name = preset.name
+
+    def _save_current_appearance_profile(self, command: SaveCurrentAppearanceProfile) -> None:
+        name = _require_name(command.name, "Appearance profile name is required before saving.")
+        appearance = command.appearance or self.workflow.current_signature_appearance
+        if appearance is None:
+            raise SignaturePropertiesCoordinatorError(
+                "A signature appearance must exist before saving an appearance profile."
+            )
+        if self.preset_catalog_store is None:
+            raise SignaturePropertiesCoordinatorError("Appearance profile storage is unavailable.")
+        try:
+            self.preset_catalog = self.preset_catalog_store.save_appearance_profile(
+                name, appearance, overwrite=command.overwrite
+            )
+        except ValueError as exc:
+            raise SignaturePropertiesCoordinatorError(str(exc)) from exc
+
+    def _compose_signature_preset(self, command: ComposeSignaturePreset) -> None:
+        name = _require_name(command.name, "Preset name is required before saving.")
+        try:
+            self.preset_catalog.preset_named(name)
+        except KeyError:
+            pass
+        else:
+            if not command.overwrite:
+                raise SignaturePropertiesCoordinatorError(
+                    f"Signature preset '{name}' already exists."
+                )
+        try:
+            appearance = self.preset_catalog.appearance_profile_named(
+                command.appearance_profile_name
+            )
+            placement = (
+                self.preset_catalog.placement_profile_named(command.placement_profile_name)
+                if command.placement_profile_name
+                else None
+            )
+        except KeyError as exc:
+            raise SignaturePropertiesCoordinatorError(str(exc)) from exc
+        if self.preset_catalog_store is None:
+            raise SignaturePropertiesCoordinatorError("Signature preset storage is unavailable.")
+        preset = SignaturePreset.from_profile_parts(
+            display_name=name,
+            appearance_profile_id=appearance.appearance_profile_id,
+            placement_profile_id=(placement.placement_profile_id if placement else None),
+            certificate_configuration_id=command.certificate_configuration_id,
+        )
+        self.preset_catalog = self.preset_catalog.upsert_reference_preset(preset)
+        self.preset_catalog_store.save_catalog(self.preset_catalog)
+        self._selected_signature_preset_name = preset.display_name
+
+    def _save_current_placement_profile(self, command: SaveCurrentPlacementProfile) -> None:
+        name = _require_name(command.name, "Placement profile name is required before saving.")
+        placement = command.placement
+        if not placement.enabled:
+            raise SignaturePropertiesCoordinatorError(
+                "Place a signature on the page before saving a placement profile."
+            )
+        if self.preset_catalog_store is None:
+            raise SignaturePropertiesCoordinatorError("Placement profile storage is unavailable.")
+        try:
+            self.preset_catalog = self.preset_catalog_store.save_placement_profile(
+                name,
+                left_pt=placement.left_pt,
+                bottom_pt=placement.bottom_pt,
+                width_pt=placement.width_pt,
+                height_pt=placement.height_pt,
+                overwrite=command.overwrite,
+            )
+        except ValueError as exc:
+            raise SignaturePropertiesCoordinatorError(str(exc)) from exc
 
     def _build_current_preset(self, name: str) -> ResolvedSignaturePreset:
         appearance = self.workflow.current_signature_appearance

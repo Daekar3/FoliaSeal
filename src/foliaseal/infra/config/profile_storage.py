@@ -8,13 +8,49 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from foliaseal.infra.config.schemas import (
+    AppearanceProfile,
     ConfigValidationError,
+    PlacementProfile,
+    PlacementProfileRect,
     ResolvedSignaturePreset,
+    SignatureAppearance,
     SignaturePresetCatalog,
+    _deserialize_appearance,
+    _deserialize_placement_defaults,
+    _stable_id,
 )
 
 PROFILE_DIRECTORY_NAME = "Signature Profiles"
 PROFILE_CATALOG_FILENAME = "profiles.json"
+
+
+def _migrate_legacy_profiles(payload: dict) -> SignaturePresetCatalog:
+    """Read the former combined-profile file shape without discarding user data."""
+    raw_profiles = payload.get("profiles")
+    if not isinstance(raw_profiles, list):
+        raise ConfigValidationError("Legacy signature profiles must be a list.")
+    catalog = SignaturePresetCatalog(schema_version=1)
+    for raw_profile in raw_profiles:
+        if not isinstance(raw_profile, dict):
+            raise ConfigValidationError("Legacy signature profile entries must be objects.")
+        name = raw_profile.get("name")
+        appearance_payload = raw_profile.get("appearance")
+        if not isinstance(name, str) or not isinstance(appearance_payload, dict):
+            raise ConfigValidationError("Legacy signature profile requires name and appearance.")
+        appearance = AppearanceProfile(
+            schema_version=1,
+            appearance_profile_id=_stable_id("appearance", name),
+            display_name=name,
+            appearance=_deserialize_appearance(appearance_payload),
+        )
+        defaults = _deserialize_placement_defaults(raw_profile.get("placement_defaults"))
+        preset = ResolvedSignaturePreset.from_parts(
+            name=name,
+            appearance=appearance.appearance,
+            placement_defaults=defaults,
+        )
+        catalog = catalog.upsert_preset(preset)
+    return catalog
 
 
 def default_signature_profiles_directory(app_name: str = "FoliaSeal") -> Path:
@@ -64,6 +100,8 @@ class SignaturePresetCatalogStore:
             ) from exc
         if not isinstance(payload, dict):
             raise ConfigValidationError("Signature preset catalog must be a JSON object.")
+        if "profiles" in payload and "appearance_profiles" not in payload:
+            return _migrate_legacy_profiles(payload)
         return SignaturePresetCatalog.from_dict(payload)
 
     def save_catalog(self, catalog: SignaturePresetCatalog) -> None:
@@ -84,8 +122,103 @@ class SignaturePresetCatalogStore:
         self.save_catalog(catalog)
         return catalog
 
+    def save_appearance_profile(
+        self,
+        name: str,
+        appearance: SignatureAppearance,
+        *,
+        overwrite: bool = False,
+    ) -> SignaturePresetCatalog:
+        """Upsert a named appearance profile and persist the catalog."""
+        profile = AppearanceProfile(
+            schema_version=1,
+            appearance_profile_id=_stable_id("appearance", name),
+            display_name=name.strip(),
+            appearance=appearance,
+        )
+        catalog = self.load_catalog()
+        if not overwrite:
+            try:
+                catalog.appearance_profile_named(profile.display_name)
+            except KeyError:
+                pass
+            else:
+                raise ConfigValidationError(
+                    f"Appearance profile '{profile.display_name}' already exists."
+                )
+        catalog = catalog.upsert_appearance_profile(profile)
+        self.save_catalog(catalog)
+        return catalog
+
+    def save_placement_profile(
+        self,
+        name: str,
+        *,
+        left_pt: float,
+        bottom_pt: float,
+        width_pt: float,
+        height_pt: float,
+        overwrite: bool = False,
+    ) -> SignaturePresetCatalog:
+        """Upsert a named placement profile and persist the catalog."""
+        profile = PlacementProfile(
+            schema_version=1,
+            placement_profile_id=_stable_id("placement", name),
+            display_name=name.strip(),
+            page_selection_mode="current_page",
+            rect=PlacementProfileRect(
+                left_pt=left_pt,
+                bottom_pt=bottom_pt,
+                width_pt=width_pt,
+                height_pt=height_pt,
+            ),
+        )
+        catalog = self.load_catalog()
+        if not overwrite:
+            try:
+                catalog.placement_profile_named(profile.display_name)
+            except KeyError:
+                pass
+            else:
+                raise ConfigValidationError(
+                    f"Placement profile '{profile.display_name}' already exists."
+                )
+        catalog = catalog.upsert_placement_profile(profile)
+        self.save_catalog(catalog)
+        return catalog
+
+    def delete_appearance_profile(self, name: str) -> SignaturePresetCatalog:
+        """Delete an unreferenced appearance profile and persist the catalog."""
+        catalog = self.load_catalog().remove_appearance_profile(name)
+        self.save_catalog(catalog)
+        return catalog
+
+    def delete_placement_profile(self, name: str) -> SignaturePresetCatalog:
+        """Delete an unreferenced placement profile and persist the catalog."""
+        catalog = self.load_catalog().remove_placement_profile(name)
+        self.save_catalog(catalog)
+        return catalog
+
     def delete_preset(self, name: str) -> SignaturePresetCatalog:
         """Remove a signature preset by name and persist the resulting catalog."""
         catalog = self.load_catalog().remove_preset(name)
+        self.save_catalog(catalog)
+        return catalog
+
+    def rename_preset(self, name: str, new_name: str) -> SignaturePresetCatalog:
+        """Rename a preset and persist its unchanged component references."""
+        catalog = self.load_catalog().rename_preset(name, new_name)
+        self.save_catalog(catalog)
+        return catalog
+
+    def rename_appearance_profile(self, name: str, new_name: str) -> SignaturePresetCatalog:
+        """Rename an appearance profile while preserving preset references."""
+        catalog = self.load_catalog().rename_appearance_profile(name, new_name)
+        self.save_catalog(catalog)
+        return catalog
+
+    def rename_placement_profile(self, name: str, new_name: str) -> SignaturePresetCatalog:
+        """Rename a placement profile while preserving preset references."""
+        catalog = self.load_catalog().rename_placement_profile(name, new_name)
         self.save_catalog(catalog)
         return catalog

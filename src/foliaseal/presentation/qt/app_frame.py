@@ -11,6 +11,7 @@ from typing import Any
 
 from foliaseal.application import (
     CertificateLifecycleService,
+    SignatureProfileLibrary,
     SigningDraftWorkflow,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -28,6 +29,9 @@ from foliaseal.presentation.qt.app_frame_certificate_management import (
     AppFrameCertificateDialogService,
     CertificateDialogCompatibilityState,
     CertificateDialogPort,
+)
+from foliaseal.presentation.qt.app_frame_profile_library import (
+    SignatureProfileLibraryDialog,
 )
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
@@ -93,6 +97,7 @@ class AppFrameDialogCompatibilityState:
     certificate_import_dialog: Any | None = None
     certificate_creation_dialog: Any | None = None
     certificate_management_dialog: Any | None = None
+    signature_profile_library_dialog: Any | None = None
 
 
 class AppSettingsDialog:
@@ -127,9 +132,7 @@ class AppSettingsDialog:
             settings = AppSettings(
                 schema_version=self._settings.schema_version,
                 default_open_directory=self.controls.default_open_directory.text().strip(),
-                default_output_directory=(
-                    self.controls.default_output_directory.text().strip()
-                ),
+                default_output_directory=(self.controls.default_output_directory.text().strip()),
                 linux_packaging_channel=self._settings.linux_packaging_channel,
                 ui=dict(self._settings.ui),
             )
@@ -157,9 +160,7 @@ class AppSettingsDialog:
             dialog.setWindowTitle("Application settings")
         layout = self._bindings.q_form_layout(dialog)
 
-        default_open_directory = self._bindings.q_line_edit(
-            self._settings.default_open_directory
-        )
+        default_open_directory = self._bindings.q_line_edit(self._settings.default_open_directory)
         default_open_directory_browse_button = self._bindings.q_push_button("Browse...")
         default_output_directory = self._bindings.q_line_edit(
             self._settings.default_output_directory
@@ -263,7 +264,7 @@ class FoliaSealAppFrame:
                 secret_store=self._certificate_secret_provider,
             )
         )
-        self._preset_catalog_store = preset_catalog_store
+        self._preset_catalog_store = preset_catalog_store or SignaturePresetCatalogStore.default()
         self._sign_executor = sign_executor
         self._shell_factory = shell_factory or QtSigningWorkspaceFactory()
         self._render_backend_factory = render_backend_factory
@@ -287,15 +288,13 @@ class FoliaSealAppFrame:
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
-        self._certificate_dialog_port: CertificateDialogPort = (
-            AppFrameCertificateDialogService(
-                bindings=self._bindings,
-                parent=self.window,
-                lifecycle_service=self._certificate_lifecycle_service,
-                refresh_shell_certificate_configurations=(
-                    self._refresh_shell_certificate_configurations
-                ),
-            )
+        self._certificate_dialog_port: CertificateDialogPort = AppFrameCertificateDialogService(
+            bindings=self._bindings,
+            parent=self.window,
+            lifecycle_service=self._certificate_lifecycle_service,
+            refresh_shell_certificate_configurations=(
+                self._refresh_shell_certificate_configurations
+            ),
         )
         self._install_menus()
         self._set_placeholder()
@@ -346,6 +345,10 @@ class FoliaSealAppFrame:
     @property
     def certificate_management_dialog(self) -> Any | None:
         return self._dialog_compatibility.certificate_management_dialog
+
+    @property
+    def signature_profile_library_dialog(self) -> Any | None:
+        return self._dialog_compatibility.signature_profile_library_dialog
 
     def choose_open_pdf(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
@@ -429,6 +432,24 @@ class FoliaSealAppFrame:
         self._apply_certificate_dialog_compatibility(outcome.compatibility)
         return outcome.result
 
+    def show_signature_profile_library(self) -> Any:
+        """Open Settings management for reusable signing profiles and presets."""
+        dialog = SignatureProfileLibraryDialog(
+            bindings=self._bindings,
+            parent=self.window,
+            library=SignatureProfileLibrary(self._preset_catalog_store),
+        )
+        self._dialog_compatibility = AppFrameDialogCompatibilityState(
+            settings_dialog=self.settings_dialog,
+            certificate_import_dialog=self.certificate_import_dialog,
+            certificate_creation_dialog=self.certificate_creation_dialog,
+            certificate_management_dialog=self.certificate_management_dialog,
+            signature_profile_library_dialog=dialog,
+        )
+        dialog.exec()
+        self._refresh_shell_signature_profiles()
+        return dialog
+
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
         file_menu = menu_bar.addMenu("File")
@@ -462,15 +483,17 @@ class FoliaSealAppFrame:
         )
         edit_menu.addAction(self._copy_selected_text_action)
         settings_menu = menu_bar.addMenu("Settings")
+        settings_menu.addAction(self._action("Application settings", self.show_app_settings))
         settings_menu.addAction(
-            self._action("Application settings", self.show_app_settings)
+            self._action(
+                "Manage signing profiles...",
+                self.show_signature_profile_library,
+            )
         )
         settings_menu.addAction(
             self._action("Create certificate...", self.show_certificate_creation)
         )
-        settings_menu.addAction(
-            self._action("Import certificate...", self.show_certificate_import)
-        )
+        settings_menu.addAction(self._action("Import certificate...", self.show_certificate_import))
         settings_menu.addAction(
             self._action(
                 "Manage certificate configurations...",
@@ -508,9 +531,7 @@ class FoliaSealAppFrame:
         return action
 
     def _choose_save_as(self) -> str | None:
-        return self._with_current_shell_port(
-            lambda shell_port: shell_port.choose_output_pdf_path()
-        )
+        return self._with_current_shell_port(lambda shell_port: shell_port.choose_output_pdf_path())
 
     def _set_save_as_enabled(self, enabled: bool) -> None:
         action = self._save_as_action
@@ -604,13 +625,16 @@ class FoliaSealAppFrame:
 
     def _apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
-        self._with_current_shell_port(
-            lambda shell_port: shell_port.apply_app_settings(settings)
-        )
+        self._with_current_shell_port(lambda shell_port: shell_port.apply_app_settings(settings))
 
     def _refresh_shell_certificate_configurations(self) -> None:
         self._with_current_shell_port(
             lambda shell_port: shell_port.refresh_certificate_configurations()
+        )
+
+    def _refresh_shell_signature_profiles(self) -> None:
+        self._with_current_shell_port(
+            lambda shell_port: shell_port.refresh_signature_profiles()
         )
 
     def _with_current_shell_port(
@@ -731,6 +755,7 @@ class QtAppFrameAdapter:
             q_application=getattr(qt_widgets, "QApplication"),
             qpdf_document=getattr(qtpdf, "QPdfDocument"),
         )
+
 
 def build_qt_app_frame_host(
     *,
