@@ -1337,14 +1337,14 @@ def test_signing_shell_refresh_certificate_configurations_reapplies_signed_actio
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
     widget.submit_sign_request()
 
-    assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 6 of 6 — Verify signed PDF"
     assert "Signing completed successfully." in widget.sidebar_surface.sign_result_label.text()
     assert widget.sidebar_surface.open_signed_output_button._enabled is True
 
     store.save_catalog(build_certificate_catalog())
     widget.refresh_certificate_configurations()
 
-    assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 6 of 6 — Verify signed PDF"
     assert "Signing completed successfully." in widget.sidebar_surface.sign_result_label.text()
     assert widget.sidebar_surface.open_signed_output_button._enabled is True
 
@@ -1417,6 +1417,9 @@ def test_signing_shell_document_review_page_navigation_buttons_track_viewer_stat
     assert controls["copy_selection_button"].icon.path.endswith("copy.svg")
     assert controls["text_selection_button"].tooltip == "Text selection mode"
     assert controls["copy_selection_button"].tooltip == "Copy selected text"
+    assert controls["interaction_mode_label"].text() == (
+        "Placement mode — drag on the page to draw or resize the signature"
+    )
     assert controls["previous_page_button"]._enabled is False
     assert controls["next_page_button"]._enabled is True
 
@@ -1490,7 +1493,7 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
         in widget.sidebar_surface.sign_result_label.text()
     )
     assert "No timestamp token was found." in widget.sidebar_surface.sign_result_label.text()
-    assert widget.sidebar_surface.flow_stage_label.text() == "Signed"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 6 of 6 — Verify signed PDF"
     assert "review its local verification status" in widget.sidebar_surface.flow_detail_label.text()
     assert widget.sidebar_surface.open_signed_output_button._enabled is False
 
@@ -2156,6 +2159,9 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
 
     assert widget.viewer_widget.interaction_mode == "text"
     assert controls["text_selection_button"].isChecked() is True
+    assert controls["interaction_mode_label"].text() == (
+        "Text selection mode — drag across PDF text to select and copy"
+    )
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
 
@@ -2185,6 +2191,9 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
 
     assert widget.viewer_widget.interaction_mode == "signature"
     assert controls["text_selection_button"].isChecked() is False
+    assert controls["interaction_mode_label"].text() == (
+        "Placement mode — drag on the page to draw or resize the signature"
+    )
     assert widget.signature_rect() is not None
     assert widget.signature_rect().left_pt == 1.0
 
@@ -2319,7 +2328,7 @@ def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_change
 
     widget.viewer_widget.emit_selection(PdfRect(x1=12.0, y1=12.0, x2=34.0, y2=24.0))
 
-    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 5 of 6 — Confirm and sign"
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert widget.sidebar_surface.sign_result_label.text() == ""
@@ -2360,7 +2369,7 @@ def test_signing_shell_flow_summary_replaces_signed_result_after_output_path_cha
     bindings.q_file_dialog.next_save_file_name = str(selected_path)
     widget.choose_output_pdf_path()
 
-    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 5 of 6 — Confirm and sign"
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert "Signing completed successfully." not in widget.sidebar_surface.sign_result_label.text()
@@ -2401,7 +2410,7 @@ def test_signing_shell_flow_summary_clears_signed_result_after_page_change(
 
     widget.properties_panel._placement_controls.page_spin.setValue(2)
 
-    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 5 of 6 — Confirm and sign"
     assert widget.last_signing_result is None
     assert widget.last_signing_result is None
     assert widget.sidebar_surface.sign_result_label.text() == ""
@@ -2551,7 +2560,10 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
 
     assert widget.sidebar_surface.container is widget.sidebar
     assert widget.sidebar_surface.signing_action_panel is not None
-    assert widget.sidebar_surface.flow_stage_label.text() == "Place signature"
+    assert widget.sidebar_surface.flow_journey_label.text() == (
+        "Workflow: 1 Review → 2 Setup → 3 Place → 4 Ready → 5 Sign → 6 Verify"
+    )
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 3 of 6 — Place visible signature"
     assert "Drag on the page" in widget.sidebar_surface.flow_detail_label.text()
     assert len(widget.layout.items) == 1
     assert len(widget.layout.items[0][0].items) == 2
@@ -3069,7 +3081,7 @@ def test_signing_shell_flow_summary_advances_after_signature_placement(
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
 
-    assert widget.sidebar_surface.flow_stage_label.text() == "Confirm/sign"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 5 of 6 — Confirm and sign"
     assert "Confirm the output path" in widget.sidebar_surface.flow_detail_label.text()
     assert widget.is_sign_action_enabled() is True
 
@@ -3320,7 +3332,7 @@ def test_signing_shell_readiness_detail_is_width_limited_to_action_panel(
 
     assert not hasattr(panel, "_validation_label")
     assert widget.sidebar_surface.flow_detail_label.fixed_width == 464
-    assert widget.sidebar_surface.flow_stage_label.text() == "Review preview"
+    assert widget.sidebar_surface.flow_stage_label.text() == "Step 4 of 6 — Review readiness"
     assert widget.sidebar_surface.flow_detail_label.text().startswith("Will fail to sign:")
     assert panel.validation_text().startswith("Will fail to sign:")
 

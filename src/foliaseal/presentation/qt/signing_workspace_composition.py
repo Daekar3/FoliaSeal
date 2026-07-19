@@ -208,6 +208,9 @@ def build_signing_workspace_composition(
     next_page_button = bindings.q_push_button(">")
     page_input = bindings.q_line_edit("1")
     total_pages_label = bindings.q_label(f"of {viewer_workflow.session.page_count}")
+    interaction_mode_label = bindings.q_label(
+        "Placement mode — drag on the page to draw or resize the signature"
+    )
     text_selection_button = bindings.q_push_button("")
     copy_selection_button = bindings.q_push_button("")
     for button in (previous_page_button, next_page_button):
@@ -251,6 +254,7 @@ def build_signing_workspace_composition(
         viewer_navigation_row.addWidget(toolbar_gap)
     viewer_navigation_row.addWidget(text_selection_button)
     viewer_navigation_row.addWidget(copy_selection_button)
+    viewer_navigation_row.addWidget(interaction_mode_label)
     if hasattr(viewer_navigation_row, "addStretch"):
         viewer_navigation_row.addStretch()
 
@@ -291,6 +295,14 @@ def build_signing_workspace_composition(
         if callable(set_checked):
             set_checked(document_text_state.selection_mode_enabled)
         copy_selection_button.setEnabled(document_text_state.selection_state.can_copy)
+        _set_text(
+            interaction_mode_label,
+            (
+                "Text selection mode — drag across PDF text to select and copy"
+                if document_text_state.selection_mode_enabled
+                else "Placement mode — drag on the page to draw or resize the signature"
+            ),
+        )
 
     def toggle_text_selection_mode() -> None:
         is_checked = getattr(text_selection_button, "isChecked", None)
@@ -315,6 +327,7 @@ def build_signing_workspace_composition(
         "next_page_button": next_page_button,
         "text_selection_button": text_selection_button,
         "copy_selection_button": copy_selection_button,
+        "interaction_mode_label": interaction_mode_label,
     }
     properties_panel = SignaturePropertiesPanel(
         bindings=bindings,

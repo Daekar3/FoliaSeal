@@ -374,6 +374,8 @@ def test_signing_setup_session_set_signature_appearance_delegates_to_coordinator
         selected_signature_preset_name=None,
         certificate_configuration_names=("Corporate Records Signing",),
         signature_preset_names=("Default", "Compact"),
+        appearance_profile_names=(),
+        placement_profile_names=(),
         visible_signature_setup_draft=VisibleSignatureSetupDraft(
             appearance=build_signature_appearance(
                 signer_label_prefix="Delegated",

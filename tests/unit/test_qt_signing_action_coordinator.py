@@ -59,10 +59,33 @@ def test_signing_action_coordinator_load_reports_place_signature_when_draft_is_e
     state = coordinator.load()
 
     assert state.can_sign is False
-    assert state.stage_text == "Place signature"
+    assert state.stage_text == "Step 3 of 6 — Place visible signature"
     assert "Drag on the page to place the visible signature" in state.detail_text
     assert state.last_signing_result is None
     assert state.can_open_signed_output is False
+
+
+def test_signing_action_coordinator_prioritizes_missing_signing_setup(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path="",
+        passphrase="",
+        tsa_url="",
+    )
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: False,
+        validation_text=lambda: "Choose a certificate before signing.",
+    )
+
+    state = coordinator.load()
+
+    assert state.stage_text == "Step 2 of 6 — Choose signing setup"
+    assert "choose or create a certificate" in state.detail_text.lower()
 
 
 def test_signing_action_coordinator_accept_output_path_clears_previous_success(
@@ -96,7 +119,7 @@ def test_signing_action_coordinator_accept_output_path_clears_previous_success(
     assert updated.last_signing_result is None
     assert updated.result_text == f"Output will be saved to: {tmp_path / 'other.pdf'}"
     assert updated.can_open_signed_output is False
-    assert updated.stage_text == "Confirm/sign"
+    assert updated.stage_text == "Step 5 of 6 — Confirm and sign"
 
 
 def test_signing_action_coordinator_invalidate_clears_signed_state(tmp_path: Path) -> None:
@@ -126,7 +149,7 @@ def test_signing_action_coordinator_invalidate_clears_signed_state(tmp_path: Pat
     assert state.last_successful_output_path is None
     assert state.result_text == ""
     assert state.can_open_signed_output is False
-    assert state.stage_text == "Confirm/sign"
+    assert state.stage_text == "Step 5 of 6 — Confirm and sign"
 
 
 def test_signing_action_coordinator_returns_validation_failure_without_request(
@@ -148,7 +171,7 @@ def test_signing_action_coordinator_returns_validation_failure_without_request(
     assert transition.error_message == "Selection is incomplete."
     assert transition.error_via_emit is True
     assert transition.state.last_signing_result is None
-    assert transition.state.stage_text == "Review preview"
+    assert transition.state.stage_text == "Step 4 of 6 — Review readiness"
 
 
 def test_signing_action_coordinator_success_tracks_signed_state(tmp_path: Path) -> None:
@@ -182,7 +205,7 @@ def test_signing_action_coordinator_success_tracks_signed_state(tmp_path: Path) 
     assert transition.error_message is None
     assert transition.state.last_signing_result is not None
     assert transition.state.last_signing_result.success is True
-    assert transition.state.stage_text == "Signed"
+    assert transition.state.stage_text == "Step 6 of 6 — Verify signed PDF"
     assert transition.state.can_open_signed_output is True
     assert coordinator.open_signed_output() == workflow.output_pdf_path
 

@@ -13,6 +13,7 @@ from foliaseal.domain.models import (
 )
 from foliaseal.presentation.qt import signature_preview_layout as preview_layout_module
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
+from foliaseal.presentation.qt import signing_workspace_properties_panel as properties_panel_module
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     CanonicalPreviewRenderState,
 )
@@ -28,7 +29,7 @@ from tests.unit.test_qt_signing_shell import (
 
 def _panel_and_layout(tmp_path: Path):
     bindings = _fake_bindings()
-    panel = signing_shell_module.SignaturePropertiesPanel(
+    panel = properties_panel_module.SignaturePropertiesPanel(
         bindings=bindings,
         workflow=_workflow(tmp_path),
     )

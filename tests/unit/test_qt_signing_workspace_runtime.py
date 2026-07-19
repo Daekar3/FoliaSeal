@@ -241,6 +241,7 @@ def _bind_runtime(
     sign_button = _FakeSignButton()
     result_label = _FakeResultLabel()
     refresh_sign_button_state_calls = []
+    refresh_page_navigation_state_calls = []
     runtime.bind(
         viewer_interaction_session=viewer_interaction_session,
         viewer_workflow=viewer_workflow,
@@ -255,6 +256,10 @@ def _bind_runtime(
         refresh_sign_button_state=lambda: (
             order.append(("refresh_sign_button_state", None)),
             refresh_sign_button_state_calls.append("refresh"),
+        )[-1],
+        refresh_page_navigation_state=lambda: (
+            order.append(("refresh_page_navigation_state", None)),
+            refresh_page_navigation_state_calls.append("refresh"),
         )[-1],
         result_label=result_label,
     )
@@ -272,6 +277,7 @@ def _bind_runtime(
         sign_button=sign_button,
         result_label=result_label,
         refresh_sign_button_state_calls=refresh_sign_button_state_calls,
+        refresh_page_navigation_state_calls=refresh_page_navigation_state_calls,
         order=order,
     )
 

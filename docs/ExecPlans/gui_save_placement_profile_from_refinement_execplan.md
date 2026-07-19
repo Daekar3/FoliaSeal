@@ -16,7 +16,8 @@ Users can save the currently edited visible-signature rectangle as a named reusa
 - [x] (2026-07-17 00:00Z) Added `SaveCurrentPlacementProfile`, the session wrapper, and coordinator regression tests for rectangle persistence, fixed `current_page` semantics, and disabled-placement rejection.
 - [x] (2026-07-17 00:00Z) Added `Save placement for reuse...` to the refinement dialog plus a Qt regression test that proves the dialog stays open and cancellation leaves the live draft unchanged.
 - [x] (2026-07-17 00:00Z) Ran focused coordinator and Qt tests, plus Ruff for touched application and Qt files.
-- [ ] Run the live GUI walkthrough together with the reusable-object Settings library, which is the first user-facing catalog-inspection surface after restart.
+- [x] (2026-07-18) Ran the display-backed representative-PDF startup audit after the Settings library landed; the live workspace mounted with the saved catalog after legacy-profile migration coverage was added.
+- [ ] Complete the live refinement save walkthrough; the startup smoke audit confirms catalog loading only.
 
 ## Surprises & Discoveries
 

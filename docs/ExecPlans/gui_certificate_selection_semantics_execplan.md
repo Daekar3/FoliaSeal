@@ -19,7 +19,8 @@ After this change, a user will understand exactly how a saved certificate config
 - [x] (2026-07-18) Aligned helper wording and the mounted selector with that one transition.
 - [x] (2026-07-18) Retired the unmounted alternative `Use for this PDF` affordance.
 - [x] (2026-07-18) Focused integrated coverage passed (163 tests) and architecture documentation was reconciled.
-- [ ] Validate the clarified behavior in the representative-PDF GUI audit. Pending because this run has no display-backed evidence.
+- [x] (2026-07-18) Ran the representative-PDF display-backed startup audit; focused Qt coverage verifies immediate selection, password prompting, cancellation, and error rollback.
+- [ ] Complete the live certificate create/select walkthrough; the startup smoke audit did not exercise that dialog path end-to-end.
 
 ## Surprises & Discoveries
 

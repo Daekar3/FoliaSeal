@@ -12,11 +12,8 @@ This parent plan exists because the missing product behavior spans several relat
 
 ## Child ExecPlan Dependencies
 
-- [ ] `docs/ExecPlans/gui_reusable_signing_objects_execplan.md` must land before any plan can claim SPEC-compliant reusable signing setup creation, because the current GUI has no visible create/save path for new signature presets and no management surface for appearance or placement objects.
-- [ ] `docs/ExecPlans/gui_certificate_selection_semantics_execplan.md` can run in parallel with the reusable-object work, but it should be complete before the confirmation-flow work lands so the sign-summary surface does not describe ambiguous certificate-selection behavior.
-- [ ] `docs/ExecPlans/gui_sign_confirmation_and_verification_execplan.md` depends on the reusable-object plan and certificate-selection semantics plan being understood, because its confirmation and post-sign guidance must describe the actual active signing objects and certificate state.
-- [ ] `docs/ExecPlans/gui_main_shell_process_narration_execplan.md` depends on the reusable-object plan and confirmation/verification plan, because the shell cannot truthfully narrate the full process until those surfaces exist.
-- [ ] The parent walkthrough is not complete until all four child plans land and one live GUI audit against a representative PDF is rerun using `.tmp/gui_user_flow_audit_2026-07-13.md` as the exact checklist.
+- [x] Reusable signing objects, certificate-selection semantics, confirmation/verification, and shell narration landed together in `8cc188c`.
+- [ ] A full representative-PDF GUI walkthrough remains required. Startup smoke evidence verified catalog migration only; focused Qt coverage exercises the dialog interactions but does not replace the end-to-end audit.
 
 ## Progress
 
@@ -24,11 +21,9 @@ This parent plan exists because the missing product behavior spans several relat
 - [x] (2026-07-13 00:00Z) Wrote `.tmp/gui_findings_and_fix_plan_2026-07-13.md` to summarize confirmed GUI problems and a high-level SPEC-compliant fix direction.
 - [x] (2026-07-13 00:00Z) Ran two independent review passes over the audit and findings: one code-surface review and one SPEC-compliance review, then folded their corrections back into the temp artifacts.
 - [x] (2026-07-13 00:00Z) Wrote this parent ExecPlan plus the child ExecPlans for reusable signing objects, certificate-selection semantics, sign confirmation plus verification, and main-shell process narration.
-- [ ] Execute `gui_reusable_signing_objects_execplan.md`.
-- [ ] Execute `gui_certificate_selection_semantics_execplan.md`.
-- [ ] Execute `gui_sign_confirmation_and_verification_execplan.md`.
-- [ ] Execute `gui_main_shell_process_narration_execplan.md`.
-- [ ] Re-run the exact user-flow audit live in the GUI, then update `docs/ARCHITECTURE.md`, `README.md`, and any remaining acceptance notes so repository documentation matches the delivered product behavior.
+- [x] (2026-07-18) Executed the four child plans in `8cc188c` with 163 focused tests, Ruff, and diff checks passing.
+- [x] (2026-07-18) Re-ran the display-backed representative-PDF startup smoke audit and reconciled the architecture documentation; README required no capability change.
+- [ ] (2026-07-18) Complete the full display-backed user-flow audit: profile selection, confirmation, post-sign verification, and reopen remain to be exercised end-to-end.
 
 ## Surprises & Discoveries
 

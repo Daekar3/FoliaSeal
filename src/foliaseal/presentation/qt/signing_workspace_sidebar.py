@@ -17,6 +17,7 @@ class SigningActionControls:
     """Widgets used for the primary signing action/status panel."""
 
     container: Any
+    journey_label: Any
     stage_label: Any
     detail_label: Any
     choose_output_button: Any
@@ -65,6 +66,7 @@ class SigningWorkspaceSidebarSurface:
     sign_button: Any
     open_signed_output_button: Any
     sign_result_label: Any
+    flow_journey_label: Any
     flow_stage_label: Any
     flow_detail_label: Any
     document_review_headline_label: Any
@@ -169,6 +171,7 @@ class SigningWorkspaceSidebar:
             sign_button=self.sign_button,
             open_signed_output_button=self.open_signed_output_button,
             sign_result_label=self.result_label,
+            flow_journey_label=self.signing_action_controls.journey_label,
             flow_stage_label=self.signing_action_controls.stage_label,
             flow_detail_label=self.signing_action_controls.detail_label,
             document_review_headline_label=self.document_review_controls.headline_label,
@@ -312,19 +315,24 @@ class SigningWorkspaceSidebar:
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
         stage_label = self._bindings.q_label("")
+        journey_label = self._bindings.q_label(
+            "Workflow: 1 Review → 2 Setup → 3 Place → 4 Ready → 5 Sign → 6 Verify"
+        )
         detail_label = self._bindings.q_label("")
         choose_output_button = self._bindings.q_push_button("Choose output...")
         sign_button = self._bindings.q_push_button("Confirm and sign")
         open_signed_output_button = self._bindings.q_push_button("Open signed PDF")
         open_signed_output_button.setEnabled(False)
         result_label = self._bindings.q_label("")
-        for label in (stage_label, detail_label):
+        for label in (journey_label, stage_label, detail_label):
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
         if hasattr(result_label, "setWordWrap"):
             result_label.setWordWrap(True)
         if hasattr(stage_label, "setStyleSheet"):
             stage_label.setStyleSheet("font-weight: 700; color: #111827;")
+        if hasattr(journey_label, "setStyleSheet"):
+            journey_label.setStyleSheet("color: #4b5563; font-size: 11px;")
         if hasattr(detail_label, "setStyleSheet"):
             detail_label.setStyleSheet("color: #374151;")
         if hasattr(result_label, "setStyleSheet"):
@@ -332,6 +340,7 @@ class SigningWorkspaceSidebar:
         choose_output_button.clicked.connect(on_choose_output)  # type: ignore[attr-defined]
         sign_button.clicked.connect(on_sign)  # type: ignore[attr-defined]
         open_signed_output_button.clicked.connect(on_open_signed_output)  # type: ignore[attr-defined]
+        layout.addWidget(journey_label)
         layout.addWidget(stage_label)
         layout.addWidget(detail_label)
         layout.addWidget(choose_output_button)
@@ -340,6 +349,7 @@ class SigningWorkspaceSidebar:
         layout.addWidget(result_label)
         return SigningActionControls(
             container=container,
+            journey_label=journey_label,
             stage_label=stage_label,
             detail_label=detail_label,
             choose_output_button=choose_output_button,

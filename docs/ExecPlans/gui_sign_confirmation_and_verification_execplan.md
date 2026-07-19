@@ -19,7 +19,8 @@ After this change, a user will encounter an unmistakable final confirmation/revi
 - [x] (2026-07-18) The confirmation summarizes the output, active certificate, active preset or current-document custom setup, and irreversible effect; declining it submits no request.
 - [x] (2026-07-18) The signed stage now directs users to reopen the output, inspect local verification, retain trust caveats, and add an approval signature only when document permissions permit it.
 - [x] (2026-07-18) Focused integrated coverage passed (163 tests) and architecture documentation was reconciled.
-- [ ] Validate the complete pre-sign/post-sign story in the representative-PDF GUI audit. Pending because this run has no display-backed evidence.
+- [x] (2026-07-18) Ran the representative-PDF display-backed startup audit; focused Qt coverage verifies confirmation wording, signing transitions, signed-state local-verification guidance, and reopen availability.
+- [ ] Complete the live confirmation, signed-result reopen, and verification walkthrough; the startup smoke audit did not exercise signing end-to-end.
 
 ## Surprises & Discoveries
 

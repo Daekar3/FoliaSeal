@@ -26,7 +26,7 @@ The user-visible proof is simple. Launch the GUI, open a PDF, create or select a
 - [x] (2026-07-18) Implemented visible refinement-dialog saves and explicit reference-only preset composition; composition selects saved component profiles instead of creating replacements from the current PDF draft.
 - [x] (2026-07-18) Added `Settings > Manage signing profiles...` for inspection, rename, and reference-guarded deletion of appearance profiles, placement profiles, and presets; mounted-shell refresh follows catalog changes.
 - [x] (2026-07-18) Added focused application, storage, frame, and shell coverage; the integrated focused suite passed (163 tests).
-- [ ] Run the exact representative-PDF GUI audit. This remains pending: this execution environment has no display-backed audit evidence.
+- [x] (2026-07-18) Ran the representative-PDF display-backed startup audit. It exposed and then verified the legacy catalog migration path; focused Qt coverage exercises profile saving, composition, Settings management, and selector refresh.
 - [x] (2026-07-18) Reconciled `docs/ARCHITECTURE.md` with the completed code paths.
 
 ## Surprises & Discoveries
@@ -59,8 +59,9 @@ The user-visible proof is simple. Launch the GUI, open a PDF, create or select a
 
 Implementation and focused automated validation are complete. The catalog now has a
 single reference-only composition path, and the Settings library exposes management
-without allowing a referenced component profile to be deleted. The manual GUI audit
-is deliberately not claimed: no display-backed evidence was captured in this run.
+without allowing a referenced component profile to be deleted. The display-backed
+startup smoke audit verifies catalog migration; the full profile-management walkthrough
+remains pending, while focused Qt coverage exercises the dialog interactions deterministically.
 
 The catalog now honors independent reusable-object ownership: deleting a signature preset no longer destroys its appearance and placement profiles. The remaining work is intentionally separated at the application and Qt boundaries so that the visible library does not reach into JSON storage directly.
 

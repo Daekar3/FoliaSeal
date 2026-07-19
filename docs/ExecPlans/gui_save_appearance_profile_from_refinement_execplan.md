@@ -17,7 +17,8 @@ After this slice, a person refining a PDF's visible signature can press `Save ap
 - [x] (2026-07-17 00:00Z) Added a Qt refinement-dialog behavior test that saves an edited appearance, keeps the dialog active, and proves cancellation leaves the live draft unchanged.
 - [x] (2026-07-17 00:00Z) Implemented `SaveCurrentAppearanceProfile`, the session wrapper, and the mounted refinement-dialog action.
 - [x] (2026-07-17 00:00Z) Ran focused regression evidence: `2 passed` for coordinator appearance tests and `1 passed` for the Qt refinement-dialog save/cancel test.
-- [ ] Run the live GUI/restart walkthrough after the Settings library exists, because that is the first visible catalog-inspection surface for a persisted appearance profile.
+- [x] (2026-07-18) Ran the display-backed representative-PDF startup audit after the Settings library landed; the live workspace mounted with the saved catalog after legacy-profile migration coverage was added.
+- [ ] Complete the live refinement save walkthrough; the startup smoke audit confirms catalog loading only.
 
 ## Surprises & Discoveries
 

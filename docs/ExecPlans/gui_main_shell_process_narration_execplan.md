@@ -18,7 +18,8 @@ After this change, the main signing shell will tell the user what is active, wha
 - [x] (2026-07-18) Centralized stage-appropriate narration in the signing-action state: placement, preview review, confirm/sign, and signed-result guidance.
 - [x] (2026-07-18) Made the active setup and output target explicit in the final confirmation, while signed guidance points to reopen and local verification.
 - [x] (2026-07-18) Focused integrated coverage passed (163 tests) and architecture documentation was reconciled.
-- [ ] Validate wording and visible summaries in the representative-PDF GUI audit. Pending because this run has no display-backed evidence.
+- [x] (2026-07-18) Ran the representative-PDF display-backed startup audit; focused Qt coverage verifies stage, readiness, confirmation, output, and signed-state narration.
+- [ ] Complete the live narrated flow through signing and reopen; the startup smoke audit only verifies initial rendering.
 
 ## Surprises & Discoveries
 

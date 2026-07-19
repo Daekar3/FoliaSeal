@@ -164,22 +164,32 @@ class SigningActionCoordinator:
             and self._last_signing_result.success
             and self._last_successful_output_path is not None
         ):
-            stage_text = "Signed"
+            stage_text = "Step 6 of 6 — Verify signed PDF"
             detail_text = (
                 "Open the signed PDF, review its local verification status, and keep any "
                 "trust caveats in mind. Add another approval signature only if document "
                 "permissions permit it."
             )
         elif can_sign:
-            stage_text = "Confirm/sign"
-            detail_text = "Confirm the output path, review readiness, then sign the PDF."
-        elif self._workflow.signature_rect is None:
-            stage_text = "Place signature"
+            stage_text = "Step 5 of 6 — Confirm and sign"
             detail_text = (
-                "Drag on the page to place the visible signature, or enter placement values."
+                "Confirm the output path and review the on-page preview, then use Confirm and sign "
+                "to review the final signing summary."
+            )
+        elif not self._has_signing_setup():
+            stage_text = "Step 2 of 6 — Choose signing setup"
+            detail_text = (
+                "Choose or create a certificate and signing setup in the sidebar before "
+                "placing the visible signature."
+            )
+        elif self._workflow.signature_rect is None:
+            stage_text = "Step 3 of 6 — Place visible signature"
+            detail_text = (
+                "Placement mode is active — Drag on the page to place the visible "
+                "signature, or enter placement values."
             )
         else:
-            stage_text = "Review preview"
+            stage_text = "Step 4 of 6 — Review readiness"
             validation_text = self._validation_text().strip()
             if validation_text:
                 detail_text = validation_text
@@ -199,3 +209,8 @@ class SigningActionCoordinator:
                 and self._can_open_signed_output
             ),
         )
+
+    def _has_signing_setup(self) -> bool:
+        """Return whether the draft has the minimum material needed for signing."""
+
+        return bool(self._workflow.certificate_path and self._workflow.passphrase)
