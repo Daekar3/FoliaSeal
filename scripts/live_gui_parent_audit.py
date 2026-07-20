@@ -144,6 +144,39 @@ class _NonNativeAuditSaveDialog:
         return (selected[0], file_filter)
 
 
+@dataclass
+class _NonNativeAuditDirectoryDialog:
+    """Drive the real Qt directory picker while avoiding an opaque WM-native dialog."""
+
+    selections: dict[str, Path]
+    calls: list[tuple[str, str]]
+
+    def getExistingDirectory(self, parent: Any, caption: str, directory: str) -> str:
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QDialog, QFileDialog
+
+        self.calls.append((caption, directory))
+        selected_path = self.selections.get(caption)
+        if selected_path is None:
+            raise RuntimeError(f"Unexpected directory-dialog caption: {caption!r}.")
+        dialog = QFileDialog(parent, caption, directory)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+
+        def select_and_accept() -> None:
+            dialog.setDirectory(str(selected_path))
+            dialog.accept()
+
+        QTimer.singleShot(0, select_and_accept)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return ""
+        selected = dialog.selectedFiles()
+        if len(selected) != 1:
+            raise RuntimeError(f"Directory dialog accepted {len(selected)} paths, expected one.")
+        return selected[0]
+
+
 def _button_with_text(root: Any, text: str) -> Any:
     from PySide6.QtWidgets import QPushButton
 
@@ -180,6 +213,16 @@ def _single_line_edit(dialog: Any) -> Any:
             f"Expected one text editor in {dialog.windowTitle()!r}, found {len(editors)}."
         )
     return editors[0]
+
+
+def _assert_visible_text(root: Any, expected: str) -> None:
+    from PySide6.QtWidgets import QLabel
+
+    for label in root.findChildren(QLabel):
+        is_visible = getattr(label, "isVisible", None)
+        if (not callable(is_visible) or is_visible()) and expected in label.text():
+            return
+    raise RuntimeError(f"Could not find visible explanatory text: {expected!r}.")
 
 
 def _active_modal(app: Any, title: str) -> Any | None:
@@ -307,6 +350,117 @@ def _select_certificate_configuration(shell: Any, display_name: str) -> None:
     raise RuntimeError(f"Certificate configuration {display_name!r} is not visible in the shell.")
 
 
+def _audit_certificate_and_preset_clarity(shell: Any, audit: _Audit) -> None:
+    """Assert the mounted shell explains the two reusable-object choices."""
+    _assert_visible_text(
+        shell,
+        "Certificate configurations are saved signing identities.",
+    )
+    _assert_visible_text(
+        shell,
+        "Signature presets reuse saved appearance and placement choices.",
+    )
+    audit.checkpoint("certificate-and-preset-clarity", "Step 2 of 6 — Choose signing setup")
+
+
+def _audit_profile_library(frame: Any, audit: _Audit) -> None:
+    """Verify the visible Settings route manages saved presets without shell internals."""
+    def drive(app: Any) -> bool:
+        dialog = _active_modal(app, "Manage signing profiles")
+        if dialog is None:
+            return False
+        _assert_visible_text(dialog, "References")
+        from PySide6.QtWidgets import QComboBox
+
+        combos = dialog.findChildren(QComboBox)
+        if len(combos) != 1 or combos[0].findText(f"Preset: {AUDIT_SIGNATURE_PRESET}") < 0:
+            raise RuntimeError("Profile library did not visibly list the saved signature preset.")
+        _button_with_text(dialog, "Close").click()
+        return True
+
+    _run_modal_action(audit.app, frame.show_signature_profile_library, drive)
+    audit.checkpoint("profile-library-clarity", "Step 4 of 6 — Review reusable signing objects")
+
+
+def _audit_settings_directory_browsing(
+    frame: Any,
+    audit: _Audit,
+    *,
+    root: Path,
+    settings_store: AppSettingsStore,
+) -> None:
+    """Select both settings directories through visible production Browse controls."""
+    open_directory = root / "selected-open"
+    output_directory = root / "selected-output"
+    open_directory.mkdir()
+    output_directory.mkdir()
+    original_bindings = frame._bindings
+    directory_dialog = _NonNativeAuditDirectoryDialog(
+        selections={
+            "Choose default open folder": open_directory,
+            "Choose default output folder": output_directory,
+        },
+        calls=[],
+    )
+    frame._bindings = replace(original_bindings, q_file_dialog=directory_dialog)
+    phase = "open"
+    try:
+        def drive(app: Any) -> bool:
+            nonlocal phase
+            dialog = _active_modal(app, "Application settings")
+            if dialog is None:
+                return False
+            open_edit = _line_edit_for_form_label(dialog, "Default open folder")
+            output_edit = _line_edit_for_form_label(dialog, "Default output folder")
+            from PySide6.QtWidgets import QPushButton
+
+            browse_buttons = [
+                button
+                for button in dialog.findChildren(QPushButton)
+                if button.text().strip() == "Browse..." and button.isVisible()
+            ]
+            if len(browse_buttons) != 2:
+                raise RuntimeError(
+                    "Application settings did not expose two visible Browse controls."
+                )
+            if phase == "open":
+                browse_buttons[0].click()
+                phase = "output"
+                return False
+            if phase == "output":
+                browse_buttons[1].click()
+                phase = "save"
+                return False
+            if (
+                str(open_edit.text()) != str(open_directory)
+                or str(output_edit.text()) != str(output_directory)
+            ):
+                raise RuntimeError(
+                    "Directory picker selection did not update both settings fields."
+                )
+            _button_with_text(dialog, "Save").click()
+            return True
+
+        _run_modal_action(audit.app, frame.show_app_settings, drive)
+    finally:
+        frame._bindings = original_bindings
+    if [caption for caption, _directory in directory_dialog.calls] != [
+        "Choose default open folder",
+        "Choose default output folder",
+    ]:
+        raise RuntimeError(
+            f"Unexpected settings directory-picker calls: {directory_dialog.calls!r}."
+        )
+    persisted = settings_store.load_settings()
+    if (
+        persisted.default_open_directory != str(open_directory)
+        or persisted.default_output_directory != str(output_directory)
+        or frame.app_settings != persisted
+    ):
+        raise RuntimeError("Application settings did not persist selected directory paths.")
+    audit.checkpoint("settings-directory-browsing", "Step 2 of 6 — Configure application folders")
+
+
 def _save_appearance_profile(shell: Any, audit: _Audit) -> None:
     """Persist the appearance before placement through the visible refinement dialog."""
     saved = False
@@ -331,7 +485,12 @@ def _save_appearance_profile(shell: Any, audit: _Audit) -> None:
     _open_refinement_from_visible_control(shell, audit, drive)
 
 
-def _save_and_reselect_signature_preset(shell: Any, audit: _Audit) -> None:
+def _save_and_reselect_signature_preset(
+    shell: Any,
+    audit: _Audit,
+    *,
+    expected_certificate_name: str,
+) -> None:
     """Persist placement and a composed preset through the real refinement dialog.
 
     This deliberately drives the same nested input dialogs a person sees.  It is
@@ -402,6 +561,11 @@ def _save_and_reselect_signature_preset(shell: Any, audit: _Audit) -> None:
     if preset_combo.currentText() != AUDIT_SIGNATURE_PRESET:
         raise RuntimeError(
             "Saved signature preset could not be reselected through the workspace selector."
+        )
+    certificate_combo = _combo_with_item(shell, expected_certificate_name)
+    if certificate_combo is None or certificate_combo.currentText() != expected_certificate_name:
+        raise RuntimeError(
+            "Reselecting a signature preset changed the active certificate configuration."
         )
 
 
@@ -642,6 +806,13 @@ def run_audit(
         if shell is None:
             raise RuntimeError("FoliaSeal did not open the representative PDF.")
         audit.checkpoint("document-review", "Step 2 of 6 — Choose signing setup")
+        _audit_certificate_and_preset_clarity(shell, audit)
+        _audit_settings_directory_browsing(
+            frame,
+            audit,
+            root=root,
+            settings_store=settings_store,
+        )
 
         creation = _create_managed_certificate(frame, audit)
         catalog = cert_store.load_catalog()
@@ -657,7 +828,12 @@ def run_audit(
         audit.checkpoint("appearance-profile-saved", "Step 3 of 6 — Place visible signature")
 
         _place_signature_with_viewer_drag(shell, audit)
-        _save_and_reselect_signature_preset(shell, audit)
+        _save_and_reselect_signature_preset(
+            shell,
+            audit,
+            expected_certificate_name=config.display_name,
+        )
+        _audit_profile_library(frame, audit)
         audit.process_events()
         audit.checkpoint("saved-profile-reselected", "Step 4 of 6 — Review readiness")
         audit.checkpoint("visible-placement", "Step 4 of 6 — Review readiness")

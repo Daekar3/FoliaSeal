@@ -311,6 +311,7 @@ class _FakeQApplication:
 class _FakeShell:
     def __init__(self) -> None:
         self.refresh_certificate_configurations_calls = 0
+        self.refresh_signature_profiles_calls = 0
         self.applied_settings = []
         self.output_dialog_defaults = []
         self.choose_output_pdf_path_calls = 0
@@ -327,6 +328,9 @@ class _FakeShell:
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         self.refresh_certificate_configurations_calls += 1
         return self.certificate_catalog
+
+    def refresh_signature_profiles(self) -> None:
+        self.refresh_signature_profiles_calls += 1
 
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
@@ -356,6 +360,9 @@ class _FakeShellPort:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self.shell_widget.refresh_certificate_configurations()
+
+    def refresh_signature_profiles(self) -> None:
+        self.shell_widget.refresh_signature_profiles()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self.shell_widget.set_document_text_selection_mode(enabled)
@@ -516,6 +523,8 @@ def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path
 
     assert catalog is shell.certificate_catalog
     assert shell.refresh_certificate_configurations_calls == 1
+    port.refresh_signature_profiles()
+    assert shell.refresh_signature_profiles_calls == 1
     assert port.set_document_text_selection_mode(True) is True
     assert shell.set_document_text_selection_mode_calls == [True]
     assert port.copy_selected_document_text() == "Alice Example"

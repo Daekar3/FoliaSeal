@@ -740,6 +740,32 @@ def test_signing_shell_output_dialog_uses_app_settings_default_directory(
     assert not hasattr(widget.properties_panel, "_app_settings_controls")
 
 
+def test_signing_shell_close_aware_widget_exports_profile_refresh(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+
+    widget.refresh_signature_profiles()
+
+    assert callable(widget.refresh_signature_profiles)
+
+
 def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     monkeypatch,
     tmp_path: Path,

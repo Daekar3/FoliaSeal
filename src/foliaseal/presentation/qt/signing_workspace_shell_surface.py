@@ -42,6 +42,7 @@ class SigningWorkspaceShellSurface:
         self._widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
             self.refresh_certificate_configurations
         )
+        self._widget.refresh_signature_profiles = self.refresh_signature_profiles  # type: ignore[attr-defined]
         self._widget.set_document_text_selection_mode = (  # type: ignore[attr-defined]
             self.set_document_text_selection_mode
         )
@@ -59,6 +60,10 @@ class SigningWorkspaceShellSurface:
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self._action_bridge.refresh_certificate_configurations()
+
+    def refresh_signature_profiles(self) -> None:
+        """Reload reusable profile selectors exposed through the workspace port."""
+        self._action_bridge.refresh_signature_profiles()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self._set_document_text_selection_mode(enabled)

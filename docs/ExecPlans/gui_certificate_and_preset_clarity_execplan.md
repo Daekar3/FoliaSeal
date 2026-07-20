@@ -19,24 +19,41 @@ After this change, a user will be able to understand the difference between a ma
 - [x] (2026-07-11 00:00Z) Replaced unclear labels and added helper text and empty-state copy where the UI assumed internal knowledge.
 - [x] (2026-07-11 00:00Z) Added directory-picker affordances to application settings for default open/output folders.
 - [x] (2026-07-11 00:09Z) Updated focused tests for the wording, helper-text, placeholder, and settings-directory-picker changes; `131 passed` in the focused Qt app-frame/app-frame-certificate-management/signing-shell suite, plus `9 passed` in the adjacent text-selection/page-navigation regression set, and `ruff check` passed for all touched files.
-- [ ] Validate manually in the live GUI.
+- [x] (2026-07-19) Re-audited the implemented wording and management routes against the running code: the main shell distinguishes saved certificate configurations from signature presets, the refinement dialog saves reusable profiles, and `Settings → Manage signing profiles…` is the persistent library route.
+- [x] (2026-07-19) Extended `scripts/live_gui_parent_audit.py` with product assertions for the certificate/preset explanations, profile-library visibility, and both application-settings directory browsers. The settings portion passed in the live display audit.
+- [x] (2026-07-19) Repaired the live workspace port export for `refresh_signature_profiles`; opening the profile library had exposed that the close-aware production widget did not expose the public port verb, despite the inner shell supporting it. The focused regression suite, including a real close-aware-widget assembly test, passed: `127 passed`.
+- [x] (2026-07-19) Completed the display-backed live GUI audit: all 12 checkpoints passed, including certificate/preset helper text, both settings-directory pickers, profile-library visibility, saved-preset reselection with certificate preservation, signing, and signed-PDF reopening/visible-appearance verification. The final process/window check found no FoliaSeal dialogs or audit processes; only the host terminal's title contained “FoliaSeal”.
 
 ## Surprises & Discoveries
 
 - Observation: the certificate creation dialog itself is not obviously out of spec; the larger problem is that the surrounding surfaces do not explain how created objects participate in the signing flow.
   Evidence: the user could create a certificate successfully, but then could not tell what the management surfaces and `Apply certificate` action meant.
+- Observation: the shell has legacy-looking preset-name/save/delete controls in construction, but the mounted product routes are refinement-dialog save and `Settings → Manage signing profiles…`; the live audit must prove those routes are visible and intelligible rather than treating the unmounted controls as a missing feature.
+  Evidence: `signing_workspace_properties_panel.py` builds the shell controls, while `app_frame.py` exposes the profile library and the audited refinement flow persists the preset.
+- Observation: the first audit-only non-native directory-dialog proxy selected a child path rather than the directory and left two chooser dialogs open; the bounded audit was explicitly cleaned up by terminating its two recorded process IDs. Removing that child selection allowed the settings-directory pass to complete.
+  Evidence: live-audit checkpoints reached `03-settings-directory-browsing` before the subsequent production defect.
+- Observation: invoking the profile library in the live audit exposed a real production gap: `QtSigningWorkspacePort.refresh_signature_profiles()` forwarded to a close-aware widget that did not export that verb.
+  Evidence: `AttributeError: '_CloseAwareWidget' object has no attribute 'refresh_signature_profiles'` after the settings pass; the shell surface now exports the method and has a focused regression test.
 
 ## Decision Log
 
 - Decision: keep this plan separate from the deeper shell simplification work.
   Rationale: users need clearer names and explanations even if the larger inline editor remains temporarily in place, and these changes should be able to land sooner.
   Date/Author: 2026-07-08 / Codex
+- Decision: treat the refinement dialog and the profile library as the supported profile-management UX, and keep direct shell save/delete controls out of the product surface unless a separate UX slice deliberately reintroduces them.
+  Rationale: that is the current visible interaction model; acceptance should verify its discoverability instead of adding duplicate controls during a terminology-and-clarity slice.
+  Date/Author: 2026-07-19 / Codex
+- Decision: repair the missing profile-refresh port export within this plan before accepting its live GUI audit.
+  Rationale: the bug blocks the required profile-library walkthrough and makes saved preset management unreliable in a running workspace.
+  Date/Author: 2026-07-19 / Codex
 
 ## Outcomes & Retrospective
 
 The implementation pass for this slice is complete and green on focused tests. The main shell and management dialogs now explain the difference between managed certificates, certificate configurations, and signature presets without relying on internal vocabulary, and the app-frame settings dialog exposes standard directory browsing for the default open and output folders.
 
-This removed the main terminology confusion around `Apply certificate`-style actions and made the app-wide settings dialog feel closer to a standard desktop app while keeping the existing manual path entry behavior available. The remaining acceptance step is a live GUI walkthrough to confirm that the clearer wording actually reads correctly in context and that the new browse buttons feel right in the running app.
+This removed the main terminology confusion around `Apply certificate`-style actions and made the app-wide settings dialog feel closer to a standard desktop app while keeping the existing manual path entry behavior available. The final 2026-07-19 display-backed walkthrough passed all 12 checkpoints, confirming the wording and browse controls in context while also completing signing and reopen/visible-appearance verification.
+
+The extended walkthrough also made the supported profile-management boundary explicit: the refinement dialog saves a reusable profile in context, while `Settings → Manage signing profiles…` opens its persistent library. When that library closes, `FoliaSealAppFrame` refreshes the mounted shell through `SigningWorkspacePort.refresh_signature_profiles()`; that public verb must remain available on the close-aware production widget, rather than being replaced with a frame-to-widget private call.
 
 ## Context and Orientation
 
@@ -103,5 +120,5 @@ The relevant spec anchors are:
 
 The touched modules should remain `app_frame.py`, `signing_workspace_properties_panel.py`, and `app_frame_certificate_management.py`. Use Qt’s standard directory chooser via `QFileDialog.getExistingDirectory` or the closest dynamic-import equivalent already exposed in `QtAppFrameBindings`. Keep behavior testable through the existing Qt-fake unit suites.
 
-Revision note: 2026-07-11 / Codex
-Corrected the living document after implementation so it now reports the slice truthfully as code-complete and test-green, with live GUI validation still pending.
+Revision note: 2026-07-19 / Codex
+Extended the acceptance audit instead of treating the original test-green implementation as complete. The live pass found and repaired a real workspace-port export gap; final display-backed acceptance, cleanup verification, architecture review, and documentation reconciliation are complete.
