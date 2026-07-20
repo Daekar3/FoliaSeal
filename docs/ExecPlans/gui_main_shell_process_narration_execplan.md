@@ -19,7 +19,7 @@ After this change, the main signing shell will tell the user what is active, wha
 - [x] (2026-07-18) Made the active setup and output target explicit in the final confirmation, while signed guidance points to reopen and local verification.
 - [x] (2026-07-18) Focused integrated coverage passed (163 tests) and architecture documentation was reconciled.
 - [x] (2026-07-18) Ran the representative-PDF display-backed startup audit; focused Qt coverage verifies stage, readiness, confirmation, output, and signed-state narration.
-- [ ] Complete the live narrated flow through signing and reopen; the startup smoke audit only verifies initial rendering.
+- [x] (2026-07-19) Completed the semantic real-Qt narrated flow in `scripts/live_gui_parent_audit.py`: checkpoints captured setup, placement, readiness, output selection, confirmation, signed guidance, reopen, and local verification.
 
 ## Surprises & Discoveries
 
@@ -36,7 +36,9 @@ After this change, the main signing shell will tell the user what is active, wha
 
 The shell now narrates the sign lifecycle from the state coordinator and confirmation
 dialog instead of relying on an implicit transition to the irreversible action.
-The remaining outcome is a display-backed audit, not further inferred completion.
+The 2026-07-19 display-backed semantic audit captured every narrated workflow stage
+through signing and reopened verification, so no further acceptance audit remains
+for this slice.
 
 ## Context and Orientation
 
@@ -98,3 +100,6 @@ The key files are `src/foliaseal/presentation/qt/signing_workspace_sidebar.py`, 
 
 Revision note: 2026-07-13 / Codex
 Created this ExecPlan from the reviewed GUI audit because the repaired capabilities still need explicit main-shell narration so the full signing process becomes understandable without developer explanation.
+
+Revision note: 2026-07-19 / Codex
+Closed the stale live-flow checkbox with the nine-checkpoint semantic real-Qt parent audit in `scripts/live_gui_parent_audit.py`.

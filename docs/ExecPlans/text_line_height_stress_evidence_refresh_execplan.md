@@ -6,7 +6,7 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-After this evidence refresh, FoliaSeal will know whether the shared structural line-height contract reduced the currently documented realistic-content preview clipping clusters. The user-visible value is confidence in the V1 WYSIWYG promise: the preview matrix should identify whether signable `single_line`, `multi_line`, and `wrapped_block` stress scenarios still show text clipping after the contract change.
+After this evidence refresh, FoliaSeal has a current characterization of the local compact preview-fixture corpus for the `single_line`, `multi_line`, and `wrapped_block` stress families. The user-visible value is scoped confidence that those currently available signable scenarios render without the reported diagnostic risks; this slice does not claim to reduce or resolve the historical large-corpus clipping clusters.
 
 This slice is an evidence refresh, not a rendering behavior change. It should rerun the three stress families that README currently records as red: `single_line_full_matrix_stress`, `multi_line_full_matrix_stress`, and `wrapped_block_full_matrix_stress`. It must not mix in backend, preview renderer, manifest, or fixture-generation changes unless a separate follow-up ExecPlan is created.
 
@@ -14,7 +14,7 @@ This slice is an evidence refresh, not a rendering behavior change. It should re
 
 - [x] `docs/ExecPlans/text_line_height_contract_execplan.md` is complete and the shared structural line-bound helper has landed in commit `163926f`.
 - [x] The repository documents local stress manifests and preview fixture assets under `artifacts/preview_sweep_assets/`.
-- [ ] Local fixture assets are present in this workspace: `artifacts/preview_sweep_assets/sweep_fixture.pdf`, `test_identity.p12`, `stamp_wide.png`, `stamp_tall.png`, `stamp_script.png`, `single_line_full_matrix_stress.json`, `multi_line_full_matrix_stress.json`, and `wrapped_block_full_matrix_stress.json`.
+- [x] (2026-07-19) Local fixture assets are present in this workspace: `artifacts/preview_sweep_assets/sweep_fixture.pdf`, `test_identity.p12`, `stamp_wide.png`, `stamp_tall.png`, `stamp_script.png`, `single_line_full_matrix_stress.json`, `multi_line_full_matrix_stress.json`, and `wrapped_block_full_matrix_stress.json`.
 
 ## Progress
 
@@ -29,15 +29,19 @@ This slice is an evidence refresh, not a rendering behavior change. It should re
 - [x] (2026-05-14T00:05Z) Updated this plan to restore the full preview fixture family, rerun all three stress manifests that README currently records as red, include exact single-line batch output naming, and validate CLI dispatch.
 - [x] (2026-05-14T00:20Z) Tightened the single-line batch fallback to an attempt-scoped output directory and added direct CLI dispatch coverage for `phase3-signing-harness-validate`.
 - [x] (2026-05-14T00:35Z) Tightened the single-line temporary manifest directory to the same attempt scope and added negative `phase3-signing-harness-validate` CLI coverage for failed evidence contracts.
-- [ ] Restore or provide the local preview sweep fixture assets.
-- [ ] Rerun the three targeted stress matrices.
-- [ ] Update this ExecPlan, `README.md`, and, if counts change materially, `docs/ExecPlans/real_world_stress_coverage_execplan.md` and `docs/ExecPlans/stress_matrix_green_path_remediation_execplan.md`.
+- [x] (2026-07-19) Rechecked the restored local fixture workspace and current manifests. Each stress manifest has nine scenarios, so this run is a 27-scenario compact-corpus refresh rather than a rerun of the historical large corpus.
+- [x] (2026-07-19) Ran all three current compact stress matrices offscreen. Each wrote a summary with `scenario_count=9`, `error_scenario_count=0`, and zero signable/rejected clipping, overlap, stamp-warning, and edge-touch counts.
+- [x] (2026-07-19) Reconciled this ExecPlan and `README.md` to report the compact-corpus result as non-comparable to the preserved historical large-corpus evidence. Historic stress plans remain unchanged.
+- [x] (2026-07-19) Ran current focused validation: `114 passed, 1 warning`; Ruff and `git diff --check` passed.
 - [ ] Commit the completed evidence refresh.
 
 ## Surprises & Discoveries
 
-- Observation: The current workspace has an empty `artifacts/` directory and no `preview_sweep_assets` subtree.
-  Evidence: `find artifacts -maxdepth 3 -type f` returned no files, and searching for `sweep_fixture.pdf`, `test_identity.p12`, `stamp_wide.png`, `stamp_tall.png`, `stamp_script.png`, and the stress manifests returned no matches.
+- Observation: the prior workspace was missing fixtures, but the current workspace contains the full local compact fixture family.
+  Evidence: on 2026-07-19, `artifacts/preview_sweep_assets/` contained `sweep_fixture.pdf`, `test_identity.p12`, all three stamp PNGs, and all three target stress manifests.
+
+- Observation: each current target manifest contains nine scenarios, not the large scenario counts recorded in historical stress plans.
+  Evidence: the 2026-07-19 explorer inspected the three JSON manifests and found nine scenarios in each. Fresh counts therefore describe the current compact corpus and must not overwrite or be compared as like-for-like replacements for historic large-corpus counts.
 
 - Observation: The preview matrix command fails cleanly before running any scenarios when the fixture PDF is missing.
   Evidence: running `phase3-signing-preview-matrix` for `single_line_full_matrix_stress` raised `FileNotFoundError: PDF does not exist: artifacts/preview_sweep_assets/sweep_fixture.pdf`.
@@ -52,15 +56,23 @@ This slice is an evidence refresh, not a rendering behavior change. It should re
   Rationale: The README treats `artifacts/preview_sweep_assets/` as conventional local QA fixture input. Recreating ad hoc PDFs, certificates, or manifests would risk comparing against a different corpus and producing misleading counts.
   Date/Author: 2026-05-13 / Codex
 
+- Decision: run the three current compact manifests monolithically and reserve the old single-line batch procedure only for an unexpected runtime failure.
+  Rationale: each manifest now has nine scenarios, so batching would add complexity without reducing risk. A passing process is insufficient by itself: each summary must report nine scenarios and zero `error_scenario_count`.
+  Date/Author: 2026-07-19 / Codex
+
+- Decision: record compact-corpus results as new scoped evidence, without replacing historical large-corpus numbers in related plans.
+  Rationale: the fixture scope materially differs. README may report the current compact result only when it is labelled as such; historical evidence remains useful and must not be falsely treated as directly comparable.
+  Date/Author: 2026-07-19 / Codex
+
 ## Outcomes & Retrospective
 
-This slice is blocked on missing local fixture assets. The narrow rerun path is identified, the first command was validated up to the expected fixture check, the available CLI/harness tests pass, and the recovery path is documented. No stress counts have been refreshed yet.
+This slice was historically blocked on missing local fixture assets. Those inputs are now present, and the living plan has been corrected for the current compact 27-scenario corpus. On 2026-07-19 all three nine-scenario matrices completed with zero execution errors and zero reported clipping, overlap, warning, or edge-touch risks. Documentation reconciliation and focused validation are complete. This is fresh compact-corpus evidence only; it does not supersede the older large-corpus red counts. Commit remains pending.
 
 ## Context and Orientation
 
 The preview matrix command is implemented by `src/foliaseal/__main__.py` and delegates to `run_phase3_preview_matrix()` in `src/foliaseal/presentation/qt/phase3_harness.py`. It opens a source PDF, applies each scenario from a JSON manifest, renders a headless canonical preview, writes per-scenario artifacts under `--artifacts-dir`, and writes a `summary.json` file there.
 
-The stress manifests and fixture PDF/certificate are local QA assets under `artifacts/preview_sweep_assets/`. They are intentionally not guaranteed to be tracked source files because `artifacts/` is ignored for repository hygiene. A valid refresh therefore needs those local assets restored from the user's artifact store or from a prior local workspace before the matrix can run.
+The stress manifests and fixture PDF/certificate are local QA assets under `artifacts/preview_sweep_assets/`. They are intentionally not guaranteed to be tracked source files because `artifacts/` is ignored for repository hygiene. They are present in this workspace for this refresh; a future fresh clone still needs them restored from approved local or external artifact storage before the matrix can run.
 
 The summary fields that matter for this refresh are:
 
@@ -84,11 +96,11 @@ The README's current latest stress summary is newer/different and must be reconc
 
 ## Plan of Work
 
-First, restore the local fixture inputs under `artifacts/preview_sweep_assets/`. At minimum this directory must contain `sweep_fixture.pdf`, `test_identity.p12`, `stamp_wide.png`, `stamp_tall.png`, `stamp_script.png`, `single_line_full_matrix_stress.json`, `multi_line_full_matrix_stress.json`, and `wrapped_block_full_matrix_stress.json`. If the full baseline manifests are also restored, keep them untouched; this slice does not regenerate stress manifests.
+First, verify the current local fixture inputs under `artifacts/preview_sweep_assets/`. This workspace has all required files and each target manifest contains nine scenarios. Keep the baseline manifests untouched; this slice does not generate or edit fixtures or manifests.
 
-Second, run the three targeted preview matrices with `QT_QPA_PLATFORM=offscreen` and dedicated output directories under `artifacts/preview_sweep_runs/`. If the `single_line` matrix aborts before writing `summary.json`, split that manifest into smaller local batches without editing the checked-in generator or source manifests, then aggregate counts manually in this plan.
+Second, run the three targeted preview matrices with `QT_QPA_PLATFORM=offscreen` and dedicated output directories under `artifacts/preview_sweep_runs/`. Validate each summary has exactly nine scenarios and zero scenario errors. If the `single_line` matrix unexpectedly aborts before writing `summary.json`, use the retained batch fallback without editing the checked-in generator or source manifests.
 
-Third, inspect each `summary.json` and record the diagnostic counts in `Artifacts and Notes`. Compare against both the prior remediation counts and README's current latest stress summary. If counts improve, update README's current stress summary. If counts are unchanged or worse, record that too; evidence refresh is still useful when it falsifies a hoped-for improvement.
+Third, inspect each `summary.json` and record the diagnostic counts in `Artifacts and Notes`. Preserve the prior remediation counts and README's historical large-corpus summary as non-comparable context. Update README only with the explicitly scoped compact-corpus result; do not frame a difference in counts as remediation of the historical clusters.
 
 Fourth, run focused verification for the CLI/harness surfaces. This includes direct `test_main_cli.py` dispatch coverage for both `phase3-signing-preview-matrix` and `phase3-signing-harness-validate`, plus parser and harness behavior coverage:
 
@@ -169,9 +181,9 @@ Inspect summary counts:
 
 ## Validation and Acceptance
 
-This evidence refresh is accepted when all three targeted stress matrices produce `summary.json` or complete batch summaries, the key diagnostic counts are recorded in this plan, relevant status docs are updated to match the fresh counts, and focused CLI/harness tests pass.
+This evidence refresh is accepted when all three targeted stress matrices produce `summary.json` with exactly nine scenarios and `error_scenario_count == 0`, the key diagnostic counts are recorded in this plan as compact-corpus evidence, relevant status docs preserve the historical large-corpus numbers as non-comparable evidence, and focused CLI/harness tests pass. It does not accept or reject the historical large-corpus findings.
 
-If fixture assets remain unavailable, this plan is accepted only as a blocked handoff document, not as a completed evidence refresh. In that state, the final report must clearly say no counts were refreshed.
+If fixtures are unavailable in a future workspace, this plan is accepted only as a blocked handoff document, not as a completed evidence refresh. In that state, the final report must clearly say no counts were refreshed.
 
 ## Idempotence and Recovery
 
@@ -187,6 +199,28 @@ Attempted command before fixture restoration:
     FileNotFoundError: PDF does not exist: artifacts/preview_sweep_assets/sweep_fixture.pdf
 
 No generated artifacts were produced by this failed attempt.
+
+Current compact-corpus evidence (2026-07-19):
+
+    single_line_full_matrix_stress: scenario_count=9, error_scenario_count=0,
+      signable_text_clipping_risk_scenario_count=0,
+      rejected_text_clipping_risk_scenario_count=0,
+      signable_text_stamp_overlap_risk_scenario_count=0,
+      signable_stamp_warning_scenario_count=0, stamp_edge_touch_scenario_count=0
+    multi_line_full_matrix_stress: scenario_count=9, error_scenario_count=0,
+      signable_text_clipping_risk_scenario_count=0,
+      rejected_text_clipping_risk_scenario_count=0,
+      signable_text_stamp_overlap_risk_scenario_count=0,
+      signable_stamp_warning_scenario_count=0, stamp_edge_touch_scenario_count=0
+    wrapped_block_full_matrix_stress: scenario_count=9, error_scenario_count=0,
+      signable_text_clipping_risk_scenario_count=0,
+      rejected_text_clipping_risk_scenario_count=0,
+      signable_text_stamp_overlap_risk_scenario_count=0,
+      signable_stamp_warning_scenario_count=0, stamp_edge_touch_scenario_count=0
+
+The summaries are ignored local artifacts under `artifacts/preview_sweep_runs/`. The
+current nine-scenario manifests are not comparable to the historical large corpus,
+so the result must be described as a scoped compact-fixture refresh.
 
 Available local validation:
 
@@ -236,3 +270,7 @@ Revision note: Updated 2026-05-14 by Codex after compliance review to include th
 Revision note: Updated 2026-05-14 by Codex after the second compliance review to scope single-line batch aggregation to one attempt and add `phase3-signing-harness-validate` CLI dispatch coverage.
 
 Revision note: Updated 2026-05-14 by Codex after the final compliance review to also scope temporary single-line batch manifests to one attempt and test the validate subcommand's failure path.
+
+Revision note: Updated 2026-07-19 by Codex after a fresh explorer review found the formerly missing fixtures restored but the current manifests reduced to nine scenarios per family. The plan now treats this as a compact-corpus refresh, requires zero scenario errors, and preserves historic large-corpus evidence as non-comparable context.
+
+Revision note: Updated 2026-07-19 by Codex after the compact refresh completed. README and this plan now distinguish the nine-scenario-per-family result from historical large-corpus evidence; focused validation and documentation reconciliation are complete, with commit still pending.

@@ -20,7 +20,7 @@ After this change, a user will encounter an unmistakable final confirmation/revi
 - [x] (2026-07-18) The signed stage now directs users to reopen the output, inspect local verification, retain trust caveats, and add an approval signature only when document permissions permit it.
 - [x] (2026-07-18) Focused integrated coverage passed (163 tests) and architecture documentation was reconciled.
 - [x] (2026-07-18) Ran the representative-PDF display-backed startup audit; focused Qt coverage verifies confirmation wording, signing transitions, signed-state local-verification guidance, and reopen availability.
-- [ ] Complete the live confirmation, signed-result reopen, and verification walkthrough; the startup smoke audit did not exercise signing end-to-end.
+- [x] (2026-07-19) Completed the semantic real-Qt confirmation, signing, reopen, and verification walkthrough in `scripts/live_gui_parent_audit.py`. It asserts the confirmation summary, retains the signed output, verifies the reopened visible mark, and captures the local verification state.
 
 ## Surprises & Discoveries
 
@@ -36,8 +36,9 @@ After this change, a user will encounter an unmistakable final confirmation/revi
 ## Outcomes & Retrospective
 
 The confirmation and post-sign guidance are implemented and covered by the focused
-shell suite. The final live walkthrough remains an explicit outstanding acceptance
-artifact rather than an assumed result.
+shell suite. The final live walkthrough passed on 2026-07-19: it asserted the
+visible confirmation summary, signed an isolated output, reopened it, verified the
+on-page mark, and recorded the local verification guidance in the parent audit.
 
 ## Context and Orientation
 
@@ -98,3 +99,6 @@ The key presentation files are `src/foliaseal/presentation/qt/signing_workspace_
 
 Revision note: 2026-07-13 / Codex
 Created this ExecPlan from the reviewed GUI audit because the current sign panel does not yet provide a full explicit confirmation/review state or a complete post-sign verification story.
+
+Revision note: 2026-07-19 / Codex
+Closed the stale live-walkthrough checkbox with the nine-checkpoint semantic real-Qt parent audit in `scripts/live_gui_parent_audit.py`.

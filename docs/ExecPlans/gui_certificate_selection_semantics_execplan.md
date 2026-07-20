@@ -20,7 +20,7 @@ After this change, a user will understand exactly how a saved certificate config
 - [x] (2026-07-18) Retired the unmounted alternative `Use for this PDF` affordance.
 - [x] (2026-07-18) Focused integrated coverage passed (163 tests) and architecture documentation was reconciled.
 - [x] (2026-07-18) Ran the representative-PDF display-backed startup audit; focused Qt coverage verifies immediate selection, password prompting, cancellation, and error rollback.
-- [ ] Complete the live certificate create/select walkthrough; the startup smoke audit did not exercise that dialog path end-to-end.
+- [x] (2026-07-19) Completed the semantic real-Qt certificate create/select walkthrough in `scripts/live_gui_parent_audit.py`: the visible Create certificate dialog persisted one isolated configuration and the mounted selector immediately applied it before placement, signing, reopen, and verification.
 
 ## Surprises & Discoveries
 
@@ -37,7 +37,9 @@ After this change, a user will understand exactly how a saved certificate config
 
 Immediate selection is now the single production behavior. The old unmounted
 alternative has been removed; cancellation and resolution failures continue to
-return a non-applied selection outcome. Live GUI proof remains pending.
+return a non-applied selection outcome. The 2026-07-19 semantic real-Qt audit
+created an isolated certificate and selected its saved configuration through the
+mounted shell before the full sign/reopen flow, closing the live-proof gap.
 
 ## Context and Orientation
 
@@ -97,3 +99,6 @@ The key files are `src/foliaseal/presentation/qt/signing_workspace_properties_pa
 
 Revision note: 2026-07-13 / Codex
 Created this ExecPlan from the GUI audit because the main shell currently exposes certificate-selection behavior inconsistently and later confirmation/narration work must build on a single clear model.
+
+Revision note: 2026-07-19 / Codex
+Closed the stale live-walkthrough checkbox with the certificate creation and immediate-selection steps in `scripts/live_gui_parent_audit.py`.

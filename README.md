@@ -376,7 +376,7 @@ Current interpretation of the preview-matrix summaries:
 - the stress matrices are the realistic-content companion sweeps; they use anonymized long-field
   fixture data shaped to reproduce the pressure of real signing identities without baking user
   strings into the repository
-- as of the latest rechecks:
+- historical large-corpus results (not comparable with the current compact fixture refresh):
   - baseline `single_line`: `0` signable text clipping risks, `42` rejected text clipping risks,
     `0` signable stamp warnings, `0` signable stamp edge-touch cases
   - baseline `multi_line`: `0` signable text risks, `0` signable stamp warnings,
@@ -387,10 +387,10 @@ Current interpretation of the preview-matrix summaries:
   - stress `multi_line`: `18` signable text clipping risks, `264` rejected text clipping risks
   - stress `wrapped_block`: `15` signable text clipping risks, `423` rejected text clipping risks
 
-In other words, the baseline green path is still structurally clean, but the new stress corpus
-immediately exposed remaining green-path text-fit problems under realistic content pressure. That
-is an expected and useful result of the stronger methodology, not a reason to ignore the stress
-suite.
+The 2026-07-19 compact-fixture refresh ran nine scenarios in each stress family (27 total) with
+zero scenario errors and zero reported clipping, overlap, stamp-warning, or edge-touch counts.
+That result characterizes only the current compact fixture corpus; it neither reruns nor resolves
+the historical large-corpus clusters above.
 
 The local QA workflow uses two distinct fixture families under `artifacts/`. These paths are
 conventional local workspace paths, not guaranteed tracked repository inputs:
@@ -440,8 +440,9 @@ Status note:
 
 - the local baseline `single_line`, `multi_line`, and `wrapped_block` matrices are currently
   green in automation
-- the local stress matrices are intentionally not green yet; they are currently exposing
-  remaining green-path clipping regressions under realistic content pressure
+- the current compact stress fixtures have nine scenarios per family and their 2026-07-19 refresh
+  reported zero errors plus zero clipping, overlap, warning, and edge-touch counts; this is not a
+  replacement for, or a like-for-like comparison with, the historical large-corpus stress evidence
 - preview typography semantics are layout-invariant: the selected point size means the same thing in
   `single_line`, `multi_line`, and `wrapped_block`; layout mode may change reservation geometry,
   wrapping, and fit outcomes, but it must not silently change the meaning of the chosen text size

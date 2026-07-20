@@ -23,7 +23,7 @@ The user-visible proof is behavior preservation. Running the existing focused Ph
 - [x] (2026-07-07 05:03Z) Threaded typed ports/dependencies through the workspace adapter, session runner, preview-matrix runner, signed-acceptance matrix runner, and signed-acceptance scenario executor.
 - [x] (2026-07-07 05:11Z) Preserved the existing evidence payload contract while retargeting the focused Phase 3 tests to the new seam.
 - [x] (2026-07-07 05:22Z) Ran focused validation and reconciled `docs/ARCHITECTURE.md`.
-- [ ] Complete the required dev-loop compliance review and commit flow.
+- [x] (2026-07-07 05:35Z) Completed the required compliance review, architecture reconciliation, and commit flow in `23bcb0547` (`refactor: route phase 3 harness through typed gateway ports`).
 
 ## Surprises & Discoveries
 
@@ -52,6 +52,8 @@ The user-visible proof is behavior preservation. Running the existing focused Ph
 The hybrid landed as intended. `Phase3Harness` now presents explicit `capture()`, `preview_matrix()`, and `signed_acceptance_matrix()` verbs while keeping `run_*` wrappers for compatibility, and the internal wiring now passes through typed dependency bundles instead of a loose builder/callback mesh. Focused Phase 3 harness tests still pass without changing the evidence payload contract.
 
 The most important follow-up from the compliance review was architectural documentation, not code fixes. `docs/SPEC.md` remained unchanged, the independent review found no spec regression, and the only stale contract description was in `docs/ARCHITECTURE.md`, which now reflects the typed gateway/runner split and the unchanged evidence payload boundary.
+
+The required commit was `23bcb0547`; the former unchecked publication marker was stale rather than a remaining implementation or review task.
 
 ## Context and Orientation
 
@@ -228,3 +230,6 @@ The key constraints are more important than the exact spelling:
 - payload and evidence semantics should remain unchanged.
 
 Revision note: Created on 2026-07-07 by Codex for the one-pass dev-loop implementation of the accepted Phase 3 harness gateway hybrid refactor.
+
+Revision note: 2026-07-19 / Codex
+Reconciled the stale compliance-and-commit checkbox with the already-landed `23bcb0547` commit and its documented architecture review.

@@ -17,7 +17,7 @@ Users can save the currently edited visible-signature rectangle as a named reusa
 - [x] (2026-07-17 00:00Z) Added `Save placement for reuse...` to the refinement dialog plus a Qt regression test that proves the dialog stays open and cancellation leaves the live draft unchanged.
 - [x] (2026-07-17 00:00Z) Ran focused coordinator and Qt tests, plus Ruff for touched application and Qt files.
 - [x] (2026-07-18) Ran the display-backed representative-PDF startup audit after the Settings library landed; the live workspace mounted with the saved catalog after legacy-profile migration coverage was added.
-- [ ] Complete the live refinement save walkthrough; the startup smoke audit confirms catalog loading only.
+- [x] (2026-07-19) Completed the semantic real-Qt save walkthrough in `scripts/live_gui_parent_audit.py`: the mounted refinement control visibly saved an appearance and a placement profile, then composed and reselected a preset before signing/reopen evidence was captured. Focused application/storage tests prove the persisted placement's reusable `current_page` semantics.
 
 ## Surprises & Discoveries
 
@@ -32,7 +32,7 @@ Users can save the currently edited visible-signature rectangle as a named reusa
 
 ## Outcomes & Retrospective
 
-The placement-profile save tracer bullet is complete at the application and Qt boundaries. It persists only the edited PDF-space rectangle as a reusable `current_page` template; it intentionally never persists the draft's document-specific page number. The remaining work is preset composition and the Settings library that lets users inspect and manage independent profiles after restart.
+The placement-profile save tracer bullet is complete at the application and Qt boundaries. Focused application/storage tests establish that it persists only the edited PDF-space rectangle as a reusable `current_page` template and never the draft's document-specific page number. The final semantic real-Qt walkthrough on 2026-07-19 visibly saved the profile through the mounted dialog, composed it into a preset, reselected that preset, and completed sign/reopen verification.
 
 ## Context and Orientation
 
@@ -68,3 +68,6 @@ Use `SignaturePresetCatalogStore.save_placement_profile` as the only persistence
 
 Revision note: 2026-07-17 / Codex
 Closed the application/Qt slice after compliance review. The restart walkthrough remains deferred to the Settings-library milestone because the shell cannot yet inspect independent placement profiles.
+
+Revision note: 2026-07-19 / Codex
+Closed the stale live-walkthrough checkbox after `scripts/live_gui_parent_audit.py` exercised the visible refinement save and reusable preset path as part of the nine-checkpoint parent acceptance audit. The audit is evidence of visible save/compose/reselect behavior; focused application/storage tests remain the evidence for `current_page` persistence semantics.
