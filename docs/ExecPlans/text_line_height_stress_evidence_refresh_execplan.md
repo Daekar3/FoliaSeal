@@ -33,7 +33,7 @@ This slice is an evidence refresh, not a rendering behavior change. It should re
 - [x] (2026-07-19) Ran all three current compact stress matrices offscreen. Each wrote a summary with `scenario_count=9`, `error_scenario_count=0`, and zero signable/rejected clipping, overlap, stamp-warning, and edge-touch counts.
 - [x] (2026-07-19) Reconciled this ExecPlan and `README.md` to report the compact-corpus result as non-comparable to the preserved historical large-corpus evidence. Historic stress plans remain unchanged.
 - [x] (2026-07-19) Ran current focused validation: `114 passed, 1 warning`; Ruff and `git diff --check` passed.
-- [ ] Commit the completed evidence refresh.
+- [x] (2026-07-19) Committed the completed compact-corpus evidence refresh and stale-plan reconciliation in `9c128372a` (`docs: reconcile GUI audits and stress evidence`).
 
 ## Surprises & Discoveries
 
@@ -66,7 +66,7 @@ This slice is an evidence refresh, not a rendering behavior change. It should re
 
 ## Outcomes & Retrospective
 
-This slice was historically blocked on missing local fixture assets. Those inputs are now present, and the living plan has been corrected for the current compact 27-scenario corpus. On 2026-07-19 all three nine-scenario matrices completed with zero execution errors and zero reported clipping, overlap, warning, or edge-touch risks. Documentation reconciliation and focused validation are complete. This is fresh compact-corpus evidence only; it does not supersede the older large-corpus red counts. Commit remains pending.
+This slice was historically blocked on missing local fixture assets. Those inputs are now present, and the living plan has been corrected for the current compact 27-scenario corpus. On 2026-07-19 all three nine-scenario matrices completed with zero execution errors and zero reported clipping, overlap, warning, or edge-touch risks. Documentation reconciliation and focused validation are complete. This is fresh compact-corpus evidence only; it does not supersede the older large-corpus red counts. The documentation/status result landed in `9c128372a`.
 
 ## Context and Orientation
 
@@ -272,5 +272,7 @@ Revision note: Updated 2026-05-14 by Codex after the second compliance review to
 Revision note: Updated 2026-05-14 by Codex after the final compliance review to also scope temporary single-line batch manifests to one attempt and test the validate subcommand's failure path.
 
 Revision note: Updated 2026-07-19 by Codex after a fresh explorer review found the formerly missing fixtures restored but the current manifests reduced to nine scenarios per family. The plan now treats this as a compact-corpus refresh, requires zero scenario errors, and preserves historic large-corpus evidence as non-comparable context.
+
+Revision note: Updated 2026-07-19 by Codex after `9c128372a` committed the completed compact-corpus refresh and stale-plan reconciliation; this closes the final commit marker.
 
 Revision note: Updated 2026-07-19 by Codex after the compact refresh completed. README and this plan now distinguish the nine-scenario-per-family result from historical large-corpus evidence; focused validation and documentation reconciliation are complete, with commit still pending.
