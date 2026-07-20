@@ -3,6 +3,7 @@ from pathlib import Path
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.render import PopplerPdfRenderBackend
 from foliaseal.presentation.qt import app_frame as app_frame_module
 from foliaseal.presentation.qt import signing_shell_port as signing_shell_port_module
 from foliaseal.presentation.qt.app_frame import (
@@ -14,6 +15,12 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBootstrap,
     SigningWorkspaceBundle,
 )
+
+
+def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
+    defaults = FoliaSealAppFrame.__init__.__kwdefaults__
+    assert defaults is not None
+    assert defaults["render_backend_factory"] is PopplerPdfRenderBackend
 
 
 class _FakeSignal:

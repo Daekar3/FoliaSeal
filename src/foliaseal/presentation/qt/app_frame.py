@@ -23,7 +23,7 @@ from foliaseal.infra.config.schemas import (
     AppSettings,
     ConfigValidationError,
 )
-from foliaseal.infra.render import QtPdfRenderBackend
+from foliaseal.infra.render import PopplerPdfRenderBackend
 from foliaseal.infra.secret_storage import SecretToolCertificateSecretStore
 from foliaseal.presentation.qt.app_frame_certificate_management import (
     AppFrameCertificateDialogService,
@@ -244,7 +244,7 @@ class FoliaSealAppFrame:
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         shell_factory: SigningWorkspaceFactory | None = None,
-        render_backend_factory: Callable[[], Any] = QtPdfRenderBackend,
+        render_backend_factory: Callable[[], Any] = PopplerPdfRenderBackend,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,

@@ -153,6 +153,10 @@ python -m pip install -e .[gui]
 foliaseal gui --pdf-path "/path/to/representative.pdf"
 ```
 
+The interactive PDF viewer also requires the system `pdftoppm` executable from
+Poppler. FoliaSeal reports an actionable renderer diagnostic when it is absent;
+the Python GUI extra does not install this operating-system dependency.
+
 ## PyInstaller build
 
 Build a one-dir bundle for packaging and runtime evidence capture:

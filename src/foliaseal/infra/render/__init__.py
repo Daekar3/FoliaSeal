@@ -9,6 +9,7 @@ from foliaseal.infra.render.base import (
     RenderPageResult,
 )
 from foliaseal.infra.render.cache import RenderCacheKey, RenderCachePolicy
+from foliaseal.infra.render.poppler_backend import PopplerPdfRenderBackend
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "NullPdfRenderBackend",
     "PdfPageGeometry",
     "PdfRenderBackend",
+    "PopplerPdfRenderBackend",
     "RenderBackendDiagnostic",
     "RenderPageRequest",
     "RenderPageResult",
