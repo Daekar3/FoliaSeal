@@ -21,7 +21,7 @@ After this documentation-only slice, a maintainer can identify real remaining V1
 - [x] (2026-07-20) Updated only evidence-backed GUI parent/child records, preserving the historical nine-checkpoint audit as distinct evidence and leaving the staged-flow and preset-first direct acceptances open.
 - [x] (2026-07-20) Classified historical unchecked commit/publication markers as archival where their own latest commit proves the behavior landed; did not alter genuine behavior/evidence follow-ups.
 - [x] (2026-07-20) Ran documentation checks and an independent compliance review; it found no remaining overclaim, omission, source/architecture conflict, or new ExecPlan need.
-- [ ] Create the dedicated documentation/status commit and confirm the worktree is clean.
+- [x] (2026-07-20) Created the dedicated documentation/status commit `4903fba82` (`docs: reconcile V1 release plan status`) and verified its six-plan scope and clean worktree.
 
 ## Surprises & Discoveries
 
@@ -44,7 +44,7 @@ After this documentation-only slice, a maintainer can identify real remaining V1
 
 ## Outcomes & Retrospective
 
-The reconciliation pass closed stale GUI workflow markers, classified archival commit/publication residue without rewriting history, and preserved the historical audit distinction. Remaining work is the required compliance/documentation review and commit of this documentation/status slice.
+The reconciliation pass closed stale GUI workflow markers, classified archival commit/publication residue without rewriting history, and preserved the historical audit distinction. Documentation checks and an independent compliance review passed, and the six-plan status update landed in `4903fba82`.
 
 The archival classification is intentionally recorded here rather than mass-editing historical plans. Their unchecked commit/publication markers are archival when their latest commits directly name the delivered behavior: `66d64cdd5` (certificate dialog boundary), `3cc7e559b`, `a10ddce66`, `7602aa623`, `0ab01f604`, `5cfdd4de9`, `214f48361`, `612a11a7b`, and `0361563b9` (Phase 3 harness boundaries), `0f04864eb` (overwrite confirmation), `ff3b37f88`, `2af2722df`, `7b2126eda`, `ed616e3ca`, and `18e35ef2c` (signing-setup boundaries), `9430ffe94` and `08d6ae202` (workspace contracts), and `8cddd7546`, `5d05e71b5`, and `4cb84e52a` (per-signature review/guidance). Genuine remaining work stays open: the direct staged-flow sign-and-reopen walkthrough, the direct preset-first shell assertion, the named backend/fidelity behavior follow-ups, and the new V1 parent’s multi-signature, packaging, and fidelity children.
 
@@ -90,3 +90,6 @@ Created as the documentation/status child of `v1_release_compliance_parent_execp
 
 Revision note: 2026-07-20 / Codex
 Compliance review retained the parent reconciliation dependency until this child commits, retained staged-flow direct acceptance as open, and narrowed reusable-object audit claims to the interactions actually evidenced.
+
+Revision note: 2026-07-20 / Codex
+Completed by documentation/status commit `4903fba82`; the remaining staged-flow and preset-first acceptances are deliberately outside this completed reconciliation slice.
