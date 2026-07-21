@@ -18,7 +18,7 @@ After this slice, a person refining a PDF's visible signature can press `Save ap
 - [x] (2026-07-17 00:00Z) Implemented `SaveCurrentAppearanceProfile`, the session wrapper, and the mounted refinement-dialog action.
 - [x] (2026-07-17 00:00Z) Ran focused regression evidence: `2 passed` for coordinator appearance tests and `1 passed` for the Qt refinement-dialog save/cancel test.
 - [x] (2026-07-18) Ran the display-backed representative-PDF startup audit after the Settings library landed; the live workspace mounted with the saved catalog after legacy-profile migration coverage was added.
-- [ ] Complete the live refinement save walkthrough; the startup smoke audit confirms catalog loading only.
+- [x] (2026-07-20) Completed the live refinement save walkthrough in `/tmp/foliaseal-reconciliation-audit/audit.json`: checkpoint `appearance-profile-saved` proves the mounted dialog saved the profile before placement, preset composition, signing, reopen, and verification continued.
 
 ## Surprises & Discoveries
 

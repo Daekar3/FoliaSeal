@@ -10,16 +10,17 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 
 ## Child ExecPlan Dependencies
 
-- [ ] `v1_execplan_reconciliation_execplan.md` must complete first so release status is not inferred from stale unchecked markers.
+- [ ] `v1_execplan_reconciliation_execplan.md` has completed its evidence work but remains pending until its documentation/status commit lands; the remaining direct preset-first acceptance is intentionally preserved as real work.
 - [ ] `v1_multi_signature_acceptance_execplan.md` must complete before claiming the release-bar “add another approval signature” behavior.
 - [ ] `v1_linux_desktop_distribution_execplan.md` must complete before claiming packaged Linux desktop distribution.
 - [ ] `v1_visible_signature_fidelity_rebaseline_execplan.md` must complete before claiming durable WYSIWYG evidence beyond the historical or compact-only matrices.
+- [ ] The direct staged-flow acceptance in `gui_signing_flow_guidance_execplan.md` and the direct default-shell acceptance in `gui_preset_first_shell_reduction_execplan.md` must close before final release-bar review; they remain outside this parent’s four child slices because they are pre-existing GUI acceptance work.
 
 ## Progress
 
 - [x] (2026-07-20) Audited `docs/SPEC.md`, current GUI/recovery plans, `docs/ARCHITECTURE.md`, and the current PyInstaller path.
 - [x] (2026-07-20) Created four child plans with one primary change class each.
-- [ ] Execute the reconciliation child and update this dependency list.
+- [ ] (2026-07-20) The reconciliation child completed its fresh twelve-checkpoint audit and evidence review; leave this parent dependency pending until the child completes documentation checks and its dedicated commit.
 - [ ] Execute the multi-signature child and retain its audit evidence.
 - [ ] Execute the Linux distribution child and retain its package acceptance evidence.
 - [ ] Execute the fidelity child and publish the bounded release conclusion.

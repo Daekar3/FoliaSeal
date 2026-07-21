@@ -26,7 +26,7 @@ The user-visible proof is simple. Launch the GUI, open a PDF, create or select a
 - [x] (2026-07-18) Implemented visible refinement-dialog saves and explicit reference-only preset composition; composition selects saved component profiles instead of creating replacements from the current PDF draft.
 - [x] (2026-07-18) Added `Settings > Manage signing profiles...` for inspection, rename, and reference-guarded deletion of appearance profiles, placement profiles, and presets; mounted-shell refresh follows catalog changes.
 - [x] (2026-07-18) Added focused application, storage, frame, and shell coverage; the integrated focused suite passed (163 tests).
-- [x] (2026-07-18) Ran the representative-PDF display-backed startup audit. It exposed and then verified the legacy catalog migration path; focused Qt coverage exercises profile saving, composition, Settings management, and selector refresh.
+- [x] (2026-07-18) Ran the representative-PDF display-backed startup audit. It exposed and then verified the legacy catalog migration path; focused Qt coverage exercises profile saving, composition, and selector refresh.
 - [x] (2026-07-18) Reconciled `docs/ARCHITECTURE.md` with the completed code paths.
 
 ## Surprises & Discoveries
@@ -60,8 +60,11 @@ The user-visible proof is simple. Launch the GUI, open a PDF, create or select a
 Implementation and focused automated validation are complete. The catalog now has a
 single reference-only composition path, and the Settings library exposes management
 without allowing a referenced component profile to be deleted. The display-backed
-startup smoke audit verifies catalog migration; the full profile-management walkthrough
-remains pending, while focused Qt coverage exercises the dialog interactions deterministically.
+startup smoke audit verifies catalog migration, and the 2026-07-20 twelve-checkpoint
+audit proves visible appearance/placement saving, preset composition and reselection,
+and profile-library visibility before it continues through signing, reopen, and
+verification. It is not evidence of every profile-library management operation.
+Focused Qt coverage continues to exercise the dialog interactions deterministically.
 
 The catalog now honors independent reusable-object ownership: deleting a signature preset no longer destroys its appearance and placement profiles. The remaining work is intentionally separated at the application and Qt boundaries so that the visible library does not reach into JSON storage directly.
 

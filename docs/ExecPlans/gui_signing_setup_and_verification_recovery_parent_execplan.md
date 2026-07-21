@@ -28,6 +28,7 @@ This parent plan exists because the missing product behavior spanned several rel
 - [x] (2026-07-19) Recorded and bounded the native-chooser audit limitation. Synthetic X11 typing is not a trustworthy way to drive the platform chooser; the final semantic Qt audit creates/selects the certificate and uses a narrowly injected non-native Qt save-dialog proxy only for output selection. This is an audit-driver limitation, not a product defect.
 - [x] (2026-07-19) Completed the isolated semantic real-Qt route through certificate creation/selection, appearance/placement/preset save and re-selection, visible page drag, output selection, confirmation, signing, reopen, and verification messaging. The runner always closes its Qt windows.
 - [x] (2026-07-19) Resolved reopened signed-PDF canvas fidelity: `PopplerPdfRenderBackend` supplies live viewer pixels while QtPdf remains the geometry source. The final audit's `09-reopened-and-verified.png` visibly contains the signed mark and verification state. Evidence: `/tmp/foliaseal-live-gui-parent-audit/audit.json` (`"status": "passed"`, nine checkpoints).
+- [x] (2026-07-20) Ran the later certificate/preset UX audit independently: `/tmp/foliaseal-reconciliation-audit/audit.json` passed with twelve checkpoints, adding settings-directory browsing, appearance save, and profile-library clarity. This is additional evidence, not a revision of the historical nine-checkpoint audit above.
 
 ## Surprises & Discoveries
 
