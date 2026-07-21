@@ -14,7 +14,7 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 - [ ] `v1_multi_signature_acceptance_execplan.md` must complete before claiming the release-bar “add another approval signature” behavior.
 - [ ] `v1_linux_desktop_distribution_execplan.md` must complete before claiming packaged Linux desktop distribution.
 - [ ] `v1_visible_signature_fidelity_rebaseline_execplan.md` must complete before claiming durable WYSIWYG evidence beyond the historical or compact-only matrices.
-- [ ] The direct staged-flow acceptance in `gui_signing_flow_guidance_execplan.md` and the direct default-shell acceptance in `gui_preset_first_shell_reduction_execplan.md` must close before final release-bar review; they remain outside this parent’s four child slices because they are pre-existing GUI acceptance work.
+- [ ] The direct default-shell acceptance in `gui_preset_first_shell_reduction_execplan.md` must close before final release-bar review. The staged-flow acceptance completed on 2026-07-20; this pre-existing GUI acceptance work remains outside this parent’s four child slices.
 
 ## Progress
 

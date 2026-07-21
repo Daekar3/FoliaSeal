@@ -34,7 +34,7 @@ After this documentation-only slice, a maintainer can identify real remaining V1
 - Observation: many unchecked historical “commit” entries are publication residue, not active product work.
   Evidence: the latest commits for `app_frame_certificate_dialog_boundary_execplan.md`, the Phase 3 harness boundary plans, `signed_output_overwrite_confirmation_execplan.md`, signing-setup boundary plans, and per-signature guidance plans are behavior-oriented commits that already contain the named slices.
 - Observation: implementation landing and a broader integration audit do not substitute for a child plan's explicitly scoped direct acceptance.
-  Evidence: `gui_signing_flow_guidance_execplan.md` records only a display-backed startup smoke and leaves its full sign-and-reopen click-through unperformed; the reusable-object audit proves save/compose/reselect and profile-library visibility, not every management operation.
+  Evidence: at reconciliation time, `gui_signing_flow_guidance_execplan.md` recorded only a display-backed startup smoke; its 2026-07-20 follow-up later completed the isolated real-Qt sign-and-reopen route. The reusable-object audit proves save/compose/reselect and profile-library visibility, not every management operation.
 
 ## Decision Log
 
@@ -46,7 +46,7 @@ After this documentation-only slice, a maintainer can identify real remaining V1
 
 The reconciliation pass closed stale GUI workflow markers, classified archival commit/publication residue without rewriting history, and preserved the historical audit distinction. Documentation checks and an independent compliance review passed, and the six-plan status update landed in `4903fba82`.
 
-The archival classification is intentionally recorded here rather than mass-editing historical plans. Their unchecked commit/publication markers are archival when their latest commits directly name the delivered behavior: `66d64cdd5` (certificate dialog boundary), `3cc7e559b`, `a10ddce66`, `7602aa623`, `0ab01f604`, `5cfdd4de9`, `214f48361`, `612a11a7b`, and `0361563b9` (Phase 3 harness boundaries), `0f04864eb` (overwrite confirmation), `ff3b37f88`, `2af2722df`, `7b2126eda`, `ed616e3ca`, and `18e35ef2c` (signing-setup boundaries), `9430ffe94` and `08d6ae202` (workspace contracts), and `8cddd7546`, `5d05e71b5`, and `4cb84e52a` (per-signature review/guidance). Genuine remaining work stays open: the direct staged-flow sign-and-reopen walkthrough, the direct preset-first shell assertion, the named backend/fidelity behavior follow-ups, and the new V1 parent’s multi-signature, packaging, and fidelity children.
+The archival classification is intentionally recorded here rather than mass-editing historical plans. Their unchecked commit/publication markers are archival when their latest commits directly name the delivered behavior: `66d64cdd5` (certificate dialog boundary), `3cc7e559b`, `a10ddce66`, `7602aa623`, `0ab01f604`, `5cfdd4de9`, `214f48361`, `612a11a7b`, and `0361563b9` (Phase 3 harness boundaries), `0f04864eb` (overwrite confirmation), `ff3b37f88`, `2af2722df`, `7b2126eda`, `ed616e3ca`, and `18e35ef2c` (signing-setup boundaries), `9430ffe94` and `08d6ae202` (workspace contracts), and `8cddd7546`, `5d05e71b5`, and `4cb84e52a` (per-signature review/guidance). The direct staged-flow sign-and-reopen walkthrough subsequently completed on 2026-07-20. Genuine remaining work stays open: the direct preset-first shell assertion, the named backend/fidelity behavior follow-ups, and the new V1 parent’s multi-signature, packaging, and fidelity children.
 
 ## Context and Orientation
 
@@ -93,3 +93,6 @@ Compliance review retained the parent reconciliation dependency until this child
 
 Revision note: 2026-07-20 / Codex
 Completed by documentation/status commit `4903fba82`; the remaining staged-flow and preset-first acceptances are deliberately outside this completed reconciliation slice.
+
+Revision note: 2026-07-20 / Codex
+The subsequent staged-flow acceptance is complete; this historical reconciliation record now preserves its original evidence boundary while naming the current status accurately.

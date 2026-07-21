@@ -14,7 +14,7 @@ This parent plan exists because the current problems are tightly related but sho
 
 - [x] `docs/ExecPlans/gui_document_review_usability_execplan.md` landed before staged-flow completion.
 - [x] `docs/ExecPlans/gui_text_selection_mode_execplan.md` landed before staged-flow completion.
-- [x] `docs/ExecPlans/gui_signing_flow_guidance_execplan.md` landed in `08d1021c7` with the real review affordances in place; its planned direct live acceptance remains open in that child plan.
+- [x] `docs/ExecPlans/gui_signing_flow_guidance_execplan.md` landed in `08d1021c7` and completed its direct isolated real-Qt acceptance on 2026-07-20.
 - [x] `docs/ExecPlans/gui_certificate_and_preset_clarity_execplan.md` completed its live GUI validation in `7d940ab3f`.
 - [x] `docs/ExecPlans/gui_preset_first_shell_reduction_execplan.md` implemented progressive disclosure after staged-flow guidance landed; its direct default-shell acceptance remains open in that child plan.
 - [x] The refinement/profile-library fallback path is verified by the current reusable-object audit; it remains available while the default shell stays narrow.
@@ -27,8 +27,7 @@ This parent plan exists because the current problems are tightly related but sho
 - [x] (2026-07-10 18:55Z) Completed `gui_document_review_usability_execplan.md`, including relocation of page navigation into a compact toolbar above the viewer, editable page jump, focused tests, and live GUI validation with follow-up sizing polish.
 - [x] (2026-07-11 00:12Z) Completed `gui_text_selection_mode_execplan.md`, including classic desktop command placement, viewer cursor/mode signaling, working select/copy behavior, toolbar icon polish, focused tests, and live GUI validation.
 - [x] (2026-07-20) Revalidated certificate/preset clarity and settings-directory browsing in a fresh 12-checkpoint display-backed audit.
-- [x] (2026-07-20) Reconciled the staged-flow implementation as landed in `08d1021c7`; its display-backed evidence is a representative-PDF startup smoke, not the child plan's required direct sign-and-reopen acceptance.
-- [ ] Complete the direct staged-flow acceptance required by `gui_signing_flow_guidance_execplan.md`; do not infer it from the startup smoke or broader workflow audit.
+- [x] (2026-07-20) Completed the staged-flow direct acceptance required by `gui_signing_flow_guidance_execplan.md`: the isolated real-Qt route passed twelve checkpoints through certificate/setup, placement, explicit confirmation, signing, reopen, and local verification; retained screenshots received visual review.
 - [ ] Complete the direct default-shell assertion required by `gui_preset_first_shell_reduction_execplan.md`; do not infer it solely from the broader audit.
 - [x] (2026-07-20) Ran an end-to-end representative-PDF walkthrough covering profile creation/reselection, placement, output selection, confirmation, signing, reopen, and verification. This broader audit does not close the staged-flow child's separately specified direct acceptance. `docs/ARCHITECTURE.md` remains current; README required no new capability statement.
 

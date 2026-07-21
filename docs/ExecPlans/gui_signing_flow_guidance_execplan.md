@@ -21,6 +21,10 @@ After this change, the main FoliaSeal window will explain the signing process in
 - [x] (2026-07-18) Added a persistent viewer-toolbar mode cue that distinguishes placement dragging from text selection, alongside the existing cursor change.
 - [x] (2026-07-18) Updated focused coordinator and shell behavior coverage; `112 passed` and Ruff passed.
 - [x] (2026-07-18) Performed a display-backed representative-PDF startup smoke audit. It visibly showed the six-step journey and setup guidance; full sign/reopen click-through remains covered by focused Qt tests, not claimed as a manual end-to-end walkthrough.
+- [x] (2026-07-20) Re-explored the direct acceptance seam. `scripts/live_gui_parent_audit.py` drives isolated real Qt widgets through certificate creation, placement, the real confirmation dialog, signing, reopen, and verification; it is suitable for reproducible direct workflow evidence when its retained screenshots are visually reviewed.
+- [x] (2026-07-20) Ran `DISPLAY=:0 timeout 180s .venv/bin/python scripts/live_gui_parent_audit.py --artifacts-dir /tmp/foliaseal-staged-flow-audit`; all twelve real-Qt workflow checkpoints passed, including readiness, signing, reopened signed PDF, and verification.
+- [x] (2026-07-20) Visually reviewed `01-document-review.png`, `09-ready-to-sign.png`, and `12-reopened-and-verified.png`; they show the persistent journey/setup guidance, Step 5 readiness with visible placement, and reopened visible signature with local verification text. `wmctrl -lx` and a process scan found no FoliaSeal window or audit process afterward.
+- [x] (2026-07-20) Re-ran focused staged-flow evidence: `113 passed` for `tests/unit/test_qt_signing_shell.py` and `tests/unit/test_qt_signing_action_coordinator.py`; Ruff passed for the coordinator and sidebar modules.
 
 ## Surprises & Discoveries
 
@@ -29,6 +33,12 @@ After this change, the main FoliaSeal window will explain the signing process in
 
 - Observation: a numbered active-stage label alone can imply a rigid wizard and omit the always-available document-review step.
   Evidence: the first implementation only derived actionable states 2 through 6; focused compliance review required a permanently visible journey that includes Review.
+
+- Observation: launching `foliaseal gui` directly uses a person's configured certificate and profile stores, while the parent audit runner supplies isolated stores and a temporary PDF/output path.
+  Evidence: `scripts/live_gui_parent_audit.py` constructs and closes the Qt workflow in its own temporary environment; this makes its direct GUI route safer and repeatable for acceptance evidence.
+
+- Observation: the retained `ready-to-sign` frame shows Step 5 and the real `Confirm and sign` action with the output path, while the reopened frame shows the embedded visible signature and local verification review.
+  Evidence: `/tmp/foliaseal-staged-flow-audit/09-ready-to-sign.png` and `/tmp/foliaseal-staged-flow-audit/12-reopened-and-verified.png`; `audit.json` reports twelve passed checkpoints.
 
 ## Decision Log
 
@@ -44,9 +54,13 @@ After this change, the main FoliaSeal window will explain the signing process in
   Rationale: the toolbar is visible while the user drags on the page, so it can explain the active interaction mode without duplicating workflow state in the viewer.
   Date/Author: 2026-07-18 / Codex
 
+- Decision: close the remaining direct acceptance with the display-backed isolated Qt audit runner and visual inspection of its retained artifacts.
+  Rationale: it exercises the actual mounted controls, confirmation dialog, signing, reopen, and verification path while avoiding mutation of the user's configured profiles or output files. The evidence will be described accurately as semantic real-Qt interaction plus visual review, not as an independent human-input usability study.
+  Date/Author: 2026-07-20 / Codex
+
 ## Outcomes & Retrospective
 
-The sidebar now exposes the complete `Review → Setup → Place → Ready → Sign → Verify` journey, while the active state gives a direct next action. Missing certificate material directs the user to setup; missing placement explains that page dragging is active; invalid drafts point to readiness review; valid drafts lead to explicit confirmation; and successful signing leads to local verification/reopen guidance. The viewer toolbar visibly changes between placement and text-selection instructions. Focused Qt behavior tests pass and a display-backed startup smoke audit confirmed the rendered initial guidance. A complete manual sign-and-reopen click-through was not performed in this environment and is not represented as completed evidence.
+The sidebar now exposes the complete `Review → Setup → Place → Ready → Sign → Verify` journey, while the active state gives a direct next action. Missing certificate material directs the user to setup; missing placement explains that page dragging is active; invalid drafts point to readiness review; valid drafts lead to explicit confirmation; and successful signing leads to local verification/reopen guidance. The viewer toolbar visibly changes between placement and text-selection instructions. Focused Qt behavior tests passed (`113 passed`), and the isolated real-Qt certificate-to-reopen audit passed all twelve checkpoints. Visual review confirmed the setup, readiness, and reopened-verification states; its semantic automation is recorded accurately as direct mounted-GUI behavior evidence rather than a separate human-input usability study.
 
 ## Context and Orientation
 
@@ -109,7 +123,16 @@ The motivating product review is:
 
 ## Interfaces and Dependencies
 
-The main dependencies are `signing_action_coordinator.py`, `signing_workspace_sidebar.py`, `signing_workspace_composition.py`, `signing_shell.py`, and the certificate/preset controls in `signing_workspace_properties_panel.py`. `signing_workspace_composition.py` owns the toolbar's persistent placement-versus-text-selection instruction label; `signing_workspace_review_bridge.py` supplies the review/text state that drives it, and the viewer retains cursor ownership. The final UI should expose a stable, explicit stage presentation that can be exercised in tests and seen plainly in the live GUI. The display-backed evidence for this slice is deliberately limited to a representative-PDF startup smoke; focused Qt tests, rather than an unperformed manual click-through, cover the remaining interaction transitions.
+The main dependencies are `signing_action_coordinator.py`, `signing_workspace_sidebar.py`, `signing_workspace_composition.py`, `signing_shell.py`, and the certificate/preset controls in `signing_workspace_properties_panel.py`. `signing_workspace_composition.py` owns the toolbar's persistent placement-versus-text-selection instruction label; `signing_workspace_review_bridge.py` supplies the review/text state that drives it, and the viewer retains cursor ownership. The final UI exposes a stable, explicit stage presentation exercised by focused tests and by the isolated real-Qt audit at `/tmp/foliaseal-staged-flow-audit`. That audit drives the mounted certificate, placement, output, confirmation, signing, reopen, and verification route, then retains screenshots for visual review. Its evidence is semantic automation plus visual inspection, not an independent human-input usability study.
 
 Revision note: 2026-07-18 / Codex
 Completed the staged guidance and viewer mode-cue implementation, recorded the persistent-journey decision, and corrected manual-audit scope to startup smoke evidence rather than an unperformed end-to-end walkthrough.
+
+Revision note: 2026-07-20 / Codex
+Added the isolated real-Qt acceptance route after re-exploration. It is the safe, reproducible way to close the required sign-and-reopen evidence without mutating a user's configured GUI state; artifact inspection remains mandatory.
+
+Revision note: 2026-07-20 / Codex
+Completed the direct staged-flow acceptance with isolated real-Qt execution, retained-artifact inspection, focused tests, and explicit GUI cleanup verification.
+
+Revision note: 2026-07-20 / Codex
+Compliance review removed the obsolete startup-only evidence statement so the interface section matches the completed audit scope.
