@@ -78,9 +78,12 @@ class _Audit:
         self.app.processEvents()
 
     def checkpoint(self, name: str, stage: str) -> None:
+        self.checkpoint_widget(name, stage, self.window)
+
+    def checkpoint_widget(self, name: str, stage: str, widget: Any) -> None:
         self.process_events()
         screenshot = self.artifact_dir / f"{len(self.checkpoints) + 1:02d}-{name}.png"
-        pixmap = self.window.grab()
+        pixmap = widget.grab()
         if not pixmap.save(str(screenshot), "PNG"):
             raise RuntimeError(f"Could not write screenshot: {screenshot}")
         self.checkpoints.append({"name": name, "stage": stage, "screenshot": str(screenshot)})
@@ -361,6 +364,88 @@ def _audit_certificate_and_preset_clarity(shell: Any, audit: _Audit) -> None:
         "Signature presets reuse saved appearance and placement choices.",
     )
     audit.checkpoint("certificate-and-preset-clarity", "Step 2 of 6 — Choose signing setup")
+
+
+def _visible_group_titles(root: Any) -> set[str]:
+    """Return titles from group boxes that are actually visible in ``root``."""
+    from PySide6.QtWidgets import QGroupBox
+
+    return {
+        group.title().strip()
+        for group in root.findChildren(QGroupBox)
+        if group.isVisible()
+    }
+
+
+def _audit_preset_first_shell(shell: Any, audit: _Audit) -> None:
+    """Prove the narrow default shell keeps the full editor behind refinement."""
+    expected_default_groups = {
+        "Signature preset",
+        "Certificate configuration",
+        "Signed appearance preview",
+        "Manual refinement",
+    }
+    forbidden_default_groups = {
+        "Visible signature",
+        "Signature style",
+        "Visible text",
+        "Placement on page",
+    }
+    default_groups = _visible_group_titles(shell)
+    missing = expected_default_groups - default_groups
+    leaked = forbidden_default_groups & default_groups
+    if missing or leaked:
+        raise RuntimeError(
+            "Default shell is not preset-first "
+            f"(missing={sorted(missing)!r}, leaked={sorted(leaked)!r})."
+        )
+    for forbidden_button in (
+        "Save preset",
+        "Delete preset",
+        "Save appearance for reuse...",
+        "Save placement for reuse...",
+        "Save signature preset for reuse...",
+    ):
+        try:
+            _visible_button_with_text(shell, forbidden_button)
+        except RuntimeError:
+            continue
+        raise RuntimeError(f"Default shell leaked inline authoring action {forbidden_button!r}.")
+    from PySide6.QtWidgets import QLineEdit
+
+    if any(
+        editor.isVisible() and editor.placeholderText().strip() == "Enter a preset name"
+        for editor in shell.findChildren(QLineEdit)
+    ):
+        raise RuntimeError("Default shell leaked the inline preset-name editor.")
+    audit.checkpoint("preset-first-default-shell", "Step 2 of 6 — Choose signing setup")
+
+    def drive(app: Any) -> bool:
+        dialog = _active_modal(app, "Refine current PDF setup")
+        if dialog is None:
+            return False
+        dialog_groups = _visible_group_titles(dialog)
+        required_dialog_groups = {"Visible signature", "Placement on page"}
+        absent = required_dialog_groups - dialog_groups
+        if absent:
+            raise RuntimeError(
+                "Manual refinement did not expose current-PDF editing controls "
+                f"(missing={sorted(absent)!r})."
+            )
+        _button_with_text(dialog, "Apply")
+        _button_with_text(dialog, "Cancel")
+        audit.checkpoint_widget(
+            "manual-refinement-dialog",
+            "Manual refinement exposes current-PDF appearance and placement",
+            dialog,
+        )
+        _button_with_text(dialog, "Cancel").click()
+        return True
+
+    _open_refinement_from_visible_control(shell, audit, drive)
+    default_groups_after_cancel = _visible_group_titles(shell)
+    if default_groups_after_cancel != default_groups:
+        raise RuntimeError("Cancelling manual refinement changed the default shell layout.")
 
 
 def _audit_profile_library(frame: Any, audit: _Audit) -> None:
@@ -806,6 +891,7 @@ def run_audit(
         if shell is None:
             raise RuntimeError("FoliaSeal did not open the representative PDF.")
         audit.checkpoint("document-review", "Step 2 of 6 — Choose signing setup")
+        _audit_preset_first_shell(shell, audit)
         _audit_certificate_and_preset_clarity(shell, audit)
         _audit_settings_directory_browsing(
             frame,
