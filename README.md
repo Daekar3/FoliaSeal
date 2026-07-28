@@ -43,6 +43,8 @@ Current capabilities:
   - Saved signature presets now persist across relaunches in the user-visible `Signature Profiles`
     storage area.
   - The shell supports deleting the selected signature preset with explicit confirmation.
+  - The primary shell is preset-first: current-PDF appearance and placement editing is available
+    through the explicit `Manual refinement` dialog instead of occupying the default sidebar.
 - `render_signing_preview()` should turn the normalized draft state into a deterministic text
   snapshot for logs, tests, and lower-level parity checks.
   - It should not become a second live-preview formatter alongside the Qt widget path.

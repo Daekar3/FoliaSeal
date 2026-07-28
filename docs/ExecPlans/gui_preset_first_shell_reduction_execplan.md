@@ -23,7 +23,8 @@ After this change, the primary signing shell will stop looking like an always-op
 - [x] (2026-07-20) Added a bounded `live_gui_parent_audit.py` checkpoint that requires the visible default preset/certificate/preview/refinement groups, rejects visible inline editor and legacy preset-authoring controls, then opens and records the real refinement dialog with its `Visible signature` and `Placement on page` groups.
 - [x] (2026-07-20) Completed focused shell regression coverage: `111 passed` for `tests/unit/test_qt_signing_shell.py` and `tests/unit/test_qt_visible_signature_setup_form.py`; Ruff passed for the audit runner and properties panel.
 - [x] (2026-07-20) Completed architecture/SPEC compliance review and documentation stewardship. The strengthened audit rejects legacy inline preset mutation controls; no child plan, README, or architecture-document change is needed.
-- [ ] Run the isolated display-backed audit, inspect both retained shell screenshots, and verify cleanup. Blocked on 2026-07-20: the environment rejected the required display escalation before execution because its Codex usage limit was exhausted; no GUI process, dialog, artifact directory, or audit evidence was created.
+- [x] (2026-07-28) Ran the isolated display-backed audit; it passed 14 checkpoints, including `preset-first-default-shell` and `manual-refinement-dialog`, with temporary stores and signed/reopened output.
+- [x] (2026-07-28) Visually inspected `02-preset-first-default-shell.png` and `03-manual-refinement-dialog.png`; the default shell is narrow and the refinement controls appear only after the explicit refinement action. `wmctrl` and process scans found no FoliaSeal window or process afterward.
 
 ## Surprises & Discoveries
 
@@ -38,6 +39,9 @@ After this change, the primary signing shell will stop looking like an always-op
 
 - Observation: the environment usage-limit lock also prevented the normal Git staging/commit escalation after the focused checks passed.
   Evidence: the commit worker verified only this plan and `scripts/live_gui_parent_audit.py` were modified and that `git diff --check` passed, but its `git add`/`git commit` request was rejected before execution. The changes remain unstaged and recoverable in the worktree.
+
+- Observation: the previously blocked acceptance succeeded once display escalation was available.
+  Evidence: `/tmp/foliaseal-preset-first-audit/audit.json` reports `passed` with 14 checkpoints, and the retained screenshots show the default-shell/refinement boundary.
 
 ## Decision Log
 
@@ -55,7 +59,7 @@ After this change, the primary signing shell will stop looking like an always-op
 
 ## Outcomes & Retrospective
 
-The main shell no longer mounts the old harness-era inline visible-signature editor by default. Instead, it shows the compact preset/certificate/preview flow plus a small manual-refinement affordance that opens a separate dialog for current-PDF appearance and placement edits. Focused Qt shell tests cover both the default narrow layout and the apply/cancel paths of the refinement dialog. The remaining proof is display-backed: inspect the narrow mounted shell and the refinement dialog separately, rather than inferring the first from the second.
+The main shell no longer mounts the old harness-era inline visible-signature editor by default. Instead, it shows the compact preset/certificate/preview flow plus a small manual-refinement affordance that opens a separate dialog for current-PDF appearance and placement edits. Focused Qt shell tests cover both the default narrow layout and the apply/cancel paths of the refinement dialog. The isolated display-backed audit passed 14 checkpoints, and visual inspection confirmed the default/refinement boundary; no FoliaSeal process or dialog remained afterward.
 
 ## Context and Orientation
 
@@ -138,3 +142,6 @@ Architecture review strengthened the audit to reject legacy inline preset mutati
 
 Revision note: 2026-07-20 / Codex
 The external usage-limit lock also blocked the normal final commit. The unfinished audit extension remains deliberately unstaged in the cleanly scoped worktree for resumption; it must not be represented as a completed plan.
+
+Revision note: 2026-07-28 / Codex
+Completed the previously blocked display-backed acceptance. The 14-checkpoint audit and retained screenshot review prove preset-first default disclosure and the preserved manual-refinement fallback; cleanup was independently verified.

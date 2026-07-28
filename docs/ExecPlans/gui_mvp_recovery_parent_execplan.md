@@ -16,7 +16,7 @@ This parent plan exists because the current problems are tightly related but sho
 - [x] `docs/ExecPlans/gui_text_selection_mode_execplan.md` landed before staged-flow completion.
 - [x] `docs/ExecPlans/gui_signing_flow_guidance_execplan.md` landed in `08d1021c7` and completed its direct isolated real-Qt acceptance on 2026-07-20.
 - [x] `docs/ExecPlans/gui_certificate_and_preset_clarity_execplan.md` completed its live GUI validation in `7d940ab3f`.
-- [x] `docs/ExecPlans/gui_preset_first_shell_reduction_execplan.md` implemented progressive disclosure after staged-flow guidance landed; its direct default-shell acceptance remains open in that child plan.
+- [x] `docs/ExecPlans/gui_preset_first_shell_reduction_execplan.md` implemented progressive disclosure after staged-flow guidance landed; its direct default-shell acceptance completed on 2026-07-28 with the isolated 14-checkpoint audit and retained screenshot review.
 - [x] The refinement/profile-library fallback path is verified by the current reusable-object audit; it remains available while the default shell stays narrow.
 
 ## Progress
@@ -28,8 +28,8 @@ This parent plan exists because the current problems are tightly related but sho
 - [x] (2026-07-11 00:12Z) Completed `gui_text_selection_mode_execplan.md`, including classic desktop command placement, viewer cursor/mode signaling, working select/copy behavior, toolbar icon polish, focused tests, and live GUI validation.
 - [x] (2026-07-20) Revalidated certificate/preset clarity and settings-directory browsing in a fresh 12-checkpoint display-backed audit.
 - [x] (2026-07-20) Completed the staged-flow direct acceptance required by `gui_signing_flow_guidance_execplan.md`: the isolated real-Qt route passed twelve checkpoints through certificate/setup, placement, explicit confirmation, signing, reopen, and local verification; retained screenshots received visual review.
-- [ ] Complete the direct default-shell assertion required by `gui_preset_first_shell_reduction_execplan.md`; do not infer it solely from the broader audit.
-- [x] (2026-07-20) Ran an end-to-end representative-PDF walkthrough covering profile creation/reselection, placement, output selection, confirmation, signing, reopen, and verification. This broader audit does not close the staged-flow child's separately specified direct acceptance. `docs/ARCHITECTURE.md` remains current; README required no new capability statement.
+- [x] (2026-07-28) Completed the direct default-shell assertion required by `gui_preset_first_shell_reduction_execplan.md`; the isolated audit passed `preset-first-default-shell` and `manual-refinement-dialog`, and cleanup found no FoliaSeal process or window.
+- [x] (2026-07-20) Ran an end-to-end representative-PDF walkthrough covering profile creation/reselection, placement, output selection, confirmation, signing, reopen, and verification. This broader audit did not replace the separately specified direct acceptance checks; the later staged-flow and preset-first audits now close those gaps. `docs/ARCHITECTURE.md` remains current, and README now records the preset-first default-shell boundary.
 
 ## Surprises & Discoveries
 
@@ -60,7 +60,7 @@ This parent plan exists because the current problems are tightly related but sho
 
 Two document-review recovery slices are complete. The live GUI now exposes viewer-local page navigation, direct page jump, intentional text-selection mode, working copy behavior, and compact toolbar icons that fit the existing dark shell more cleanly than the earlier text-button pass. Those changes removed the most obvious review-stage spec misses, but they also clarified the next bottleneck: the right-hand shell still uses harness-era terminology and object relationships that are not intelligible enough for a first-time user.
 
-The parent plan is therefore not at the “re-review the whole MVP flow” stage yet. The remaining work is now concentrated in the workflow/productization slices: live validation of the implemented certificate/preset clarity changes, staged signing guidance, and the later preset-first shell reduction. The certificate and preset clarity implementation has landed and reduced the terminology gap that was obscuring the main shell, but it still needs one running-GUI confirmation pass before it should be called fully closed.
+The parent plan is now ready for its integrated final walkthrough: the certificate/preset clarity, staged-flow, and preset-first shell slices all have current live GUI evidence, including the 14-checkpoint audit proving the default-shell/refinement boundary. The parent remains open until that final walkthrough and release-bar reconciliation are recorded.
 
 ## Context and Orientation
 
