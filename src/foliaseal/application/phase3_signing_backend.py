@@ -92,11 +92,24 @@ from foliaseal.infra.certification import inspect_pdf_certification_reader
 from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validation_context
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
-_SIG_FIELD_NAME = "Signature1"
 _SINGLE_LINE_RENDERED_INK_FIT_CACHE = _visible_layout._SINGLE_LINE_RENDERED_INK_FIT_CACHE
 detect_text_content_bounds_in_image = (
     _text_raster_analysis.detect_text_content_bounds_in_image
 )
+
+
+def _next_signature_field_name(input_path: Path) -> str:
+    """Choose the first unused ``SignatureN`` field for an incremental append."""
+    with input_path.open("rb") as input_stream:
+        reader = PdfFileReader(input_stream)
+        existing_names = {
+            str(field_name)
+            for field_name, _field_value, _field_ref in fields.enumerate_sig_fields(reader)
+        }
+    index = 1
+    while f"Signature{index}" in existing_names:
+        index += 1
+    return f"Signature{index}"
 @dataclass(frozen=True)
 class BackendReservationEvidence:
     """JSON-ready backend reservation evidence for a signing request."""
@@ -312,6 +325,7 @@ class PyHankoPdfSigner:
         appearance = request.signature_appearance
         if request.signature_rect is None or appearance is None:
             raise ValueError("A visible signature rectangle and appearance are required.")
+        signature_field_name = _next_signature_field_name(input_path)
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         signing_time = _current_signing_time(appearance.timezone_display_mode)
         semantics = _resolve_visible_signature_semantics(
@@ -345,7 +359,7 @@ class PyHankoPdfSigner:
         if request.timestamp_required:
             timestamper = self._build_timestamper(request.tsa_url)
         metadata = PdfSignatureMetadata(
-            field_name=_SIG_FIELD_NAME,
+            field_name=signature_field_name,
             md_algorithm="sha256",
             name=_signature_name_for_metadata(request, signer),
             reason=semantics.text.metadata_reason,
@@ -354,7 +368,7 @@ class PyHankoPdfSigner:
             subfilter=fields.SigSeedSubFilter.ADOBE_PKCS7_DETACHED,
         )
         field_spec = fields.SigFieldSpec(
-            sig_field_name=_SIG_FIELD_NAME,
+            sig_field_name=signature_field_name,
             on_page=request.signature_rect.page_index,
             box=_rect_to_box(request.signature_rect),
             readable_field_name="Visible signature",

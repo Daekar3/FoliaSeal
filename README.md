@@ -64,6 +64,9 @@ Current capabilities:
 - The shell now exposes a read-only signing-flow summary so the user can see whether the current state is placing the signature, confirming/signing, reviewing preview issues, or reviewing signed output.
 - The current concrete signing backend now produces a genuinely cryptographically signed PDF
   through `pyHanko`.
+- When the input PDF permits incremental approval signing, the backend allocates the next unused
+  `SignatureN` field so a reopened signed PDF can receive another visible approval signature while
+  preserving the earlier signed revision.
 - The key integration rule is to avoid duplicating semantics across layers.
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.

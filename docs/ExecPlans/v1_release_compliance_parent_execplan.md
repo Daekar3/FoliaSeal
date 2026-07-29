@@ -21,15 +21,17 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 - [x] (2026-07-20) Audited `docs/SPEC.md`, current GUI/recovery plans, `docs/ARCHITECTURE.md`, and the current PyInstaller path.
 - [x] (2026-07-20) Created four child plans with one primary change class each.
 - [x] (2026-07-20) Executed the reconciliation child: its fresh twelve-checkpoint audit, evidence review, compliance review, and dedicated documentation/status commit `4903fba82` are complete.
-- [ ] Execute the multi-signature child and retain its audit evidence.
+- [x] (2026-07-28) Executed the multi-signature child: dynamic unused `SignatureN` allocation, actual-PDF two-signature review coverage, and the isolated 19-checkpoint audit passed; final child closeout remains pending its compliance review and commit.
 - [ ] Execute the Linux distribution child and retain its package acceptance evidence.
 - [ ] Execute the fidelity child and publish the bounded release conclusion.
 - [ ] Perform a final release-bar review, reconcile `README.md` and `docs/ARCHITECTURE.md`, and commit the parent-plan closeout.
 
 ## Surprises & Discoveries
 
-- Observation: the current display-backed GUI audit proves one complete signing journey, but not a second signing journey over an already signed output.
-  Evidence: `scripts/live_gui_parent_audit.py` records certificate, preset, sign, reopen, and verification checkpoints; it does not create a second output with two signatures.
+- Observation: the original display-backed GUI audit proved one complete signing journey, but not a second signing journey over an already signed output.
+  Evidence: its pre-extension checkpoint set stopped after certificate, preset, sign, reopen, and verification; the multi-signature child added the second-signing path.
+- Observation: the multi-signature audit now covers two separated placements, two signed outputs, and two locally verified review items while preserving the first output.
+  Evidence: `/tmp/foliaseal-live-gui-multi-signature-audit/audit.json` reports `status: passed`, `output_signature_count: 2`, and 19 checkpoints.
 - Observation: PyInstaller bundles font assets, but the live viewer now relies on the operating-system `pdftoppm` executable.
   Evidence: `src/foliaseal/infra/render/poppler_backend.py` is the interactive viewer pixel source and `docs/ARCHITECTURE.md` says broader desktop distribution remains open.
 

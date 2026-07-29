@@ -701,7 +701,13 @@ def _sidebar_button(shell: Any, attribute: str, *, label: str) -> Any:
     return button
 
 
-def _place_signature_with_viewer_drag(shell: Any, audit: _Audit) -> None:
+def _place_signature_with_viewer_drag(
+    shell: Any,
+    audit: _Audit,
+    *,
+    start: tuple[int, int] | None = None,
+    end: tuple[int, int] | None = None,
+) -> None:
     """Place a signature by sending real Qt mouse events to the visible PDF canvas."""
     from PySide6.QtCore import QPoint, Qt
     from PySide6.QtTest import QTest
@@ -712,11 +718,25 @@ def _place_signature_with_viewer_drag(shell: Any, audit: _Audit) -> None:
         raise RuntimeError("PDF canvas is not large enough for a visible placement drag.")
     # These are canvas-local coordinates, intentionally away from page margins
     # and use Qt's own event dispatch rather than X11 coordinates.
-    start = QPoint(35, 35)
-    end = QPoint(canvas.width() - 35, canvas.height() - 35)
-    QTest.mousePress(canvas, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, start)
-    QTest.mouseMove(canvas, end, delay=30)
-    QTest.mouseRelease(canvas, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, end)
+    start_point = QPoint(*(start or (35, 35)))
+    end_point = QPoint(*(end or (canvas.width() - 35, canvas.height() - 35)))
+    if not (0 <= start_point.x() < end_point.x() <= canvas.width()):
+        raise RuntimeError("Signature placement drag does not fit horizontally in the PDF canvas.")
+    if not (0 <= start_point.y() < end_point.y() <= canvas.height()):
+        raise RuntimeError("Signature placement drag does not fit vertically in the PDF canvas.")
+    QTest.mousePress(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        start_point,
+    )
+    QTest.mouseMove(canvas, end_point, delay=30)
+    QTest.mouseRelease(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        end_point,
+    )
     audit.process_events()
     if shell.signature_rect() is None:
         raise RuntimeError("Visible PDF-canvas drag did not create a signature placement.")
@@ -835,6 +855,84 @@ def _accept_confirm_signing_with_assertion(app: Any, expected_output: Path) -> b
     return True
 
 
+def _sign_current_shell(
+    frame: Any,
+    shell: Any,
+    audit: _Audit,
+    output_path: Path,
+    *,
+    checkpoint_prefix: str,
+) -> Path:
+    """Choose output, confirm, and sign the currently mounted workspace."""
+    _choose_output_path(shell, audit, output_path)
+    audit.checkpoint(f"{checkpoint_prefix}-output-selected", "Step 5 of 6 — Confirm and sign")
+    if not frame.current_shell.is_sign_action_enabled():
+        raise RuntimeError(f"{checkpoint_prefix} sign action remained disabled.")
+    audit.checkpoint(f"{checkpoint_prefix}-ready-to-sign", "Step 5 of 6 — Confirm and sign")
+    sign_button = _sidebar_button(shell, "sign_button", label="Confirm and sign")
+    if not sign_button.isEnabled():
+        raise RuntimeError(f"{checkpoint_prefix} Confirm and sign control is disabled.")
+    _run_modal_action(
+        audit.app,
+        sign_button.click,
+        lambda app: _accept_confirm_signing_with_assertion(app, output_path),
+    )
+    audit.process_events()
+    actual_output = Path(frame.current_signing_workflow.output_pdf_path)
+    if not actual_output.is_file():
+        raise RuntimeError(f"{checkpoint_prefix} signing did not create {actual_output}.")
+    audit.checkpoint(f"{checkpoint_prefix}-signed", "Step 6 of 6 — Verify signed PDF")
+    return actual_output
+
+
+def _assert_two_signature_review(shell: Any, signed_output: Path) -> None:
+    """Assert two locally verified review items in both model and mounted Qt UI."""
+    from PySide6.QtWidgets import QLabel
+
+    from foliaseal.application.document_review import PyHankoDocumentReviewInspector
+
+    review = PyHankoDocumentReviewInspector().inspect(str(signed_output))
+    if review.signature_count != 2 or len(review.signature_items) != 2:
+        raise RuntimeError(
+            f"Expected two signature review items, got {review.signature_count!r}."
+        )
+    if [item.label for item in review.signature_items] != [
+        "Signature 1",
+        "Signature 2 (latest)",
+    ]:
+        raise RuntimeError("Two-signature review labels were not stable.")
+    if not all(item.cryptographic_validation_passed is True for item in review.signature_items):
+        raise RuntimeError("Both signature review items must verify locally.")
+    selector = getattr(
+        getattr(shell, "sidebar_surface", None),
+        "document_review_signature_selector",
+        None,
+    )
+    if selector is None or selector.count() != 2:
+        raise RuntimeError("Mounted review selector did not expose two signatures.")
+    expected_labels = ("Signature 1", "Signature 2 (latest)")
+    for index, expected_label in enumerate(expected_labels):
+        selector.setCurrentIndex(index)
+        if selector.currentText() != expected_label:
+            raise RuntimeError(
+                f"Mounted review selector item {index} was {selector.currentText()!r}."
+            )
+    review_text = "\n".join(label.text() for label in shell.findChildren(QLabel)).lower()
+    if "signature 1" not in review_text or "signature 2" not in review_text:
+        raise RuntimeError("Mounted review surface did not render both signature labels.")
+
+
+def _signature_rects_overlap(first: Any, second: Any) -> bool:
+    if first.page_index != second.page_index:
+        return False
+    return not (
+        first.left_pt + first.width_pt <= second.left_pt
+        or second.left_pt + second.width_pt <= first.left_pt
+        or first.bottom_pt + first.height_pt <= second.bottom_pt
+        or second.bottom_pt + second.height_pt <= first.bottom_pt
+    )
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pdf", type=Path, default=DEFAULT_PDF, help="Representative source PDF.")
@@ -913,7 +1011,18 @@ def run_audit(
         audit.process_events()
         audit.checkpoint("appearance-profile-saved", "Step 3 of 6 — Place visible signature")
 
-        _place_signature_with_viewer_drag(shell, audit)
+        canvas = shell.viewer_widget.widget()
+        if canvas.height() < 520:
+            raise RuntimeError("PDF canvas is not tall enough for two audit signature regions.")
+        _place_signature_with_viewer_drag(
+            shell,
+            audit,
+            start=(35, 35),
+            end=(canvas.width() - 35, 220),
+        )
+        first_signature_rect = shell.signature_rect()
+        if first_signature_rect is None:
+            raise RuntimeError("First audit signature placement did not expose a rectangle.")
         _save_and_reselect_signature_preset(
             shell,
             audit,
@@ -1000,13 +1109,78 @@ def run_audit(
             )
         audit.checkpoint("reopened-and-verified", "Signed PDF reopened and verification reviewed")
 
+        retained_first_output = artifact_dir / "first-signed-output.pdf"
+        first_output_bytes = output_path.read_bytes()
+        shutil.copy2(output_path, retained_first_output)
+
+        _select_certificate_configuration(reopened_shell, config.display_name)
+        preset_combo = _combo_with_item(reopened_shell, AUDIT_SIGNATURE_PRESET)
+        if preset_combo is None:
+            raise RuntimeError("Reopened workspace did not expose the stored signature preset.")
+        preset_combo.setCurrentText(AUDIT_SIGNATURE_PRESET)
+        frame.current_signing_workflow.tsa_url = "https://tsa.example.invalid"
+        frame.current_signing_workflow.timestamp_required = False
+        audit.process_events()
+        second_canvas = reopened_shell.viewer_widget.widget()
+        second_start = (35, second_canvas.height() - 220)
+        second_end = (second_canvas.width() - 35, second_canvas.height() - 35)
+        _place_signature_with_viewer_drag(
+            reopened_shell,
+            audit,
+            start=second_start,
+            end=second_end,
+        )
+        second_signature_rect = reopened_shell.signature_rect()
+        if second_signature_rect is None:
+            raise RuntimeError("Second audit signature placement did not expose a rectangle.")
+        if _signature_rects_overlap(first_signature_rect, second_signature_rect):
+            raise RuntimeError("Second audit signature rectangle overlaps the first signature.")
+        audit.checkpoint("second-placement", "Step 4 of 6 — Review readiness")
+
+        second_output = root / "second-chosen-signed-output.pdf"
+        second_output_path = _sign_current_shell(
+            frame,
+            reopened_shell,
+            audit,
+            second_output,
+            checkpoint_prefix="second-signature",
+        )
+        if output_path.read_bytes() != first_output_bytes:
+            raise RuntimeError("The first signed output changed during the second signing.")
+
+        second_open_button = _sidebar_button(
+            reopened_shell,
+            "open_signed_output_button",
+            label="Open signed PDF",
+        )
+        if not second_open_button.isEnabled():
+            raise RuntimeError("Open signed PDF was not enabled after the second signature.")
+        second_open_button.click()
+        audit.process_events()
+        final_shell = frame.current_shell
+        if final_shell is reopened_shell:
+            raise RuntimeError("Second signed output did not mount a fresh workspace.")
+        final_shell.refresh_viewer()
+        audit.process_events()
+        _assert_on_page_preview(final_shell, require_visible_signed_content=True)
+        _assert_two_signature_review(final_shell, second_output_path)
+        audit.checkpoint(
+            "reopened-two-signatures",
+            "Signed PDF reopened with two locally verified signatures",
+        )
+
         retained_output = artifact_dir / "signed-output.pdf"
-        shutil.copy2(output_path, retained_output)
+        shutil.copy2(second_output_path, retained_output)
+        retained_second_output = artifact_dir / "second-signed-output.pdf"
+        shutil.copy2(second_output_path, retained_second_output)
 
         report = {
             "status": "passed",
             "source_pdf": str(pdf_path),
             "signed_output": str(retained_output),
+            "first_signed_output": str(retained_first_output),
+            "second_signed_output": str(retained_second_output),
+            "output_signature_count": 2,
             "certificate_configuration": creation.certificate_configuration.display_name,
             "checkpoints": audit.checkpoints,
             "isolated_workspace": str(root),

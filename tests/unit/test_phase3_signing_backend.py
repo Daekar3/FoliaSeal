@@ -24,6 +24,7 @@ from pyhanko_certvalidator import ValidationContext
 from pyhanko_certvalidator.registry import SimpleCertificateStore
 
 from foliaseal.application import signing_preview_renderer as signing_preview_renderer_module
+from foliaseal.application.document_review import PyHankoDocumentReviewInspector
 from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     HorizontalSingleLineRenderedReference,
@@ -367,6 +368,74 @@ def test_phase3_signing_executor_produces_visible_signature_without_image_stamp(
     assert "Board Secretary" in appearance_text
     assert "FoliaSeal" in appearance_text
     assert appearance_text.strip()
+
+
+def test_phase3_signing_executor_appends_second_incremental_signature(
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    first_output = tmp_path / "first-output.pdf"
+    second_output = tmp_path / "second-output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    appearance = build_signature_appearance(
+        image_stamp_path=None,
+        show_field_names=True,
+        signer_label_prefix="",
+    )
+
+    first_request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="first-output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=560.0,
+            height_pt=180.0,
+            left_pt=24.0,
+            bottom_pt=580.0,
+        ),
+        signature_appearance=appearance,
+    )
+    first_result = build_phase3_signing_executor().execute(first_request)
+    assert first_result.success is True
+    first_bytes = first_output.read_bytes()
+
+    second_request = build_signing_request(
+        tmp_path,
+        input_name="first-output.pdf",
+        output_name="second-output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            width_pt=560.0,
+            height_pt=180.0,
+            left_pt=24.0,
+            bottom_pt=360.0,
+        ),
+        signature_appearance=appearance,
+    )
+    second_result = build_phase3_signing_executor().execute(second_request)
+
+    assert second_result.success is True
+    assert second_result.revision_strategy.value == "incremental"
+    assert first_output.read_bytes() == first_bytes
+    with second_output.open("rb") as handle:
+        assert len(list(PdfFileReader(handle).embedded_signatures)) == 2
+    assert PyHankoSignatureVerifier().verify(str(second_output)).signature_count == 2
+    review = PyHankoDocumentReviewInspector().inspect(str(second_output))
+    assert review.signature_count == 2
+    assert [item.label for item in review.signature_items] == [
+        "Signature 1",
+        "Signature 2 (latest)",
+    ]
+    assert all(item.cryptographic_validation_passed is True for item in review.signature_items)
 
 
 def test_phase3_signing_executor_adds_timestamp_when_required_with_tsa(
