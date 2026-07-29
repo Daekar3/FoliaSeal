@@ -21,7 +21,7 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 - [x] (2026-07-20) Audited `docs/SPEC.md`, current GUI/recovery plans, `docs/ARCHITECTURE.md`, and the current PyInstaller path.
 - [x] (2026-07-20) Created four child plans with one primary change class each.
 - [x] (2026-07-20) Executed the reconciliation child: its fresh twelve-checkpoint audit, evidence review, compliance review, and dedicated documentation/status commit `4903fba82` are complete.
-- [x] (2026-07-28) Executed the multi-signature child: dynamic unused `SignatureN` allocation, actual-PDF two-signature review coverage, and the isolated 19-checkpoint audit passed; final child closeout remains pending its compliance review and commit.
+- [x] (2026-07-28) Executed and closed the multi-signature child: dynamic unused `SignatureN` allocation, actual-PDF two-signature review coverage, isolated 19-checkpoint audit, compliance review, documentation updates, and commit `2b36c49c4` all passed.
 - [ ] Execute the Linux distribution child and retain its package acceptance evidence.
 - [ ] Execute the fidelity child and publish the bounded release conclusion.
 - [ ] Perform a final release-bar review, reconcile `README.md` and `docs/ARCHITECTURE.md`, and commit the parent-plan closeout.

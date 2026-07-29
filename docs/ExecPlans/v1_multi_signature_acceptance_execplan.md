@@ -22,7 +22,7 @@ After this change, a user can reopen FoliaSeal’s signed output, add a second v
 - [x] (2026-07-28) Extended the isolated GUI audit with bounded non-overlapping second placement, second output/sign/reopen checkpoints, first-output preservation, and two-item mounted review assertions.
 - [x] (2026-07-28) Ran focused backend/document-review/certification/Qt coverage (`231 passed`) and the display-backed acceptance audit; it passed 19 checkpoints and retained both signed outputs plus two-signature review evidence.
 - [x] (2026-07-28) Completed compliance review, documentation stewardship, cleanup verification, and final plan-scope reconciliation; no code correction or child plan is needed.
-- [ ] Create the dedicated multi-signature behavior/evidence commit and close the parent dependency with its commit hash.
+- [x] (2026-07-28) Created the dedicated multi-signature behavior/evidence commit `2b36c49c4` (`feat: support multi-signature approval flow`) and verified the worktree is clean.
 
 ## Surprises & Discoveries
 
@@ -56,7 +56,7 @@ After this change, a user can reopen FoliaSeal’s signed output, add a second v
 
 ## Outcomes & Retrospective
 
-At creation, this was unproven release-bar behavior. The implementation now allocates unused incremental field names, and the focused integration test plus 19-checkpoint live audit prove two signatures, two locally verified review items, preserved first output, and clean reopen behavior. Existing certification-hardening tests retain the restricted-case diagnostic/no-output proof; the focused run passed 231 tests, and final compliance/documentation review is complete before commit.
+At creation, this was unproven release-bar behavior. The implementation now allocates unused incremental field names, and the focused integration test plus 19-checkpoint live audit prove two signatures, two locally verified review items, preserved first output, and clean reopen behavior. Existing certification-hardening tests retain the restricted-case diagnostic/no-output proof; the focused run passed 231 tests, and final compliance/documentation review passed before commit `2b36c49c4`.
 
 ## Context and Orientation
 
@@ -100,3 +100,6 @@ Implemented dynamic unused `SignatureN` allocation, added actual-PDF two-signatu
 
 Revision note: 2026-07-28 / Codex
 Compliance review narrowed the restricted-document acceptance wording to the existing real backend, document-review, and Qt guidance evidence; the live audit remains focused on the permitted second-signature success path.
+
+Revision note: 2026-07-28 / Codex
+Closed the child plan with behavior/evidence commit `2b36c49c4`; the V1 parent now records this dependency as complete.
