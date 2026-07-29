@@ -47,7 +47,11 @@ def _build_request(input_pdf_path: Path, output_pdf_path: Path) -> SigningReques
         ),
         signature_appearance=build_signature_appearance(
             image_stamp_path=None,
-            show_field_names=True,
+            # Certification policy assertions should not depend on the
+            # variable width of the generated acceptance certificate subject.
+            # Keep this request compact so the test exercises DocMDP policy,
+            # rather than visible-layout fit behavior.
+            show_field_names=False,
             signer_label_prefix="",
         ),
     )

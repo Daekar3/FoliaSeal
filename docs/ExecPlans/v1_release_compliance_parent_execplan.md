@@ -13,7 +13,7 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 - [x] `v1_execplan_reconciliation_execplan.md` completed in `4903fba82`; it reconciled status from fresh evidence while preserving the remaining direct GUI acceptances as real work.
 - [x] `v1_multi_signature_acceptance_execplan.md` completed in `2b36c49c4` with its final plan closeout in `794976d8c`; the release-bar “add another approval signature” behavior is now evidenced.
 - [x] `v1_linux_desktop_distribution_execplan.md` completed on 2026-07-28 with Debian packaging, extracted GUI startup, and package-owned signing evidence.
-- [ ] `v1_visible_signature_fidelity_rebaseline_execplan.md` must complete before claiming durable WYSIWYG evidence beyond the historical or compact-only matrices.
+- [x] `v1_visible_signature_fidelity_rebaseline_execplan.md` completed with the bounded `phase3_fidelity_v1` manifest-v1 corpus; this supports only the eight named scenarios, not every historical stress combination.
 - [x] The direct default-shell acceptance in `gui_preset_first_shell_reduction_execplan.md` completed on 2026-07-28 with a 14-checkpoint audit and retained screenshot review. The staged-flow acceptance completed on 2026-07-20; both pre-existing GUI acceptance slices remain outside this parent’s four child slices.
 
 ## Progress
@@ -23,8 +23,9 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 - [x] (2026-07-20) Executed the reconciliation child: its fresh twelve-checkpoint audit, evidence review, compliance review, and dedicated documentation/status commit `4903fba82` are complete.
 - [x] (2026-07-28) Executed and closed the multi-signature child: dynamic unused `SignatureN` allocation, actual-PDF two-signature review coverage, isolated 19-checkpoint audit, compliance review, documentation updates, and commit `2b36c49c4` all passed.
 - [x] (2026-07-28) Executed and closed the Linux distribution child: `dist/foliaseal_0.1.0_amd64.deb` declares `Depends: poppler-utils`; extracted wrapper/help and offscreen GUI startup passed; package-owned evidence passed 10/7, 18/18, and 3/3 matrices. SHA-256: `14403f944861636ca8729893eb4be721668f197e07ae733154e493b70b6a8d95`; audit: `/tmp/foliaseal-deb-audit/audit.json`.
-- [ ] Execute the fidelity child and publish the bounded release conclusion.
-- [ ] Perform a final release-bar review, reconcile `README.md` and `docs/ARCHITECTURE.md`, and commit the parent-plan closeout.
+- [x] (2026-07-29) Executed and closed the fidelity child: tracked manifest `tests/fixtures/phase3/release_fidelity_manifest.json` (SHA-256 `4dd4545c94398411268589666caf06ee7cdceb3a79f03aeac6591008b5e1085e`) defines eight scenarios; `/tmp/foliaseal-release-preview-final/summary.json` and `/tmp/foliaseal-release-signed-final/summary.json` show six supported signings, two intentional fit rejections, `acceptance_expectations_passed=true`, and zero critical counters.
+- [x] (2026-07-29) Performed the final fidelity documentation review and reconciled `README.md` and `docs/ARCHITECTURE.md`; historical stress plans remain explicitly non-comparable and are not claimed as remediated.
+- [x] (2026-07-29) Re-ran the full repository suite after the fidelity evidence setup; a generated-identity layout-fixture mismatch was isolated to the certification-policy test and compacted there, leaving `979 passed` with one pre-existing Pillow deprecation warning.
 
 ## Surprises & Discoveries
 
@@ -48,7 +49,7 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 
 ## Outcomes & Retrospective
 
-At creation, the one-signature product journey is demonstrated, but the release bar is not yet fully proven. Record each completed child’s observable evidence here and state any remaining limitation plainly.
+The release-bar child evidence is now complete for the bounded claims: multi-signature, Debian packaging, and the manifest-v1 fidelity corpus. Fidelity evidence is limited to six supported scenarios and two intentional pre-signing fit rejections; it does not establish support for the historical large stress corpus or every theoretical layout combination.
 
 ## Context and Orientation
 
@@ -77,7 +78,7 @@ Each child uses isolated `/tmp` audit directories or versioned package/evidence 
 
 ## Artifacts and Notes
 
-The parent acceptance record should name the final package file, package inspection output, multi-signature audit JSON, and fidelity-summary JSON. Generated binary packages and screenshots may remain outside Git when repository policy requires it, but their generation command and checksums must be recorded.
+The parent acceptance record names the final package file, package inspection output, multi-signature audit JSON, and fidelity-summary JSON. Fidelity artifacts are `/tmp/foliaseal-release-preview-final/summary.json` and `/tmp/foliaseal-release-signed-final/summary.json`; the tracked manifest digest is `4dd4545c94398411268589666caf06ee7cdceb3a79f03aeac6591008b5e1085e`. Generated binary packages and screenshots may remain outside Git when repository policy requires it, but their generation command and checksums must be recorded.
 
 ## Interfaces and Dependencies
 
@@ -85,3 +86,9 @@ The children use `scripts/live_gui_parent_audit.py`, `src/foliaseal/application/
 
 Revision note: 2026-07-20 / Codex
 Created the parent from the live release-bar audit. It deliberately separates completed first-signature GUI recovery from still-unproven multi-signature, package, and representative-fidelity acceptance.
+
+Revision note: 2026-07-29 / Codex
+Closed the fidelity child and documented its manifest-v1 evidence paths/digest. The parent now records the bounded six-supported/two-fit-rejection claim and explicitly excludes historical stress remediation.
+
+Revision note: 2026-07-29 / Codex
+Completed full-suite validation for the fidelity slice after isolating generated acceptance-identity width from certification-policy assertions.

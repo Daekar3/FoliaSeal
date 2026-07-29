@@ -25,6 +25,7 @@ from foliaseal.application.phase3_evidence_service import (
     Phase3HarnessCaptureRequest,
     Phase3MatrixRequest,
 )
+from foliaseal.application.phase3_fidelity_contract import validate_release_fidelity_contract
 from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
     _single_line_vertical_outer_margin,
@@ -1419,6 +1420,8 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
         scenarios = payload
     elif isinstance(payload, dict):
         scenarios = payload.get("scenarios")
+        if "manifest_version" in payload or "comparison_contract" in payload:
+            validate_release_fidelity_contract(payload)
         raw_expectations = payload.get("acceptance_expectations")
         if raw_expectations is not None:
             if not isinstance(raw_expectations, dict):
@@ -1463,6 +1466,10 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
     for key in ("fixture_profile", "fixture_role"):
         if isinstance(payload, dict) and key in payload:
             manifest[key] = payload[key]
+    if isinstance(payload, dict):
+        for key in ("manifest_version", "comparison_contract"):
+            if key in payload:
+                manifest[key] = payload[key]
     return manifest
 
 

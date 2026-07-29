@@ -1,0 +1,145 @@
+{
+  "manifest_version": 1,
+  "fixture_profile": "stress_visible_appearance_v1",
+  "fixture_role": "signed_release_fidelity_v1",
+  "timestamping_mode": "dummy",
+  "comparison_contract": {
+    "version": "phase3_fidelity_v1",
+    "critical_zero_counters": [
+      "expected_outcome_mismatch_count",
+      "cryptographic_validation_failure_count",
+      "preview_output_comparison_failure_count",
+      "annotation_rect_mismatch_count"
+    ],
+    "tolerances": {
+      "preview_vs_output": 0
+    }
+  },
+  "acceptance_expectations": {
+    "scenario_count": 8,
+    "minimum_successful_signing_run_count": 6,
+    "expected_intentional_rejection_count": 2,
+    "require_zero_cryptographic_validation_failures": true,
+    "require_zero_preview_output_comparison_failures": true,
+    "require_zero_annotation_rect_mismatches": true
+  },
+  "scenarios": [
+    {
+      "name": "single_line_top_empty_page_aspect",
+      "case_tags": ["empty", "page_aspect"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "single_line",
+        "stamp_position": "top",
+        "visible_fields": ["common_name", "signing_time"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "success",
+      "expected_diagnostics": {"classification": "supported", "preview_vs_output": "pass"},
+      "timestamp_required": false
+    },
+    {
+      "name": "single_line_bottom_compact_certificate",
+      "case_tags": ["compact", "certificate_derived"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "single_line",
+        "stamp_position": "bottom",
+        "visible_fields": ["common_name", "company", "signing_time"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "success",
+      "expected_diagnostics": {"classification": "supported", "preview_vs_output": "pass"},
+      "timestamp_required": false
+    },
+    {
+      "name": "single_line_left_long_fields",
+      "case_tags": ["long_field", "zoom"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "single_line",
+        "stamp_position": "left",
+        "visible_fields": ["common_name", "email", "title", "company", "signing_time"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "validation_rejection",
+      "expected_failure_message_contains": "does not fit inside the selected rectangle",
+      "expected_diagnostics": {"classification": "rejected_before_signing", "preview_vs_output": "not_applicable"},
+      "timestamp_required": false
+    },
+    {
+      "name": "single_line_right_custom_text",
+      "case_tags": ["custom_text", "zoom"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "single_line",
+        "stamp_position": "right",
+        "signer_label_prefix": "Approved by",
+        "visible_fields": ["common_name", "signing_time", "location"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "success",
+      "expected_diagnostics": {"classification": "supported", "preview_vs_output": "pass"},
+      "timestamp_required": false
+    },
+    {
+      "name": "multi_line_top_image_stamp",
+      "case_tags": ["image_stamp", "page_aspect"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "multi_line",
+        "stamp_position": "top",
+        "image_stamp_path": "artifacts/generated_acceptance_assets/signed_acceptance_stamp.png",
+        "visible_fields": ["common_name", "title", "company", "signing_time"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "success",
+      "expected_diagnostics": {"classification": "supported", "preview_vs_output": "pass"},
+      "timestamp_required": false
+    },
+    {
+      "name": "multi_line_bottom_long_fields",
+      "case_tags": ["long_field", "page_aspect"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "multi_line",
+        "stamp_position": "bottom",
+        "visible_fields": ["common_name", "email", "title", "company", "signing_time"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "success",
+      "expected_diagnostics": {"classification": "supported", "preview_vs_output": "pass"},
+      "timestamp_required": false
+    },
+    {
+      "name": "wrapped_block_top_compact_zoom",
+      "case_tags": ["compact", "zoom"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "wrapped_block",
+        "stamp_position": "top",
+        "visible_fields": ["common_name", "title", "company", "signing_time"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "success",
+      "expected_diagnostics": {"classification": "supported", "preview_vs_output": "pass"},
+      "timestamp_required": false
+    },
+    {
+      "name": "wrapped_block_bottom_custom_text",
+      "case_tags": ["custom_text", "long_field", "page_aspect"],
+      "appearance_overrides": {
+        "fixture_profile": "stress_visible_appearance_v1",
+        "layout_template": "wrapped_block",
+        "stamp_position": "bottom",
+        "signer_label_prefix": "Digitally approved by",
+        "visible_fields": ["common_name", "email", "title", "company", "signing_time", "location"]
+      },
+      "signature_rect": {"page_index": 0, "left_pt": 84, "bottom_pt": 96, "width_pt": 420, "height_pt": 86},
+      "expected_outcome": "validation_rejection",
+      "expected_failure_message_contains": "does not fit inside the selected rectangle",
+      "expected_diagnostics": {"classification": "rejected_before_signing", "preview_vs_output": "not_applicable"},
+      "timestamp_required": false
+    }
+  ]
+}

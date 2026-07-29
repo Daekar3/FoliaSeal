@@ -138,6 +138,16 @@ Roadmap note:
 - The current signed preview parity and fit-rejection matrices are green for the fixture corpus.
   The remaining engineering focus is on representative manual gate evidence, closing the
   stress-matrix green-path gaps, and finishing TSA/timestamp support.
+- The bounded release-fidelity claim is now versioned as `manifest_version: 1` with the
+  `phase3_fidelity_v1` comparison contract in
+  `tests/fixtures/phase3/release_fidelity_manifest.json`: eight scenarios, six supported
+  signings, and two intentional pre-signing fit rejections. Its signed evidence requires zero
+  expected-outcome, cryptographic, preview/output, and annotation-rectangle failures; it does
+  not claim that every historical stress combination is supported. The tracked manifest SHA-256
+  is `4dd4545c94398411268589666caf06ee7cdceb3a79f03aeac6591008b5e1085e`; current evidence is
+  `/tmp/foliaseal-release-preview-final/summary.json` and
+  `/tmp/foliaseal-release-signed-final/summary.json`. These artifacts do not constitute remediation
+  or like-for-like replacement of the historical large stress corpus.
 
 ## Local development
 

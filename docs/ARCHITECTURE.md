@@ -44,6 +44,7 @@ The canonical repository document split is:
 | `src/foliaseal/domain/` | Stable domain models, enums, protocols, and failure codes. | No Qt imports found. |
 | `src/foliaseal/application/` | Use cases, workflows, geometry, preview/render evidence logic, layout planning, protocol boundaries, and the Phase 3 evidence service. | Some transitional modules still import concrete infra helpers. |
 | `src/foliaseal/application/phase3_evidence_service.py` | Explicit service boundary for Phase 3 evidence capture, matrix execution, validation, and signed-acceptance evidence generation. | Owns the request/result dataclasses and the only caller-facing Phase 3 service verbs. |
+| `src/foliaseal/application/phase3_fidelity_contract.py` | Versioned release-fidelity manifest contract for the tracked Phase 3 corpus. | Validates `manifest_version`, `phase3_fidelity_v1` tolerances/critical counters, and per-scenario expected outcomes/diagnostics before matrix execution. |
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, QtPdf geometry plus Poppler interactive-viewer rasterisation, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed; the interactive viewer also late-resolves the Linux `pdftoppm` executable. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, preset certificate display-name lookup, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
@@ -380,6 +381,16 @@ The canonical repository document split is:
 - Main entry points: `build_default_phase3_evidence_service()`, `Phase3EvidenceService.capture_harness()`, `Phase3EvidenceService.run_preview_matrix()`, `Phase3EvidenceService.run_signed_acceptance_matrix()`, `Phase3EvidenceService.validate_harness_capture()`, `Phase3EvidenceService.run_signed_acceptance_evidence()`.
 - Known constraints: The service is intentionally thin over injected runners and writers, but it centralizes the CLI-facing request/result types and the signed-acceptance summary assembly. The Qt helper module only suppresses known benign Qt/pyHanko chatter and preserves the documented output paths for default service construction.
 - Status: Confirmed by code and tests.
+
+### Phase 3 release-fidelity contract
+
+- Location: `src/foliaseal/application/phase3_fidelity_contract.py`, `tests/fixtures/phase3/release_fidelity_manifest.json`
+- Responsibility: Validate the versioned, tracked manifest contract used for the bounded release-fidelity corpus before matrix execution.
+- Owns: `manifest_version: 1`, `phase3_fidelity_v1` comparison tolerances and critical-zero counters, per-scenario `expected_outcome` and expected diagnostics, and the six-supported/two-intentional-fit-rejection corpus declaration.
+- Does not own: preview rendering, signing, PDF verification, or historical stress-corpus remediation.
+- Key collaborators: Phase 3 preview and signed-acceptance matrix runners, `phase3_evidence_service.py`, and the tracked release manifest.
+- Known constraints: This is a bounded release claim, not a universal layout guarantee. The eight scenarios and zero-tolerance comparison fields are the only supported scope; compact or historical stress manifests remain separate, non-comparable evidence.
+- Status: Confirmed by code, tests, and matrix evidence (`/tmp/foliaseal-release-preview-final/summary.json`, `/tmp/foliaseal-release-signed-final/summary.json`; manifest SHA-256 `4dd4545c94398411268589666caf06ee7cdceb3a79f03aeac6591008b5e1085e`).
 
 ### Phase 3 harness session runner
 
