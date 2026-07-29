@@ -5,14 +5,25 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+# PyInstaller executes spec files as code without defining ``__file__``.
+# ``SPECPATH`` is the stable spec-directory variable supplied by PyInstaller.
+PROJECT_ROOT = Path(SPECPATH).resolve()  # noqa: F821
 SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from foliaseal.build.pyinstaller_support import collect_runtime_assets  # noqa: E402
 
-hiddenimports = collect_submodules("foliaseal")
+hiddenimports = collect_submodules("foliaseal") + [
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtNetwork",
+    "PySide6.QtPdf",
+    "PySide6.QtPdfWidgets",
+    "PySide6.QtPrintSupport",
+    "PySide6.QtSvg",
+    "PySide6.QtWidgets",
+]
 runtime_assets = collect_runtime_assets(PROJECT_ROOT)
 
 

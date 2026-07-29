@@ -12,7 +12,7 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 
 - [x] `v1_execplan_reconciliation_execplan.md` completed in `4903fba82`; it reconciled status from fresh evidence while preserving the remaining direct GUI acceptances as real work.
 - [x] `v1_multi_signature_acceptance_execplan.md` completed in `2b36c49c4` with its final plan closeout in `794976d8c`; the release-bar “add another approval signature” behavior is now evidenced.
-- [ ] `v1_linux_desktop_distribution_execplan.md` must complete before claiming packaged Linux desktop distribution.
+- [x] `v1_linux_desktop_distribution_execplan.md` completed on 2026-07-28 with Debian packaging, extracted GUI startup, and package-owned signing evidence.
 - [ ] `v1_visible_signature_fidelity_rebaseline_execplan.md` must complete before claiming durable WYSIWYG evidence beyond the historical or compact-only matrices.
 - [x] The direct default-shell acceptance in `gui_preset_first_shell_reduction_execplan.md` completed on 2026-07-28 with a 14-checkpoint audit and retained screenshot review. The staged-flow acceptance completed on 2026-07-20; both pre-existing GUI acceptance slices remain outside this parent’s four child slices.
 
@@ -22,7 +22,7 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
 - [x] (2026-07-20) Created four child plans with one primary change class each.
 - [x] (2026-07-20) Executed the reconciliation child: its fresh twelve-checkpoint audit, evidence review, compliance review, and dedicated documentation/status commit `4903fba82` are complete.
 - [x] (2026-07-28) Executed and closed the multi-signature child: dynamic unused `SignatureN` allocation, actual-PDF two-signature review coverage, isolated 19-checkpoint audit, compliance review, documentation updates, and commit `2b36c49c4` all passed.
-- [ ] Execute the Linux distribution child and retain its package acceptance evidence.
+- [x] (2026-07-28) Executed and closed the Linux distribution child: `dist/foliaseal_0.1.0_amd64.deb` declares `Depends: poppler-utils`; extracted wrapper/help and offscreen GUI startup passed; package-owned evidence passed 10/7, 18/18, and 3/3 matrices. SHA-256: `14403f944861636ca8729893eb4be721668f197e07ae733154e493b70b6a8d95`; audit: `/tmp/foliaseal-deb-audit/audit.json`.
 - [ ] Execute the fidelity child and publish the bounded release conclusion.
 - [ ] Perform a final release-bar review, reconcile `README.md` and `docs/ARCHITECTURE.md`, and commit the parent-plan closeout.
 
@@ -34,6 +34,8 @@ After this parent plan is complete, FoliaSeal has current, reproducible proof fo
   Evidence: `/tmp/foliaseal-live-gui-multi-signature-audit/audit.json` reports `status: passed`, `output_signature_count: 2`, and 19 checkpoints.
 - Observation: PyInstaller bundles font assets, but the live viewer now relies on the operating-system `pdftoppm` executable.
   Evidence: `src/foliaseal/infra/render/poppler_backend.py` is the interactive viewer pixel source and `docs/ARCHITECTURE.md` says broader desktop distribution remains open.
+- Observation: the Debian package now supplies the missing distribution boundary while retaining `pdftoppm` as an explicit host dependency.
+  Evidence: `dpkg-deb --info dist/foliaseal_0.1.0_amd64.deb` and `/tmp/foliaseal-deb-audit/audit.json`.
 
 ## Decision Log
 

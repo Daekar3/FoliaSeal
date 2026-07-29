@@ -176,6 +176,46 @@ This produces:
 - bundle directory: `dist/foliaseal`
 - executable: `dist/foliaseal/foliaseal`
 
+## Debian-family desktop package
+
+The supported Linux distribution artifact is a Debian-family `.deb` package. Build it after
+installing the development extras (the builder invokes the existing PyInstaller one-dir build):
+
+```bash
+python -m pip install -e .[dev]
+./scripts/build_deb.sh
+```
+
+The deterministic output is `dist/foliaseal_<version>_<architecture>.deb`. The package installs
+the bundled application under `/usr/lib/foliaseal`, a relocatable `/usr/bin/foliaseal` launcher,
+the desktop entry `/usr/share/applications/foliaseal.desktop`, and the `foliaseal` icon. Its
+declared runtime dependency is Debian's `poppler-utils` package, which supplies `pdftoppm` for
+interactive PDF pixels; PySide6 and the Python runtime are bundled by PyInstaller.
+
+Inspect a package without installing it:
+
+```bash
+dpkg-deb --info dist/foliaseal_0.1.0_amd64.deb
+dpkg-deb --contents dist/foliaseal_0.1.0_amd64.deb
+sha256sum dist/foliaseal_0.1.0_amd64.deb
+```
+
+Run the package-owned extraction audit from an isolated environment. It removes `PYTHONPATH`,
+uses isolated XDG stores, starts the real Qt GUI with the offscreen platform when no X11 cursor
+provider is available, and runs the signed-acceptance/parity/fit-rejection matrices from the
+extracted executable:
+
+```bash
+python scripts/deb_package_audit.py \
+  dist/foliaseal_0.1.0_amd64.deb \
+  --artifacts-dir /tmp/foliaseal-deb-audit
+```
+
+The 2026-07-28 audit passed: package SHA-256
+`14403f944861636ca8729893eb4be721668f197e07ae733154e493b70b6a8d95`, wrapper `--help` and
+isolated GUI startup succeeded, and the extracted package reported 10 signing scenarios (7
+successful), 18/18 parity scenarios, and 3/3 fit-rejection scenarios.
+
 Phase 2 evidence commands and prior runtime notes are still available in:
 
 - [phase2_manual_qa_results.md](/home/daekar/FoliaSeal/artifacts/phase2_manual_qa_results.md)

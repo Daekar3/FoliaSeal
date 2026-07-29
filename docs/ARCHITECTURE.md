@@ -13,7 +13,7 @@ Status markers used in this document:
 
 ## 1. Purpose and scope
 
-FoliaSeal is a Linux-targeted desktop PDF signing application foundation. The package provides a `foliaseal` command, a Qt-based PDF viewer/signing shell, an application-layer signature-properties coordinator, a headless PDF signing use case, named visible-signature profiles, preview and signed-output QA harnesses, and PyInstaller packaging support. This is confirmed by `README.md`, `pyproject.toml`, and `src/foliaseal/__main__.py`.
+FoliaSeal is a Linux-targeted desktop PDF signing application foundation. The package provides a `foliaseal` command, a Qt-based PDF viewer/signing shell, an application-layer signature-properties coordinator, a headless PDF signing use case, named visible-signature profiles, preview and signed-output QA harnesses, and a Debian-family desktop distribution built around a PyInstaller bundle. This is confirmed by `README.md`, `pyproject.toml`, `scripts/build_deb.sh`, and `src/foliaseal/__main__.py`.
 
 This document governs the repository architecture: Python package layout, application/domain/infra/presentation boundaries, object models, file contracts, CLI contracts, rendering/signing dependencies, persistence, and tests. It does not describe a deployed service or network protocol because the current code is a local desktop application and CLI tool.
 
@@ -525,11 +525,12 @@ The canonical repository document split is:
 
 ### Packaging
 
-- Location: `pyproject.toml`, `foliaseal.spec`, `scripts/build_pyinstaller.sh`, `src/foliaseal/build/pyinstaller_support.py`
-- Responsibility: Python package metadata, console script registration, package data, and PyInstaller one-dir bundle support.
-- Owns: `foliaseal` console script, dependencies, package-data declaration for fonts, and runtime-asset collection for bundled visible-signature fonts.
-- Known constraints: Runtime dependencies in `pyproject.toml` are `pyHanko[opentype]` and Pillow; the optional `gui` extra installs `PySide6`, and the `dev` extra installs PyInstaller, PySide6, pytest, and ruff. PySide6 is still loaded dynamically at runtime so headless/unit-test paths can use fakes or raise explicit unavailable diagnostics. PyInstaller currently covers tested runtime-asset collection for bundled visible-signature fonts; broader desktop distribution packaging remains separate open work.
-- Status: Confirmed by code and tests; explicit GUI launch and optional GUI dependency metadata are now present, while broader desktop distribution packaging remains open.
+- Location: `pyproject.toml`, `foliaseal.spec`, `scripts/build_pyinstaller.sh`, `scripts/build_deb.sh`, `scripts/deb_package_audit.py`, `src/foliaseal/build/pyinstaller_support.py`, `src/foliaseal/build/debian_packaging.py`, and `packaging/foliaseal.svg`
+- Responsibility: Python package metadata, console script registration, package data, PyInstaller one-dir bundle support, and Debian-family desktop distribution.
+- Owns: the `foliaseal` console script; bundled font assets, Python runtime, and Qt runtime; deterministic `.deb` naming and staging; `/usr/bin/foliaseal` relocation-aware launcher; desktop entry and icon; `Depends: poppler-utils`; and package-owned extraction/startup/signed-acceptance auditing.
+- Does not own: system-wide package installation, distribution repositories, or copying arbitrary host libraries into the bundle.
+- Known constraints: Runtime dependencies in `pyproject.toml` are `pyHanko[opentype]` and Pillow; the optional `gui` extra installs `PySide6`, while the Debian package bundles PySide6 and the Python runtime. Interactive pixels still late-resolve the host `pdftoppm` supplied by `poppler-utils`; canonical preview and evidence rendering remain QtPdf-scoped. The first supported distribution mode is Debian-family `amd64` (architecture is read from `dpkg --print-architecture`).
+- Status: Confirmed by code and tests. The built `dist/foliaseal_0.1.0_amd64.deb` passed package inspection, extracted wrapper/help and offscreen Qt startup, and the package-owned signing audit (10 scenarios/7 successful signings, 18/18 parity, 3/3 fit rejection). SHA-256: `14403f944861636ca8729893eb4be721668f197e07ae733154e493b70b6a8d95`.
 
 ## 5. Object model / domain model
 
@@ -914,7 +915,6 @@ Default local validation from README:
 | Historical profile terminology remains in storage path/module names. | `profile_storage.py` and `Signature Profiles/profiles.json` may still look broader than the current `SignaturePresetCatalog` responsibility. | Public methods and shell behavior use preset-oriented names; the historical path is documented. | Consider a storage-path/module rename only if it can be done without introducing unnecessary migration code. |
 | `SignatureLayoutPlan.backend_reservation` | Removed from the public layout result. | Public layout boundary is now neutral; backend compatibility lives in evidence names. | Preserve pyHanko parity during migration. | Backend-facing evidence still uses `backend_reservation_snapshot` and `backend_reservation_error`. |
 | PySide6 is dynamically imported and now listed only in the optional `gui` and `dev` extras, not the base runtime dependencies. | A fresh base install may still run CLI helpers but fail GUI/harness commands until the extra is installed. | Runtime diagnostics report unavailable Qt bindings; `foliaseal gui` is the supported launch path once the extra is present. | Keep the GUI dependency optional unless packaging work requires the desktop stack in every install. |
-| PyInstaller support currently covers runtime asset collection for bundled fonts, but not a GUI launcher or broader desktop distribution packaging flow. | Helper/tests align with the spec, while a full packaged desktop app remains a separate workstream. | `foliaseal.spec` uses `collect_runtime_assets()` for the runtime font assets. | Add launcher/distribution packaging when that work starts. |
 | Checked-in artifact docs include historical status and roadmap notes. | README warns some narrative notes may be stale. | Current gate status should come from latest checked-in summaries/artifacts. | Keep live status in generated summaries or curated release notes, not scattered narratives. |
 
 ## 13. Open questions
