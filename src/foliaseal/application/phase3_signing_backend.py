@@ -51,15 +51,16 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
 )
+from foliaseal.application.visible_signature_color import text_style_color_rgba
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
-    LayoutRequest,
     RectBounds,
     SignatureLayoutPlan,
-    VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
+    VisibleSignaturePlanRequest,
     _SignatureLayoutReservation,
 )
 from foliaseal.application.visible_signature_semantics import (
@@ -93,9 +94,7 @@ from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validati
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 _SINGLE_LINE_RENDERED_INK_FIT_CACHE = _visible_layout._SINGLE_LINE_RENDERED_INK_FIT_CACHE
-detect_text_content_bounds_in_image = (
-    _text_raster_analysis.detect_text_content_bounds_in_image
-)
+detect_text_content_bounds_in_image = _text_raster_analysis.detect_text_content_bounds_in_image
 
 
 def _next_signature_field_name(input_path: Path) -> str:
@@ -110,6 +109,8 @@ def _next_signature_field_name(input_path: Path) -> str:
     while f"Signature{index}" in existing_names:
         index += 1
     return f"Signature{index}"
+
+
 @dataclass(frozen=True)
 class BackendReservationEvidence:
     """JSON-ready backend reservation evidence for a signing request."""
@@ -541,19 +542,15 @@ def _build_stamp_style(
     stamp_background: PdfImage | None,
     signature_rect: SignatureRect,
 ) -> TextStampStyle:
-    layout_plan = VisibleSignatureLayoutEngine(
-        ink_measurer=_BackendHorizontalInkMeasurer(appearance),
-    ).plan(
-        LayoutRequest(
+    plan_result = VisibleSignatureLayoutBoundary().plan(
+        VisibleSignaturePlanRequest(
+            appearance=appearance,
             signature_rect=signature_rect,
-            layout_template=appearance.layout_template,
-            stamp_position=appearance.stamp_position,
-            text_style=appearance.text_style,
-            box_style=appearance.box_style,
             stamp_text=stamp_text,
-            image_stamp_path=appearance.image_stamp_path,
+            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
         )
     )
+    layout_plan = plan_result.layout_plan
     if layout_plan.fit_issues and not (
         _single_line_rendered_ink_fits_reservation(
             signature_rect=signature_rect,
@@ -569,14 +566,19 @@ def _build_stamp_style(
     ):
         raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
 
-    return VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
-        appearance=appearance,
-        stamp_text=stamp_text,
-        stamp_background=stamp_background,
-        signature_rect=signature_rect,
-        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-        ink_measurer=_BackendHorizontalInkMeasurer(appearance),
-    ).stamp_style
+    return (
+        VisibleSignatureLayoutService.production()
+        .pyhanko_style_for_signing(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+            layout_plan=layout_plan,
+        )
+        .stamp_style
+    )
 
 
 @dataclass(frozen=True)
@@ -710,9 +712,7 @@ def _single_line_stamp_content_inset(
     """Reserve a small internal gutter so fitted stamp content is not flush to the band edge."""
 
     effective_width = (
-        reserved_width
-        if isinstance(reserved_width, int) and reserved_width > 0
-        else box_width
+        reserved_width if isinstance(reserved_width, int) and reserved_width > 0 else box_width
     )
     effective_height = (
         reserved_height if isinstance(reserved_height, int) and reserved_height > 0 else box_height
@@ -1085,7 +1085,7 @@ def _stamp_text_preview_parts(
 
 
 def _text_style_color_rgba(text_style: SignatureTextStyle) -> tuple[int, int, int, int] | None:
-    return _visible_layout._text_style_color_rgba(text_style)
+    return text_style_color_rgba(text_style)
 
 
 def _ensure_layout_can_fit(
@@ -1201,9 +1201,7 @@ def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
 
 
 def _solid_background_for_color(color_hex: str) -> PdfImage:
-    red, green, blue = (
-        int(component * 255) for component in _hex_to_rgb(color_hex)
-    )
+    red, green, blue = (int(component * 255) for component in _hex_to_rgb(color_hex))
     image = Image.new("RGB", (16, 16), color=(red, green, blue))
     return PdfImage(image, writer=None)
 
@@ -1361,9 +1359,7 @@ def build_backend_reservation_evidence(
     if request is None or request.signature_rect is None or request.signature_appearance is None:
         return None
 
-    appearance = SigningBackendAppearance.from_signature_appearance(
-        request.signature_appearance
-    )
+    appearance = SigningBackendAppearance.from_signature_appearance(request.signature_appearance)
     snapshot: dict[str, Any] = {
         "layout_template": appearance.layout_template.value,
         "stamp_position": appearance.stamp_position.value,
@@ -1388,12 +1384,20 @@ def build_backend_reservation_evidence(
             signature_rect=request.signature_rect,
         )
         stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
+        plan_result = VisibleSignatureLayoutBoundary().plan(
+            VisibleSignaturePlanRequest(
+                appearance=appearance,
+                signature_rect=request.signature_rect,
+                stamp_text=stamp_text,
+            )
+        )
         style_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
             appearance=appearance,
             stamp_text=stamp_text,
             stamp_background=stamp_background,
             signature_rect=request.signature_rect,
             options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+            layout_plan=plan_result.layout_plan,
         )
         layout_plan = style_result.layout_plan
         text_box_width = layout_plan.text_box.width_pt
@@ -1435,6 +1439,7 @@ def build_backend_reservation_evidence(
                 else None,
                 "background_layout": _snapshot_layout_rule(style_result.background_layout),
                 "content_layout": _snapshot_layout_rule(layout_plan.text_layout),
+                "neutral_plan": plan_result.reservation_snapshot,
             }
         )
     except Exception as exc:
@@ -1523,8 +1528,7 @@ def _status_has_timestamp(status) -> bool:
     if timestamp_validity is None:
         return False
     return bool(
-        getattr(timestamp_validity, "intact", True)
-        and getattr(timestamp_validity, "valid", True)
+        getattr(timestamp_validity, "intact", True) and getattr(timestamp_validity, "valid", True)
     )
 
 

@@ -71,6 +71,13 @@ Current capabilities:
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
   - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
+- The visible-signature layout path now has a neutral planner boundary before either PyHanko
+  adapter.
+  - `visible_signature_layout.py` owns the shared geometry plan and fit diagnostics.
+  - `visible_signature_color.py` owns the shared RGBA conversion helper used by horizontal
+    measurement.
+  - `_text_style_color_rgba` remains only as a delegating compatibility shim while older callers
+    migrate.
 - Visible-signature typography now uses bundled OpenType font assets as the canonical source of
   truth.
   - Backend fit validation and final signed rendering use pyHanko's OpenType shaping path instead

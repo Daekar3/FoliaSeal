@@ -34,8 +34,10 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     RectBounds,
     SignatureLayoutPlan,
+    VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
+    VisibleSignaturePlanRequest,
     structural_line_bounds,
 )
 from foliaseal.domain.models import (
@@ -499,9 +501,7 @@ def compare_signature_appearance_snapshots(
 
     composite_matches = preview_snapshot.image_size_px == signed_snapshot.image_size_px
     composite_reason = (
-        None
-        if composite_matches
-        else "Normalized preview and signed image dimensions differ."
+        None if composite_matches else "Normalized preview and signed image dimensions differ."
     )
 
     border = SignatureAppearanceLayerComparison(
@@ -525,12 +525,7 @@ def compare_signature_appearance_snapshots(
         reason=composite_reason,
     )
     return SignatureAppearanceComparison(
-        is_consistent=(
-            border.matches
-            and text.matches
-            and stamp.matches
-            and composite.matches
-        ),
+        is_consistent=(border.matches and text.matches and stamp.matches and composite.matches),
         border=border,
         text=text,
         stamp=stamp,
@@ -846,6 +841,19 @@ def _canonical_preview_layout(
     )
     stamp_text = _semantic_preview_stamp_text(preview) if include_text else " "
     stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
+    ink_measurer = (
+        _PreviewHorizontalInkMeasurer(preview) if use_horizontal_ink_reservation else None
+    )
+    plan_result = VisibleSignatureLayoutBoundary().plan(
+        VisibleSignaturePlanRequest(
+            appearance=appearance,
+            signature_rect=preview.signature_rect,
+            stamp_text=stamp_text,
+            include_stamp=include_stamp,
+            use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+            ink_measurer=ink_measurer,
+        )
+    )
     service_layout = VisibleSignatureLayoutService.production().pyhanko_style_for_canonical_preview(
         appearance=appearance,
         stamp_text=stamp_text,
@@ -859,11 +867,8 @@ def _canonical_preview_layout(
             allow_fit_issues=True,
             horizontal_ink_policy="auto" if use_horizontal_ink_reservation else "disabled",
         ),
-        ink_measurer=(
-            _PreviewHorizontalInkMeasurer(preview)
-            if use_horizontal_ink_reservation
-            else None
-        ),
+        ink_measurer=ink_measurer,
+        layout_plan=plan_result.layout_plan,
     )
     return _CanonicalPreviewLayout(
         style=service_layout.style,
@@ -1076,8 +1081,7 @@ def _compare_preview_fields_to_appearance(
     for preview_field, (field_key, binding) in zip(preview_fields, expected_bindings, strict=True):
         expected_label = _field_label(field_key)
         expected_visible = (
-            binding.show_in_visible_appearance
-            and binding.source != SignatureFieldSource.HIDDEN
+            binding.show_in_visible_appearance and binding.source != SignatureFieldSource.HIDDEN
         )
 
         if preview_field.field_key != field_key:
@@ -1123,9 +1127,7 @@ def _compare_preview_fields_to_appearance(
                 )
         elif binding.source == SignatureFieldSource.DERIVED:
             expected_hint = (
-                "sign time"
-                if field_key == SignatureFieldKey.SIGNING_TIME
-                else "from certificate"
+                "sign time" if field_key == SignatureFieldKey.SIGNING_TIME else "from certificate"
             )
             if not preview_field.text or preview_field.hint != expected_hint:
                 issues.append(

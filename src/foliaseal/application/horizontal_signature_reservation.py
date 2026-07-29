@@ -58,13 +58,13 @@ def measure_horizontal_single_line_rendered_reference(
         height_padding_pt=roomy_height_padding_pt,
     )
     try:
-        from foliaseal.application.phase3_signing_backend import _text_style_color_rgba
         from foliaseal.application.signing_preview_renderer import (
             render_canonical_signature_preview,
         )
         from foliaseal.application.text_raster_analysis import (
             detect_text_content_bounds_in_image,
         )
+        from foliaseal.application.visible_signature_color import text_style_color_rgba
 
         snapshot = render_canonical_signature_preview(
             replace(preview, signature_rect=reference_rect),
@@ -82,7 +82,7 @@ def measure_horizontal_single_line_rendered_reference(
         rendered_ink_bounds_px, _error = detect_text_content_bounds_in_image(
             preview_image_path=snapshot.image_path,
             text_widget_bounds=snapshot.text_area_bounds_px,
-            text_color_rgba=_text_style_color_rgba(preview.text_style),
+            text_color_rgba=text_style_color_rgba(preview.text_style),
             reference_text_content_bounds=snapshot.text_bounds_px,
         )
         if rendered_ink_bounds_px is None:

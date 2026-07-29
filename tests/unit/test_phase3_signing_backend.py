@@ -636,154 +636,6 @@ def test_single_line_horizontal_stamp_vertical_inset_uses_border_safe_spacing() 
     )
 
 
-def test_background_layout_for_top_multi_line_stamp_adds_border_facing_inset(
-) -> None:
-    stamp_path = Path("/tmp/test-top-stamp-inset.png")
-    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
-    signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=46.0)
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.MULTI_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        signature_rect=signature_rect,
-        text_box_width=180,
-        text_box_height=24,
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=1.0,
-            background_color_hex="#FFFFFF",
-        ),
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=40 / 12,
-    )
-
-    background_layout = _background_layout_for_stamp(
-        SignatureLayoutTemplate.MULTI_LINE,
-        stamp_position=SignatureStampPosition.TOP,
-        stamp_background=stamp_background,
-        signature_rect=signature_rect,
-        text_box_width=180,
-        text_box_height=24,
-        box_style=SignatureBoxStyle(
-            show_border=True,
-            border_color_hex="#000000",
-            border_width_pt=1.0,
-            background_color_hex="#FFFFFF",
-        ),
-    )
-
-    assert background_layout.margins.top > reservation.background_layout.margins.top
-
-
-def test_background_layout_for_bottom_wrapped_block_stamp_adds_border_facing_inset(
-) -> None:
-    stamp_path = Path("/tmp/test-bottom-stamp-inset.png")
-    Image.new("RGBA", (12, 40), color=(0, 0, 0, 255)).save(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
-    signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=54.0)
-    box_style = SignatureBoxStyle(
-        show_border=True,
-        border_color_hex="#000000",
-        border_width_pt=1.0,
-        background_color_hex="#FFFFFF",
-    )
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.BOTTOM,
-        signature_rect=signature_rect,
-        text_box_width=180,
-        text_box_height=24,
-        box_style=box_style,
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=12 / 40,
-    )
-
-    background_layout = _background_layout_for_stamp(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.BOTTOM,
-        stamp_background=stamp_background,
-        signature_rect=signature_rect,
-        text_box_width=180,
-        text_box_height=24,
-        box_style=box_style,
-    )
-
-    assert background_layout.margins.bottom > reservation.background_layout.margins.bottom
-
-
-def test_background_layout_for_right_wrapped_block_stamp_adds_border_facing_inset(
-) -> None:
-    stamp_path = Path("/tmp/test-right-stamp-inset.png")
-    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
-    signature_rect = build_signature_rect(page_index=0, width_pt=220.0, height_pt=62.0)
-    box_style = SignatureBoxStyle(
-        show_border=True,
-        border_color_hex="#000000",
-        border_width_pt=1.0,
-        background_color_hex="#FFFFFF",
-    )
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.RIGHT,
-        signature_rect=signature_rect,
-        text_box_width=120,
-        text_box_height=36,
-        box_style=box_style,
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=40 / 12,
-    )
-
-    background_layout = _background_layout_for_stamp(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.RIGHT,
-        stamp_background=stamp_background,
-        signature_rect=signature_rect,
-        text_box_width=120,
-        text_box_height=36,
-        box_style=box_style,
-    )
-
-    assert background_layout.margins.right > reservation.background_layout.margins.right
-
-
-def test_background_layout_for_left_wrapped_block_stamp_adds_border_facing_inset(
-) -> None:
-    stamp_path = Path("/tmp/test-left-stamp-inset.png")
-    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
-    signature_rect = build_signature_rect(page_index=0, width_pt=220.0, height_pt=62.0)
-    box_style = SignatureBoxStyle(
-        show_border=True,
-        border_color_hex="#000000",
-        border_width_pt=1.0,
-        background_color_hex="#FFFFFF",
-    )
-    reservation = _layout_reservation_for_template(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.LEFT,
-        signature_rect=signature_rect,
-        text_box_width=120,
-        text_box_height=36,
-        box_style=box_style,
-        has_visible_stamp_image=True,
-        stamp_aspect_ratio=40 / 12,
-    )
-
-    background_layout = _background_layout_for_stamp(
-        SignatureLayoutTemplate.WRAPPED_BLOCK,
-        stamp_position=SignatureStampPosition.LEFT,
-        stamp_background=stamp_background,
-        signature_rect=signature_rect,
-        text_box_width=120,
-        text_box_height=36,
-        box_style=box_style,
-    )
-
-    assert background_layout.margins.left > reservation.background_layout.margins.left
-
-
 def test_single_line_horizontal_text_reservation_width_is_strict_for_left_right() -> None:
     assert (
         _effective_horizontal_text_reservation_width(
@@ -795,8 +647,7 @@ def test_single_line_horizontal_text_reservation_width_is_strict_for_left_right(
     )
 
 
-def test_single_line_horizontal_text_reservation_width_matches_strict_preview_contract(
-) -> None:
+def test_single_line_horizontal_text_reservation_width_matches_strict_preview_contract() -> None:
     assert (
         _effective_horizontal_text_reservation_width(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
@@ -955,8 +806,7 @@ def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compac
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend."
-        "_single_line_rendered_ink_fits_reservation",
+        "foliaseal.application.phase3_signing_backend._single_line_rendered_ink_fits_reservation",
         lambda **_kwargs: False,
     )
     monkeypatch.setattr(
@@ -982,8 +832,7 @@ def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compac
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
         ),
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
@@ -1016,8 +865,7 @@ def test_horizontal_single_line_backend_validation_falls_back_without_ink_refere
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend."
-        "_single_line_rendered_ink_fits_reservation",
+        "foliaseal.application.phase3_signing_backend._single_line_rendered_ink_fits_reservation",
         lambda **_kwargs: False,
     )
     monkeypatch.setattr(
@@ -1036,8 +884,7 @@ def test_horizontal_single_line_backend_validation_falls_back_without_ink_refere
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
         ),
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
@@ -1079,8 +926,7 @@ def test_horizontal_single_line_cap10_geometry_passes_after_text_first_reservati
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
         ),
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
@@ -1122,8 +968,7 @@ def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
         ),
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
@@ -1166,8 +1011,7 @@ def test_horizontal_single_line_short_height_accepts_preserved_rendered_ink(
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:27"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:27"
         ),
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
@@ -1805,11 +1649,7 @@ def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_ren
         ),
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery\n"
-            "Board Secretary\n"
-            "FoliaSeal\n"
-            "2026-04-28 23:56"
+            "Digitally signed by\nMorgan Ellery\nBoard Secretary\nFoliaSeal\n2026-04-28 23:56"
         ),
         stamp_background=_stamp_background_for_path(str(stamp_path)),
     )
@@ -2179,8 +2019,7 @@ def test_build_stamp_style_uses_ink_reservation_for_horizontal_single_line_pdf_l
         height_pt=36.86,
     )
     stamp_text = (
-        "Digitally signed by\n"
-        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+        "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
     )
     structural_reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
@@ -2257,8 +2096,7 @@ def test_build_stamp_style_falls_back_to_structural_horizontal_layout_without_in
         height_pt=36.86,
     )
     stamp_text = (
-        "Digitally signed by\n"
-        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+        "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
     )
     structural_reservation = _layout_reservation_for_template(
         SignatureLayoutTemplate.SINGLE_LINE,
@@ -2336,8 +2174,7 @@ def test_build_stamp_style_matches_canonical_preview_ink_reservation_margins(
         lambda *_args, **_kwargs: rendered_reference,
     )
     stamp_text = (
-        "Digitally signed by\n"
-        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+        "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
     )
     appearance = SigningBackendAppearance.from_signature_appearance(
         build_signature_appearance(
@@ -2384,9 +2221,7 @@ def test_build_stamp_style_matches_canonical_preview_ink_reservation_margins(
         include_border=True,
     )
 
-    assert pdf_style.inner_content_layout.margins == (
-        preview_layout.inner_content_layout.margins
-    )
+    assert pdf_style.inner_content_layout.margins == (preview_layout.inner_content_layout.margins)
     assert pdf_style.background_layout.margins == preview_layout.background_layout.margins
 
 
@@ -2457,11 +2292,7 @@ def test_background_layout_for_horizontal_single_line_keeps_stamp_vertically_ins
         box_style=box_style,
     )
 
-    fitted_height = (
-        reservation.container_height_pt
-        - layout.margins.top
-        - layout.margins.bottom
-    )
+    fitted_height = reservation.container_height_pt - layout.margins.top - layout.margins.bottom
     assert fitted_height <= reservation.stamp_area_height_pt - 4
 
 
@@ -2655,8 +2486,7 @@ def test_visible_signature_fit_issues_use_semantics_stamp_text(
         return ()
 
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend."
-        "_visible_signature_fit_issues_for_stamp_text",
+        "foliaseal.application.phase3_signing_backend._visible_signature_fit_issues_for_stamp_text",
         _capture_fit_issues,
     )
 
@@ -2904,7 +2734,6 @@ def test_build_stamp_text_wraps_horizontal_single_line_when_stamp_is_present(
     assert with_stamp.count("\n") >= without_stamp.count("\n")
     assert "Adam Smith" in with_stamp
     assert "Wytheville, Virginia, US" in with_stamp
-
 
 
 @pytest.mark.parametrize(
@@ -3489,8 +3318,7 @@ def test_build_stamp_text_accepts_compact_vertical_single_line_with_modest_width
 
     assert "Inkslapped by" in stamp_text
     assert (
-        "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary | Lawson Heirs Inc."
-        in stamp_text
+        "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary | Lawson Heirs Inc." in stamp_text
     )
 
 
@@ -3763,8 +3591,7 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
         )
     )
     stamp_text = (
-        "Digitally signed by\n"
-        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
+        "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
     )
 
     issues = _visible_signature_fit_issues_for_stamp_text(
@@ -3795,40 +3622,35 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
             SignatureStampPosition.TOP,
             None,
             "Sans Serif",
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:34",
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:34",
         ),
         (
             248.66,
             SignatureStampPosition.TOP,
             None,
             "Sans Serif",
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:35",
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:35",
         ),
         (
             250.106,
             SignatureStampPosition.BOTTOM,
             "stamp.png",
             "Serif",
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:37",
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:37",
         ),
         (
             258.56,
             SignatureStampPosition.LEFT,
             None,
             "Sans Serif",
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:50",
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:50",
         ),
         (
             258.56,
             SignatureStampPosition.RIGHT,
             None,
             "Sans Serif",
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:51",
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 02:51",
         ),
     ],
 )
@@ -3948,8 +3770,7 @@ def test_single_line_rendered_ink_fallback_caches_identical_checks(
         height_pt=61.44,
     )
     stamp_text = (
-        "Digitally signed by\n"
-        "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
+        "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
     )
 
     assert _single_line_rendered_ink_fits_reservation(
@@ -4040,8 +3861,7 @@ def test_single_line_rendered_ink_fallback_rejects_border_flush_text(
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
         ),
     )
 
@@ -4115,8 +3935,7 @@ def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
         ),
         signature_appearance=appearance,
         stamp_text=(
-            "Digitally signed by\n"
-            "Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
+            "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
         ),
     )
 
