@@ -11,6 +11,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
     Phase3SignedAcceptanceScenarioExecutorDeps,
+    Phase3SignedAcceptanceScenarioResult,
 )
 from tests.support.phase3_builders import build_signature_rect, build_signing_request
 
@@ -210,3 +211,23 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
     assert result["output_file_exists"] is True
     assert result["output_signature_count"] == 2
     assert result["signed_output_preview_comparison"] == {"comparison_path": "cmp.png"}
+
+
+def test_signed_acceptance_scenario_executor_exposes_typed_result_without_changing_mapping(
+    tmp_path: Path,
+) -> None:
+    result = _executor().run_result(
+        shell=_FakeShell(),
+        scenario={"name": "Scenario A", "expected_outcome": "validation_rejection"},
+        profile_store=object(),
+        artifacts_dir=tmp_path,
+        base_input_path=tmp_path / "input.pdf",
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        sign_executor=SimpleNamespace(execute=lambda _request: None),
+    )
+
+    assert isinstance(result, Phase3SignedAcceptanceScenarioResult)
+    assert result.name == "Scenario A"
+    assert result.as_mapping()["expected_outcome"] == "validation_rejection"
+    assert result.as_mapping()["preview_text"] == "Preview text"

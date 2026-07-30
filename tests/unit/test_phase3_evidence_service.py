@@ -9,6 +9,7 @@ from foliaseal.application.phase3_evidence_service import (
     Phase3EvidenceService,
     Phase3HarnessCaptureRequest,
     Phase3HarnessValidationRequest,
+    Phase3MatrixKind,
     Phase3MatrixRequest,
     Phase3SignedAcceptanceEvidenceRequest,
     validate_signed_acceptance_matrix_summary,
@@ -147,6 +148,76 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
             artifacts_dir="artifacts/acceptance",
         ),
     }
+
+
+def test_phase3_evidence_service_normalizes_typed_matrix_results() -> None:
+    service = _service(
+        preview_matrix_runner=lambda _request: {
+            "scenario_count": 2,
+            "successful_scenario_count": 2,
+            "error_scenario_count": 0,
+            "artifacts_dir": "artifacts/preview",
+        },
+        signed_acceptance_matrix_runner=lambda _request: {
+            "scenario_count": 2,
+            "successful_signing_run_count": 2,
+            "acceptance_expectations_passed": True,
+            "acceptance_expectation_errors": [],
+            "expected_outcome_mismatch_count": 0,
+            "cryptographic_validation_failure_count": 0,
+            "preview_output_comparison_failure_count": 0,
+            "annotation_rect_mismatch_count": 0,
+            "artifacts_dir": "artifacts/signed",
+        },
+    )
+    request = Phase3MatrixRequest(
+        pdf_path="input.pdf",
+        certificate_path="cert.p12",
+        passphrase="secret",
+        scenario_manifest_path="manifest.json",
+        artifacts_dir="artifacts",
+    )
+
+    preview = service.preview_matrix_result(request)
+    signed = service.signed_acceptance_matrix_result(request)
+
+    assert preview.kind is Phase3MatrixKind.PREVIEW
+    assert preview.passed is True
+    assert preview.summary_json_path == "artifacts/preview/summary.json"
+    assert preview.successful_run_count == 2
+    assert signed.kind is Phase3MatrixKind.SIGNED_ACCEPTANCE
+    assert signed.passed is True
+    assert signed.summary_json_path == "artifacts/signed/summary.json"
+    assert signed.successful_run_count == 2
+
+
+def test_phase3_evidence_service_typed_signed_result_surfaces_counter_failures() -> None:
+    service = _service(
+        signed_acceptance_matrix_runner=lambda _request: {
+            "scenario_count": 2,
+            "successful_signing_run_count": 1,
+            "acceptance_expectations_passed": False,
+            "acceptance_expectation_errors": ["one mismatch"],
+            "expected_outcome_mismatch_count": 1,
+            "cryptographic_validation_failure_count": 0,
+            "preview_output_comparison_failure_count": 0,
+            "annotation_rect_mismatch_count": 0,
+            "artifacts_dir": "artifacts/signed",
+        }
+    )
+
+    result = service.signed_acceptance_matrix_result(
+        Phase3MatrixRequest(
+            pdf_path="input.pdf",
+            certificate_path="cert.p12",
+            passphrase="secret",
+            scenario_manifest_path="manifest.json",
+            artifacts_dir="artifacts",
+        )
+    )
+
+    assert result.passed is False
+    assert result.errors == ("one mismatch", "expected_outcome_mismatch_count=1")
 
 
 def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(

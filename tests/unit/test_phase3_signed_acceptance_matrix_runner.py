@@ -3,9 +3,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from foliaseal.presentation.qt.phase3_matrix_artifacts import (
+    MemoryPhase3MatrixArtifactPort,
+)
+from foliaseal.presentation.qt.phase3_signed_acceptance_lifecycle import (
+    FakePhase3SignedAcceptanceLifecycle,
+)
 from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
     Phase3SignedAcceptanceMatrixRunner,
     Phase3SignedAcceptanceMatrixRunnerDeps,
+)
+from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
+    Phase3SignedAcceptanceScenarioResult,
 )
 
 
@@ -82,6 +91,8 @@ def _runner(
     build_dummy_timestamper=None,
     build_signing_executor=None,
     build_workspace=None,
+    lifecycle=None,
+    artifact_port=None,
 ) -> Phase3SignedAcceptanceMatrixRunner:
     return Phase3SignedAcceptanceMatrixRunner(
         deps=Phase3SignedAcceptanceMatrixRunnerDeps(
@@ -115,6 +126,10 @@ def _runner(
             evaluate_signed_matrix_acceptance_expectations=lambda **_kwargs: expectation_result,
             jsonable_capture=lambda payload: payload,
             render_backend_factory=_FakeBackend,
+            lifecycle_factory=(lambda _bindings: lifecycle) if lifecycle is not None else None,
+            artifact_port_factory=(lambda: artifact_port)
+            if artifact_port is not None
+            else None,
         )
     )
 
@@ -199,6 +214,156 @@ def test_signed_acceptance_matrix_runner_records_error_results(tmp_path: Path) -
     assert summary["error_scenario_count"] == 1
     assert summary["results"][1]["error"] == "boom"
     assert summary["results"][1]["error_type"] == "RuntimeError"
+
+
+def test_signed_acceptance_matrix_runner_closes_lifecycle_after_scenario_failure(
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    lifecycle = FakePhase3SignedAcceptanceLifecycle()
+    artifacts = MemoryPhase3MatrixArtifactPort()
+    runner = _runner(
+        manifest={"scenarios": [{"name": "Scenario A"}]},
+        scenario_executor=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+        lifecycle=lifecycle,
+        artifact_port=artifacts,
+    )
+
+    summary = runner.run(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(tmp_path / "manifest.json"),
+        artifacts_dir="memory/artifacts",
+    )
+
+    assert summary["error_scenario_count"] == 1
+    assert [name for name, _value in lifecycle.calls] == [
+        "start",
+        "attach_shell",
+        "process_events",
+        "process_events",
+        "close",
+    ]
+    assert artifacts.summaries["memory/artifacts/summary.json"]["error_scenario_count"] == 1
+
+
+def test_signed_acceptance_matrix_runner_closes_lifecycle_when_summary_write_fails(
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    lifecycle = FakePhase3SignedAcceptanceLifecycle()
+
+    class _FailingArtifactPort:
+        def prepare(self, artifacts_dir: str) -> Path:
+            return Path(artifacts_dir)
+
+        def write_summary(self, _artifacts_dir: Path, _summary) -> str:
+            raise OSError("summary sink unavailable")
+
+    runner = _runner(
+        manifest={"scenarios": []},
+        scenario_executor=lambda **_kwargs: {},
+        lifecycle=lifecycle,
+        artifact_port=_FailingArtifactPort(),
+    )
+
+    try:
+        runner.run(
+            pdf_path=str(source_pdf),
+            certificate_path=str(tmp_path / "cert.p12"),
+            passphrase="secret",
+            scenario_manifest_path=str(tmp_path / "manifest.json"),
+            artifacts_dir="memory/failing",
+        )
+    except OSError as exc:
+        assert str(exc) == "summary sink unavailable"
+    else:
+        raise AssertionError("expected summary sink failure")
+
+    assert [name for name, _value in lifecycle.calls][-1] == "close"
+
+
+def test_signed_acceptance_matrix_runner_closes_lifecycle_when_shell_setup_fails(
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    lifecycle = FakePhase3SignedAcceptanceLifecycle()
+    runner = _runner(
+        manifest={"scenarios": []},
+        scenario_executor=lambda **_kwargs: {},
+        lifecycle=lifecycle,
+        build_workspace=lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("workspace setup unavailable")
+        ),
+    )
+
+    try:
+        runner.run(
+            pdf_path=str(source_pdf),
+            certificate_path=str(tmp_path / "cert.p12"),
+            passphrase="secret",
+            scenario_manifest_path=str(tmp_path / "manifest.json"),
+            artifacts_dir="memory/setup-failure",
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "workspace setup unavailable"
+    else:
+        raise AssertionError("expected workspace setup failure")
+
+    assert [name for name, _value in lifecycle.calls][-1] == "close"
+
+
+def test_signed_acceptance_matrix_runner_normalizes_typed_scenario_result(
+    tmp_path: Path,
+) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    typed_result = Phase3SignedAcceptanceScenarioResult.from_mapping(
+        {
+            "name": "Scenario A",
+            "profile_name": None,
+            "expected_outcome": "success",
+            "expected_failure_message_contains": None,
+            "preview_snapshot": {},
+            "preview_text": "Ready",
+            "validation_text": "Ready",
+            "sign_request_snapshot": None,
+            "backend_reservation_snapshot": None,
+            "signing_result": {"success": True},
+            "output_file_exists": True,
+            "output_signature_count": 1,
+            "output_signature_snapshot": None,
+            "output_verification_snapshot": None,
+            "output_visible_appearance_snapshot": None,
+            "signed_output_render_snapshot": None,
+            "signed_output_preview_comparison": None,
+        }
+    )
+    artifacts = MemoryPhase3MatrixArtifactPort()
+    runner = _runner(
+        manifest={"scenarios": [{"name": "Scenario A"}]},
+        scenario_executor=lambda **_kwargs: typed_result,
+        artifact_port=artifacts,
+    )
+
+    summary = runner.run(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(tmp_path / "manifest.json"),
+        artifacts_dir="memory/typed",
+    )
+
+    assert summary["successful_scenario_count"] == 1
+    assert summary["results"][0]["name"] == "Scenario A"
+    assert summary["summary_json_path"] == "memory/typed/summary.json"
+    assert artifacts.summaries["memory/typed/summary.json"]["summary_json_path"] == (
+        "memory/typed/summary.json"
+    )
 
 
 def test_signed_acceptance_matrix_runner_rejects_unknown_timestamping_mode(

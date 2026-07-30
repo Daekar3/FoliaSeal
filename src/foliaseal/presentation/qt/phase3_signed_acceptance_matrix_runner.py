@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +14,17 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspacePort,
 )
+from foliaseal.presentation.qt.phase3_matrix_artifacts import (
+    FilesystemPhase3MatrixArtifactPort,
+    Phase3MatrixArtifactPort,
+)
+from foliaseal.presentation.qt.phase3_signed_acceptance_lifecycle import (
+    Phase3SignedAcceptanceLifecyclePort,
+    QtPhase3SignedAcceptanceLifecycle,
+)
+from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
+    Phase3SignedAcceptanceScenarioResult,
+)
 
 LoadQtHarnessBindings = Callable[[], Any]
 LoadPreviewMatrixManifest = Callable[[str], dict[str, Any]]
@@ -23,11 +33,15 @@ BuildDummyTimestamper = Callable[[], Any]
 LoadPageCount = Callable[..., int]
 BuildQtSigningShell = Callable[..., Any]
 BuildWorkspace = Callable[..., Phase3HarnessWorkspacePort]
-ExecuteSignedAcceptanceScenario = Callable[..., dict[str, Any]]
+ExecuteSignedAcceptanceScenario = Callable[
+    ..., Phase3SignedAcceptanceScenarioResult | dict[str, Any]
+]
 PreviewMatrixErrorResult = Callable[..., dict[str, Any]]
 SignedMatrixDiagnosticSummary = Callable[[list[dict[str, Any]]], dict[str, int]]
 EvaluateSignedMatrixAcceptanceExpectations = Callable[..., tuple[bool, list[str]]]
 JsonableCapture = Callable[[Any], Any]
+LifecycleFactory = Callable[[Any], Phase3SignedAcceptanceLifecyclePort]
+ArtifactPortFactory = Callable[[], Phase3MatrixArtifactPort]
 
 
 @dataclass(frozen=True)
@@ -49,6 +63,8 @@ class Phase3SignedAcceptanceMatrixRunnerDeps:
     )
     jsonable_capture: JsonableCapture
     render_backend_factory: Callable[[], Any]
+    lifecycle_factory: LifecycleFactory | None = None
+    artifact_port_factory: ArtifactPortFactory | None = None
 
 
 @dataclass(frozen=True)
@@ -73,8 +89,11 @@ class Phase3SignedAcceptanceMatrixRunner:
 
         manifest = self.deps.load_preview_matrix_manifest(scenario_manifest_path)
         scenarios = manifest["scenarios"]
-        artifact_root = Path(artifacts_dir)
-        artifact_root.mkdir(parents=True, exist_ok=True)
+        artifact_port_factory = (
+            self.deps.artifact_port_factory or FilesystemPhase3MatrixArtifactPort
+        )
+        artifact_port = artifact_port_factory()
+        artifact_root = artifact_port.prepare(artifacts_dir)
         timestamping_mode = manifest.get("timestamping_mode", "real")
         if timestamping_mode not in {"real", "dummy"}:
             raise ValueError("'timestamping_mode' must be one of 'real' or 'dummy'.")
@@ -107,77 +126,84 @@ class Phase3SignedAcceptanceMatrixRunner:
         )
         profile_store = SignaturePresetCatalogStore.default()
 
-        app = bindings.q_application.instance() or bindings.q_application([])
-        window = bindings.q_main_window()
-        window.setWindowTitle(
-            f"FoliaSeal Phase 3 Signed Acceptance Matrix - {source_path.name}"
-        )
-        window.resize(1440, 980)
-        shell = self.deps.build_qt_signing_shell(
-            viewer_workflow=viewer_workflow,
-            signing_workflow=signing_workflow,
-            preset_catalog_store=profile_store,
-            sign_executor=sign_executor,
-        )
-        window.setCentralWidget(shell)
-        window.show()
-        workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
-        workspace.refresh_viewer()
-        app.processEvents()
-
-        results: list[dict[str, Any]] = []
-        for scenario in scenarios:
-            try:
-                result = self.deps.execute_signed_acceptance_scenario(
-                    shell=shell,
-                    scenario=scenario,
-                    profile_store=profile_store,
-                    artifacts_dir=artifact_root,
-                    base_input_path=source_path,
-                    certificate_path=certificate_path,
-                    passphrase=passphrase,
-                    sign_executor=sign_executor,
-                )
-            except Exception as exc:
-                result = self.deps.preview_matrix_error_result(scenario=scenario, error=exc)
-            results.append(result)
-            app.processEvents()
-
-        close = getattr(window, "close", None)
-        if callable(close):
-            close()
-
-        summary = {
-            "pdf_path": str(source_path),
-            "scenario_manifest_path": scenario_manifest_path,
-            "artifacts_dir": str(artifact_root),
-            "scenario_count": len(results),
-            "successful_scenario_count": sum(
-                1
-                for item in results
-                if _mapping(item.get("signing_result")).get("success") is True
-            ),
-            "error_scenario_count": sum(1 for item in results if "error" in item),
-            **self.deps.signed_matrix_diagnostic_summary(results),
-            "results": results,
-        }
-        if "acceptance_expectations" in manifest:
-            summary["acceptance_expectations"] = manifest["acceptance_expectations"]
-        summary["timestamping_mode"] = timestamping_mode
-        expectations_passed, expectation_errors = (
-            self.deps.evaluate_signed_matrix_acceptance_expectations(
-                summary=summary,
-                manifest_expectations=_mapping(manifest.get("acceptance_expectations")),
+        lifecycle_factory = self.deps.lifecycle_factory or QtPhase3SignedAcceptanceLifecycle
+        lifecycle = lifecycle_factory(bindings)
+        try:
+            lifecycle.start(
+                title=f"FoliaSeal Phase 3 Signed Acceptance Matrix - {source_path.name}"
             )
-        )
-        summary["acceptance_expectations_passed"] = expectations_passed
-        summary["acceptance_expectation_errors"] = expectation_errors
-        summary_path = artifact_root / "summary.json"
-        summary_path.write_text(
-            json.dumps(self.deps.jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        return summary
+            shell = self.deps.build_qt_signing_shell(
+                viewer_workflow=viewer_workflow,
+                signing_workflow=signing_workflow,
+                preset_catalog_store=profile_store,
+                sign_executor=sign_executor,
+            )
+            lifecycle.attach_shell(shell)
+            workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
+            workspace.refresh_viewer()
+            lifecycle.process_events()
+
+            results: list[dict[str, Any]] = []
+            for scenario in scenarios:
+                try:
+                    scenario_result = self.deps.execute_signed_acceptance_scenario(
+                        shell=shell,
+                        scenario=scenario,
+                        profile_store=profile_store,
+                        artifacts_dir=artifact_root,
+                        base_input_path=source_path,
+                        certificate_path=certificate_path,
+                        passphrase=passphrase,
+                        sign_executor=sign_executor,
+                    )
+                except Exception as exc:
+                    scenario_result = self.deps.preview_matrix_error_result(
+                        scenario=scenario,
+                        error=exc,
+                    )
+                results.append(
+                    scenario_result.as_mapping()
+                    if isinstance(scenario_result, Phase3SignedAcceptanceScenarioResult)
+                    else dict(scenario_result)
+                )
+                lifecycle.process_events()
+            summary = {
+                "pdf_path": str(source_path),
+                "scenario_manifest_path": scenario_manifest_path,
+                "artifacts_dir": str(artifact_root),
+                "scenario_count": len(results),
+                "successful_scenario_count": sum(
+                    1
+                    for item in results
+                    if _mapping(item.get("signing_result")).get("success") is True
+                ),
+                "error_scenario_count": sum(1 for item in results if "error" in item),
+                **self.deps.signed_matrix_diagnostic_summary(results),
+                "results": results,
+            }
+            if "acceptance_expectations" in manifest:
+                summary["acceptance_expectations"] = manifest["acceptance_expectations"]
+            summary["timestamping_mode"] = timestamping_mode
+            expectations_passed, expectation_errors = (
+                self.deps.evaluate_signed_matrix_acceptance_expectations(
+                    summary=summary,
+                    manifest_expectations=_mapping(manifest.get("acceptance_expectations")),
+                )
+            )
+            summary["acceptance_expectations_passed"] = expectations_passed
+            summary["acceptance_expectation_errors"] = expectation_errors
+            summary_path = artifact_port.write_summary(
+                artifact_root,
+                self.deps.jsonable_capture(summary),
+            )
+            summary["summary_json_path"] = summary_path
+            artifact_port.write_summary(
+                artifact_root,
+                self.deps.jsonable_capture(summary),
+            )
+            return summary
+        finally:
+            lifecycle.close()
 
 
 def _mapping(value: Any) -> dict[str, Any]:

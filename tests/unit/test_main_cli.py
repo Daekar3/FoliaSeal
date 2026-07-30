@@ -348,17 +348,18 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
     captured = {}
 
     class _FakeService:
-        def run_preview_matrix(self, request):
+        def preview_matrix_result(self, request):
             captured["pdf_path"] = request.pdf_path
             captured["certificate_path"] = request.certificate_path
             captured["passphrase"] = request.passphrase
             captured["scenario_manifest_path"] = request.scenario_manifest_path
             captured["artifacts_dir"] = request.artifacts_dir
-            return {
-                "artifacts_dir": request.artifacts_dir,
-                "scenario_count": 1,
-                "successful_scenario_count": 1,
-            }
+            return SimpleNamespace(
+                artifacts_dir=request.artifacts_dir,
+                scenario_count=1,
+                successful_run_count=1,
+                summary_json_path=f"{request.artifacts_dir}/summary.json",
+            )
 
     monkeypatch.setattr(
         "foliaseal.__main__._build_phase3_evidence_service",
@@ -397,17 +398,18 @@ def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
     captured = {}
 
     class _FakeService:
-        def run_signed_acceptance_matrix(self, request):
+        def signed_acceptance_matrix_result(self, request):
             captured["pdf_path"] = request.pdf_path
             captured["certificate_path"] = request.certificate_path
             captured["passphrase"] = request.passphrase
             captured["scenario_manifest_path"] = request.scenario_manifest_path
             captured["artifacts_dir"] = request.artifacts_dir
-            return {
-                "artifacts_dir": request.artifacts_dir,
-                "scenario_count": 3,
-                "successful_signing_run_count": 2,
-            }
+            return SimpleNamespace(
+                artifacts_dir=request.artifacts_dir,
+                scenario_count=3,
+                successful_run_count=2,
+                summary_json_path=f"{request.artifacts_dir}/summary.json",
+            )
 
     monkeypatch.setattr(
         "foliaseal.__main__._build_phase3_evidence_service",

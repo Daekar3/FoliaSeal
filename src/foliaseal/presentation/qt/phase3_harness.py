@@ -113,6 +113,7 @@ from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
     Phase3SignedAcceptanceScenarioExecutorDeps,
+    Phase3SignedAcceptanceScenarioResult,
 )
 from foliaseal.presentation.qt.phase3_signed_output_render_snapshotter import (
     Phase3SignedOutputRenderSnapshotter,
@@ -1601,8 +1602,21 @@ def _execute_signed_acceptance_scenario(
     certificate_path: str,
     passphrase: str,
     sign_executor: Any,
-) -> dict[str, Any]:
-    return _build_phase3_signed_acceptance_scenario_executor().run(
+) -> Phase3SignedAcceptanceScenarioResult | dict[str, Any]:
+    executor = _build_phase3_signed_acceptance_scenario_executor()
+    run_result = getattr(executor, "run_result", None)
+    if callable(run_result):
+        return run_result(
+            shell=shell,
+            scenario=scenario,
+            profile_store=profile_store,
+            artifacts_dir=artifacts_dir,
+            base_input_path=base_input_path,
+            certificate_path=certificate_path,
+            passphrase=passphrase,
+            sign_executor=sign_executor,
+        )
+    return executor.run(
         shell=shell,
         scenario=scenario,
         profile_store=profile_store,

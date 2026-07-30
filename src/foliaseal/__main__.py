@@ -529,23 +529,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "phase3-signing-preview-matrix":
-        summary = _build_phase3_evidence_service().run_preview_matrix(
+        result = _build_phase3_evidence_service().preview_matrix_result(
             _build_phase3_matrix_request(args)
         )
         print("Phase 3 preview matrix")
-        print(f"- scenarios executed: {summary['scenario_count']}")
-        print(f"- artifacts directory: {summary['artifacts_dir']}")
-        print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
+        print(f"- scenarios executed: {result.scenario_count}")
+        print(f"- artifacts directory: {result.artifacts_dir}")
+        print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-matrix":
-        summary = _build_phase3_evidence_service().run_signed_acceptance_matrix(
+        result = _build_phase3_evidence_service().signed_acceptance_matrix_result(
             _build_phase3_matrix_request(args)
         )
         print("Phase 3 signed acceptance matrix")
-        print(f"- scenarios executed: {summary['scenario_count']}")
-        print(f"- successful signings: {summary['successful_signing_run_count']}")
-        print(f"- artifacts directory: {summary['artifacts_dir']}")
-        print(f"- summary json: {Path(summary['artifacts_dir']) / 'summary.json'}")
+        print(f"- scenarios executed: {result.scenario_count}")
+        print(f"- successful signings: {result.successful_run_count}")
+        print(f"- artifacts directory: {result.artifacts_dir}")
+        print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-evidence":
         evidence = _build_phase3_evidence_service().run_signed_acceptance_evidence(

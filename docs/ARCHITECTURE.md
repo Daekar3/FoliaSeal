@@ -45,6 +45,8 @@ The canonical repository document split is:
 | `src/foliaseal/application/` | Use cases, workflows, geometry, preview/render evidence logic, layout planning, protocol boundaries, and the Phase 3 evidence service. | Some transitional modules still import concrete infra helpers. |
 | `src/foliaseal/application/visible_signature_color.py` | Shared visible-signature color conversion helper. | Owns the RGBA conversion used by horizontal reservation and preview diagnostics. |
 | `src/foliaseal/application/phase3_evidence_service.py` | Explicit service boundary for Phase 3 evidence capture, matrix execution, validation, and signed-acceptance evidence generation. | Owns the request/result dataclasses and the only caller-facing Phase 3 service verbs. |
+| `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py` | Lifecycle port and Qt/fake adapters for one signed matrix shell session. | Keeps application/window creation, shell attachment, event processing, and cleanup outside scenario logic. |
+| `src/foliaseal/presentation/qt/phase3_matrix_artifacts.py` | Matrix artifact directory and summary publication port. | Filesystem and memory adapters return the authoritative `summary_json_path`. |
 | `src/foliaseal/application/phase3_fidelity_contract.py` | Versioned release-fidelity manifest contract for the tracked Phase 3 corpus. | Validates `manifest_version`, `phase3_fidelity_v1` tolerances/critical counters, and per-scenario expected outcomes/diagnostics before matrix execution. |
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, QtPdf geometry plus Poppler interactive-viewer rasterisation, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed; the interactive viewer also late-resolves the Linux `pdftoppm` executable. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, preset certificate display-name lookup, and catalog refresh/save/delete commands. |
@@ -376,11 +378,11 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/application/phase3_evidence_service.py`
 - Responsibility: Own the explicit application-layer boundary for Phase 3 harness capture, preview matrices, signed-acceptance matrices, capture validation, and signed-acceptance evidence generation.
-- Owns: `Phase3HarnessCaptureRequest`, `Phase3MatrixRequest`, `Phase3SignedAcceptanceEvidenceRequest`, `Phase3HarnessValidationRequest`, `Phase3SignedAcceptanceMatrixCounters`, `Phase3SignedAcceptanceMatrixResult`, `Phase3SignedAcceptanceEvidenceResult`, `Phase3EvidenceService`, `capture_harness()`, `run_preview_matrix()`, `run_signed_acceptance_matrix()`, `validate_harness_capture()`, `run_signed_acceptance_evidence()`, `validate_signed_acceptance_matrix_summary()`.
+- Owns: `Phase3HarnessCaptureRequest`, `Phase3MatrixRequest`, `Phase3SignedAcceptanceEvidenceRequest`, `Phase3HarnessValidationRequest`, `Phase3MatrixKind`, `Phase3MatrixResult`, `Phase3SignedAcceptanceMatrixCounters`, `Phase3SignedAcceptanceMatrixResult`, `Phase3SignedAcceptanceEvidenceResult`, `Phase3EvidenceService`, `capture_harness()`, `run_preview_matrix()`, `run_signed_acceptance_matrix()`, `preview_matrix_result()`, `signed_acceptance_matrix_result()`, `validate_harness_capture()`, `run_signed_acceptance_evidence()`, `validate_signed_acceptance_matrix_summary()`.
 - Does not own: Qt widget behavior, direct harness UI orchestration, or the concrete artifact writer implementation.
 - Key collaborators: `presentation/qt/phase3_harness.py`, `presentation/qt/phase3_signed_acceptance_evidence.py`, `__main__.py`, `qa_evidence_contract.py`, `qa_signed_acceptance_generation.py`.
 - Main entry points: `build_default_phase3_evidence_service()`, `Phase3EvidenceService.capture_harness()`, `Phase3EvidenceService.run_preview_matrix()`, `Phase3EvidenceService.run_signed_acceptance_matrix()`, `Phase3EvidenceService.validate_harness_capture()`, `Phase3EvidenceService.run_signed_acceptance_evidence()`.
-- Known constraints: The service is intentionally thin over injected runners and writers, but it centralizes the CLI-facing request/result types and the signed-acceptance summary assembly. The Qt helper module only suppresses known benign Qt/pyHanko chatter and preserves the documented output paths for default service construction.
+- Known constraints: The service is intentionally thin over injected runners and writers, but it centralizes the CLI-facing request/result types and typed matrix normalization. `run_*_matrix()` remain raw-dictionary compatibility methods; typed result methods preserve the raw summary mapping while exposing normalized pass/path/count/error fields. The Qt helper module only suppresses known benign Qt/pyHanko chatter and preserves the documented output paths for default service construction.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 release-fidelity contract
@@ -430,22 +432,31 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_matrix_runner.py`
 - Responsibility: Run the Qt-backed signed-acceptance matrix sweep and emit the stable summary artifact for one manifest.
-- Owns: `Phase3SignedAcceptanceMatrixRunnerDeps`, `Phase3SignedAcceptanceMatrixRunner`, signed-acceptance manifest loading, `timestamping_mode` validation, fresh-shell scenario iteration, scenario-level exception mapping, aggregate counter shaping, acceptance-expectation evaluation, and `summary.json` writing.
+- Owns: `Phase3SignedAcceptanceMatrixRunnerDeps`, `Phase3SignedAcceptanceMatrixRunner`, signed-acceptance manifest loading, `timestamping_mode` validation, fresh-shell scenario iteration, scenario-level exception mapping, aggregate counter shaping, acceptance-expectation evaluation, and `summary.json` writing through `Phase3MatrixArtifactPort`.
 - Does not own: the public harness entrypoint signature, interactive harness capture assembly, preview-only matrix execution, or evidence-contract evaluation.
 - Key collaborators: `phase3_harness.py`, `_load_signed_acceptance_manifest()`, `phase3_harness_workspace.py`, `phase3_signed_acceptance_scenario_executor.py`, `_preview_matrix_error_result()`, `_signed_matrix_diagnostic_summary()`, `_evaluate_signed_matrix_acceptance_expectations()`, `Phase3EvidenceService.run_signed_acceptance_matrix()`.
 - Main entry points: `Phase3SignedAcceptanceMatrixRunner.run()`, `phase3_harness.py::Phase3Harness.signed_acceptance_matrix()`, `phase3_harness.py::Phase3Harness.run_signed_acceptance_matrix()`.
-- Known constraints: The runner intentionally keeps the matrix-level lifecycle together, including `timestamping_mode` validation and dummy timestamper wiring, because those are part of the signed-acceptance workflow contract. `phase3_harness.py` remains the composition root that wires the real manifest loader, scenario executor, workspace boundary, error mapper, render-backend factory, acceptance evaluator, and JSON normalization helper into the runner.
+- Known constraints: The runner intentionally keeps the matrix-level workflow together, including `timestamping_mode` validation and dummy timestamper wiring, while delegating Qt window/event-loop work to `Phase3SignedAcceptanceLifecyclePort`. It starts and attaches the shell, processes events after priming and each scenario, and closes in `finally`, including failure paths. `Phase3SignedAcceptanceScenarioResult` rows are converted with `as_mapping()` before existing counters are calculated. The artifact adapter's returned path is authoritative for `summary_json_path`; `phase3_harness.py` remains the composition root that wires the real manifest loader, lifecycle, artifact, scenario, workspace, error mapper, render-backend factory, acceptance evaluator, and JSON normalization collaborators.
+- Status: Confirmed by code and tests.
+
+### Phase 3 signed-acceptance lifecycle and artifact ports
+
+- Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py`, `src/foliaseal/presentation/qt/phase3_matrix_artifacts.py`
+- Responsibility: Isolate replaceable side effects from signed matrix orchestration.
+- Owns: `Phase3SignedAcceptanceLifecyclePort`, `QtPhase3SignedAcceptanceLifecycle`, `FakePhase3SignedAcceptanceLifecycle`, `Phase3MatrixArtifactPort`, `FilesystemPhase3MatrixArtifactPort`, and `MemoryPhase3MatrixArtifactPort`.
+- Does not own: scenario application, signing, acceptance counters, or report schema decisions.
+- Known constraints: Lifecycle call order is start -> attach shell -> process events -> scenario/event processing -> close. Artifact adapters only prepare the matrix directory and write `summary.json`; generated PDFs and image evidence remain owned by scenario/output snapshot helpers.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 signed-acceptance scenario executor
 
 - Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py`
 - Responsibility: Execute one signed-acceptance scenario row from live shell state through optional signed-output capture.
-- Owns: `Phase3SignedAcceptanceScenarioExecutor`, scenario application, workspace snapshot capture consumption, signing submission, successful-output snapshotting, and final result-row shaping.
+- Owns: `Phase3SignedAcceptanceScenarioExecutor`, `Phase3SignedAcceptanceScenarioResult`, scenario application, workspace snapshot capture consumption, signing submission, successful-output snapshotting, and final result-row shaping.
 - Does not own: matrix-level iteration, exception mapping, acceptance-expectation evaluation, or summary writing.
 - Key collaborators: `phase3_harness.py`, `phase3_harness_workspace.py`, `_apply_preview_matrix_scenario()`, `_capture_preview_render()`, `phase3_signed_output_snapshotter.py`, `Phase3SignedAcceptanceMatrixRunner`.
 - Main entry points: `Phase3SignedAcceptanceScenarioExecutor.run()`, `phase3_harness.py::_execute_signed_acceptance_scenario()`.
-- Known constraints: The executor intentionally keeps the per-scenario preview and signing flow together because the result-row contract spans both preview evidence and optional signed-output evidence. `phase3_harness_workspace.py` now owns the workspace reads for the scenario row, `phase3_signed_acceptance_matrix_runner.py` still owns the pre-scenario viewer refresh, and `phase3_harness.py` remains the composition root that wires the real scenario-application, workspace, snapshot, and output-capture helpers into the executor, while successful-output evidence shaping itself now lives in the shared snapshotter boundary.
+- Known constraints: The executor intentionally keeps the per-scenario preview and signing flow together because the result-row contract spans both preview evidence and optional signed-output evidence. Its typed result's `as_mapping()` is the compatibility serializer for existing row keys, including intentional fit rejections. `phase3_harness_workspace.py` owns workspace reads, while successful-output evidence shaping lives in the shared snapshotter boundary.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 signed-output snapshotter
@@ -580,6 +591,8 @@ The canonical repository document split is:
 | `RenderPageRequest` / `RenderPageResult` | `infra/render/base.py` | Render backend request/result. | document path, page index, zoom; width/height/RGBA bytes. | Backend protocol contract. |
 | `Phase3HarnessReportRequest` / `Phase3HarnessReportResult` | `presentation/qt/phase3_harness_reporting.py` | Post-Qt reporting request/result for one Phase 3 harness run. | raw capture payload, summary/checklist paths, finalized capture, contract evaluation, rendered checklist text. | Gives the harness a smaller direct reporting boundary for tests and orchestration. |
 | `Phase3HarnessCaptureRequest` / `Phase3MatrixRequest` / `Phase3HarnessValidationRequest` | `application/phase3_evidence_service.py` | Caller-facing Phase 3 request dataclasses. | capture inputs, matrix inputs, capture-validation path. | Shared by the CLI and the Qt-backed harness adapter so the application service owns the public request contract. |
+| `Phase3MatrixKind` / `Phase3MatrixResult` | `application/phase3_evidence_service.py` | Typed preview or signed-acceptance matrix result over the existing summary mapping. | kind, raw summary, passed, artifacts directory, authoritative summary path, counts, errors, warnings. | Additive typed view; raw dictionary service methods remain compatibility shims. |
+| `Phase3SignedAcceptanceScenarioResult` | `presentation/qt/phase3_signed_acceptance_scenario_executor.py` | Typed result for one signed-acceptance scenario row. | existing row fields plus optional signed-output evidence. | `as_mapping()` preserves the established JSON row contract, including intentional rejection rows. |
 | `Phase3HarnessDependencies` / `Phase3Harness` | `presentation/qt/phase3_harness.py` | Qt-backed adapter/composition root for Phase 3 harness modes. | injectable interactive/matrix gateway ports plus explicit adapter verbs that consume application-layer requests. | Delegates to extracted runners through typed ports; it no longer owns a second public request type. |
 | `Phase3HarnessSessionResult` | `presentation/qt/phase3_harness_session_runner.py` | Raw interactive Qt session state before capture assembly. | first render timing, sign requests, signed runs, errors, interaction counts, captured states, final session state, capture request, last signing result. | Feeds `Phase3HarnessCaptureAssembler.build_capture_payload()` so capture assembly stays separate from the Qt loop. |
 | `Phase3HarnessCaptureAssembler` | `presentation/qt/phase3_harness_capture_assembler.py` | Pure helper that turns raw session state into signed-run bundles and the final capture payload dictionary. | output snapshot collaborators plus `build_signed_run_bundle()` and `build_capture_payload()`. | Lets harness tests target capture assembly directly without patching as much of the interactive Qt runner. |
@@ -735,6 +748,24 @@ The canonical repository document split is:
 - Known constraints: `backend_reservation_snapshot` and `backend_reservation_error` remain part of the capture payload, but Phase 3 harness code now consumes those values from `build_backend_reservation_evidence()` instead of reconstructing them from backend-private helpers. The session runner returns `Phase3HarnessSessionResult`, and `Phase3HarnessCaptureAssembler.build_capture_payload()` derives the stable capture payload before `phase3_harness_reporting.py` finalizes the files.
 - Source files: `src/foliaseal/presentation/qt/phase3_harness.py`, `src/foliaseal/application/qa_evidence_contract.py`, `artifacts/`.
 
+### Phase 3 matrix gateway contract
+
+- Producer: `Phase3EvidenceService` and the preview/signed matrix runners.
+- Consumer: CLI dispatch, focused tests, and evidence tooling.
+- Stability: Compatibility contract; typed application results are additive.
+- Format: `Phase3MatrixResult` exposes `kind`, raw `summary`, `passed`, artifact and summary paths,
+  counts, errors, and warnings. Raw `run_*_matrix()` mappings and serialized summary fields remain
+  unchanged.
+- Validation: Normalization reads existing summary keys; signed rows are serialized through
+  `Phase3SignedAcceptanceScenarioResult.as_mapping()`.
+- Error behavior: Runner exceptions remain scenario error rows where previously mapped; lifecycle
+  cleanup runs in `finally`; artifact writers return the authoritative summary path.
+- Source files: `src/foliaseal/application/phase3_evidence_service.py`,
+  `src/foliaseal/presentation/qt/phase3_signed_acceptance_matrix_runner.py`,
+  `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py`,
+  `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py`,
+  `src/foliaseal/presentation/qt/phase3_matrix_artifacts.py`.
+
 ## 7. Control flow
 
 ### CLI startup
@@ -843,10 +874,16 @@ The canonical repository document split is:
 
 ### Phase 3 evidence validation
 
-1. Harness or matrix command writes structured JSON and optional images.
-2. `phase3-signing-harness-validate` reads a summary JSON.
-3. `evaluate_phase3_evidence_contract()` classifies errors, warnings, acceptance tier, and gate verdict.
-4. CLI prints the evaluation and raises if validation failed.
+1. CLI dispatch calls the application evidence service; legacy matrix verbs return raw dictionaries,
+   while typed callers use `preview_matrix_result()` or `signed_acceptance_matrix_result()`.
+2. The signed runner loads the manifest, starts the lifecycle adapter, attaches the shell, primes the
+   workspace, and processes events before iterating scenarios.
+3. Each scenario returns a typed result (or a mapped error row), is converted to the existing JSON
+   mapping, and is followed by lifecycle event processing.
+4. Acceptance expectations and counters are computed without renaming summary fields. The artifact
+   port writes `summary.json`; its returned path is authoritative and is reported by the CLI.
+5. Lifecycle close runs in `finally`. Harness or matrix validation then reads structured JSON and
+   `evaluate_phase3_evidence_contract()` classifies errors, warnings, acceptance tier, and gate verdict.
 
 ## 8. Data flow and persistence
 

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,28 @@ class Phase3MatrixRequest:
     passphrase: str
     scenario_manifest_path: str
     artifacts_dir: str
+
+
+class Phase3MatrixKind(StrEnum):
+    """Stable names for the two batch evidence matrix modes."""
+
+    PREVIEW = "preview"
+    SIGNED_ACCEPTANCE = "signed_acceptance"
+
+
+@dataclass(frozen=True)
+class Phase3MatrixResult:
+    """Typed view over an existing Phase 3 matrix summary mapping."""
+
+    kind: Phase3MatrixKind
+    summary: Mapping[str, Any]
+    passed: bool
+    artifacts_dir: str
+    summary_json_path: str
+    scenario_count: int | None
+    successful_run_count: int | None
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -171,6 +194,25 @@ class Phase3EvidenceService:
     ) -> dict[str, Any]:
         return self._signed_acceptance_matrix_runner(request)
 
+    def preview_matrix_result(self, request: Phase3MatrixRequest) -> Phase3MatrixResult:
+        """Return a typed result while preserving the legacy raw summary method."""
+
+        return _normalize_matrix_result(
+            kind=Phase3MatrixKind.PREVIEW,
+            summary=self.run_preview_matrix(request),
+        )
+
+    def signed_acceptance_matrix_result(
+        self,
+        request: Phase3MatrixRequest,
+    ) -> Phase3MatrixResult:
+        """Return a typed signed-acceptance result over the stable summary contract."""
+
+        return _normalize_matrix_result(
+            kind=Phase3MatrixKind.SIGNED_ACCEPTANCE,
+            summary=self.run_signed_acceptance_matrix(request),
+        )
+
     def validate_harness_capture(
         self,
         request: Phase3HarnessValidationRequest,
@@ -237,6 +279,69 @@ class Phase3EvidenceService:
                 + "\n".join(f"- {error}" for error in all_errors)
             )
         return evidence
+
+
+def _normalize_matrix_result(
+    *,
+    kind: Phase3MatrixKind,
+    summary: Mapping[str, Any],
+) -> Phase3MatrixResult:
+    """Normalize one runner summary without changing its serialized shape."""
+
+    summary_mapping = dict(summary)
+    artifacts_dir = str(summary_mapping.get("artifacts_dir", ""))
+    summary_json_path = str(
+        summary_mapping.get("summary_json_path")
+        or Path(artifacts_dir) / "summary.json"
+    )
+    if kind is Phase3MatrixKind.PREVIEW:
+        errors = tuple(_string_values(summary_mapping.get("errors")))
+        passed = summary_mapping.get("error_scenario_count", 0) == 0 and not errors
+        successful_run_count = _optional_int(
+            summary_mapping.get("successful_scenario_count")
+        )
+    else:
+        errors = tuple(_string_values(summary_mapping.get("acceptance_expectation_errors")))
+        errors += tuple(
+            _nonzero_counter_errors(summary_mapping, CRITICAL_ZERO_COUNTERS)
+        )
+        passed = summary_mapping.get("acceptance_expectations_passed") is True and not errors
+        successful_run_count = _optional_int(
+            summary_mapping.get("successful_signing_run_count")
+        )
+    return Phase3MatrixResult(
+        kind=kind,
+        summary=summary_mapping,
+        passed=passed,
+        artifacts_dir=artifacts_dir,
+        summary_json_path=summary_json_path,
+        scenario_count=_optional_int(summary_mapping.get("scenario_count")),
+        successful_run_count=successful_run_count,
+        errors=errors,
+        warnings=tuple(_string_values(summary_mapping.get("warnings"))),
+    )
+
+
+def _string_values(value: object) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(item for item in value if isinstance(item, str) and item)
+
+
+def _optional_int(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _nonzero_counter_errors(
+    summary: Mapping[str, Any],
+    counters: tuple[str, ...],
+) -> tuple[str, ...]:
+    errors: list[str] = []
+    for key in counters:
+        value = summary.get(key)
+        if isinstance(value, int) and value != 0:
+            errors.append(f"{key}={value}")
+    return tuple(errors)
 
 
 def validate_signed_acceptance_matrix_summary(

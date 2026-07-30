@@ -98,6 +98,23 @@ Current capabilities:
     output then feeds both preview rendering and pre-submit fit validation
   - prefer deleting duplicate interpretation layers over adding new synchronization logic
 
+Phase 3 evidence gateway and signed lifecycle:
+
+- `Phase3EvidenceService` now exposes typed `Phase3MatrixResult` values, tagged by
+  `Phase3MatrixKind` (`preview` or `signed_acceptance`). The existing raw-dictionary
+  `run_preview_matrix()` and `run_signed_acceptance_matrix()` methods remain compatibility
+  adapters, so the CLI and existing `summary.json` consumers keep their current behavior.
+- Signed-acceptance rows use a typed scenario result whose `as_mapping()` preserves the existing
+  JSON row keys, including successful signed-output evidence and intentional fit-rejection rows.
+- The signed matrix runner owns lifecycle ordering through `Phase3SignedAcceptanceLifecyclePort`
+  (Qt and deterministic fake adapters): start the application/window, attach and show the shell,
+  prime/process events, process events after each scenario, and always close in `finally`.
+- Matrix directory preparation and `summary.json` publication use `Phase3MatrixArtifactPort`,
+  with filesystem and in-memory adapters. The path returned by `write_summary()` is authoritative
+  for the summary's `summary_json_path` and CLI reporting; the second serialization pass preserves
+  that same path in the persisted mapping.
+- CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
+
 Not yet production-ready:
 
 - automated preview/output parity is green for the current signed fixture matrices, but still needs
