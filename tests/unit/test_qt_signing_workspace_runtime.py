@@ -1,8 +1,14 @@
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
+
+import pytest
 
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
 from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
-from foliaseal.domain.models import SignatureRect
+from foliaseal.domain.models import SignatureRect, SigningResult
+from foliaseal.presentation.qt.signing_workspace_diagnostics import (
+    SigningWorkspaceSnapshot,
+)
 from foliaseal.presentation.qt.signing_workspace_runtime import (
     SigningWorkspaceRuntime,
 )
@@ -399,6 +405,40 @@ def test_signing_workspace_runtime_owns_page_rect_and_current_request_helpers() 
         ("set_signature_rect", False),
         ("apply_plan", bound.interaction_session.panel_plan),
     ]
+
+
+def test_signing_workspace_runtime_snapshot_is_complete_and_immutable() -> None:
+    bound = _bind_runtime()
+    appearance = build_signature_appearance()
+    rect = SignatureRect(
+        page_index=2,
+        left_pt=10.0,
+        bottom_pt=12.0,
+        width_pt=30.0,
+        height_pt=18.0,
+    )
+    bound.viewer_workflow.session.current_page = 4
+    bound.draft_workflow.current_signature_rect = rect
+    bound.draft_workflow.signature_rect = rect
+    bound.draft_workflow.current_signature_appearance = appearance
+    bound.draft_workflow.signature_appearance = appearance
+    bound.draft_workflow.selected_certificate_configuration_id = "cert-1"
+    bound.draft_workflow.timestamp_required = True
+    result = SigningResult(success=True, failure_code=None, message="ok")
+
+    snapshot = bound.runtime.snapshot(last_signing_result=result)
+
+    assert isinstance(snapshot, SigningWorkspaceSnapshot)
+    assert snapshot.logical_page_index == 4
+    assert snapshot.signature_rect == rect
+    assert snapshot.signature_appearance is appearance
+    assert snapshot.selected_certificate_configuration_id == "cert-1"
+    assert snapshot.timestamp_required is True
+    assert snapshot.current_request is not None
+    assert snapshot.sign_action_enabled is True
+    assert snapshot.last_signing_result is result
+    with pytest.raises(FrozenInstanceError):
+        snapshot.logical_page_index = 99  # type: ignore[misc]
 
 
 def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_state() -> None:

@@ -266,6 +266,12 @@ For lower-level viewer regression checks, you can still run:
 
 To make Phase 3 acceptance easier, there is also an interactive signing-shell harness that writes a structured capture and a partially completed FR-3B worksheet for you.
 
+The live shell keeps a small `SigningWorkspacePort` for app-frame operations. Diagnostics and Phase 3
+use the separate `testing_adapter` boundary: it exposes one immutable, Qt-free
+`SigningWorkspaceSnapshot` containing the current request, placement/appearance, certificate and
+timestamp state, sign readiness, and last signing result. The older `compat_surface` widget exports
+remain transitional compatibility aids; new harness reads should consume the snapshot.
+
 Current acceptance note:
 
 - The harness helps collect a consistent record, but it does not prove final Phase 3 readiness on its own.

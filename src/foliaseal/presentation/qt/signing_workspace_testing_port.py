@@ -10,6 +10,15 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.presentation.qt.signing_workspace_diagnostics import (
+    SigningWorkspaceSnapshot,
+)
+
+
+class SigningWorkspaceDiagnosticsPort(Protocol):
+    """Read-only diagnostic boundary for one live signing workspace."""
+
+    def snapshot(self) -> SigningWorkspaceSnapshot: ...
 
 
 class SigningWorkspaceTestingPanelPort(Protocol):
@@ -35,7 +44,7 @@ class SigningWorkspaceTestingPanelPort(Protocol):
     ) -> dict[str, Any]: ...
 
 
-class SigningWorkspaceTestingPort(Protocol):
+class SigningWorkspaceTestingPort(SigningWorkspaceDiagnosticsPort, Protocol):
     """Explicit non-production harness/testing contract for the signing workspace."""
 
     @property

@@ -23,6 +23,9 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     capture_qt_preview_render,
     snapshot_current_draft_request,
 )
+from foliaseal.presentation.qt.signing_workspace_diagnostics import (
+    SigningWorkspaceSnapshot,
+)
 from tests.support.phase3_builders import (
     build_signature_appearance,
     build_signature_rect,
@@ -113,6 +116,18 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
         def signature_appearance(self):
             return self._signature_appearance
 
+        def snapshot(self):
+            return SigningWorkspaceSnapshot(
+                logical_page_index=0,
+                signature_rect=self.panel.rect,
+                signature_appearance=self._signature_appearance,
+                selected_certificate_configuration_id=None,
+                timestamp_required=self.timestamp_required,
+                current_request=None,
+                sign_action_enabled=True,
+                last_signing_result=None,
+            )
+
         def set_timestamp_required(self, required: bool) -> None:
             self.timestamp_required = required
 
@@ -179,6 +194,18 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
 
         def signature_appearance(self):
             return self._signature_appearance
+
+        def snapshot(self):
+            return SigningWorkspaceSnapshot(
+                logical_page_index=0,
+                signature_rect=None,
+                signature_appearance=self._signature_appearance,
+                selected_certificate_configuration_id=None,
+                timestamp_required=bool(self.timestamp_required),
+                current_request=None,
+                sign_action_enabled=True,
+                last_signing_result=None,
+            )
 
         def set_timestamp_required(self, required: bool) -> None:
             self.timestamp_required = required
@@ -313,6 +340,18 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
 
         def current_request(self):
             return self._current_request
+
+        def snapshot(self):
+            return SigningWorkspaceSnapshot(
+                logical_page_index=1,
+                signature_rect=request.signature_rect,
+                signature_appearance=request.signature_appearance,
+                selected_certificate_configuration_id=None,
+                timestamp_required=request.timestamp_required,
+                current_request=self._current_request,
+                sign_action_enabled=True,
+                last_signing_result=self.last_signing_result,
+            )
 
     testing_adapter = _FakeTestingAdapter()
     shell = type("_Shell", (), {"testing_adapter": testing_adapter})()

@@ -26,6 +26,10 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureRect,
     SigningRequest,
+    SigningResult,
+)
+from foliaseal.presentation.qt.signing_workspace_diagnostics import (
+    SigningWorkspaceSnapshot,
 )
 from foliaseal.presentation.qt.signing_workspace_orchestrator import (
     SigningWorkspaceOrchestrator,
@@ -269,6 +273,26 @@ class SigningWorkspaceRuntime:
 
     def current_request(self) -> SigningRequest | None:
         return _snapshot_current_request(self._draft_workflow)
+
+    def snapshot(
+        self,
+        *,
+        last_signing_result: SigningResult | None = None,
+    ) -> SigningWorkspaceSnapshot:
+        """Return one coherent read model for diagnostics and harness callers."""
+
+        return SigningWorkspaceSnapshot(
+            logical_page_index=self.logical_page_index(),
+            signature_rect=self.signature_rect(),
+            signature_appearance=self.signature_appearance(),
+            selected_certificate_configuration_id=(
+                self.selected_certificate_configuration_id()
+            ),
+            timestamp_required=self._draft_workflow.timestamp_required,
+            current_request=self.current_request(),
+            sign_action_enabled=self.is_sign_action_enabled(),
+            last_signing_result=last_signing_result,
+        )
 
     def is_sign_action_enabled(self) -> bool:
         sign_button = self._sign_button_required()

@@ -10,6 +10,9 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.presentation.qt.signing_workspace_diagnostics import (
+    SigningWorkspaceSnapshot,
+)
 from foliaseal.presentation.qt.signing_workspace_properties_panel import (
     SignaturePropertiesPanel,
 )
@@ -65,6 +68,9 @@ class SigningWorkspaceCompatibilitySurface:
     @property
     def testing_adapter(self) -> SigningWorkspaceTestingAdapter:
         return self._testing_adapter
+
+    def snapshot(self) -> SigningWorkspaceSnapshot:
+        return self._runtime.snapshot(last_signing_result=self.last_signing_result)
 
     def install_widget_exports(self) -> None:
         self._widget.compat_surface = self  # type: ignore[attr-defined]
@@ -150,6 +156,9 @@ class SigningWorkspaceTestingAdapter:
     def last_signing_result(self) -> SigningResult | None:
         signing_result = self._compatibility_surface.last_signing_result
         return signing_result if isinstance(signing_result, SigningResult) else None
+
+    def snapshot(self) -> SigningWorkspaceSnapshot:
+        return self._compatibility_surface.snapshot()
 
 
 class SigningWorkspaceTestingPanelAdapter:

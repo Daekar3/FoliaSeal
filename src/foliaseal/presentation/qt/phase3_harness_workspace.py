@@ -257,10 +257,11 @@ class QtPhase3HarnessWorkspaceAdapter:
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
         testing_surface = _testing_surface(self._shell)
+        workspace_state = testing_surface.snapshot()
         base_appearance = _base_appearance(
             profile_store=self._profile_store,
             profile_name=command.profile_name,
-            fallback=testing_surface.signature_appearance() or SignatureAppearance(),
+            fallback=workspace_state.signature_appearance or SignatureAppearance(),
         )
         appearance = _apply_appearance_overrides(
             base_appearance,
@@ -283,17 +284,13 @@ class QtPhase3HarnessWorkspaceAdapter:
         self, command: Phase3HarnessCaptureCommand
     ) -> Phase3HarnessWorkspaceSnapshot:
         testing_surface = _testing_surface(self._shell)
+        workspace_state = testing_surface.snapshot()
         request = (
             command.request
             if command.request is not None
-            else testing_surface.current_request()
+            else workspace_state.current_request
         )
-        last_signing_result = getattr(testing_surface, "last_signing_result", None)
-        if callable(last_signing_result):
-            signing_result = last_signing_result()
-        else:
-            signing_result = last_signing_result
-        signing_result = signing_result if isinstance(signing_result, SigningResult) else None
+        signing_result = workspace_state.last_signing_result
         preview = testing_surface.panel.refresh_preview()
         app = _widget_application(self._shell)
         if app is not None and hasattr(app, "processEvents"):

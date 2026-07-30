@@ -2939,6 +2939,7 @@ def test_signing_shell_installs_named_compatibility_surface(
     assert callable(widget.testing_adapter.refresh_viewer)
     assert callable(widget.testing_adapter.current_request)
     assert callable(widget.testing_adapter.last_signing_result)
+    assert callable(widget.testing_adapter.snapshot)
     assert callable(widget.testing_adapter.panel.set_signature_appearance)
     assert callable(widget.testing_adapter.panel.refresh_preview)
     assert callable(widget.testing_adapter.panel.preview_text)
@@ -2947,6 +2948,9 @@ def test_signing_shell_installs_named_compatibility_surface(
     assert widget.refresh_viewer.__self__ is not widget.compat_surface
     assert widget.testing_adapter.current_request() == widget.current_request()
     assert widget.testing_adapter.last_signing_result() == widget.last_signing_result
+    snapshot = widget.testing_adapter.snapshot()
+    assert snapshot.current_request == widget.current_request()
+    assert snapshot.last_signing_result == widget.last_signing_result
 
 
 def test_signing_shell_testing_adapter_panel_forwards_notify_flag(
