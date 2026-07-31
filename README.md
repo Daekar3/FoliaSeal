@@ -98,6 +98,28 @@ Current capabilities:
     output then feeds both preview rendering and pre-submit fit validation
   - prefer deleting duplicate interpretation layers over adding new synchronization logic
 
+Prepared signing and headless compatibility:
+
+- `prepare_phase3_signing_plan()` creates the immutable, application-owned
+  `PreparedSigningPlan` used by the concrete signer. It carries the normalized backend request,
+  resolved visible-signature semantics, one neutral `SignatureLayoutPlan`, resolved stamp text,
+  typed fit issues, and an explicit visible/invisible mode.
+- Layout fit diagnostics are converted to `SigningDraftValidationIssue` values at this boundary;
+  layout implementation types do not leak to callers.
+- `PyHankoPdfSigner.sign()` accepts an optional prepared plan and otherwise prepares one itself.
+  `Phase3SigningExecutor.execute(request)` and the public `SignPdfUseCase.execute(request)` facade
+  remain unchanged for Qt, CLI, and other callers.
+- Requests with no rectangle and no appearance take the explicit invisible headless PyHanko path:
+  PyHanko creates a hidden signature field without a visible stamp, while preserving TSA setup,
+  incremental output, and post-sign verification. This is a headless signing capability, not a
+  new GUI workflow.
+- PyHanko and Pillow objects remain owned by the concrete adapter and layout adapters; the
+  prepared plan exposes only application/domain data and layout evidence.
+
+The prepared-plan compliance slice is complete. Focused prepared/invisible backend coverage passes
+(5 tests), Ruff is clean, and the full suite passes (1,016 tests, one existing Pillow deprecation
+warning).
+
 Phase 3 evidence gateway and signed lifecycle:
 
 - `Phase3EvidenceService` now exposes typed `Phase3MatrixResult` values, tagged by

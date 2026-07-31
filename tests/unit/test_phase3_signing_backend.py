@@ -31,6 +31,7 @@ from foliaseal.application.horizontal_signature_reservation import (
 )
 from foliaseal.application.phase3_signing_backend import (
     _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
+    PreparedSigningPlan,
     PyHankoCertificateLoader,
     PyHankoPdfInspector,
     PyHankoPdfSigner,
@@ -55,9 +56,17 @@ from foliaseal.application.phase3_signing_backend import (
     _visible_signature_fit_issues_for_stamp_text,
     build_backend_reservation_evidence,
     build_phase3_signing_executor,
+    prepare_phase3_signing_plan,
 )
-from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance, SignPdfUseCase
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.sign_pdf_use_case import (
+    SigningBackendAppearance,
+    SigningBackendRequest,
+    SignPdfUseCase,
+)
+from foliaseal.application.signing_draft_workflow import (
+    SigningDraftPreview,
+    SigningDraftValidationIssue,
+)
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -66,6 +75,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
+    SigningRequest,
     TimestampTrustPolicy,
 )
 from tests.support.phase3_builders import (
@@ -327,6 +337,142 @@ def test_phase3_signing_executor_produces_signed_pdf_and_validates(tmp_path: Pat
     summary = verifier.verify(str(output_pdf))
     assert summary.signature_count == 1
     assert summary.timestamp_present is False
+
+
+def test_prepared_signing_plan_contains_one_visible_layout_result(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        signature_appearance=build_signature_appearance(image_stamp_path=None),
+    )
+    backend_request = SigningBackendRequest.from_signing_request(request)
+
+    prepared = prepare_phase3_signing_plan(backend_request)
+
+    assert isinstance(prepared, PreparedSigningPlan)
+    assert prepared.visible is True
+    assert prepared.visible_semantics is not None
+    assert prepared.layout_plan is not None
+    assert prepared.stamp_text == prepared.visible_semantics.text.stamp_text
+    assert prepared.fit_issues == ()
+
+
+def test_prepared_signing_plan_converts_layout_issues_to_application_issues(
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=20.0, height_pt=20.0),
+        signature_appearance=build_signature_appearance(image_stamp_path=None),
+    )
+
+    prepared = prepare_phase3_signing_plan(SigningBackendRequest.from_signing_request(request))
+
+    assert prepared.fit_issues
+    assert all(isinstance(issue, SigningDraftValidationIssue) for issue in prepared.fit_issues)
+
+
+def test_pyhanko_signer_consumes_supplied_prepared_plan(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        signature_appearance=build_signature_appearance(image_stamp_path=None),
+    )
+    backend_request = SigningBackendRequest.from_signing_request(request)
+    prepared = prepare_phase3_signing_plan(backend_request)
+
+    output = PyHankoPdfSigner().sign(backend_request, prepared=prepared)
+    output_pdf.write_bytes(output.output_bytes)
+
+    assert output.timestamp_present is False
+    assert PyHankoSignatureVerifier().verify(str(output_pdf)).signature_count == 1
+
+
+def test_phase3_signing_executor_supports_invisible_incremental_signing(
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = SigningRequest(
+        input_pdf_path=str(input_pdf),
+        output_pdf_path=str(output_pdf),
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=False,
+    )
+
+    result = build_phase3_signing_executor().execute(request)
+
+    assert result.success is True
+    assert result.failure_code is None
+    assert output_pdf.exists()
+    assert result.timestamp_present is False
+    with output_pdf.open("rb") as handle:
+        assert len(list(PdfFileReader(handle).embedded_signatures)) == 1
+    verification = PyHankoSignatureVerifier().verify(str(output_pdf))
+    assert verification.signature_count == 1
+    assert verification.timestamp_present is False
+
+
+def test_invisible_signing_preserves_required_timestamp_behavior(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = SigningRequest(
+        input_pdf_path=str(input_pdf),
+        output_pdf_path=str(output_pdf),
+        certificate_path=str(cert_path),
+        passphrase="secret",
+        tsa_url="https://tsa.example.com",
+        timestamp_required=True,
+    )
+
+    result = SignPdfUseCase(
+        inspector=PyHankoPdfInspector(),
+        certificate_loader=PyHankoCertificateLoader(),
+        signer=PyHankoPdfSigner(
+            timestamper_factory=lambda _request: _build_dummy_timestamper()
+        ),
+        verifier=PyHankoSignatureVerifier(),
+    ).execute(request)
+
+    assert result.success is True
+    assert result.timestamp_present is True
+    assert PyHankoSignatureVerifier().verify(str(output_pdf)).timestamp_present is True
 
 
 def test_phase3_signing_executor_produces_visible_signature_without_image_stamp(

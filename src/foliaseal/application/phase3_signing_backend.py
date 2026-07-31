@@ -28,6 +28,7 @@ from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
 from pyhanko.pdf_utils.writer import PdfFileWriter
 from pyhanko.sign import fields, validation
+from pyhanko.sign.fields import InvisSigSettings
 from pyhanko.sign.signers import PdfSignatureMetadata, PdfSigner, SimpleSigner
 from pyhanko.sign.timestamps.common_utils import TimestampRequestError
 from pyhanko.stamp import TextStamp, TextStampStyle
@@ -117,6 +118,18 @@ class BackendReservationEvidence:
 
     snapshot: dict[str, Any] | None
     error: str | None
+
+
+@dataclass(frozen=True)
+class PreparedSigningPlan:
+    """Application-owned preparation shared by signing and layout adapters."""
+
+    backend_request: SigningBackendRequest
+    visible_semantics: VisibleSignatureSemantics | None
+    layout_plan: SignatureLayoutPlan | None
+    fit_issues: tuple[SigningDraftValidationIssue, ...]
+    stamp_text: str
+    visible: bool
 
 
 def _fmt_pdf_number(value: float) -> bytes:
@@ -319,60 +332,67 @@ class PyHankoPdfSigner:
 
     timestamper_factory: Callable[[str], object] | None = None
 
-    def sign(self, request: SigningBackendRequest) -> SigningOutput:
+    def sign(
+        self,
+        request: SigningBackendRequest,
+        *,
+        prepared: PreparedSigningPlan | None = None,
+    ) -> SigningOutput:
         input_path = Path(request.input_pdf_path)
         if not input_path.exists():
             raise FileNotFoundError(request.input_pdf_path)
-        appearance = request.signature_appearance
-        if request.signature_rect is None or appearance is None:
-            raise ValueError("A visible signature rectangle and appearance are required.")
+        prepared = prepared or prepare_phase3_signing_plan(request)
         signature_field_name = _next_signature_field_name(input_path)
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
-        signing_time = _current_signing_time(appearance.timezone_display_mode)
-        semantics = _resolve_visible_signature_semantics(
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            appearance=appearance,
-            signer=signer,
-            signing_time=signing_time,
-            signature_rect=request.signature_rect,
-        )
-        fit_issues = _visible_signature_fit_issues(
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            signature_rect=request.signature_rect,
-            signature_appearance=appearance,
-            signer=signer,
-            signing_time=signing_time,
-            semantics=semantics,
-        )
-        if any(issue.severity == SigningDraftValidationSeverity.ERROR for issue in fit_issues):
-            raise ValueError("; ".join(issue.message for issue in fit_issues))
+        if any(
+            issue.severity == SigningDraftValidationSeverity.ERROR
+            for issue in prepared.fit_issues
+        ):
+            raise ValueError("; ".join(issue.message for issue in prepared.fit_issues))
 
-        stamp_text = semantics.text.stamp_text
-        stamp_style = _build_stamp_style(
-            appearance,
-            stamp_text=stamp_text,
-            stamp_background=_stamp_background_for_path(appearance.image_stamp_path),
-            signature_rect=request.signature_rect,
-        )
         timestamper = None
         if request.timestamp_required:
             timestamper = self._build_timestamper(request.tsa_url)
+        semantics = prepared.visible_semantics
+        stamp_style = None
+        field_spec: fields.SigFieldSpec
+        if prepared.visible:
+            appearance = request.signature_appearance
+            signature_rect = request.signature_rect
+            if appearance is None or signature_rect is None or semantics is None:
+                raise ValueError("A visible signature rectangle and appearance are required.")
+            stamp_style = _build_stamp_style(
+                appearance,
+                stamp_text=prepared.stamp_text,
+                stamp_background=_stamp_background_for_path(appearance.image_stamp_path),
+                signature_rect=signature_rect,
+                layout_plan=prepared.layout_plan,
+            )
+            field_spec = fields.SigFieldSpec(
+                sig_field_name=signature_field_name,
+                on_page=signature_rect.page_index,
+                box=_rect_to_box(signature_rect),
+                readable_field_name="Visible signature",
+            )
+        else:
+            field_spec = fields.SigFieldSpec(
+                sig_field_name=signature_field_name,
+                box=None,
+                readable_field_name="Invisible signature",
+                invis_sig_settings=InvisSigSettings(
+                    set_print_flag=False,
+                    set_hidden_flag=True,
+                ),
+            )
+
         metadata = PdfSignatureMetadata(
             field_name=signature_field_name,
             md_algorithm="sha256",
             name=_signature_name_for_metadata(request, signer),
-            reason=semantics.text.metadata_reason,
-            location=semantics.text.metadata_location,
-            contact_info=semantics.text.metadata_contact_info,
+            reason=None if semantics is None else semantics.text.metadata_reason,
+            location=None if semantics is None else semantics.text.metadata_location,
+            contact_info=None if semantics is None else semantics.text.metadata_contact_info,
             subfilter=fields.SigSeedSubFilter.ADOBE_PKCS7_DETACHED,
-        )
-        field_spec = fields.SigFieldSpec(
-            sig_field_name=signature_field_name,
-            on_page=request.signature_rect.page_index,
-            box=_rect_to_box(request.signature_rect),
-            readable_field_name="Visible signature",
         )
 
         with input_path.open("rb") as input_stream:
@@ -508,6 +528,60 @@ def build_phase3_signing_executor(
     return Phase3SigningExecutor(use_case=use_case)
 
 
+def prepare_phase3_signing_plan(
+    request: SigningBackendRequest,
+) -> PreparedSigningPlan:
+    """Resolve visible semantics and layout once for the signing adapters."""
+
+    if request.signature_rect is None and request.signature_appearance is None:
+        return PreparedSigningPlan(
+            backend_request=request,
+            visible_semantics=None,
+            layout_plan=None,
+            fit_issues=(),
+            stamp_text="",
+            visible=False,
+        )
+    appearance = request.signature_appearance
+    signature_rect = request.signature_rect
+    if appearance is None or signature_rect is None:
+        raise ValueError("A visible signature rectangle and appearance are required.")
+
+    signer = _load_simple_signer(request.certificate_path, request.passphrase)
+    signing_time = _current_signing_time(appearance.timezone_display_mode)
+    semantics = _resolve_visible_signature_semantics(
+        certificate_path=request.certificate_path,
+        passphrase=request.passphrase,
+        appearance=appearance,
+        signer=signer,
+        signing_time=signing_time,
+        signature_rect=signature_rect,
+    )
+    stamp_text = semantics.text.stamp_text
+    plan_result = VisibleSignatureLayoutBoundary().plan(
+        VisibleSignaturePlanRequest(
+            appearance=appearance,
+            signature_rect=signature_rect,
+            stamp_text=stamp_text,
+            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+        )
+    )
+    fit_issues = _layout_fit_issues(
+        layout_plan=plan_result.layout_plan,
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+    )
+    return PreparedSigningPlan(
+        backend_request=request,
+        visible_semantics=semantics,
+        layout_plan=plan_result.layout_plan,
+        fit_issues=fit_issues,
+        stamp_text=stamp_text,
+        visible=True,
+    )
+
+
 def _load_simple_signer(certificate_path: str, passphrase: str) -> SimpleSigner:
     path = Path(certificate_path)
     if not path.exists():
@@ -541,30 +615,25 @@ def _build_stamp_style(
     stamp_text: str,
     stamp_background: PdfImage | None,
     signature_rect: SignatureRect,
+    layout_plan: SignatureLayoutPlan | None = None,
 ) -> TextStampStyle:
-    plan_result = VisibleSignatureLayoutBoundary().plan(
-        VisibleSignaturePlanRequest(
-            appearance=appearance,
-            signature_rect=signature_rect,
-            stamp_text=stamp_text,
-            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
-        )
+    if layout_plan is None:
+        layout_plan = VisibleSignatureLayoutBoundary().plan(
+            VisibleSignaturePlanRequest(
+                appearance=appearance,
+                signature_rect=signature_rect,
+                stamp_text=stamp_text,
+                ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+            )
+        ).layout_plan
+    fit_issues = _layout_fit_issues(
+        layout_plan=layout_plan,
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
     )
-    layout_plan = plan_result.layout_plan
-    if layout_plan.fit_issues and not (
-        _single_line_rendered_ink_fits_reservation(
-            signature_rect=signature_rect,
-            signature_appearance=appearance,
-            stamp_text=stamp_text,
-        )
-        or _horizontal_multi_line_rendered_layout_fits_reservation(
-            signature_rect=signature_rect,
-            signature_appearance=appearance,
-            stamp_text=stamp_text,
-            layout_plan=layout_plan,
-        )
-    ):
-        raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
+    if fit_issues:
+        raise ValueError("; ".join(issue.message for issue in fit_issues))
 
     return (
         VisibleSignatureLayoutService.production()
@@ -578,6 +647,39 @@ def _build_stamp_style(
             layout_plan=layout_plan,
         )
         .stamp_style
+    )
+
+
+def _layout_fit_issues(
+    *,
+    layout_plan: SignatureLayoutPlan,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+) -> tuple[SigningDraftValidationIssue, ...]:
+    """Apply the existing rendered-ink fallback ladder to one prepared plan."""
+
+    if not layout_plan.fit_issues:
+        return ()
+    if _single_line_rendered_ink_fits_reservation(
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
+    ) or _horizontal_multi_line_rendered_layout_fits_reservation(
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
+        layout_plan=layout_plan,
+    ):
+        return ()
+    return tuple(
+        SigningDraftValidationIssue(
+            code=issue.code,
+            message=issue.message,
+            field_name=issue.field_name,
+            severity=issue.severity,
+        )
+        for issue in layout_plan.fit_issues
     )
 
 
