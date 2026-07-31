@@ -115,6 +115,28 @@ Phase 3 evidence gateway and signed lifecycle:
   that same path in the persisted mapping.
 - CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
 
+Reusable Python callers can bind one PDF and its credentials once, then run the common evidence
+operations through the document-bound session:
+
+```python
+from foliaseal.application.phase3_evidence_service import Phase3EvidenceService
+from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
+    build_default_phase3_evidence_service,
+)
+
+service: Phase3EvidenceService = build_default_phase3_evidence_service()
+session = service.for_pdf(
+    "/path/to/input.pdf",
+    certificate_path="/path/to/certificate.p12",
+    passphrase="secret",
+)
+preview = session.preview("/path/to/preview-manifest.json")
+signed = session.signed_acceptance("/path/to/signed-acceptance-manifest.json")
+```
+
+The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir=` per call when
+isolating a run. Existing harness, service, and CLI entry points remain compatibility adapters.
+
 Not yet production-ready:
 
 - automated preview/output parity is green for the current signed fixture matrices, but still needs

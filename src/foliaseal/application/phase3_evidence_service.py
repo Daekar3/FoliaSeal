@@ -8,12 +8,15 @@ from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluation
 from foliaseal.application.qa_signed_acceptance_generation import (
     GeneratedSignedAcceptanceAssets,
 )
+
+if TYPE_CHECKING:
+    from foliaseal.application.phase3_evidence_gateway import Phase3EvidenceSession
 
 CRITICAL_ZERO_COUNTERS = (
     "expected_outcome_mismatch_count",
@@ -181,6 +184,25 @@ class Phase3EvidenceService:
             matrix_runtime_context_factory or (lambda _name: nullcontext())
         )
         self._capture_loader = capture_loader or _load_capture_json
+
+    def for_pdf(
+        self,
+        pdf_path: str | Path,
+        *,
+        certificate_path: str,
+        passphrase: str,
+        artifacts_dir: str = "artifacts/phase3",
+    ) -> Phase3EvidenceSession:
+        """Return a reusable session bound to one PDF and its credentials."""
+
+        from foliaseal.application.phase3_evidence_gateway import gateway_for_service
+
+        return gateway_for_service(self).for_pdf(
+            pdf_path,
+            certificate_path=certificate_path,
+            passphrase=passphrase,
+            artifacts_dir=artifacts_dir,
+        )
 
     def capture_harness(self, request: Phase3HarnessCaptureRequest) -> Any:
         return self._harness_runner(request)

@@ -96,8 +96,8 @@ class SigningWorkspaceLifecycle:
         if callable(close):
             try:
                 close()
-        except Exception:
-            pass
+            except Exception:
+                pass
         delete_later = getattr(widget, "deleteLater", None)
         if callable(delete_later):
             try:
