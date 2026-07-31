@@ -36,6 +36,7 @@ The user-visible proof is unchanged but stronger: running the existing preview a
 - [x] (2026-07-31) Revalidated the completed hybrid after the gateway/session additions: focused tests (143), full suite (1,009), Ruff, and both release-fidelity matrices passed; the architecture review found no ownership drift.
 - [x] (2026-07-31) Addressed the SPEC compliance finding in child plan `phase3_typed_result_truth_execplan.md`: signed typed results now surface scenario-error rows and aggregate evidence preserves custom authoritative summary paths.
 - [x] (2026-07-31) Completed the final post-fix validation and documentation reconciliation: 23 focused Phase 3 evidence/gateway/matrix tests, 1,011 full-suite tests (one pre-existing Pillow deprecation warning), and Ruff passed; the recorded release-fidelity process/window audit remains clean.
+- [x] (2026-07-31) Committed the complete post-fix change set as `d3c2b5123` and verified a clean checkout.
 
 ## Surprises & Discoveries
 
@@ -246,3 +247,7 @@ release-fidelity matrices green. The independent compliance review's final setup
 was resolved by widening the runner `try/finally` to cover startup through artifact publication;
 commit `21a872aa8` contains the complete intentional slice and the final process/window audit is
 clean.
+
+2026-07-31 / Codex: Post-gateway reconciliation, typed-result truth fixes, documentation updates,
+and final validation were committed as `d3c2b5123`; no further implementation iteration is needed
+for this slice.
