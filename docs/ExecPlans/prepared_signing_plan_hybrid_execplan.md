@@ -64,6 +64,7 @@ Ruff passed, and the full suite passed (1,016 tests; one existing Pillow depreca
 Documentation now records that invisible signing is headless-compatible rather than a new GUI flow.
 The post-fix architecture/spec review found no blocking discrepancy; the independent signing-time
 snapshot concern is documented as the next fidelity-focused architecture slice.
+Implementation commit: `42e4fe3c3` (`Complete prepared signing plan boundary`).
 
 ## Context and Orientation
 
@@ -125,7 +126,7 @@ The changes are additive and safe to rerun. Generated PDFs, PNGs, and matrix sum
 
 ## Artifacts and Notes
 
-Tracked artifacts are source, tests, README, architecture documentation, and this ExecPlan. Generated evidence remains outside Git. Record focused/full test counts, invisible-signing verification evidence, release-fidelity counters, compliance findings, documentation changes, and the final commit hash in this plan.
+Tracked artifacts are source, tests, README, architecture documentation, and this ExecPlan. Generated evidence remains outside Git. Record focused/full test counts, invisible-signing verification evidence, release-fidelity counters, compliance findings, documentation changes, and the final commit hash (`42e4fe3c3`) in this plan.
 
 ## Interfaces and Dependencies
 
