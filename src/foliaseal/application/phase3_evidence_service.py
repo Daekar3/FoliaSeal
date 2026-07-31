@@ -327,6 +327,9 @@ def _normalize_matrix_result(
         errors += tuple(
             _nonzero_counter_errors(summary_mapping, CRITICAL_ZERO_COUNTERS)
         )
+        errors += tuple(
+            _nonzero_counter_errors(summary_mapping, ("error_scenario_count",))
+        )
         passed = summary_mapping.get("acceptance_expectations_passed") is True and not errors
         successful_run_count = _optional_int(
             summary_mapping.get("successful_signing_run_count")
@@ -454,14 +457,16 @@ def _matrix_summary_row(
         ),
     )
     artifacts_dir = str(summary.get("artifacts_dir", ""))
+    summary_json_path = str(
+        summary.get("summary_json_path")
+        or (Path(artifacts_dir) / "summary.json" if artifacts_dir else "")
+    )
     return Phase3SignedAcceptanceMatrixResult(
         name=name,
         passed=not errors,
         errors=tuple(errors),
         artifacts_dir=artifacts_dir,
-        summary_json_path=(
-            str(Path(artifacts_dir) / "summary.json") if artifacts_dir else ""
-        ),
+        summary_json_path=summary_json_path,
         counters=counters,
     )
 

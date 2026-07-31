@@ -12,7 +12,8 @@ The user-visible proof is unchanged but stronger: running the existing preview a
 
 - [x] Fresh explorer reconnaissance completed and reviewed. It identified `Phase3EvidenceService` as the existing CLI-facing boundary and the signed-acceptance matrix runner plus scenario executor/workspace adapter as the highest-friction seam.
 - [x] The preceding visible-signature layout boundary slice is complete and committed; this plan must not modify that completed architecture slice.
-- [x] No child ExecPlans are required. The gateway typing, lifecycle/artifact ports, scenario-result normalization, tests, documentation, compliance review, and commit are one deliberately bounded implementation slice.
+- [x] The primary gateway/lifecycle/artifact implementation was completed as one bounded slice.
+- [x] Child `phase3_typed_result_truth_execplan.md` was created from the post-fix compliance finding, implemented, validated, and reconciled into this parent plan before handoff.
 
 ## Progress
 
@@ -31,6 +32,10 @@ The user-visible proof is unchanged but stronger: running the existing preview a
 - [x] (2026-07-29) Release-fidelity signed matrix passed: 8 scenarios, 6 successful signings, 2 matched intentional rejections, and all acceptance failure counters at zero.
 - [x] (2026-07-29) Independent compliance review findings were resolved: typed scenario rows are wired, artifact paths are authoritative, and lifecycle cleanup covers setup, scenario, and summary failures.
 - [x] (2026-07-29) Committed the complete slice as `21a872aa8` and verified a clean worktree, process list, and window list.
+- [x] (2026-07-31) Re-ran the required dev-loop explorer against the post-gateway checkout. It confirmed that the constrained hybrid implementation is already present and that the later gateway/session commits are additive; no second public orchestrator or duplicate lifecycle/artifact framework is warranted.
+- [x] (2026-07-31) Revalidated the completed hybrid after the gateway/session additions: focused tests (143), full suite (1,009), Ruff, and both release-fidelity matrices passed; the architecture review found no ownership drift.
+- [x] (2026-07-31) Addressed the SPEC compliance finding in child plan `phase3_typed_result_truth_execplan.md`: signed typed results now surface scenario-error rows and aggregate evidence preserves custom authoritative summary paths.
+- [x] (2026-07-31) Completed the final post-fix validation and documentation reconciliation: 23 focused Phase 3 evidence/gateway/matrix tests, 1,011 full-suite tests (one pre-existing Pillow deprecation warning), and Ruff passed; the recorded release-fidelity process/window audit remains clean.
 
 ## Surprises & Discoveries
 
@@ -45,6 +50,8 @@ The user-visible proof is unchanged but stronger: running the existing preview a
 - Observation: the first independent compliance review found typed scenario results were declared but not fully wired, the returned artifact path was not persisted in the summary, and setup failures could skip cleanup.
   Resolution: the runner normalizes `Phase3SignedAcceptanceScenarioResult` rows, persists the authoritative `summary_json_path`, and wraps the complete startup-to-publication flow in `try/finally`; regression tests cover all three failure classes.
 - Observation: the Qt offscreen release-fidelity run emits existing platform/content-box warnings but completes with the expected counters and no leaked FoliaSeal process or window.
+- Observation: the first post-gateway SPEC review found that typed signed-result normalization did not include nonzero `error_scenario_count`, and aggregate evidence rows reconstructed rather than preserved custom summary paths.
+  Resolution: child plan `phase3_typed_result_truth_execplan.md` added regression tests and corrected both application-service helpers without changing raw summary or CLI contracts.
 
 ## Decision Log
 
@@ -66,6 +73,12 @@ The user-visible proof is unchanged but stronger: running the existing preview a
 - Decision: Keep the artifact publication's second write after receiving the adapter path.
   Rationale: the first write establishes the stable file location; the returned path is then inserted into the summary and written again so persisted JSON and the typed CLI result share one authoritative `summary_json_path` value without changing the existing artifact-port contract.
   Date/Author: 2026-07-29 / Codex.
+- Decision: Treat this dev-loop invocation as a completion and reconciliation pass rather than adding a second Phase 3 orchestrator.
+  Rationale: the requested hybrid already landed in `21a872aa8`, and the current gateway/session layer provides the reusable caller facade. Adding a separate plan-oriented orchestrator would duplicate the existing application service boundary and broaden the slice without removing a live coupling problem.
+  Date/Author: 2026-07-31 / Codex, after `explorer-light` review.
+- Decision: Fix the typed-result and aggregate-path gaps in a child plan before declaring the parent slice complete.
+  Rationale: the compliance review showed these were observable contract discrepancies, not merely documentation concerns; keeping the fixes local preserves the one-slice architecture while making typed results truthful.
+  Date/Author: 2026-07-31 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -78,7 +91,9 @@ Lifecycle ordering is start, shell attachment, initial event processing, per-sce
 processing, and unconditional close. The artifact adapter's returned path is authoritative for
 `summary_json_path`. CLI command names, labels, exit behavior, and legacy raw-dict methods remain
 compatible. README and architecture documentation were updated in this slice; generated evidence
-remains outside Git. Validation completed with 139 focused tests and 995 full-suite tests passing.
+remains outside Git. Initial validation completed with 139 focused tests and 995 full-suite tests;
+post-fix validation completed with 23 focused Phase 3 evidence/gateway/matrix tests and 1,011
+full-suite tests (one pre-existing Pillow deprecation warning), with Ruff clean.
 The preview matrix executed 8 scenarios with 0 error rows. The signed matrix executed 8 scenarios
 with 6 successful signings, 2 matched intentional fit rejections, `acceptance_expectations_passed=true`,
 and zero expected-outcome, cryptographic-validation, preview-comparison, and annotation-rectangle

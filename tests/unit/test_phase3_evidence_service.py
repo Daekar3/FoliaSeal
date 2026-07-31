@@ -220,6 +220,28 @@ def test_phase3_evidence_service_typed_signed_result_surfaces_counter_failures()
     assert result.errors == ("one mismatch", "expected_outcome_mismatch_count=1")
 
 
+def test_phase3_evidence_service_typed_signed_result_surfaces_scenario_errors() -> None:
+    service = _service(
+        signed_acceptance_matrix_runner=lambda _request: {
+            **_passing_summary(artifacts_dir="artifacts/signed"),
+            "error_scenario_count": 1,
+        }
+    )
+
+    result = service.signed_acceptance_matrix_result(
+        Phase3MatrixRequest(
+            pdf_path="input.pdf",
+            certificate_path="cert.p12",
+            passphrase="secret",
+            scenario_manifest_path="manifest.json",
+            artifacts_dir="artifacts",
+        )
+    )
+
+    assert result.passed is False
+    assert result.errors == ("error_scenario_count=1",)
+
+
 def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
     tmp_path: Path,
 ) -> None:
@@ -260,6 +282,33 @@ def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
     summary_text = Path(result.summary_markdown_path).read_text(encoding="utf-8")
     assert "Overall result: PASS" in summary_text
     assert "signed_fit_rejection_matrix" in summary_text
+
+
+def test_phase3_evidence_service_aggregate_preserves_runner_summary_path(
+    tmp_path: Path,
+) -> None:
+    custom_summary_path = str(tmp_path / "custom" / "authoritative-summary.json")
+
+    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+        return {
+            **_passing_summary(artifacts_dir=request.artifacts_dir),
+            "summary_json_path": custom_summary_path,
+        }
+
+    service = _service(signed_acceptance_matrix_runner=fake_matrix_runner)
+
+    result = service.run_signed_acceptance_evidence(
+        Phase3SignedAcceptanceEvidenceRequest(
+            artifacts_root=tmp_path,
+            summary_markdown_path=tmp_path / "artifacts/summary.md",
+            passphrase="secret",
+        )
+    )
+
+    assert all(
+        row.summary_json_path == custom_summary_path
+        for row in result.matrix_results
+    )
 
 
 def test_phase3_evidence_service_writes_failure_summary_before_raising(

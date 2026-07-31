@@ -106,6 +106,10 @@ Phase 3 evidence gateway and signed lifecycle:
   adapters, so the CLI and existing `summary.json` consumers keep their current behavior.
 - Signed-acceptance rows use a typed scenario result whose `as_mapping()` preserves the existing
   JSON row keys, including successful signed-output evidence and intentional fit-rejection rows.
+- Typed signed-matrix results preserve failure truth: a nonzero `error_scenario_count` makes the
+  result fail even when acceptance counters are otherwise zero. Aggregate evidence rows retain a
+  runner-provided `summary_json_path`, falling back to `artifacts_dir/summary.json` only for legacy
+  runners.
 - The signed matrix runner owns lifecycle ordering through `Phase3SignedAcceptanceLifecyclePort`
   (Qt and deterministic fake adapters): start the application/window, attach and show the shell,
   prime/process events, process events after each scenario, and always close in `finally`.
@@ -114,6 +118,11 @@ Phase 3 evidence gateway and signed lifecycle:
   for the summary's `summary_json_path` and CLI reporting; the second serialization pass preserves
   that same path in the persisted mapping.
 - CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
+
+The post-fix validation snapshot is 23 focused Phase 3 evidence/gateway/matrix tests and 1,011
+tests for the full suite, with Ruff clean. The release-fidelity contract remains the bounded
+eight-scenario corpus: six supported signings, two intentional fit rejections, and zero acceptance
+failure counters.
 
 Reusable Python callers can bind one PDF and its credentials once, then run the common evidence
 operations through the document-bound session:
