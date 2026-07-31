@@ -35,7 +35,7 @@ There are no child ExecPlans. The existing `Phase3EvidenceService`, Phase 3 runn
 - [x] (2026-07-31) Ran the complete suite; 1,009 tests passed in 45.09 seconds with one existing Pillow deprecation warning.
 - [x] (2026-07-31) Compliance review found missing architecture/README documentation, a weak `Any` service return annotation, and gateway terminology drift; all were corrected. `docs/SPEC.md` has no Phase 3 API requirement.
 - [x] (2026-07-31) Updated `docs/ARCHITECTURE.md` and `README.md` with the gateway/session contracts, defaults, usage, and compatibility rules.
-- [ ] Commit the completed slice and record the final outcome here.
+- [x] (2026-07-31) Committed the complete slice as `42c60a8b9` (`Add reusable Phase 3 evidence gateway session`); the final plan-status amendment is ready to fold into that commit.
 
 ## Surprises & Discoveries
 
@@ -73,8 +73,9 @@ the Phase 3 compatibility set passes (133 tests), Ruff and `git diff --check` ar
 complete suite passes (1,009 tests, one pre-existing Pillow deprecation warning). The session returns
 the same typed matrix results and artifact paths as equivalent legacy service calls; per-call artifact
 overrides and the `artifacts/phase3` default are covered by boundary tests. Documentation is updated
-in `docs/ARCHITECTURE.md` and `README.md`. Commit hash is recorded after the final staged commit;
-future work may deepen runner ports or CLI migration, but remains outside this slice.
+in `docs/ARCHITECTURE.md` and `README.md`. Commit `42c60a8b9` contains the implementation, the
+necessary lifecycle syntax correction, tests, documentation, and this plan. Future work may deepen
+runner ports or CLI migration, but remains outside this slice.
 
 ## Context and Orientation
 
