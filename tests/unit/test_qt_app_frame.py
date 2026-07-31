@@ -319,6 +319,8 @@ class _FakeShell:
         self.copy_selected_document_text_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
         self.testing_adapter = object()
+        self.close_calls = 0
+        self.delete_later_calls = 0
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -343,6 +345,12 @@ class _FakeShell:
     def copy_selected_document_text(self) -> str | None:
         self.copy_selected_document_text_calls += 1
         return "Alice Example"
+
+    def close(self) -> None:
+        self.close_calls += 1
+
+    def deleteLater(self) -> None:  # noqa: N802
+        self.delete_later_calls += 1
 
 
 class _FakeShellPort:
@@ -381,6 +389,20 @@ class _FakeShellFactory:
         return SigningWorkspaceBundle(
             port=_FakeShellPort(self.shell_widget),
             testing_adapter=self.shell_widget.testing_adapter,
+        )
+
+
+class _SequenceShellFactory:
+    def __init__(self, *shells) -> None:
+        self.shells = list(shells)
+        self.bootstrap_calls: list[SigningWorkspaceBootstrap] = []
+
+    def create(self, bootstrap: SigningWorkspaceBootstrap):
+        self.bootstrap_calls.append(bootstrap)
+        shell = self.shells.pop(0)
+        return SigningWorkspaceBundle(
+            port=_FakeShellPort(shell),
+            testing_adapter=shell.testing_adapter,
         )
 
 
@@ -596,6 +618,81 @@ def test_app_frame_reopens_signed_output_from_shell_callback(tmp_path: Path) -> 
         str(tmp_path / "source" / "contract.pdf"),
         str(tmp_path / "signed" / "contract-signed.pdf"),
     ]
+
+
+def test_app_frame_replacing_workspace_closes_previous_shell(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    second = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_SequenceShellFactory(first, second),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    frame.open_pdf_path(tmp_path / "source" / "second.pdf")
+
+    assert frame.window.central_widget is second
+    assert frame.current_shell is second
+    assert first.close_calls == 1
+    assert first.delete_later_calls == 1
+    assert second.close_calls == 0
+
+
+def test_app_frame_failed_replacement_preserves_previous_shell(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(first),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    _FakeQPdfDocument.next_status = _FakeQPdfDocument.Error.Failed
+
+    result = frame.open_pdf_path(tmp_path / "source" / "broken.pdf")
+
+    assert result is None
+    assert frame.window.central_widget is first
+    assert frame.current_shell is first
+    assert first.close_calls == 0
+    assert len(bindings.q_message_box.warning_calls) == 1
+
+
+def test_app_frame_close_workspace_is_idempotent_and_restores_placeholder(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+
+    frame.close_workspace()
+    frame.close_workspace()
+
+    assert frame.current_shell is None
+    assert frame.current_workspace is None
+    assert shell.close_calls == 1
+    assert shell.delete_later_calls == 1
+    assert bindings.q_message_box.warning_calls == []
+    assert frame.window.menu_bar.menus[0].actions[1].enabled is False
+    assert frame.window.menu_bar.menus[1].actions[0].enabled is False
+    assert frame.window.menu_bar.menus[1].actions[1].enabled is False
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:

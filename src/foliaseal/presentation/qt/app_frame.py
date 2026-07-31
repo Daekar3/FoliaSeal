@@ -49,6 +49,10 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceFactory,
     SigningWorkspacePort,
 )
+from foliaseal.presentation.qt.signing_workspace_lifecycle import (
+    QtWorkspaceMount,
+    SigningWorkspaceLifecycle,
+)
 from foliaseal.resources.icons import icon_path
 
 
@@ -288,6 +292,11 @@ class FoliaSealAppFrame:
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
+        self._workspace_mount = QtWorkspaceMount(self.window)
+        self._workspace_lifecycle = SigningWorkspaceLifecycle(
+            workspace_open_port=self._workspace_open_port,
+            mount_port=self._workspace_mount,
+        )
         self._certificate_dialog_port: CertificateDialogPort = AppFrameCertificateDialogService(
             bindings=self._bindings,
             parent=self.window,
@@ -369,7 +378,7 @@ class FoliaSealAppFrame:
 
     def open_pdf_path(self, pdf_path: str | Path) -> Any | None:
         try:
-            outcome = self._workspace_open_port.open_workspace(
+            outcome = self._workspace_lifecycle.replace(
                 OpenWorkspaceCommand(
                     source_pdf=Path(pdf_path),
                     app_settings=self._app_settings,
@@ -390,12 +399,19 @@ class FoliaSealAppFrame:
 
         self._current_shell_port = outcome.shell_port
         self._current_workspace = outcome.compatibility
-        self.window.setCentralWidget(outcome.compatibility.shell_widget)
         self._set_save_as_enabled(True)
         self._set_text_selection_action_enabled(True)
         self._set_text_selection_action_checked(False)
         self._set_copy_selected_text_action_enabled(True)
         return outcome.compatibility.shell_widget
+
+    def close_workspace(self) -> None:
+        """Close the active signing workspace and restore the placeholder view."""
+
+        self._workspace_lifecycle.close()
+        self._current_shell_port = None
+        self._current_workspace = None
+        self._set_placeholder()
 
     def show_app_settings(self) -> AppSettings | None:
         dialog = AppSettingsDialog(
@@ -610,7 +626,7 @@ class FoliaSealAppFrame:
         label = self._bindings.q_label("Open a PDF to begin signing.")
         if hasattr(label, "setWordWrap"):
             label.setWordWrap(True)
-        self.window.setCentralWidget(label)
+        self._workspace_mount.mount(label)
         self._set_save_as_enabled(False)
         self._set_text_selection_action_enabled(False)
         self._set_text_selection_action_checked(False)
