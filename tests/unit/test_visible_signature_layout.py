@@ -20,6 +20,7 @@ from foliaseal.application.visible_signature_layout import (
     TextMetrics,
     VisibleSignatureLayoutEngine,
     VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
     _background_layout_for_stamp,
 )
@@ -69,6 +70,28 @@ class FakeHorizontalInkMeasurer:
     ) -> HorizontalInkMeasurement | None:
         self.requests.append(request)
         return self.measurement
+
+
+def _materialized_layout(
+    *,
+    appearance: SigningBackendAppearance,
+    stamp_text: str,
+    stamp_background: object | None,
+    signature_rect: SignatureRect,
+    options: VisibleSignatureLayoutOptions | None = None,
+    service: VisibleSignatureLayoutService | None = None,
+    preview: bool = False,
+):
+    preparation = (service or VisibleSignatureLayoutService()).prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+            options=options or VisibleSignatureLayoutOptions(),
+        )
+    )
+    return preparation.preview() if preview else preparation.signing()
 
 
 def _box_style(
@@ -689,11 +712,6 @@ def test_pyhanko_adapter_matches_existing_stamp_style_with_injected_horizontal_i
         fake_reference,
     )
 
-    expected_style = _existing_stamp_style(
-        appearance=appearance,
-        stamp_text=stamp_text,
-        signature_rect=signature_rect,
-    )
     ink_measurer = FakeHorizontalInkMeasurer(
         measurement=HorizontalInkMeasurement(
             structural_text_bounds_px=RectBounds(x=40, y=8, width=200, height=18),
@@ -701,6 +719,12 @@ def test_pyhanko_adapter_matches_existing_stamp_style_with_injected_horizontal_i
             px_to_pt=1.0,
         ),
         requests=[],
+    )
+    expected_style = _existing_stamp_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        signature_rect=signature_rect,
+        ink_measurer=ink_measurer,
     )
     layout_plan = VisibleSignatureLayoutEngine(ink_measurer=ink_measurer).plan(
         _layout_request(
@@ -753,7 +777,7 @@ def test_layout_service_builds_backend_signing_style_from_public_facade(tmp_path
         layout_plan=expected_plan,
     )
 
-    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+    service_result = _materialized_layout(
         appearance=appearance,
         stamp_text=stamp_text,
         stamp_background=_stamp_background(appearance.image_stamp_path),
@@ -814,7 +838,7 @@ def test_layout_service_exposes_background_layout_policy_through_public_facade(
         height_pt=120.0,
     )
 
-    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+    service_result = _materialized_layout(
         appearance=appearance,
         stamp_text="Digitally signed by\nMorgan Ellery\nFoliaSeal",
         stamp_background=_stamp_background(appearance.image_stamp_path),
@@ -842,7 +866,7 @@ def test_layout_service_keeps_distinct_top_and_bottom_single_line_stamp_layouts(
         height_pt=40.0,
     )
 
-    top_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+    top_result = _materialized_layout(
         appearance=_backend_appearance(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.TOP,
@@ -854,7 +878,7 @@ def test_layout_service_keeps_distinct_top_and_bottom_single_line_stamp_layouts(
         signature_rect=signature_rect,
         options=VisibleSignatureLayoutOptions(),
     )
-    bottom_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+    bottom_result = _materialized_layout(
         appearance=_backend_appearance(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.BOTTOM,
@@ -896,7 +920,7 @@ def test_layout_service_keeps_horizontal_single_line_stamp_inside_reserved_lane(
         height_pt=28.678,
     )
 
-    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_signing(
+    service_result = _materialized_layout(
         appearance=appearance,
         stamp_text="Digitally signed by\nMorgan Ellery | FoliaSeal",
         stamp_background=_stamp_background(appearance.image_stamp_path),
@@ -945,12 +969,13 @@ def test_layout_service_builds_canonical_preview_style_from_public_facade(tmp_pa
         allow_fit_issues=True,
     )
 
-    service_result = VisibleSignatureLayoutService.production().pyhanko_style_for_canonical_preview(
+    service_result = _materialized_layout(
         appearance=appearance,
         stamp_text=stamp_text,
         stamp_background=_stamp_background(appearance.image_stamp_path),
         signature_rect=signature_rect,
         options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        preview=True,
     )
 
     assert isinstance(service_result, CanonicalPreviewLayout)
@@ -975,17 +1000,20 @@ def test_layout_service_suppresses_collapsed_horizontal_preview_stamp() -> None:
         height_pt=32.0,
     )
 
-    service_result = VisibleSignatureLayoutService(
+    service = VisibleSignatureLayoutService(
         text_measurer=FakeTextMeasurer(width_pt=200, height_pt=16),
         image_probe=FakeStampImageProbe(
             ImageMetrics(width_px=400, height_px=100, aspect_ratio=4.0)
         ),
-    ).pyhanko_style_for_canonical_preview(
+    )
+    service_result = _materialized_layout(
+        service=service,
         appearance=appearance,
         stamp_text="Digitally signed by Morgan Ellery",
         stamp_background=object(),
         signature_rect=signature_rect,
         options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        preview=True,
     )
 
     assert service_result.stamp_suppressed is True
@@ -1110,21 +1138,23 @@ def _existing_stamp_style(
     appearance: SigningBackendAppearance,
     stamp_text: str,
     signature_rect: SignatureRect,
+    ink_measurer: FakeHorizontalInkMeasurer | None = None,
 ):
-    from foliaseal.application.phase3_signing_backend import _build_stamp_style
-
-    return _build_stamp_style(
-        appearance,
-        stamp_text=stamp_text,
-        stamp_background=_stamp_background(appearance.image_stamp_path),
-        signature_rect=signature_rect,
-    )
+    return VisibleSignatureLayoutService.production().prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=_stamp_background(appearance.image_stamp_path),
+            signature_rect=signature_rect,
+            ink_measurer=ink_measurer,
+        )
+    ).signing().stamp_style
 
 
 def _stamp_background(image_stamp_path: str | None):
-    from foliaseal.application.phase3_signing_backend import _stamp_background_for_path
+    from foliaseal.application.phase3_signing_backend import stamp_background_for_path
 
-    return _stamp_background_for_path(image_stamp_path)
+    return stamp_background_for_path(image_stamp_path)
 
 
 def _style_snapshot(style) -> dict[str, object]:

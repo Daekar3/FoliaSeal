@@ -34,8 +34,8 @@ from foliaseal.application.visible_signature_layout import (
     RectBounds,
     SignatureLayoutPlan,
     VisibleSignatureLayoutOptions,
-    VisibleSignaturePlanner,
-    VisibleSignaturePlanRequest,
+    VisibleSignatureLayoutRequest,
+    VisibleSignatureLayoutService,
     structural_line_bounds,
 )
 from foliaseal.domain.models import (
@@ -842,33 +842,26 @@ def _canonical_preview_layout(
     ink_measurer = (
         _PreviewHorizontalInkMeasurer(preview) if use_horizontal_ink_reservation else None
     )
-    planner = VisibleSignaturePlanner.production()
-    plan_result = planner.plan(
-        VisibleSignaturePlanRequest(
+    preparation = VisibleSignatureLayoutService.production().prepare(
+        VisibleSignatureLayoutRequest(
             appearance=appearance,
             signature_rect=preview.signature_rect,
             stamp_text=stamp_text,
-            include_stamp=include_stamp,
-            use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+            stamp_background=stamp_background,
+            options=VisibleSignatureLayoutOptions(
+                include_text=include_text,
+                include_stamp=include_stamp,
+                include_border=include_border,
+                include_background=include_stamp,
+                allow_fit_issues=True,
+                horizontal_ink_policy=(
+                    "auto" if use_horizontal_ink_reservation else "disabled"
+                ),
+            ),
             ink_measurer=ink_measurer,
         )
     )
-    service_layout = planner.prepare_preview_style(
-        appearance=appearance,
-        stamp_text=stamp_text,
-        stamp_background=stamp_background,
-        signature_rect=preview.signature_rect,
-        options=VisibleSignatureLayoutOptions(
-            include_text=include_text,
-            include_stamp=include_stamp,
-            include_border=include_border,
-            include_background=include_stamp,
-            allow_fit_issues=True,
-            horizontal_ink_policy="auto" if use_horizontal_ink_reservation else "disabled",
-        ),
-        ink_measurer=ink_measurer,
-        layout_plan=plan_result.layout_plan,
-    )
+    service_layout = preparation.preview()
     return _CanonicalPreviewLayout(
         style=service_layout.style,
         background_layout=service_layout.background_layout,

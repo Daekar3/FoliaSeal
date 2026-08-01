@@ -8,9 +8,9 @@ from PIL import Image
 from foliaseal.application import compare_preview_to_request, render_signing_preview
 from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.phase3_signing_backend import (
-    _build_stamp_style,
-    _stamp_background_for_path,
+    _BackendHorizontalInkMeasurer,
     _visible_signature_fit_issues_for_stamp_text,
+    stamp_background_for_path,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_workflow import (
@@ -30,6 +30,9 @@ from foliaseal.application.visible_signature_layout import (
     PyHankoTextMeasurer,
     RectBounds,
     TextMetrics,
+    VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutRequest,
+    VisibleSignatureLayoutService,
     structural_line_bounds,
 )
 from foliaseal.domain.models import (
@@ -341,7 +344,7 @@ def test_canonical_preview_rendered_ink_matrix_documents_all_layout_positions(
             box_style=box_style,
         )
     )
-    stamp_background = _stamp_background_for_path(str(stamp_path))
+    stamp_background = stamp_background_for_path(str(stamp_path))
 
     snapshot = render_canonical_signature_preview(preview, zoom=1.0)
     text_bounds = _render_text_only_bounds_for_preview(
@@ -358,12 +361,16 @@ def test_canonical_preview_rendered_ink_matrix_documents_all_layout_positions(
         stamp_text=stamp_text,
         stamp_background=stamp_background,
     )
-    pdf_style = _build_stamp_style(
-        appearance,
-        stamp_text=stamp_text,
-        stamp_background=stamp_background,
-        signature_rect=preview.signature_rect,
-    )
+    pdf_style = VisibleSignatureLayoutService.production().prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=preview.signature_rect,
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+        )
+    ).signing().stamp_style
     preview_layout = _canonical_preview_layout(
         preview,
         include_text=True,

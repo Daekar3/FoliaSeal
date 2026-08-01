@@ -71,9 +71,10 @@ Current capabilities:
   - Workflow code should normalize the draft.
   - Preview code should render that normalized state.
   - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
-- The visible-signature layout path now has a neutral planner boundary before either PyHanko
-  adapter.
-  - `visible_signature_layout.py` owns the shared geometry plan and fit diagnostics.
+- The visible-signature layout path now has one prepare-once application boundary before either
+  target adapter.
+  - `VisibleSignatureLayoutPort` and the concrete `VisibleSignatureLayoutService` own the shared
+    geometry plan, fit decision, and reservation evidence.
   - `visible_signature_color.py` owns the shared RGBA conversion helper used by horizontal
     measurement.
   - `_text_style_color_rgba` remains only as a delegating compatibility shim while older callers
@@ -92,9 +93,11 @@ Current capabilities:
   multiline descender correction used by both preview/layout and signing reservation checks.
   `PyHankoTextMeasurer` remains a metrics-only compatibility wrapper and accepts an injected engine
   for deterministic layout tests. The default wrapper lazily imports the PyHanko adapter to keep
-  the neutral layout module independent, so that import-cycle risk is deliberate and localized.
-  The legacy backend helper names remain delegating compatibility wrappers. A capability-aware
-  multi-provider measurement registry is intentionally deferred until a second provider exists.
+  the layout module's optional adapter construction localized; a future import-purity extraction
+  remains tracked architecture debt.
+  Backend fit helpers that remain are behavior-bearing implementation policy for the authoritative
+  fit gate, not a compatibility facade. A capability-aware multi-provider measurement registry is
+  intentionally deferred until a second provider exists.
 - Manual harness fit review now distinguishes between:
   - structural text boxes derived from the same glyph-metric model the backend fit gate uses, and
   - raster glyph-ink bounds detected from the canonical analysis preview image.
@@ -130,22 +133,21 @@ The prepared-plan compliance slice is complete. Focused prepared/invisible backe
 (5 tests), Ruff is clean, and the full suite passes (1,016 tests, one existing Pillow deprecation
 warning).
 
-Visible-signature planner/IR hybrid:
+Visible-signature prepare-once hybrid:
 
-- `VisibleSignaturePlanner` is the application-owned entry point for one neutral,
-  immutable `VisibleSignaturePlan` containing the canonical `SignatureLayoutPlan` and typed fit
-  evidence. Preview and signing can reuse that plan rather than recomputing geometry.
-- `prepare_signing_style()` and `prepare_preview_style()` are explicit adapter operations. They
-  are the only planner methods that materialize PyHanko/Pillow-backed results; Qt preview remains a
-  presentation adapter over the neutral layout data.
-- Image loading and fit validation are named public backend operations, and the three Qt inset
-  policies are named public layout operations. Existing underscored helpers remain thin
-  compatibility wrappers so older tests and integrations retain their behavior while callers
-  migrate.
-- Boundary tests cover shared-plan reuse, stable image/fit errors, and the public inset/import
-  boundary. The remaining debt is adapter consolidation: private backend aliases and some
-  PyHanko fit/rejection helpers still exist until direct legacy-helper coverage is replaced by
-  boundary coverage.
+- `VisibleSignatureLayoutPort.prepare()` returns one immutable `VisibleSignaturePreparation` with
+  the neutral `SignatureLayoutPlan`, typed fit issues, backend fit-gate result, and JSON-ready
+  reservation evidence. `signing()` and `preview()` are memoized target materializers and consume
+  that prepared decision without optional-plan fallbacks or silent re-planning.
+- Canonical preview can explicitly derive a text-only plan for compact horizontal stamps. The
+  resulting `CanonicalPreviewLayout.stamp_suppressed` flag records that presentation decision;
+  signing keeps the authoritative backend plan.
+- PyHanko/Pillow construction remains in concrete adapters. Behavior-bearing backend rendered-ink
+  and fit helpers remain implementation policy for the authoritative fit gate, rather than public
+  compatibility facades. The removed planner/boundary facades and optional-plan paths are not part
+  of the contract.
+- Boundary tests cover one-preparation reuse, explicit preview suppression, stable fit/evidence
+  behavior, and the public inset/import boundary.
 
 Phase 3 evidence command pipeline and signed lifecycle:
 

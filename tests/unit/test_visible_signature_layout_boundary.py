@@ -16,11 +16,9 @@ from foliaseal.application.signature_text_measurement import PreparedTextBox
 from foliaseal.application.visible_signature_layout import (
     PyHankoTextMeasurer,
     TextMetrics,
-    VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
-    VisibleSignaturePlanner,
-    VisibleSignaturePlanRequest,
 )
 from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
 from foliaseal.presentation.qt import signature_preview_layout
@@ -36,16 +34,49 @@ class _CountingTextMeasurer:
         return TextMetrics(width_pt=72, height_pt=18, line_count=1)
 
 
+@dataclass(frozen=True)
+class _LayoutTestRequest:
+    appearance: SigningBackendAppearance
+    signature_rect: object
+    stamp_text: str
+    include_stamp: bool = True
+    use_horizontal_ink_reservation: bool = True
+    text_measurer: object | None = None
+    image_probe: object | None = None
+    ink_measurer: object | None = None
+
+
 def _appearance() -> SigningBackendAppearance:
     return SigningBackendAppearance.from_signature_appearance(
         build_signature_appearance(signer_label_prefix="Digitally signed by")
     )
 
 
+def _prepare(request: _LayoutTestRequest):
+    return VisibleSignatureLayoutService(
+        text_measurer=request.text_measurer,
+        image_probe=request.image_probe,
+        ink_measurer=request.ink_measurer,
+    ).prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=request.appearance,
+            signature_rect=request.signature_rect,
+            stamp_text=request.stamp_text,
+            options=VisibleSignatureLayoutOptions(
+                include_stamp=request.include_stamp,
+                horizontal_ink_policy=(
+                    "auto" if request.use_horizontal_ink_reservation else "disabled"
+                ),
+            ),
+            ink_measurer=request.ink_measurer,
+        )
+    )
+
+
 def test_neutral_boundary_returns_one_plan_and_json_ready_snapshot() -> None:
     measurer = _CountingTextMeasurer()
-    result = VisibleSignatureLayoutBoundary().plan(
-        VisibleSignaturePlanRequest(
+    result = _prepare(
+        _LayoutTestRequest(
             appearance=_appearance(),
             signature_rect=build_signature_rect(
                 page_index=0,
@@ -84,8 +115,8 @@ def test_pyhanko_text_measurer_delegates_to_injected_atomic_engine() -> None:
 
 
 def test_neutral_boundary_preserves_existing_fit_diagnostic() -> None:
-    result = VisibleSignatureLayoutBoundary().plan(
-        VisibleSignaturePlanRequest(
+    result = _prepare(
+        _LayoutTestRequest(
             appearance=_appearance(),
             signature_rect=build_signature_rect(
                 page_index=0,
@@ -102,13 +133,13 @@ def test_neutral_boundary_preserves_existing_fit_diagnostic() -> None:
 
 
 def test_planner_facade_returns_the_shared_neutral_plan() -> None:
-    request = VisibleSignaturePlanRequest(
+    request = _LayoutTestRequest(
         appearance=_appearance(),
         signature_rect=build_signature_rect(page_index=0, width_pt=420, height_pt=86),
         stamp_text="Digitally signed by\nMorgan Ellery",
     )
 
-    result = VisibleSignaturePlanner.production().plan(request)
+    result = _prepare(request)
 
     assert result.fit_issues == ()
     assert result.reservation_snapshot["text_area_width_pt"] > 0
@@ -116,12 +147,8 @@ def test_planner_facade_returns_the_shared_neutral_plan() -> None:
 
 def test_planner_facade_uses_injected_measurement_collaborators() -> None:
     measurer = _CountingTextMeasurer()
-    planner = VisibleSignaturePlanner(
-        service=VisibleSignatureLayoutService(text_measurer=measurer),
-    )
-
-    planner.plan(
-        VisibleSignaturePlanRequest(
+    VisibleSignatureLayoutService(text_measurer=measurer).prepare(
+        VisibleSignatureLayoutRequest(
             appearance=_appearance(),
             signature_rect=build_signature_rect(page_index=0, width_pt=420, height_pt=86),
             stamp_text="Digitally signed by\nMorgan Ellery",
@@ -133,8 +160,8 @@ def test_planner_facade_uses_injected_measurement_collaborators() -> None:
 
 def test_signing_adapter_consumes_precomputed_plan_without_remeasuring() -> None:
     appearance = _appearance()
-    plan = VisibleSignatureLayoutBoundary().plan(
-        VisibleSignaturePlanRequest(
+    plan = _prepare(
+        _LayoutTestRequest(
             appearance=appearance,
             signature_rect=build_signature_rect(
                 page_index=0,
@@ -145,24 +172,7 @@ def test_signing_adapter_consumes_precomputed_plan_without_remeasuring() -> None
         )
     )
 
-    class _FailingTextMeasurer:
-        def measure(self, _text: str, _text_style) -> TextMetrics:
-            raise AssertionError("the supplied plan should avoid a second planning pass")
-
-    style = VisibleSignatureLayoutService(
-        text_measurer=_FailingTextMeasurer(),
-    ).pyhanko_style_for_signing(
-        appearance=appearance,
-        stamp_text="Digitally signed by\nMorgan Ellery",
-        stamp_background=None,
-        signature_rect=build_signature_rect(
-            page_index=0,
-            width_pt=420,
-            height_pt=86,
-        ),
-        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-        layout_plan=plan.layout_plan,
-    )
+    style = plan.signing()
 
     assert style.layout_plan == plan.layout_plan
 
@@ -170,28 +180,15 @@ def test_signing_adapter_consumes_precomputed_plan_without_remeasuring() -> None
 def test_canonical_preview_adapter_consumes_precomputed_plan_without_remeasuring() -> None:
     appearance = _appearance()
     rect = build_signature_rect(page_index=0, width_pt=420, height_pt=86)
-    plan = VisibleSignatureLayoutBoundary().plan(
-        VisibleSignaturePlanRequest(
+    plan = _prepare(
+        _LayoutTestRequest(
             appearance=appearance,
             signature_rect=rect,
             stamp_text="Digitally signed by\nMorgan Ellery",
         )
     )
 
-    class _FailingTextMeasurer:
-        def measure(self, _text: str, _text_style) -> TextMetrics:
-            raise AssertionError("the supplied plan should avoid a second planning pass")
-
-    preview = VisibleSignatureLayoutService(
-        text_measurer=_FailingTextMeasurer(),
-    ).pyhanko_style_for_canonical_preview(
-        appearance=appearance,
-        stamp_text="Digitally signed by\nMorgan Ellery",
-        stamp_background=None,
-        signature_rect=rect,
-        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-        layout_plan=plan.layout_plan,
-    )
+    preview = plan.preview()
 
     assert preview.layout_plan == plan.layout_plan
 
@@ -199,36 +196,69 @@ def test_canonical_preview_adapter_consumes_precomputed_plan_without_remeasuring
 def test_planner_adapter_methods_consume_the_same_precomputed_plan() -> None:
     appearance = _appearance()
     rect = build_signature_rect(page_index=0, width_pt=420, height_pt=86)
-    plan = VisibleSignaturePlanner.production().plan(
-        VisibleSignaturePlanRequest(
+    plan = _prepare(
+        _LayoutTestRequest(
             appearance=appearance,
             signature_rect=rect,
             stamp_text="Digitally signed by\nMorgan Ellery",
         )
     )
 
-    planner = VisibleSignaturePlanner(
-        service=VisibleSignatureLayoutService(text_measurer=_CountingTextMeasurer()),
-    )
-    signing = planner.prepare_signing_style(
-        appearance=appearance,
-        stamp_text="Digitally signed by\nMorgan Ellery",
-        stamp_background=None,
-        signature_rect=rect,
-        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-        layout_plan=plan.layout_plan,
-    )
-    preview = planner.prepare_preview_style(
-        appearance=appearance,
-        stamp_text="Digitally signed by\nMorgan Ellery",
-        stamp_background=None,
-        signature_rect=rect,
-        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-        layout_plan=plan.layout_plan,
-    )
+    signing = plan.signing()
+    preview = plan.preview()
 
     assert signing.layout_plan == plan.layout_plan
     assert preview.layout_plan == plan.layout_plan
+
+
+def test_prepare_once_materializes_both_targets_without_replanning() -> None:
+    measurer = _CountingTextMeasurer()
+    preparation = VisibleSignatureLayoutService(text_measurer=measurer).prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=_appearance(),
+            signature_rect=build_signature_rect(page_index=0, width_pt=420, height_pt=86),
+            stamp_text="Digitally signed by\nMorgan Ellery",
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        )
+    )
+
+    base_plan = preparation.layout_plan
+    signing = preparation.signing()
+    preview = preparation.preview()
+
+    assert measurer.calls == 1
+    assert signing.layout_plan is base_plan
+    assert preview.layout_plan is base_plan
+    assert preparation.signing() is signing
+    assert preparation.preview() is preview
+
+
+def test_compact_preview_derivation_is_prepared_once_and_memoized(tmp_path) -> None:
+    from PIL import Image
+
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (400, 100), color=(0, 0, 0, 160)).save(stamp_path)
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            image_stamp_path=str(stamp_path),
+        )
+    )
+    measurer = _CountingTextMeasurer()
+    preparation = VisibleSignatureLayoutService(text_measurer=measurer).prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            signature_rect=build_signature_rect(page_index=0, width_pt=40, height_pt=24),
+            stamp_text="Digitally signed by\nMorgan Ellery",
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        )
+    )
+
+    assert preparation.preview().stamp_suppressed is True
+    assert preparation.preview() is preparation.preview()
+    assert preparation.signing().layout_plan is preparation.layout_plan
+    assert measurer.calls == 2
 
 
 def test_horizontal_reservation_has_no_backend_private_color_dependency() -> None:
@@ -302,20 +332,23 @@ def test_public_signing_adapter_preserves_stamp_border_facing_inset(
     rect = build_signature_rect(page_index=0, width_pt=260, height_pt=62)
     service = VisibleSignatureLayoutService()
     options = VisibleSignatureLayoutOptions(allow_fit_issues=True)
-    baseline = service.pyhanko_style_for_signing(
-        appearance=appearance,
-        stamp_text="Digitally signed by\nMorgan Ellery",
-        stamp_background=None,
-        signature_rect=rect,
-        options=options,
-    )
-    with_stamp = service.pyhanko_style_for_signing(
-        appearance=appearance,
-        stamp_text="Digitally signed by\nMorgan Ellery",
-        stamp_background=object(),
-        signature_rect=rect,
-        options=options,
-    )
+    baseline = service.prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            signature_rect=rect,
+            stamp_text="Digitally signed by\nMorgan Ellery",
+            options=options,
+        )
+    ).signing()
+    with_stamp = service.prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            signature_rect=rect,
+            stamp_text="Digitally signed by\nMorgan Ellery",
+            stamp_background=object(),
+            options=options,
+        )
+    ).signing()
 
     assert getattr(with_stamp.background_layout.margins, margin_name) > getattr(
         baseline.background_layout.margins,
@@ -327,8 +360,8 @@ def test_public_signing_adapter_preserves_stamp_border_facing_inset(
 def test_boundary_controls_stamp_presence_without_changing_neutral_contract(
     include_stamp: bool,
 ) -> None:
-    result = VisibleSignatureLayoutBoundary().plan(
-        VisibleSignaturePlanRequest(
+    result = _prepare(
+        _LayoutTestRequest(
             appearance=_appearance(),
             signature_rect=build_signature_rect(
                 page_index=0,

@@ -30,30 +30,21 @@ from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineRenderedReference,
 )
 from foliaseal.application.phase3_signing_backend import (
-    _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
     PreparedSigningPlan,
     PyHankoCertificateLoader,
     PyHankoPdfInspector,
     PyHankoPdfSigner,
     PyHankoSignatureTextBoxEngine,
     PyHankoSignatureVerifier,
-    _background_layout_for_stamp,
-    _build_stamp_style,
+    _BackendHorizontalInkMeasurer,
     _build_stamp_text,
     _build_text_box_style,
     _current_signing_time,
     _effective_horizontal_text_reservation_width,
-    _horizontal_single_line_ink_validation_reservation,
-    _layout_reservation_for_template,
     _load_simple_signer,
     _measure_text_box_dimensions,
     _resolve_visible_signature_semantics,
-    _single_line_horizontal_stamp_vertical_inset,
-    _single_line_rendered_ink_fits_reservation,
-    _single_line_stamp_content_inset,
     _single_line_text_fits_reservation,
-    _single_line_vertical_stamp_border_gap,
-    _stamp_background_for_path,
     _visible_signature_fit_issues,
     _visible_signature_fit_issues_for_stamp_text,
     build_backend_reservation_evidence,
@@ -70,6 +61,25 @@ from foliaseal.application.sign_pdf_use_case import (
 from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
+)
+from foliaseal.application.visible_signature_layout import (
+    _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
+    VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutRequest,
+    VisibleSignatureLayoutService,
+    _background_layout_for_stamp,
+    _horizontal_single_line_ink_validation_reservation,
+    _layout_reservation_for_template,
+    _single_line_rendered_ink_fits_reservation,
+)
+from foliaseal.application.visible_signature_layout import (
+    single_line_horizontal_stamp_vertical_inset as _single_line_horizontal_stamp_vertical_inset,
+)
+from foliaseal.application.visible_signature_layout import (
+    single_line_stamp_content_inset as _single_line_stamp_content_inset,
+)
+from foliaseal.application.visible_signature_layout import (
+    single_line_vertical_stamp_border_gap as _single_line_vertical_stamp_border_gap,
 )
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
@@ -94,6 +104,26 @@ _MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH = (
     / "fixtures"
     / "phase3_horizontal_single_line_manual_replay.json"
 )
+
+
+def _prepared_stamp_style(
+    appearance: SigningBackendAppearance,
+    *,
+    stamp_text: str,
+    stamp_background: object | None,
+    signature_rect,
+):
+    preparation = VisibleSignatureLayoutService.production().prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+        )
+    )
+    return preparation.signing().stamp_style
 
 
 def _load_manual_horizontal_single_line_replay() -> dict:
@@ -809,7 +839,7 @@ def test_single_line_horizontal_text_reservation_width_matches_strict_preview_co
 
 
 def test_build_text_box_style_preserves_half_point_font_size_in_stamp_style() -> None:
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         SigningBackendAppearance.from_signature_appearance(
             build_signature_appearance(
                 text_style=SignatureTextStyle(
@@ -1005,7 +1035,7 @@ def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compac
         stamp_text=(
             "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert issues == ()
@@ -1057,7 +1087,7 @@ def test_horizontal_single_line_backend_validation_falls_back_without_ink_refere
         stamp_text=(
             "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 21:19"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert len(issues) == 1
@@ -1099,7 +1129,7 @@ def test_horizontal_single_line_cap10_geometry_passes_after_text_first_reservati
         stamp_text=(
             "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert issues == ()
@@ -1141,7 +1171,7 @@ def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
         stamp_text=(
             "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-25 15:26"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert issues
@@ -1184,7 +1214,7 @@ def test_horizontal_single_line_short_height_accepts_preserved_rendered_ink(
         stamp_text=(
             "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-26 17:27"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert issues == ()
@@ -1197,7 +1227,7 @@ def test_manual_caps_4_to_8_replay_backend_validation_ladder(
     stamp_path = tmp_path / "manual-replay-signature.png"
     Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
     appearance_config = replay["appearance"]
-    stamp_background = _stamp_background_for_path(str(stamp_path))
+    stamp_background = stamp_background_for_path(str(stamp_path))
 
     for case in replay["cases"]:
         stamp_position = _replay_stamp_position(case)
@@ -1240,7 +1270,7 @@ def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
 ) -> None:
     stamp_path = tmp_path / "tall_stamp.png"
     Image.new("RGBA", (40, 120), color=(32, 48, 96, 255)).save(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
+    stamp_background = stamp_background_for_path(str(stamp_path))
 
     layout = _background_layout_for_stamp(
         SignatureLayoutTemplate.SINGLE_LINE,
@@ -1503,7 +1533,7 @@ def test_build_stamp_style_uses_solid_background_when_no_image_stamp() -> None:
         stamp_position=SignatureStampPosition.TOP,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Visible signature",
         stamp_background=None,
@@ -1540,7 +1570,7 @@ def test_build_stamp_style_uses_rounded_border_path_for_visible_stamp() -> None:
         ),
         image_stamp_path=None,
     )
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Morgan Ellery | Board Secretary | FoliaSeal | 2026-04-19 15:52",
         stamp_background=None,
@@ -1686,7 +1716,7 @@ def test_multi_line_bottom_allows_one_point_width_rounding_overflow(tmp_path: Pa
         signature_rect=signature_rect,
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text="Adam Smith\nLawson Heirs Inc.\n2026-04-06 18:11",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert issues == ()
@@ -1758,7 +1788,7 @@ def test_multi_line_bottom_rejects_zero_height_stamp_band(tmp_path: Path) -> Non
         signature_rect=signature_rect,
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text="Adam Smith\nLawson Heirs Inc.\n2026-04-06 18:11",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert len(issues) == 1
@@ -1822,7 +1852,7 @@ def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_ren
         stamp_text=(
             "Digitally signed by\nMorgan Ellery\nBoard Secretary\nFoliaSeal\n2026-04-28 23:56"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     if expected_pass:
@@ -1958,7 +1988,7 @@ def test_stamp_background_for_gif_preserves_transparency(tmp_path: Path) -> None
             image.putpixel((x, y), (0, 0, 0, 255))
     image.save(stamp_path, format="GIF", transparency=0)
 
-    background = _stamp_background_for_path(str(stamp_path))
+    background = stamp_background_for_path(str(stamp_path))
 
     assert background is not None
     assert getattr(background.image, "mode", None) == "RGBA"
@@ -2051,7 +2081,7 @@ def test_multi_line_top_accepts_real_world_half_point_width_case(tmp_path: Path)
             "Adam Smith\nSecretary.LHI@Outlook.com\nBoard Secretary\n"
             "Lawson Heirs Inc.\n2026-04-09 21:17"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert issues == ()
@@ -2128,7 +2158,7 @@ def test_single_line_top_rejects_large_horizontal_overflow_even_with_vertical_co
             "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary | "
             "Lawson Heirs Inc. | 2026-04-12 11:28"
         ),
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     assert len(issues) == 1
@@ -2161,7 +2191,7 @@ def test_background_layout_for_single_line_bottom_preserves_border_facing_gap(
     layout = _background_layout_for_stamp(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.BOTTOM,
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=signature_rect,
         text_box_width=180,
         text_box_height=8,
@@ -2174,7 +2204,7 @@ def test_background_layout_for_single_line_bottom_preserves_border_facing_gap(
 def test_single_line_top_and_bottom_use_distinct_vertical_layout_paths(tmp_path: Path) -> None:
     stamp_path = tmp_path / "stamp.png"
     _write_test_stamp_image(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
+    stamp_background = stamp_background_for_path(str(stamp_path))
     signature_rect = build_signature_rect(page_index=0, width_pt=260.0, height_pt=40.0)
     box_style = SignatureBoxStyle(
         show_border=True,
@@ -2217,10 +2247,10 @@ def test_build_stamp_style_uses_template_specific_layout_for_single_line(
         layout_template=SignatureLayoutTemplate.SINGLE_LINE,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Visible signature",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=build_signature_rect(page_index=0),
     )
 
@@ -2291,10 +2321,10 @@ def test_build_stamp_style_uses_ink_reservation_for_horizontal_single_line_pdf_l
         ),
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text=stamp_text,
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=signature_rect,
     )
 
@@ -2361,10 +2391,10 @@ def test_build_stamp_style_falls_back_to_structural_horizontal_layout_without_in
         lambda *_args, **_kwargs: None,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text=stamp_text,
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=signature_rect,
     )
 
@@ -2455,10 +2485,10 @@ def test_build_stamp_style_matches_canonical_preview_ink_reservation_margins(
         can_submit=True,
     )
 
-    pdf_style = _build_stamp_style(
+    pdf_style = _prepared_stamp_style(
         appearance,
         stamp_text=stamp_text,
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=signature_rect,
     )
     preview_layout = signing_preview_renderer_module._canonical_preview_layout(
@@ -2483,10 +2513,10 @@ def test_build_stamp_style_uses_template_specific_layout_for_multi_line(
         stamp_position=SignatureStampPosition.RIGHT,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Visible signature",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=build_signature_rect(page_index=0),
     )
 
@@ -2504,7 +2534,7 @@ def test_background_layout_for_horizontal_single_line_keeps_stamp_vertically_ins
 ) -> None:
     stamp_path = tmp_path / "wide_signature.png"
     Image.new("RGBA", (1400, 334), color=(0, 0, 0, 160)).save(stamp_path)
-    stamp_background = _stamp_background_for_path(str(stamp_path))
+    stamp_background = stamp_background_for_path(str(stamp_path))
     signature_rect = build_signature_rect(
         page_index=3,
         left_pt=36.86,
@@ -2554,10 +2584,10 @@ def test_build_stamp_style_uses_template_specific_layout_for_left_position(
         stamp_position=SignatureStampPosition.LEFT,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Visible signature",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=build_signature_rect(page_index=0),
     )
 
@@ -2581,10 +2611,10 @@ def test_build_stamp_style_uses_template_specific_layout_for_wrapped_block(
         stamp_position=SignatureStampPosition.BOTTOM,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Visible signature",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=build_signature_rect(page_index=0),
     )
 
@@ -2607,10 +2637,10 @@ def test_build_stamp_style_uses_shrink_to_fit_for_image_background(
         layout_template=SignatureLayoutTemplate.MULTI_LINE,
     )
 
-    style = _build_stamp_style(
+    style = _prepared_stamp_style(
         appearance,
         stamp_text="Visible signature",
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
         signature_rect=build_signature_rect(page_index=0),
     )
 
@@ -3851,7 +3881,7 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
         ),
         signature_appearance=appearance,
         stamp_text=stamp_text,
-        stamp_background=_stamp_background_for_path(str(stamp_path)),
+        stamp_background=stamp_background_for_path(str(stamp_path)),
     )
 
     if expected_pass:
@@ -3945,7 +3975,7 @@ def test_visible_signature_fit_issues_use_rendered_ink_for_manual_vertical_singl
         ),
         signature_appearance=appearance,
         stamp_text=stamp_text,
-        stamp_background=_stamp_background_for_path(image_stamp_path),
+        stamp_background=stamp_background_for_path(image_stamp_path),
     )
 
     assert issues == ()
@@ -4094,7 +4124,7 @@ def test_single_line_rendered_ink_fallback_rejects_border_flush_text(
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend._single_line_text_only_ink_bounds",
+        "foliaseal.application.visible_signature_layout._single_line_text_only_ink_bounds",
         lambda **kwargs: next(text_only_bounds),
     )
 
@@ -4168,7 +4198,7 @@ def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend._single_line_text_only_ink_bounds",
+        "foliaseal.application.visible_signature_layout._single_line_text_only_ink_bounds",
         lambda **kwargs: next(text_only_bounds),
     )
 
