@@ -67,9 +67,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _preview_matrix_error_result,
     _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
-    _snapshot_output_verification,
     _snapshot_preview,
-    _snapshot_visible_signature_appearance,
     _stamp_edge_diagnostics,
     _text_edge_diagnostics,
     _text_font_diagnostics,
@@ -83,6 +81,9 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
     _apply_appearance_overrides,
     _apply_visible_fields_override,
+)
+from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
+    Phase3PdfSignatureSnapshotter,
 )
 from tests.support.phase3_builders import (
     build_signature_appearance,
@@ -751,10 +752,10 @@ def test_phase3_harness_capture_can_preserve_signed_runs_after_later_preview_cha
     assert payload["signed_runs"][0]["signing_result"]["success"] is True
 
 
-def test_snapshot_output_verification_reports_cryptographic_details(tmp_path: Path) -> None:
+def test_pdf_snapshotter_reports_cryptographic_details(tmp_path: Path) -> None:
     output_pdf = _write_signed_test_pdf(tmp_path)
 
-    snapshot = _snapshot_output_verification(output_pdf)
+    snapshot = Phase3PdfSignatureSnapshotter().snapshot_output_verification(output_pdf)
 
     assert snapshot is not None
     assert snapshot["cryptographic_validation_passed"] is True
@@ -3146,12 +3147,12 @@ def test_apply_visible_fields_override_rejects_empty_or_unknown_values() -> None
         _apply_visible_fields_override(appearance, ["not_a_field"])
 
 
-def test_snapshot_visible_signature_appearance_extracts_text_and_image_facts(
+def test_pdf_snapshotter_extracts_visible_appearance_facts(
     tmp_path: Path,
 ) -> None:
     output_pdf = _write_signed_test_pdf(tmp_path)
 
-    snapshot = _snapshot_visible_signature_appearance(output_pdf)
+    snapshot = Phase3PdfSignatureSnapshotter().snapshot_visible_signature_appearance(output_pdf)
 
     assert snapshot is not None
     assert snapshot["field_name"] == "Signature1"

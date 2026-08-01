@@ -23,7 +23,7 @@ After this slice, the interactive Phase 3 harness will still behave the same fro
 
 ## Surprises & Discoveries
 
-- Observation: the service boundary did not eliminate the main internal harness seam; `phase3_harness.py` still owns both `_build_signed_run_bundle()` and `_build_phase3_harness_capture_payload()`.
+- Observation (superseded 2026-08-01): the service boundary originally left `_build_signed_run_bundle()` and `_build_phase3_harness_capture_payload()` as harness seams. The signed-PDF evidence extraction removed the unused forwarding wrapper; capture payload shaping remains owned by the assembler.
   Evidence: `run_phase3_signing_harness()` still calls `_run_phase3_harness_session()` and then immediately calls `_build_phase3_harness_capture_payload()` in the same module.
 
 - Observation: the current tests already point at the next seam because they patch session collection separately from payload finalization.

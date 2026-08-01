@@ -67,6 +67,7 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/phase3_preview_matrix_runner.py` | Headless preview-matrix runner boundary for Phase 3 QA. | Owns preview-matrix manifest loading, scenario iteration, exception mapping, summary shaping, `summary.json` writing, and the typed dependency bundle that injects manifest/scenario/json collaborators while leaving scenario-specific preview capture logic in `phase3_harness.py` and `phase3_harness_workspace.py`. |
 | `src/foliaseal/presentation/qt/phase3_signed_acceptance_matrix_runner.py` | Qt-backed signed-acceptance matrix runner boundary for Phase 3 QA. | Owns signed-acceptance manifest loading, `timestamping_mode` validation, fresh-shell scenario iteration, exception mapping, acceptance-expectation evaluation, summary shaping, `summary.json` writing, and the typed dependency bundle that injects shell/workspace/scenario collaborators while leaving scenario-specific preview capture and signed-output shaping in `phase3_harness_workspace.py` and `phase3_signed_acceptance_scenario_executor.py`. `phase3_harness.py` exposes the typed `signed_acceptance_matrix()` adapter entrypoint. |
 | `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py` | Per-scenario signed-acceptance execution boundary for Phase 3 QA. | Owns one signed-acceptance row from scenario application through preview capture, optional signing submission, successful-output snapshotting, and final result shaping while leaving matrix-level looping and expectation evaluation in `phase3_signed_acceptance_matrix_runner.py`. |
+| `src/foliaseal/presentation/qt/phase3_pdf_signature_snapshotter.py` | Pure signed-PDF evidence boundary for Phase 3 QA. | Owns signature counting, signature metadata, cryptographic/certification/timestamp verification projections, visible-appearance stream parsing, and JSON-safe PDF/pyHanko serialization; the harness composition root injects its bound methods into signed-output and capture assemblers. |
 | `src/foliaseal/presentation/qt/phase3_appearance_snapshotter.py` | Shared appearance parity-model boundary for Phase 3 QA. | Owns preview-side and signed-output-side `SignatureAppearanceSnapshot` reconstruction for render-parity comparison. |
 | `src/foliaseal/presentation/qt/phase3_image_comparison_helper.py` | Shared image-comparison boundary for Phase 3 QA. | Owns crop hashing, preview flattening, change-ratio calculations, aspect-ratio delta, and side-by-side comparison artifact writing. |
 | `src/foliaseal/presentation/qt/phase3_text_geometry_helper.py` | Shared preview text-geometry boundary for Phase 3 QA. | Owns source-to-preview bounds projection, rendered-text geometry detection, candidate filtering, and reference-label fallback capture. |
@@ -525,10 +526,21 @@ The canonical repository document split is:
 - Responsibility: Shape the stable successful-output evidence bundle and the compact preview-vs-output comparison view used by Phase 3 QA.
 - Owns: `Phase3SignedOutputSnapshotter`, `snapshot_successful_signed_output()`, and `signed_output_preview_comparison_snapshot()`.
 - Does not own: lower-level PDF verification, signed-output render analysis orchestration, matrix iteration, or evidence-contract evaluation.
-- Key collaborators: `phase3_harness.py`, `phase3_harness_capture_assembler.py`, `phase3_signed_output_render_snapshotter.py`, `_snapshot_output_signature()`, `_snapshot_output_verification()`, `_snapshot_visible_signature_appearance()`.
+- Key collaborators: `phase3_harness.py`, `phase3_harness_capture_assembler.py`, `phase3_pdf_signature_snapshotter.py` (bound `snapshot_output_signature()`, `snapshot_output_verification()`, and `snapshot_visible_signature_appearance()` methods), `phase3_signed_output_render_snapshotter.py`.
 - Main entry points: `Phase3SignedOutputSnapshotter.snapshot_successful_signed_output()`, `signed_output_preview_comparison_snapshot()`.
-- Known constraints: The snapshotter intentionally stays in the Qt harness package because it composes existing harness-private output helpers, but it centralizes the signed-output payload contract so both scenario execution and interactive capture assembly reuse the same shaping logic while delegating render-analysis orchestration to the dedicated render snapshotter.
+- Known constraints: The snapshotter intentionally stays in the Qt harness package because it composes the focused PDF evidence adapter and render snapshotter, but it centralizes the signed-output payload contract so both scenario execution and interactive capture assembly reuse the same shaping logic while delegating render-analysis orchestration to the dedicated render snapshotter.
 - Status: Confirmed by code and tests.
+
+### Phase 3 PDF signature snapshotter
+
+- Location: `src/foliaseal/presentation/qt/phase3_pdf_signature_snapshotter.py`
+- Responsibility: Extract JSON-ready signed-PDF evidence without owning Qt lifecycle, scenario mutation, or matrix/report orchestration.
+- Owns: `Phase3PdfSignatureSnapshotter`, embedded-signature counting, signature metadata, cryptographic/certification/timestamp verification projections, visible signature appearance parsing, appearance XObject/text/image summaries, PDF rectangle/name/numeric serializers, and pyHanko metadata normalization.
+- Does not own: signed-output render comparison, preview geometry, Qt widgets, signing semantics, matrix iteration, or evidence-contract evaluation.
+- Key collaborators: `phase3_harness.py` composition wiring, `phase3_signed_output_snapshotter.py`, `phase3_harness_capture_assembler.py`, pyHanko/PDF readers, and timestamp trust adapters.
+- Main entry points: `count_embedded_signatures()`, `snapshot_output_signature()`, `snapshot_output_verification()`, and `snapshot_visible_signature_appearance()`.
+- Known constraints: The adapter preserves the existing mapping keys, error strings, `None` versus `False` distinctions, malformed-input fallbacks, and timestamp projections. Recursive appearance-state/hex-text parsing and any timestamp-presence semantic redesign remain deferred behavior-focused debt rather than part of this extraction.
+- Status: Confirmed by code and direct boundary tests.
 
 ### Phase 3 signed-output render snapshotter
 
@@ -591,9 +603,9 @@ The canonical repository document split is:
 - Responsibility: Turn raw interactive harness session state into stable JSON-ready signed-run bundles and final capture payload dictionaries.
 - Owns: `Phase3HarnessCaptureAssembler`, `build_signed_run_bundle()`, and `build_capture_payload()`.
 - Does not own: Qt session control, widget capture, checklist rendering, JSON writing, or evidence-contract evaluation.
-- Key collaborators: `phase3_harness.py`, `phase3_signed_output_snapshotter.py`, `_count_embedded_signatures()`, `_snapshot_output_signature()`, `_snapshot_output_verification()`, `_snapshot_visible_signature_appearance()`, `_snapshot_signed_output_render()`, `_analyze_capture_state_transitions()`.
+- Key collaborators: `phase3_harness.py`, `phase3_signed_output_snapshotter.py`, `phase3_pdf_signature_snapshotter.py` (bound `count_embedded_signatures()`, `snapshot_output_signature()`, `snapshot_output_verification()`, and `snapshot_visible_signature_appearance()` methods), `_snapshot_signed_output_render()`, `_analyze_capture_state_transitions()`.
 - Main entry points: `Phase3HarnessCaptureAssembler.build_signed_run_bundle()`, `Phase3HarnessCaptureAssembler.build_capture_payload()`.
-- Known constraints: The assembler is still a presentation-layer helper because it depends on existing preview/output snapshot functions in the Qt harness package. It now delegates shared successful-output evidence shaping to `phase3_signed_output_snapshotter.py`, but must still preserve the current capture JSON keys and artifact semantics exactly while reducing monkeypatch pressure in harness tests. In particular, `backend_reservation_snapshot`, `signed_runs`, `captured_states`, and the final evidence fields are treated as a stable payload contract for downstream report finalization and validation.
+- Known constraints: The assembler is still a presentation-layer helper because it depends on preview/output snapshot functions in the Qt harness package. It delegates low-level signed-PDF evidence to bound `Phase3PdfSignatureSnapshotter` methods and shared successful-output shaping to `phase3_signed_output_snapshotter.py`, while preserving the current capture JSON keys and artifact semantics exactly. In particular, `backend_reservation_snapshot`, `signed_runs`, `captured_states`, and the final evidence fields are treated as a stable payload contract for downstream report finalization and validation.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 harness reporting boundary
@@ -1093,12 +1105,13 @@ Default local validation from README:
 | What is the public stability level of CLI harness commands? | They are documented and tested, but some are engineering acceptance tools. | A: stable developer contract; B: internal tool contract. | Treat command names/required args as stable unless a migration note is added. |
 | Should PySide6 remain an optional package extra instead of a base dependency? | The real GUI now has a stable launch command, but headless CLI and evidence workflows still do not require Qt. | A: keep `gui` extra; B: move PySide6 into base dependencies. | Keep the `gui` extra for now and revisit only when full desktop packaging is defined. |
 | Where should trust/timestamp policy config be persisted outside tests? | Schemas exist, but signature profile and certificate stores are the only obvious stores. | A: add a store; B: keep CLI/request-only for now. | Needs maintainer decision before documenting as settled. |
-| How much of `phase3_harness.py` should become reusable analysis library code? | The file owns many PDF/render/diagnostic helpers. | A: keep as harness-local; B: extract evidence analyzers. | Keep local until reuse pressure is concrete. |
+| How much of `phase3_harness.py` should become reusable analysis library code? | The file owns many PDF/render/diagnostic helpers. | A: keep as harness-local; B: extract evidence analyzers. | Pure signed-PDF evidence is now extracted into `phase3_pdf_signature_snapshotter.py`; preview/widget/render helpers remain harness-local until reuse pressure justifies another slice. |
 
 ## 14. Change log
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-08-01 | Added the Phase 3 pure signed-PDF evidence snapshotter boundary. | Reconciled ownership of signature counting, metadata, verification/certification/timestamp projections, visible-appearance parsing, and JSON-safe PDF serialization; signed-output and capture assemblers now consume bound snapshotter methods, while recursive AP/timestamp-semantic debt remains explicitly deferred. |
 | 2026-07-31 | Added the visible-signature planner/IR hybrid boundary (retired by the 2026-08-01 migration). | Historical record of the superseded `VisibleSignaturePlanner`/`VisibleSignaturePlan` seam. |
 | 2026-08-01 | Replaced the planner/IR compatibility seam with prepare-once layout composition. | Documented `VisibleSignatureLayoutPort`, immutable `VisibleSignaturePreparation`, captured fit-gate/evidence, explicit preview stamp suppression, and retained backend fit helpers as behavior-bearing implementation policy. |
 | 2026-07-31 | Added the prepared signing plan and explicit invisible headless signing path. | Reconciled the application/backend boundary: typed fit issues remain application-owned, PyHanko/Pillow materialization stays adapter-owned, and the existing `execute(request)` facade remains compatible. |

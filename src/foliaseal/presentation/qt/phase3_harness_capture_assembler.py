@@ -32,7 +32,7 @@ def _mapping(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _snapshot_signing_result_payload(signing_result: SigningResult) -> dict[str, Any]:
+def snapshot_signing_result_payload(signing_result: SigningResult) -> dict[str, Any]:
     return {
         "success": signing_result.success,
         "failure_code": (
@@ -104,7 +104,7 @@ class Phase3HarnessCaptureAssembler:
                 sign_time_state.get("backend_reservation_snapshot")
             ),
             "backend_reservation_error": sign_time_state.get("backend_reservation_error"),
-            "signing_result": _snapshot_signing_result_payload(signing_result),
+            "signing_result": snapshot_signing_result_payload(signing_result),
             "output_pdf_path": request.output_pdf_path,
             "output_file_exists": False,
             "output_file_size_bytes": None,

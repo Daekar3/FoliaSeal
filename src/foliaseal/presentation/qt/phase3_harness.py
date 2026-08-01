@@ -17,8 +17,6 @@ from PIL import Image, ImageDraw
 from pyhanko.pdf_utils import generic
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
-from pyhanko.sign import validation
-from pyhanko_certvalidator import ValidationContext
 
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.phase3_evidence_service import (
@@ -59,19 +57,18 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
     SigningRequest,
-    SigningResult,
     TimestampTrustPolicy,
 )
-from foliaseal.infra.certification import inspect_pdf_certification_reader
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
-from foliaseal.infra.tsa import build_dummy_timestamper, build_timestamp_validation_context
+from foliaseal.infra.tsa import build_dummy_timestamper
 from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
     Phase3AppearanceSnapshotter,
 )
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
+    snapshot_signing_result_payload,
 )
 from foliaseal.presentation.qt.phase3_harness_reporting import (
     Phase3HarnessReportRequest,
@@ -97,6 +94,10 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
+)
+from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
+    Phase3PdfSignatureSnapshotter,
+    snapshot_pdf_rect,
 )
 from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
     Phase3PreviewMatrixRunner,
@@ -472,11 +473,12 @@ def _build_phase3_harness_capture(
 
 
 def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
+    pdf_snapshotter = Phase3PdfSignatureSnapshotter()
     return Phase3HarnessCaptureAssembler(
-        count_embedded_signatures=_count_embedded_signatures,
-        snapshot_output_signature=_snapshot_output_signature,
-        snapshot_output_verification=_snapshot_output_verification,
-        snapshot_visible_signature_appearance=_snapshot_visible_signature_appearance,
+        count_embedded_signatures=pdf_snapshotter.count_embedded_signatures,
+        snapshot_output_signature=pdf_snapshotter.snapshot_output_signature,
+        snapshot_output_verification=pdf_snapshotter.snapshot_output_verification,
+        snapshot_visible_signature_appearance=pdf_snapshotter.snapshot_visible_signature_appearance,
         snapshot_signed_output_render=_snapshot_signed_output_render,
         analyze_capture_state_transitions=_analyze_capture_state_transitions,
     )
@@ -584,38 +586,6 @@ def _interactive_capture_label(*, preview, capture_index: int, capture_kind: str
     return f"{capture_kind}_{capture_index:02d}_{layout_name}_{stamp_name}"
 
 
-def _snapshot_signing_result_payload(signing_result: SigningResult) -> dict[str, Any]:
-    return {
-        "success": signing_result.success,
-        "failure_code": (
-            signing_result.failure_code.value
-            if getattr(signing_result, "failure_code", None) is not None
-            else None
-        ),
-        "message": signing_result.message,
-        "output_pdf_version": signing_result.output_pdf_version,
-        "signature_subfilter": signing_result.signature_subfilter,
-        "timestamp_present": signing_result.timestamp_present,
-        "timestamp_cryptographically_valid": signing_result.timestamp_cryptographically_valid,
-        "tsa_chain_trusted": signing_result.tsa_chain_trusted,
-        "timestamp_validation_error": signing_result.timestamp_validation_error,
-        "docmdp_permission": signing_result.docmdp_permission,
-        "certification_restricted": signing_result.certification_restricted,
-        "restriction_reason": signing_result.restriction_reason,
-        "operation_type": (
-            signing_result.operation_type.value
-            if getattr(signing_result, "operation_type", None) is not None
-            else None
-        ),
-        "revision_strategy": (
-            signing_result.revision_strategy.value
-            if getattr(signing_result, "revision_strategy", None) is not None
-            else None
-        ),
-        "standards_summary": signing_result.standards_summary,
-    }
-
-
 def _snapshot_successful_signed_output(
     *,
     output_file: Path,
@@ -632,25 +602,6 @@ def _snapshot_successful_signed_output(
         preview_snapshot=preview_snapshot,
         preview_text=preview_text,
         trust_policy=trust_policy,
-        artifacts_dir=artifacts_dir,
-        artifact_basename=artifact_basename,
-    )
-
-
-def _build_signed_run_bundle(
-    *,
-    run_index: int,
-    sign_time_state: dict[str, Any],
-    request: SigningRequest,
-    signing_result: SigningResult,
-    artifacts_dir: str | None,
-    artifact_basename: str | None,
-) -> dict[str, Any]:
-    return _build_phase3_harness_capture_assembler().build_signed_run_bundle(
-        run_index=run_index,
-        sign_time_state=sign_time_state,
-        request=request,
-        signing_result=signing_result,
         artifacts_dir=artifacts_dir,
         artifact_basename=artifact_basename,
     )
@@ -697,18 +648,19 @@ def _build_phase3_signed_acceptance_scenario_executor() -> Phase3SignedAcceptanc
             apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
             build_workspace=_build_preview_matrix_qt_workspace,
             scenario_slug=_scenario_slug,
-            snapshot_signing_result_payload=_snapshot_signing_result_payload,
+            snapshot_signing_result_payload=snapshot_signing_result_payload,
             snapshot_successful_signed_output=_snapshot_successful_signed_output,
         )
     )
 
 
 def _build_phase3_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
+    pdf_snapshotter = Phase3PdfSignatureSnapshotter()
     return Phase3SignedOutputSnapshotter(
-        count_embedded_signatures=_count_embedded_signatures,
-        snapshot_output_signature=_snapshot_output_signature,
-        snapshot_output_verification=_snapshot_output_verification,
-        snapshot_visible_signature_appearance=_snapshot_visible_signature_appearance,
+        count_embedded_signatures=pdf_snapshotter.count_embedded_signatures,
+        snapshot_output_signature=pdf_snapshotter.snapshot_output_signature,
+        snapshot_output_verification=pdf_snapshotter.snapshot_output_verification,
+        snapshot_visible_signature_appearance=pdf_snapshotter.snapshot_visible_signature_appearance,
         snapshot_signed_output_render=_snapshot_signed_output_render,
     )
 
@@ -830,180 +782,6 @@ def _write_optional_text(*, target_path: str | None, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _count_embedded_signatures(output_file: Path) -> int | None:
-    try:
-        with output_file.open("rb") as handle:
-            reader = PdfFileReader(handle)
-            return len(list(reader.embedded_signatures))
-    except Exception:
-        return None
-
-
-def _snapshot_output_signature(output_file: Path) -> dict[str, Any] | None:
-    try:
-        with output_file.open("rb") as handle:
-            reader = PdfFileReader(handle)
-            embedded_signatures = list(reader.embedded_signatures)
-            if not embedded_signatures:
-                return None
-            signature = embedded_signatures[-1]
-            sig_object = signature.sig_object
-            return {
-                "field_name": signature.field_name,
-                "name": sig_object.get("/Name"),
-                "location": sig_object.get("/Location"),
-                "contact_info": sig_object.get("/ContactInfo"),
-                "byte_range": list(sig_object.get("/ByteRange", [])),
-                "subfilter": sig_object.get("/SubFilter"),
-                "md_algorithm": signature.md_algorithm,
-                "coverage": _serialize_signature_metadata(signature.coverage),
-                "docmdp_level": _serialize_signature_metadata(signature.docmdp_level),
-            }
-    except Exception:
-        return None
-
-
-def _snapshot_output_verification(
-    output_file: Path,
-    trust_policy: TimestampTrustPolicy | None = None,
-) -> dict[str, Any] | None:
-    try:
-        with output_file.open("rb") as handle:
-            reader = PdfFileReader(handle)
-            embedded_signatures = list(reader.embedded_signatures)
-            if not embedded_signatures:
-                return {
-                    "cryptographic_validation_passed": False,
-                    "signature_count": 0,
-                    "docmdp_permission": None,
-                    "certification_restricted": False,
-                    "restriction_reason": None,
-                    "error": "No embedded signature fields were found in the output PDF.",
-                }
-
-            signature = embedded_signatures[-1]
-            validation_context = ValidationContext(trust_roots=[signature.signer_cert])
-            ts_validation_context = build_timestamp_validation_context(trust_policy)
-            status = validation.validate_pdf_signature(
-                signature,
-                signer_validation_context=validation_context,
-                ts_validation_context=ts_validation_context,
-            )
-            certification = inspect_pdf_certification_reader(reader)
-            signer_subject = None
-            if getattr(signature, "signer_cert", None) is not None:
-                subject = getattr(signature.signer_cert, "subject", None)
-                if subject is not None:
-                    human_friendly = getattr(subject, "human_friendly", None)
-                    signer_subject = (
-                        human_friendly if isinstance(human_friendly, str) else str(subject)
-                    )
-            return {
-                "cryptographic_validation_passed": bool(status.intact and status.valid),
-                "intact": bool(status.intact),
-                "valid": bool(status.valid),
-                "trusted": bool(getattr(status, "trust_problem_indicative", False) is False),
-                "signature_count": len(embedded_signatures),
-                "timestamp_present": _status_has_timestamp_for_snapshot(status),
-                "timestamp_cryptographically_valid": (
-                    _status_timestamp_cryptographically_valid_for_snapshot(status)
-                    if trust_policy is not None
-                    else None
-                ),
-                "tsa_chain_trusted": (
-                    _status_timestamp_trusted_for_snapshot(status)
-                    if trust_policy is not None
-                    else None
-                ),
-                "timestamp_validation_error": (
-                    _describe_timestamp_trust_for_snapshot(status)
-                    if trust_policy is not None
-                    and not _status_timestamp_trusted_for_snapshot(status)
-                    else None
-                ),
-                "docmdp_permission": certification.docmdp_permission,
-                "certification_restricted": certification.certification_restricted,
-                "restriction_reason": certification.restriction_reason,
-                "field_name": signature.field_name,
-                "subfilter": signature.sig_object.get("/SubFilter"),
-                "byte_range_present": bool(signature.sig_object.get("/ByteRange")),
-                "md_algorithm": signature.md_algorithm,
-                "signer_subject": signer_subject,
-                "error": None,
-            }
-    except Exception as exc:
-        return {
-            "cryptographic_validation_passed": False,
-            "signature_count": None,
-            "docmdp_permission": None,
-            "certification_restricted": False,
-            "restriction_reason": None,
-            "error": str(exc),
-        }
-
-
-def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] | None:
-    try:
-        with output_file.open("rb") as handle:
-            reader = PdfFileReader(handle)
-            embedded_signatures = list(reader.embedded_signatures)
-            if not embedded_signatures:
-                return None
-
-            signature = embedded_signatures[-1]
-            sig_field = signature.sig_field
-            rect = _snapshot_pdf_rect(sig_field.get("/Rect"))
-            appearance_dict = sig_field.get("/AP")
-            if appearance_dict is None:
-                return {
-                    "field_name": signature.field_name,
-                    "annotation_rect": rect,
-                    "error": "Missing /AP entry on the signature field.",
-                }
-
-            normal_appearance = appearance_dict.get("/N")
-            if normal_appearance is None:
-                return {
-                    "field_name": signature.field_name,
-                    "annotation_rect": rect,
-                    "error": "Missing normal appearance stream for the signature field.",
-                }
-
-            appearance_stream = normal_appearance.get_object()
-            appearance_data = appearance_stream.data
-            appearance_text = appearance_data.decode("latin1", errors="replace")
-            xobject_summaries = _snapshot_appearance_xobjects(appearance_stream.get("/Resources"))
-            text_fragments = _extract_pdf_text_fragments(appearance_text)
-            visible_text_present = bool(text_fragments)
-            image_xobject_count = sum(
-                1 for item in xobject_summaries if item.get("subtype") == "/Image"
-            )
-            appearance_bbox = _snapshot_pdf_rect(appearance_stream.get("/BBox"))
-            rounded_border = _appearance_text_uses_rounded_border(appearance_text)
-            return {
-                "field_name": signature.field_name,
-                "annotation_rect": rect,
-                "appearance_bbox": appearance_bbox,
-                "appearance_stream_length": len(appearance_data),
-                "appearance_text_fragments": text_fragments,
-                "appearance_text_snippet": appearance_text[:240],
-                "appearance_text_operator_count": _count_pdf_text_operators(appearance_text),
-                "appearance_xobjects": xobject_summaries,
-                "appearance_image_xobject_count": image_xobject_count,
-                "appearance_has_visible_text": visible_text_present,
-                "visible_text_present": visible_text_present,
-                "text_fragments": text_fragments,
-                "image_xobjects": xobject_summaries,
-                "annotation_rect_size": _snapshot_rect_size(rect),
-                "appearance_bbox_size": _snapshot_rect_size(appearance_bbox),
-                "text_fragment_count": len(text_fragments),
-                "image_xobject_count": image_xobject_count,
-                "appearance_uses_rounded_border": rounded_border,
-            }
-    except Exception as exc:
-        return {"error": str(exc)}
-
-
 def _render_signed_annotation_appearance_direct(
     *,
     output_pdf_path: str,
@@ -1035,7 +813,7 @@ def _render_signed_annotation_appearance_direct(
             writer = PdfFileWriter()
             imported_appearance = writer.import_object(normal_appearance)
             appearance_ref = writer.add_object(imported_appearance)
-            bbox = _snapshot_pdf_rect(imported_appearance.get("/BBox"))
+            bbox = snapshot_pdf_rect(imported_appearance.get("/BBox"))
             if bbox is None:
                 result["error"] = "Signed appearance stream does not define a /BBox."
                 return result
@@ -1104,44 +882,6 @@ def _appearance_text_uses_rounded_border(appearance_text: str) -> bool | None:
     if " re S" in appearance_text or "\nre\nS" in appearance_text:
         return False
     return None
-
-
-def _status_has_timestamp_for_snapshot(status: Any) -> bool:
-    timestamp_validity = getattr(status, "timestamp_validity", None)
-    if timestamp_validity is None:
-        return False
-    return bool(
-        getattr(timestamp_validity, "intact", True) and getattr(timestamp_validity, "valid", True)
-    )
-
-
-def _status_timestamp_cryptographically_valid_for_snapshot(status: Any) -> bool | None:
-    timestamp_validity = getattr(status, "timestamp_validity", None)
-    if timestamp_validity is None:
-        return None
-    return bool(
-        getattr(timestamp_validity, "intact", True) and getattr(timestamp_validity, "valid", True)
-    )
-
-
-def _status_timestamp_trusted_for_snapshot(status: Any) -> bool | None:
-    timestamp_validity = getattr(status, "timestamp_validity", None)
-    if timestamp_validity is None:
-        return None
-    return bool(getattr(timestamp_validity, "trusted", False))
-
-
-def _describe_timestamp_trust_for_snapshot(status: Any) -> str | None:
-    timestamp_validity = getattr(status, "timestamp_validity", None)
-    if timestamp_validity is None:
-        return None
-    describe_timestamp_trust = getattr(timestamp_validity, "describe_timestamp_trust", None)
-    if not callable(describe_timestamp_trust):
-        return None
-    try:
-        return describe_timestamp_trust()
-    except Exception:
-        return None
 
 
 def _snapshot_signed_output_render(
@@ -4137,144 +3877,6 @@ def _snapshot_visible_appearance_error(snapshot: dict[str, Any] | None) -> str:
         return "not captured"
     value = snapshot.get("error")
     return str(value) if value is not None else "none"
-
-
-def _snapshot_appearance_xobjects(resources) -> list[dict[str, Any]]:
-    if resources is None:
-        return []
-    xobjects = resources.get("/XObject")
-    if xobjects is None:
-        return []
-    summaries: list[dict[str, Any]] = []
-    for name, ref in xobjects.items():
-        try:
-            obj = ref.get_object()
-        except Exception:
-            obj = ref
-        summaries.append(
-            {
-                "name": str(name),
-                "subtype": _snapshot_pdf_name(obj.get("/Subtype")),
-                "width": _snapshot_pdf_numeric(obj.get("/Width")),
-                "height": _snapshot_pdf_numeric(obj.get("/Height")),
-                "bbox": _snapshot_pdf_rect(obj.get("/BBox")),
-            }
-        )
-    return summaries
-
-
-def _count_pdf_text_operators(appearance_text: str) -> int:
-    return len(re.findall(r"\)\s*T[Jj]\b", appearance_text))
-
-
-def _extract_pdf_text_fragments(appearance_text: str) -> list[str]:
-    fragments: list[str] = []
-    for match in re.finditer(r"\((?:\\.|[^()])*\)", appearance_text):
-        fragment = _decode_pdf_literal_string(match.group(0))
-        if fragment:
-            fragments.append(fragment)
-    return fragments
-
-
-def _decode_pdf_literal_string(literal: str) -> str:
-    if not literal.startswith("(") or not literal.endswith(")"):
-        return literal
-
-    body = literal[1:-1]
-    out: list[str] = []
-    index = 0
-    while index < len(body):
-        char = body[index]
-        if char != "\\":
-            out.append(char)
-            index += 1
-            continue
-
-        index += 1
-        if index >= len(body):
-            break
-        escape = body[index]
-        if escape in "nrtbf()\\":
-            out.append(
-                {
-                    "n": "\n",
-                    "r": "\r",
-                    "t": "\t",
-                    "b": "\b",
-                    "f": "\f",
-                    "(": "(",
-                    ")": ")",
-                    "\\": "\\",
-                }[escape]
-            )
-            index += 1
-            continue
-        if escape in "\r\n":
-            if escape == "\r" and index + 1 < len(body) and body[index + 1] == "\n":
-                index += 2
-            else:
-                index += 1
-            continue
-        if escape in "01234567":
-            digits = [escape]
-            index += 1
-            while index < len(body) and len(digits) < 3 and body[index] in "01234567":
-                digits.append(body[index])
-                index += 1
-            out.append(chr(int("".join(digits), 8)))
-            continue
-        out.append(escape)
-        index += 1
-    return "".join(out)
-
-
-def _snapshot_pdf_rect(value) -> list[float] | None:
-    if value is None:
-        return None
-    try:
-        return [float(component) for component in value]
-    except Exception:
-        return None
-
-
-def _snapshot_rect_size(rect: list[float] | None) -> dict[str, float] | None:
-    if rect is None or len(rect) != 4:
-        return None
-    left, bottom, right, top = rect
-    return {
-        "width": float(right - left),
-        "height": float(top - bottom),
-    }
-
-
-def _snapshot_pdf_name(value) -> str | None:
-    if value is None:
-        return None
-    return str(value)
-
-
-def _snapshot_pdf_numeric(value) -> float | int | None:
-    if value is None:
-        return None
-    try:
-        numeric = float(value)
-    except Exception:
-        return None
-    if numeric.is_integer():
-        return int(numeric)
-    return numeric
-
-
-def _serialize_signature_metadata(value: Any) -> Any:
-    if value is None:
-        return None
-    if isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {str(key): _serialize_signature_metadata(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_serialize_signature_metadata(item) for item in value]
-    return str(value)
 
 
 def _jsonable_capture(value: Any) -> Any:
