@@ -85,6 +85,16 @@ Current capabilities:
   - The Qt preview now loads the same bundled font assets instead of generic system fallback stacks.
   - The intent is ruthless simplicity: one shared font asset set and one glyph-metric-driven
     measurement story for preview, validation, and final output.
+- Structural signature text measurement now crosses an explicit application-owned boundary:
+  `SignatureTextBoxEngine.prepare()` returns an atomic `PreparedTextBox` containing neutral
+  `TextMetrics` plus an opaque render-style token. `PyHankoSignatureTextBoxEngine` owns the
+  concrete PyHanko style construction, bundled-font resolution, color conversion, rounding, and
+  multiline descender correction used by both preview/layout and signing reservation checks.
+  `PyHankoTextMeasurer` remains a metrics-only compatibility wrapper and accepts an injected engine
+  for deterministic layout tests. The default wrapper lazily imports the PyHanko adapter to keep
+  the neutral layout module independent, so that import-cycle risk is deliberate and localized.
+  The legacy backend helper names remain delegating compatibility wrappers. A capability-aware
+  multi-provider measurement registry is intentionally deferred until a second provider exists.
 - Manual harness fit review now distinguishes between:
   - structural text boxes derived from the same glyph-metric model the backend fit gate uses, and
   - raster glyph-ink bounds detected from the canonical analysis preview image.

@@ -9,9 +9,12 @@ from foliaseal.application import (
     horizontal_signature_reservation,
     signing_draft_workflow,
     signing_preview_renderer,
+    visible_signature_layout,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+from foliaseal.application.signature_text_measurement import PreparedTextBox
 from foliaseal.application.visible_signature_layout import (
+    PyHankoTextMeasurer,
     TextMetrics,
     VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
@@ -60,6 +63,24 @@ def test_neutral_boundary_returns_one_plan_and_json_ready_snapshot() -> None:
     assert result.reservation_snapshot["text_area_width_pt"] > 0
     assert result.reservation_snapshot["fit_issue_codes"] == []
     assert not hasattr(result, "stamp_style")
+
+
+def test_pyhanko_text_measurer_delegates_to_injected_atomic_engine() -> None:
+    class _FakeEngine:
+        def prepare(self, text: str, text_style) -> PreparedTextBox:
+            assert text == "Measured"
+            assert text_style == _appearance().text_style
+            return PreparedTextBox(
+                metrics=TextMetrics(width_pt=41, height_pt=13, line_count=1),
+                render_style=object(),
+            )
+
+    measured = PyHankoTextMeasurer(engine=_FakeEngine()).measure(
+        "Measured",
+        _appearance().text_style,
+    )
+
+    assert measured == TextMetrics(width_pt=41, height_pt=13, line_count=1)
 
 
 def test_neutral_boundary_preserves_existing_fit_diagnostic() -> None:
@@ -215,6 +236,13 @@ def test_horizontal_reservation_has_no_backend_private_color_dependency() -> Non
 
     assert "phase3_signing_backend import _text_style_color_rgba" not in source
     assert "visible_signature_color import text_style_color_rgba" in source
+
+
+def test_layout_module_uses_the_public_text_measurement_port() -> None:
+    source = inspect.getsource(visible_signature_layout)
+
+    assert "_build_text_box_style" not in source
+    assert "_measure_text_box_dimensions" not in source
 
 
 def test_production_consumers_use_public_layout_adapter_names() -> None:

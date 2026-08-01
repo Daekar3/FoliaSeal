@@ -27,6 +27,7 @@ from foliaseal.application.horizontal_signature_reservation import (
     build_horizontal_single_line_ink_reservation,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+from foliaseal.application.signature_text_measurement import SignatureTextBoxEngine
 from foliaseal.application.signing_draft_workflow import SigningDraftValidationSeverity
 from foliaseal.application.visible_signature_color import text_style_color_rgba
 from foliaseal.domain.models import (
@@ -583,22 +584,21 @@ class HorizontalInkMeasurer(Protocol):
         """Return rendered ink bounds for horizontal single-line layout."""
 
 
+@dataclass(frozen=True)
 class PyHankoTextMeasurer:
     """Production text measurer backed by the current pyHanko text engine."""
 
-    def measure(self, text: str, text_style: SignatureTextStyle) -> TextMetrics:
-        from foliaseal.application.phase3_signing_backend import (
-            _build_text_box_style,
-            _measure_text_box_dimensions,
-        )
+    engine: SignatureTextBoxEngine | None = None
 
-        text_box_style = _build_text_box_style(text_style)
-        width_pt, height_pt = _measure_text_box_dimensions(text, text_box_style)
-        return TextMetrics(
-            width_pt=width_pt,
-            height_pt=height_pt,
-            line_count=max(1, len(text.splitlines()) or 1),
-        )
+    def measure(self, text: str, text_style: SignatureTextStyle) -> TextMetrics:
+        engine = self.engine
+        if engine is None:
+            from foliaseal.application.phase3_signing_backend import (
+                PyHankoSignatureTextBoxEngine,
+            )
+
+            engine = PyHankoSignatureTextBoxEngine()
+        return engine.prepare(text, text_style).metrics
 
 
 def structural_line_bounds(
@@ -1300,8 +1300,8 @@ class PyHankoSignatureAppearanceAdapter:
             raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
 
         from foliaseal.application.phase3_signing_backend import (
+            PyHankoSignatureTextBoxEngine,
             RoundedBorderTextStampStyle,
-            _build_text_box_style,
             _hex_to_rgb,
             _solid_background_for_color,
         )
@@ -1317,7 +1317,10 @@ class PyHankoSignatureAppearanceAdapter:
             if include_background
             else None
         )
-        text_box_style = _build_text_box_style(appearance.text_style)
+        text_box_style = PyHankoSignatureTextBoxEngine().prepare(
+            stamp_text,
+            appearance.text_style,
+        ).render_style
         background_layout = self.build_background_layout(
             appearance=appearance,
             stamp_background=stamp_background,

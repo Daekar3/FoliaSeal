@@ -57,6 +57,10 @@ from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
+from foliaseal.application.signature_text_measurement import (
+    PreparedTextBox,
+    SignatureTextBoxEngine,
+)
 from foliaseal.application.signing_completion import format_signing_completion_message
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
@@ -249,6 +253,8 @@ __all__ = [
     "SystemSigningClock",
     "TextMeasurer",
     "TextMetrics",
+    "PreparedTextBox",
+    "SignatureTextBoxEngine",
     "UnavailableCertificateFieldReader",
     "VisibleSignatureFitIssue",
     "VisibleSignatureLayoutInput",

@@ -47,6 +47,10 @@ from foliaseal.application.sign_pdf_use_case import (
     SignPdfUseCase,
 )
 from foliaseal.application.signature_font_registry import resolve_signature_font_face
+from foliaseal.application.signature_text_measurement import (
+    PreparedTextBox,
+    SignatureTextBoxEngine,
+)
 from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
@@ -718,7 +722,7 @@ def _rect_bounds_from_mapping(bounds: dict[str, int]) -> RectBounds:
     )
 
 
-def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
+def _build_text_box_style_impl(text_style: SignatureTextStyle) -> TextBoxStyle:
     # Preserve the user's selected half-point font sizes in backend measurement.
     # Rounding 8.5pt up to 9pt creates avoidable preview/backend drift in narrow
     # layouts because the Qt preview renders the actual selected size.
@@ -1252,9 +1256,14 @@ def _single_line_text_fits_reservation(
     appearance: SigningBackendAppearance,
     signature_rect: SignatureRect,
     text: str,
+    text_box_engine: SignatureTextBoxEngine | None = None,
 ) -> bool:
-    text_box_style = _build_text_box_style(appearance.text_style)
-    text_box_width, text_box_height = _measure_text_box_dimensions(text, text_box_style)
+    prepared_text = (text_box_engine or PyHankoSignatureTextBoxEngine()).prepare(
+        text,
+        appearance.text_style,
+    )
+    text_box_width = prepared_text.metrics.width_pt
+    text_box_height = prepared_text.metrics.height_pt
     reservation = _layout_reservation_for_template(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
@@ -1289,6 +1298,23 @@ def _effective_horizontal_text_reservation_width(
     if layout_template != SignatureLayoutTemplate.SINGLE_LINE:
         return text_box_width
     return text_box_width
+
+
+@dataclass(frozen=True)
+class PyHankoSignatureTextBoxEngine:
+    """Production adapter for atomic PyHanko text style and metric preparation."""
+
+    def prepare(self, text: str, text_style: SignatureTextStyle) -> PreparedTextBox:
+        text_box_style = _build_text_box_style_impl(text_style)
+        width_pt, height_pt = _measure_text_box_dimensions_impl(text, text_box_style)
+        return PreparedTextBox(
+            metrics=_visible_layout.TextMetrics(
+                width_pt=width_pt,
+                height_pt=height_pt,
+            line_count=max(1, text.count("\n") + 1),
+            ),
+            render_style=text_box_style,
+        )
 
 
 def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
@@ -1385,7 +1411,7 @@ def _background_layout_for_template(
     ).background_layout
 
 
-def _measure_text_box_dimensions(
+def _measure_text_box_dimensions_impl(
     stamp_text: str,
     text_box_style: TextBoxStyle,
 ) -> tuple[int, int]:
@@ -1410,6 +1436,21 @@ def _measure_text_box_dimensions(
         # vertical room than the nominal per-line font size alone captures.
         minimum_height += 1
     return measured_width, max(measured_height, minimum_height)
+
+
+def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
+    """Compatibility wrapper for the public text-box engine."""
+
+    return _build_text_box_style_impl(text_style)
+
+
+def _measure_text_box_dimensions(
+    stamp_text: str,
+    text_box_style: TextBoxStyle,
+) -> tuple[int, int]:
+    """Compatibility wrapper for the public text-box engine."""
+
+    return _measure_text_box_dimensions_impl(stamp_text, text_box_style)
 
 
 def _reserved_space(container_length: int, content_length: int, gap: int) -> int:

@@ -35,6 +35,7 @@ from foliaseal.application.phase3_signing_backend import (
     PyHankoCertificateLoader,
     PyHankoPdfInspector,
     PyHankoPdfSigner,
+    PyHankoSignatureTextBoxEngine,
     PyHankoSignatureVerifier,
     _background_layout_for_stamp,
     _build_stamp_style,
@@ -50,6 +51,7 @@ from foliaseal.application.phase3_signing_backend import (
     _single_line_horizontal_stamp_vertical_inset,
     _single_line_rendered_ink_fits_reservation,
     _single_line_stamp_content_inset,
+    _single_line_text_fits_reservation,
     _single_line_vertical_stamp_border_gap,
     _stamp_background_for_path,
     _visible_signature_fit_issues,
@@ -1828,6 +1830,82 @@ def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_ren
     else:
         assert len(issues) == 1
         assert "does not fit" in issues[0].message
+
+
+def test_signature_text_box_engine_preserves_half_point_and_multiline_metrics() -> None:
+    engine = PyHankoSignatureTextBoxEngine()
+    style = SignatureTextStyle(
+        font_family="Serif",
+        font_size_pt=8.5,
+        bold=False,
+        italic=True,
+        text_color_hex="#123456",
+    )
+
+    prepared = engine.prepare("Line 1\nLine 2\nLine 3", style)
+
+    assert prepared.metrics.line_count == 3
+    assert prepared.metrics.height_pt >= 27
+    assert prepared.render_style.font_size == Fraction(17, 2)
+
+
+def test_signature_text_box_engine_preserves_face_color_and_trailing_line_metrics() -> None:
+    engine = PyHankoSignatureTextBoxEngine()
+    style = SignatureTextStyle(
+        font_family="Serif",
+        font_size_pt=8.5,
+        bold=True,
+        italic=True,
+        text_color_hex="#123456",
+    )
+
+    prepared = engine.prepare("Line 1\n", style)
+
+    assert prepared.metrics.line_count == 2
+    assert prepared.metrics.height_pt >= 18
+    assert prepared.render_style.font.font_file.endswith("NotoSerif-BoldItalic.ttf")
+    assert prepared.render_style.text_color == pytest.approx(
+        (0x12 / 255, 0x34 / 255, 0x56 / 255)
+    )
+
+
+def test_signature_text_box_engine_preserves_missing_font_error() -> None:
+    with pytest.raises(ValueError, match="Unsupported signature font family 'Cursive'"):
+        PyHankoSignatureTextBoxEngine().prepare(
+            "Text",
+            SignatureTextStyle(
+                font_family="Cursive",
+                font_size_pt=8.0,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        )
+
+
+def test_single_line_reservation_consumes_injected_text_box_engine() -> None:
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(layout_template=SignatureLayoutTemplate.SINGLE_LINE)
+    )
+
+    class _SpyEngine:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, SignatureTextStyle]] = []
+
+        def prepare(self, text: str, text_style: SignatureTextStyle):
+            self.calls.append((text, text_style))
+            return PyHankoSignatureTextBoxEngine().prepare(text, text_style)
+
+    engine = _SpyEngine()
+    result = _single_line_text_fits_reservation(
+        appearance=appearance,
+        signature_rect=build_signature_rect(page_index=0, width_pt=300, height_pt=100),
+        text="Signed",
+        text_box_engine=engine,
+    )
+
+    assert isinstance(result, bool)
+    assert engine.calls == [("Signed", appearance.text_style)]
 
 
 def test_build_text_box_style_preserves_half_point_font_size() -> None:
