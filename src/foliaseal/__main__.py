@@ -15,9 +15,13 @@ from foliaseal.application.phase2_evidence import (
     build_phase2_timing_evidence,
     parse_checklist_markdown,
 )
+from foliaseal.application.phase3_evidence_gateway import (
+    Phase3EvidenceGateway,
+    Phase3OperationRequest,
+    Phase3ValidationRequest,
+)
 from foliaseal.application.phase3_evidence_service import (
     Phase3HarnessCaptureRequest,
-    Phase3HarnessValidationRequest,
     Phase3MatrixRequest,
     Phase3SignedAcceptanceEvidenceRequest,
 )
@@ -446,8 +450,8 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
 
 
 def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
-    evaluation = _build_phase3_evidence_service().validate_harness_capture(
-        Phase3HarnessValidationRequest(summary_json_path=args.summary_json_path)
+    evaluation = _build_phase3_evidence_gateway().validate(
+        Phase3ValidationRequest(summary_json_path=args.summary_json_path)
     )
     print("Phase 3 evidence contract")
     print(f"- acceptance tier: {evaluation.acceptance_tier}")
@@ -464,6 +468,12 @@ def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
 
 def _build_phase3_evidence_service():
     return build_default_phase3_evidence_service()
+
+
+def _build_phase3_evidence_gateway() -> Phase3EvidenceGateway:
+    """Build the canonical application boundary over the default service."""
+
+    return Phase3EvidenceGateway(_build_phase3_evidence_service())
 
 
 def _build_phase3_harness_capture_request(
@@ -518,8 +528,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "phase3-signing-harness":
-        _build_phase3_evidence_service().capture_harness(
-            _build_phase3_harness_capture_request(args)
+        _build_phase3_evidence_gateway().run(
+            Phase3OperationRequest.capture(_build_phase3_harness_capture_request(args))
         )
         return 0
     if args.command == "gui":
@@ -529,8 +539,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "phase3-signing-preview-matrix":
-        result = _build_phase3_evidence_service().preview_matrix_result(
-            _build_phase3_matrix_request(args)
+        result = _build_phase3_evidence_gateway().run(
+            Phase3OperationRequest.preview_matrix(_build_phase3_matrix_request(args))
         )
         print("Phase 3 preview matrix")
         print(f"- scenarios executed: {result.scenario_count}")
@@ -538,8 +548,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-matrix":
-        result = _build_phase3_evidence_service().signed_acceptance_matrix_result(
-            _build_phase3_matrix_request(args)
+        result = _build_phase3_evidence_gateway().run(
+            Phase3OperationRequest.signed_acceptance_matrix(
+                _build_phase3_matrix_request(args)
+            )
         )
         print("Phase 3 signed acceptance matrix")
         print(f"- scenarios executed: {result.scenario_count}")
@@ -548,8 +560,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-evidence":
-        evidence = _build_phase3_evidence_service().run_signed_acceptance_evidence(
-            _build_phase3_signed_acceptance_evidence_request(args)
+        evidence = _build_phase3_evidence_gateway().run(
+            Phase3OperationRequest.signed_acceptance_evidence(
+                _build_phase3_signed_acceptance_evidence_request(args)
+            )
         )
         print("Phase 3 signed acceptance evidence")
         print(f"- summary markdown: {evidence.summary_markdown_path}")

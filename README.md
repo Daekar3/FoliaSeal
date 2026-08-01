@@ -168,10 +168,10 @@ Phase 3 evidence gateway and signed lifecycle:
   that same path in the persisted mapping.
 - CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
 
-The post-fix validation snapshot is 23 focused Phase 3 evidence/gateway/matrix tests and 1,011
-tests for the full suite, with Ruff clean. The release-fidelity contract remains the bounded
-eight-scenario corpus: six supported signings, two intentional fit rejections, and zero acceptance
-failure counters.
+The orchestrator slice passes 59 focused evidence/service/runner/CLI tests and 1,032 full-suite
+tests, with Ruff clean and one existing Pillow deprecation warning. The release-fidelity contract
+remains the bounded eight-scenario corpus: six supported signings, two intentional fit rejections,
+zero acceptance failure counters, and zero preview/output comparison or annotation mismatches.
 
 Reusable Python callers can bind one PDF and its credentials once, then run the common evidence
 operations through the document-bound session:
@@ -359,6 +359,23 @@ Current acceptance note:
 - Harness terminal success is non-gating unless the run also produces the required evidence artifacts.
 - The harness JSON is now validated against a machine evidence contract; contradictory captures should be treated as failed gate evidence even if the GUI appeared to finish normally.
 - For the current acceptance focus and unresolved items, rely on the Phase 3 checklist and results artifacts rather than treating this README as the project status log.
+
+Application boundary and execution contexts:
+
+- `Phase3EvidenceOrchestrator` is the canonical application-owned boundary for tagged capture,
+  preview-matrix, signed-acceptance-matrix, aggregate signed-evidence, and capture-validation
+  requests. It validates request payloads and delegates to the injected evidence service without
+  importing Qt, PyHanko, Pillow, TSA, or presentation modules.
+- `Phase3EvidenceGateway` and its PDF-bound `Phase3EvidenceSession` remain compatibility facades
+  for reusable callers. Existing service methods, result DTOs, raw summary mappings, artifact
+  paths, and validation behavior remain unchanged.
+- The CLI commands `phase3-signing-harness`, `phase3-signing-preview-matrix`,
+  `phase3-signing-acceptance-matrix`, `phase3-signing-acceptance-evidence`, and
+  `phase3-signing-harness-validate` route through this application boundary while preserving
+  command names, labels, exit behavior, and output contracts.
+- Preview/headless matrices, signed/Qt acceptance matrices, and interactive Qt capture remain
+  separate execution adapters. Their lifecycle ownership and artifact semantics differ and are
+  intentionally not merged by this boundary slice.
 
 Signed-output acceptance:
 

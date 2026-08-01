@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol, TypeAlias
 
+from foliaseal.application.phase3_evidence_orchestrator import (
+    Phase3EvidenceOrchestrator,
+    Phase3EvidenceServicePort,
+    Phase3OperationKind,
+    Phase3OperationPayload,
+    Phase3OperationRequest,
+    Phase3ValidationRequest,
+    orchestrator_for_service,
+)
 from foliaseal.application.phase3_evidence_service import (
     Phase3EvidenceService,
     Phase3HarnessCaptureRequest,
@@ -18,121 +25,44 @@ from foliaseal.application.phase3_evidence_service import (
 )
 from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluation
 
+__all__ = [
+    "DEFAULT_PHASE3_ARTIFACTS_DIR",
+    "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH",
+    "DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH",
+    "Phase3EvidenceGateway",
+    "Phase3EvidenceOrchestrator",
+    "Phase3EvidenceSession",
+    "Phase3EvidenceServicePort",
+    "Phase3HarnessValidationRequest",
+    "Phase3OperationKind",
+    "Phase3OperationPayload",
+    "Phase3OperationRequest",
+    "Phase3SignedAcceptanceEvidenceRequest",
+    "Phase3SignedAcceptanceEvidenceResult",
+    "Phase3ValidationRequest",
+    "gateway_for_service",
+]
+
 DEFAULT_PHASE3_ARTIFACTS_DIR = "artifacts/phase3"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 
 
-class Phase3EvidenceServicePort(Protocol):
-    """Existing service behaviors required by the gateway."""
-
-    def capture_harness(self, request: Phase3HarnessCaptureRequest) -> object:
-        """Capture one interactive harness run."""
-
-    def preview_matrix_result(self, request: Phase3MatrixRequest) -> Phase3MatrixResult:
-        """Run and normalize one preview matrix."""
-
-    def signed_acceptance_matrix_result(
-        self,
-        request: Phase3MatrixRequest,
-    ) -> Phase3MatrixResult:
-        """Run and normalize one signed-acceptance matrix."""
-
-    def run_signed_acceptance_evidence(
-        self,
-        request: Phase3SignedAcceptanceEvidenceRequest,
-    ) -> Phase3SignedAcceptanceEvidenceResult:
-        """Run the aggregate signed-acceptance evidence workflow."""
-
-    def validate_harness_capture(
-        self,
-        request: Phase3HarnessValidationRequest,
-    ) -> EvidenceContractEvaluation:
-        """Validate one existing capture JSON file."""
-
-
-class Phase3OperationKind(StrEnum):
-    """Effectful operation kinds accepted by ``Phase3EvidenceGateway.run``."""
-
-    CAPTURE = "capture"
-    PREVIEW_MATRIX = "preview_matrix"
-    SIGNED_ACCEPTANCE_MATRIX = "signed_acceptance_matrix"
-    SIGNED_ACCEPTANCE_EVIDENCE = "signed_acceptance_evidence"
-
-
-Phase3OperationPayload: TypeAlias = (
-    Phase3HarnessCaptureRequest
-    | Phase3MatrixRequest
-    | Phase3SignedAcceptanceEvidenceRequest
-)
-
-
-@dataclass(frozen=True)
-class Phase3OperationRequest:
-    """Tagged request used by the gateway's effectful ``run`` entry point."""
-
-    kind: Phase3OperationKind
-    payload: Phase3OperationPayload
-
-    @classmethod
-    def capture(cls, request: Phase3HarnessCaptureRequest) -> Phase3OperationRequest:
-        return cls(Phase3OperationKind.CAPTURE, request)
-
-    @classmethod
-    def preview_matrix(cls, request: Phase3MatrixRequest) -> Phase3OperationRequest:
-        return cls(Phase3OperationKind.PREVIEW_MATRIX, request)
-
-    @classmethod
-    def signed_acceptance_matrix(
-        cls,
-        request: Phase3MatrixRequest,
-    ) -> Phase3OperationRequest:
-        return cls(Phase3OperationKind.SIGNED_ACCEPTANCE_MATRIX, request)
-
-    @classmethod
-    def signed_acceptance_evidence(
-        cls,
-        request: Phase3SignedAcceptanceEvidenceRequest,
-    ) -> Phase3OperationRequest:
-        return cls(Phase3OperationKind.SIGNED_ACCEPTANCE_EVIDENCE, request)
-
-
-@dataclass(frozen=True)
-class Phase3ValidationRequest:
-    """Read-only validation request kept separate from effectful operations."""
-
-    summary_json_path: str | Path
-
-
 @dataclass(frozen=True)
 class Phase3EvidenceGateway:
-    """Small gateway over the existing Phase 3 evidence service."""
+    """Compatibility gateway over the application evidence orchestrator."""
 
     service: Phase3EvidenceServicePort
 
     def run(self, request: Phase3OperationRequest) -> object:
-        """Dispatch one tagged operation without exposing runner internals."""
+        """Dispatch through the application-owned orchestration boundary."""
 
-        if request.kind is Phase3OperationKind.CAPTURE:
-            self._require_payload(request, Phase3HarnessCaptureRequest)
-            return self.service.capture_harness(request.payload)
-        if request.kind is Phase3OperationKind.PREVIEW_MATRIX:
-            self._require_payload(request, Phase3MatrixRequest)
-            return self.service.preview_matrix_result(request.payload)
-        if request.kind is Phase3OperationKind.SIGNED_ACCEPTANCE_MATRIX:
-            self._require_payload(request, Phase3MatrixRequest)
-            return self.service.signed_acceptance_matrix_result(request.payload)
-        if request.kind is Phase3OperationKind.SIGNED_ACCEPTANCE_EVIDENCE:
-            self._require_payload(request, Phase3SignedAcceptanceEvidenceRequest)
-            return self.service.run_signed_acceptance_evidence(request.payload)
-        raise ValueError(f"Unsupported Phase 3 operation kind: {request.kind}")
+        return orchestrator_for_service(self.service).run(request)
 
     def validate(self, request: Phase3ValidationRequest) -> EvidenceContractEvaluation:
         """Validate a previously written capture through the service boundary."""
 
-        return self.service.validate_harness_capture(
-            Phase3HarnessValidationRequest(summary_json_path=request.summary_json_path)
-        )
+        return orchestrator_for_service(self.service).validate(request)
 
     def for_pdf(
         self,
@@ -151,17 +81,6 @@ class Phase3EvidenceGateway:
             passphrase=passphrase,
             artifacts_dir=artifacts_dir,
         )
-
-    @staticmethod
-    def _require_payload(
-        request: Phase3OperationRequest,
-        expected_type: type[Any],
-    ) -> None:
-        if not isinstance(request.payload, expected_type):
-            raise TypeError(
-                f"{request.kind.name} requires {expected_type.__name__}, "
-                f"got {type(request.payload).__name__}"
-            )
 
 
 @dataclass(frozen=True)
