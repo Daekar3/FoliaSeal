@@ -29,7 +29,7 @@ The user-visible behavior is intentionally unchanged. Running `foliaseal phase3-
 - [x] (2026-08-01) Completed architecture/SPEC review; restored legacy gateway DTO exports, corrected the orchestrator factory to accept the service protocol, and added a CLI gateway-routing assertion.
 - [x] (2026-08-01) Ran the full suite (1,032 passed, one existing Pillow deprecation warning), preview and signed release-fidelity matrices, `git diff --check`, and the process/window cleanup audit.
 - [x] (2026-08-01) Updated README, architecture documentation, and this plan to describe the application-owned orchestrator, compatibility gateway/session, CLI routing, retained execution adapters, lifecycle/artifact contracts, and residual debt.
-- [ ] Commit the completed slice (parent agent owns commit/handoff).
+- [x] (2026-08-01) Committed the completed slice as `6280e4718`; final plan metadata is recorded in the follow-up commit.
 
 ## Surprises & Discoveries
 
@@ -85,7 +85,8 @@ factory annotation, missing gateway DTO re-exports, and absent CLI routing cover
 fixed and revalidated. Documentation now records canonical orchestrator ownership, gateway and
 session compatibility, CLI routing, lifecycle/artifact contracts, and residual runner-specific
 complexity plus compatibility aliases. No Qt/PyHanko/Pillow types are directly imported by the
-orchestrator module.
+orchestrator module. Implementation commit: `6280e4718`; the final plan-metadata commit follows
+this update in Git history.
 
 ## Context and Orientation
 
