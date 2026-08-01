@@ -1,5 +1,9 @@
 # Add A Phase 3 Harness Facade Tracer Bullet For Interactive Signing Harness Runs
 
+> **Retired / superseded (2026-08-01):** This interim facade is historical. Interactive callers
+> now cross the typed application orchestrator/session; `Phase3Harness.capture()` remains the Qt
+> adapter entrypoint and the former `run_*` aliases are removed.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.

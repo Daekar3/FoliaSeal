@@ -1,159 +1,202 @@
-"""Application layer helpers for orchestration and viewer workflows."""
+"""Application-layer exports loaded lazily to keep pure boundaries lightweight."""
 
-from foliaseal.application.certificate_creation import (
-    CertificateCreationError,
-    CertificateCreationResult,
-    CertificateCreationService,
-)
-from foliaseal.application.certificate_import import (
-    CertificateImportError,
-    CertificateImportResult,
-    CertificateImportService,
-)
-from foliaseal.application.certificate_lifecycle import (
-    CertificateLifecycleError,
-    CertificateLifecycleResult,
-    CertificateLifecycleService,
-)
-from foliaseal.application.document_review_workspace import (
-    DocumentReviewCardState,
-    DocumentReviewWorkspaceSession,
-    DocumentReviewWorkspaceState,
-    DocumentReviewWorkspaceTransition,
-    DocumentReviewWorkspaceViewerEffects,
-    DocumentTextWorkspaceState,
-)
-from foliaseal.application.horizontal_signature_reservation import (
-    HorizontalSingleLineInkReservation,
-    HorizontalSingleLineRenderedReference,
-    build_horizontal_single_line_ink_reservation,
-    measure_horizontal_single_line_rendered_reference,
-)
-from foliaseal.application.output_path_policy import suggest_signed_output_path
-from foliaseal.application.performance_timing import (
-    ViewerPerformanceTracker,
-    ViewerTimingSnapshot,
-)
-from foliaseal.application.phase3_signing_backend import (
-    BackendReservationEvidence,
-    build_backend_reservation_evidence,
-)
-from foliaseal.application.signature_profile_library import (
-    SignatureProfileLibrary,
-    SignatureProfileLibraryItem,
-)
-from foliaseal.application.signature_properties_coordinator import (
-    ApplyCertificateConfiguration,
-    ApplySignaturePreset,
-    ApplyVisibleSignatureSetup,
-    ClearSelectedSignaturePreset,
-    DefaultSignaturePropertiesCoordinator,
-    DeletePreset,
-    RefreshCatalogs,
-    SaveCurrentPreset,
-    SignaturePropertiesCoordinator,
-    SignaturePropertiesCoordinatorError,
-    SignaturePropertiesViewState,
-    VisibleSignaturePlacementDraft,
-    VisibleSignatureSetupDraft,
-)
-from foliaseal.application.signature_text_measurement import (
-    PreparedTextBox,
-    SignatureTextBoxEngine,
-)
-from foliaseal.application.signing_completion import format_signing_completion_message
-from foliaseal.application.signing_draft_workflow import (
-    SignaturePlacementContext,
-    SigningDraftPreview,
-    SigningDraftPreviewField,
-    SigningDraftValidationError,
-    SigningDraftValidationIssue,
-    SigningDraftValidationSeverity,
-    SigningDraftWorkflow,
-)
-from foliaseal.application.signing_preview_renderer import (
-    CanonicalSignaturePreviewSnapshot,
-    SignatureAppearanceComparison,
-    SignatureAppearanceLayerComparison,
-    SignatureAppearanceSnapshot,
-    SigningPreviewLine,
-    SigningPreviewLineKind,
-    SigningPreviewParityIssue,
-    SigningPreviewParityReport,
-    SigningPreviewRenderSnapshot,
-    compare_preview_to_request,
-    compare_signature_appearance_snapshots,
-    render_canonical_signature_preview,
-    render_signing_preview,
-)
-from foliaseal.application.signing_setup_session import (
-    CertificatePassphrasePrompter,
-    SigningSetupSelectionOutcome,
-    SigningSetupSession,
-)
-from foliaseal.application.viewer_interaction_session import (
-    ViewerInteractionSession,
-    ViewerPlacementContextResult,
-    ViewerSelectionPlacementResult,
-)
-from foliaseal.application.viewer_session import ViewerSession, ViewerZoomLimits
-from foliaseal.application.viewer_workflow import ViewerRenderSnapshot, ViewerWorkflow
-from foliaseal.application.visible_signature_layout import (
-    CanonicalPreviewLayout,
-    HorizontalInkMeasurement,
-    HorizontalInkMeasurementRequest,
-    HorizontalInkMeasurer,
-    HorizontalInkReservation,
-    ImageMetrics,
-    LayoutMargins,
-    LayoutRequest,
-    LayoutRuleSpec,
-    PillowStampImageProbe,
-    PyHankoSignatureAppearanceAdapter,
-    PyHankoTextMeasurer,
-    PyHankoVisibleSignatureStyle,
-    RectBounds,
-    SignatureLayoutPlan,
-    StampImageProbe,
-    TextMeasurer,
-    TextMetrics,
-    VisibleSignatureFitIssue,
-    VisibleSignatureLayoutEngine,
-    VisibleSignatureLayoutInput,
-    VisibleSignatureLayoutOptions,
-    VisibleSignatureLayoutService,
-)
-from foliaseal.application.visible_signature_semantics import (
-    CertificateFieldReader,
-    CertificateFieldValues,
-    NoopVisibleSignatureFitValidator,
-    SigningClock,
-    SystemSigningClock,
-    UnavailableCertificateFieldReader,
-    VisibleSignatureField,
-    VisibleSignatureFitRequest,
-    VisibleSignatureFitValidator,
-    VisibleSignatureSemantics,
-    VisibleSignatureSemanticsMode,
-    VisibleSignatureSemanticsRequest,
-    VisibleSignatureSemanticsService,
-    VisibleSignatureText,
-)
-from foliaseal.application.workspace_interaction_session import (
-    ApplyPlacementContext,
-    ApplyReviewTransition,
-    ApplySignatureRect,
-    EmitInteractionError,
-    InvalidateSigningAction,
-    RefreshCurrentPlacementContext,
-    RefreshPreview,
-    RefreshViewer,
-    ReloadSigningActionState,
-    SyncSignatureOverlay,
-    WorkspaceInteractionEffect,
-    WorkspaceInteractionPlan,
-    WorkspaceInteractionSession,
-)
+from __future__ import annotations
+
+from importlib import import_module
+
+_EXPORT_MODULES = {
+    **dict.fromkeys(
+        ("CertificateCreationError", "CertificateCreationResult", "CertificateCreationService"),
+        "certificate_creation",
+    ),
+    **dict.fromkeys(
+        ("CertificateImportError", "CertificateImportResult", "CertificateImportService"),
+        "certificate_import",
+    ),
+    **dict.fromkeys(
+        ("CertificateLifecycleError", "CertificateLifecycleResult", "CertificateLifecycleService"),
+        "certificate_lifecycle",
+    ),
+    **dict.fromkeys(
+        (
+            "DocumentReviewCardState",
+            "DocumentReviewWorkspaceSession",
+            "DocumentReviewWorkspaceState",
+            "DocumentReviewWorkspaceTransition",
+            "DocumentReviewWorkspaceViewerEffects",
+            "DocumentTextWorkspaceState",
+        ),
+        "document_review_workspace",
+    ),
+    **dict.fromkeys(
+        (
+            "HorizontalSingleLineInkReservation",
+            "HorizontalSingleLineRenderedReference",
+            "build_horizontal_single_line_ink_reservation",
+            "measure_horizontal_single_line_rendered_reference",
+        ),
+        "horizontal_signature_reservation",
+    ),
+    "suggest_signed_output_path": "output_path_policy",
+    **dict.fromkeys(("ViewerPerformanceTracker", "ViewerTimingSnapshot"), "performance_timing"),
+    **dict.fromkeys(
+        ("BackendReservationEvidence", "build_backend_reservation_evidence"),
+        "phase3_signing_backend",
+    ),
+    **dict.fromkeys(
+        ("SignatureProfileLibrary", "SignatureProfileLibraryItem"),
+        "signature_profile_library",
+    ),
+    **dict.fromkeys(
+        (
+            "ApplyCertificateConfiguration",
+            "ApplySignaturePreset",
+            "ApplyVisibleSignatureSetup",
+            "ClearSelectedSignaturePreset",
+            "DefaultSignaturePropertiesCoordinator",
+            "DeletePreset",
+            "RefreshCatalogs",
+            "SaveCurrentPreset",
+            "SignaturePropertiesCoordinator",
+            "SignaturePropertiesCoordinatorError",
+            "SignaturePropertiesViewState",
+            "VisibleSignaturePlacementDraft",
+            "VisibleSignatureSetupDraft",
+        ),
+        "signature_properties_coordinator",
+    ),
+    **dict.fromkeys(("PreparedTextBox", "SignatureTextBoxEngine"), "signature_text_measurement"),
+    "format_signing_completion_message": "signing_completion",
+    **dict.fromkeys(
+        (
+            "SignaturePlacementContext",
+            "SigningDraftPreview",
+            "SigningDraftPreviewField",
+            "SigningDraftValidationError",
+            "SigningDraftValidationIssue",
+            "SigningDraftValidationSeverity",
+            "SigningDraftWorkflow",
+        ),
+        "signing_draft_workflow",
+    ),
+    **dict.fromkeys(
+        (
+            "CanonicalSignaturePreviewSnapshot",
+            "SignatureAppearanceComparison",
+            "SignatureAppearanceLayerComparison",
+            "SignatureAppearanceSnapshot",
+            "SigningPreviewLine",
+            "SigningPreviewLineKind",
+            "SigningPreviewParityIssue",
+            "SigningPreviewParityReport",
+            "SigningPreviewRenderSnapshot",
+            "compare_preview_to_request",
+            "compare_signature_appearance_snapshots",
+            "render_canonical_signature_preview",
+            "render_signing_preview",
+        ),
+        "signing_preview_renderer",
+    ),
+    **dict.fromkeys(
+        ("CertificatePassphrasePrompter", "SigningSetupSelectionOutcome", "SigningSetupSession"),
+        "signing_setup_session",
+    ),
+    **dict.fromkeys(
+        (
+            "ViewerInteractionSession",
+            "ViewerPlacementContextResult",
+            "ViewerSelectionPlacementResult",
+        ),
+        "viewer_interaction_session",
+    ),
+    **dict.fromkeys(("ViewerSession", "ViewerZoomLimits"), "viewer_session"),
+    **dict.fromkeys(("ViewerRenderSnapshot", "ViewerWorkflow"), "viewer_workflow"),
+    **dict.fromkeys(
+        (
+            "CanonicalPreviewLayout",
+            "HorizontalInkMeasurement",
+            "HorizontalInkMeasurementRequest",
+            "HorizontalInkMeasurer",
+            "HorizontalInkReservation",
+            "ImageMetrics",
+            "LayoutMargins",
+            "LayoutRequest",
+            "LayoutRuleSpec",
+            "PillowStampImageProbe",
+            "PyHankoSignatureAppearanceAdapter",
+            "PyHankoTextMeasurer",
+            "PyHankoVisibleSignatureStyle",
+            "RectBounds",
+            "SignatureLayoutPlan",
+            "StampImageProbe",
+            "TextMeasurer",
+            "TextMetrics",
+            "VisibleSignatureFitIssue",
+            "VisibleSignatureLayoutEngine",
+            "VisibleSignatureLayoutInput",
+            "VisibleSignatureLayoutOptions",
+            "VisibleSignatureLayoutService",
+        ),
+        "visible_signature_layout",
+    ),
+    **dict.fromkeys(
+        (
+            "CertificateFieldReader",
+            "CertificateFieldValues",
+            "NoopVisibleSignatureFitValidator",
+            "SigningClock",
+            "SystemSigningClock",
+            "UnavailableCertificateFieldReader",
+            "VisibleSignatureField",
+            "VisibleSignatureFitRequest",
+            "VisibleSignatureFitValidator",
+            "VisibleSignatureSemantics",
+            "VisibleSignatureSemanticsMode",
+            "VisibleSignatureSemanticsRequest",
+            "VisibleSignatureSemanticsService",
+            "VisibleSignatureText",
+        ),
+        "visible_signature_semantics",
+    ),
+    **dict.fromkeys(
+        (
+            "ApplyPlacementContext",
+            "ApplyReviewTransition",
+            "ApplySignatureRect",
+            "EmitInteractionError",
+            "InvalidateSigningAction",
+            "RefreshCurrentPlacementContext",
+            "RefreshPreview",
+            "RefreshViewer",
+            "ReloadSigningActionState",
+            "SyncSignatureOverlay",
+            "WorkspaceInteractionEffect",
+            "WorkspaceInteractionPlan",
+            "WorkspaceInteractionSession",
+        ),
+        "workspace_interaction_session",
+    ),
+}
+
+
+def __getattr__(name: str):
+    """Resolve legacy convenience exports only when a caller requests them."""
+
+    module_name = _EXPORT_MODULES.get(name)
+    if module_name is not None:
+        module = import_module(f"{__name__}.{module_name}")
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    try:
+        module = import_module(f"{__name__}.{name}")
+    except ModuleNotFoundError:
+        module = None
+    if module is not None:
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "ViewerPerformanceTracker",

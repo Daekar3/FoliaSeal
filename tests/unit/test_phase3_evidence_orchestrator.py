@@ -75,14 +75,18 @@ def test_orchestrator_dispatches_all_effectful_operation_kinds() -> None:
     assert orchestrator.run(Phase3OperationRequest.preview_matrix(_matrix_request())) == (
         "preview-result"
     )
-    assert orchestrator.run(
-        Phase3OperationRequest.signed_acceptance_matrix(_matrix_request())
-    ) == "signed-result"
-    assert orchestrator.run(
-        Phase3OperationRequest.signed_acceptance_evidence(
-            Phase3SignedAcceptanceEvidenceRequest(passphrase="secret")
+    assert (
+        orchestrator.run(Phase3OperationRequest.signed_acceptance_matrix(_matrix_request()))
+        == "signed-result"
+    )
+    assert (
+        orchestrator.run(
+            Phase3OperationRequest.signed_acceptance_evidence(
+                Phase3SignedAcceptanceEvidenceRequest(passphrase="secret")
+            )
         )
-    ) == "evidence-result"
+        == "evidence-result"
+    )
 
     assert [name for name, _request in service.calls] == [
         "capture",
@@ -95,9 +99,7 @@ def test_orchestrator_dispatches_all_effectful_operation_kinds() -> None:
 def test_orchestrator_validates_through_the_service_boundary() -> None:
     service = _FakeService([])
 
-    result = Phase3EvidenceOrchestrator(service).validate(
-        Phase3ValidationRequest("capture.json")
-    )
+    result = Phase3EvidenceOrchestrator(service).validate(Phase3ValidationRequest("capture.json"))
 
     assert result == "validation-result"
     assert service.calls == [

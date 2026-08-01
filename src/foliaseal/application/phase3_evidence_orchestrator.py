@@ -7,6 +7,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, TypeAlias
 
+from foliaseal.application.phase3_evidence_ports import CaptureResultPort
 from foliaseal.application.phase3_evidence_service import (
     Phase3HarnessCaptureRequest,
     Phase3HarnessValidationRequest,
@@ -21,7 +22,7 @@ from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluatio
 class Phase3EvidenceServicePort(Protocol):
     """Service behaviors required by the application orchestrator."""
 
-    def capture_harness(self, request: Phase3HarnessCaptureRequest) -> object:
+    def capture_harness(self, request: Phase3HarnessCaptureRequest) -> CaptureResultPort:
         """Capture one interactive harness run."""
 
     def preview_matrix_result(self, request: Phase3MatrixRequest) -> Phase3MatrixResult:
@@ -56,9 +57,13 @@ class Phase3OperationKind(StrEnum):
 
 
 Phase3OperationPayload: TypeAlias = (
-    Phase3HarnessCaptureRequest
-    | Phase3MatrixRequest
-    | Phase3SignedAcceptanceEvidenceRequest
+    Phase3HarnessCaptureRequest | Phase3MatrixRequest | Phase3SignedAcceptanceEvidenceRequest
+)
+Phase3OperationResult: TypeAlias = (
+    CaptureResultPort
+    | Phase3MatrixResult
+    | Phase3SignedAcceptanceEvidenceResult
+    | EvidenceContractEvaluation
 )
 
 
@@ -105,21 +110,51 @@ class Phase3EvidenceOrchestrator:
 
     service: Phase3EvidenceServicePort
 
-    def run(self, request: Phase3OperationRequest) -> object:
+    def capture(self, request: Phase3HarnessCaptureRequest) -> CaptureResultPort:
+        return self.service.capture_harness(request)
+
+    def preview_matrix(self, request: Phase3MatrixRequest) -> Phase3MatrixResult:
+        return self.service.preview_matrix_result(request)
+
+    def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> Phase3MatrixResult:
+        return self.service.signed_acceptance_matrix_result(request)
+
+    def signed_acceptance_evidence(
+        self, request: Phase3SignedAcceptanceEvidenceRequest
+    ) -> Phase3SignedAcceptanceEvidenceResult:
+        return self.service.run_signed_acceptance_evidence(request)
+
+    def for_pdf(
+        self,
+        pdf_path: str | Path,
+        *,
+        certificate_path: str,
+        passphrase: str,
+        artifacts_dir: str = "artifacts/phase3",
+    ) -> Phase3EvidenceSession:
+        return Phase3EvidenceSession(
+            orchestrator=self,
+            pdf_path=str(pdf_path),
+            certificate_path=certificate_path,
+            passphrase=passphrase,
+            artifacts_dir=artifacts_dir,
+        )
+
+    def run(self, request: Phase3OperationRequest) -> Phase3OperationResult:
         """Dispatch one tagged operation without exposing runner internals."""
 
         if request.kind is Phase3OperationKind.CAPTURE:
             self._require_payload(request, Phase3HarnessCaptureRequest)
-            return self.service.capture_harness(request.payload)
+            return self.capture(request.payload)
         if request.kind is Phase3OperationKind.PREVIEW_MATRIX:
             self._require_payload(request, Phase3MatrixRequest)
-            return self.service.preview_matrix_result(request.payload)
+            return self.preview_matrix(request.payload)
         if request.kind is Phase3OperationKind.SIGNED_ACCEPTANCE_MATRIX:
             self._require_payload(request, Phase3MatrixRequest)
-            return self.service.signed_acceptance_matrix_result(request.payload)
+            return self.signed_acceptance_matrix(request.payload)
         if request.kind is Phase3OperationKind.SIGNED_ACCEPTANCE_EVIDENCE:
             self._require_payload(request, Phase3SignedAcceptanceEvidenceRequest)
-            return self.service.run_signed_acceptance_evidence(request.payload)
+            return self.signed_acceptance_evidence(request.payload)
         raise ValueError(f"Unsupported Phase 3 operation kind: {request.kind}")
 
     def validate(self, request: Phase3ValidationRequest) -> EvidenceContractEvaluation:
@@ -147,3 +182,63 @@ def orchestrator_for_service(
     """Build the application orchestrator for the default service composition."""
 
     return Phase3EvidenceOrchestrator(service)
+
+
+@dataclass(frozen=True)
+class Phase3EvidenceSession:
+    """Document-bound convenience object without a compatibility gateway."""
+
+    orchestrator: Phase3EvidenceOrchestrator
+    pdf_path: str
+    certificate_path: str
+    passphrase: str
+    artifacts_dir: str = "artifacts/phase3"
+
+    def preview(
+        self, manifest_path: str | Path, *, artifacts_dir: str | None = None
+    ) -> Phase3MatrixResult:
+        return self.orchestrator.preview_matrix(
+            Phase3MatrixRequest(
+                pdf_path=self.pdf_path,
+                certificate_path=self.certificate_path,
+                passphrase=self.passphrase,
+                scenario_manifest_path=str(manifest_path),
+                artifacts_dir=artifacts_dir or self.artifacts_dir,
+            )
+        )
+
+    def signed_acceptance(
+        self, manifest_path: str | Path, *, artifacts_dir: str | None = None
+    ) -> Phase3MatrixResult:
+        return self.orchestrator.signed_acceptance_matrix(
+            Phase3MatrixRequest(
+                pdf_path=self.pdf_path,
+                certificate_path=self.certificate_path,
+                passphrase=self.passphrase,
+                scenario_manifest_path=str(manifest_path),
+                artifacts_dir=artifacts_dir or self.artifacts_dir,
+            )
+        )
+
+    def capture(
+        self,
+        *,
+        summary_json_path: str | Path | None = None,
+        checklist_results_path: str = "artifacts/phase3_fr3b_acceptance_results.md",
+        checklist_template_path: str = "artifacts/phase3_fr3b_acceptance_checklist.md",
+        artifacts_dir: str | None = None,
+    ) -> CaptureResultPort:
+        return self.orchestrator.capture(
+            Phase3HarnessCaptureRequest(
+                pdf_path=self.pdf_path,
+                certificate_path=self.certificate_path,
+                passphrase=self.passphrase,
+                summary_json_path=None if summary_json_path is None else str(summary_json_path),
+                checklist_results_path=str(checklist_results_path),
+                checklist_template_path=str(checklist_template_path),
+                artifacts_dir=artifacts_dir or self.artifacts_dir,
+            )
+        )
+
+    def validate(self, summary_json_path: str | Path) -> EvidenceContractEvaluation:
+        return self.orchestrator.validate(Phase3ValidationRequest(summary_json_path))

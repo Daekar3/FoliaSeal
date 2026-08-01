@@ -3,6 +3,9 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.phase3_evidence_core import (
+    validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.phase3_evidence_service import (
     Phase3MatrixRequest,
     Phase3SignedAcceptanceEvidenceRequest,
@@ -19,7 +22,6 @@ from foliaseal.application.qa_signed_acceptance_generation import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
     DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
     build_default_phase3_evidence_service,
-    validate_signed_acceptance_matrix_summary,
 )
 
 _PYHANKO_LOGGER_NAME = "pyhanko.sign.validation.generic_cms"
@@ -183,8 +185,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raise
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "Overall result: FAIL" in summary_text
     assert (
-        "matrix runner failed before returning a summary: Qt renderer unavailable"
-        in summary_text
+        "matrix runner failed before returning a summary: Qt renderer unavailable" in summary_text
     )
 
 

@@ -8,11 +8,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from foliaseal.application.phase3_evidence_core import (
+    validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.phase3_evidence_service import (
     AssetGenerator,
     MatrixRunner,
     Phase3EvidenceService,
-    validate_signed_acceptance_matrix_summary,
 )
 from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
@@ -34,9 +36,7 @@ __all__ = [
 
 _PYHANKO_DUMMY_TSA_LOGGER = "pyhanko.sign.validation.generic_cms"
 _PYHANKO_LAYOUT_LOGGER = "pyhanko.pdf_utils.layout"
-_DUMMY_TSA_SUBJECT_FRAGMENT = (
-    "Common Name: FoliaSeal TSA, Organization: FoliaSeal, Country: US"
-)
+_DUMMY_TSA_SUBJECT_FRAGMENT = "Common Name: FoliaSeal TSA, Organization: FoliaSeal, Country: US"
 _DUMMY_TSA_SELF_SIGNED_FRAGMENT = "The X.509 certificate provided is self-signed"
 _BENIGN_PYHANKO_LAYOUT_FRAGMENT = "post_margin will be ignored"
 _BENIGN_QT_OFFSCREEN_MESSAGE = "This plugin does not support propagateSizeHints()"
@@ -57,8 +57,7 @@ class _SignedEvidenceRuntimeNoiseFilter(logging.Filter):
             return False
         if (
             self._suppress_layout_warnings
-            and
-            record.name == _PYHANKO_LAYOUT_LOGGER
+            and record.name == _PYHANKO_LAYOUT_LOGGER
             and message.startswith("Content box width/height ")
             and _BENIGN_PYHANKO_LAYOUT_FRAGMENT in message
         ):
@@ -108,6 +107,8 @@ def _suppress_known_qt_runtime_chatter():
         yield
     finally:
         QtCore.qInstallMessageHandler(previous_handler)
+
+
 def _write_evidence_markdown(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -126,11 +127,9 @@ def build_default_phase3_evidence_service(
         )
 
     return Phase3EvidenceService(
-        harness_runner=harness.run_signing_harness,
-        preview_matrix_runner=harness.run_preview_matrix,
-        signed_acceptance_matrix_runner=(
-            matrix_runner or harness.run_signed_acceptance_matrix
-        ),
+        harness_runner=harness.capture,
+        preview_matrix_runner=harness.preview_matrix,
+        signed_acceptance_matrix_runner=(matrix_runner or harness.signed_acceptance_matrix),
         asset_generator=asset_generator,
         capture_contract_evaluator=evaluate_phase3_evidence_contract,
         text_writer=_write_evidence_markdown,

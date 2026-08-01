@@ -225,26 +225,14 @@ class Phase3Harness:
     def preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
         return self.deps.preview_matrix.run(request)
 
-    def run_preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.preview_matrix(request)
-
     def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
         return self.deps.signed_acceptance_matrix.run(request)
-
-    def run_signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.signed_acceptance_matrix(request)
 
     def capture(
         self,
         request: Phase3HarnessCaptureRequest,
     ) -> Phase3HarnessCapture:
         return self.deps.interactive.run(request)
-
-    def run_signing_harness(
-        self,
-        request: Phase3HarnessCaptureRequest,
-    ) -> Phase3HarnessCapture:
-        return self.capture(request)
 
 
 @dataclass(frozen=True)
@@ -406,9 +394,7 @@ def _build_phase3_preview_matrix_port() -> Phase3PreviewMatrixPort:
 
 
 def _build_phase3_signed_acceptance_matrix_port() -> Phase3SignedAcceptanceMatrixPort:
-    return Phase3SignedAcceptanceMatrixPort(
-        runner=_build_phase3_signed_acceptance_matrix_runner()
-    )
+    return Phase3SignedAcceptanceMatrixPort(runner=_build_phase3_signed_acceptance_matrix_runner())
 
 
 def _run_phase3_harness_session(
@@ -472,7 +458,9 @@ def _build_phase3_harness_capture(
         sign_request_count=capture_payload["sign_request_count"],
         last_signature_page_index=capture_payload["last_signature_page_index"],
         last_signature_page_number=capture_payload["last_signature_page_number"],
-        last_signature_has_visible_appearance=capture_payload["last_signature_has_visible_appearance"],
+        last_signature_has_visible_appearance=capture_payload[
+            "last_signature_has_visible_appearance"
+        ],
         last_signature_output_path=capture_payload["last_signature_output_path"],
         last_signing_result_message=capture_payload["last_signing_result_message"],
         last_signing_result_success=capture_payload["last_signing_result_success"],
@@ -705,9 +693,7 @@ def _build_phase3_preview_matrix_runner() -> Phase3PreviewMatrixRunner:
     )
 
 
-def _build_phase3_signed_acceptance_matrix_runner() -> (
-    Phase3SignedAcceptanceMatrixRunner
-):
+def _build_phase3_signed_acceptance_matrix_runner() -> Phase3SignedAcceptanceMatrixRunner:
     return Phase3SignedAcceptanceMatrixRunner(
         deps=Phase3SignedAcceptanceMatrixRunnerDeps(
             load_qt_harness_bindings=_load_qt_harness_bindings,
@@ -729,9 +715,7 @@ def _build_phase3_signed_acceptance_matrix_runner() -> (
     )
 
 
-def _build_phase3_signed_acceptance_scenario_executor() -> (
-    Phase3SignedAcceptanceScenarioExecutor
-):
+def _build_phase3_signed_acceptance_scenario_executor() -> Phase3SignedAcceptanceScenarioExecutor:
     return Phase3SignedAcceptanceScenarioExecutor(
         deps=Phase3SignedAcceptanceScenarioExecutorDeps(
             apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
@@ -753,9 +737,7 @@ def _build_phase3_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
     )
 
 
-def _build_phase3_signed_output_render_snapshotter() -> (
-    Phase3SignedOutputRenderSnapshotter
-):
+def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRenderSnapshotter:
     return Phase3SignedOutputRenderSnapshotter(
         render_backend_factory=QtPdfRenderBackend,
         render_signed_annotation_appearance_direct=_render_signed_annotation_appearance_direct,
@@ -832,9 +814,7 @@ def _derive_phase3_auto_checked_items(capture: Phase3HarnessCapture) -> set[str]
         auto_checked.add(
             "Confirm the viewer preview renders before any signing action is attempted."
         )
-        auto_checked.add(
-            "The focused properties panel shows the available appearance controls."
-        )
+        auto_checked.add("The focused properties panel shows the available appearance controls.")
 
     if not capture.errors:
         auto_checked.add(
@@ -1016,9 +996,7 @@ def _snapshot_visible_signature_appearance(output_file: Path) -> dict[str, Any] 
             appearance_stream = normal_appearance.get_object()
             appearance_data = appearance_stream.data
             appearance_text = appearance_data.decode("latin1", errors="replace")
-            xobject_summaries = _snapshot_appearance_xobjects(
-                appearance_stream.get("/Resources")
-            )
+            xobject_summaries = _snapshot_appearance_xobjects(appearance_stream.get("/Resources"))
             text_fragments = _extract_pdf_text_fragments(appearance_text)
             visible_text_present = bool(text_fragments)
             image_xobject_count = sum(
@@ -1101,9 +1079,7 @@ def _render_signed_annotation_appearance_direct(
                 }
             )
             content_stream = generic.StreamObject(
-                stream_data=(
-                    f"q 1 0 0 1 {-min_x} {-min_y} cm /Fx Do Q".encode("ascii")
-                )
+                stream_data=(f"q 1 0 0 1 {-min_x} {-min_y} cm /Fx Do Q".encode("ascii"))
             )
             stream_ref = writer.add_object(content_stream)
             page = PageObject(
@@ -1159,8 +1135,7 @@ def _status_has_timestamp_for_snapshot(status: Any) -> bool:
     if timestamp_validity is None:
         return False
     return bool(
-        getattr(timestamp_validity, "intact", True)
-        and getattr(timestamp_validity, "valid", True)
+        getattr(timestamp_validity, "intact", True) and getattr(timestamp_validity, "valid", True)
     )
 
 
@@ -1169,8 +1144,7 @@ def _status_timestamp_cryptographically_valid_for_snapshot(status: Any) -> bool 
     if timestamp_validity is None:
         return None
     return bool(
-        getattr(timestamp_validity, "intact", True)
-        and getattr(timestamp_validity, "valid", True)
+        getattr(timestamp_validity, "intact", True) and getattr(timestamp_validity, "valid", True)
     )
 
 
@@ -1224,9 +1198,7 @@ def _preview_appearance_snapshot_from_capture(
     )
 
 
-def _build_phase3_sign_time_diagnostics_snapshotter() -> (
-    Phase3SignTimeDiagnosticsSnapshotter
-):
+def _build_phase3_sign_time_diagnostics_snapshotter() -> Phase3SignTimeDiagnosticsSnapshotter:
     return Phase3SignTimeDiagnosticsSnapshotter(mapping=_mapping)
 
 
@@ -1279,8 +1251,10 @@ def _signature_text_style_from_snapshot(snapshot: object) -> SignatureTextStyle 
     font_family = snapshot.get("font_family")
     font_size_pt = snapshot.get("font_size_pt")
     text_color_hex = snapshot.get("text_color_hex")
-    if not isinstance(font_family, str) or font_size_pt is None or not isinstance(
-        text_color_hex, str
+    if (
+        not isinstance(font_family, str)
+        or font_size_pt is None
+        or not isinstance(text_color_hex, str)
     ):
         return None
     return SignatureTextStyle(
@@ -1455,8 +1429,7 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
         timestamp_required = scenario.get("timestamp_required")
         if timestamp_required is not None and not isinstance(timestamp_required, bool):
             raise ValueError(
-                f"Scenario '{name}' has unsupported timestamp_required: "
-                f"{timestamp_required!r}"
+                f"Scenario '{name}' has unsupported timestamp_required: {timestamp_required!r}"
             )
         validated.append(scenario)
     manifest: dict[str, Any] = {"scenarios": validated}
@@ -1724,8 +1697,7 @@ def _signed_scenario_matches_expectation(result: dict[str, Any]) -> tuple[bool |
             if not isinstance(message, str) or fragment not in message:
                 return (
                     False,
-                    "Expected rejection message to contain "
-                    f"{fragment!r}, got {message!r}.",
+                    f"Expected rejection message to contain {fragment!r}, got {message!r}.",
                 )
         return True, None
     return False, f"Unsupported expected_outcome: {expected_outcome!r}"
@@ -1812,20 +1784,17 @@ def _evaluate_signed_matrix_acceptance_expectations(
         expected = int(manifest_expectations["expected_intentional_rejection_count"])
         if rejection_count != expected:
             errors.append(
-                "Expected "
-                f"{expected} intentional rejections, observed {rejection_count}."
+                f"Expected {expected} intentional rejections, observed {rejection_count}."
             )
     if manifest_expectations.get("require_zero_cryptographic_validation_failures") is True:
         if crypto_failures != 0:
             errors.append(
-                "Expected zero cryptographic validation failures, observed "
-                f"{crypto_failures}."
+                f"Expected zero cryptographic validation failures, observed {crypto_failures}."
             )
     if manifest_expectations.get("require_zero_preview_output_comparison_failures") is True:
         if comparison_failures != 0:
             errors.append(
-                "Expected zero preview/output comparison failures, observed "
-                f"{comparison_failures}."
+                f"Expected zero preview/output comparison failures, observed {comparison_failures}."
             )
     if manifest_expectations.get("require_zero_annotation_rect_mismatches") is True:
         if annotation_mismatches != 0:
@@ -3881,6 +3850,8 @@ def _snapshot_signing_request(request: SigningRequest | None) -> dict[str, Any] 
             None if appearance is None else _snapshot_signing_appearance(appearance)
         ),
     }
+
+
 def _snapshot_layout_rule(layout_rule) -> dict[str, Any] | None:
     if layout_rule is None:
         return None
@@ -4341,8 +4312,7 @@ def _jsonable_capture(value: Any) -> Any:
         return str(value)
     if is_dataclass(value):
         return {
-            field.name: _jsonable_capture(getattr(value, field.name))
-            for field in fields(value)
+            field.name: _jsonable_capture(getattr(value, field.name)) for field in fields(value)
         }
     if isinstance(value, dict):
         return {str(key): _jsonable_capture(item) for key, item in value.items()}

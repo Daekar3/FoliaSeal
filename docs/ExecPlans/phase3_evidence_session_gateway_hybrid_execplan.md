@@ -1,5 +1,10 @@
 # Add a reusable Phase 3 evidence session gateway
 
+> **Retired / superseded (2026-08-01):** This plan described the temporary
+> `Phase3EvidenceGateway` facade. The gateway module was removed; its reusable session now lives
+> in `phase3_evidence_orchestrator.py` over the typed core/ports pipeline. Retain this document as
+> historical rationale only.
+
 This ExecPlan is a living document and must be maintained according to `.agents/skills/write-execplan/PLANS.md`. It defines one complete implementation slice: add a Qt-free `Phase3EvidenceGateway` with two top-level entry points (`run` and `validate`) and four explicit `run` operation kinds, plus a reusable per-document `Phase3EvidenceSession`, while preserving every existing `Phase3EvidenceService`, `Phase3Harness`, runner, result schema, artifact path, and CLI compatibility contract.
 
 ## Purpose / Big Picture

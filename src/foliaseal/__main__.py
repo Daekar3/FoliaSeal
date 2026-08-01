@@ -15,10 +15,10 @@ from foliaseal.application.phase2_evidence import (
     build_phase2_timing_evidence,
     parse_checklist_markdown,
 )
-from foliaseal.application.phase3_evidence_gateway import (
-    Phase3EvidenceGateway,
-    Phase3OperationRequest,
+from foliaseal.application.phase3_evidence_orchestrator import (
+    Phase3EvidenceOrchestrator,
     Phase3ValidationRequest,
+    orchestrator_for_service,
 )
 from foliaseal.application.phase3_evidence_service import (
     Phase3HarnessCaptureRequest,
@@ -241,10 +241,7 @@ def _build_parser() -> argparse.ArgumentParser:
     phase3_harness.add_argument(
         "--checklist-results-path",
         default=DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
-        help=(
-            "File path where the run-specific Phase 3 acceptance results should be "
-            "written."
-        ),
+        help=("File path where the run-specific Phase 3 acceptance results should be written."),
     )
     phase3_harness.add_argument(
         "--checklist-template-path",
@@ -340,10 +337,7 @@ def _build_parser() -> argparse.ArgumentParser:
     phase3_signed_evidence.add_argument(
         "--artifacts-root",
         default=".",
-        help=(
-            "Repository or workspace root under which ignored artifacts should be "
-            "generated."
-        ),
+        help=("Repository or workspace root under which ignored artifacts should be generated."),
     )
     phase3_signed_evidence.add_argument(
         "--summary-markdown-path",
@@ -409,15 +403,11 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
 
     runtime_validation = None
     if args.qa_checklist_file is not None:
-        runtime_validation = parse_checklist_markdown(
-            checklist_path=args.qa_checklist_file
-        )
+        runtime_validation = parse_checklist_markdown(checklist_path=args.qa_checklist_file)
 
     if args.qa_passed_checks is not None or args.qa_total_checks is not None:
         if args.qa_passed_checks is None or args.qa_total_checks is None:
-            raise ValueError(
-                "--qa-passed-checks and --qa-total-checks must be provided together."
-            )
+            raise ValueError("--qa-passed-checks and --qa-total-checks must be provided together.")
         manual_validation = RuntimeValidationSnapshot(
             passed_checks=args.qa_passed_checks,
             total_checks=args.qa_total_checks,
@@ -430,9 +420,7 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
             total_checks=runtime_validation.total_checks,
             issues=runtime_validation.issues + tuple(args.qa_issues),
         )
-    qt_runtime_readiness = (
-        QtRuntimeReadinessSnapshot.collect() if args.check_qt_runtime else None
-    )
+    qt_runtime_readiness = QtRuntimeReadinessSnapshot.collect() if args.check_qt_runtime else None
 
     report = build_phase2_timing_evidence(
         timing=tracker.snapshot(),
@@ -450,7 +438,7 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
 
 
 def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
-    evaluation = _build_phase3_evidence_gateway().validate(
+    evaluation = _build_phase3_evidence_orchestrator().validate(
         Phase3ValidationRequest(summary_json_path=args.summary_json_path)
     )
     print("Phase 3 evidence contract")
@@ -470,10 +458,10 @@ def _build_phase3_evidence_service():
     return build_default_phase3_evidence_service()
 
 
-def _build_phase3_evidence_gateway() -> Phase3EvidenceGateway:
-    """Build the canonical application boundary over the default service."""
+def _build_phase3_evidence_orchestrator() -> Phase3EvidenceOrchestrator:
+    """Build the canonical typed application boundary."""
 
-    return Phase3EvidenceGateway(_build_phase3_evidence_service())
+    return orchestrator_for_service(_build_phase3_evidence_service())
 
 
 def _build_phase3_harness_capture_request(
@@ -528,9 +516,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "phase3-signing-harness":
-        _build_phase3_evidence_gateway().run(
-            Phase3OperationRequest.capture(_build_phase3_harness_capture_request(args))
-        )
+        _build_phase3_evidence_orchestrator().capture(_build_phase3_harness_capture_request(args))
         return 0
     if args.command == "gui":
         return launch_qt_app_frame(
@@ -539,8 +525,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "phase3-signing-preview-matrix":
-        result = _build_phase3_evidence_gateway().run(
-            Phase3OperationRequest.preview_matrix(_build_phase3_matrix_request(args))
+        result = _build_phase3_evidence_orchestrator().preview_matrix(
+            _build_phase3_matrix_request(args)
         )
         print("Phase 3 preview matrix")
         print(f"- scenarios executed: {result.scenario_count}")
@@ -548,10 +534,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-matrix":
-        result = _build_phase3_evidence_gateway().run(
-            Phase3OperationRequest.signed_acceptance_matrix(
-                _build_phase3_matrix_request(args)
-            )
+        result = _build_phase3_evidence_orchestrator().signed_acceptance_matrix(
+            _build_phase3_matrix_request(args)
         )
         print("Phase 3 signed acceptance matrix")
         print(f"- scenarios executed: {result.scenario_count}")
@@ -560,10 +544,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-evidence":
-        evidence = _build_phase3_evidence_gateway().run(
-            Phase3OperationRequest.signed_acceptance_evidence(
-                _build_phase3_signed_acceptance_evidence_request(args)
-            )
+        evidence = _build_phase3_evidence_orchestrator().signed_acceptance_evidence(
+            _build_phase3_signed_acceptance_evidence_request(args)
         )
         print("Phase 3 signed acceptance evidence")
         print(f"- summary markdown: {evidence.summary_markdown_path}")

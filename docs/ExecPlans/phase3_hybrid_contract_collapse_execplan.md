@@ -1,5 +1,10 @@
 # Collapse The Phase 3 Hybrid To One Application Contract
 
+> **Superseded (2026-08-01):** The one-service contract described here was an earlier milestone.
+> The current architecture deepens it with `phase3_evidence_core.py`, explicit effect ports, and
+> the typed orchestrator/session command pipeline; the historical compatibility wrappers were
+> subsequently removed.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.

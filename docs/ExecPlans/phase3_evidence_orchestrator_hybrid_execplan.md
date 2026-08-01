@@ -1,5 +1,10 @@
 # Deepen Phase 3 evidence orchestration behind one application boundary
 
+> **Retired / superseded (2026-08-01):** This plan's compatibility-gateway outcome was replaced by
+> the typed command-pipeline slice in `phase3_evidence_hybrid_command_pipeline_execplan.md`.
+> Keep this plan as historical record; the current canonical surface is the orchestrator/session
+> over `phase3_evidence_core.py` and `phase3_evidence_ports.py`.
+
 This ExecPlan is a living document. Maintain it in accordance with `.agents/skills/write-execplan/PLANS.md`. The entire change is one compatibility-preserving architecture slice: make an application-owned Phase 3 evidence orchestrator canonical for tagged evidence dispatch and validation, route the CLI through it, and preserve the existing Qt adapters, matrix runners, artifact files, result DTOs, and command-line contracts.
 
 ## Purpose / Big Picture

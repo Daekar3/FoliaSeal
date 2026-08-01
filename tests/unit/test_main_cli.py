@@ -391,28 +391,27 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
     }
 
 
-def test_main_phase3_preview_matrix_uses_the_application_gateway(
+def test_main_phase3_preview_matrix_uses_the_application_orchestrator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = {}
 
-    class _FakeGateway:
-        def run(self, request):
-            captured["kind"] = request.kind
-            captured["payload"] = request.payload
+    class _FakeOrchestrator:
+        def preview_matrix(self, request):
+            captured["payload"] = request
             return SimpleNamespace(
-                artifacts_dir=request.payload.artifacts_dir,
+                artifacts_dir=request.artifacts_dir,
                 scenario_count=1,
                 successful_run_count=1,
-                summary_json_path=f"{request.payload.artifacts_dir}/summary.json",
+                summary_json_path=f"{request.artifacts_dir}/summary.json",
             )
 
     def fail_if_service_builder_called():
-        raise AssertionError("CLI should compose the gateway as its Phase 3 boundary")
+        raise AssertionError("CLI should compose the orchestrator as its Phase 3 boundary")
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_gateway",
-        lambda: _FakeGateway(),
+        "foliaseal.__main__._build_phase3_evidence_orchestrator",
+        lambda: _FakeOrchestrator(),
     )
     monkeypatch.setattr(
         "foliaseal.__main__._build_phase3_evidence_service",
@@ -435,7 +434,6 @@ def test_main_phase3_preview_matrix_uses_the_application_gateway(
         ]
     )
 
-    assert captured["kind"].value == "preview_matrix"
     assert captured["payload"].pdf_path == "/tmp/sample.pdf"
 
 

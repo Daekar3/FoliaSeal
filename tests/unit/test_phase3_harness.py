@@ -305,8 +305,7 @@ def test_evidence_contract_rejects_success_without_output_file() -> None:
     assert any("output_file_exists is false" in item for item in evaluation.errors)
     assert any("output_signature_count is missing" in item for item in evaluation.errors)
     assert any(
-        "output_visible_appearance_snapshot is missing" in item
-        for item in evaluation.errors
+        "output_visible_appearance_snapshot is missing" in item for item in evaluation.errors
     )
 
 
@@ -462,8 +461,7 @@ def test_evidence_contract_rejects_saved_capture_without_preview_artifacts() -> 
         for item in evaluation.errors
     )
     assert any(
-        "captured_states[1] is missing preview_image_path" in item
-        for item in evaluation.errors
+        "captured_states[1] is missing preview_image_path" in item for item in evaluation.errors
     )
 
 
@@ -510,10 +508,7 @@ def test_evidence_contract_rejects_signable_render_clipping() -> None:
     )
 
     assert evaluation.passed is False
-    assert any(
-        "user-visible fit failure" in item
-        for item in evaluation.errors
-    )
+    assert any("user-visible fit failure" in item for item in evaluation.errors)
 
 
 def test_evidence_contract_requires_signed_output_evidence_for_success() -> None:
@@ -560,9 +555,7 @@ def test_evidence_contract_requires_signed_output_evidence_for_success() -> None
 
     assert evaluation.passed is False
     assert any("output_verification_snapshot is missing" in item for item in evaluation.errors)
-    assert any(
-        "signed_output_preview_comparison is missing" in item for item in evaluation.errors
-    )
+    assert any("signed_output_preview_comparison is missing" in item for item in evaluation.errors)
 
 
 def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
@@ -871,10 +864,7 @@ def test_default_harness_output_pdf_path_uses_artifacts_dir_and_numbering() -> N
         sign_attempt_index=3,
     )
 
-    assert (
-        output_path
-        == "artifacts/phase3_harness_capture_artifacts/input_harness_signed_003.pdf"
-    )
+    assert output_path == "artifacts/phase3_harness_capture_artifacts/input_harness_signed_003.pdf"
 
 
 def test_default_harness_output_pdf_path_falls_back_to_source_directory() -> None:
@@ -1020,9 +1010,7 @@ def test_execute_preview_matrix_scenario_uses_workspace_snapshot_capture(
             )
 
     original_builder = phase3_harness_module._build_preview_matrix_qt_workspace
-    phase3_harness_module._build_preview_matrix_qt_workspace = (
-        lambda **_kwargs: _FakeWorkspace()
-    )
+    phase3_harness_module._build_preview_matrix_qt_workspace = lambda **_kwargs: _FakeWorkspace()
     try:
         result = phase3_harness_module._execute_preview_matrix_scenario(
             shell=object(),
@@ -1039,9 +1027,7 @@ def test_execute_preview_matrix_scenario_uses_workspace_snapshot_capture(
         "preview_snapshot": {"title": "Live preview"},
         "preview_text": "Preview text",
         "validation_text": "Ready to sign.",
-        "sign_request_snapshot": {
-            "signature_appearance": {"layout_template": "single_line"}
-        },
+        "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
         "backend_reservation_snapshot": {"layout_template": "single_line"},
     }
     assert captured["capture_command"] == phase3_harness_module.Phase3HarnessCaptureCommand(
@@ -1081,8 +1067,8 @@ def test_execute_headless_preview_matrix_scenario_uses_workspace_snapshot_captur
     original_workflow_builder = phase3_harness_module._build_headless_preview_matrix_workflow
     original_workspace_builder = phase3_harness_module._build_preview_matrix_headless_workspace
     phase3_harness_module._build_headless_preview_matrix_workflow = lambda **_kwargs: object()
-    phase3_harness_module._build_preview_matrix_headless_workspace = (
-        lambda **_kwargs: _FakeWorkspace()
+    phase3_harness_module._build_preview_matrix_headless_workspace = lambda **_kwargs: (
+        _FakeWorkspace()
     )
     try:
         result = phase3_harness_module._execute_headless_preview_matrix_scenario(
@@ -1094,12 +1080,8 @@ def test_execute_headless_preview_matrix_scenario_uses_workspace_snapshot_captur
             artifacts_dir=tmp_path,
         )
     finally:
-        phase3_harness_module._build_headless_preview_matrix_workflow = (
-            original_workflow_builder
-        )
-        phase3_harness_module._build_preview_matrix_headless_workspace = (
-            original_workspace_builder
-        )
+        phase3_harness_module._build_headless_preview_matrix_workflow = original_workflow_builder
+        phase3_harness_module._build_preview_matrix_headless_workspace = original_workspace_builder
 
     assert result == {
         "name": "Scenario B",
@@ -1107,9 +1089,7 @@ def test_execute_headless_preview_matrix_scenario_uses_workspace_snapshot_captur
         "preview_snapshot": {"title": "Headless preview"},
         "preview_text": "Preview text",
         "validation_text": "Ready to sign.",
-        "sign_request_snapshot": {
-            "signature_appearance": {"layout_template": "single_line"}
-        },
+        "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
         "backend_reservation_snapshot": {"layout_template": "single_line"},
     }
     assert captured["capture_command"] == phase3_harness_module.Phase3HarnessCaptureCommand(
@@ -1165,6 +1145,7 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         "build_phase3_signing_executor",
         lambda: object(),
     )
+
     def fake_finalize(request_obj, **_kwargs):
         captured["payload"] = request_obj.capture_payload
         return SimpleNamespace(
@@ -1241,7 +1222,7 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
     assert captured["payload"]["preview_snapshot"]["title"] == "Final preview"
 
 
-def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_reporting(
+def test_phase3_harness_capture_orchestrates_session_and_reporting(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -1270,7 +1251,7 @@ def test_phase3_harness_facade_run_signing_harness_orchestrates_session_and_repo
             preview_matrix=object(),
             signed_acceptance_matrix=object(),
         )
-    ).run_signing_harness(
+    ).capture(
         Phase3HarnessCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),
@@ -1615,8 +1596,7 @@ def test_text_edge_diagnostics_flags_reference_content_loss_as_clipping() -> Non
     assert diagnostics["text_content_clipped_in_preview"] is True
 
 
-def test_text_edge_diagnostics_flags_horizontal_border_edge_reference_loss(
-) -> None:
+def test_text_edge_diagnostics_flags_horizontal_border_edge_reference_loss() -> None:
     preview = type(
         "_Preview",
         (),
@@ -2038,7 +2018,7 @@ def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
                         "text_content_overlaps_stamp_content": False,
                         "stamp_content_within_warning_distance": True,
                         "stamp_content_touches_band_edge": False,
-                    }
+                    },
                 }
             },
             {
@@ -2050,7 +2030,7 @@ def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
                         "text_content_overlaps_stamp_content": False,
                         "stamp_content_within_warning_distance": False,
                         "stamp_content_touches_band_edge": True,
-                    }
+                    },
                 }
             },
             {"error": "boom"},
@@ -2129,8 +2109,7 @@ def test_load_preview_matrix_manifest_accepts_object_or_array(tmp_path: Path) ->
     )
 
     assert (
-        _load_preview_matrix_manifest(str(object_manifest))["scenarios"][0]["name"]
-        == "Compact Top"
+        _load_preview_matrix_manifest(str(object_manifest))["scenarios"][0]["name"] == "Compact Top"
     )
     assert (
         _load_preview_matrix_manifest(str(array_manifest))["scenarios"][0]["name"]
@@ -2145,7 +2124,7 @@ def test_stress_preview_manifests_exist_and_parse() -> None:
         assert manifest["scenarios"]
 
 
-def test_phase3_harness_facade_run_preview_matrix_delegates_to_runner(tmp_path: Path) -> None:
+def test_phase3_harness_preview_matrix_delegates_to_runner(tmp_path: Path) -> None:
     source_pdf = tmp_path / "fixture.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
     manifest_path = tmp_path / "manifest.json"
@@ -2165,7 +2144,7 @@ def test_phase3_harness_facade_run_preview_matrix_delegates_to_runner(tmp_path: 
         )
     )
 
-    summary = harness.run_preview_matrix(
+    summary = harness.preview_matrix(
         Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
@@ -2206,7 +2185,7 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
         lambda: phase3_harness_module.Phase3PreviewMatrixPort(runner=FakeRunner()),
     )
 
-    summary = Phase3Harness().run_preview_matrix(
+    summary = Phase3Harness().preview_matrix(
         Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
@@ -2226,7 +2205,7 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
     }
 
 
-def test_phase3_harness_facade_run_signed_acceptance_matrix_delegates_to_runner(
+def test_phase3_harness_signed_acceptance_matrix_delegates_to_runner(
     tmp_path: Path,
 ) -> None:
     source_pdf = tmp_path / "fixture.pdf"
@@ -2250,7 +2229,7 @@ def test_phase3_harness_facade_run_signed_acceptance_matrix_delegates_to_runner(
         )
     )
 
-    summary = harness.run_signed_acceptance_matrix(
+    summary = harness.signed_acceptance_matrix(
         Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
@@ -2291,7 +2270,7 @@ def test_phase3_harness_default_dependencies_use_signed_acceptance_runner_builde
         lambda: phase3_harness_module.Phase3SignedAcceptanceMatrixPort(runner=FakeRunner()),
     )
 
-    summary = Phase3Harness().run_signed_acceptance_matrix(
+    summary = Phase3Harness().signed_acceptance_matrix(
         Phase3MatrixRequest(
             pdf_path=str(source_pdf),
             certificate_path=str(tmp_path / "cert.p12"),
@@ -2908,12 +2887,10 @@ def test_signed_preview_parity_manifest_covers_layout_families_and_positions() -
     payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
     names = {scenario["name"] for scenario in payload["scenarios"]}
     positions = {
-        scenario["appearance_overrides"]["stamp_position"]
-        for scenario in payload["scenarios"]
+        scenario["appearance_overrides"]["stamp_position"] for scenario in payload["scenarios"]
     }
     families = {
-        scenario["appearance_overrides"]["layout_template"]
-        for scenario in payload["scenarios"]
+        scenario["appearance_overrides"]["layout_template"] for scenario in payload["scenarios"]
     }
 
     assert families == {"single_line", "multi_line", "wrapped_block"}
@@ -2934,8 +2911,7 @@ def test_signed_preview_parity_manifest_covers_layout_families_and_positions() -
     assert "wrapped_block_top_dense_large" not in names
 
 
-def test_signed_preview_parity_manifest_excludes_stale_horizontal_replay_ladder(
-) -> None:
+def test_signed_preview_parity_manifest_excludes_stale_horizontal_replay_ladder() -> None:
     _require_local_artifact_paths(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST))
     payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
     names = {scenario["name"] for scenario in payload["scenarios"]}
@@ -2962,9 +2938,7 @@ def test_signed_fit_rejection_manifest_exists_and_parses() -> None:
     assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] == len(
         manifest["scenarios"]
     )
-    assert (
-        manifest["acceptance_expectations"].get("minimum_successful_signing_run_count", 0) == 0
-    )
+    assert manifest["acceptance_expectations"].get("minimum_successful_signing_run_count", 0) == 0
     assert all(
         scenario.get("expected_outcome") == "validation_rejection"
         for scenario in manifest["scenarios"]

@@ -1,5 +1,10 @@
 # Deepen the Phase 3 evidence gateway and signed-acceptance scenario boundary
 
+> **Retired / superseded (2026-08-01):** The gateway terminology and compatibility facade in this
+> plan describe an intermediate architecture. The current implementation uses the typed
+> orchestrator/session, `phase3_evidence_core.py`, and `phase3_evidence_ports.py`; no gateway module
+> or raw `run_*` service aliases remain.
+
 This ExecPlan is a living document. Maintain it in accordance with `.agents/skills/write-execplan/PLANS.md`. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current at every stopping point.
 
 ## Purpose / Big Picture

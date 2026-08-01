@@ -1,5 +1,9 @@
 # Add A Phase 3 Harness Facade Tracer Bullet For Signed-Acceptance Matrix Runs
 
+> **Retired / superseded (2026-08-01):** This interim facade tracer bullet is historical. Signed
+> acceptance now enters through the typed application orchestrator/session; `Phase3Harness` keeps
+> only the Qt adapter verb and no `run_*` compatibility alias.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.

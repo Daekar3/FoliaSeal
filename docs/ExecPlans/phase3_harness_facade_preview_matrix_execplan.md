@@ -1,5 +1,9 @@
 # Add A Phase 3 Harness Facade Tracer Bullet For Preview Matrix Runs
 
+> **Retired / superseded (2026-08-01):** This tracer-bullet facade was later removed. Preview
+> callers use the typed application orchestrator/session, while `Phase3Harness.preview_matrix()`
+> remains only the Qt execution adapter entrypoint.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.

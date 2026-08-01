@@ -5,14 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.phase3_evidence_core import (
+    Phase3MatrixKind,
+    validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.phase3_evidence_service import (
     Phase3EvidenceService,
     Phase3HarnessCaptureRequest,
     Phase3HarnessValidationRequest,
-    Phase3MatrixKind,
     Phase3MatrixRequest,
     Phase3SignedAcceptanceEvidenceRequest,
-    validate_signed_acceptance_matrix_summary,
 )
 from foliaseal.application.qa_signed_acceptance_generation import (
     GeneratedSignedAcceptanceAssets,
@@ -86,10 +88,21 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
 
     service = _service(
         harness_runner=lambda request: captured.setdefault("harness", request),
-        preview_matrix_runner=lambda request: captured.setdefault("preview", request),
-        signed_acceptance_matrix_runner=lambda request: captured.setdefault(
-            "acceptance",
-            request,
+        preview_matrix_runner=lambda request: (
+            captured.setdefault("preview", request)
+            and {"artifacts_dir": request.artifacts_dir, "error_scenario_count": 0}
+        ),
+        signed_acceptance_matrix_runner=lambda request: (
+            captured.setdefault("acceptance", request)
+            and {
+                "artifacts_dir": request.artifacts_dir,
+                "acceptance_expectations_passed": True,
+                "acceptance_expectation_errors": [],
+                "expected_outcome_mismatch_count": 0,
+                "cryptographic_validation_failure_count": 0,
+                "preview_output_comparison_failure_count": 0,
+                "annotation_rect_mismatch_count": 0,
+            }
         ),
     )
 
@@ -104,7 +117,7 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
             artifacts_dir="artifacts",
         )
     )
-    service.run_preview_matrix(
+    service.preview_matrix_result(
         Phase3MatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
@@ -113,7 +126,7 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
             artifacts_dir="artifacts/preview",
         )
     )
-    service.run_signed_acceptance_matrix(
+    service.signed_acceptance_matrix_result(
         Phase3MatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
@@ -250,12 +263,9 @@ def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
 
     service = _service(
         signed_acceptance_matrix_runner=lambda request: (
-            matrix_calls.append(request)
-            or _passing_summary(artifacts_dir=request.artifacts_dir)
+            matrix_calls.append(request) or _passing_summary(artifacts_dir=request.artifacts_dir)
         ),
-        matrix_runtime_context_factory=lambda name: (
-            context_names.append(name) or nullcontext()
-        ),
+        matrix_runtime_context_factory=lambda name: context_names.append(name) or nullcontext(),
     )
 
     result = service.run_signed_acceptance_evidence(
@@ -305,10 +315,7 @@ def test_phase3_evidence_service_aggregate_preserves_runner_summary_path(
         )
     )
 
-    assert all(
-        row.summary_json_path == custom_summary_path
-        for row in result.matrix_results
-    )
+    assert all(row.summary_json_path == custom_summary_path for row in result.matrix_results)
 
 
 def test_phase3_evidence_service_writes_failure_summary_before_raising(
@@ -353,8 +360,7 @@ def test_phase3_evidence_service_validate_harness_capture_loads_payload(
 
     service = _service(
         capture_loader=lambda path: {"loaded_from": str(path)},
-        capture_contract_evaluator=lambda payload: captured.setdefault("payload", payload)
-        or None,
+        capture_contract_evaluator=lambda payload: captured.setdefault("payload", payload) or None,
     )
 
     result = service.validate_harness_capture(

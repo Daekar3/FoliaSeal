@@ -147,12 +147,16 @@ Visible-signature planner/IR hybrid:
   PyHanko fit/rejection helpers still exist until direct legacy-helper coverage is replaced by
   boundary coverage.
 
-Phase 3 evidence gateway and signed lifecycle:
+Phase 3 evidence command pipeline and signed lifecycle:
 
-- `Phase3EvidenceService` now exposes typed `Phase3MatrixResult` values, tagged by
-  `Phase3MatrixKind` (`preview` or `signed_acceptance`). The existing raw-dictionary
-  `run_preview_matrix()` and `run_signed_acceptance_matrix()` methods remain compatibility
-  adapters, so the CLI and existing `summary.json` consumers keep their current behavior.
+- `phase3_evidence_core.py` owns the Qt-free typed result models, normalization, validation, and
+  evidence-markdown decisions. `phase3_evidence_ports.py` defines the narrow effect protocols.
+  `Phase3EvidenceOrchestrator` and its document-bound `Phase3EvidenceSession` are the canonical
+  typed application boundary over those ports.
+- `Phase3EvidenceService` remains the injected execution service. It exposes typed
+  `Phase3MatrixResult` values, tagged by `Phase3MatrixKind` (`preview` or `signed_acceptance`);
+  raw runner dictionaries stay inside the service adapters and the removed `run_*` aliases are
+  no longer part of the public contract.
 - Signed-acceptance rows use a typed scenario result whose `as_mapping()` preserves the existing
   JSON row keys, including successful signed-output evidence and intentional fit-rejection rows.
 - Typed signed-matrix results preserve failure truth: a nonzero `error_scenario_count` makes the
@@ -193,7 +197,8 @@ signed = session.signed_acceptance("/path/to/signed-acceptance-manifest.json")
 ```
 
 The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir=` per call when
-isolating a run. Existing harness, service, and CLI entry points remain compatibility adapters.
+isolating a run. `Phase3Harness` remains the Qt execution adapter, while application exports are
+lazy so importing the package does not eagerly load optional GUI/runtime dependencies.
 
 Not yet production-ready:
 
@@ -366,9 +371,8 @@ Application boundary and execution contexts:
   preview-matrix, signed-acceptance-matrix, aggregate signed-evidence, and capture-validation
   requests. It validates request payloads and delegates to the injected evidence service without
   importing Qt, PyHanko, Pillow, TSA, or presentation modules.
-- `Phase3EvidenceGateway` and its PDF-bound `Phase3EvidenceSession` remain compatibility facades
-  for reusable callers. Existing service methods, result DTOs, raw summary mappings, artifact
-  paths, and validation behavior remain unchanged.
+- The former `Phase3EvidenceGateway` facade has been retired. Reusable callers use
+  `Phase3EvidenceOrchestrator.for_pdf()` and the typed `Phase3EvidenceSession` directly.
 - The CLI commands `phase3-signing-harness`, `phase3-signing-preview-matrix`,
   `phase3-signing-acceptance-matrix`, `phase3-signing-acceptance-evidence`, and
   `phase3-signing-harness-validate` route through this application boundary while preserving

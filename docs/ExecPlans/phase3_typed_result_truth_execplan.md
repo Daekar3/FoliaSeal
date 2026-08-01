@@ -1,5 +1,9 @@
 # Preserve failure truth in typed Phase 3 evidence results
 
+> **Historical / incorporated (2026-08-01):** The typed-result decisions in this child plan are
+> now implemented in `phase3_evidence_core.py`; references to legacy raw service wrappers describe
+> the pre-cleanup state and are not active API guidance.
+
 This ExecPlan is a child of `docs/ExecPlans/phase3_evidence_gateway_signed_scenario_hybrid_execplan.md` and is maintained according to `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture

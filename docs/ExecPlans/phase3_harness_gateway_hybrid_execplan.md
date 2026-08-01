@@ -1,5 +1,9 @@
 # Phase 3 harness gateway hybrid refactor
 
+> **Retired / superseded (2026-08-01):** This plan records an intermediate Qt harness gateway
+> design. `Phase3Harness` is now an execution adapter with typed verbs; caller-facing command
+> dispatch belongs to the application orchestrator/session. Preserve this plan for history only.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
