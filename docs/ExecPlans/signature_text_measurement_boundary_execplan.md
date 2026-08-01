@@ -83,8 +83,8 @@ found missing documentation, an injectable compact-reservation seam, helper-owne
 trailing-newline metric inconsistency; all were fixed in this slice. Residual debt is limited to the
 retained private compatibility wrappers, the localized lazy-import cycle risk, and the intentionally
 deferred multi-provider registry. The process/window audit was clean: no FoliaSeal/Phase 3 Python
-processes and no `wmctrl` windows remained. Implementation commit: `909fddd8c`; plan metadata
-commits: `a1dc0ad3f` and `ed34f764e`.
+processes and no `wmctrl` windows remained. Implementation commit: `909fddd8c`; the plan-metadata
+follow-up commits are recorded in the surrounding Git history.
 
 ## Context and Orientation
 
