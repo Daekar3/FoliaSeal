@@ -382,6 +382,14 @@ Application boundary and execution contexts:
 - Preview/headless matrices, signed/Qt acceptance matrices, and interactive Qt capture remain
   separate execution adapters. Their lifecycle ownership and artifact semantics differ and are
   intentionally not merged by this boundary slice.
+- The Qt-side `Phase3Composition` is headless-first: `default_headless()` lazily wires preview and
+  signed-matrix operations without constructing the interactive capture graph. Interactive capture
+  is an explicit `with_interactive_qt()` opt-in and remains lazy until `capture()` is requested.
+  Operation-local dependency bundles inject profile stores, Qt lifecycles, renderers, artifact
+  writers, and signing executors, keeping tests substitutable while preserving the existing three
+  verbs and their CLI, JSON, summary-path, and artifact contracts. Redundant matrix gateways and
+  private forwarding wrappers are implementation details and are not part of the compatibility
+  surface.
 
 Signed-output acceptance:
 

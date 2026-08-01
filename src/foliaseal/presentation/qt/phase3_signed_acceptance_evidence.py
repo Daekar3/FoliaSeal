@@ -22,7 +22,7 @@ from foliaseal.application.qa_evidence_contract import (
 from foliaseal.application.qa_signed_acceptance_generation import (
     generate_signed_acceptance_assets,
 )
-from foliaseal.presentation.qt.phase3_harness import Phase3Harness
+from foliaseal.presentation.qt.phase3_harness import Phase3Composition
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
     "artifacts/phase3_signed_acceptance_evidence_summary.md"
@@ -119,7 +119,8 @@ def build_default_phase3_evidence_service(
     asset_generator: AssetGenerator = generate_signed_acceptance_assets,
     matrix_runner: MatrixRunner | None = None,
 ) -> Phase3EvidenceService:
-    harness = Phase3Harness()
+    composition = Phase3Composition.default_headless()
+    interactive = composition.with_interactive_qt()
 
     def matrix_runtime_context(name: str):
         return _suppress_known_signed_evidence_runtime_chatter(
@@ -127,9 +128,9 @@ def build_default_phase3_evidence_service(
         )
 
     return Phase3EvidenceService(
-        harness_runner=harness.capture,
-        preview_matrix_runner=harness.preview_matrix,
-        signed_acceptance_matrix_runner=(matrix_runner or harness.signed_acceptance_matrix),
+        harness_runner=interactive.capture,
+        preview_matrix_runner=composition.preview_matrix,
+        signed_acceptance_matrix_runner=(matrix_runner or composition.signed_acceptance_matrix),
         asset_generator=asset_generator,
         capture_contract_evaluator=evaluate_phase3_evidence_contract,
         text_writer=_write_evidence_markdown,

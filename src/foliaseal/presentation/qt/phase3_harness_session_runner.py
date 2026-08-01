@@ -243,25 +243,30 @@ class Phase3HarnessSessionRunner:
         shell.refresh_viewer()
         first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
 
-        window.show()
-        refocus_shell()
-        app.exec()
+        try:
+            window.show()
+            refocus_shell()
+            app.exec()
 
-        final_snapshot = capture_current_state(
-            capture_kind="final",
-            request=sign_requests[-1] if sign_requests else None,
-        )
-        capture_request = final_snapshot.current_request
-        final_state = final_snapshot.as_mapping()
-        last_signing_result = final_snapshot.last_signing_result
-        return Phase3HarnessSessionResult(
-            first_render_ms=first_render_ms,
-            sign_requests=tuple(sign_requests),
-            signed_runs=tuple(signed_runs),
-            errors=tuple(errors),
-            interaction_counts=dict(sorted(interaction_counts.items())),
-            captured_states=tuple(captured_states),
-            final_state=final_state,
-            capture_request=capture_request,
-            last_signing_result=last_signing_result,
-        )
+            final_snapshot = capture_current_state(
+                capture_kind="final",
+                request=sign_requests[-1] if sign_requests else None,
+            )
+            capture_request = final_snapshot.current_request
+            final_state = final_snapshot.as_mapping()
+            last_signing_result = final_snapshot.last_signing_result
+            return Phase3HarnessSessionResult(
+                first_render_ms=first_render_ms,
+                sign_requests=tuple(sign_requests),
+                signed_runs=tuple(signed_runs),
+                errors=tuple(errors),
+                interaction_counts=dict(sorted(interaction_counts.items())),
+                captured_states=tuple(captured_states),
+                final_state=final_state,
+                capture_request=capture_request,
+                last_signing_result=last_signing_result,
+            )
+        finally:
+            close_window = getattr(window, "close", None)
+            if callable(close_window):
+                close_window()

@@ -63,6 +63,7 @@ class Phase3SignedAcceptanceMatrixRunnerDeps:
     )
     jsonable_capture: JsonableCapture
     render_backend_factory: Callable[[], Any]
+    profile_store_factory: Callable[[], Any] = SignaturePresetCatalogStore.default
     lifecycle_factory: LifecycleFactory | None = None
     artifact_port_factory: ArtifactPortFactory | None = None
 
@@ -124,7 +125,7 @@ class Phase3SignedAcceptanceMatrixRunner:
             tsa_url="https://tsa.example.invalid",
             timestamp_required=False,
         )
-        profile_store = SignaturePresetCatalogStore.default()
+        profile_store = self.deps.profile_store_factory()
 
         lifecycle_factory = self.deps.lifecycle_factory or QtPhase3SignedAcceptanceLifecycle
         lifecycle = lifecycle_factory(bindings)

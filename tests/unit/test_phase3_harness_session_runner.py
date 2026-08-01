@@ -1,6 +1,8 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import foliaseal.presentation.qt.phase3_harness_session_runner as runner_module
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -15,7 +17,11 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 from tests.support.phase3_builders import build_signing_request
 
 
-def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) -> None:
+@pytest.mark.parametrize("raise_on_final_capture", [False, True])
+def test_session_runner_returns_raw_session_state(
+    tmp_path: Path,
+    raise_on_final_capture: bool,
+) -> None:
     input_pdf = tmp_path / "input.pdf"
     request = build_signing_request(
         tmp_path,
@@ -28,6 +34,7 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
     button_registry = {}
     shell_holder = {}
     workspace_holder = {}
+    window_holder = {}
 
     class _FakeSignal:
         def __init__(self) -> None:
@@ -79,6 +86,10 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
             self.items.append(("stretch", value))
 
     class _FakeMainWindow:
+        def __init__(self) -> None:
+            self.closed = False
+            window_holder["window"] = self
+
         def setWindowTitle(self, title):  # noqa: N802
             self.title = title
 
@@ -90,6 +101,9 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
 
         def show(self):
             self.shown = True
+
+        def close(self):
+            self.closed = True
 
     class _FakeApplication:
         _instance = None
@@ -164,6 +178,8 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
             if capture_kind == "final":
                 assert command.request == request
                 assert command.artifact_basename == "interactive_final"
+                if raise_on_final_capture:
+                    raise RuntimeError("final capture failed")
             titles = {
                 "manual": "Manual preview",
                 "signed_run": "Sign-time preview",
@@ -218,7 +234,7 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
         session=ViewerSession(page_count=1),
     )
 
-    result = runner_module.Phase3HarnessSessionRunner(
+    runner = runner_module.Phase3HarnessSessionRunner(
         deps=Phase3HarnessSessionRunnerDeps(
             build_qt_signing_shell=fake_build_qt_signing_shell,
             build_workspace=lambda shell: workspace_holder.setdefault(
@@ -231,18 +247,28 @@ def test_run_phase3_harness_session_returns_raw_session_state(tmp_path: Path) ->
                 )
             ),
         ),
-    ).run(
-        bindings=bindings,
-        source_path=input_pdf,
-        artifacts_dir=str(tmp_path / "artifacts"),
-        viewer_workflow=viewer_workflow,
-        signing_workflow=SimpleNamespace(output_pdf_path=str(tmp_path / "output.pdf")),
-        profile_store=object(),
-        sign_executor=object(),
-        capture_assembler=fake_capture_assembler,
     )
 
+    run_kwargs = {
+        "bindings": bindings,
+        "source_path": input_pdf,
+        "artifacts_dir": str(tmp_path / "artifacts"),
+        "viewer_workflow": viewer_workflow,
+        "signing_workflow": SimpleNamespace(output_pdf_path=str(tmp_path / "output.pdf")),
+        "profile_store": object(),
+        "sign_executor": object(),
+        "capture_assembler": fake_capture_assembler,
+    }
+    if raise_on_final_capture:
+        with pytest.raises(RuntimeError, match="final capture failed"):
+            runner.run(**run_kwargs)
+        assert window_holder["window"].closed is True
+        return
+
+    result = runner.run(**run_kwargs)
+
     assert result.sign_requests == (request,)
+    assert window_holder["window"].closed is True
     assert result.errors == ("debug issue",)
     assert result.interaction_counts == {
         "selection_success": 1,

@@ -81,7 +81,6 @@ from foliaseal.presentation.qt.phase3_harness_reporting import (
     build_phase3_checklist_results_markdown as render_phase3_checklist_results_markdown,
 )
 from foliaseal.presentation.qt.phase3_harness_session_runner import (
-    Phase3HarnessSessionResult,
     Phase3HarnessSessionRunner,
     Phase3HarnessSessionRunnerDeps,
     _QtHarnessBindings,
@@ -199,72 +198,99 @@ class Phase3HarnessCapture:
         return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
 
 
-@dataclass(frozen=True)
-class Phase3HarnessDependencies:
-    """Injectable collaborators for the Phase 3 harness facade."""
+@dataclass
+class _Phase3LazyMatrixOperation:
+    """Create one matrix runner only when its operation is first requested."""
 
-    interactive: Phase3HarnessInteractivePort
-    preview_matrix: Phase3HarnessMatrixPort
-    signed_acceptance_matrix: Phase3HarnessMatrixPort
+    factory: Callable[[], Any]
+    _operation: Any | None = None
+
+    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        if self._operation is None:
+            self._operation = self.factory()
+        return self._operation.run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+
+@dataclass
+class _Phase3LazyCaptureOperation:
+    """Create the Qt capture runner only when interactive capture is requested."""
+
+    factory: Callable[[], Phase3HarnessInteractivePort]
+    _operation: Phase3HarnessInteractivePort | None = None
+
+    def run(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+        if self._operation is None:
+            self._operation = self.factory()
+        return self._operation.run(request)
+
+
+@dataclass(frozen=True)
+class Phase3Composition:
+    """Headless-first composition of the three Phase 3 harness operations."""
+
+    preview_operation: Phase3HarnessMatrixPort
+    signed_operation: Phase3HarnessMatrixPort
+    capture_operation: Phase3HarnessInteractivePort | None = None
 
     @classmethod
-    def default(cls) -> Phase3HarnessDependencies:
+    def default_headless(cls) -> Phase3Composition:
+        """Build matrix operations without constructing the interactive Qt graph."""
+
         return cls(
-            interactive=_build_phase3_interactive_harness_runner(),
-            preview_matrix=_build_phase3_preview_matrix_port(),
-            signed_acceptance_matrix=_build_phase3_signed_acceptance_matrix_port(),
+            preview_operation=_Phase3LazyMatrixOperation(_build_phase3_preview_matrix_runner),
+            signed_operation=_Phase3LazyMatrixOperation(
+                _build_phase3_signed_acceptance_matrix_runner
+            ),
         )
+
+    @classmethod
+    def default(cls) -> Phase3Composition:
+        """Build the standard composition with interactive capture available lazily."""
+
+        return cls.default_headless().with_interactive_qt()
+
+    def with_interactive_qt(self) -> Phase3Composition:
+        """Return a composition that adds lazy interactive Qt capture."""
+
+        return replace(
+            self,
+            capture_operation=_Phase3LazyCaptureOperation(
+                _build_phase3_interactive_harness_runner
+            ),
+        )
+
+    def preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        return self.preview_operation.run(request)
+
+    def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
+        return self.signed_operation.run(request)
+
+    def capture(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+        if self.capture_operation is None:
+            raise RuntimeError("Interactive Phase 3 capture is not installed.")
+        return self.capture_operation.run(request)
 
 
 @dataclass(frozen=True)
 class Phase3Harness:
-    """Qt-backed adapter for Phase 3 evidence service requests."""
+    """Stable three-verb adapter over the lazy Phase 3 composition."""
 
-    deps: Phase3HarnessDependencies = field(default_factory=Phase3HarnessDependencies.default)
+    composition: Phase3Composition = field(default_factory=Phase3Composition.default)
 
     def preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.deps.preview_matrix.run(request)
+        return self.composition.preview_matrix(request)
 
     def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.deps.signed_acceptance_matrix.run(request)
+        return self.composition.signed_acceptance_matrix(request)
 
-    def capture(
-        self,
-        request: Phase3HarnessCaptureRequest,
-    ) -> Phase3HarnessCapture:
-        return self.deps.interactive.run(request)
-
-
-@dataclass(frozen=True)
-class Phase3PreviewMatrixPort:
-    """Thin gateway from the harness facade to the preview-matrix runner."""
-
-    runner: Phase3PreviewMatrixRunner
-
-    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.runner.run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
-
-
-@dataclass(frozen=True)
-class Phase3SignedAcceptanceMatrixPort:
-    """Thin gateway from the harness facade to the signed-acceptance runner."""
-
-    runner: Phase3SignedAcceptanceMatrixRunner
-
-    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.runner.run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
+    def capture(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+        return self.composition.capture(request)
 
 
 @dataclass(frozen=True)
@@ -386,56 +412,6 @@ def _build_phase3_interactive_harness_runner() -> Phase3InteractiveHarnessRunner
         text_writer=_write_optional_text,
         report_finalizer=finalize_phase3_harness_report,
         default_harness_artifacts_dir=_default_harness_artifacts_dir,
-    )
-
-
-def _build_phase3_preview_matrix_port() -> Phase3PreviewMatrixPort:
-    return Phase3PreviewMatrixPort(runner=_build_phase3_preview_matrix_runner())
-
-
-def _build_phase3_signed_acceptance_matrix_port() -> Phase3SignedAcceptanceMatrixPort:
-    return Phase3SignedAcceptanceMatrixPort(runner=_build_phase3_signed_acceptance_matrix_runner())
-
-
-def _run_phase3_harness_session(
-    *,
-    bindings: _QtHarnessBindings,
-    source_path: Path,
-    artifacts_dir: str | None,
-    viewer_workflow: ViewerWorkflow,
-    signing_workflow: SigningDraftWorkflow,
-    profile_store: SignaturePresetCatalogStore,
-    sign_executor: Any,
-    capture_assembler: Phase3HarnessCaptureAssembler,
-) -> Phase3HarnessSessionResult:
-    return _build_phase3_harness_session_runner().run(
-        bindings=bindings,
-        source_path=source_path,
-        artifacts_dir=artifacts_dir,
-        viewer_workflow=viewer_workflow,
-        signing_workflow=signing_workflow,
-        profile_store=profile_store,
-        sign_executor=sign_executor,
-        capture_assembler=capture_assembler,
-    )
-
-
-def _build_phase3_harness_capture_payload(
-    *,
-    source_path: Path,
-    summary_json_path: str | None,
-    checklist_results_path: str,
-    artifacts_dir: str | None,
-    session: Phase3HarnessSessionResult,
-    capture_assembler: Phase3HarnessCaptureAssembler | None = None,
-) -> dict[str, Any]:
-    assembler = capture_assembler or _build_phase3_harness_capture_assembler()
-    return assembler.build_capture_payload(
-        source_path=source_path,
-        summary_json_path=summary_json_path,
-        checklist_results_path=checklist_results_path,
-        artifacts_dir=artifacts_dir,
-        session=session,
     )
 
 

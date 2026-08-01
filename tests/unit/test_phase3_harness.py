@@ -51,9 +51,9 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
 )
 from foliaseal.presentation.qt.phase3_harness import (
+    Phase3Composition,
     Phase3Harness,
     Phase3HarnessCapture,
-    Phase3HarnessDependencies,
     _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
     _capture_headless_preview_render,
@@ -78,6 +78,7 @@ from foliaseal.presentation.qt.phase3_harness import (
     _write_stamp_debug_overlay,
     _write_text_debug_overlay,
 )
+from foliaseal.presentation.qt.phase3_harness_session_runner import Phase3HarnessSessionResult
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
     _apply_appearance_overrides,
@@ -1173,7 +1174,7 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         profile_store_factory=phase3_harness_module.SignaturePresetCatalogStore.default,
         build_phase3_signing_executor=phase3_harness_module.build_phase3_signing_executor,
         session_runner=SimpleNamespace(
-            run=lambda **_kwargs: phase3_harness_module.Phase3HarnessSessionResult(
+            run=lambda **_kwargs: Phase3HarnessSessionResult(
                 first_render_ms=12.5,
                 sign_requests=(request,),
                 signed_runs=(),
@@ -1246,10 +1247,10 @@ def test_phase3_harness_capture_orchestrates_session_and_reporting(
             )
 
     capture = Phase3Harness(
-        deps=Phase3HarnessDependencies(
-            interactive=_FakeInteractivePort(),
-            preview_matrix=object(),
-            signed_acceptance_matrix=object(),
+        composition=Phase3Composition(
+            preview_operation=object(),
+            signed_operation=object(),
+            capture_operation=_FakeInteractivePort(),
         )
     ).capture(
         Phase3HarnessCaptureRequest(
@@ -2131,16 +2132,16 @@ def test_phase3_harness_preview_matrix_delegates_to_runner(tmp_path: Path) -> No
     artifacts_dir = tmp_path / "artifacts"
     captured: dict[str, object] = {}
 
-    class FakeRunner:
-        def run(self, **kwargs):
-            captured.update(kwargs)
+    class FakeOperation:
+        def run(self, request_obj):
+            captured["request"] = request_obj
             return {"scenario_count": 4}
 
     harness = Phase3Harness(
-        deps=Phase3HarnessDependencies(
-            interactive=object(),
-            preview_matrix=phase3_harness_module.Phase3PreviewMatrixPort(runner=FakeRunner()),
-            signed_acceptance_matrix=object(),
+        composition=Phase3Composition(
+            preview_operation=FakeOperation(),
+            signed_operation=object(),
+            capture_operation=object(),
         )
     )
 
@@ -2155,13 +2156,8 @@ def test_phase3_harness_preview_matrix_delegates_to_runner(tmp_path: Path) -> No
     )
 
     assert summary == {"scenario_count": 4}
-    assert captured == {
-        "pdf_path": str(source_pdf),
-        "certificate_path": str(tmp_path / "cert.p12"),
-        "passphrase": "secret",
-        "scenario_manifest_path": str(manifest_path),
-        "artifacts_dir": str(artifacts_dir),
-    }
+    assert captured["request"].pdf_path == str(source_pdf)
+    assert captured["request"].scenario_manifest_path == str(manifest_path)
 
 
 def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
@@ -2181,8 +2177,8 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_preview_matrix_port",
-        lambda: phase3_harness_module.Phase3PreviewMatrixPort(runner=FakeRunner()),
+        "_build_phase3_preview_matrix_runner",
+        lambda: FakeRunner(),
     )
 
     summary = Phase3Harness().preview_matrix(
@@ -2205,6 +2201,71 @@ def test_phase3_harness_default_dependencies_use_preview_matrix_runner_builder(
     }
 
 
+def test_headless_composition_does_not_construct_interactive_runner(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fail_interactive_factory():
+        calls.append("interactive")
+        raise AssertionError("interactive runner must be lazy")
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_interactive_harness_runner",
+        fail_interactive_factory,
+    )
+
+    composition = phase3_harness_module.Phase3Composition.default_headless()
+
+    assert calls == []
+    with pytest.raises(RuntimeError, match="Interactive Phase 3 capture is not installed"):
+        composition.capture(Phase3HarnessCaptureRequest(
+            pdf_path="missing.pdf",
+            certificate_path="missing.p12",
+            passphrase="secret",
+            summary_json_path=None,
+            checklist_results_path="results.md",
+            checklist_template_path="template.md",
+            artifacts_dir=None,
+        ))
+
+
+def test_interactive_composition_constructs_capture_runner_lazily(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeInteractiveRunner:
+        def run(self, request):
+            calls.append(request.pdf_path)
+            return "capture-result"
+
+    def build_interactive_runner():
+        calls.append("factory")
+        return FakeInteractiveRunner()
+
+    monkeypatch.setattr(
+        phase3_harness_module,
+        "_build_phase3_interactive_harness_runner",
+        build_interactive_runner,
+    )
+
+    composition = phase3_harness_module.Phase3Composition.default_headless().with_interactive_qt()
+
+    assert calls == []
+    result = composition.capture(
+        Phase3HarnessCaptureRequest(
+            pdf_path="fixture.pdf",
+            certificate_path="certificate.p12",
+            passphrase="secret",
+            summary_json_path=None,
+            checklist_results_path="results.md",
+            checklist_template_path="template.md",
+            artifacts_dir=None,
+        )
+    )
+
+    assert result == "capture-result"
+    assert calls == ["factory", "fixture.pdf"]
+
+
 def test_phase3_harness_signed_acceptance_matrix_delegates_to_runner(
     tmp_path: Path,
 ) -> None:
@@ -2219,13 +2280,16 @@ def test_phase3_harness_signed_acceptance_matrix_delegates_to_runner(
             captured.update(kwargs)
             return {"scenario_count": 2, "acceptance_expectations_passed": True}
 
+    class FakeOperation:
+        def run(self, request_obj):
+            captured["request"] = request_obj
+            return {"scenario_count": 2, "acceptance_expectations_passed": True}
+
     harness = Phase3Harness(
-        deps=Phase3HarnessDependencies(
-            interactive=object(),
-            preview_matrix=object(),
-            signed_acceptance_matrix=phase3_harness_module.Phase3SignedAcceptanceMatrixPort(
-                runner=FakeRunner()
-            ),
+        composition=Phase3Composition(
+            preview_operation=object(),
+            signed_operation=FakeOperation(),
+            capture_operation=object(),
         )
     )
 
@@ -2240,13 +2304,8 @@ def test_phase3_harness_signed_acceptance_matrix_delegates_to_runner(
     )
 
     assert summary == {"scenario_count": 2, "acceptance_expectations_passed": True}
-    assert captured == {
-        "pdf_path": str(source_pdf),
-        "certificate_path": str(tmp_path / "cert.p12"),
-        "passphrase": "secret",
-        "scenario_manifest_path": str(manifest_path),
-        "artifacts_dir": str(artifacts_dir),
-    }
+    assert captured["request"].pdf_path == str(source_pdf)
+    assert captured["request"].scenario_manifest_path == str(manifest_path)
 
 
 def test_phase3_harness_default_dependencies_use_signed_acceptance_runner_builder(
@@ -2266,8 +2325,8 @@ def test_phase3_harness_default_dependencies_use_signed_acceptance_runner_builde
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_signed_acceptance_matrix_port",
-        lambda: phase3_harness_module.Phase3SignedAcceptanceMatrixPort(runner=FakeRunner()),
+        "_build_phase3_signed_acceptance_matrix_runner",
+        lambda: FakeRunner(),
     )
 
     summary = Phase3Harness().signed_acceptance_matrix(
