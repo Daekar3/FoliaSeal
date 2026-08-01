@@ -27,7 +27,7 @@ The user-visible behavior remains unchanged: visible signatures keep their curre
 - [x] (2026-07-31) Full suite passed 1,022 tests with one existing Pillow deprecation warning; Ruff and `git diff --check` passed.
 - [x] (2026-07-31) Release-fidelity preview ran 8 scenarios with zero error rows; signed acceptance ran 8 scenarios with 6 successful signings, 2 matched intentional rejections, and zero critical counters.
 - [x] (2026-07-31) Completed architecture/SPEC compliance review for this slice and reconciled README/ARCHITECTURE/ExecPlan documentation.
-- [ ] Commit the completed slice and record the hash here.
+- [x] (2026-07-31) Committed the completed slice as `ddf250473` (`Deepen visible-signature planner boundary`); the follow-up plan metadata commit will record this hash.
 
 ## Surprises & Discoveries
 
@@ -153,4 +153,4 @@ The exact placement may remain in `visible_signature_layout.py` if that avoids a
 
 2026-07-31 / Codex: Created after architecture exploration selected the planner/IR plus common-caller hybrid. The scope deliberately removes consumer-private imports and centralizes plan reuse without attempting a risky wholesale relocation of every PyHanko helper.
 2026-07-31 / Codex: Completed the implementation/documentation slice. Focused validation: 245 passed. Compatibility wrappers remain by design; full/release-fidelity evidence and commit recording are parent-owned follow-up steps.
-2026-07-31 / Codex: Completed the implementation/documentation slice and post-fix compliance review. Full validation and both release-fidelity matrices are now recorded; compatibility wrappers remain by design until a later boundary-test retirement slice. Commit recording remains the final dev-loop step.
+2026-07-31 / Codex: Completed the implementation/documentation slice and post-fix compliance review. Full validation and both release-fidelity matrices are now recorded; compatibility wrappers remain by design until a later boundary-test retirement slice. Implementation commit: `ddf250473`.
