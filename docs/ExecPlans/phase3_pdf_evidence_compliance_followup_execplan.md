@@ -18,7 +18,7 @@ The new signed-PDF evidence module must be behavior-preserving, directly tested 
 - [x] (2026-08-01) Updated architecture and parent-plan references; README requires no change because no user-facing ownership/contract statement was stale.
 - [x] (2026-08-01) Re-ran the full suite (`1040 passed`, one pre-existing Pillow warning), focused evidence tests, both release-fidelity matrices, structural cleanup, and process cleanup.
 - [x] (2026-08-01) Completed the final independent compliance and high-risk re-reviews; removed the unused signed-run forwarding wrapper and reconciled stale historical references.
-- [ ] (2026-08-01) Create the parent-slice commit and verify the checkout is clean.
+- [x] (2026-08-01) Created parent-slice implementation commit `06697aec0` and verified the checkout is clean on `main`.
 
 ## Surprises & Discoveries
 
@@ -37,7 +37,7 @@ The new signed-PDF evidence module must be behavior-preserving, directly tested 
 
 ## Outcomes & Retrospective
 
-Parity tests and direct boundary coverage are complete. Architecture and parent-plan reconciliation are complete; README was reviewed and needs no user-facing ownership change. Recursive AP-state/hex-text parsing and timestamp-presence semantic redesign remain explicitly deferred.
+Parity tests and direct boundary coverage are complete. Architecture and parent-plan reconciliation are complete; README was reviewed and needs no user-facing ownership change. Recursive AP-state/hex-text parsing and timestamp-presence semantic redesign remain explicitly deferred. The parent-slice implementation commit is `06697aec0`.
 
 ## Context and Orientation
 

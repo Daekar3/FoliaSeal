@@ -26,7 +26,7 @@ The user's compatibility-cleanup requirement is part of this slice. The duplicat
 - [x] (2026-08-01) Ran focused affected tests, full suite (`1040 passed`, one pre-existing Pillow warning), Ruff, diff checks, release-fidelity matrices, structural cleanup, and process cleanup.
 - [x] (2026-08-01) Completed initial and high-risk compliance reviews; restored malformed-input parity, added direct snapshotter boundary coverage, and reconciled architecture ownership/collaborator references through the child follow-up.
 - [x] (2026-08-01) Completed the final independent compliance and high-risk re-reviews; removed the dead signed-run forwarding wrapper and reconciled the historical plan references they identified.
-- [ ] (2026-08-01) Create the focused main-branch commit and verify the checkout is clean.
+- [x] (2026-08-01) Created focused implementation commit `06697aec0` and verified the checkout is clean on `main`.
 
 ## Surprises & Discoveries
 
@@ -60,7 +60,7 @@ The user's compatibility-cleanup requirement is part of this slice. The duplicat
 
 ## Outcomes & Retrospective
 
-The completed slice owns pure signed-PDF evidence in `phase3_pdf_signature_snapshotter.py`; the harness composition root supplies bound methods to existing assemblers. Direct boundary coverage and malformed-input parity are complete, and `docs/ARCHITECTURE.md` now records the ownership and collaborator direction. The final compliance review also removed the unused `_build_signed_run_bundle` forwarding wrapper and reconciled stale historical references. Recursive AP-state/hex-text parsing and timestamp-presence semantic changes remain deferred behavior-focused debt. Final focused commit details remain to be recorded by the parent workflow.
+The completed slice owns pure signed-PDF evidence in `phase3_pdf_signature_snapshotter.py`; the harness composition root supplies bound methods to existing assemblers. Direct boundary coverage and malformed-input parity are complete, and `docs/ARCHITECTURE.md` now records the ownership and collaborator direction. The final compliance review also removed the unused `_build_signed_run_bundle` forwarding wrapper and reconciled stale historical references. Recursive AP-state/hex-text parsing and timestamp-presence semantic changes remain deferred behavior-focused debt. The implementation commit is `06697aec0` (`Extract Phase 3 PDF evidence snapshotter`).
 
 ## Context and Orientation
 
@@ -145,7 +145,7 @@ Record concise evidence here during implementation:
        signed matrix: 8 scenarios, 6 successful signings, 2 intentional rejections, expectations passed
        compatibility cleanup: duplicate PDF helpers/serializer and unused `_build_signed_run_bundle` forwarding wrapper absent from phase3_harness.py; stale private-helper test seams removed
        process cleanup: no matching FoliaSeal/Phase 3 process
-       commit: <hash>
+       commit: 06697aec0 (Extract Phase 3 PDF evidence snapshotter)
 
 ## Interfaces and Dependencies
 
