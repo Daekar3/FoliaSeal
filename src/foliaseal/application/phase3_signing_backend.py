@@ -61,6 +61,7 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
+    VisibleSignaturePlanner,
     VisibleSignaturePlanRequest,
     _SignatureLayoutReservation,
 )
@@ -558,7 +559,7 @@ def prepare_phase3_signing_plan(
         signature_rect=signature_rect,
     )
     stamp_text = semantics.text.stamp_text
-    plan_result = VisibleSignatureLayoutBoundary().plan(
+    plan_result = VisibleSignaturePlanner.production().plan(
         VisibleSignaturePlanRequest(
             appearance=appearance,
             signature_rect=signature_rect,
@@ -635,19 +636,15 @@ def _build_stamp_style(
     if fit_issues:
         raise ValueError("; ".join(issue.message for issue in fit_issues))
 
-    return (
-        VisibleSignatureLayoutService.production()
-        .pyhanko_style_for_signing(
-            appearance=appearance,
-            stamp_text=stamp_text,
-            stamp_background=stamp_background,
-            signature_rect=signature_rect,
-            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
-            layout_plan=layout_plan,
-        )
-        .stamp_style
-    )
+    return VisibleSignaturePlanner.production().prepare_signing_style(
+        appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=stamp_background,
+        signature_rect=signature_rect,
+        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+        layout_plan=layout_plan,
+    ).stamp_style
 
 
 def _layout_fit_issues(
@@ -811,37 +808,24 @@ def _single_line_stamp_content_inset(
     reserved_width: int | None = None,
     reserved_height: int | None = None,
 ) -> int:
-    """Reserve a small internal gutter so fitted stamp content is not flush to the band edge."""
+    """Compatibility wrapper for the shared layout inset policy."""
 
-    effective_width = (
-        reserved_width if isinstance(reserved_width, int) and reserved_width > 0 else box_width
+    return _visible_layout.single_line_stamp_content_inset(
+        stamp_position=stamp_position,
+        box_width=box_width,
+        box_height=box_height,
+        reserved_width=reserved_width,
+        reserved_height=reserved_height,
     )
-    effective_height = (
-        reserved_height if isinstance(reserved_height, int) and reserved_height > 0 else box_height
-    )
-    shortest_edge = max(1, min(effective_width, effective_height))
-    if stamp_position in {
-        SignatureStampPosition.TOP,
-        SignatureStampPosition.BOTTOM,
-    }:
-        return max(0, min(2, int(shortest_edge * 0.08)))
-    if stamp_position in {
-        SignatureStampPosition.LEFT,
-        SignatureStampPosition.RIGHT,
-    }:
-        return max(0, min(1, int(round(shortest_edge * 0.03))))
-    return 0
 
 
 def _single_line_vertical_stamp_border_gap(
     *,
     box_style: SignatureBoxStyle | None,
 ) -> int:
-    """Reserve a small border-facing gap for vertical single-line stamp images."""
+    """Compatibility wrapper for the shared layout border-gap policy."""
 
-    if box_style is None or not box_style.show_border:
-        return 0
-    return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
+    return _visible_layout.single_line_vertical_stamp_border_gap(box_style=box_style)
 
 
 def _single_line_horizontal_stamp_vertical_inset(
@@ -849,9 +833,12 @@ def _single_line_horizontal_stamp_vertical_inset(
     box_style: SignatureBoxStyle | None,
     content_inset: int,
 ) -> int:
-    """Keep horizontal single-line stamps optically inside the text-height lane."""
+    """Compatibility wrapper for the shared horizontal-stamp inset policy."""
 
-    return max(content_inset, _border_safe_inset(box_style))
+    return _visible_layout.single_line_horizontal_stamp_vertical_inset(
+        box_style=box_style,
+        content_inset=content_inset,
+    )
 
 
 def _top_stamp_border_facing_inset(
@@ -1082,6 +1069,23 @@ def _visible_signature_fit_issues_for_stamp_text(
     stamp_text: str,
     stamp_background: PdfImage | None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
+    """Compatibility wrapper for public visible-signature fit validation."""
+
+    return validate_visible_signature_fit(
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
+        stamp_background=stamp_background,
+    )
+
+
+def validate_visible_signature_fit(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+    stamp_background: PdfImage | None,
+) -> tuple[SigningDraftValidationIssue, ...]:
     try:
         _build_stamp_style(
             signature_appearance,
@@ -1288,6 +1292,14 @@ def _effective_horizontal_text_reservation_width(
 
 
 def _stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
+    """Compatibility wrapper for the public stamp-background adapter."""
+
+    return stamp_background_for_path(image_stamp_path)
+
+
+def stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
+    """Load one optional image stamp for a concrete rendering adapter."""
+
     if image_stamp_path is None:
         return None
     try:

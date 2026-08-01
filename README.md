@@ -120,6 +120,23 @@ The prepared-plan compliance slice is complete. Focused prepared/invisible backe
 (5 tests), Ruff is clean, and the full suite passes (1,016 tests, one existing Pillow deprecation
 warning).
 
+Visible-signature planner/IR hybrid:
+
+- `VisibleSignaturePlanner` is the application-owned entry point for one neutral,
+  immutable `VisibleSignaturePlan` containing the canonical `SignatureLayoutPlan` and typed fit
+  evidence. Preview and signing can reuse that plan rather than recomputing geometry.
+- `prepare_signing_style()` and `prepare_preview_style()` are explicit adapter operations. They
+  are the only planner methods that materialize PyHanko/Pillow-backed results; Qt preview remains a
+  presentation adapter over the neutral layout data.
+- Image loading and fit validation are named public backend operations, and the three Qt inset
+  policies are named public layout operations. Existing underscored helpers remain thin
+  compatibility wrappers so older tests and integrations retain their behavior while callers
+  migrate.
+- Boundary tests cover shared-plan reuse, stable image/fit errors, and the public inset/import
+  boundary. The remaining debt is adapter consolidation: private backend aliases and some
+  PyHanko fit/rejection helpers still exist until direct legacy-helper coverage is replaced by
+  boundary coverage.
+
 Phase 3 evidence gateway and signed lifecycle:
 
 - `Phase3EvidenceService` now exposes typed `Phase3MatrixResult` values, tagged by

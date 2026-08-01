@@ -560,8 +560,8 @@ class SigningDraftWorkflow:
                 if not Path(workflow.certificate_path).exists():
                     return ()
                 from foliaseal.application.phase3_signing_backend import (
-                    _stamp_background_for_path,
-                    _visible_signature_fit_issues_for_stamp_text,
+                    stamp_background_for_path,
+                    validate_visible_signature_fit,
                 )
                 from foliaseal.application.sign_pdf_use_case import (
                     SigningBackendAppearance,
@@ -570,7 +570,7 @@ class SigningDraftWorkflow:
                 if workflow.signature_appearance is None:
                     return ()
                 try:
-                    stamp_background = _stamp_background_for_path(
+                    stamp_background = stamp_background_for_path(
                         workflow.signature_appearance.image_stamp_path
                     )
                 except ValueError as exc:
@@ -581,7 +581,7 @@ class SigningDraftWorkflow:
                             field_name="signature_appearance",
                         ),
                     )
-                return _visible_signature_fit_issues_for_stamp_text(
+                return validate_visible_signature_fit(
                     signature_rect=request.signature_rect,
                     signature_appearance=SigningBackendAppearance.from_signature_appearance(
                         workflow.signature_appearance

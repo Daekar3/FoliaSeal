@@ -20,8 +20,7 @@ from foliaseal.application.horizontal_signature_reservation import (
     measure_horizontal_single_line_rendered_reference,
 )
 from foliaseal.application.phase3_signing_backend import (
-    RoundedBorderTextStampStyle,
-    _stamp_background_for_path,
+    stamp_background_for_path,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_workflow import (
@@ -34,9 +33,8 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     RectBounds,
     SignatureLayoutPlan,
-    VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
-    VisibleSignatureLayoutService,
+    VisibleSignaturePlanner,
     VisibleSignaturePlanRequest,
     structural_line_bounds,
 )
@@ -840,11 +838,12 @@ def _canonical_preview_layout(
         image_stamp_path=preview.image_stamp_path if include_stamp else None,
     )
     stamp_text = _semantic_preview_stamp_text(preview) if include_text else " "
-    stamp_background = _stamp_background_for_path(appearance.image_stamp_path)
+    stamp_background = stamp_background_for_path(appearance.image_stamp_path)
     ink_measurer = (
         _PreviewHorizontalInkMeasurer(preview) if use_horizontal_ink_reservation else None
     )
-    plan_result = VisibleSignatureLayoutBoundary().plan(
+    planner = VisibleSignaturePlanner.production()
+    plan_result = planner.plan(
         VisibleSignaturePlanRequest(
             appearance=appearance,
             signature_rect=preview.signature_rect,
@@ -854,7 +853,7 @@ def _canonical_preview_layout(
             ink_measurer=ink_measurer,
         )
     )
-    service_layout = VisibleSignatureLayoutService.production().pyhanko_style_for_canonical_preview(
+    service_layout = planner.prepare_preview_style(
         appearance=appearance,
         stamp_text=stamp_text,
         stamp_background=stamp_background,
@@ -932,7 +931,7 @@ def _render_optional_preview_bounds(
         return None
     if include_stamp and layout.style.background is None:
         return None
-    style = RoundedBorderTextStampStyle(
+    style = TextStampStyle(
         border_width=0,
         border_color=layout.style.border_color,
         background=layout.style.background if include_stamp else None,

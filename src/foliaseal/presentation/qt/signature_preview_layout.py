@@ -7,11 +7,6 @@ from dataclasses import dataclass
 from math import ceil
 from typing import Any
 
-from foliaseal.application.phase3_signing_backend import (
-    _single_line_horizontal_stamp_vertical_inset,
-    _single_line_stamp_content_inset,
-    _single_line_vertical_stamp_border_gap,
-)
 from foliaseal.application.signature_font_registry import (
     bundled_font_root,
     resolve_signature_font_face,
@@ -22,6 +17,9 @@ from foliaseal.application.visible_signature_layout import (
     LayoutRequest,
     SignatureLayoutPlan,
     VisibleSignatureLayoutEngine,
+    single_line_horizontal_stamp_vertical_inset,
+    single_line_stamp_content_inset,
+    single_line_vertical_stamp_border_gap,
 )
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -337,7 +335,7 @@ def _preview_stamp_max_size(
     area_height = max(1, geometry.stamp_area_height_pt)
     content_inset = 0
     if preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        content_inset = _single_line_stamp_content_inset(
+        content_inset = single_line_stamp_content_inset(
             stamp_position=preview.stamp_position,
             box_width=max(1, int(round(preview.signature_rect.width_pt))),
             box_height=max(1, int(round(preview.signature_rect.height_pt))),
@@ -350,7 +348,7 @@ def _preview_stamp_max_size(
         and preview.stamp_position
         in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}
     ):
-        vertical_inset = _single_line_horizontal_stamp_vertical_inset(
+        vertical_inset = single_line_horizontal_stamp_vertical_inset(
             box_style=preview.box_style,
             content_inset=content_inset,
         )
@@ -968,7 +966,7 @@ class QtSignaturePreviewLayout:
         if state.raw_stamp_pixmap is not None:
             if is_vertical and vertical_band_geometry is not None:
                 _text_height, stamp_height, _separator_height = vertical_band_geometry
-                content_inset = _single_line_stamp_content_inset(
+                content_inset = single_line_stamp_content_inset(
                     stamp_position=preview.stamp_position,
                     box_width=max(1, int(round(preview.signature_rect.width_pt))),
                     box_height=max(1, int(round(preview.signature_rect.height_pt))),
@@ -980,7 +978,7 @@ class QtSignaturePreviewLayout:
                     0,
                     int(
                         round(
-                            _single_line_vertical_stamp_border_gap(box_style=preview.box_style)
+                            single_line_vertical_stamp_border_gap(box_style=preview.box_style)
                             * state.preview_scale
                         )
                     ),

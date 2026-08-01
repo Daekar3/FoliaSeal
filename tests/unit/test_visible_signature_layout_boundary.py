@@ -5,16 +5,22 @@ from dataclasses import dataclass
 
 import pytest
 
-from foliaseal.application import horizontal_signature_reservation
+from foliaseal.application import (
+    horizontal_signature_reservation,
+    signing_draft_workflow,
+    signing_preview_renderer,
+)
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.visible_signature_layout import (
     TextMetrics,
     VisibleSignatureLayoutBoundary,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutService,
+    VisibleSignaturePlanner,
     VisibleSignaturePlanRequest,
 )
 from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
+from foliaseal.presentation.qt import signature_preview_layout
 from tests.support.phase3_builders import build_signature_appearance, build_signature_rect
 
 
@@ -72,6 +78,36 @@ def test_neutral_boundary_preserves_existing_fit_diagnostic() -> None:
     assert result.fit_issues
     assert result.fit_issues[0].code == "visible_signature_layout_unavailable"
     assert "does not fit inside the selected rectangle" in result.fit_issues[0].message
+
+
+def test_planner_facade_returns_the_shared_neutral_plan() -> None:
+    request = VisibleSignaturePlanRequest(
+        appearance=_appearance(),
+        signature_rect=build_signature_rect(page_index=0, width_pt=420, height_pt=86),
+        stamp_text="Digitally signed by\nMorgan Ellery",
+    )
+
+    result = VisibleSignaturePlanner.production().plan(request)
+
+    assert result.fit_issues == ()
+    assert result.reservation_snapshot["text_area_width_pt"] > 0
+
+
+def test_planner_facade_uses_injected_measurement_collaborators() -> None:
+    measurer = _CountingTextMeasurer()
+    planner = VisibleSignaturePlanner(
+        service=VisibleSignatureLayoutService(text_measurer=measurer),
+    )
+
+    planner.plan(
+        VisibleSignaturePlanRequest(
+            appearance=_appearance(),
+            signature_rect=build_signature_rect(page_index=0, width_pt=420, height_pt=86),
+            stamp_text="Digitally signed by\nMorgan Ellery",
+        )
+    )
+
+    assert measurer.calls == 1
 
 
 def test_signing_adapter_consumes_precomputed_plan_without_remeasuring() -> None:
@@ -139,11 +175,58 @@ def test_canonical_preview_adapter_consumes_precomputed_plan_without_remeasuring
     assert preview.layout_plan == plan.layout_plan
 
 
+def test_planner_adapter_methods_consume_the_same_precomputed_plan() -> None:
+    appearance = _appearance()
+    rect = build_signature_rect(page_index=0, width_pt=420, height_pt=86)
+    plan = VisibleSignaturePlanner.production().plan(
+        VisibleSignaturePlanRequest(
+            appearance=appearance,
+            signature_rect=rect,
+            stamp_text="Digitally signed by\nMorgan Ellery",
+        )
+    )
+
+    planner = VisibleSignaturePlanner(
+        service=VisibleSignatureLayoutService(text_measurer=_CountingTextMeasurer()),
+    )
+    signing = planner.prepare_signing_style(
+        appearance=appearance,
+        stamp_text="Digitally signed by\nMorgan Ellery",
+        stamp_background=None,
+        signature_rect=rect,
+        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        layout_plan=plan.layout_plan,
+    )
+    preview = planner.prepare_preview_style(
+        appearance=appearance,
+        stamp_text="Digitally signed by\nMorgan Ellery",
+        stamp_background=None,
+        signature_rect=rect,
+        options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+        layout_plan=plan.layout_plan,
+    )
+
+    assert signing.layout_plan == plan.layout_plan
+    assert preview.layout_plan == plan.layout_plan
+
+
 def test_horizontal_reservation_has_no_backend_private_color_dependency() -> None:
     source = inspect.getsource(horizontal_signature_reservation)
 
     assert "phase3_signing_backend import _text_style_color_rgba" not in source
     assert "visible_signature_color import text_style_color_rgba" in source
+
+
+def test_production_consumers_use_public_layout_adapter_names() -> None:
+    preview_source = inspect.getsource(signing_preview_renderer)
+    workflow_source = inspect.getsource(signing_draft_workflow)
+    qt_source = inspect.getsource(signature_preview_layout)
+
+    assert "phase3_signing_backend import (\n    RoundedBorderTextStampStyle" not in preview_source
+    assert "_stamp_background_for_path" not in preview_source
+    assert "_visible_signature_fit_issues_for_stamp_text" not in workflow_source
+    assert "_stamp_background_for_path" not in workflow_source
+    assert "phase3_signing_backend" not in qt_source
 
 
 @pytest.mark.parametrize(

@@ -1210,6 +1210,75 @@ class VisibleSignatureLayoutService:
         )
 
 
+@dataclass(frozen=True)
+class VisibleSignaturePlanner:
+    """Small application-owned facade for one neutral plan and its adapters."""
+
+    service: VisibleSignatureLayoutService
+
+    @classmethod
+    def production(cls) -> VisibleSignaturePlanner:
+        return cls(service=VisibleSignatureLayoutService.production())
+
+    def plan(self, request: VisibleSignaturePlanRequest) -> VisibleSignaturePlan:
+        """Build the immutable neutral plan consumed by preview and signing."""
+
+        return VisibleSignatureLayoutBoundary().plan(
+            replace(
+                request,
+                text_measurer=request.text_measurer or self.service.text_measurer,
+                image_probe=request.image_probe or self.service.image_probe,
+                ink_measurer=request.ink_measurer or self.service.ink_measurer,
+            )
+        )
+
+    def prepare_signing_style(
+        self,
+        *,
+        appearance: SigningBackendAppearance,
+        stamp_text: str,
+        stamp_background: object | None,
+        signature_rect: SignatureRect,
+        options: VisibleSignatureLayoutOptions | None = None,
+        ink_measurer: HorizontalInkMeasurer | None = None,
+        layout_plan: SignatureLayoutPlan | None = None,
+    ) -> PyHankoVisibleSignatureStyle:
+        """Materialize a signing adapter result from one optional prepared plan."""
+
+        return self.service.pyhanko_style_for_signing(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+            options=options,
+            ink_measurer=ink_measurer,
+            layout_plan=layout_plan,
+        )
+
+    def prepare_preview_style(
+        self,
+        *,
+        appearance: SigningBackendAppearance,
+        stamp_text: str,
+        stamp_background: object | None,
+        signature_rect: SignatureRect,
+        options: VisibleSignatureLayoutOptions | None = None,
+        ink_measurer: HorizontalInkMeasurer | None = None,
+        layout_plan: SignatureLayoutPlan | None = None,
+    ) -> CanonicalPreviewLayout:
+        """Materialize a canonical-preview adapter result from one optional prepared plan."""
+
+        return self.service.pyhanko_style_for_canonical_preview(
+            appearance=appearance,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            signature_rect=signature_rect,
+            options=options,
+            ink_measurer=ink_measurer,
+            layout_plan=layout_plan,
+        )
+
+
 class PyHankoSignatureAppearanceAdapter:
     """Build pyHanko stamp styles from a visible-signature layout plan."""
 
@@ -1488,6 +1557,44 @@ def _single_line_horizontal_stamp_vertical_inset(
     content_inset: int,
 ) -> int:
     return max(content_inset, _border_safe_inset(box_style))
+
+
+def single_line_stamp_content_inset(
+    *,
+    stamp_position: SignatureStampPosition,
+    box_width: int,
+    box_height: int,
+    reserved_width: int | None = None,
+    reserved_height: int | None = None,
+) -> int:
+    """Return the public content inset used by Qt and backend adapters."""
+
+    return _single_line_stamp_content_inset(
+        stamp_position=stamp_position,
+        box_width=box_width,
+        box_height=box_height,
+        reserved_width=reserved_width,
+        reserved_height=reserved_height,
+    )
+
+
+def single_line_vertical_stamp_border_gap(*, box_style: SignatureBoxStyle | None) -> int:
+    """Return the public border gap used by Qt and backend adapters."""
+
+    return _single_line_vertical_stamp_border_gap(box_style=box_style)
+
+
+def single_line_horizontal_stamp_vertical_inset(
+    *,
+    box_style: SignatureBoxStyle | None,
+    content_inset: int,
+) -> int:
+    """Return the public horizontal-stamp vertical inset."""
+
+    return _single_line_horizontal_stamp_vertical_inset(
+        box_style=box_style,
+        content_inset=content_inset,
+    )
 
 
 def _top_stamp_border_facing_inset(

@@ -57,6 +57,8 @@ from foliaseal.application.phase3_signing_backend import (
     build_backend_reservation_evidence,
     build_phase3_signing_executor,
     prepare_phase3_signing_plan,
+    stamp_background_for_path,
+    validate_visible_signature_fit,
 )
 from foliaseal.application.sign_pdf_use_case import (
     SigningBackendAppearance,
@@ -925,6 +927,27 @@ def test_horizontal_single_line_ink_validation_reservation_falls_back_to_structu
         )
         is structural_reservation
     )
+
+
+def test_public_stamp_background_adapter_preserves_missing_path_error(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Image stamp path not found"):
+        stamp_background_for_path(str(tmp_path / "missing.png"))
+
+
+def test_public_fit_adapter_preserves_stable_issue_mapping() -> None:
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(signer_label_prefix="Digitally signed by")
+    )
+    issues = validate_visible_signature_fit(
+        signature_rect=build_signature_rect(page_index=0, width_pt=24, height_pt=18),
+        signature_appearance=appearance,
+        stamp_text="A very long visible signature line that cannot fit",
+        stamp_background=None,
+    )
+
+    assert issues
+    assert issues[0].code == "visible_signature_layout_unavailable"
+    assert issues[0].severity.name == "ERROR"
 
 
 def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compact_stamp_lane(
