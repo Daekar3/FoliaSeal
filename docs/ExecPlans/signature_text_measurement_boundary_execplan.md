@@ -84,7 +84,7 @@ trailing-newline metric inconsistency; all were fixed in this slice. Residual de
 retained private compatibility wrappers, the localized lazy-import cycle risk, and the intentionally
 deferred multi-provider registry. The process/window audit was clean: no FoliaSeal/Phase 3 Python
 processes and no `wmctrl` windows remained. Implementation commit: `909fddd8c`; final plan metadata
-commit: record the hash in this paragraph after committing this update.
+commit: `a1dc0ad3f`.
 
 ## Context and Orientation
 
