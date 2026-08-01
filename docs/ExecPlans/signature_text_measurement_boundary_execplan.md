@@ -27,7 +27,7 @@ Users will see no intentional visual change: half-point font sizes, bundled bold
 - [x] (2026-08-01) Updated README and architecture documentation with `PreparedTextBox`/`SignatureTextBoxEngine` ownership, PyHanko adapter scope, compatibility wrappers, lazy-import cycle risk, injected compact-reservation seam, and deferred multi-provider registry.
 - [x] (2026-08-01) Completed focused validation, Ruff, full-suite validation, preview/signed release-fidelity matrices, and the source import audit; all required counters passed.
 - [x] (2026-08-01) Completed architecture/SPEC review, fixed trailing-newline line-count drift, added compact-engine injection coverage, and reconciled the docs.
-- [ ] Commit the implementation and final plan metadata.
+- [x] (2026-08-01) Committed the implementation as `909fddd8c` and recorded final plan metadata in the follow-up commit.
 
 ## Surprises & Discoveries
 
@@ -74,7 +74,7 @@ Users will see no intentional visual change: half-point font sizes, bundled bold
 ## Outcomes & Retrospective
 
 Implementation and validation are complete for the code slice. Focused boundary/backend/preview
-tests pass (126 focused tests after the compliance fixes), Ruff and `git diff --check` pass, and the
+tests pass (222 focused tests after the compliance fixes), Ruff and `git diff --check` pass, and the
 full suite passes (1,028 tests, one existing Pillow deprecation warning). The preview matrix ran
 eight scenarios with zero error rows. The signed matrix ran eight scenarios with six successful
 signings, two matched intentional rejections, zero outcome mismatches, zero cryptographic failures,
@@ -82,8 +82,9 @@ zero preview-comparison failures, and zero annotation-rectangle mismatches. Arch
 found missing documentation, an injectable compact-reservation seam, helper-ownership drift, and a
 trailing-newline metric inconsistency; all were fixed in this slice. Residual debt is limited to the
 retained private compatibility wrappers, the localized lazy-import cycle risk, and the intentionally
-deferred multi-provider registry. The final process/window audit and commit metadata are recorded
-below before closing the plan.
+deferred multi-provider registry. The process/window audit was clean: no FoliaSeal/Phase 3 Python
+processes and no `wmctrl` windows remained. Implementation commit: `909fddd8c`; final plan metadata
+commit: record the hash in this paragraph after committing this update.
 
 ## Context and Orientation
 
