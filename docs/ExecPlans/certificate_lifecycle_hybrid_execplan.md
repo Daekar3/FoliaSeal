@@ -51,7 +51,8 @@ deciding ownership.
 - [x] (2026-08-02) Focused manager/storage/Qt/support validation passed 36 tests; full suite passed 1021 tests with one pre-existing Pillow warning; Ruff, compileall, and diff checks are clean.
 - [x] (2026-08-02) Reconciled current README and architecture documentation to the `CertificateManager` typed request/result boundary, app-frame refresh flow, and actual `ValueError`/`ConfigValidationError` behavior; historical plan records and stable Phase 3 evidence names remain unchanged.
 - [x] (2026-08-02) Documentation diff check and `compileall` passed; final review found no stale legacy names in current architecture or README.
-- [x] (2026-08-02) Post-fix compliance review passed: focused manager/app-frame/storage/schema validation passed 65 tests; no deleted source/test/support imports or stale current architecture names remain.
+- [x] (2026-08-02) Post-fix compliance review passed: focused manager/app-frame/storage/schema validation passed 67 tests; no deleted source/test/support imports or stale current architecture names remain.
+- [x] (2026-08-02) Committed the complete 47-file implementation/docs slice as `0163efc36` (`refactor certificate lifecycle behind manager`); this plan-only closure follows in the next commit.
 
 ## Surprises & Discoveries
 
@@ -94,7 +95,8 @@ and `ValueError` plus `ConfigValidationError` behavior. Historical ExecPlans
 retain their original terminology as records of past architecture, and stable
 Phase 3 evidence/harness nomenclature was not changed. Two initial compliance
 reviews found only documentation drift; the documentation worker fixed it and a
-post-fix review passed.
+post-fix review passed. The implementation commit is `0163efc36`; this plan
+revision records the final closure.
 
 ## Context and Orientation
 

@@ -22,7 +22,8 @@ which would mislead future contributors and violate the architecture map.
 - [x] (2026-08-02) Recorded review findings at current architecture lines 282, 843, 956, and 1125.
 - [x] Updated current architecture ownership, flow, exception, and debt text to use `CertificateManager` and typed request/result contracts.
 - [x] Ran documentation search, diff check, compileall, and final compliance review.
-- [x] (2026-08-02) Post-fix review passed; focused manager/app-frame/storage/schema validation passed 65 tests and historical ExecPlan references were confirmed archival only.
+- [x] (2026-08-02) Post-fix review passed; focused manager/app-frame/storage/schema validation passed 67 tests and historical ExecPlan references were confirmed archival only.
+- [x] (2026-08-02) Implementation and documentation scope committed in `0163efc36`; this revision records final plan closure.
 
 ## Surprises & Discoveries
 
@@ -42,7 +43,8 @@ application boundary, records typed requests/results and the app-frame refresh
 flow, and describes `ValueError` for malformed/missing imports alongside
 `ConfigValidationError` for catalog and policy validation. Historical ExecPlan
 records and stable Phase 3 evidence nomenclature remain unchanged. The child
-plan is closed as part of the parent slice; commit hashes remain to be recorded.
+plan is closed as part of the parent slice. The implementation and
+documentation commit is `0163efc36`; this revision is the final closure record.
 
 ## Context and Orientation
 
@@ -90,7 +92,7 @@ and verify the resulting diff manually.
 ## Artifacts and Notes
 
 Record the documentation worker result, search output, final review result, and
-commit hash here and in the parent plan.
+implementation commit `0163efc36` here and in the parent plan.
 
 ## Interfaces and Dependencies
 
