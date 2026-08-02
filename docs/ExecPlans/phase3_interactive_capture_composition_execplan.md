@@ -30,7 +30,7 @@ The user-visible proof is the unchanged interactive capture command and unchange
 - [x] (2026-08-01) Completed repeated compliance/high-risk reviews after the child follow-up; no further implementation defects were found.
 - [x] (2026-08-01) Reconciled README, `docs/ARCHITECTURE.md`, and active ExecPlans through architecture-steward; corrected interactive ownership references and marked superseded composition prose historical.
 - [x] (2026-08-01) Recorded and validated the artifact-index fix: the first interactive signing attempt uses one-based index `1` (not `2`).
-- [ ] Create the focused main-branch commit with write-git-commit and verify a clean checkout.
+- [x] (2026-08-01) Created focused main-branch commit `60fa8318b` with write-git-commit; the checkout was clean after commit.
 
 ## Surprises & Discoveries
 
@@ -67,7 +67,7 @@ The user-visible proof is the unchanged interactive capture command and unchange
 
 ## Outcomes & Retrospective
 
-The primary extraction is implemented and the concrete artifact-numbering defect found by high-risk review is corrected in the child follow-up. Repeated compliance/high-risk review and documentation reconciliation are complete; only the focused main-branch commit and final clean-checkout verification remain. Broad preview/render extraction remains a separate future opportunity.
+The primary extraction and child artifact-numbering correction are implemented, validated, documented, and committed in `60fa8318b`. Repeated compliance/high-risk review and documentation reconciliation are complete. Broad preview/render extraction remains a separate future opportunity.
 
 ## Context and Orientation
 
@@ -164,7 +164,7 @@ Record concise evidence during execution:
        import isolation: no PySide6/PIL/pyhanko before selected operation
        compatibility cleanup: old harness capture/runner exports absent from live source/tests
        process cleanup: no matching FoliaSeal/Phase 3 process
-       implementation commit: <hash>
+       implementation commit: 60fa8318b
 
 ## Interfaces and Dependencies
 

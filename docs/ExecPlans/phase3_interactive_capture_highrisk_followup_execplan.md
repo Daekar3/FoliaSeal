@@ -18,7 +18,7 @@ The fix is a one-line behavioral correction plus a regression test that records 
 - [x] (2026-08-01) Recorded the high-risk finding and created this child plan before the corrective edit.
 - [x] (2026-08-01) Changed `Phase3HarnessSessionRunner.on_sign_request()` to pass the current one-based request count without adding one twice.
 - [x] (2026-08-01) Added a focused regression assertion for first-attempt artifact naming; focused session/harness tests pass (`85 passed`, one pre-existing Pillow warning).
-- [x] (2026-08-01) Repeated compliance/high-risk review found no further defects; reconciled parent/child documentation and recorded the artifact-index correction. The focused commit remains with the parent plan.
+- [x] (2026-08-01) Repeated compliance/high-risk review found no further defects; reconciled parent/child documentation and recorded the artifact-index correction. Parent commit `60fa8318b` includes this child plan.
 
 ## Surprises & Discoveries
 
@@ -35,7 +35,7 @@ The fix is a one-line behavioral correction plus a regression test that records 
 
 ## Outcomes & Retrospective
 
-The off-by-one artifact index is corrected and covered by a focused regression assertion. Repeated compliance/high-risk review and parent/child documentation reconciliation are complete; the focused commit remains with the parent plan.
+The off-by-one artifact index is corrected and covered by a focused regression assertion. Repeated compliance/high-risk review and parent/child documentation reconciliation are complete; the correction is included in parent commit `60fa8318b`.
 
 ## Context and Orientation
 
@@ -70,7 +70,7 @@ The edit is deterministic and safe to rerun. If a test reveals a fixture that in
     corrected attempt index: 1-based request count
     focused tests: 85 passed (one pre-existing Pillow warning)
     full suite: 1040 passed (one pre-existing Pillow warning)
-    child commit: included in parent focused commit; not committed separately
+    child commit: included in parent focused commit `60fa8318b`
 
 ## Interfaces and Dependencies
 
