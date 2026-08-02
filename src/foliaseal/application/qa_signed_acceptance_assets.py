@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE = b"secret"
+
 SIGNED_ACCEPTANCE_FIXTURE_PDF = (
     "artifacts/generated_acceptance_assets/signed_acceptance_fixture.pdf"
 )

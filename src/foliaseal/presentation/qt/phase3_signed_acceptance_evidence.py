@@ -19,10 +19,9 @@ from foliaseal.application.phase3_evidence_service import (
 from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
 )
-from foliaseal.application.qa_signed_acceptance_generation import (
-    generate_signed_acceptance_assets,
+from foliaseal.presentation.qt.phase3_matrix_operations import (
+    build_headless_phase3_matrix_operations,
 )
-from foliaseal.presentation.qt.phase3_harness import Phase3Composition
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
     "artifacts/phase3_signed_acceptance_evidence_summary.md"
@@ -114,13 +113,53 @@ def _write_evidence_markdown(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _build_preview_matrix_operation():
+    from foliaseal.presentation.qt.phase3_harness import (
+        _build_preview_matrix_operation as build_operation,
+    )
+
+    return build_operation()
+
+
+def _build_signed_acceptance_matrix_operation():
+    from foliaseal.presentation.qt.phase3_harness import (
+        _build_signed_acceptance_matrix_operation as build_operation,
+    )
+
+    return build_operation()
+
+
+def _build_lazy_interactive_capture_runner():
+    runner = None
+
+    def run(request):
+        nonlocal runner
+        if runner is None:
+            from foliaseal.presentation.qt.phase3_harness import (
+                build_interactive_phase3_capture_runner,
+            )
+
+            runner = build_interactive_phase3_capture_runner()
+        return runner(request)
+
+    return run
+
+
 def build_default_phase3_evidence_service(
     *,
-    asset_generator: AssetGenerator = generate_signed_acceptance_assets,
+    asset_generator: AssetGenerator | None = None,
     matrix_runner: MatrixRunner | None = None,
 ) -> Phase3EvidenceService:
-    composition = Phase3Composition.default_headless()
-    interactive = composition.with_interactive_qt()
+    if asset_generator is None:
+        from foliaseal.application.qa_signed_acceptance_generation import (
+            generate_signed_acceptance_assets,
+        )
+
+        asset_generator = generate_signed_acceptance_assets
+    matrix_operations = build_headless_phase3_matrix_operations(
+        preview_factory=_build_preview_matrix_operation,
+        signed_acceptance_factory=_build_signed_acceptance_matrix_operation,
+    )
 
     def matrix_runtime_context(name: str):
         return _suppress_known_signed_evidence_runtime_chatter(
@@ -128,9 +167,9 @@ def build_default_phase3_evidence_service(
         )
 
     return Phase3EvidenceService(
-        harness_runner=interactive.capture,
-        preview_matrix_runner=composition.preview_matrix,
-        signed_acceptance_matrix_runner=(matrix_runner or composition.signed_acceptance_matrix),
+        harness_runner=_build_lazy_interactive_capture_runner(),
+        preview_matrix_runner=matrix_operations.preview,
+        signed_acceptance_matrix_runner=(matrix_runner or matrix_operations.signed_acceptance),
         asset_generator=asset_generator,
         capture_contract_evaluator=evaluate_phase3_evidence_contract,
         text_writer=_write_evidence_markdown,

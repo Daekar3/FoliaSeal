@@ -23,6 +23,7 @@ from foliaseal.application.qa_preview_stress_fixtures import (
 from foliaseal.application.qa_signed_acceptance_assets import (
     SIGNED_ACCEPTANCE_FIXTURE_PDF,
     SIGNED_ACCEPTANCE_IDENTITY_P12,
+    SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
     SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
     SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
     SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
@@ -31,9 +32,6 @@ from foliaseal.application.qa_signed_acceptance_assets import (
 SIGNED_ACCEPTANCE_STAMP_IMAGE = (
     "artifacts/generated_acceptance_assets/signed_acceptance_stamp.png"
 )
-SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE = b"secret"
-
-
 @dataclass(frozen=True)
 class GeneratedSignedAcceptanceAssets:
     """Paths written by the signed acceptance asset generator."""

@@ -7,11 +7,11 @@ import json
 import re
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass, field, fields, is_dataclass, replace
+from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 from PIL import Image, ImageDraw
 from pyhanko.pdf_utils import generic
@@ -128,25 +128,6 @@ from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
-# Matrix reliability matters more than shell reuse speed. A fresh shell per scenario
-# keeps the canonical preview sweep from accumulating Qt state across hundreds of runs.
-_PREVIEW_MATRIX_SHELL_RECYCLE_INTERVAL = 1
-
-BuildPhase3PreviewMatrixRunner = Callable[[], Phase3PreviewMatrixRunner]
-BuildPhase3SignedAcceptanceMatrixRunner = Callable[[], Phase3SignedAcceptanceMatrixRunner]
-
-
-class Phase3HarnessInteractivePort(Protocol):
-    """Run one interactive Phase 3 harness capture."""
-
-    def run(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture: ...
-
-
-class Phase3HarnessMatrixPort(Protocol):
-    """Run one non-interactive Phase 3 matrix flow."""
-
-    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]: ...
-
 
 @dataclass(frozen=True)
 class Phase3HarnessCapture:
@@ -197,101 +178,6 @@ class Phase3HarnessCapture:
         """Return a stable JSON representation for later review."""
 
         return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
-
-
-@dataclass
-class _Phase3LazyMatrixOperation:
-    """Create one matrix runner only when its operation is first requested."""
-
-    factory: Callable[[], Any]
-    _operation: Any | None = None
-
-    def run(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        if self._operation is None:
-            self._operation = self.factory()
-        return self._operation.run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
-
-
-@dataclass
-class _Phase3LazyCaptureOperation:
-    """Create the Qt capture runner only when interactive capture is requested."""
-
-    factory: Callable[[], Phase3HarnessInteractivePort]
-    _operation: Phase3HarnessInteractivePort | None = None
-
-    def run(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
-        if self._operation is None:
-            self._operation = self.factory()
-        return self._operation.run(request)
-
-
-@dataclass(frozen=True)
-class Phase3Composition:
-    """Headless-first composition of the three Phase 3 harness operations."""
-
-    preview_operation: Phase3HarnessMatrixPort
-    signed_operation: Phase3HarnessMatrixPort
-    capture_operation: Phase3HarnessInteractivePort | None = None
-
-    @classmethod
-    def default_headless(cls) -> Phase3Composition:
-        """Build matrix operations without constructing the interactive Qt graph."""
-
-        return cls(
-            preview_operation=_Phase3LazyMatrixOperation(_build_phase3_preview_matrix_runner),
-            signed_operation=_Phase3LazyMatrixOperation(
-                _build_phase3_signed_acceptance_matrix_runner
-            ),
-        )
-
-    @classmethod
-    def default(cls) -> Phase3Composition:
-        """Build the standard composition with interactive capture available lazily."""
-
-        return cls.default_headless().with_interactive_qt()
-
-    def with_interactive_qt(self) -> Phase3Composition:
-        """Return a composition that adds lazy interactive Qt capture."""
-
-        return replace(
-            self,
-            capture_operation=_Phase3LazyCaptureOperation(
-                _build_phase3_interactive_harness_runner
-            ),
-        )
-
-    def preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.preview_operation.run(request)
-
-    def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.signed_operation.run(request)
-
-    def capture(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
-        if self.capture_operation is None:
-            raise RuntimeError("Interactive Phase 3 capture is not installed.")
-        return self.capture_operation.run(request)
-
-
-@dataclass(frozen=True)
-class Phase3Harness:
-    """Stable three-verb adapter over the lazy Phase 3 composition."""
-
-    composition: Phase3Composition = field(default_factory=Phase3Composition.default)
-
-    def preview_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.composition.preview_matrix(request)
-
-    def signed_acceptance_matrix(self, request: Phase3MatrixRequest) -> dict[str, Any]:
-        return self.composition.signed_acceptance_matrix(request)
-
-    def capture(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
-        return self.composition.capture(request)
 
 
 @dataclass(frozen=True)
@@ -414,6 +300,54 @@ def _build_phase3_interactive_harness_runner() -> Phase3InteractiveHarnessRunner
         report_finalizer=finalize_phase3_harness_report,
         default_harness_artifacts_dir=_default_harness_artifacts_dir,
     )
+
+
+def _build_preview_matrix_operation() -> Callable[[Phase3MatrixRequest], dict[str, Any]]:
+    runner = _build_phase3_preview_matrix_runner()
+
+    def run(request: Phase3MatrixRequest) -> dict[str, Any]:
+        return runner.run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+    return run
+
+
+def _build_signed_acceptance_matrix_operation() -> Callable[
+    [Phase3MatrixRequest], dict[str, Any]
+]:
+    runner = _build_phase3_signed_acceptance_matrix_runner()
+
+    def run(request: Phase3MatrixRequest) -> dict[str, Any]:
+        return runner.run(
+            pdf_path=request.pdf_path,
+            certificate_path=request.certificate_path,
+            passphrase=request.passphrase,
+            scenario_manifest_path=request.scenario_manifest_path,
+            artifacts_dir=request.artifacts_dir,
+        )
+
+    return run
+
+
+def build_interactive_phase3_capture_runner() -> Callable[
+    [Phase3HarnessCaptureRequest], Phase3HarnessCapture
+]:
+    """Build the interactive runner explicitly, without changing matrix wiring."""
+
+    runner: Phase3InteractiveHarnessRunner | None = None
+
+    def run(request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+        nonlocal runner
+        if runner is None:
+            runner = _build_phase3_interactive_harness_runner()
+        return runner.run(request)
+
+    return run
 
 
 def _build_phase3_harness_capture(

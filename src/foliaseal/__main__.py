@@ -25,7 +25,7 @@ from foliaseal.application.phase3_evidence_service import (
     Phase3MatrixRequest,
     Phase3SignedAcceptanceEvidenceRequest,
 )
-from foliaseal.application.qa_signed_acceptance_generation import (
+from foliaseal.application.qa_signed_acceptance_assets import (
     SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
 )
 from foliaseal.application.runtime_metrics import (
@@ -33,20 +33,29 @@ from foliaseal.application.runtime_metrics import (
     collect_runtime_footprint_snapshot,
     measure_startup_latency_ms,
 )
-from foliaseal.presentation.qt.app_frame import launch_qt_app_frame
-from foliaseal.presentation.qt.phase2_harness import (
-    DEFAULT_CHECKLIST_RESULTS_PATH,
-    DEFAULT_CHECKLIST_TEMPLATE_PATH,
-    run_phase2_viewer_harness,
-)
-from foliaseal.presentation.qt.phase3_harness import (
-    DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
-    DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
-)
 from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
     DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
     build_default_phase3_evidence_service,
 )
+
+DEFAULT_CHECKLIST_TEMPLATE_PATH = "docs/ExecPlans/phase2_manual_qa_checklist.md"
+DEFAULT_CHECKLIST_RESULTS_PATH = "artifacts/phase2_manual_qa_results.md"
+DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
+DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
+
+
+def launch_qt_app_frame(*args, **kwargs):
+    from foliaseal.presentation.qt.app_frame import launch_qt_app_frame as launch
+
+    return launch(*args, **kwargs)
+
+
+def run_phase2_viewer_harness(*args, **kwargs):
+    from foliaseal.presentation.qt.phase2_harness import (
+        run_phase2_viewer_harness as run_harness,
+    )
+
+    return run_harness(*args, **kwargs)
 
 
 def _build_parser() -> argparse.ArgumentParser:
