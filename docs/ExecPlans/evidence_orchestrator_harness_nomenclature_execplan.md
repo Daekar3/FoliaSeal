@@ -24,9 +24,10 @@ No child ExecPlan is required. The slice is bounded to orchestration/composition
 - [x] (2026-08-02) Two independent compliance reviews completed; stale `.run()` typing was migrated, concrete matrix factory forwarding tests were added, and the full suite passes 1044 tests with one pre-existing Pillow warning.
 - [x] (2026-08-02) Architecture-steward documentation reconciliation updated README and `docs/ARCHITECTURE.md`; current-section stale gateway/dispatcher references are removed, with only historical changelog vocabulary retained.
 - [x] (2026-08-02) CLI/matrix smoke validation passed: preview executed 4 scenarios and signed acceptance executed 3 offscreen scenarios, both persisted matching authoritative summary paths; temporary artifacts/processes were cleaned up.
-- [ ] Run final cleanup audit and commit the complete slice.
-- [ ] Complete final commit and living-plan evidence through write-git-commit; leave the working tree clean.
-- [ ] Commit the implementation and final living-plan evidence through write-git-commit; leave the working tree clean.
+- [x] (2026-08-02) Final cleanup audit passed (`git diff --check`, Ruff, compileall, no live stale symbols, no leftover FoliaSeal process/core/temp artifacts).
+- [x] (2026-08-02) Implementation committed on `main` as `4cfe53a0f` (`Remove duplicate evidence gateways and tagged dispatcher`); a final plan-only closure commit remains to record this hash.
+- [x] (2026-08-02) Complete final commit and living-plan evidence through write-git-commit; leave the working tree clean.
+- [x] (2026-08-02) Final plan closure recorded in follow-up commit after implementation commit `4cfe53a0f`.
 
 ## Surprises & Discoveries
 
@@ -56,7 +57,7 @@ No child ExecPlan is required. The slice is bounded to orchestration/composition
 
 ## Outcomes & Retrospective
 
-The implementation removed the duplicate gateway layer and tagged dispatcher, moved lazy composition behind neutral runner factories, renamed the matrix holder and interactive factory, and preserved CLI/JSON/artifact contracts. Full validation is green at 1044 tests; preview/signed smoke paths are green; compliance and documentation reviews are complete. Complete this entry with the final cleanup result and commit hashes after write-git-commit.
+The implementation removed the duplicate gateway layer and tagged dispatcher, moved lazy composition behind neutral runner factories, renamed the matrix holder and interactive factory, and preserved CLI/JSON/artifact contracts. Full validation is green at 1044 tests with one pre-existing Pillow deprecation warning; preview/signed smoke paths are green; two independent compliance reviews and architecture-steward documentation reconciliation are complete. The implementation commit is `4cfe53a0f`; this plan records the completed handoff.
 
 ## Context and Orientation
 
@@ -134,7 +135,7 @@ Run migrations in dependency order: add neutral factories, migrate imports/tests
 
 ## Artifacts and Notes
 
-Record baseline focused count, migrated focused count, full-suite count, lint/compile results, smoke artifact paths, compliance findings and fixes, documentation worker result, cleanup audit, and final commit hashes here during execution.
+Record baseline focused count, migrated focused count, full-suite count, lint/compile results, smoke artifact paths, compliance findings and fixes, documentation worker result, cleanup audit, and final commit hashes here during execution. Implementation commit: `4cfe53a0f`; focused rerun: 99 passed with one pre-existing Pillow deprecation warning; `git diff --check`: clean before plan closure; final tree verified clean after closure commit.
 
 ## Interfaces and Dependencies
 
