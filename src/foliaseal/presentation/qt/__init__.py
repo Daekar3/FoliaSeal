@@ -36,7 +36,7 @@ _EXPORTS = {
     "QtAppFrameBindingsUnavailable": ("app_frame", "QtAppFrameBindingsUnavailable"),
     "build_qt_app_frame_host": ("app_frame", "build_qt_app_frame_host"),
     "launch_qt_app_frame": ("app_frame", "launch_qt_app_frame"),
-    "Phase3HarnessCapture": ("phase3_harness", "Phase3HarnessCapture"),
+    "Phase3HarnessCapture": ("phase3_interactive_capture", "Phase3HarnessCapture"),
     "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH": (
         "phase3_harness",
         "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH",

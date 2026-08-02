@@ -1,4 +1,9 @@
-# Split Phase 3 evidence composition into headless matrices and opt-in interactive capture
+# Historical: Split Phase 3 evidence composition into headless matrices and opt-in interactive capture
+
+> **Historical/stale plan.** This design was implemented and then superseded by the typed
+> application service/matrix-operations boundary and the focused `phase3_interactive_capture.py`
+> extraction. Keep the rationale and validation record for changelog purposes; do not implement
+> new `Phase3Composition` or `Phase3Harness` facades from this document.
 
 This ExecPlan is a living document and must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. It describes one complete implementation slice: deepen the Phase 3 harness composition root so ordinary preview, signed-acceptance, validation, and evidence callers do not construct the interactive Qt graph, while keeping interactive capture explicit, preserving every CLI/JSON/artifact contract, and removing obsolete compatibility gateways and duplicate wrappers.
 

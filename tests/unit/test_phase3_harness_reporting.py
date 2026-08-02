@@ -8,12 +8,12 @@ from foliaseal.application.qa_evidence_contract import (
     NON_GATING,
     PHASE3_EVIDENCE_CONTRACT_VERSION,
 )
-from foliaseal.presentation.qt.phase3_harness import Phase3HarnessCapture
 from foliaseal.presentation.qt.phase3_harness_reporting import (
     Phase3HarnessReportRequest,
     build_phase3_checklist_results_markdown,
     finalize_phase3_harness_report,
 )
+from foliaseal.presentation.qt.phase3_interactive_capture import Phase3HarnessCapture
 
 
 class _FakeCapture:

@@ -50,12 +50,9 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
 )
 from foliaseal.presentation.qt.phase3_harness import (
-    Phase3HarnessCapture,
     _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
     _capture_headless_preview_render,
-    _default_harness_artifacts_dir,
-    _default_harness_output_pdf_path,
     _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
@@ -72,13 +69,21 @@ from foliaseal.presentation.qt.phase3_harness import (
     _widget_is_visible,
     _write_stamp_debug_overlay,
     _write_text_debug_overlay,
-    build_interactive_phase3_capture_runner,
 )
 from foliaseal.presentation.qt.phase3_harness_session_runner import Phase3HarnessSessionResult
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
     _apply_appearance_overrides,
     _apply_visible_fields_override,
+)
+from foliaseal.presentation.qt.phase3_interactive_capture import (
+    Phase3HarnessCapture,
+    Phase3InteractiveCaptureArtifactPolicy,
+    Phase3InteractiveHarnessRunner,
+    build_interactive_phase3_capture_runner,
+    default_harness_artifacts_dir,
+    default_harness_output_pdf_path,
+    write_optional_text,
 )
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
@@ -839,7 +844,7 @@ def test_evaluate_signed_matrix_acceptance_expectations_flags_contract_failures(
 
 def test_default_harness_artifacts_dir_prefers_explicit_override() -> None:
     assert (
-        _default_harness_artifacts_dir(
+        default_harness_artifacts_dir(
             summary_json_path="artifacts/phase3_harness_capture.json",
             artifacts_dir="artifacts/manual_override",
         )
@@ -849,7 +854,7 @@ def test_default_harness_artifacts_dir_prefers_explicit_override() -> None:
 
 def test_default_harness_artifacts_dir_derives_from_summary_json_path() -> None:
     assert (
-        _default_harness_artifacts_dir(
+        default_harness_artifacts_dir(
             summary_json_path="artifacts/phase3_harness_capture.json",
             artifacts_dir=None,
         )
@@ -858,7 +863,7 @@ def test_default_harness_artifacts_dir_derives_from_summary_json_path() -> None:
 
 
 def test_default_harness_output_pdf_path_uses_artifacts_dir_and_numbering() -> None:
-    output_path = _default_harness_output_pdf_path(
+    output_path = default_harness_output_pdf_path(
         pdf_path="/tmp/input.pdf",
         artifacts_dir="artifacts/phase3_harness_capture_artifacts",
         sign_attempt_index=3,
@@ -868,7 +873,7 @@ def test_default_harness_output_pdf_path_uses_artifacts_dir_and_numbering() -> N
 
 
 def test_default_harness_output_pdf_path_falls_back_to_source_directory() -> None:
-    output_path = _default_harness_output_pdf_path(
+    output_path = default_harness_output_pdf_path(
         pdf_path="/tmp/input.pdf",
         artifacts_dir=None,
         sign_attempt_index=2,
@@ -1166,7 +1171,7 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         fake_finalize,
     )
 
-    runner = phase3_harness_module.Phase3InteractiveHarnessRunner(
+    runner = Phase3InteractiveHarnessRunner(
         load_qt_harness_bindings=phase3_harness_module._load_qt_harness_bindings,
         load_page_count=phase3_harness_module._load_page_count,
         render_backend_factory=phase3_harness_module.QtPdfRenderBackend,
@@ -1199,9 +1204,12 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         contract_evaluator=evaluate_phase3_evidence_contract,
         capture_factory=phase3_harness_module._build_phase3_harness_capture,
         checklist_renderer=phase3_harness_module.render_phase3_checklist_results_markdown,
-        text_writer=phase3_harness_module._write_optional_text,
         report_finalizer=phase3_harness_module.finalize_phase3_harness_report,
-        default_harness_artifacts_dir=phase3_harness_module._default_harness_artifacts_dir,
+        artifact_policy=Phase3InteractiveCaptureArtifactPolicy(
+            default_artifacts_dir=default_harness_artifacts_dir,
+            output_pdf_path=default_harness_output_pdf_path,
+            write_text=write_optional_text,
+        ),
     )
     capture = runner.run(
         Phase3HarnessCaptureRequest(

@@ -115,7 +115,7 @@ class Phase3HarnessSessionRunner:
             signing_workflow.output_pdf_path = self.deps.default_harness_output_pdf_path(
                 pdf_path=str(source_path),
                 artifacts_dir=artifacts_dir,
-                sign_attempt_index=len(sign_requests) + 1,
+                sign_attempt_index=len(sign_requests),
             )
 
         def on_error(message: str) -> None:

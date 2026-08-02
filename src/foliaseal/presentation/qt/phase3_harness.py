@@ -7,8 +7,7 @@ import json
 import re
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass, fields, is_dataclass, replace
-from enum import Enum
+from dataclasses import replace
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -19,10 +18,7 @@ from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.application.phase3_evidence_service import (
-    Phase3HarnessCaptureRequest,
-    Phase3MatrixRequest,
-)
+from foliaseal.application.phase3_evidence_service import Phase3MatrixRequest
 from foliaseal.application.phase3_fidelity_contract import validate_release_fidelity_contract
 from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
@@ -43,8 +39,6 @@ from foliaseal.application.text_raster_analysis import (
     detect_text_content_bounds_in_image,
     detect_text_line_bounds_in_image,
 )
-from foliaseal.application.viewer_session import ViewerSession
-from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.application.visible_signature_layout import (
     LayoutRequest,
     VisibleSignatureLayoutEngine,
@@ -71,11 +65,10 @@ from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     snapshot_signing_result_payload,
 )
 from foliaseal.presentation.qt.phase3_harness_reporting import (
-    Phase3HarnessReportRequest,
-    finalize_phase3_harness_report,
+    build_phase3_checklist_results_markdown as render_phase3_checklist_results_markdown,
 )
 from foliaseal.presentation.qt.phase3_harness_reporting import (
-    build_phase3_checklist_results_markdown as render_phase3_checklist_results_markdown,
+    finalize_phase3_harness_report,
 )
 from foliaseal.presentation.qt.phase3_harness_session_runner import (
     Phase3HarnessSessionRunner,
@@ -94,6 +87,21 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
+)
+from foliaseal.presentation.qt.phase3_interactive_capture import (
+    Phase3HarnessCapture as _Phase3HarnessCapture,
+)
+from foliaseal.presentation.qt.phase3_interactive_capture import (
+    Phase3InteractiveCaptureArtifactPolicy,
+    default_harness_artifacts_dir,
+    default_harness_output_pdf_path,
+    write_optional_text,
+)
+from foliaseal.presentation.qt.phase3_interactive_capture import (
+    Phase3InteractiveHarnessRunner as _Phase3InteractiveHarnessRunner,
+)
+from foliaseal.presentation.qt.phase3_interactive_capture import (
+    jsonable_capture as _jsonable_capture,
 )
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
@@ -129,163 +137,8 @@ from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
 
-@dataclass(frozen=True)
-class Phase3HarnessCapture:
-    """Structured capture emitted by the interactive Phase 3 harness."""
-
-    pdf_path: str
-    summary_json_path: str | None
-    summary_json_written: bool
-    checklist_results_path: str
-    checklist_results_written: bool
-    first_render_ms: float | None
-    selection_count: int
-    sign_request_count: int
-    last_signature_page_index: int | None
-    last_signature_page_number: int | None
-    last_signature_has_visible_appearance: bool
-    last_signature_output_path: str | None
-    last_signing_result_message: str | None
-    last_signing_result_success: bool | None
-    preview_snapshot: dict[str, Any]
-    sign_request_snapshot: dict[str, Any] | None
-    backend_reservation_snapshot: dict[str, Any] | None
-    backend_reservation_error: str | None
-    output_file_exists: bool
-    output_file_size_bytes: int | None
-    output_signature_count: int | None
-    output_signature_snapshot: dict[str, Any] | None
-    output_visible_appearance_snapshot: dict[str, Any] | None
-    preview_available: bool
-    preview_text: str
-    validation_text: str
-    evidence_contract_version: str
-    acceptance_tier: str
-    gate_verdict: str
-    evidence_validation_passed: bool
-    evidence_validation_errors: tuple[str, ...]
-    evidence_validation_warnings: tuple[str, ...]
-    interaction_counts: dict[str, int]
-    errors: tuple[str, ...]
-    output_verification_snapshot: dict[str, Any] | None = None
-    signed_output_render_snapshot: dict[str, Any] | None = None
-    signed_output_preview_comparison: dict[str, Any] | None = None
-    signed_runs: tuple[dict[str, Any], ...] = ()
-    captured_states: tuple[dict[str, Any], ...] = ()
-    captured_state_transition_diagnostics: tuple[dict[str, Any], ...] = ()
-
-    def to_json(self) -> str:
-        """Return a stable JSON representation for later review."""
-
-        return json.dumps(_jsonable_capture(self), indent=2, sort_keys=True)
-
-
-@dataclass(frozen=True)
-class Phase3InteractiveHarnessRunner:
-    """Interactive capture gateway that hides session and reporting choreography."""
-
-    load_qt_harness_bindings: Callable[[], _QtHarnessBindings]
-    load_page_count: Callable[..., int]
-    render_backend_factory: Callable[[], Any]
-    profile_store_factory: Callable[[], Any]
-    build_phase3_signing_executor: Callable[[], Any]
-    session_runner: Phase3HarnessSessionRunner
-    capture_assembler: Phase3HarnessCaptureAssembler
-    contract_evaluator: Callable[..., Any]
-    capture_factory: Callable[..., Phase3HarnessCapture]
-    checklist_renderer: Callable[..., str]
-    text_writer: Callable[..., None]
-    report_finalizer: Callable[..., Any]
-    default_harness_artifacts_dir: Callable[..., str | None]
-
-    def run(
-        self,
-        request: Phase3HarnessCaptureRequest,
-    ) -> Phase3HarnessCapture:
-        bindings = self.load_qt_harness_bindings()
-        source_path = Path(request.pdf_path)
-        if not source_path.exists():
-            raise FileNotFoundError(f"PDF does not exist: {request.pdf_path}")
-        artifacts_dir = self.default_harness_artifacts_dir(
-            summary_json_path=request.summary_json_path,
-            artifacts_dir=request.artifacts_dir,
-        )
-
-        page_count = self.load_page_count(bindings=bindings, pdf_path=str(source_path))
-        backend = self.render_backend_factory()
-        diagnostic = backend.diagnostics()
-        if not diagnostic.available:
-            raise RuntimeError(diagnostic.message)
-
-        viewer_workflow = ViewerWorkflow(
-            document_path=str(source_path),
-            render_backend=backend,
-            session=ViewerSession(page_count=page_count),
-        )
-        signing_workflow = SigningDraftWorkflow(
-            input_pdf_path=str(source_path),
-            output_pdf_path=_default_harness_output_pdf_path(
-                pdf_path=str(source_path),
-                artifacts_dir=artifacts_dir,
-                sign_attempt_index=1,
-            ),
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            tsa_url="https://tsa.example.invalid",
-            timestamp_required=False,
-        )
-        profile_store = self.profile_store_factory()
-        sign_executor = self.build_phase3_signing_executor()
-        session = self.session_runner.run(
-            bindings=bindings,
-            source_path=source_path,
-            artifacts_dir=artifacts_dir,
-            viewer_workflow=viewer_workflow,
-            signing_workflow=signing_workflow,
-            profile_store=profile_store,
-            sign_executor=sign_executor,
-            capture_assembler=self.capture_assembler,
-        )
-        capture_payload = self.capture_assembler.build_capture_payload(
-            source_path=source_path,
-            summary_json_path=request.summary_json_path,
-            checklist_results_path=request.checklist_results_path,
-            artifacts_dir=artifacts_dir,
-            session=session,
-        )
-        report = self.report_finalizer(
-            Phase3HarnessReportRequest(
-                capture_payload=capture_payload,
-                summary_json_path=request.summary_json_path,
-                checklist_results_path=request.checklist_results_path,
-                checklist_template_path=request.checklist_template_path,
-            ),
-            contract_evaluator=self.contract_evaluator,
-            capture_factory=self.capture_factory,
-            checklist_renderer=self.checklist_renderer,
-            text_writer=self.text_writer,
-        )
-        capture = report.capture
-        if request.summary_json_path is None:
-            print("Phase 3 harness capture")
-            print(capture.to_json())
-            print()
-        else:
-            print("Phase 3 harness capture written")
-            print(f"- summary json: {request.summary_json_path}")
-            print(f"- acceptance tier: {capture.acceptance_tier}")
-            print(f"- gate verdict: {capture.gate_verdict}")
-            print(f"- validation: {capture.validation_text}")
-            print(f"- captured states: {len(capture.captured_states)}")
-            print()
-        print(f"Checklist results file: {request.checklist_results_path}")
-        print("Review the pre-checked items, complete the remaining manual-only checks, and")
-        print("use the generated file as the acceptance worksheet for Phase 3.")
-        return capture
-
-
-def _build_phase3_interactive_harness_runner() -> Phase3InteractiveHarnessRunner:
-    return Phase3InteractiveHarnessRunner(
+def _build_phase3_interactive_harness_runner() -> _Phase3InteractiveHarnessRunner:
+    return _Phase3InteractiveHarnessRunner(
         load_qt_harness_bindings=_load_qt_harness_bindings,
         load_page_count=_load_page_count,
         render_backend_factory=QtPdfRenderBackend,
@@ -296,9 +149,12 @@ def _build_phase3_interactive_harness_runner() -> Phase3InteractiveHarnessRunner
         contract_evaluator=evaluate_phase3_evidence_contract,
         capture_factory=_build_phase3_harness_capture,
         checklist_renderer=render_phase3_checklist_results_markdown,
-        text_writer=_write_optional_text,
         report_finalizer=finalize_phase3_harness_report,
-        default_harness_artifacts_dir=_default_harness_artifacts_dir,
+        artifact_policy=Phase3InteractiveCaptureArtifactPolicy(
+            default_artifacts_dir=default_harness_artifacts_dir,
+            output_pdf_path=default_harness_output_pdf_path,
+            write_text=write_optional_text,
+        ),
     )
 
 
@@ -334,22 +190,6 @@ def _build_signed_acceptance_matrix_operation() -> Callable[
     return run
 
 
-def build_interactive_phase3_capture_runner() -> Callable[
-    [Phase3HarnessCaptureRequest], Phase3HarnessCapture
-]:
-    """Build the interactive runner explicitly, without changing matrix wiring."""
-
-    runner: Phase3InteractiveHarnessRunner | None = None
-
-    def run(request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
-        nonlocal runner
-        if runner is None:
-            runner = _build_phase3_interactive_harness_runner()
-        return runner.run(request)
-
-    return run
-
-
 def _build_phase3_harness_capture(
     *,
     capture_payload: dict[str, Any],
@@ -357,8 +197,8 @@ def _build_phase3_harness_capture(
     summary_json_path: str | None,
     checklist_results_path: str,
     checklist_results_written: bool,
-) -> Phase3HarnessCapture:
-    return Phase3HarnessCapture(
+) -> _Phase3HarnessCapture:
+    return _Phase3HarnessCapture(
         pdf_path=capture_payload["pdf_path"],
         summary_json_path=summary_json_path,
         summary_json_written=summary_json_path is not None,
@@ -423,36 +263,9 @@ def _build_phase3_harness_session_runner() -> Phase3HarnessSessionRunner:
         deps=Phase3HarnessSessionRunnerDeps(
             build_qt_signing_shell=build_qt_signing_shell,
             build_workspace=_build_qt_phase3_harness_workspace,
-            default_harness_output_pdf_path=_default_harness_output_pdf_path,
+            default_harness_output_pdf_path=default_harness_output_pdf_path,
         )
     )
-
-
-def _default_harness_artifacts_dir(
-    *,
-    summary_json_path: str | None,
-    artifacts_dir: str | None,
-) -> str | None:
-    if artifacts_dir is not None:
-        return artifacts_dir
-    if summary_json_path is None:
-        return None
-    summary_path = Path(summary_json_path)
-    return str(summary_path.with_name(f"{summary_path.stem}_artifacts"))
-
-
-def _default_harness_output_pdf_path(
-    *,
-    pdf_path: str,
-    artifacts_dir: str | None,
-    sign_attempt_index: int = 1,
-) -> str:
-    source_path = Path(pdf_path)
-    if artifacts_dir is None:
-        return str(source_path.with_name(source_path.stem + "-signed.pdf"))
-    target_dir = Path(artifacts_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    return str(target_dir / f"{source_path.stem}_harness_signed_{sign_attempt_index:03d}.pdf")
 
 
 def _build_live_phase3_harness_workspace(
@@ -666,7 +479,7 @@ def _load_page_count(*, bindings: _QtHarnessBindings, pdf_path: str) -> int:
     return int(document.pageCount())
 
 
-def _derive_phase3_auto_checked_items(capture: Phase3HarnessCapture) -> set[str]:
+def _derive_phase3_auto_checked_items(capture: _Phase3HarnessCapture) -> set[str]:
     auto_checked: set[str] = set()
 
     if capture.preview_available:
@@ -706,14 +519,6 @@ def _derive_phase3_auto_checked_items(capture: Phase3HarnessCapture) -> set[str]
         auto_checked.add("The user can choose the target page before placement.")
 
     return auto_checked
-
-
-def _write_optional_text(*, target_path: str | None, content: str) -> None:
-    if target_path is None:
-        return
-    path = Path(target_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
 
 
 def _render_signed_annotation_appearance_direct(
@@ -3628,7 +3433,7 @@ def _snapshot_sign_request_appearance(
     return appearance
 
 
-def _snapshot_request_origin(capture: Phase3HarnessCapture) -> str:
+def _snapshot_request_origin(capture: _Phase3HarnessCapture) -> str:
     if capture.sign_request_snapshot is None:
         return "not captured"
     if capture.sign_request_count > 0:
@@ -3811,23 +3616,3 @@ def _snapshot_visible_appearance_error(snapshot: dict[str, Any] | None) -> str:
         return "not captured"
     value = snapshot.get("error")
     return str(value) if value is not None else "none"
-
-
-def _jsonable_capture(value: Any) -> Any:
-    if value is None:
-        return None
-    if isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, Enum):
-        return value.value
-    if isinstance(value, Path):
-        return str(value)
-    if is_dataclass(value):
-        return {
-            field.name: _jsonable_capture(getattr(value, field.name)) for field in fields(value)
-        }
-    if isinstance(value, dict):
-        return {str(key): _jsonable_capture(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_jsonable_capture(item) for item in value]
-    return str(value)

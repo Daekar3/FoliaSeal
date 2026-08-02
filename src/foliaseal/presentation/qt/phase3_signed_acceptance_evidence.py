@@ -135,7 +135,7 @@ def _build_lazy_interactive_capture_runner():
     def run(request):
         nonlocal runner
         if runner is None:
-            from foliaseal.presentation.qt.phase3_harness import (
+            from foliaseal.presentation.qt.phase3_interactive_capture import (
                 build_interactive_phase3_capture_runner,
             )
 

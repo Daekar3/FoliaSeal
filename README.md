@@ -202,9 +202,10 @@ The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir
 isolating a run. Preview and signed matrices are injected as separate lazy operations, while
 interactive capture is installed through an explicit lazy factory. Application package exports
 are also lazy so importing a focused presentation module does not eagerly load optional GUI/runtime
-dependencies. `phase3_harness.py` remains the Qt composition root for concrete runner factories and
-interactive capture, but it is no longer a three-verb `Phase3Composition`/`Phase3Harness`
-compatibility facade. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
+dependencies. `phase3_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
+interactive runner, JSON normalization, artifact policy, and lazy factory; `phase3_harness.py`
+remains the Qt composition root that builds the concrete runner dependencies. It is no longer a
+three-verb `Phase3Composition`/`Phase3Harness` compatibility facade. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
 scenario sweep, processes events between scenarios, and closes that shell in its cleanup path.
 
 Not yet production-ready:

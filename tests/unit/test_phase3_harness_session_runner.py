@@ -35,6 +35,7 @@ def test_session_runner_returns_raw_session_state(
     shell_holder = {}
     workspace_holder = {}
     window_holder = {}
+    attempt_indices = []
 
     class _FakeSignal:
         def __init__(self) -> None:
@@ -240,8 +241,9 @@ def test_session_runner_returns_raw_session_state(
             build_workspace=lambda shell: workspace_holder.setdefault(
                 "workspace", _FakeWorkspace(shell)
             ),
-            default_harness_output_pdf_path=(
-                lambda **kwargs: str(
+            default_harness_output_pdf_path=lambda **kwargs: (
+                attempt_indices.append(kwargs["sign_attempt_index"])
+                or str(
                     tmp_path
                     / f"{Path(kwargs['pdf_path']).stem}_{kwargs['sign_attempt_index']}.pdf"
                 )
@@ -268,6 +270,7 @@ def test_session_runner_returns_raw_session_state(
     result = runner.run(**run_kwargs)
 
     assert result.sign_requests == (request,)
+    assert attempt_indices == [1]
     assert window_holder["window"].closed is True
     assert result.errors == ("debug issue",)
     assert result.interaction_counts == {
