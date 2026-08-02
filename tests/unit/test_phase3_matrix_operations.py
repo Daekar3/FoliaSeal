@@ -2,13 +2,12 @@ import json
 import subprocess
 import sys
 
+import pytest
+
 from foliaseal.application.phase3_evidence_service import Phase3MatrixRequest
-from foliaseal.presentation.qt.evidence_gateways import (
-    PreviewEvidenceGateway,
-    SignedAcceptanceEvidenceGateway,
-)
+from foliaseal.presentation.qt import evidence_runner_factories
 from foliaseal.presentation.qt.phase3_matrix_operations import (
-    build_headless_phase3_matrix_operations,
+    build_evidence_matrix_operations,
 )
 
 
@@ -40,7 +39,7 @@ def test_matrix_operations_are_lazy_and_forward_typed_requests() -> None:
         calls.append("signed_factory")
         return lambda _received: {"scenario_count": 8}
 
-    operations = build_headless_phase3_matrix_operations(
+    operations = build_evidence_matrix_operations(
         preview_factory=build_preview,
         signed_acceptance_factory=build_signed,
     )
@@ -61,7 +60,7 @@ def test_each_matrix_operation_constructs_its_runner_once() -> None:
         factory_counts["signed"] += 1
         return lambda _request: {"kind": "signed"}
 
-    operations = build_headless_phase3_matrix_operations(
+    operations = build_evidence_matrix_operations(
         preview_factory=preview_factory,
         signed_acceptance_factory=signed_factory,
     )
@@ -72,7 +71,7 @@ def test_each_matrix_operation_constructs_its_runner_once() -> None:
     assert factory_counts == {"preview": 1, "signed": 1}
 
 
-def test_explicit_evidence_gateways_are_lazy_and_forward_requests() -> None:
+def test_evidence_matrix_operations_are_lazy_and_forward_requests() -> None:
     request = _request()
     calls: list[str] = []
 
@@ -84,12 +83,14 @@ def test_explicit_evidence_gateways_are_lazy_and_forward_requests() -> None:
         calls.append("signed_factory")
         return lambda received: calls.append(received.pdf_path) or {"kind": "signed"}
 
-    preview = PreviewEvidenceGateway(preview_factory)
-    signed = SignedAcceptanceEvidenceGateway(signed_factory)
+    operations = build_evidence_matrix_operations(
+        preview_factory=preview_factory,
+        signed_acceptance_factory=signed_factory,
+    )
     assert calls == []
-    assert preview.run(request) == {"kind": "preview"}
-    assert preview.run(request) == {"kind": "preview"}
-    assert signed.run(request) == {"kind": "signed"}
+    assert operations.preview(request) == {"kind": "preview"}
+    assert operations.preview(request) == {"kind": "preview"}
+    assert operations.signed_acceptance(request) == {"kind": "signed"}
     assert calls == [
         "preview_factory",
         "fixture.pdf",
@@ -99,11 +100,52 @@ def test_explicit_evidence_gateways_are_lazy_and_forward_requests() -> None:
     ]
 
 
-def test_evidence_gateway_module_does_not_import_gui_or_pdf_libraries() -> None:
+@pytest.mark.parametrize(
+    ("operation_factory", "runner_factory", "result"),
+    [
+        (
+            evidence_runner_factories.build_preview_evidence_operation,
+            "build_preview_evidence_runner",
+            {"kind": "preview"},
+        ),
+        (
+            evidence_runner_factories.build_signed_acceptance_evidence_operation,
+            "build_signed_acceptance_evidence_runner",
+            {"kind": "signed"},
+        ),
+    ],
+)
+def test_concrete_evidence_operations_forward_every_request_field(
+    monkeypatch: pytest.MonkeyPatch,
+    operation_factory,
+    runner_factory: str,
+    result: dict[str, str],
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeRunner:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return result
+
+    monkeypatch.setattr(evidence_runner_factories, runner_factory, lambda: _FakeRunner())
+    request = _request()
+
+    assert operation_factory()(request) == result
+    assert captured == {
+        "pdf_path": request.pdf_path,
+        "certificate_path": request.certificate_path,
+        "passphrase": request.passphrase,
+        "scenario_manifest_path": request.scenario_manifest_path,
+        "artifacts_dir": request.artifacts_dir,
+    }
+
+
+def test_evidence_runner_factories_do_not_import_gui_or_pdf_libraries() -> None:
     script = """
 import json
 import sys
-import foliaseal.presentation.qt.evidence_gateways
+import foliaseal.presentation.qt.evidence_runner_factories
 heavy = ("PySide6", "PIL", "pyhanko")
 loaded = sorted(
     name for name in sys.modules
@@ -123,7 +165,7 @@ print(json.dumps(loaded))
 
 def test_matrix_operations_preserve_raw_mapping_results() -> None:
     expected = {"scenario_count": 8, "results": [{"name": "baseline"}]}
-    operations = build_headless_phase3_matrix_operations(
+    operations = build_evidence_matrix_operations(
         preview_factory=lambda: lambda _request: expected,
         signed_acceptance_factory=lambda: lambda _request: expected,
     )

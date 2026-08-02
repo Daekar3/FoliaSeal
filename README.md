@@ -201,13 +201,14 @@ signed = session.signed_acceptance("/path/to/signed-acceptance-manifest.json")
 
 The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir=` per call when
 isolating a run. Preview and signed matrices are injected as separate lazy operations through
-`PreviewEvidenceGateway` and `SignedAcceptanceEvidenceGateway`; interactive capture is installed
-through the separate `InteractiveEvidenceGateway` lazy factory. These gateways construct their
+`EvidenceMatrixOperations`; interactive capture is installed through the neutral
+`build_interactive_evidence_capture_runner()` factory. These factories construct their
 Qt/runtime graphs only on first use. Application package exports
 are also lazy so importing a focused presentation module does not eagerly load optional GUI/runtime
 dependencies. `phase3_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
-interactive runner, JSON normalization, artifact policy, and lazy factory; `evidence_gateways.py`
-owns the explicit lazy gateway boundaries; `evidence_artifacts.py` owns preview/signed summary
+interactive runner, JSON normalization, and artifact policy; `evidence_runner_factories.py` owns
+neutral lazy runner construction; `phase3_matrix_operations.py` owns the dependency-light
+`EvidenceMatrixOperations` holder; `evidence_artifacts.py` owns preview/signed summary
 artifact publication; `phase3_harness.py`
 remains the Qt composition root that builds the concrete runner dependencies. It is no longer a
 three-verb `Phase3Composition`/`Phase3Harness` compatibility facade. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
@@ -394,7 +395,7 @@ Application boundary and execution contexts:
   separate execution adapters. Their lifecycle ownership and artifact semantics differ and are
   intentionally not merged by this boundary slice.
 - The Qt-side matrix boundary exposes explicit lazy preview and signed-acceptance operations, while
-  interactive capture is installed through a separate lazy gateway factory. Operation-local dependency
+  interactive capture is installed through a separate lazy runner factory. Operation-local dependency
   bundles inject profile stores, Qt lifecycles, renderers, artifact writers, and signing executors,
   keeping tests substitutable while preserving the existing CLI command names, DTO/request types,
   JSON field names, summary paths, and artifact paths. The removed composition/facade classes and

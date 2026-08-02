@@ -67,8 +67,11 @@ def test_evidence_application_boundary_does_not_import_heavy_render_dependencies
 
 
 def test_orchestrator_public_results_are_typed() -> None:
-    hints = get_type_hints(Phase3EvidenceOrchestrator.capture)
-    run_hints = get_type_hints(Phase3EvidenceOrchestrator.run)
-
-    assert hints["return"] is not Any
-    assert run_hints["return"] is not Any
+    for method in (
+        Phase3EvidenceOrchestrator.capture,
+        Phase3EvidenceOrchestrator.preview_matrix,
+        Phase3EvidenceOrchestrator.signed_acceptance_matrix,
+        Phase3EvidenceOrchestrator.signed_acceptance_evidence,
+        Phase3EvidenceOrchestrator.validate,
+    ):
+        assert get_type_hints(method)["return"] is not Any

@@ -22,9 +22,7 @@ from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
     _single_line_vertical_outer_margin,
     build_backend_reservation_evidence,
-    build_phase3_signing_executor,
 )
-from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
 from foliaseal.application.signature_font_registry import preview_font_family_supported
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
@@ -54,19 +52,12 @@ from foliaseal.domain.models import (
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
-from foliaseal.infra.tsa import build_dummy_timestamper
 from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
     Phase3AppearanceSnapshotter,
 )
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
     snapshot_signing_result_payload,
-)
-from foliaseal.presentation.qt.phase3_harness_reporting import (
-    build_phase3_checklist_results_markdown as render_phase3_checklist_results_markdown,
-)
-from foliaseal.presentation.qt.phase3_harness_reporting import (
-    finalize_phase3_harness_report,
 )
 from foliaseal.presentation.qt.phase3_harness_session_runner import (
     Phase3HarnessSessionRunner,
@@ -90,13 +81,7 @@ from foliaseal.presentation.qt.phase3_interactive_capture import (
     Phase3HarnessCapture as _Phase3HarnessCapture,
 )
 from foliaseal.presentation.qt.phase3_interactive_capture import (
-    Phase3InteractiveCaptureArtifactPolicy,
-    default_harness_artifacts_dir,
     default_harness_output_pdf_path,
-    write_optional_text,
-)
-from foliaseal.presentation.qt.phase3_interactive_capture import (
-    Phase3InteractiveHarnessRunner as _Phase3InteractiveHarnessRunner,
 )
 from foliaseal.presentation.qt.phase3_interactive_capture import (
     jsonable_capture as _jsonable_capture,
@@ -105,16 +90,8 @@ from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
     snapshot_pdf_rect,
 )
-from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
-    Phase3PreviewMatrixRunner,
-    Phase3PreviewMatrixRunnerDeps,
-)
 from foliaseal.presentation.qt.phase3_sign_time_diagnostics_snapshotter import (
     Phase3SignTimeDiagnosticsSnapshotter,
-)
-from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
-    Phase3SignedAcceptanceMatrixRunner,
-    Phase3SignedAcceptanceMatrixRunnerDeps,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioExecutor,
@@ -135,25 +112,6 @@ from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
 
-def _build_interactive_evidence_runner() -> _Phase3InteractiveHarnessRunner:
-    return _Phase3InteractiveHarnessRunner(
-        load_qt_harness_bindings=_load_qt_harness_bindings,
-        load_page_count=_load_page_count,
-        render_backend_factory=QtPdfRenderBackend,
-        profile_store_factory=SignaturePresetCatalogStore.default,
-        build_phase3_signing_executor=build_phase3_signing_executor,
-        session_runner=_build_phase3_harness_session_runner(),
-        capture_assembler=_build_phase3_harness_capture_assembler(),
-        contract_evaluator=evaluate_phase3_evidence_contract,
-        capture_factory=_build_phase3_harness_capture,
-        checklist_renderer=render_phase3_checklist_results_markdown,
-        report_finalizer=finalize_phase3_harness_report,
-        artifact_policy=Phase3InteractiveCaptureArtifactPolicy(
-            default_artifacts_dir=default_harness_artifacts_dir,
-            output_pdf_path=default_harness_output_pdf_path,
-            write_text=write_optional_text,
-        ),
-    )
 
 def _build_phase3_harness_capture(
     *,
@@ -316,41 +274,6 @@ def _snapshot_successful_signed_output(
         trust_policy=trust_policy,
         artifacts_dir=artifacts_dir,
         artifact_basename=artifact_basename,
-    )
-
-
-def _build_phase3_preview_matrix_runner() -> Phase3PreviewMatrixRunner:
-    return Phase3PreviewMatrixRunner(
-        deps=Phase3PreviewMatrixRunnerDeps(
-            load_preview_matrix_manifest=_load_preview_matrix_manifest,
-            execute_headless_preview_matrix_scenario=_execute_headless_preview_matrix_scenario,
-            preview_matrix_error_result=_preview_matrix_error_result,
-            preview_matrix_diagnostic_summary=_preview_matrix_diagnostic_summary,
-            jsonable_capture=_jsonable_capture,
-            profile_store_factory=SignaturePresetCatalogStore.default,
-        )
-    )
-
-
-def _build_phase3_signed_acceptance_matrix_runner() -> Phase3SignedAcceptanceMatrixRunner:
-    return Phase3SignedAcceptanceMatrixRunner(
-        deps=Phase3SignedAcceptanceMatrixRunnerDeps(
-            load_qt_harness_bindings=_load_qt_harness_bindings,
-            load_preview_matrix_manifest=_load_preview_matrix_manifest,
-            build_phase3_signing_executor=build_phase3_signing_executor,
-            build_dummy_timestamper=build_dummy_timestamper,
-            load_page_count=_load_page_count,
-            build_qt_signing_shell=build_qt_signing_shell,
-            build_workspace=_build_preview_matrix_qt_workspace,
-            execute_signed_acceptance_scenario=_execute_signed_acceptance_scenario,
-            preview_matrix_error_result=_preview_matrix_error_result,
-            signed_matrix_diagnostic_summary=_signed_matrix_diagnostic_summary,
-            evaluate_signed_matrix_acceptance_expectations=(
-                _evaluate_signed_matrix_acceptance_expectations
-            ),
-            jsonable_capture=_jsonable_capture,
-            render_backend_factory=QtPdfRenderBackend,
-        )
     )
 
 

@@ -2,12 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pytest
-
 from foliaseal.application.phase3_evidence_orchestrator import (
     Phase3EvidenceOrchestrator,
-    Phase3OperationKind,
-    Phase3OperationRequest,
     Phase3ValidationRequest,
 )
 from foliaseal.application.phase3_evidence_service import (
@@ -65,28 +61,16 @@ def _matrix_request() -> Phase3MatrixRequest:
     )
 
 
-def test_orchestrator_dispatches_all_effectful_operation_kinds() -> None:
+def test_orchestrator_exposes_explicit_effectful_verbs() -> None:
     service = _FakeService([])
     orchestrator = Phase3EvidenceOrchestrator(service)
 
-    assert orchestrator.run(Phase3OperationRequest.capture(_capture_request())) == (
-        "capture-result"
-    )
-    assert orchestrator.run(Phase3OperationRequest.preview_matrix(_matrix_request())) == (
-        "preview-result"
-    )
-    assert (
-        orchestrator.run(Phase3OperationRequest.signed_acceptance_matrix(_matrix_request()))
-        == "signed-result"
-    )
-    assert (
-        orchestrator.run(
-            Phase3OperationRequest.signed_acceptance_evidence(
-                Phase3SignedAcceptanceEvidenceRequest(passphrase="secret")
-            )
-        )
-        == "evidence-result"
-    )
+    assert orchestrator.capture(_capture_request()) == "capture-result"
+    assert orchestrator.preview_matrix(_matrix_request()) == "preview-result"
+    assert orchestrator.signed_acceptance_matrix(_matrix_request()) == "signed-result"
+    assert orchestrator.signed_acceptance_evidence(
+        Phase3SignedAcceptanceEvidenceRequest(passphrase="secret")
+    ) == "evidence-result"
 
     assert [name for name, _request in service.calls] == [
         "capture",
@@ -94,7 +78,6 @@ def test_orchestrator_dispatches_all_effectful_operation_kinds() -> None:
         "signed",
         "evidence",
     ]
-
 
 def test_orchestrator_validates_through_the_service_boundary() -> None:
     service = _FakeService([])
@@ -108,16 +91,3 @@ def test_orchestrator_validates_through_the_service_boundary() -> None:
             Phase3HarnessValidationRequest(summary_json_path="capture.json"),
         )
     ]
-
-
-def test_orchestrator_rejects_mismatched_payload_before_calling_service() -> None:
-    service = _FakeService([])
-    request = Phase3OperationRequest(
-        kind=Phase3OperationKind.PREVIEW_MATRIX,
-        payload=_capture_request(),
-    )
-
-    with pytest.raises(TypeError, match="PREVIEW_MATRIX requires"):
-        Phase3EvidenceOrchestrator(service).run(request)
-
-    assert service.calls == []

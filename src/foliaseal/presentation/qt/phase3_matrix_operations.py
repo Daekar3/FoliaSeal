@@ -1,4 +1,4 @@
-"""Lazy typed matrix-operation composition for Phase 3 evidence."""
+"""Lazy typed matrix-operation composition for evidence."""
 
 from __future__ import annotations
 
@@ -24,21 +24,21 @@ class _LazyMatrixOperation:
 
 
 @dataclass(frozen=True)
-class Phase3MatrixOperations:
+class EvidenceMatrixOperations:
     """The two matrix operations injected into the application evidence service."""
 
     preview: MatrixOperation
     signed_acceptance: MatrixOperation
 
 
-def build_headless_phase3_matrix_operations(
+def build_evidence_matrix_operations(
     *,
     preview_factory: MatrixOperationFactory,
     signed_acceptance_factory: MatrixOperationFactory,
-) -> Phase3MatrixOperations:
+) -> EvidenceMatrixOperations:
     """Build lazy matrix callables without importing or constructing Qt state."""
 
-    return Phase3MatrixOperations(
+    return EvidenceMatrixOperations(
         preview=_LazyMatrixOperation(preview_factory),
         signed_acceptance=_LazyMatrixOperation(signed_acceptance_factory),
     )

@@ -183,7 +183,7 @@ class Phase3InteractiveHarnessRunner:
         return capture
 
 
-def build_interactive_phase3_capture_runner() -> Callable[
+def build_interactive_evidence_capture_runner() -> Callable[
     [Phase3HarnessCaptureRequest], Phase3HarnessCapture
 ]:
     """Build the interactive runner lazily without importing the Qt harness graph."""
@@ -193,11 +193,11 @@ def build_interactive_phase3_capture_runner() -> Callable[
     def run(request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
         nonlocal runner
         if runner is None:
-            from foliaseal.presentation.qt.phase3_harness import (
-                _build_interactive_evidence_runner,
+            from foliaseal.presentation.qt.evidence_runner_factories import (
+                build_interactive_evidence_runner,
             )
 
-            runner = _build_interactive_evidence_runner()
+            runner = build_interactive_evidence_runner()
         return runner.run(request)
 
     return run

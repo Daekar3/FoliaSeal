@@ -80,7 +80,7 @@ from foliaseal.presentation.qt.phase3_interactive_capture import (
     Phase3HarnessCapture,
     Phase3InteractiveCaptureArtifactPolicy,
     Phase3InteractiveHarnessRunner,
-    build_interactive_phase3_capture_runner,
+    build_interactive_evidence_capture_runner,
     default_harness_artifacts_dir,
     default_harness_output_pdf_path,
     write_optional_text,
@@ -1145,12 +1145,6 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         "default",
         staticmethod(lambda: object()),
     )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "build_phase3_signing_executor",
-        lambda: object(),
-    )
-
     def fake_finalize(request_obj, **_kwargs):
         captured["payload"] = request_obj.capture_payload
         return SimpleNamespace(
@@ -1165,18 +1159,12 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
             )
         )
 
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "finalize_phase3_harness_report",
-        fake_finalize,
-    )
-
     runner = Phase3InteractiveHarnessRunner(
         load_qt_harness_bindings=phase3_harness_module._load_qt_harness_bindings,
         load_page_count=phase3_harness_module._load_page_count,
         render_backend_factory=phase3_harness_module.QtPdfRenderBackend,
         profile_store_factory=phase3_harness_module.SignaturePresetCatalogStore.default,
-        build_phase3_signing_executor=phase3_harness_module.build_phase3_signing_executor,
+        build_phase3_signing_executor=lambda: object(),
         session_runner=SimpleNamespace(
             run=lambda **_kwargs: Phase3HarnessSessionResult(
                 first_render_ms=12.5,
@@ -1203,8 +1191,8 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         capture_assembler=phase3_harness_module._build_phase3_harness_capture_assembler(),
         contract_evaluator=evaluate_phase3_evidence_contract,
         capture_factory=phase3_harness_module._build_phase3_harness_capture,
-        checklist_renderer=phase3_harness_module.render_phase3_checklist_results_markdown,
-        report_finalizer=phase3_harness_module.finalize_phase3_harness_report,
+        checklist_renderer=lambda *_args, **_kwargs: "",
+        report_finalizer=fake_finalize,
         artifact_policy=Phase3InteractiveCaptureArtifactPolicy(
             default_artifacts_dir=default_harness_artifacts_dir,
             output_pdf_path=default_harness_output_pdf_path,
@@ -1254,11 +1242,10 @@ def test_phase3_harness_capture_orchestrates_session_and_reporting(
             )
 
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_build_interactive_evidence_runner",
+        "foliaseal.presentation.qt.evidence_runner_factories.build_interactive_evidence_runner",
         lambda: _FakeInteractivePort(),
     )
-    capture = build_interactive_phase3_capture_runner()(
+    capture = build_interactive_evidence_capture_runner()(
         Phase3HarnessCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),

@@ -19,13 +19,13 @@ from foliaseal.application.phase3_evidence_service import (
 from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
 )
-from foliaseal.presentation.qt.evidence_gateways import (
-    build_interactive_evidence_gateway,
-    build_preview_evidence_gateway,
-    build_signed_acceptance_evidence_gateway,
+from foliaseal.presentation.qt.evidence_runner_factories import (
+    build_interactive_evidence_operation,
+    build_preview_evidence_operation,
+    build_signed_acceptance_evidence_operation,
 )
 from foliaseal.presentation.qt.phase3_matrix_operations import (
-    build_headless_phase3_matrix_operations,
+    build_evidence_matrix_operations,
 )
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
@@ -119,7 +119,7 @@ def _write_evidence_markdown(path: Path, text: str) -> None:
 
 
 def _build_lazy_interactive_capture_runner():
-    return build_interactive_evidence_gateway().run
+    return build_interactive_evidence_operation()
 
 
 def build_default_phase3_evidence_service(
@@ -133,11 +133,9 @@ def build_default_phase3_evidence_service(
         )
 
         asset_generator = generate_signed_acceptance_assets
-    preview_gateway = build_preview_evidence_gateway()
-    signed_gateway = build_signed_acceptance_evidence_gateway()
-    matrix_operations = build_headless_phase3_matrix_operations(
-        preview_factory=lambda: preview_gateway.run,
-        signed_acceptance_factory=lambda: signed_gateway.run,
+    matrix_operations = build_evidence_matrix_operations(
+        preview_factory=build_preview_evidence_operation,
+        signed_acceptance_factory=build_signed_acceptance_evidence_operation,
     )
 
     def matrix_runtime_context(name: str):
