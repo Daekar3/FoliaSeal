@@ -20,7 +20,7 @@ No child ExecPlan is required. The slice is bounded to orchestration/composition
 - [x] (2026-08-02) Selected the hybrid: retain explicit `Phase3EvidenceOrchestrator`/`Phase3EvidenceSession` as the application boundary, delete duplicate presentation gateways, move composition into neutral runner factories, and remove stale internal dispatcher/aliases.
 - [x] (2026-08-02) Added `evidence_runner_factories.py`, moved the three lazy composition entrypoints behind neutral factories, and migrated interactive/matrix service wiring.
 - [x] (2026-08-02) Deleted `evidence_gateways.py`, removed the tagged orchestrator dispatcher/types, renamed the matrix operation boundary, and removed the harness private-builder compatibility seams while preserving stable request/result/CLI contracts.
-- [x] (2026-08-02) Migrated orchestrator/harness/matrix tests to explicit boundary behavior, added concrete preview/signed factory forwarding coverage, and the focused suite passes 140 tests with Ruff clean.
+- [x] (2026-08-02) Migrated orchestrator/harness/matrix tests to explicit boundary behavior, added concrete preview/signed factory forwarding coverage, and the final focused selected suite passes 131 tests with Ruff clean.
 - [x] (2026-08-02) Two independent compliance reviews completed; stale `.run()` typing was migrated, concrete matrix factory forwarding tests were added, and the full suite passes 1044 tests with one pre-existing Pillow warning.
 - [x] (2026-08-02) Architecture-steward documentation reconciliation updated README and `docs/ARCHITECTURE.md`; current-section stale gateway/dispatcher references are removed, with only historical changelog vocabulary retained.
 - [x] (2026-08-02) CLI/matrix smoke validation passed: preview executed 4 scenarios and signed acceptance executed 3 offscreen scenarios, both persisted matching authoritative summary paths; temporary artifacts/processes were cleaned up.
@@ -135,7 +135,7 @@ Run migrations in dependency order: add neutral factories, migrate imports/tests
 
 ## Artifacts and Notes
 
-Record baseline focused count, migrated focused count, full-suite count, lint/compile results, smoke artifact paths, compliance findings and fixes, documentation worker result, cleanup audit, and final commit hashes here during execution. Implementation commit: `4cfe53a0f`; focused rerun: 99 passed with one pre-existing Pillow deprecation warning; `git diff --check`: clean before plan closure; final tree verified clean after closure commit.
+Record baseline focused count, migrated focused count, full-suite count, lint/compile results, smoke artifact paths, compliance findings and fixes, documentation worker result, cleanup audit, and final commit hashes here during execution. Baseline focused slice: 43 passed; implementation-focused rerun: 99 passed; final focused selected suite: 131 passed; full suite: 1044 passed with one pre-existing Pillow deprecation warning. Implementation commit: `4cfe53a0f`; plan closure commit: `e996b2243`; `git diff --check` and final tree verification are clean.
 
 ## Interfaces and Dependencies
 
