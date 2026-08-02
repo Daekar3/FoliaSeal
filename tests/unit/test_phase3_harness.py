@@ -17,8 +17,8 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.application.phase3_evidence_service import (
-    Phase3HarnessCaptureRequest,
+from foliaseal.application.evidence_service import (
+    EvidenceCaptureRequest,
 )
 from foliaseal.application.phase3_signing_backend import (
     build_phase3_signing_executor,
@@ -49,6 +49,15 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
+from foliaseal.presentation.qt.evidence_interactive_capture import (
+    InteractiveEvidenceArtifactPolicy,
+    InteractiveEvidenceRunner,
+    Phase3HarnessCapture,
+    build_interactive_evidence_capture_runner,
+    default_harness_artifacts_dir,
+    default_harness_output_pdf_path,
+    write_optional_text,
+)
 from foliaseal.presentation.qt.phase3_harness import (
     _analyze_capture_state_transitions,
     _analyze_stamp_source_image,
@@ -75,15 +84,6 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
     _apply_appearance_overrides,
     _apply_visible_fields_override,
-)
-from foliaseal.presentation.qt.phase3_interactive_capture import (
-    Phase3HarnessCapture,
-    Phase3InteractiveCaptureArtifactPolicy,
-    Phase3InteractiveHarnessRunner,
-    build_interactive_evidence_capture_runner,
-    default_harness_artifacts_dir,
-    default_harness_output_pdf_path,
-    write_optional_text,
 )
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
@@ -1159,7 +1159,7 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
             )
         )
 
-    runner = Phase3InteractiveHarnessRunner(
+    runner = InteractiveEvidenceRunner(
         load_qt_harness_bindings=phase3_harness_module._load_qt_harness_bindings,
         load_page_count=phase3_harness_module._load_page_count,
         render_backend_factory=phase3_harness_module.QtPdfRenderBackend,
@@ -1193,14 +1193,14 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
         capture_factory=phase3_harness_module._build_phase3_harness_capture,
         checklist_renderer=lambda *_args, **_kwargs: "",
         report_finalizer=fake_finalize,
-        artifact_policy=Phase3InteractiveCaptureArtifactPolicy(
+        artifact_policy=InteractiveEvidenceArtifactPolicy(
             default_artifacts_dir=default_harness_artifacts_dir,
             output_pdf_path=default_harness_output_pdf_path,
             write_text=write_optional_text,
         ),
     )
     capture = runner.run(
-        Phase3HarnessCaptureRequest(
+        EvidenceCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),
             passphrase="secret",
@@ -1246,7 +1246,7 @@ def test_phase3_harness_capture_orchestrates_session_and_reporting(
         lambda: _FakeInteractivePort(),
     )
     capture = build_interactive_evidence_capture_runner()(
-        Phase3HarnessCaptureRequest(
+        EvidenceCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),
             passphrase="secret",

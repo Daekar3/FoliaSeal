@@ -7,6 +7,16 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from foliaseal.application.evidence_program import (
+    EvidenceProgram,
+    EvidenceValidationRequest,
+    program_for_service,
+)
+from foliaseal.application.evidence_service import (
+    EvidenceCaptureRequest,
+    EvidenceMatrixRequest,
+    SignedAcceptanceEvidenceRequest,
+)
 from foliaseal.application.performance_timing import ViewerPerformanceTracker
 from foliaseal.application.phase2_evidence import (
     QtRuntimeReadinessSnapshot,
@@ -14,16 +24,6 @@ from foliaseal.application.phase2_evidence import (
     RuntimeValidationSnapshot,
     build_phase2_timing_evidence,
     parse_checklist_markdown,
-)
-from foliaseal.application.phase3_evidence_orchestrator import (
-    Phase3EvidenceOrchestrator,
-    Phase3ValidationRequest,
-    orchestrator_for_service,
-)
-from foliaseal.application.phase3_evidence_service import (
-    Phase3HarnessCaptureRequest,
-    Phase3MatrixRequest,
-    Phase3SignedAcceptanceEvidenceRequest,
 )
 from foliaseal.application.qa_signed_acceptance_assets import (
     SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
@@ -33,9 +33,9 @@ from foliaseal.application.runtime_metrics import (
     collect_runtime_footprint_snapshot,
     measure_startup_latency_ms,
 )
-from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
+from foliaseal.presentation.qt.signed_acceptance_evidence import (
     DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
-    build_default_phase3_evidence_service,
+    build_default_evidence_service,
 )
 
 DEFAULT_CHECKLIST_TEMPLATE_PATH = "docs/ExecPlans/phase2_manual_qa_checklist.md"
@@ -447,8 +447,8 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
 
 
 def _run_evidence_harness_validate(args: argparse.Namespace) -> None:
-    evaluation = _build_phase3_evidence_orchestrator().validate(
-        Phase3ValidationRequest(summary_json_path=args.summary_json_path)
+    evaluation = _build_evidence_program().validate(
+        EvidenceValidationRequest(summary_json_path=args.summary_json_path)
     )
     print("Phase 3 evidence contract")
     print(f"- acceptance tier: {evaluation.acceptance_tier}")
@@ -463,20 +463,20 @@ def _run_evidence_harness_validate(args: argparse.Namespace) -> None:
         raise ValueError("Phase 3 harness capture failed evidence contract validation.")
 
 
-def _build_phase3_evidence_service():
-    return build_default_phase3_evidence_service()
+def _build_evidence_service():
+    return build_default_evidence_service()
 
 
-def _build_phase3_evidence_orchestrator() -> Phase3EvidenceOrchestrator:
+def _build_evidence_program() -> EvidenceProgram:
     """Build the canonical typed application boundary."""
 
-    return orchestrator_for_service(_build_phase3_evidence_service())
+    return program_for_service(_build_evidence_service())
 
 
-def _build_phase3_harness_capture_request(
+def _build_evidence_capture_request(
     args: argparse.Namespace,
-) -> Phase3HarnessCaptureRequest:
-    return Phase3HarnessCaptureRequest(
+) -> EvidenceCaptureRequest:
+    return EvidenceCaptureRequest(
         pdf_path=args.pdf_path,
         certificate_path=args.certificate_path,
         passphrase=args.passphrase,
@@ -487,8 +487,8 @@ def _build_phase3_harness_capture_request(
     )
 
 
-def _build_phase3_matrix_request(args: argparse.Namespace) -> Phase3MatrixRequest:
-    return Phase3MatrixRequest(
+def _build_evidence_matrix_request(args: argparse.Namespace) -> EvidenceMatrixRequest:
+    return EvidenceMatrixRequest(
         pdf_path=args.pdf_path,
         certificate_path=args.certificate_path,
         passphrase=args.passphrase,
@@ -497,10 +497,10 @@ def _build_phase3_matrix_request(args: argparse.Namespace) -> Phase3MatrixReques
     )
 
 
-def _build_phase3_signed_acceptance_evidence_request(
+def _build_signed_acceptance_evidence_request(
     args: argparse.Namespace,
-) -> Phase3SignedAcceptanceEvidenceRequest:
-    return Phase3SignedAcceptanceEvidenceRequest(
+) -> SignedAcceptanceEvidenceRequest:
+    return SignedAcceptanceEvidenceRequest(
         artifacts_root=args.artifacts_root,
         summary_markdown_path=args.summary_markdown_path,
         passphrase=SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE.decode("utf-8"),
@@ -525,7 +525,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "phase3-signing-harness":
-        _build_phase3_evidence_orchestrator().capture(_build_phase3_harness_capture_request(args))
+        _build_evidence_program().capture(_build_evidence_capture_request(args))
         return 0
     if args.command == "gui":
         return launch_qt_app_frame(
@@ -534,8 +534,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "phase3-signing-preview-matrix":
-        result = _build_phase3_evidence_orchestrator().preview_matrix(
-            _build_phase3_matrix_request(args)
+        result = _build_evidence_program().preview_matrix(
+            _build_evidence_matrix_request(args)
         )
         print("Phase 3 preview matrix")
         print(f"- scenarios executed: {result.scenario_count}")
@@ -543,8 +543,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-matrix":
-        result = _build_phase3_evidence_orchestrator().signed_acceptance_matrix(
-            _build_phase3_matrix_request(args)
+        result = _build_evidence_program().signed_acceptance_matrix(
+            _build_evidence_matrix_request(args)
         )
         print("Phase 3 signed acceptance matrix")
         print(f"- scenarios executed: {result.scenario_count}")
@@ -553,8 +553,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"- summary json: {result.summary_json_path}")
         return 0
     if args.command == "phase3-signing-acceptance-evidence":
-        evidence = _build_phase3_evidence_orchestrator().signed_acceptance_evidence(
-            _build_phase3_signed_acceptance_evidence_request(args)
+        evidence = _build_evidence_program().signed_acceptance_evidence(
+            _build_signed_acceptance_evidence_request(args)
         )
         print("Phase 3 signed acceptance evidence")
         print(f"- summary markdown: {evidence.summary_markdown_path}")

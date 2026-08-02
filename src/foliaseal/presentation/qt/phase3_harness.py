@@ -52,6 +52,15 @@ from foliaseal.domain.models import (
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.presentation.qt.evidence_interactive_capture import (
+    Phase3HarnessCapture as _Phase3HarnessCapture,
+)
+from foliaseal.presentation.qt.evidence_interactive_capture import (
+    default_harness_output_pdf_path,
+)
+from foliaseal.presentation.qt.evidence_interactive_capture import (
+    jsonable_capture as _jsonable_capture,
+)
 from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
     Phase3AppearanceSnapshotter,
 )
@@ -76,15 +85,6 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 )
 from foliaseal.presentation.qt.phase3_image_comparison_helper import (
     Phase3ImageComparisonHelper,
-)
-from foliaseal.presentation.qt.phase3_interactive_capture import (
-    Phase3HarnessCapture as _Phase3HarnessCapture,
-)
-from foliaseal.presentation.qt.phase3_interactive_capture import (
-    default_harness_output_pdf_path,
-)
-from foliaseal.presentation.qt.phase3_interactive_capture import (
-    jsonable_capture as _jsonable_capture,
 )
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,

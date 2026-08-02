@@ -8,20 +8,32 @@ isolation while removing the duplicate gateway layer.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
-from foliaseal.application.phase3_evidence_service import (
-    Phase3HarnessCaptureRequest,
-    Phase3MatrixRequest,
+from foliaseal.application.evidence_service import (
+    EvidenceCaptureRequest,
+    EvidenceMatrixRequest,
 )
 
+MatrixOperation = Callable[[EvidenceMatrixRequest], Mapping[str, Any]]
+
+
+class _LazyOperation:
+    def __init__(self, factory: Callable[[], MatrixOperation]) -> None:
+        self._factory = factory
+        self._operation: MatrixOperation | None = None
+
+    def __call__(self, request: EvidenceMatrixRequest) -> Mapping[str, Any]:
+        if self._operation is None:
+            self._operation = self._factory()
+        return self._operation(request)
+
 if TYPE_CHECKING:
-    from foliaseal.presentation.qt.phase3_interactive_capture import (
+    from foliaseal.presentation.qt.evidence_interactive_capture import (
+        InteractiveEvidenceRunner,
         Phase3HarnessCapture,
-        Phase3InteractiveHarnessRunner,
     )
-    from foliaseal.presentation.qt.phase3_matrix_operations import MatrixOperation
     from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
         Phase3PreviewMatrixRunner,
     )
@@ -30,33 +42,32 @@ if TYPE_CHECKING:
     )
 else:
     Phase3HarnessCapture = Any
-    Phase3InteractiveHarnessRunner = Any
+    InteractiveEvidenceRunner = Any
     Phase3PreviewMatrixRunner = Any
     Phase3SignedAcceptanceMatrixRunner = Any
-    MatrixOperation = Any
 
 
-def build_interactive_evidence_runner() -> Phase3InteractiveHarnessRunner:
+def build_interactive_evidence_runner() -> InteractiveEvidenceRunner:
     """Build the interactive runner only after a capture is requested."""
 
     from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
     from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
     from foliaseal.presentation.qt import phase3_harness as harness
+    from foliaseal.presentation.qt.evidence_interactive_capture import (
+        InteractiveEvidenceArtifactPolicy,
+        InteractiveEvidenceRunner,
+        default_harness_artifacts_dir,
+        default_harness_output_pdf_path,
+        write_optional_text,
+    )
     from foliaseal.presentation.qt.phase3_harness_reporting import (
         build_phase3_checklist_results_markdown as render_phase3_checklist_results_markdown,
     )
     from foliaseal.presentation.qt.phase3_harness_reporting import (
         finalize_phase3_harness_report,
     )
-    from foliaseal.presentation.qt.phase3_interactive_capture import (
-        Phase3InteractiveCaptureArtifactPolicy,
-        Phase3InteractiveHarnessRunner,
-        default_harness_artifacts_dir,
-        default_harness_output_pdf_path,
-        write_optional_text,
-    )
 
-    return Phase3InteractiveHarnessRunner(
+    return InteractiveEvidenceRunner(
         load_qt_harness_bindings=harness._load_qt_harness_bindings,
         load_page_count=harness._load_page_count,
         render_backend_factory=harness.QtPdfRenderBackend,
@@ -68,7 +79,7 @@ def build_interactive_evidence_runner() -> Phase3InteractiveHarnessRunner:
         capture_factory=harness._build_phase3_harness_capture,
         checklist_renderer=render_phase3_checklist_results_markdown,
         report_finalizer=finalize_phase3_harness_report,
-        artifact_policy=Phase3InteractiveCaptureArtifactPolicy(
+        artifact_policy=InteractiveEvidenceArtifactPolicy(
             default_artifacts_dir=default_harness_artifacts_dir,
             output_pdf_path=default_harness_output_pdf_path,
             write_text=write_optional_text,
@@ -132,13 +143,13 @@ def build_signed_acceptance_evidence_runner() -> Phase3SignedAcceptanceMatrixRun
 
 
 def build_interactive_evidence_operation() -> Callable[
-    [Phase3HarnessCaptureRequest], Phase3HarnessCapture
+    [EvidenceCaptureRequest], Phase3HarnessCapture
 ]:
     """Return a lazy request callable for interactive capture."""
 
-    runner: Phase3InteractiveHarnessRunner | None = None
+    runner: InteractiveEvidenceRunner | None = None
 
-    def run(request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+    def run(request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
         nonlocal runner
         if runner is None:
             runner = build_interactive_evidence_runner()
@@ -147,15 +158,17 @@ def build_interactive_evidence_operation() -> Callable[
     return run
 
 
-def build_preview_evidence_operation() -> MatrixOperation:
-    """Return a lazy request callable for preview matrices."""
+def _build_matrix_operation(
+    runner_factory: Callable[[], Any],
+) -> MatrixOperation:
+    runner: Any | None = None
 
-    runner: Phase3PreviewMatrixRunner | None = None
-
-    def run(request: Phase3MatrixRequest):
+    def run(request: EvidenceMatrixRequest) -> Mapping[str, Any]:
         nonlocal runner
         if runner is None:
-            runner = build_preview_evidence_runner()
+            runner = runner_factory()
+        if callable(runner) and not hasattr(runner, "run"):
+            return runner(request)
         return runner.run(
             pdf_path=request.pdf_path,
             certificate_path=request.certificate_path,
@@ -165,23 +178,15 @@ def build_preview_evidence_operation() -> MatrixOperation:
         )
 
     return run
+
+
+def build_preview_evidence_operation() -> MatrixOperation:
+    """Return a lazy request callable for preview matrices."""
+
+    return _build_matrix_operation(build_preview_evidence_runner)
 
 
 def build_signed_acceptance_evidence_operation() -> MatrixOperation:
     """Return a lazy request callable for signed-acceptance matrices."""
 
-    runner: Phase3SignedAcceptanceMatrixRunner | None = None
-
-    def run(request: Phase3MatrixRequest):
-        nonlocal runner
-        if runner is None:
-            runner = build_signed_acceptance_evidence_runner()
-        return runner.run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
-
-    return run
+    return _build_matrix_operation(build_signed_acceptance_evidence_runner)

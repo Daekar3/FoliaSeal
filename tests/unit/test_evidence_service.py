@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.evidence_service import (
+    EvidenceCaptureRequest,
+    EvidenceMatrixRequest,
+    EvidenceService,
+    EvidenceServiceValidationRequest,
+    SignedAcceptanceEvidenceRequest,
+)
 from foliaseal.application.phase3_evidence_core import (
     Phase3MatrixKind,
     validate_signed_acceptance_matrix_summary,
-)
-from foliaseal.application.phase3_evidence_service import (
-    Phase3EvidenceService,
-    Phase3HarnessCaptureRequest,
-    Phase3HarnessValidationRequest,
-    Phase3MatrixRequest,
-    Phase3SignedAcceptanceEvidenceRequest,
 )
 from foliaseal.application.qa_signed_acceptance_generation import (
     GeneratedSignedAcceptanceAssets,
@@ -48,6 +48,7 @@ def _passing_summary(*, artifacts_dir: str, scenario_count: int = 3) -> dict[str
         "cryptographic_validation_failure_count": 0,
         "preview_output_comparison_failure_count": 0,
         "annotation_rect_mismatch_count": 0,
+        "error_scenario_count": 0,
         "artifacts_dir": artifacts_dir,
     }
 
@@ -62,8 +63,8 @@ def _service(
     text_writer=None,
     matrix_runtime_context_factory=None,
     capture_loader=None,
-) -> Phase3EvidenceService:
-    return Phase3EvidenceService(
+) -> EvidenceService:
+    return EvidenceService(
         harness_runner=harness_runner or (lambda request: request),
         preview_matrix_runner=preview_matrix_runner or (lambda request: request),
         signed_acceptance_matrix_runner=signed_acceptance_matrix_runner
@@ -83,7 +84,7 @@ def _service(
     )
 
 
-def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
+def test_evidence_service_forwards_capture_and_matrix_requests() -> None:
     captured: dict[str, object] = {}
 
     service = _service(
@@ -106,8 +107,8 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
         ),
     )
 
-    service.capture_harness(
-        Phase3HarnessCaptureRequest(
+    service.capture(
+        EvidenceCaptureRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -117,8 +118,8 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
             artifacts_dir="artifacts",
         )
     )
-    service.preview_matrix_result(
-        Phase3MatrixRequest(
+    service.preview_matrix(
+        EvidenceMatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -126,8 +127,8 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
             artifacts_dir="artifacts/preview",
         )
     )
-    service.signed_acceptance_matrix_result(
-        Phase3MatrixRequest(
+    service.signed_acceptance_matrix(
+        EvidenceMatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -137,7 +138,7 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
     )
 
     assert captured == {
-        "harness": Phase3HarnessCaptureRequest(
+        "harness": EvidenceCaptureRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -146,14 +147,14 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
             checklist_template_path="template.md",
             artifacts_dir="artifacts",
         ),
-        "preview": Phase3MatrixRequest(
+        "preview": EvidenceMatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
             scenario_manifest_path="preview.json",
             artifacts_dir="artifacts/preview",
         ),
-        "acceptance": Phase3MatrixRequest(
+        "acceptance": EvidenceMatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -163,7 +164,7 @@ def test_phase3_evidence_service_forwards_capture_and_matrix_requests() -> None:
     }
 
 
-def test_phase3_evidence_service_normalizes_typed_matrix_results() -> None:
+def test_evidence_service_normalizes_typed_matrix_results() -> None:
     service = _service(
         preview_matrix_runner=lambda _request: {
             "scenario_count": 2,
@@ -183,7 +184,7 @@ def test_phase3_evidence_service_normalizes_typed_matrix_results() -> None:
             "artifacts_dir": "artifacts/signed",
         },
     )
-    request = Phase3MatrixRequest(
+    request = EvidenceMatrixRequest(
         pdf_path="input.pdf",
         certificate_path="cert.p12",
         passphrase="secret",
@@ -191,8 +192,8 @@ def test_phase3_evidence_service_normalizes_typed_matrix_results() -> None:
         artifacts_dir="artifacts",
     )
 
-    preview = service.preview_matrix_result(request)
-    signed = service.signed_acceptance_matrix_result(request)
+    preview = service.preview_matrix(request)
+    signed = service.signed_acceptance_matrix(request)
 
     assert preview.kind is Phase3MatrixKind.PREVIEW
     assert preview.passed is True
@@ -204,7 +205,7 @@ def test_phase3_evidence_service_normalizes_typed_matrix_results() -> None:
     assert signed.successful_run_count == 2
 
 
-def test_phase3_evidence_service_typed_signed_result_surfaces_counter_failures() -> None:
+def test_evidence_service_typed_signed_result_surfaces_counter_failures() -> None:
     service = _service(
         signed_acceptance_matrix_runner=lambda _request: {
             "scenario_count": 2,
@@ -219,8 +220,8 @@ def test_phase3_evidence_service_typed_signed_result_surfaces_counter_failures()
         }
     )
 
-    result = service.signed_acceptance_matrix_result(
-        Phase3MatrixRequest(
+    result = service.signed_acceptance_matrix(
+        EvidenceMatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -233,7 +234,7 @@ def test_phase3_evidence_service_typed_signed_result_surfaces_counter_failures()
     assert result.errors == ("one mismatch", "expected_outcome_mismatch_count=1")
 
 
-def test_phase3_evidence_service_typed_signed_result_surfaces_scenario_errors() -> None:
+def test_evidence_service_typed_signed_result_surfaces_scenario_errors() -> None:
     service = _service(
         signed_acceptance_matrix_runner=lambda _request: {
             **_passing_summary(artifacts_dir="artifacts/signed"),
@@ -241,8 +242,8 @@ def test_phase3_evidence_service_typed_signed_result_surfaces_scenario_errors() 
         }
     )
 
-    result = service.signed_acceptance_matrix_result(
-        Phase3MatrixRequest(
+    result = service.signed_acceptance_matrix(
+        EvidenceMatrixRequest(
             pdf_path="input.pdf",
             certificate_path="cert.p12",
             passphrase="secret",
@@ -255,10 +256,10 @@ def test_phase3_evidence_service_typed_signed_result_surfaces_scenario_errors() 
     assert result.errors == ("error_scenario_count=1",)
 
 
-def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
+def test_evidence_service_signed_acceptance_evidence_writes_summary(
     tmp_path: Path,
 ) -> None:
-    matrix_calls: list[Phase3MatrixRequest] = []
+    matrix_calls: list[EvidenceMatrixRequest] = []
     context_names: list[str] = []
 
     service = _service(
@@ -268,8 +269,8 @@ def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
         matrix_runtime_context_factory=lambda name: context_names.append(name) or nullcontext(),
     )
 
-    result = service.run_signed_acceptance_evidence(
-        Phase3SignedAcceptanceEvidenceRequest(
+    result = service.signed_acceptance_evidence(
+        SignedAcceptanceEvidenceRequest(
             artifacts_root=tmp_path,
             summary_markdown_path=tmp_path / "artifacts/summary.md",
             passphrase="secret",
@@ -294,12 +295,12 @@ def test_phase3_evidence_service_run_signed_acceptance_evidence_writes_summary(
     assert "signed_fit_rejection_matrix" in summary_text
 
 
-def test_phase3_evidence_service_aggregate_preserves_runner_summary_path(
+def test_evidence_service_aggregate_preserves_runner_summary_path(
     tmp_path: Path,
 ) -> None:
     custom_summary_path = str(tmp_path / "custom" / "authoritative-summary.json")
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         return {
             **_passing_summary(artifacts_dir=request.artifacts_dir),
             "summary_json_path": custom_summary_path,
@@ -307,8 +308,8 @@ def test_phase3_evidence_service_aggregate_preserves_runner_summary_path(
 
     service = _service(signed_acceptance_matrix_runner=fake_matrix_runner)
 
-    result = service.run_signed_acceptance_evidence(
-        Phase3SignedAcceptanceEvidenceRequest(
+    result = service.signed_acceptance_evidence(
+        SignedAcceptanceEvidenceRequest(
             artifacts_root=tmp_path,
             summary_markdown_path=tmp_path / "artifacts/summary.md",
             passphrase="secret",
@@ -318,12 +319,12 @@ def test_phase3_evidence_service_aggregate_preserves_runner_summary_path(
     assert all(row.summary_json_path == custom_summary_path for row in result.matrix_results)
 
 
-def test_phase3_evidence_service_writes_failure_summary_before_raising(
+def test_evidence_service_writes_failure_summary_before_raising(
     tmp_path: Path,
 ) -> None:
     call_count = 0
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         nonlocal call_count
         call_count += 1
         summary = _passing_summary(artifacts_dir=request.artifacts_dir)
@@ -338,8 +339,8 @@ def test_phase3_evidence_service_writes_failure_summary_before_raising(
     service = _service(signed_acceptance_matrix_runner=fake_matrix_runner)
 
     with pytest.raises(RuntimeError, match="signed_preview_parity_matrix"):
-        service.run_signed_acceptance_evidence(
-            Phase3SignedAcceptanceEvidenceRequest(
+        service.signed_acceptance_evidence(
+            SignedAcceptanceEvidenceRequest(
                 artifacts_root=tmp_path,
                 summary_markdown_path=tmp_path / "artifacts/summary.md",
                 passphrase="secret",
@@ -351,7 +352,7 @@ def test_phase3_evidence_service_writes_failure_summary_before_raising(
     assert "expected preview_output_comparison_failure_count=0, observed 1" in summary_text
 
 
-def test_phase3_evidence_service_validate_harness_capture_loads_payload(
+def test_evidence_service_validate_loads_payload(
     tmp_path: Path,
 ) -> None:
     summary_path = tmp_path / "summary.json"
@@ -363,8 +364,8 @@ def test_phase3_evidence_service_validate_harness_capture_loads_payload(
         capture_contract_evaluator=lambda payload: captured.setdefault("payload", payload) or None,
     )
 
-    result = service.validate_harness_capture(
-        Phase3HarnessValidationRequest(summary_json_path=summary_path)
+    result = service.validate(
+        EvidenceServiceValidationRequest(summary_json_path=summary_path)
     )
 
     assert captured == {"payload": {"loaded_from": str(summary_path)}}

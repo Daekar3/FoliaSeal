@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.evidence_service import (
+    EvidenceMatrixRequest,
+    SignedAcceptanceEvidenceRequest,
+)
 from foliaseal.application.phase3_evidence_core import (
     validate_signed_acceptance_matrix_summary,
-)
-from foliaseal.application.phase3_evidence_service import (
-    Phase3MatrixRequest,
-    Phase3SignedAcceptanceEvidenceRequest,
 )
 from foliaseal.application.qa_signed_acceptance_assets import (
     SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
@@ -19,9 +19,9 @@ from foliaseal.application.qa_signed_acceptance_generation import (
     SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE,
     GeneratedSignedAcceptanceAssets,
 )
-from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
+from foliaseal.presentation.qt.signed_acceptance_evidence import (
     DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH,
-    build_default_phase3_evidence_service,
+    build_default_evidence_service,
 )
 
 _PYHANKO_LOGGER_NAME = "pyhanko.sign.validation.generic_cms"
@@ -55,23 +55,24 @@ def _passing_summary(*, artifacts_dir: str, scenario_count: int = 3) -> dict[str
         "cryptographic_validation_failure_count": 0,
         "preview_output_comparison_failure_count": 0,
         "annotation_rect_mismatch_count": 0,
+        "error_scenario_count": 0,
         "artifacts_dir": artifacts_dir,
     }
 
 
-def _run_signed_acceptance_evidence(
+def _signed_acceptance_evidence(
     *,
     artifacts_root: Path,
     asset_generator,
     matrix_runner,
     suppress_known_runtime_chatter: bool = True,
 ):
-    service = build_default_phase3_evidence_service(
+    service = build_default_evidence_service(
         asset_generator=asset_generator,
         matrix_runner=matrix_runner,
     )
-    return service.run_signed_acceptance_evidence(
-        Phase3SignedAcceptanceEvidenceRequest(
+    return service.signed_acceptance_evidence(
+        SignedAcceptanceEvidenceRequest(
             artifacts_root=artifacts_root,
             summary_markdown_path=(
                 artifacts_root / DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH
@@ -88,21 +89,21 @@ def _run_signed_acceptance_evidence(
     )
 
 
-def test_run_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_writes_summary(
+def test_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_writes_summary(
     tmp_path: Path,
 ) -> None:
     generated_roots: list[Path] = []
-    matrix_calls: list[Phase3MatrixRequest] = []
+    matrix_calls: list[EvidenceMatrixRequest] = []
 
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         generated_roots.append(root)
         return _assets(root)
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         matrix_calls.append(request)
         return _passing_summary(artifacts_dir=request.artifacts_dir)
 
-    evidence = _run_signed_acceptance_evidence(
+    evidence = _signed_acceptance_evidence(
         artifacts_root=tmp_path,
         asset_generator=fake_asset_generator,
         matrix_runner=fake_matrix_runner,
@@ -124,7 +125,7 @@ def test_run_signed_acceptance_evidence_generates_assets_runs_three_matrices_and
     assert "signed_fit_rejection_matrix" in summary_text
 
 
-def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
+def test_signed_acceptance_evidence_writes_failure_summary_and_raises(
     tmp_path: Path,
 ) -> None:
     call_count = 0
@@ -132,7 +133,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         nonlocal call_count
         call_count += 1
         summary = _passing_summary(artifacts_dir=request.artifacts_dir)
@@ -145,7 +146,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
         return summary
 
     with pytest.raises(RuntimeError, match="signed_preview_parity_matrix"):
-        _run_signed_acceptance_evidence(
+        _signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -159,7 +160,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_and_raises(
     assert "Preview/output comparison failures: 1" in summary_text
 
 
-def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raises(
+def test_signed_acceptance_evidence_writes_failure_summary_when_matrix_raises(
     tmp_path: Path,
 ) -> None:
     call_count = 0
@@ -167,7 +168,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raise
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         nonlocal call_count
         call_count += 1
         if call_count == 2:
@@ -175,7 +176,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raise
         return _passing_summary(artifacts_dir=request.artifacts_dir)
 
     with pytest.raises(RuntimeError, match="Qt renderer unavailable"):
-        _run_signed_acceptance_evidence(
+        _signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -189,7 +190,7 @@ def test_run_signed_acceptance_evidence_writes_failure_summary_when_matrix_raise
     )
 
 
-def test_run_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
+def test_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -198,7 +199,7 @@ def test_run_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(_request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(_request: EvidenceMatrixRequest) -> dict[str, object]:
         logger.warning(
             "Validation error [cert context: Common Name: FoliaSeal TSA, "
             "Organization: FoliaSeal, Country: US]: The X.509 certificate "
@@ -207,7 +208,7 @@ def test_run_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
         return _passing_summary(artifacts_dir="artifacts/run")
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LOGGER_NAME):
-        _run_signed_acceptance_evidence(
+        _signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -216,7 +217,7 @@ def test_run_signed_acceptance_evidence_suppresses_known_dummy_tsa_warning(
     assert "Validation error [cert context:" not in caplog.text
 
 
-def test_run_signed_acceptance_evidence_keeps_unmatched_pyhanko_warning(
+def test_signed_acceptance_evidence_keeps_unmatched_pyhanko_warning(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -225,12 +226,12 @@ def test_run_signed_acceptance_evidence_keeps_unmatched_pyhanko_warning(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(_request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(_request: EvidenceMatrixRequest) -> dict[str, object]:
         logger.warning("Validation error [cert context: Real TSA]: network timeout")
         return _passing_summary(artifacts_dir="artifacts/run")
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LOGGER_NAME):
-        _run_signed_acceptance_evidence(
+        _signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -239,7 +240,7 @@ def test_run_signed_acceptance_evidence_keeps_unmatched_pyhanko_warning(
     assert "Real TSA" in caplog.text
 
 
-def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
+def test_signed_acceptance_evidence_suppresses_known_layout_warning(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -248,7 +249,7 @@ def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         if Path(request.scenario_manifest_path).name == "signed_fit_rejection_matrix.json":
             logger.warning(
                 "Content box width/height 397 is too wide for container size 170 "
@@ -257,7 +258,7 @@ def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
         return _passing_summary(artifacts_dir=request.artifacts_dir)
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
-        _run_signed_acceptance_evidence(
+        _signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,
@@ -266,7 +267,7 @@ def test_run_signed_acceptance_evidence_suppresses_known_layout_warning(
     assert "post_margin will be ignored" not in caplog.text
 
 
-def test_run_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_matrix(
+def test_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_matrix(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -275,7 +276,7 @@ def test_run_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_m
     def fake_asset_generator(*, root: Path) -> GeneratedSignedAcceptanceAssets:
         return _assets(root)
 
-    def fake_matrix_runner(request: Phase3MatrixRequest) -> dict[str, object]:
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
         if Path(request.scenario_manifest_path).name == "signed_acceptance_matrix.json":
             logger.warning(
                 "Content box width/height 397 is too wide for container size 170 "
@@ -284,7 +285,7 @@ def test_run_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_m
         return _passing_summary(artifacts_dir=request.artifacts_dir)
 
     with caplog.at_level(logging.WARNING, logger=_PYHANKO_LAYOUT_LOGGER_NAME):
-        _run_signed_acceptance_evidence(
+        _signed_acceptance_evidence(
             artifacts_root=tmp_path,
             asset_generator=fake_asset_generator,
             matrix_runner=fake_matrix_runner,

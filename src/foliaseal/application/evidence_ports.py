@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any, Protocol
 from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluation
 
 if TYPE_CHECKING:
-    from foliaseal.application.phase3_evidence_service import (
-        Phase3HarnessCaptureRequest,
-        Phase3MatrixRequest,
+    from foliaseal.application.evidence_service import (
+        EvidenceCaptureRequest,
+        EvidenceMatrixRequest,
     )
     from foliaseal.application.qa_signed_acceptance_generation import (
         GeneratedSignedAcceptanceAssets,
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class CaptureRunnerPort(Protocol):
-    def __call__(self, request: Phase3HarnessCaptureRequest) -> CaptureResultPort: ...
+    def __call__(self, request: EvidenceCaptureRequest) -> CaptureResultPort: ...
 
 
 class CaptureResultPort(Protocol):
@@ -30,7 +30,7 @@ class CaptureResultPort(Protocol):
 
 
 class MatrixRunnerPort(Protocol):
-    def __call__(self, request: Phase3MatrixRequest) -> Mapping[str, Any]: ...
+    def __call__(self, request: EvidenceMatrixRequest) -> Mapping[str, Any]: ...
 
 
 class AssetGeneratorPort(Protocol):

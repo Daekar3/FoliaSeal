@@ -8,13 +8,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from foliaseal.application.evidence_ports import AssetGeneratorPort, MatrixRunnerPort
+from foliaseal.application.evidence_service import (
+    EvidenceService,
+)
 from foliaseal.application.phase3_evidence_core import (
     validate_signed_acceptance_matrix_summary,
-)
-from foliaseal.application.phase3_evidence_service import (
-    AssetGenerator,
-    MatrixRunner,
-    Phase3EvidenceService,
 )
 from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
@@ -24,9 +23,6 @@ from foliaseal.presentation.qt.evidence_runner_factories import (
     build_preview_evidence_operation,
     build_signed_acceptance_evidence_operation,
 )
-from foliaseal.presentation.qt.phase3_matrix_operations import (
-    build_evidence_matrix_operations,
-)
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
     "artifacts/phase3_signed_acceptance_evidence_summary.md"
@@ -34,7 +30,7 @@ DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
 
 __all__ = [
     "DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH",
-    "build_default_phase3_evidence_service",
+    "build_default_evidence_service",
     "validate_signed_acceptance_matrix_summary",
 ]
 
@@ -118,35 +114,31 @@ def _write_evidence_markdown(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _build_lazy_interactive_capture_runner():
-    return build_interactive_evidence_operation()
-
-
-def build_default_phase3_evidence_service(
+def build_default_evidence_service(
     *,
-    asset_generator: AssetGenerator | None = None,
-    matrix_runner: MatrixRunner | None = None,
-) -> Phase3EvidenceService:
+    asset_generator: AssetGeneratorPort | None = None,
+    matrix_runner: MatrixRunnerPort | None = None,
+) -> EvidenceService:
     if asset_generator is None:
-        from foliaseal.application.qa_signed_acceptance_generation import (
-            generate_signed_acceptance_assets,
-        )
+        def deferred_asset_generator(*, root: Path):
+            from foliaseal.application.qa_signed_acceptance_generation import (
+                generate_signed_acceptance_assets,
+            )
 
-        asset_generator = generate_signed_acceptance_assets
-    matrix_operations = build_evidence_matrix_operations(
-        preview_factory=build_preview_evidence_operation,
-        signed_acceptance_factory=build_signed_acceptance_evidence_operation,
-    )
+            return generate_signed_acceptance_assets(root=root)
 
+        asset_generator = deferred_asset_generator
     def matrix_runtime_context(name: str):
         return _suppress_known_signed_evidence_runtime_chatter(
             suppress_layout_warnings=name == "signed_fit_rejection_matrix"
         )
 
-    return Phase3EvidenceService(
-        harness_runner=_build_lazy_interactive_capture_runner(),
-        preview_matrix_runner=matrix_operations.preview,
-        signed_acceptance_matrix_runner=(matrix_runner or matrix_operations.signed_acceptance),
+    return EvidenceService(
+        harness_runner=build_interactive_evidence_operation(),
+        preview_matrix_runner=build_preview_evidence_operation(),
+        signed_acceptance_matrix_runner=(
+            matrix_runner or build_signed_acceptance_evidence_operation()
+        ),
         asset_generator=asset_generator,
         capture_contract_evaluator=evaluate_phase3_evidence_contract,
         text_writer=_write_evidence_markdown,

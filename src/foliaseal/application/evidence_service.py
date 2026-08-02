@@ -1,4 +1,4 @@
-"""Service boundary for Phase 3 evidence workflows."""
+"""Application service for evidence workflows."""
 
 from __future__ import annotations
 
@@ -7,6 +7,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from foliaseal.application.evidence_ports import (
+    AssetGeneratorPort,
+    CaptureContractEvaluatorPort,
+    CaptureLoaderPort,
+    CaptureResultPort,
+    CaptureRunnerPort,
+    MatrixRunnerPort,
+    MatrixRuntimeContextPort,
+    TextWriterPort,
+)
 from foliaseal.application.phase3_evidence_core import (
     Phase3MatrixKind,
     Phase3MatrixResult,
@@ -31,35 +41,16 @@ from foliaseal.application.phase3_evidence_core import (
 from foliaseal.application.phase3_evidence_core import (
     validate_signed_acceptance_matrix_summary as core_validate_signed_acceptance_matrix_summary,
 )
-from foliaseal.application.phase3_evidence_ports import (
-    AssetGeneratorPort,
-    CaptureContractEvaluatorPort,
-    CaptureLoaderPort,
-    CaptureResultPort,
-    CaptureRunnerPort,
-    MatrixRunnerPort,
-    MatrixRuntimeContextPort,
-    TextWriterPort,
-)
 from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluation
 
 if TYPE_CHECKING:
-    from foliaseal.application.phase3_evidence_orchestrator import Phase3EvidenceSession
+    from foliaseal.application.evidence_program import EvidenceSession
     from foliaseal.application.qa_signed_acceptance_generation import (
         GeneratedSignedAcceptanceAssets,
     )
 
-HarnessCaptureRunner = CaptureRunnerPort
-MatrixRunner = MatrixRunnerPort
-AssetGenerator = AssetGeneratorPort
-CaptureContractEvaluator = CaptureContractEvaluatorPort
-TextWriter = TextWriterPort
-MatrixRuntimeContextFactory = MatrixRuntimeContextPort
-CaptureLoader = CaptureLoaderPort
-
-
 @dataclass(frozen=True)
-class Phase3HarnessCaptureRequest:
+class EvidenceCaptureRequest:
     pdf_path: str
     certificate_path: str
     passphrase: str
@@ -70,7 +61,7 @@ class Phase3HarnessCaptureRequest:
 
 
 @dataclass(frozen=True)
-class Phase3MatrixRequest:
+class EvidenceMatrixRequest:
     pdf_path: str
     certificate_path: str
     passphrase: str
@@ -79,7 +70,7 @@ class Phase3MatrixRequest:
 
 
 @dataclass(frozen=True)
-class Phase3SignedAcceptanceEvidenceRequest:
+class SignedAcceptanceEvidenceRequest:
     artifacts_root: str | Path = "."
     summary_markdown_path: str | Path | None = None
     passphrase: str = ""
@@ -89,22 +80,22 @@ class Phase3SignedAcceptanceEvidenceRequest:
 
 
 @dataclass(frozen=True)
-class Phase3HarnessValidationRequest:
+class EvidenceServiceValidationRequest:
     summary_json_path: str | Path
 
 
-class Phase3EvidenceService:
+class EvidenceService:
     def __init__(
         self,
         *,
-        harness_runner: HarnessCaptureRunner,
-        preview_matrix_runner: MatrixRunner,
-        signed_acceptance_matrix_runner: MatrixRunner,
-        asset_generator: AssetGenerator,
-        capture_contract_evaluator: CaptureContractEvaluator,
-        text_writer: TextWriter,
-        matrix_runtime_context_factory: MatrixRuntimeContextFactory | None = None,
-        capture_loader: CaptureLoader | None = None,
+        harness_runner: CaptureRunnerPort,
+        preview_matrix_runner: MatrixRunnerPort,
+        signed_acceptance_matrix_runner: MatrixRunnerPort,
+        asset_generator: AssetGeneratorPort,
+        capture_contract_evaluator: CaptureContractEvaluatorPort,
+        text_writer: TextWriterPort,
+        matrix_runtime_context_factory: MatrixRuntimeContextPort | None = None,
+        capture_loader: CaptureLoaderPort | None = None,
     ) -> None:
         self._harness_runner = harness_runner
         self._preview_matrix_runner = preview_matrix_runner
@@ -124,22 +115,22 @@ class Phase3EvidenceService:
         certificate_path: str,
         passphrase: str,
         artifacts_dir: str = "artifacts/phase3",
-    ) -> Phase3EvidenceSession:
+    ) -> EvidenceSession:
         """Return a reusable session bound to one PDF and its credentials."""
 
-        from foliaseal.application.phase3_evidence_orchestrator import orchestrator_for_service
+        from foliaseal.application.evidence_program import program_for_service
 
-        return orchestrator_for_service(self).for_pdf(
+        return program_for_service(self).for_pdf(
             pdf_path,
             certificate_path=certificate_path,
             passphrase=passphrase,
             artifacts_dir=artifacts_dir,
         )
 
-    def capture_harness(self, request: Phase3HarnessCaptureRequest) -> CaptureResultPort:
+    def capture(self, request: EvidenceCaptureRequest) -> CaptureResultPort:
         return self._harness_runner(request)
 
-    def preview_matrix_result(self, request: Phase3MatrixRequest) -> Phase3MatrixResult:
+    def preview_matrix(self, request: EvidenceMatrixRequest) -> Phase3MatrixResult:
         """Run and normalize a preview matrix through the injected runner."""
 
         return core_normalize_matrix_result(
@@ -147,9 +138,9 @@ class Phase3EvidenceService:
             summary=self._preview_matrix_runner(request),
         )
 
-    def signed_acceptance_matrix_result(
+    def signed_acceptance_matrix(
         self,
-        request: Phase3MatrixRequest,
+        request: EvidenceMatrixRequest,
     ) -> Phase3MatrixResult:
         """Return a typed signed-acceptance result over the stable summary contract."""
 
@@ -158,16 +149,16 @@ class Phase3EvidenceService:
             summary=self._signed_acceptance_matrix_runner(request),
         )
 
-    def validate_harness_capture(
+    def validate(
         self,
-        request: Phase3HarnessValidationRequest,
+        request: EvidenceServiceValidationRequest,
     ) -> EvidenceContractEvaluation:
         payload = self._capture_loader(Path(request.summary_json_path))
         return self._capture_contract_evaluator(payload)
 
-    def run_signed_acceptance_evidence(
+    def signed_acceptance_evidence(
         self,
-        request: Phase3SignedAcceptanceEvidenceRequest,
+        request: SignedAcceptanceEvidenceRequest,
     ) -> Phase3SignedAcceptanceEvidenceResult:
         root = Path(request.artifacts_root)
         summary_path = (
@@ -188,7 +179,7 @@ class Phase3EvidenceService:
             try:
                 with chatter_context:
                     summary = self._signed_acceptance_matrix_runner(
-                        Phase3MatrixRequest(
+                        EvidenceMatrixRequest(
                             pdf_path=str(assets.fixture_pdf),
                             certificate_path=str(assets.identity_p12),
                             passphrase=request.passphrase,

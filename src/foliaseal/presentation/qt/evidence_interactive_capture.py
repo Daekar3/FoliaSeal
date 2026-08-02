@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.application.phase3_evidence_service import Phase3HarnessCaptureRequest
+from foliaseal.application.evidence_service import EvidenceCaptureRequest
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
@@ -77,7 +77,7 @@ class Phase3HarnessCapture:
 
 
 @dataclass(frozen=True)
-class Phase3InteractiveCaptureArtifactPolicy:
+class InteractiveEvidenceArtifactPolicy:
     """Artifact-path and optional-text policy for one interactive capture."""
 
     default_artifacts_dir: Callable[..., str | None]
@@ -86,7 +86,7 @@ class Phase3InteractiveCaptureArtifactPolicy:
 
 
 @dataclass(frozen=True)
-class Phase3InteractiveHarnessRunner:
+class InteractiveEvidenceRunner:
     """Interactive capture runner hiding session, artifact, and report choreography."""
 
     load_qt_harness_bindings: Callable[[], _QtHarnessBindings]
@@ -100,9 +100,9 @@ class Phase3InteractiveHarnessRunner:
     capture_factory: Callable[..., Phase3HarnessCapture]
     checklist_renderer: Callable[..., str]
     report_finalizer: Callable[..., Any]
-    artifact_policy: Phase3InteractiveCaptureArtifactPolicy
+    artifact_policy: InteractiveEvidenceArtifactPolicy
 
-    def run(self, request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+    def run(self, request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
         bindings = self.load_qt_harness_bindings()
         source_path = Path(request.pdf_path)
         if not source_path.exists():
@@ -184,13 +184,13 @@ class Phase3InteractiveHarnessRunner:
 
 
 def build_interactive_evidence_capture_runner() -> Callable[
-    [Phase3HarnessCaptureRequest], Phase3HarnessCapture
+    [EvidenceCaptureRequest], Phase3HarnessCapture
 ]:
     """Build the interactive runner lazily without importing the Qt harness graph."""
 
-    runner: Phase3InteractiveHarnessRunner | None = None
+    runner: InteractiveEvidenceRunner | None = None
 
-    def run(request: Phase3HarnessCaptureRequest) -> Phase3HarnessCapture:
+    def run(request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
         nonlocal runner
         if runner is None:
             from foliaseal.presentation.qt.evidence_runner_factories import (

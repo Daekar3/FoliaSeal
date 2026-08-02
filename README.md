@@ -152,11 +152,12 @@ Visible-signature prepare-once hybrid:
 Phase 3 evidence command pipeline and signed lifecycle:
 
 - `phase3_evidence_core.py` owns the Qt-free typed result models, normalization, validation, and
-  evidence-markdown decisions. `phase3_evidence_ports.py` defines the narrow effect protocols.
-  `Phase3EvidenceOrchestrator` and its document-bound `Phase3EvidenceSession` are the canonical
+  evidence-markdown decisions. `evidence_ports.py` defines the narrow effect protocols.
+  `EvidenceProgram` and its document-bound `EvidenceSession` are the canonical
   typed application boundary over those ports.
-- `Phase3EvidenceService` remains the injected execution service. It exposes typed
-  `Phase3MatrixResult` values, tagged by `Phase3MatrixKind` (`preview` or `signed_acceptance`);
+- `EvidenceService` remains the injected execution service. It exposes typed
+  `Phase3MatrixResult` values whose `Phase3MatrixKind` identifies `preview` or
+  `signed_acceptance` results;
   raw runner dictionaries stay inside the service adapters and the removed `run_*` aliases are
   no longer part of the public contract.
 - Signed-acceptance rows use a typed scenario result whose `as_mapping()` preserves the existing
@@ -184,12 +185,12 @@ Reusable Python callers can bind one PDF and its credentials once, then run the 
 operations through the document-bound session:
 
 ```python
-from foliaseal.application.phase3_evidence_service import Phase3EvidenceService
-from foliaseal.presentation.qt.phase3_signed_acceptance_evidence import (
-    build_default_phase3_evidence_service,
+from foliaseal.application.evidence_service import EvidenceService
+from foliaseal.presentation.qt.signed_acceptance_evidence import (
+    build_default_evidence_service,
 )
 
-service: Phase3EvidenceService = build_default_phase3_evidence_service()
+service: EvidenceService = build_default_evidence_service()
 session = service.for_pdf(
     "/path/to/input.pdf",
     certificate_path="/path/to/certificate.p12",
@@ -200,18 +201,16 @@ signed = session.signed_acceptance("/path/to/signed-acceptance-manifest.json")
 ```
 
 The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir=` per call when
-isolating a run. Preview and signed matrices are injected as separate lazy operations through
-`EvidenceMatrixOperations`; interactive capture is installed through the neutral
-`build_interactive_evidence_capture_runner()` factory. These factories construct their
+isolating a run. Preview and signed matrices are injected as separate lazy operations built by
+`evidence_runner_factories.py`; interactive capture is installed through the neutral
+`build_interactive_evidence_runner()` factory. These factories construct their
 Qt/runtime graphs only on first use. Application package exports
 are also lazy so importing a focused presentation module does not eagerly load optional GUI/runtime
-dependencies. `phase3_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
+dependencies. `evidence_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
 interactive runner, JSON normalization, and artifact policy; `evidence_runner_factories.py` owns
-neutral lazy runner construction; `phase3_matrix_operations.py` owns the dependency-light
-`EvidenceMatrixOperations` holder; `evidence_artifacts.py` owns preview/signed summary
+neutral lazy runner and operation construction; `evidence_artifacts.py` owns preview/signed summary
 artifact publication; `phase3_harness.py`
-remains the Qt composition root that builds the concrete runner dependencies. It is no longer a
-three-verb `Phase3Composition`/`Phase3Harness` compatibility facade. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
+remains the Qt composition root that builds the concrete runner dependencies. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
 scenario sweep, processes events between scenarios, and closes that shell in its cleanup path.
 
 Not yet production-ready:
@@ -381,12 +380,12 @@ Current acceptance note:
 
 Application boundary and execution contexts:
 
-- `Phase3EvidenceOrchestrator` is the canonical application-owned boundary for tagged capture,
+- `EvidenceProgram` is the canonical application-owned boundary for explicit capture,
   preview-matrix, signed-acceptance-matrix, aggregate signed-evidence, and capture-validation
   requests. It validates request payloads and delegates to the injected evidence service without
   importing Qt, PyHanko, Pillow, TSA, or presentation modules.
 - The former `Phase3EvidenceGateway` facade has been retired. Reusable callers use
-  `Phase3EvidenceOrchestrator.for_pdf()` and the typed `Phase3EvidenceSession` directly.
+  `EvidenceProgram.for_pdf()` and the typed `EvidenceSession` directly.
 - The CLI commands `phase3-signing-harness`, `phase3-signing-preview-matrix`,
   `phase3-signing-acceptance-matrix`, `phase3-signing-acceptance-evidence`, and
   `phase3-signing-harness-validate` route through this application boundary while preserving
@@ -512,9 +511,9 @@ One-command signed acceptance evidence:
 This regenerates the current-code fixture PDF, test PKCS#12 identity, stamp image, and three
 scenario manifests, runs the representative acceptance, preview-parity, and fit-rejection matrices,
 then writes `artifacts/phase3_signed_acceptance_evidence_summary.md`. The command exits with an
-error if any matrix reports failed acceptance expectations, expected-outcome mismatches,
-cryptographic validation failures, preview/output comparison failures, or annotation rectangle
-mismatches. It filters known benign dummy-TSA, offscreen Qt, and intentional fit-rejection layout
+error if any matrix reports failed acceptance expectations, scenario execution errors,
+expected-outcome mismatches, cryptographic validation failures, preview/output comparison
+failures, or annotation rectangle mismatches. It filters known benign dummy-TSA, offscreen Qt, and intentional fit-rejection layout
 runtime chatter; use the per-manifest matrix command below when raw low-level diagnostics are
 needed.
 

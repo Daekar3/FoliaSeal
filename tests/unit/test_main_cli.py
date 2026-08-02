@@ -348,7 +348,7 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
     captured = {}
 
     class _FakeService:
-        def preview_matrix_result(self, request):
+        def preview_matrix(self, request):
             captured["pdf_path"] = request.pdf_path
             captured["certificate_path"] = request.certificate_path
             captured["passphrase"] = request.passphrase
@@ -362,7 +362,7 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
             )
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         lambda: _FakeService(),
     )
 
@@ -410,11 +410,11 @@ def test_main_phase3_preview_matrix_uses_the_application_orchestrator(
         raise AssertionError("CLI should compose the orchestrator as its Phase 3 boundary")
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_orchestrator",
+        "foliaseal.__main__._build_evidence_program",
         lambda: _FakeOrchestrator(),
     )
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         fail_if_service_builder_called,
     )
 
@@ -444,7 +444,7 @@ def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
     captured = {}
 
     class _FakeService:
-        def signed_acceptance_matrix_result(self, request):
+        def signed_acceptance_matrix(self, request):
             captured["pdf_path"] = request.pdf_path
             captured["certificate_path"] = request.certificate_path
             captured["passphrase"] = request.passphrase
@@ -458,7 +458,7 @@ def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
             )
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         lambda: _FakeService(),
     )
 
@@ -497,7 +497,7 @@ def test_main_phase3_signing_harness_dispatches_through_service(
     captured = {}
 
     class _FakeService:
-        def capture_harness(self, request):
+        def capture(self, request):
             captured["pdf_path"] = request.pdf_path
             captured["certificate_path"] = request.certificate_path
             captured["passphrase"] = request.passphrase
@@ -508,7 +508,7 @@ def test_main_phase3_signing_harness_dispatches_through_service(
             return object()
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         lambda: _FakeService(),
     )
 
@@ -543,7 +543,7 @@ def test_main_phase3_signing_harness_dispatches_through_service(
     }
 
 
-def test_main_phase3_signed_acceptance_evidence_dispatches_to_service(
+def test_main_signed_acceptance_evidence_dispatches_to_service(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -562,14 +562,14 @@ def test_main_phase3_signed_acceptance_evidence_dispatches_to_service(
         matrix_results = (_FakeMatrixResult(),)
 
     class _FakeService:
-        def run_signed_acceptance_evidence(self, request):
+        def signed_acceptance_evidence(self, request):
             captured["artifacts_root"] = str(request.artifacts_root)
             captured["summary_markdown_path"] = request.summary_markdown_path
             captured["passphrase"] = request.passphrase
             return _FakeEvidence()
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         lambda: _FakeService(),
     )
 
@@ -601,7 +601,7 @@ def test_main_phase3_signing_harness_validate_dispatches_to_service(
     captured = {}
 
     class _FakeService:
-        def validate_harness_capture(self, request):
+        def validate(self, request):
             captured["summary_json_path"] = str(request.summary_json_path)
             return SimpleNamespace(
                 acceptance_tier="full",
@@ -613,7 +613,7 @@ def test_main_phase3_signing_harness_validate_dispatches_to_service(
             )
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         lambda: _FakeService(),
     )
 
@@ -637,7 +637,7 @@ def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     class _FakeService:
-        def validate_harness_capture(self, request):
+        def validate(self, request):
             return SimpleNamespace(
                 acceptance_tier="partial",
                 gate_verdict="fail",
@@ -648,7 +648,7 @@ def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
             )
 
     monkeypatch.setattr(
-        "foliaseal.__main__._build_phase3_evidence_service",
+        "foliaseal.__main__._build_evidence_service",
         lambda: _FakeService(),
     )
 

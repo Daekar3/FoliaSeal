@@ -82,7 +82,7 @@ def test_phase3_preview_matrix_parser_accepts_manifest_and_artifacts_dir() -> No
     assert args.artifacts_dir == "artifacts/phase3_preview_matrix"
 
 
-def test_phase3_signed_acceptance_evidence_parser_accepts_output_paths() -> None:
+def test_signed_acceptance_evidence_parser_accepts_output_paths() -> None:
     parser = _build_parser()
 
     args = parser.parse_args(

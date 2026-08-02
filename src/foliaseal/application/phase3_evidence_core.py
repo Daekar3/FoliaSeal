@@ -149,7 +149,7 @@ def validate_signed_acceptance_matrix_summary(
                 for error in expectation_errors
                 if isinstance(error, str) and error
             )
-    for key in CRITICAL_ZERO_COUNTERS:
+    for key in CRITICAL_ZERO_COUNTERS + ("error_scenario_count",):
         try:
             observed = summary_int(summary, key)
         except ValueError as exc:
