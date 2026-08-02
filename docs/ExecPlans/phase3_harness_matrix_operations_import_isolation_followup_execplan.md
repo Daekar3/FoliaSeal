@@ -43,7 +43,7 @@ After this follow-up, importing the application service, signed-evidence default
 
 ## Outcomes & Retrospective
 
-The follow-up implementation is complete: optional GUI/PDF imports are deferred until selected operations, CLI/default-service imports are clean, and the stale shell-recycle declaration is removed without changing lifecycle behavior. The second compliance/high-risk review and documentation reconciliation are complete; the parent/child commit is intentionally left to the main agent.
+The follow-up implementation is complete: optional GUI/PDF imports are deferred until selected operations, CLI/default-service imports are clean, and the stale shell-recycle declaration is removed without changing lifecycle behavior. The second compliance/high-risk review and documentation reconciliation are complete; the parent and child plan updates are included in commit `0fa69ec5f`.
 
 ## Context and Orientation
 
@@ -90,7 +90,7 @@ Record evidence here:
        full suite: <count> passed
        matrices: preview 8/8; signed 6 successful, 2 intentional rejections
        stale shell-recycle symbol: absent
-       follow-up commit: <hash>
+       follow-up commit: 0fa69ec5f
 
 ## Interfaces and Dependencies
 

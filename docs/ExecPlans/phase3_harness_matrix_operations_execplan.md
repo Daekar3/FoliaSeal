@@ -32,7 +32,7 @@ The user-visible proof is unchanged commands with a cleaner execution path: prev
 - [x] (2026-08-01) Initial compliance review passed stable contracts; high-risk review found eager optional-dependency imports and an unused lifecycle comment, so child plan `phase3_harness_matrix_operations_import_isolation_followup_execplan.md` was created and implemented.
 - [x] (2026-08-01) Completed the required second compliance/high-risk review after the child follow-up; no remaining discrepancies were found in import isolation, lifecycle cleanup, raw summary parity, or artifact handling.
 - [x] (2026-08-01) Reconciled README, `docs/ARCHITECTURE.md`, and the active child ExecPlan through an architecture-steward documentation review; historical changelog entries remain explicitly historical.
-- [ ] Create the focused main-branch commit with write-git-commit and verify a clean checkout.
+- [x] (2026-08-01) Created focused main-branch commit `0fa69ec5f` with write-git-commit and verified the checkout was clean.
 
 ## Surprises & Discoveries
 
@@ -64,7 +64,7 @@ The user-visible proof is unchanged commands with a cleaner execution path: prev
 
 ## Outcomes & Retrospective
 
-The primary migration and import-isolation follow-up are implemented and validated. `Phase3MatrixOperations` owns lazy preview/signed operation wiring; interactive capture is separately lazy; redundant composition/facade/lazy/protocol symbols are removed; and Qt package exports are lazy. The signed matrix retains one shell/lifecycle for its scenario sweep and closes it in the existing cleanup path. The second compliance/high-risk review and architecture-steward documentation reconciliation completed on 2026-08-01. Pure preview-diagnostics and broad widget/render extraction remain deferred; only the focused main-branch commit remains before closure.
+The primary migration and import-isolation follow-up are implemented, validated, documented, and committed in `0fa69ec5f`. `Phase3MatrixOperations` owns lazy preview/signed operation wiring; interactive capture is separately lazy; redundant composition/facade/lazy/protocol symbols are removed; and Qt package exports are lazy. The signed matrix retains one shell/lifecycle for its scenario sweep and closes it in the existing cleanup path. The second compliance/high-risk review and architecture-steward documentation reconciliation completed on 2026-08-01. Pure preview-diagnostics and broad widget/render extraction remain deferred as separate future slices.
 
 ## Context and Orientation
 
@@ -149,12 +149,12 @@ Record evidence here as implementation proceeds:
        baseline commit: c682a72bf
        operation-boundary tests: 4 tests included in the 107 focused passing tests
        affected tests: 144 passed, 1 pre-existing Pillow warning
-       full suite: 1038 passed, 1 pre-existing Pillow deprecation warning
+       full suite: 1040 passed, 1 pre-existing Pillow deprecation warning
        preview matrix: 8 scenarios, 0 errors
        signed matrix: 8 scenarios, 6 successful signings, 2 intentional rejections, expectations passed
        compatibility cleanup: removed composition/facade/lazy symbols and stale test seams; stable contracts retained
        process cleanup: no matching FoliaSeal/Phase 3 process
-       implementation commit: <hash>
+       implementation commit: 0fa69ec5f
 
 ## Interfaces and Dependencies
 
