@@ -6,7 +6,7 @@ from foliaseal.domain.models import SigningResult
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
 )
-from tests.support.phase3_builders import build_signature_appearance, build_signature_rect
+from tests.support.signing_builders import build_signature_appearance, build_signature_rect
 
 
 class _FakeSigningExecutor:

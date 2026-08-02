@@ -8,7 +8,7 @@ from foliaseal.infra.config.profile_storage import (
     default_signature_profiles_directory,
 )
 from foliaseal.infra.config.schemas import ConfigValidationError
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_preset_catalog,
 )

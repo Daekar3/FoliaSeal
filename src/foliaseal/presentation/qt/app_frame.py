@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application import (
-    CertificateLifecycleService,
+    CertificateManager,
     SignatureProfileLibrary,
     SigningDraftWorkflow,
 )
@@ -244,7 +244,7 @@ class FoliaSealAppFrame:
         app_settings_store: AppSettingsStore | None = None,
         certificate_catalog_store: CertificateCatalogStore | None = None,
         certificate_secret_provider: Any | None = None,
-        certificate_lifecycle_service: CertificateLifecycleService | None = None,
+        certificate_manager: CertificateManager | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         sign_executor: SigningRequestExecutor | None = None,
         shell_factory: SigningWorkspaceFactory | None = None,
@@ -262,8 +262,8 @@ class FoliaSealAppFrame:
         self._certificate_secret_provider = (
             certificate_secret_provider or SecretToolCertificateSecretStore()
         )
-        self._certificate_lifecycle_service = certificate_lifecycle_service or (
-            CertificateLifecycleService(
+        self._certificate_manager = certificate_manager or (
+            CertificateManager(
                 store=self._certificate_catalog_store,
                 secret_store=self._certificate_secret_provider,
             )
@@ -300,7 +300,7 @@ class FoliaSealAppFrame:
         self._certificate_dialog_port: CertificateDialogPort = AppFrameCertificateDialogService(
             bindings=self._bindings,
             parent=self.window,
-            lifecycle_service=self._certificate_lifecycle_service,
+            certificate_manager=self._certificate_manager,
             refresh_shell_certificate_configurations=(
                 self._refresh_shell_certificate_configurations
             ),

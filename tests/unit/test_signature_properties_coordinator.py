@@ -29,7 +29,7 @@ from foliaseal.infra.config.profile_storage import (
     SignaturePresetCatalogStore,
 )
 from foliaseal.infra.config.schemas import CertificateCatalog, SignaturePresetCatalog
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,

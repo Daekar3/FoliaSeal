@@ -5,7 +5,7 @@ import pytest
 from foliaseal.application.signature_profile_library import SignatureProfileLibrary
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import ConfigValidationError, SignaturePreset
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 
 
 def test_profile_library_owns_reference_safe_management(tmp_path: Path) -> None:

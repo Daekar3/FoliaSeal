@@ -10,7 +10,7 @@ from foliaseal.application.signature_properties_coordinator import (
 )
 from foliaseal.application.signing_setup_session import SigningSetupSession
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,

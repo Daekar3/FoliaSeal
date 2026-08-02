@@ -17,7 +17,7 @@ from tests.support.certification_fixtures import (
     sign_pdf_for_certification,
     write_pdf_with_version,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_rect,
 )

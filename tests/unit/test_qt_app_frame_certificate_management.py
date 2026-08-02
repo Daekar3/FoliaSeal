@@ -1,16 +1,16 @@
 from pathlib import Path
 
-from foliaseal.application import CertificateLifecycleService
+from foliaseal.application import CertificateManager
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.presentation.qt.app_frame_certificate_management import (
     AppFrameCertificateDialogService,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,
+    write_test_pkcs12,
 )
-from tests.unit.test_certificate_import import _write_test_pkcs12
 from tests.unit.test_qt_app_frame import _fake_bindings, _FakeSecretStore
 
 
@@ -30,7 +30,7 @@ def _build_service(
     service = AppFrameCertificateDialogService(
         bindings=bindings,
         parent=bindings.q_main_window(),
-        lifecycle_service=CertificateLifecycleService(
+        certificate_manager=CertificateManager(
             store=store,
             secret_store=secrets,
         ),
@@ -116,7 +116,7 @@ def test_certificate_creation_dialog_reports_secure_storage_unavailable(
 def test_certificate_import_dialog_imports_and_refreshes(tmp_path: Path) -> None:
     source = tmp_path / "alice.p12"
     passphrase = "correct horse"
-    _write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
+    write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
     bindings, certificate_store, _, refresh_log, service = _build_service(tmp_path)
 
     dialog = service.show_import_dialog().compatibility.import_dialog
@@ -147,7 +147,7 @@ def test_certificate_import_dialog_saves_password_outside_catalog(
 ) -> None:
     source = tmp_path / "alice.p12"
     passphrase = "correct horse"
-    _write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
+    write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
     secret_store = _FakeSecretStore()
     _, certificate_store, _, _, service = _build_service(
         tmp_path,

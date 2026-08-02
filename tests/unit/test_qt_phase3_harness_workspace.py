@@ -26,7 +26,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
     SigningWorkspaceSnapshot,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_rect,
     build_signing_request,

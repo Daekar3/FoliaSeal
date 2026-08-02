@@ -11,7 +11,7 @@ from foliaseal.presentation.qt import visible_signature_setup_form as form_modul
 from foliaseal.presentation.qt.visible_signature_setup_form import (
     QtVisibleSignatureSetupForm,
 )
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 from tests.unit.test_qt_signing_shell import _fake_bindings
 
 

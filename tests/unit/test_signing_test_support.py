@@ -7,7 +7,7 @@ from foliaseal.domain.models import (
     SignatureFieldSource,
     SignaturePlacementDefaults,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_preset,
     build_signature_preset_catalog,
@@ -17,7 +17,7 @@ from tests.support.phase3_builders import (
 )
 
 
-def test_phase3_builders_produce_consistent_valid_contracts(tmp_path: Path) -> None:
+def test_signing_builders_produce_consistent_valid_contracts(tmp_path: Path) -> None:
     appearance = build_signature_appearance()
     preset = build_signature_preset(appearance=appearance)
     catalog = build_signature_preset_catalog(

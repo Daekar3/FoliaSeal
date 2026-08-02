@@ -31,7 +31,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
 )
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 
 
 @dataclass(frozen=True)

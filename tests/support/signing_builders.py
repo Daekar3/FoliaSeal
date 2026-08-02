@@ -1,8 +1,15 @@
-"""Reusable Phase 3 test builders for signature appearance and signing data."""
+"""Reusable test builders for signing appearance, certificates, and requests."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import NameOID
 
 from foliaseal.domain.models import (
     SignatureAnchor,
@@ -320,15 +327,47 @@ def build_certificate_catalog(
 ) -> CertificateCatalog:
     """Build a canonical certificate catalog."""
     managed_certificate = build_managed_certificate()
-    return CertificateCatalog(
-        schema_version=schema_version,
-        managed_certificates=managed_certificates or (managed_certificate,),
-        certificate_configurations=certificate_configurations
-        or (
+    effective_managed_certificates = (
+        managed_certificates if managed_certificates is not None else (managed_certificate,)
+    )
+    effective_configurations = (
+        certificate_configurations
+        if certificate_configurations is not None
+        else (
             build_certificate_configuration(
                 managed_certificate_id=managed_certificate.managed_certificate_id,
             ),
-        ),
+        )
+    )
+    return CertificateCatalog(
+        schema_version=schema_version,
+        managed_certificates=effective_managed_certificates,
+        certificate_configurations=effective_configurations,
+    )
+
+
+def write_test_pkcs12(path: Path, *, passphrase: str, common_name: str = "Alice Example") -> None:
+    """Write a password-protected PKCS#12 fixture for certificate tests."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    path.write_bytes(
+        pkcs12.serialize_key_and_certificates(
+            name=common_name.encode(),
+            key=key,
+            cert=certificate,
+            cas=None,
+            encryption_algorithm=serialization.BestAvailableEncryption(passphrase.encode()),
+        )
     )
 
 

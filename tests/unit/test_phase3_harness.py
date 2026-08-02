@@ -88,7 +88,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_field_binding,
     build_signature_rect,

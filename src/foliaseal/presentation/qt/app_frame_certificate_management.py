@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from foliaseal.application import CertificateLifecycleService
+from foliaseal.application import (
+    CertificateManager,
+    CreateCertificateRequest,
+    ExportCertificateRequest,
+    ImportCertificateRequest,
+    SaveConfigurationRequest,
+)
 from foliaseal.infra.config.schemas import CertificateConfiguration, ManagedCertificate
 
 
@@ -102,11 +108,11 @@ class CertificateImportDialog:
         *,
         bindings: Any,
         parent: Any,
-        lifecycle_service: CertificateLifecycleService,
+        certificate_manager: CertificateManager,
         on_import: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
-        self._lifecycle_service = lifecycle_service
+        self._certificate_manager = certificate_manager
         self._on_import = on_import
         self.import_result = None
         self.controls = self._build_controls(parent=parent)
@@ -140,22 +146,28 @@ class CertificateImportDialog:
         passphrase = self.controls.passphrase.text()
         save_password = bool(self.controls.save_password.isChecked())
         try:
-            result = self._lifecycle_service.import_pkcs12(
-                source_path=source_path,
-                display_name=display_name,
-                passphrase=passphrase,
-                save_password=save_password,
+            result = self._certificate_manager.import_(
+                ImportCertificateRequest(
+                    source_path=source_path,
+                    display_name=display_name,
+                    passphrase=passphrase,
+                    save_password=save_password,
+                )
             )
         except Exception as exc:
             self._show_error(str(exc))
             return None
 
         self.import_result = result
-        if result.refresh_shell and self._on_import is not None:
+        if result.operation != "exported" and self._on_import is not None:
             self._on_import()
         information = getattr(self._bindings.q_message_box, "information", None)
         if callable(information):
-            information(self.controls.dialog, "Certificate imported", result.user_message)
+            information(
+                self.controls.dialog,
+                "Certificate imported",
+                "Certificate imported successfully.",
+            )
         accept = getattr(self.controls.dialog, "accept", None)
         if callable(accept):
             accept()
@@ -223,11 +235,11 @@ class CertificateCreationDialog:
         *,
         bindings: Any,
         parent: Any,
-        lifecycle_service: CertificateLifecycleService,
+        certificate_manager: CertificateManager,
         on_create: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
-        self._lifecycle_service = lifecycle_service
+        self._certificate_manager = certificate_manager
         self._on_create = on_create
         self.creation_result = None
         self.controls = self._build_controls(parent=parent)
@@ -245,21 +257,27 @@ class CertificateCreationDialog:
         passphrase = self.controls.passphrase.text()
         save_password = bool(self.controls.save_password.isChecked())
         try:
-            result = self._lifecycle_service.create_self_signed_certificate(
-                display_name=display_name,
-                passphrase=passphrase,
-                save_password=save_password,
+            result = self._certificate_manager.create(
+                CreateCertificateRequest(
+                    display_name=display_name,
+                    passphrase=passphrase,
+                    save_password=save_password,
+                )
             )
         except Exception as exc:
             self._show_error(str(exc))
             return None
 
         self.creation_result = result
-        if result.refresh_shell and self._on_create is not None:
+        if result.operation != "exported" and self._on_create is not None:
             self._on_create()
         information = getattr(self._bindings.q_message_box, "information", None)
         if callable(information):
-            information(self.controls.dialog, "Certificate created", result.user_message)
+            information(
+                self.controls.dialog,
+                "Certificate created",
+                "Certificate created successfully.",
+            )
         accept = getattr(self.controls.dialog, "accept", None)
         if callable(accept):
             accept()
@@ -319,11 +337,11 @@ class CertificateConfigurationManagementDialog:
         *,
         bindings: Any,
         parent: Any,
-        lifecycle_service: CertificateLifecycleService,
+        certificate_manager: CertificateManager,
         on_change: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
-        self._lifecycle_service = lifecycle_service
+        self._certificate_manager = certificate_manager
         self._on_change = on_change
         self._configurations_by_id: dict[str, CertificateConfiguration] = {}
         self._managed_certificates_by_id: dict[str, ManagedCertificate] = {}
@@ -337,7 +355,7 @@ class CertificateConfigurationManagementDialog:
         return None
 
     def reload_configurations(self) -> None:
-        catalog = self._lifecycle_service.load_catalog()
+        catalog = self._certificate_manager.snapshot()
         configurations = catalog.certificate_configurations
         managed_certificates = catalog.managed_certificates
         self._configurations_by_id = {
@@ -408,10 +426,12 @@ class CertificateConfigurationManagementDialog:
             self._show_error("Select a certificate configuration to save.")
             return None
         try:
-            result = self._lifecycle_service.save_configuration(
-                configuration_id=configuration.certificate_configuration_id,
-                display_name=self.controls.display_name.text(),
-                notes=self.controls.notes.text(),
+            result = self._certificate_manager.save_configuration(
+                SaveConfigurationRequest(
+                    configuration_id=configuration.certificate_configuration_id,
+                    display_name=self.controls.display_name.text(),
+                    notes=self.controls.notes.text(),
+                )
             )
         except Exception as exc:
             self._show_error(str(exc))
@@ -424,8 +444,8 @@ class CertificateConfigurationManagementDialog:
             return None
         self._select_configuration(updated.certificate_configuration_id)
         self.load_selected_configuration()
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
+        self._emit_changed_if_needed(result.operation != "exported")
+        self._show_information("Certificate configuration saved.")
         return updated
 
     def delete_selected_configuration(self) -> bool:
@@ -439,15 +459,15 @@ class CertificateConfigurationManagementDialog:
             self.reload_configurations()
             return False
         try:
-            result = self._lifecycle_service.delete_configuration(configuration_id)
+            result = self._certificate_manager.delete_configuration(configuration_id)
         except Exception as exc:
             self._show_error(str(exc))
             self.reload_configurations()
             return False
 
         self.reload_configurations()
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
+        self._emit_changed_if_needed(result.operation != "exported")
+        self._show_information("Certificate configuration deleted.")
         return True
 
     def delete_selected_managed_certificate(self) -> bool:
@@ -456,15 +476,15 @@ class CertificateConfigurationManagementDialog:
             self._show_error("Select a managed certificate to delete.")
             return False
         try:
-            result = self._lifecycle_service.delete_managed_certificate(certificate_id)
+            result = self._certificate_manager.delete_managed_certificate(certificate_id)
         except Exception as exc:
             self._show_error(str(exc))
             self.reload_configurations()
             return False
 
         self.reload_configurations()
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
+        self._emit_changed_if_needed(result.operation != "exported")
+        self._show_information("Managed certificate deleted.")
         return True
 
     def export_selected_managed_certificate(self) -> Path | None:
@@ -487,17 +507,19 @@ class CertificateConfigurationManagementDialog:
         if not selected_path:
             return None
         try:
-            result = self._lifecycle_service.export_managed_certificate(
-                certificate_id=certificate_id,
-                destination_path=selected_path,
+            result = self._certificate_manager.export(
+                ExportCertificateRequest(
+                    certificate_id=certificate_id,
+                    destination_path=selected_path,
+                )
             )
         except Exception as exc:
             self._show_error(str(exc))
             self.reload_configurations()
             return None
 
-        self._emit_changed_if_needed(result.refresh_shell)
-        self._show_information(result.user_message)
+        self._emit_changed_if_needed(result.operation != "exported")
+        self._show_information(f"Managed certificate exported to {result.exported_path}.")
         return result.exported_path
 
     def cancel(self) -> None:
@@ -648,12 +670,12 @@ class AppFrameCertificateDialogService:
         *,
         bindings: Any,
         parent: Any,
-        lifecycle_service: CertificateLifecycleService,
+        certificate_manager: CertificateManager,
         refresh_shell_certificate_configurations: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
         self._parent = parent
-        self._lifecycle_service = lifecycle_service
+        self._certificate_manager = certificate_manager
         self._refresh_shell_certificate_configurations = (
             refresh_shell_certificate_configurations
         )
@@ -662,7 +684,7 @@ class AppFrameCertificateDialogService:
         dialog = CertificateImportDialog(
             bindings=self._bindings,
             parent=self._parent,
-            lifecycle_service=self._lifecycle_service,
+            certificate_manager=self._certificate_manager,
             on_import=self._refresh_shell_certificate_configurations,
         )
         return CertificateDialogOutcome(
@@ -674,7 +696,7 @@ class AppFrameCertificateDialogService:
         dialog = CertificateCreationDialog(
             bindings=self._bindings,
             parent=self._parent,
-            lifecycle_service=self._lifecycle_service,
+            certificate_manager=self._certificate_manager,
             on_create=self._refresh_shell_certificate_configurations,
         )
         return CertificateDialogOutcome(
@@ -686,7 +708,7 @@ class AppFrameCertificateDialogService:
         dialog = CertificateConfigurationManagementDialog(
             bindings=self._bindings,
             parent=self._parent,
-            lifecycle_service=self._lifecycle_service,
+            certificate_manager=self._certificate_manager,
             on_change=self._refresh_shell_certificate_configurations,
         )
         return CertificateDialogOutcome(

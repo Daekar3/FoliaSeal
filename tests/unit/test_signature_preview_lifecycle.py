@@ -7,7 +7,7 @@ from foliaseal.domain.models import SignatureRect
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     QtCanonicalPreviewLifecycle,
 )
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 
 
 class _FakePixmap:

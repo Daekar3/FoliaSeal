@@ -10,7 +10,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTimezoneDisplayMode,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_rect,
     build_signing_request,

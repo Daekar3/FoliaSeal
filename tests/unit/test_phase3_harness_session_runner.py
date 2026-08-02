@@ -14,7 +14,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessCaptureCommand,
     Phase3HarnessWorkspaceSnapshot,
 )
-from tests.support.phase3_builders import build_signing_request
+from tests.support.signing_builders import build_signing_request
 
 
 @pytest.mark.parametrize("raise_on_final_capture", [False, True])

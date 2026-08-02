@@ -29,7 +29,7 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
 )
 from foliaseal.infra.config.schemas import ResolvedSignaturePreset
-from tests.support.phase3_builders import build_certificate_configuration
+from tests.support.signing_builders import build_certificate_configuration
 
 
 def _appearance() -> SignatureAppearance:

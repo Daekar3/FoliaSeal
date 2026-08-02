@@ -17,7 +17,7 @@ from foliaseal.presentation.qt import signing_workspace_properties_panel as prop
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     CanonicalPreviewRenderState,
 )
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 from tests.unit.test_qt_signing_shell import (
     _fake_bindings,
     _FakeLabel,

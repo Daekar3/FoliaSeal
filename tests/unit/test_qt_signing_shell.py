@@ -37,7 +37,7 @@ from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,

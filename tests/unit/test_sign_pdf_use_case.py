@@ -27,7 +27,7 @@ from foliaseal.domain.models import (
     VerificationSummary,
 )
 from foliaseal.infra.certification import CertificationPolicyResult
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signing_request,
 )

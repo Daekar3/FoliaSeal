@@ -13,7 +13,7 @@ from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import
     Phase3SignedAcceptanceScenarioExecutorDeps,
     Phase3SignedAcceptanceScenarioResult,
 )
-from tests.support.phase3_builders import build_signature_rect, build_signing_request
+from tests.support.signing_builders import build_signature_rect, build_signing_request
 
 
 class _FakeShell:

@@ -5,7 +5,7 @@ from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionState,
     SigningActionTransition,
 )
-from tests.support.phase3_builders import build_signing_request
+from tests.support.signing_builders import build_signing_request
 
 
 def _state(

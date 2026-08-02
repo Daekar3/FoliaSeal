@@ -92,7 +92,7 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_field_binding,
     build_signature_rect,

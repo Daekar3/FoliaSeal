@@ -14,7 +14,7 @@ from foliaseal.domain.models import (
     SignatureStampPosition,
     SignatureTextStyle,
 )
-from tests.support.phase3_builders import build_signature_rect
+from tests.support.signing_builders import build_signature_rect
 
 
 def test_horizontal_single_line_ink_reservation_uses_measured_ink_inside_structural_box() -> None:

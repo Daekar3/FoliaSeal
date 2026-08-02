@@ -4,7 +4,7 @@ from foliaseal.application.qa_preview_stress_fixtures import (
     apply_preview_stress_fixture_profile,
 )
 from foliaseal.domain.models import SignatureFieldSource
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 
 
 def test_apply_preview_stress_fixture_profile_sets_expected_override_texts() -> None:

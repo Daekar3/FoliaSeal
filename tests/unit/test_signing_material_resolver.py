@@ -6,7 +6,7 @@ from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialResolver,
     SigningMaterialResolutionError,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
 )

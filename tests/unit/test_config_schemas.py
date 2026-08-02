@@ -15,7 +15,7 @@ from foliaseal.infra.config.schemas import (
     TimestampPolicy,
     TrustProfile,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_appearance_profile,
     build_certificate_catalog,
     build_certificate_configuration,

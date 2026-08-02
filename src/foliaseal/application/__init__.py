@@ -6,16 +6,17 @@ from importlib import import_module
 
 _EXPORT_MODULES = {
     **dict.fromkeys(
-        ("CertificateCreationError", "CertificateCreationResult", "CertificateCreationService"),
-        "certificate_creation",
-    ),
-    **dict.fromkeys(
-        ("CertificateImportError", "CertificateImportResult", "CertificateImportService"),
-        "certificate_import",
-    ),
-    **dict.fromkeys(
-        ("CertificateLifecycleError", "CertificateLifecycleResult", "CertificateLifecycleService"),
-        "certificate_lifecycle",
+        (
+            "CertificateManager",
+            "CertificateManagerError",
+            "CertificateSecretStore",
+            "CertificateOperationResult",
+            "CreateCertificateRequest",
+            "ImportCertificateRequest",
+            "SaveConfigurationRequest",
+            "ExportCertificateRequest",
+        ),
+        "certificate_manager",
     ),
     **dict.fromkeys(
         (
@@ -227,15 +228,14 @@ __all__ = [
     "CanonicalSignaturePreviewSnapshot",
     "BackendReservationEvidence",
     "CanonicalPreviewLayout",
-    "CertificateCreationError",
-    "CertificateCreationResult",
-    "CertificateCreationService",
-    "CertificateImportError",
-    "CertificateImportResult",
-    "CertificateImportService",
-    "CertificateLifecycleError",
-    "CertificateLifecycleResult",
-    "CertificateLifecycleService",
+    "CertificateManager",
+    "CertificateManagerError",
+    "CertificateSecretStore",
+    "CertificateOperationResult",
+    "CreateCertificateRequest",
+    "ImportCertificateRequest",
+    "SaveConfigurationRequest",
+    "ExportCertificateRequest",
     "DocumentReviewCardState",
     "DocumentReviewWorkspaceSession",
     "DocumentReviewWorkspaceState",

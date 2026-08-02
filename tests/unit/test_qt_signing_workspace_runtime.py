@@ -12,7 +12,7 @@ from foliaseal.presentation.qt.signing_workspace_diagnostics import (
 from foliaseal.presentation.qt.signing_workspace_runtime import (
     SigningWorkspaceRuntime,
 )
-from tests.support.phase3_builders import build_signature_appearance
+from tests.support.signing_builders import build_signature_appearance
 
 
 class _FakeWorkspaceInteractionSession:

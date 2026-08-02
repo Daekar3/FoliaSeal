@@ -22,7 +22,7 @@ from foliaseal.application.visible_signature_layout import (
 )
 from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
 from foliaseal.presentation.qt import signature_preview_layout
-from tests.support.phase3_builders import build_signature_appearance, build_signature_rect
+from tests.support.signing_builders import build_signature_appearance, build_signature_rect
 
 
 @dataclass

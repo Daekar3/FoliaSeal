@@ -8,7 +8,7 @@ from foliaseal.infra.config.certificate_storage import (
     default_certificate_config_directory,
 )
 from foliaseal.infra.config.schemas import ConfigValidationError
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,

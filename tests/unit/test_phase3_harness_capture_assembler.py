@@ -7,7 +7,7 @@ from foliaseal.domain.models import SigningResult
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
 )
-from tests.support.phase3_builders import (
+from tests.support.signing_builders import (
     build_signature_rect,
     build_signing_request,
 )
