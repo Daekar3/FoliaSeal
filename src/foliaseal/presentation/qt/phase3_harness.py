@@ -6,7 +6,6 @@ import importlib
 import json
 import re
 import shutil
-from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
 from pathlib import Path
@@ -18,7 +17,6 @@ from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application import SigningDraftWorkflow
-from foliaseal.application.phase3_evidence_service import Phase3MatrixRequest
 from foliaseal.application.phase3_fidelity_contract import validate_release_fidelity_contract
 from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
@@ -137,7 +135,7 @@ from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
 
-def _build_phase3_interactive_harness_runner() -> _Phase3InteractiveHarnessRunner:
+def _build_interactive_evidence_runner() -> _Phase3InteractiveHarnessRunner:
     return _Phase3InteractiveHarnessRunner(
         load_qt_harness_bindings=_load_qt_harness_bindings,
         load_page_count=_load_page_count,
@@ -156,39 +154,6 @@ def _build_phase3_interactive_harness_runner() -> _Phase3InteractiveHarnessRunne
             write_text=write_optional_text,
         ),
     )
-
-
-def _build_preview_matrix_operation() -> Callable[[Phase3MatrixRequest], dict[str, Any]]:
-    runner = _build_phase3_preview_matrix_runner()
-
-    def run(request: Phase3MatrixRequest) -> dict[str, Any]:
-        return runner.run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
-
-    return run
-
-
-def _build_signed_acceptance_matrix_operation() -> Callable[
-    [Phase3MatrixRequest], dict[str, Any]
-]:
-    runner = _build_phase3_signed_acceptance_matrix_runner()
-
-    def run(request: Phase3MatrixRequest) -> dict[str, Any]:
-        return runner.run(
-            pdf_path=request.pdf_path,
-            certificate_path=request.certificate_path,
-            passphrase=request.passphrase,
-            scenario_manifest_path=request.scenario_manifest_path,
-            artifacts_dir=request.artifacts_dir,
-        )
-
-    return run
-
 
 def _build_phase3_harness_capture(
     *,

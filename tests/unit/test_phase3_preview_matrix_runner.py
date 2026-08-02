@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from foliaseal.presentation.qt.evidence_artifacts import MemoryEvidenceArtifactPort
 from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
     Phase3PreviewMatrixRunner,
     Phase3PreviewMatrixRunnerDeps,
 )
 
 
-def _runner(*, scenario_result):
+def _runner(*, scenario_result, artifact_port=None):
     return Phase3PreviewMatrixRunner(
         deps=Phase3PreviewMatrixRunnerDeps(
             load_preview_matrix_manifest=lambda _path: {
@@ -25,6 +26,7 @@ def _runner(*, scenario_result):
             },
             jsonable_capture=lambda payload: payload,
             profile_store_factory=object,
+            artifact_port_factory=(lambda: artifact_port) if artifact_port else None,
         ),
     )
 
@@ -83,6 +85,29 @@ def test_preview_matrix_runner_records_error_results(tmp_path: Path) -> None:
     assert summary["successful_scenario_count"] == 1
     assert summary["error_scenario_count"] == 1
     assert summary["results"][1]["error"] == "RuntimeError"
+
+
+def test_preview_matrix_runner_supports_in_memory_artifacts(tmp_path: Path) -> None:
+    source_pdf = tmp_path / "fixture.pdf"
+    source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
+    artifacts = MemoryEvidenceArtifactPort()
+
+    runner = _runner(
+        scenario_result=lambda **kwargs: {"name": kwargs["scenario"]["name"]},
+        artifact_port=artifacts,
+    )
+    summary = runner.run(
+        pdf_path=str(source_pdf),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        scenario_manifest_path=str(tmp_path / "manifest.json"),
+        artifacts_dir="memory/preview",
+    )
+
+    summary_path = "memory/preview/summary.json"
+    assert artifacts.prepared == ["memory/preview"]
+    assert artifacts.summaries[summary_path]["scenario_count"] == summary["scenario_count"]
+    assert artifacts.summaries[summary_path]["summary_json_path"] == summary_path
 
 
 def test_preview_matrix_runner_preserves_canonical_render_capture_fields(

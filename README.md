@@ -168,8 +168,9 @@ Phase 3 evidence command pipeline and signed lifecycle:
 - The signed matrix runner owns lifecycle ordering through `Phase3SignedAcceptanceLifecyclePort`
   (Qt and deterministic fake adapters): start the application/window, attach and show the shell,
   prime/process events, process events after each scenario, and always close in `finally`.
-- Matrix directory preparation and `summary.json` publication use `Phase3MatrixArtifactPort`,
-  with filesystem and in-memory adapters. The path returned by `write_summary()` is authoritative
+- Matrix directory preparation and `summary.json` publication use the neutral
+  `EvidenceArtifactPort` in `evidence_artifacts.py`, with filesystem and in-memory adapters. The
+  path returned by `write_summary()` is authoritative
   for the summary's `summary_json_path` and CLI reporting; the second serialization pass preserves
   that same path in the persisted mapping.
 - CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
@@ -199,11 +200,15 @@ signed = session.signed_acceptance("/path/to/signed-acceptance-manifest.json")
 ```
 
 The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir=` per call when
-isolating a run. Preview and signed matrices are injected as separate lazy operations, while
-interactive capture is installed through an explicit lazy factory. Application package exports
+isolating a run. Preview and signed matrices are injected as separate lazy operations through
+`PreviewEvidenceGateway` and `SignedAcceptanceEvidenceGateway`; interactive capture is installed
+through the separate `InteractiveEvidenceGateway` lazy factory. These gateways construct their
+Qt/runtime graphs only on first use. Application package exports
 are also lazy so importing a focused presentation module does not eagerly load optional GUI/runtime
 dependencies. `phase3_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
-interactive runner, JSON normalization, artifact policy, and lazy factory; `phase3_harness.py`
+interactive runner, JSON normalization, artifact policy, and lazy factory; `evidence_gateways.py`
+owns the explicit lazy gateway boundaries; `evidence_artifacts.py` owns preview/signed summary
+artifact publication; `phase3_harness.py`
 remains the Qt composition root that builds the concrete runner dependencies. It is no longer a
 three-verb `Phase3Composition`/`Phase3Harness` compatibility facade. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
 scenario sweep, processes events between scenarios, and closes that shell in its cleanup path.
@@ -389,11 +394,11 @@ Application boundary and execution contexts:
   separate execution adapters. Their lifecycle ownership and artifact semantics differ and are
   intentionally not merged by this boundary slice.
 - The Qt-side matrix boundary exposes explicit lazy preview and signed-acceptance operations, while
-  interactive capture is installed through a separate lazy factory. Operation-local dependency
+  interactive capture is installed through a separate lazy gateway factory. Operation-local dependency
   bundles inject profile stores, Qt lifecycles, renderers, artifact writers, and signing executors,
-  keeping tests substitutable while preserving the existing CLI, JSON, summary-path, and artifact
-  contracts. The removed composition/facade classes and private forwarding wrappers were internal
-  implementation details, not compatibility surfaces.
+  keeping tests substitutable while preserving the existing CLI command names, DTO/request types,
+  JSON field names, summary paths, and artifact paths. The removed composition/facade classes and
+  private forwarding wrappers were internal implementation details, not compatibility surfaces.
 
 Signed-output acceptance:
 

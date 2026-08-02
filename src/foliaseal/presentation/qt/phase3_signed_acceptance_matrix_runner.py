@@ -11,12 +11,12 @@ from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+from foliaseal.presentation.qt.evidence_artifacts import (
+    EvidenceArtifactPort,
+    FilesystemEvidenceArtifactPort,
+)
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspacePort,
-)
-from foliaseal.presentation.qt.phase3_matrix_artifacts import (
-    FilesystemPhase3MatrixArtifactPort,
-    Phase3MatrixArtifactPort,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_lifecycle import (
     Phase3SignedAcceptanceLifecyclePort,
@@ -41,7 +41,7 @@ SignedMatrixDiagnosticSummary = Callable[[list[dict[str, Any]]], dict[str, int]]
 EvaluateSignedMatrixAcceptanceExpectations = Callable[..., tuple[bool, list[str]]]
 JsonableCapture = Callable[[Any], Any]
 LifecycleFactory = Callable[[Any], Phase3SignedAcceptanceLifecyclePort]
-ArtifactPortFactory = Callable[[], Phase3MatrixArtifactPort]
+ArtifactPortFactory = Callable[[], EvidenceArtifactPort]
 
 
 @dataclass(frozen=True)
@@ -91,7 +91,7 @@ class Phase3SignedAcceptanceMatrixRunner:
         manifest = self.deps.load_preview_matrix_manifest(scenario_manifest_path)
         scenarios = manifest["scenarios"]
         artifact_port_factory = (
-            self.deps.artifact_port_factory or FilesystemPhase3MatrixArtifactPort
+            self.deps.artifact_port_factory or FilesystemEvidenceArtifactPort
         )
         artifact_port = artifact_port_factory()
         artifact_root = artifact_port.prepare(artifacts_dir)

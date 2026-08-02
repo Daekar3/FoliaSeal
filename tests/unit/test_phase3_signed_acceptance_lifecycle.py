@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from foliaseal.presentation.qt.phase3_matrix_artifacts import (
-    MemoryPhase3MatrixArtifactPort,
+from foliaseal.presentation.qt.evidence_artifacts import (
+    MemoryEvidenceArtifactPort,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_lifecycle import (
     FakePhase3SignedAcceptanceLifecycle,
@@ -27,7 +27,7 @@ def test_fake_signed_acceptance_lifecycle_records_open_process_and_close() -> No
 
 
 def test_memory_matrix_artifact_port_records_summary_without_filesystem_io() -> None:
-    artifacts = MemoryPhase3MatrixArtifactPort()
+    artifacts = MemoryEvidenceArtifactPort()
 
     root = artifacts.prepare("memory/run")
     summary_path = artifacts.write_summary(root, {"scenario_count": 2})

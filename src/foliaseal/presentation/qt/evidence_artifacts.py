@@ -1,4 +1,4 @@
-"""Artifact boundary for Phase 3 matrix directories and summaries."""
+"""Artifact publication boundary for evidence directories and summaries."""
 
 from __future__ import annotations
 
@@ -8,17 +8,17 @@ from pathlib import Path
 from typing import Any, Protocol
 
 
-class Phase3MatrixArtifactPort(Protocol):
-    """Prepare one matrix directory and publish its stable summary JSON."""
+class EvidenceArtifactPort(Protocol):
+    """Prepare one evidence directory and publish its stable summary JSON."""
 
     def prepare(self, artifacts_dir: str) -> Path:
-        """Create or reuse the matrix artifact directory."""
+        """Create or reuse the evidence artifact directory."""
 
     def write_summary(self, artifacts_dir: Path, summary: Mapping[str, Any]) -> str:
         """Write and return the summary JSON path."""
 
 
-class FilesystemPhase3MatrixArtifactPort:
+class FilesystemEvidenceArtifactPort:
     """Filesystem adapter preserving the existing summary serialization."""
 
     def prepare(self, artifacts_dir: str) -> Path:
@@ -35,7 +35,7 @@ class FilesystemPhase3MatrixArtifactPort:
         return str(summary_path)
 
 
-class MemoryPhase3MatrixArtifactPort:
+class MemoryEvidenceArtifactPort:
     """In-memory artifact substitute for deterministic orchestration tests."""
 
     def __init__(self) -> None:

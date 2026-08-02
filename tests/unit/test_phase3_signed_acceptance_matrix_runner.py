@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from foliaseal.presentation.qt.phase3_matrix_artifacts import (
-    MemoryPhase3MatrixArtifactPort,
+from foliaseal.presentation.qt.evidence_artifacts import (
+    MemoryEvidenceArtifactPort,
 )
 from foliaseal.presentation.qt.phase3_signed_acceptance_lifecycle import (
     FakePhase3SignedAcceptanceLifecycle,
@@ -222,7 +222,7 @@ def test_signed_acceptance_matrix_runner_closes_lifecycle_after_scenario_failure
     source_pdf = tmp_path / "fixture.pdf"
     source_pdf.write_bytes(b"%PDF-1.4\n% fixture\n")
     lifecycle = FakePhase3SignedAcceptanceLifecycle()
-    artifacts = MemoryPhase3MatrixArtifactPort()
+    artifacts = MemoryEvidenceArtifactPort()
     runner = _runner(
         manifest={"scenarios": [{"name": "Scenario A"}]},
         scenario_executor=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
@@ -343,7 +343,7 @@ def test_signed_acceptance_matrix_runner_normalizes_typed_scenario_result(
             "signed_output_preview_comparison": None,
         }
     )
-    artifacts = MemoryPhase3MatrixArtifactPort()
+    artifacts = MemoryEvidenceArtifactPort()
     runner = _runner(
         manifest={"scenarios": [{"name": "Scenario A"}]},
         scenario_executor=lambda **_kwargs: typed_result,

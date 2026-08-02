@@ -194,10 +194,10 @@ def build_interactive_phase3_capture_runner() -> Callable[
         nonlocal runner
         if runner is None:
             from foliaseal.presentation.qt.phase3_harness import (
-                _build_phase3_interactive_harness_runner,
+                _build_interactive_evidence_runner,
             )
 
-            runner = _build_phase3_interactive_harness_runner()
+            runner = _build_interactive_evidence_runner()
         return runner.run(request)
 
     return run

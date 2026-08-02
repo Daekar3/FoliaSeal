@@ -49,12 +49,13 @@ The canonical repository document split is:
 | `src/foliaseal/application/phase3_evidence_ports.py` | Narrow effect protocols for Phase 3 evidence execution. | Keeps runners, asset generation, capture loading, writers, and runtime contexts behind injectable ports. |
 | `src/foliaseal/application/phase3_evidence_orchestrator.py` | Canonical application-owned dispatcher for tagged Phase 3 evidence operations and capture validation. | Performs payload validation and delegates to the injected service port; intentionally has no Qt, PyHanko, Pillow, TSA, filesystem-artifact, or presentation imports. |
 | `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py` | Lifecycle port and Qt/fake adapters for one signed matrix shell session. | Keeps application/window creation, shell attachment, event processing, and cleanup outside scenario logic. |
-| `src/foliaseal/presentation/qt/phase3_matrix_artifacts.py` | Matrix artifact directory and summary publication port. | Filesystem and memory adapters return the authoritative `summary_json_path`. |
+| `src/foliaseal/presentation/qt/evidence_artifacts.py` | Neutral evidence artifact directory and summary publication port. | Filesystem and memory adapters return the authoritative `summary_json_path` for preview and signed runs. |
+| `src/foliaseal/presentation/qt/evidence_gateways.py` | Explicit lazy gateways for interactive capture, preview matrices, and signed-acceptance matrices. | Each gateway builds its concrete Qt/runtime graph only on first `run()`; the three lifecycles remain separate. |
 | `src/foliaseal/application/phase3_fidelity_contract.py` | Versioned release-fidelity manifest contract for the tracked Phase 3 corpus. | Validates `manifest_version`, `phase3_fidelity_v1` tolerances/critical counters, and per-scenario expected outcomes/diagnostics before matrix execution. |
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, QtPdf geometry plus Poppler interactive-viewer rasterisation, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed; the interactive viewer also late-resolves the Linux `pdftoppm` executable. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, preset certificate display-name lookup, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
-| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; app-frame, signing-shell, workspace, lifecycle, reporting, matrix, snapshotter, and render responsibilities are documented in their focused modules below. `phase3_interactive_capture.py` owns the interactive capture contract, runner, JSON normalization, artifact policy, and lazy factory; `phase3_harness.py` remains the concrete Qt composition root that builds those runner dependencies, but no longer exposes the removed three-verb `Phase3Composition`/`Phase3Harness` compatibility facade. `phase3_matrix_operations.py` owns the dependency-light lazy matrix boundary, and `phase3_signed_acceptance_evidence.py` supplies default service wiring and runtime-noise suppression; the application service/orchestrator remains the caller boundary. |
+| `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; app-frame, signing-shell, workspace, lifecycle, reporting, matrix, snapshotter, render, gateway, and artifact responsibilities are documented in their focused modules below. `phase3_interactive_capture.py` owns the interactive capture contract, runner, JSON normalization, and artifact policy; `evidence_gateways.py` owns explicit lazy gateway factories; `evidence_artifacts.py` owns neutral preview/signed summary publication; `phase3_harness.py` remains the concrete Qt composition root, but no longer exposes the removed three-verb `Phase3Composition`/`Phase3Harness` compatibility facade. The application service/orchestrator remains the caller boundary. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_open.py` | App-frame-facing workspace-open boundary for one PDF. | Owns page-count loading, `ViewerWorkflow` / `SigningDraftWorkflow` creation, output-path defaulting, shell bootstrap assembly, and shell creation while leaving widget installation and frame-owned snapshot storage in `app_frame.py`. |
 | `src/foliaseal/presentation/qt/signing_workspace_lifecycle.py` | App-frame-facing lifecycle coordinator for the active signing workspace. | `SigningWorkspaceLifecycle` composes a candidate through `WorkspaceOpenPort`, mounts it through `WorkspaceMountPort`/`QtWorkspaceMount`, and disposes the prior widget only after the candidate is mounted; `close()` disposes the active widget idempotently. |
 | `src/foliaseal/presentation/qt/app_frame_certificate_management.py` | App-frame-facing certificate-management boundary for Settings certificate actions. | Owns certificate dialog construction/execution and delegates create, import, rename, delete, and export work to `CertificateLifecycleService` while leaving menu routing and window-level compatibility exposure in `app_frame.py`. |
@@ -479,6 +480,25 @@ The canonical repository document split is:
 - Known constraints: The module is lazy with respect to the concrete Qt harness graph; importing it must not construct matrix operations or eagerly load optional GUI/runtime dependencies.
 - Status: Confirmed by code and tests.
 
+### Phase 3 evidence gateways
+
+- Location: `src/foliaseal/presentation/qt/evidence_gateways.py`
+- Responsibility: Keep interactive capture, headless preview matrices, and Qt-backed signed-acceptance matrices behind explicit lazy construction boundaries.
+- Owns: `InteractiveEvidenceGateway`, `PreviewEvidenceGateway`, `SignedAcceptanceEvidenceGateway`, and their `build_*_evidence_gateway()` factories.
+- Does not own: application request validation/dispatch, scenario execution, summary shaping, or artifact serialization.
+- Key collaborators: `phase3_harness.py`, `phase3_preview_matrix_runner.py`, `phase3_signed_acceptance_matrix_runner.py`, and `phase3_evidence_service.py` request DTOs.
+- Known constraints: Gateway factories defer optional Qt/runtime imports and concrete runner construction until the first `run()` call. The three gateway lifecycles intentionally remain separate; this is not a replacement for the typed application orchestrator and does not alter external CLI, DTO, JSON, summary-path, or artifact-path contracts.
+- Status: Confirmed by code and focused gateway tests.
+
+### Phase 3 evidence artifact publication
+
+- Location: `src/foliaseal/presentation/qt/evidence_artifacts.py`
+- Responsibility: Provide the neutral effect boundary for preparing evidence directories and publishing `summary.json` for preview and signed runs.
+- Owns: `EvidenceArtifactPort`, `FilesystemEvidenceArtifactPort`, and `MemoryEvidenceArtifactPort`.
+- Does not own: scenario execution, signing, acceptance counters, or report-schema decisions.
+- Known constraints: `write_summary()` returns the authoritative `summary_json_path`; generated preview/signed images and PDFs remain owned by their scenario/output snapshot helpers.
+- Status: Confirmed by code and tests.
+
 ### Phase 3 harness workspace boundary
 
 - Location: `src/foliaseal/presentation/qt/phase3_harness_workspace.py`
@@ -494,29 +514,29 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/presentation/qt/phase3_preview_matrix_runner.py`
 - Responsibility: Run the headless preview-only matrix sweep and emit the stable summary artifact for one manifest.
-- Owns: `Phase3PreviewMatrixRunnerDeps`, `Phase3PreviewMatrixRunner`, preview-matrix manifest loading, scenario iteration, scenario-level exception mapping, aggregate counter shaping, and `summary.json` writing.
+- Owns: `Phase3PreviewMatrixRunnerDeps`, `Phase3PreviewMatrixRunner`, preview-matrix manifest loading, scenario iteration, scenario-level exception mapping, aggregate counter shaping, and `summary.json` writing through `EvidenceArtifactPort`.
 - Does not own: interactive Qt session control, signed-acceptance matrix execution, scenario-specific preview capture logic, or evidence-contract evaluation.
 - Key collaborators: `phase3_matrix_operations.py`, `phase3_harness.py`, `_load_preview_matrix_manifest()`, `_execute_headless_preview_matrix_scenario()`, `_preview_matrix_error_result()`, and `_preview_matrix_diagnostic_summary()`.
 - Main entry points: `Phase3PreviewMatrixRunner.run()` and `Phase3MatrixOperations.preview`.
-- Known constraints: The runner is intentionally headless and still depends on repository-default preset resolution, but that dependency is now injected through `Phase3PreviewMatrixRunnerDeps.profile_store_factory` instead of being looked up inline. `phase3_harness.py` remains the composition root that wires the real manifest loader, scenario executor, error mapper, profile-store factory, and JSON normalization helper into the runner.
+- Known constraints: The runner is intentionally headless and still depends on repository-default preset resolution, but that dependency is now injected through `Phase3PreviewMatrixRunnerDeps.profile_store_factory` instead of being looked up inline. It records the artifact adapter's returned path in `summary_json_path` and performs a second serialization pass so custom adapters remain authoritative. `phase3_harness.py` remains the composition root that wires the real manifest loader, scenario executor, error mapper, profile-store factory, artifact port, and JSON normalization helper into the runner.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 signed-acceptance matrix runner
 
 - Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_matrix_runner.py`
 - Responsibility: Run the Qt-backed signed-acceptance matrix sweep and emit the stable summary artifact for one manifest.
-- Owns: `Phase3SignedAcceptanceMatrixRunnerDeps`, `Phase3SignedAcceptanceMatrixRunner`, signed-acceptance manifest loading, `timestamping_mode` validation, one-shell scenario iteration, scenario-level exception mapping, aggregate counter shaping, acceptance-expectation evaluation, and `summary.json` writing through `Phase3MatrixArtifactPort`.
+- Owns: `Phase3SignedAcceptanceMatrixRunnerDeps`, `Phase3SignedAcceptanceMatrixRunner`, signed-acceptance manifest loading, `timestamping_mode` validation, one-shell scenario iteration, scenario-level exception mapping, aggregate counter shaping, acceptance-expectation evaluation, and `summary.json` writing through `EvidenceArtifactPort`.
 - Does not own: the public harness entrypoint signature, interactive harness capture assembly, preview-only matrix execution, or evidence-contract evaluation.
 - Key collaborators: `phase3_matrix_operations.py`, `phase3_harness.py`, `_load_signed_acceptance_manifest()`, `phase3_harness_workspace.py`, `phase3_signed_acceptance_scenario_executor.py`, `_preview_matrix_error_result()`, `_signed_matrix_diagnostic_summary()`, and `_evaluate_signed_matrix_acceptance_expectations()`.
 - Main entry points: `Phase3SignedAcceptanceMatrixRunner.run()` and `Phase3MatrixOperations.signed_acceptance`.
 - Known constraints: The runner intentionally keeps the matrix-level workflow together, including `timestamping_mode` validation and dummy timestamper wiring, while delegating Qt window/event-loop work to `Phase3SignedAcceptanceLifecyclePort`. It starts and attaches the shell, processes events after priming and each scenario, and closes in `finally`, including failure paths. `Phase3SignedAcceptanceScenarioResult` rows are converted with `as_mapping()` before existing counters are calculated. The artifact adapter's returned path is authoritative for `summary_json_path`; `phase3_harness.py` remains the composition root that wires the real manifest loader, lifecycle, artifact, scenario, workspace, error mapper, render-backend factory, acceptance evaluator, and JSON normalization collaborators.
 - Status: Confirmed by code and tests.
 
-### Phase 3 signed-acceptance lifecycle and artifact ports
+### Phase 3 signed-acceptance lifecycle and evidence artifact ports
 
-- Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py`, `src/foliaseal/presentation/qt/phase3_matrix_artifacts.py`
+- Location: `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py`, `src/foliaseal/presentation/qt/evidence_artifacts.py`
 - Responsibility: Isolate replaceable side effects from signed matrix orchestration.
-- Owns: `Phase3SignedAcceptanceLifecyclePort`, `QtPhase3SignedAcceptanceLifecycle`, `FakePhase3SignedAcceptanceLifecycle`, `Phase3MatrixArtifactPort`, `FilesystemPhase3MatrixArtifactPort`, and `MemoryPhase3MatrixArtifactPort`.
+- Owns: `Phase3SignedAcceptanceLifecyclePort`, `QtPhase3SignedAcceptanceLifecycle`, `FakePhase3SignedAcceptanceLifecycle`, `EvidenceArtifactPort`, `FilesystemEvidenceArtifactPort`, and `MemoryEvidenceArtifactPort`.
 - Does not own: scenario application, signing, acceptance counters, or report schema decisions.
 - Known constraints: Lifecycle call order is start -> attach shell -> process events -> scenario/event processing -> close. Artifact adapters only prepare the matrix directory and write `summary.json`; generated PDFs and image evidence remain owned by scenario/output snapshot helpers.
 - Status: Confirmed by code and tests.
@@ -893,7 +913,7 @@ The canonical repository document split is:
   `src/foliaseal/presentation/qt/phase3_signed_acceptance_matrix_runner.py`,
   `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py`,
   `src/foliaseal/presentation/qt/phase3_signed_acceptance_lifecycle.py`,
-  `src/foliaseal/presentation/qt/phase3_matrix_artifacts.py`.
+  `src/foliaseal/presentation/qt/evidence_artifacts.py`.
 
 ## 7. Control flow
 
@@ -1123,6 +1143,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-08-02 | Extracted neutral evidence gateways and artifact publication, and removed the obsolete matrix-artifact module/forwarding wrappers. | Kept interactive, preview, and signed lifecycles explicit and lazy while preserving CLI commands, `Phase3*` DTOs, JSON fields, summary paths, and artifact paths; this begins the bounded internal `phase3` nomenclature cleanup. |
 | 2026-08-01 | Added the Phase 3 pure signed-PDF evidence snapshotter boundary. | Reconciled ownership of signature counting, metadata, verification/certification/timestamp projections, visible-appearance parsing, and JSON-safe PDF serialization; signed-output and capture assemblers now consume bound snapshotter methods, while recursive AP/timestamp-semantic debt remains explicitly deferred. |
 | 2026-07-31 | Added the visible-signature planner/IR hybrid boundary (retired by the 2026-08-01 migration). | Historical record of the superseded `VisibleSignaturePlanner`/`VisibleSignaturePlan` seam. |
 | 2026-08-01 | Replaced the planner/IR compatibility seam with prepare-once layout composition. | Documented `VisibleSignatureLayoutPort`, immutable `VisibleSignaturePreparation`, captured fit-gate/evidence, explicit preview stamp suppression, and retained backend fit helpers as behavior-bearing implementation policy. |

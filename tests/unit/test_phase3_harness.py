@@ -1255,7 +1255,7 @@ def test_phase3_harness_capture_orchestrates_session_and_reporting(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_interactive_harness_runner",
+        "_build_interactive_evidence_runner",
         lambda: _FakeInteractivePort(),
     )
     capture = build_interactive_phase3_capture_runner()(

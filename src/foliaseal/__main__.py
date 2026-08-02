@@ -446,7 +446,7 @@ def _run_phase2_evidence(args: argparse.Namespace) -> None:
         output_path.write_text(report + "\n", encoding="utf-8")
 
 
-def _run_phase3_harness_validate(args: argparse.Namespace) -> None:
+def _run_evidence_harness_validate(args: argparse.Namespace) -> None:
     evaluation = _build_phase3_evidence_orchestrator().validate(
         Phase3ValidationRequest(summary_json_path=args.summary_json_path)
     )
@@ -567,7 +567,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return 0
     if args.command == "phase3-signing-harness-validate":
-        _run_phase3_harness_validate(args)
+        _run_evidence_harness_validate(args)
         return 0
 
     print("FoliaSeal phase 0 skeleton ready")

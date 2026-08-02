@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from foliaseal.presentation.qt.evidence_artifacts import (
+    EvidenceArtifactPort,
+    FilesystemEvidenceArtifactPort,
+)
 
 LoadPreviewMatrixManifest = Callable[[str], dict[str, Any]]
 ExecuteHeadlessPreviewMatrixScenario = Callable[..., dict[str, Any]]
 PreviewMatrixErrorResult = Callable[..., dict[str, Any]]
 PreviewMatrixDiagnosticSummary = Callable[[list[dict[str, Any]]], dict[str, int]]
 JsonableCapture = Callable[[Any], Any]
+ArtifactPortFactory = Callable[[], EvidenceArtifactPort]
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,7 @@ class Phase3PreviewMatrixRunnerDeps:
     preview_matrix_diagnostic_summary: PreviewMatrixDiagnosticSummary
     jsonable_capture: JsonableCapture
     profile_store_factory: Callable[[], Any]
+    artifact_port_factory: ArtifactPortFactory | None = None
 
 
 @dataclass(frozen=True)
@@ -48,8 +54,10 @@ class Phase3PreviewMatrixRunner:
 
         manifest = self.deps.load_preview_matrix_manifest(scenario_manifest_path)
         scenarios = manifest["scenarios"]
-        artifact_root = Path(artifacts_dir)
-        artifact_root.mkdir(parents=True, exist_ok=True)
+        artifact_port = (
+            self.deps.artifact_port_factory or FilesystemEvidenceArtifactPort
+        )()
+        artifact_root = artifact_port.prepare(artifacts_dir)
 
         profile_store = self.deps.profile_store_factory()
         results: list[dict[str, Any]] = []
@@ -77,9 +85,13 @@ class Phase3PreviewMatrixRunner:
             **self.deps.preview_matrix_diagnostic_summary(results),
             "results": results,
         }
-        summary_path = artifact_root / "summary.json"
-        summary_path.write_text(
-            json.dumps(self.deps.jsonable_capture(summary), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        summary_path = artifact_port.write_summary(
+            artifact_root,
+            self.deps.jsonable_capture(summary),
+        )
+        summary["summary_json_path"] = summary_path
+        artifact_port.write_summary(
+            artifact_root,
+            self.deps.jsonable_capture(summary),
         )
         return summary
