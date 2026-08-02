@@ -65,8 +65,8 @@ deleted. The child compliance plan fixed the historical default signed-evidence 
 deferred heavy imports during program construction, neutralized the internal protocol, and made
 `error_scenario_count` fail aggregate validation. The CLI commands, persisted `Phase3*` DTOs, JSON
 fields, summary paths, and artifact paths remain unchanged. Focused/full validation, two post-fix
-compliance passes, and documentation reconciliation are complete; only the final commit hash remains
-to be recorded.
+compliance passes, and documentation reconciliation are complete. The implementation and plan closure
+were committed as `6c2f9fb4a` (`Refine evidence program boundaries and nomenclature`).
 
 ## Context and Orientation
 
@@ -133,7 +133,7 @@ Use `git mv` for module renames and update imports before deleting files. Repeat
 
 ## Artifacts and Notes
 
-Baseline focused slice: 21 tests passed. Final focused selected suite: 137 passed with one pre-existing Pillow deprecation warning; the post-fix focused compliance subset passed 61 tests. Full suite: 1044 passed with the same warning. Ruff, compileall, and `git diff --check` are clean. Default-program construction loaded none of `PySide6`, `PIL`, `pyhanko`, or `cryptography`. Preview smoke produced 4 scenarios and signed acceptance smoke produced 3 scenarios with matching temporary summary paths; the temporary directory was removed and a separate exact process audit found no running `foliaseal`, `python`, or `python3` process. Two independent post-fix compliance reviews passed. The documentation worker reconciled README and `docs/ARCHITECTURE.md`; final commit hashes remain to be recorded.
+Baseline focused slice: 21 tests passed. Final focused selected suite: 137 passed with one pre-existing Pillow deprecation warning; the post-fix focused compliance subset passed 61 tests. Full suite: 1044 passed with the same warning. Ruff, compileall, and `git diff --check` are clean. Default-program construction loaded none of `PySide6`, `PIL`, `pyhanko`, or `cryptography`. Preview smoke produced 4 scenarios and signed acceptance smoke produced 3 scenarios with matching temporary summary paths; the temporary directory was removed and a separate exact process audit found no running `foliaseal`, `python`, or `python3` process. Two independent post-fix compliance reviews passed. The documentation worker reconciled README and `docs/ARCHITECTURE.md`. Commit: `6c2f9fb4a`.
 
 ## Interfaces and Dependencies
 

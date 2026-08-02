@@ -85,4 +85,4 @@ The neutral program remains explicit and lazy. The signed-evidence default build
 ## Revision Notes
 
 2026-08-02: Created from the two independent compliance reviews of the parent evidence-program slice.
-2026-08-02: Completed implementation, validation, two independent post-fix compliance reviews, and documentation reconciliation; no current docs claim the deleted matrix holder exists. Final commit hash remains to be recorded.
+2026-08-02: Completed implementation, validation, two independent post-fix compliance reviews, and documentation reconciliation; no current docs claim the deleted matrix holder exists. Closed in commit `6c2f9fb4a` (`Refine evidence program boundaries and nomenclature`).
