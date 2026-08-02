@@ -23,7 +23,7 @@ No child ExecPlan is required for this one-slice implementation. If compliance r
 - [x] (2026-08-02) Completed two independent compliance reviews and reconciled README and `docs/ARCHITECTURE.md` with architecture-steward; no child plan was needed after the path fix.
 - [x] (2026-08-02) Ran preview smoke (4 scenarios) and signed-acceptance smoke (3 scenarios) with temporary artifact roots; both persisted and reported matching authoritative `summary_json_path` values. The signed run required `QT_QPA_PLATFORM=offscreen` because the default xcb display was unavailable.
 - [x] (2026-08-02) Completed cleanup audit: Ruff and `git diff --check` passed, no live removed-builder/deleted-module references remain, temporary roots were removed, and no FoliaSeal process or core file was left behind.
-- [ ] Create the final git commit through the write-git-commit workflow and record its hash.
+- [x] (2026-08-02) Created commit `e967d5a3b88c3a7eb4bda1b91f2e2389d1b62383` (`Extract neutral evidence gateways and artifact boundary`) on `main`; the tree was clean after commit.
 
 ## Surprises & Discoveries
 
@@ -103,7 +103,7 @@ All edits are additive until imports and tests pass; deleting the old artifact m
 
 ## Artifacts and Notes
 
-Recorded evidence: focused evidence/matrix suite 116 passed; full suite 1043 passed with one pre-existing Pillow deprecation warning; Ruff clean; gateway and CLI import isolation clean; documentation worker updated README and `docs/ARCHITECTURE.md`; independent reviews found and resolved the preview authoritative-path discrepancy. Add matrix smoke paths, cleanup result, and final commit hash before closing the plan.
+Recorded evidence: focused evidence/matrix suite 116 passed; full suite 1043 passed with one pre-existing Pillow deprecation warning; Ruff clean; gateway and CLI import isolation clean; preview smoke ran 4 scenarios and signed smoke ran 3 offscreen scenarios with matching authoritative paths; documentation worker updated README and `docs/ARCHITECTURE.md`; independent reviews found and resolved the preview authoritative-path discrepancy; final commit is `e967d5a3b88c3a7eb4bda1b91f2e2389d1b62383`.
 
 ## Interfaces and Dependencies
 
@@ -112,4 +112,4 @@ At completion, `src/foliaseal/presentation/qt/evidence_gateways.py` must expose 
 ## Revision Notes
 
 2026-08-02: Initial one-slice plan created after the required fresh explorer review. The scope combines the recommended hybrid gateway extraction with a bounded internal nomenclature cleanup, while explicitly preserving stable external `phase3` contracts.
-2026-08-02: Updated after independent compliance reviews to document the preview authoritative-path fix, architecture/README reconciliation, full-suite and smoke evidence, and cleanup audit. The final commit remains the only open progress item.
+2026-08-02: Updated after independent compliance reviews to document the preview authoritative-path fix, architecture/README reconciliation, full-suite and smoke evidence, cleanup audit, and commit `e967d5a3b88c3a7eb4bda1b91f2e2389d1b62383`.
