@@ -10,10 +10,7 @@ from pathlib import Path
 from foliaseal.infra.config.schemas import (
     AppearanceProfile,
     ConfigValidationError,
-    PlacementProfile,
-    PlacementProfileRect,
     ResolvedSignaturePreset,
-    SignatureAppearance,
     SignaturePresetCatalog,
     _deserialize_appearance,
     _deserialize_placement_defaults,
@@ -111,114 +108,8 @@ class SignaturePresetCatalogStore:
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         payload_text = json.dumps(catalog.to_dict(), indent=2, sort_keys=True)
         temp_path = self.catalog_path.with_name(f"{self.catalog_path.name}.tmp")
-        temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
-        temp_path.replace(self.catalog_path)
-
-    def save_preset(self, preset: ResolvedSignaturePreset) -> SignaturePresetCatalog:
-        """Upsert a resolved signature preset and persist the resulting catalog."""
-        if not isinstance(preset, ResolvedSignaturePreset):
-            raise ConfigValidationError("preset must be a ResolvedSignaturePreset value.")
-        catalog = self.load_catalog().upsert_preset(preset)
-        self.save_catalog(catalog)
-        return catalog
-
-    def save_appearance_profile(
-        self,
-        name: str,
-        appearance: SignatureAppearance,
-        *,
-        overwrite: bool = False,
-    ) -> SignaturePresetCatalog:
-        """Upsert a named appearance profile and persist the catalog."""
-        profile = AppearanceProfile(
-            schema_version=1,
-            appearance_profile_id=_stable_id("appearance", name),
-            display_name=name.strip(),
-            appearance=appearance,
-        )
-        catalog = self.load_catalog()
-        if not overwrite:
-            try:
-                catalog.appearance_profile_named(profile.display_name)
-            except KeyError:
-                pass
-            else:
-                raise ConfigValidationError(
-                    f"Appearance profile '{profile.display_name}' already exists."
-                )
-        catalog = catalog.upsert_appearance_profile(profile)
-        self.save_catalog(catalog)
-        return catalog
-
-    def save_placement_profile(
-        self,
-        name: str,
-        *,
-        left_pt: float,
-        bottom_pt: float,
-        width_pt: float,
-        height_pt: float,
-        overwrite: bool = False,
-    ) -> SignaturePresetCatalog:
-        """Upsert a named placement profile and persist the catalog."""
-        profile = PlacementProfile(
-            schema_version=1,
-            placement_profile_id=_stable_id("placement", name),
-            display_name=name.strip(),
-            page_selection_mode="current_page",
-            rect=PlacementProfileRect(
-                left_pt=left_pt,
-                bottom_pt=bottom_pt,
-                width_pt=width_pt,
-                height_pt=height_pt,
-            ),
-        )
-        catalog = self.load_catalog()
-        if not overwrite:
-            try:
-                catalog.placement_profile_named(profile.display_name)
-            except KeyError:
-                pass
-            else:
-                raise ConfigValidationError(
-                    f"Placement profile '{profile.display_name}' already exists."
-                )
-        catalog = catalog.upsert_placement_profile(profile)
-        self.save_catalog(catalog)
-        return catalog
-
-    def delete_appearance_profile(self, name: str) -> SignaturePresetCatalog:
-        """Delete an unreferenced appearance profile and persist the catalog."""
-        catalog = self.load_catalog().remove_appearance_profile(name)
-        self.save_catalog(catalog)
-        return catalog
-
-    def delete_placement_profile(self, name: str) -> SignaturePresetCatalog:
-        """Delete an unreferenced placement profile and persist the catalog."""
-        catalog = self.load_catalog().remove_placement_profile(name)
-        self.save_catalog(catalog)
-        return catalog
-
-    def delete_preset(self, name: str) -> SignaturePresetCatalog:
-        """Remove a signature preset by name and persist the resulting catalog."""
-        catalog = self.load_catalog().remove_preset(name)
-        self.save_catalog(catalog)
-        return catalog
-
-    def rename_preset(self, name: str, new_name: str) -> SignaturePresetCatalog:
-        """Rename a preset and persist its unchanged component references."""
-        catalog = self.load_catalog().rename_preset(name, new_name)
-        self.save_catalog(catalog)
-        return catalog
-
-    def rename_appearance_profile(self, name: str, new_name: str) -> SignaturePresetCatalog:
-        """Rename an appearance profile while preserving preset references."""
-        catalog = self.load_catalog().rename_appearance_profile(name, new_name)
-        self.save_catalog(catalog)
-        return catalog
-
-    def rename_placement_profile(self, name: str, new_name: str) -> SignaturePresetCatalog:
-        """Rename a placement profile while preserving preset references."""
-        catalog = self.load_catalog().rename_placement_profile(name, new_name)
-        self.save_catalog(catalog)
-        return catalog
+        try:
+            temp_path.write_text(f"{payload_text}\n", encoding="utf-8")
+            temp_path.replace(self.catalog_path)
+        finally:
+            temp_path.unlink(missing_ok=True)

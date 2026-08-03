@@ -723,7 +723,10 @@ def test_coordinator_apply_signature_preset_wrapper_preserves_control_issue_fold
 
     assert state.selected_signature_preset_name == "Compact"
     assert state.ready_to_sign is True
-    assert state.validation_text == "Ready to sign."
+    assert state.validation_text == (
+        "Selected preset 'Compact' does not define a certificate; "
+        "choose a certificate configuration before signing.\nReady to sign."
+    )
 
 
 def test_coordinator_apply_signature_preset_wrapper_applies_certificate_material(

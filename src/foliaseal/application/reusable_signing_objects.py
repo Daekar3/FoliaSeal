@@ -1,0 +1,425 @@
+"""Typed application boundary for reusable signing-object catalog operations."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Protocol
+
+from foliaseal.domain.models import SignatureAppearance, SignaturePlacementDefaults
+from foliaseal.infra.config.schemas import (
+    AppearanceProfile,
+    ConfigValidationError,
+    PlacementProfile,
+    PlacementProfileRect,
+    ResolvedSignaturePreset,
+    SignaturePreset,
+    SignaturePresetCatalog,
+)
+
+
+class ReusableObjectKind(Enum):
+    """The persisted kind represented by a typed reusable-object reference."""
+
+    APPEARANCE = "appearance"
+    PLACEMENT = "placement"
+    PRESET = "preset"
+
+
+@dataclass(frozen=True)
+class ReusableObjectRef:
+    """Stable identity for one reusable object; display names are not identity."""
+
+    kind: ReusableObjectKind
+    object_id: str
+
+
+@dataclass(frozen=True)
+class ReusableObjectSummary:
+    """Display-ready description paired with its typed identity."""
+
+    ref: ReusableObjectRef
+    display_name: str
+    details: str
+
+
+@dataclass(frozen=True)
+class ReusableObjectsView:
+    """Current reusable-object choices for application and Qt callers."""
+
+    appearances: tuple[ReusableObjectSummary, ...]
+    placements: tuple[ReusableObjectSummary, ...]
+    presets: tuple[ReusableObjectSummary, ...]
+
+    @property
+    def all_items(self) -> tuple[ReusableObjectSummary, ...]:
+        return self.appearances + self.placements + self.presets
+
+    @property
+    def appearance_names(self) -> tuple[str, ...]:
+        return tuple(item.display_name for item in self.appearances)
+
+    @property
+    def placement_names(self) -> tuple[str, ...]:
+        return tuple(item.display_name for item in self.placements)
+
+    @property
+    def preset_names(self) -> tuple[str, ...]:
+        return tuple(item.display_name for item in self.presets)
+
+
+@dataclass(frozen=True)
+class SaveAppearance:
+    name: str
+    appearance: SignatureAppearance
+    overwrite: bool = False
+
+
+@dataclass(frozen=True)
+class SavePlacement:
+    name: str
+    rect: PlacementProfileRect
+    overwrite: bool = False
+
+
+@dataclass(frozen=True)
+class SavePreset:
+    name: str
+    appearance: SignatureAppearance | None = None
+    placement_defaults: SignaturePlacementDefaults | None = None
+    appearance_profile_id: str | None = None
+    placement_profile_id: str | None = None
+    certificate_configuration_id: str | None = None
+    overwrite: bool = False
+
+
+@dataclass(frozen=True)
+class RenameObject:
+    ref: ReusableObjectRef
+    new_name: str
+
+
+@dataclass(frozen=True)
+class DeleteObject:
+    ref: ReusableObjectRef
+
+
+ReusableObjectCommand = SaveAppearance | SavePlacement | SavePreset | RenameObject | DeleteObject
+ResolvedReusableObject = AppearanceProfile | PlacementProfile | ResolvedSignaturePreset
+
+
+class CatalogRepository(Protocol):
+    """Minimal persistence port used by the reusable-object application boundary."""
+
+    def load_catalog(self) -> SignaturePresetCatalog:
+        """Load the current catalog."""
+
+    def save_catalog(self, catalog: SignaturePresetCatalog) -> None:
+        """Atomically persist a catalog."""
+
+
+@dataclass
+class InMemoryCatalogRepository:
+    """Small repository stand-in for coordinator and boundary tests."""
+
+    catalog: SignaturePresetCatalog
+
+    def load_catalog(self) -> SignaturePresetCatalog:
+        return self.catalog
+
+    def save_catalog(self, catalog: SignaturePresetCatalog) -> None:
+        self.catalog = catalog
+
+
+class ReusableSigningObjects:
+    """Own reusable-object policy while hiding catalog persistence details."""
+
+    def __init__(self, repository: CatalogRepository) -> None:
+        self._repository = repository
+
+    def view(self) -> ReusableObjectsView:
+        return self._view(self._repository.load_catalog())
+
+    def resolve(self, ref: ReusableObjectRef) -> ResolvedReusableObject:
+        catalog = self._repository.load_catalog()
+        if ref.kind is ReusableObjectKind.APPEARANCE:
+            return self._resolve_by_id(catalog.appearance_profiles, ref.object_id, ref.kind)
+        if ref.kind is ReusableObjectKind.PLACEMENT:
+            return self._resolve_by_id(catalog.placement_profiles, ref.object_id, ref.kind)
+        return catalog.resolve_preset(
+            self._resolve_by_id(catalog.signature_presets, ref.object_id, ref.kind)
+        )
+
+    def execute(self, command: ReusableObjectCommand) -> ReusableObjectsView:
+        catalog = self._repository.load_catalog()
+        updated = self._apply(catalog, command)
+        if updated is not catalog:
+            self._repository.save_catalog(updated)
+        return self._view(updated)
+
+    def _apply(
+        self,
+        catalog: SignaturePresetCatalog,
+        command: ReusableObjectCommand,
+    ) -> SignaturePresetCatalog:
+        if isinstance(command, SaveAppearance):
+            name = _require_name(command.name, "Appearance profile name is required.")
+            profile = AppearanceProfile(
+                schema_version=1,
+                appearance_profile_id=_stable_id("appearance", name),
+                display_name=name,
+                appearance=command.appearance,
+            )
+            self._check_duplicate(
+                catalog.appearance_profiles,
+                name,
+                command.overwrite,
+                "Appearance",
+            )
+            return catalog.upsert_appearance_profile(profile)
+        if isinstance(command, SavePlacement):
+            name = _require_name(command.name, "Placement profile name is required.")
+            profile = PlacementProfile(
+                schema_version=1,
+                placement_profile_id=_stable_id("placement", name),
+                display_name=name,
+                page_selection_mode="current_page",
+                rect=command.rect,
+            )
+            self._check_duplicate(catalog.placement_profiles, name, command.overwrite, "Placement")
+            return catalog.upsert_placement_profile(profile)
+        if isinstance(command, SavePreset):
+            name = _require_name(command.name, "Signature preset name is required.")
+            self._check_duplicate(
+                catalog.signature_presets,
+                name,
+                command.overwrite,
+                "Signature preset",
+            )
+            if command.appearance is not None:
+                existing = next(
+                    (preset for preset in catalog.signature_presets if preset.display_name == name),
+                    None,
+                )
+                appearance_id = (
+                    existing.appearance_profile_id
+                    if existing is not None and existing.appearance_profile_id is not None
+                    else _stable_id("appearance", name)
+                )
+                appearance_profile = AppearanceProfile(
+                    schema_version=1,
+                    appearance_profile_id=appearance_id,
+                    display_name=(
+                        _appearance_by_id(catalog, appearance_id).display_name
+                        if _appearance_by_id(catalog, appearance_id) is not None
+                        else name
+                    ),
+                    appearance=command.appearance,
+                )
+                updated = catalog.upsert_appearance_profile(appearance_profile)
+                placement_id = (
+                    existing.placement_profile_id
+                    if existing is not None
+                    else None
+                )
+                if command.placement_defaults is not None:
+                    placement_id = placement_id or _stable_id("placement", name)
+                    existing_placement = (
+                        _placement_by_id(catalog, placement_id)
+                        if _placement_by_id(catalog, placement_id) is not None
+                        else None
+                    )
+                    updated = updated.upsert_placement_profile(
+                        PlacementProfile(
+                            schema_version=1,
+                            placement_profile_id=placement_id,
+                            display_name=(
+                                existing_placement.display_name
+                                if existing_placement is not None
+                                else name
+                            ),
+                            page_selection_mode="current_page",
+                            rect=PlacementProfileRect(
+                                left_pt=0.0,
+                                bottom_pt=0.0,
+                                width_pt=command.placement_defaults.width_pt,
+                                height_pt=command.placement_defaults.height_pt,
+                            ),
+                        )
+                    )
+                preset = SignaturePreset.from_profile_parts(
+                    display_name=name,
+                    appearance_profile_id=appearance_id,
+                    placement_profile_id=placement_id,
+                    certificate_configuration_id=command.certificate_configuration_id,
+                    signature_preset_id=(
+                        existing.signature_preset_id if existing is not None else None
+                    ),
+                )
+                return updated.upsert_reference_preset(preset)
+            if command.appearance_profile_id is None:
+                raise ConfigValidationError(
+                    "A preset must include an appearance or appearance profile reference."
+                )
+            appearance = self._resolve_by_id(
+                catalog.appearance_profiles,
+                command.appearance_profile_id,
+                ReusableObjectKind.APPEARANCE,
+            )
+            if command.placement_profile_id is not None:
+                self._resolve_by_id(
+                    catalog.placement_profiles,
+                    command.placement_profile_id,
+                    ReusableObjectKind.PLACEMENT,
+                )
+            existing = next(
+                (item for item in catalog.signature_presets if item.display_name == name),
+                None,
+            )
+            preset = SignaturePreset.from_profile_parts(
+                display_name=name,
+                appearance_profile_id=appearance.appearance_profile_id,
+                placement_profile_id=command.placement_profile_id,
+                certificate_configuration_id=command.certificate_configuration_id,
+                signature_preset_id=(
+                    existing.signature_preset_id if existing is not None else None
+                ),
+            )
+            return catalog.upsert_reference_preset(preset)
+        if isinstance(command, RenameObject):
+            name = self._name_for_ref(catalog, command.ref)
+            new_name = _require_name(command.new_name, "New reusable-object name is required.")
+            if command.ref.kind is ReusableObjectKind.APPEARANCE:
+                return catalog.rename_appearance_profile(name, new_name)
+            if command.ref.kind is ReusableObjectKind.PLACEMENT:
+                return catalog.rename_placement_profile(name, new_name)
+            return catalog.rename_preset(name, new_name)
+        if isinstance(command, DeleteObject):
+            name = self._name_for_ref(catalog, command.ref)
+            if command.ref.kind is ReusableObjectKind.APPEARANCE:
+                return catalog.remove_appearance_profile(name)
+            if command.ref.kind is ReusableObjectKind.PLACEMENT:
+                return catalog.remove_placement_profile(name)
+            return catalog.remove_preset(name)
+        raise TypeError(f"Unsupported reusable-object command: {type(command)!r}")
+
+    @staticmethod
+    def _check_duplicate(
+        entries: tuple[object, ...], name: str, overwrite: bool, label: str
+    ) -> None:
+        if any(getattr(entry, "display_name") == name for entry in entries) and not overwrite:
+            raise ConfigValidationError(f"{label} '{name}' already exists.")
+
+    @staticmethod
+    def _resolve_by_id(entries: tuple[object, ...], object_id: str, kind: ReusableObjectKind):
+        for entry in entries:
+            if getattr(entry, f"{kind.value}_profile_id", None) == object_id:
+                return entry
+            if (
+                kind is ReusableObjectKind.PRESET
+                and getattr(entry, "signature_preset_id", None) == object_id
+            ):
+                return entry
+        raise ConfigValidationError(
+            f"{kind.value.title()} object '{object_id}' is not available."
+        )
+
+    def _name_for_ref(self, catalog: SignaturePresetCatalog, ref: ReusableObjectRef) -> str:
+        return self._resolve_by_id(
+            {
+                ReusableObjectKind.APPEARANCE: catalog.appearance_profiles,
+                ReusableObjectKind.PLACEMENT: catalog.placement_profiles,
+                ReusableObjectKind.PRESET: catalog.signature_presets,
+            }[ref.kind],
+            ref.object_id,
+            ref.kind,
+        ).display_name
+
+    @staticmethod
+    def _view(catalog: SignaturePresetCatalog) -> ReusableObjectsView:
+        appearances = {
+            profile.appearance_profile_id: profile.display_name
+            for profile in catalog.appearance_profiles
+        }
+        placements = {
+            profile.placement_profile_id: profile.display_name
+            for profile in catalog.placement_profiles
+        }
+        return ReusableObjectsView(
+            appearances=tuple(
+                ReusableObjectSummary(
+                    ref=ReusableObjectRef(
+                        ReusableObjectKind.APPEARANCE,
+                        profile.appearance_profile_id,
+                    ),
+                    display_name=profile.display_name,
+                    details="Reusable component; referenced presets cannot be deleted.",
+                )
+                for profile in catalog.appearance_profiles
+            ),
+            placements=tuple(
+                ReusableObjectSummary(
+                    ref=ReusableObjectRef(
+                        ReusableObjectKind.PLACEMENT,
+                        profile.placement_profile_id,
+                    ),
+                    display_name=profile.display_name,
+                    details="Reusable component; referenced presets cannot be deleted.",
+                )
+                for profile in catalog.placement_profiles
+            ),
+            presets=tuple(
+                ReusableObjectSummary(
+                    ref=ReusableObjectRef(ReusableObjectKind.PRESET, preset.signature_preset_id),
+                    display_name=preset.display_name,
+                    details=(
+                        f"Appearance: {appearances.get(preset.appearance_profile_id, 'none')}; "
+                        f"placement: {placements.get(preset.placement_profile_id, 'none')}; "
+                        "certificate configuration id: "
+                        f"{preset.certificate_configuration_id or 'none'}."
+                    ),
+                )
+                for preset in catalog.signature_presets
+            ),
+        )
+
+
+def _require_name(value: str, message: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ConfigValidationError(message)
+    return normalized
+
+
+def _stable_id(prefix: str, value: str) -> str:
+    from foliaseal.infra.config.schemas import _stable_id as schema_stable_id
+
+    return schema_stable_id(prefix, value)
+
+
+def _appearance_by_id(
+    catalog: SignaturePresetCatalog,
+    profile_id: str,
+) -> AppearanceProfile | None:
+    return next(
+        (
+            profile
+            for profile in catalog.appearance_profiles
+            if profile.appearance_profile_id == profile_id
+        ),
+        None,
+    )
+
+
+def _placement_by_id(
+    catalog: SignaturePresetCatalog,
+    profile_id: str,
+) -> PlacementProfile | None:
+    return next(
+        (
+            profile
+            for profile in catalog.placement_profiles
+            if profile.placement_profile_id == profile_id
+        ),
+        None,
+    )

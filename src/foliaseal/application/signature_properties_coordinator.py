@@ -5,6 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from foliaseal.application.reusable_signing_objects import (
+    DeleteObject,
+    InMemoryCatalogRepository,
+    ReusableObjectKind,
+    ReusableObjectRef,
+    ReusableSigningObjects,
+    SaveAppearance,
+    SavePlacement,
+    SavePreset,
+)
 from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
@@ -26,6 +36,8 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     CertificateCatalog,
     CertificateConfiguration,
+    ConfigValidationError,
+    PlacementProfileRect,
     ResolvedSignaturePreset,
     SignaturePreset,
     SignaturePresetCatalog,
@@ -233,6 +245,7 @@ class DefaultSignaturePropertiesCoordinator:
     certificate_secret_provider: CertificateSecretProvider | None = None
     preset_catalog: SignaturePresetCatalog | None = None
     preset_catalog_store: SignaturePresetCatalogStore | None = None
+    reusable_objects: ReusableSigningObjects | None = None
 
     def __post_init__(self) -> None:
         if self.certificate_catalog is not None:
@@ -241,12 +254,12 @@ class DefaultSignaturePropertiesCoordinator:
             self.certificate_catalog = self.certificate_catalog_store.load_catalog()
         else:
             self.certificate_catalog = CertificateCatalog(schema_version=1)
-        if self.preset_catalog is not None:
-            self.preset_catalog = self.preset_catalog
-        elif self.preset_catalog_store is not None:
-            self.preset_catalog = self.preset_catalog_store.load_catalog()
-        else:
-            self.preset_catalog = SignaturePresetCatalog(schema_version=1)
+        if self.reusable_objects is None:
+            repository = self.preset_catalog_store or InMemoryCatalogRepository(
+                self.preset_catalog or SignaturePresetCatalog(schema_version=1)
+            )
+            self.reusable_objects = ReusableSigningObjects(repository)
+        self.preset_catalog = self._reusable_catalog()
         resolver_store = self.certificate_catalog_store or CertificateCatalogStore.default()
         self._certificate_material_resolver = CertificateSigningMaterialResolver(
             managed_certificate_dir=resolver_store.managed_certificate_dir,
@@ -265,6 +278,13 @@ class DefaultSignaturePropertiesCoordinator:
         )
         self._selected_signature_preset_name = self._resolve_selected_signature_preset_name()
         preview = self.workflow.preview()
+        validation_text = _format_validation_text(
+            preview,
+            control_issue=control_issue,
+        )
+        partial_preset_notice = self._partial_preset_notice()
+        if partial_preset_notice is not None:
+            validation_text = f"{partial_preset_notice}\n{validation_text}"
         return SignaturePropertiesViewState(
             selected_certificate_configuration_name=self._selected_certificate_configuration_name,
             selected_signature_preset_name=self._selected_signature_preset_name,
@@ -272,18 +292,11 @@ class DefaultSignaturePropertiesCoordinator:
                 configuration.display_name
                 for configuration in self.certificate_catalog.certificate_configurations
             ),
-            signature_preset_names=self.preset_catalog.preset_names(),
-            appearance_profile_names=tuple(
-                profile.display_name for profile in self.preset_catalog.appearance_profiles
-            ),
-            placement_profile_names=tuple(
-                profile.display_name for profile in self.preset_catalog.placement_profiles
-            ),
+            signature_preset_names=self.reusable_objects.view().preset_names,
+            appearance_profile_names=self.reusable_objects.view().appearance_names,
+            placement_profile_names=self.reusable_objects.view().placement_names,
             visible_signature_setup_draft=self._current_visible_signature_setup_draft(),
-            validation_text=_format_validation_text(
-                preview,
-                control_issue=control_issue,
-            ),
+            validation_text=validation_text,
             ready_to_sign=_ready_to_sign(preview, control_issue=control_issue),
             preview=preview,
         )
@@ -374,9 +387,12 @@ class DefaultSignaturePropertiesCoordinator:
         self,
         preset_name: str,
     ) -> str | None:
+        ref = self._ref_for_name(ReusableObjectKind.PRESET, preset_name)
+        if ref is None:
+            return None
         try:
-            preset = self.preset_catalog.preset_named(preset_name)
-        except KeyError:
+            preset = self.reusable_objects.resolve(ref)
+        except (ConfigValidationError, KeyError):
             return None
         configuration_id = preset.preset.certificate_configuration_id
         if configuration_id is None:
@@ -429,9 +445,15 @@ class DefaultSignaturePropertiesCoordinator:
             command.selected_name,
             "Select a signature preset before applying it.",
         )
+        ref = self._ref_for_name(ReusableObjectKind.PRESET, selected_name)
+        if ref is None:
+            self._selected_signature_preset_name = None
+            raise SignaturePropertiesCoordinatorError(
+                f"Signature preset '{selected_name}' is not available."
+            )
         try:
-            preset = self.preset_catalog.preset_named(selected_name)
-        except KeyError as exc:
+            preset = self.reusable_objects.resolve(ref)
+        except (ConfigValidationError, KeyError) as exc:
             self._selected_signature_preset_name = None
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
         certificate_configuration_id = preset.preset.certificate_configuration_id
@@ -449,9 +471,15 @@ class DefaultSignaturePropertiesCoordinator:
             )
             self.workflow.apply_certificate_configuration(configuration, signing_material)
             self._selected_certificate_configuration_name = configuration.display_name
+        try:
+            appearance = preset.appearance
+            placement_defaults = preset.placement_defaults
+        except (ConfigValidationError, KeyError) as exc:
+            self._selected_signature_preset_name = None
+            raise SignaturePropertiesCoordinatorError(str(exc)) from exc
         self.workflow.apply_signature_preset_values(
-            appearance=preset.appearance,
-            placement_defaults=preset.placement_defaults,
+            appearance=appearance,
+            placement_defaults=placement_defaults,
             signature_preset_id=preset.preset.signature_preset_id,
             appearance_profile_id=preset.preset.appearance_profile_id,
             placement_profile_id=preset.preset.placement_profile_id,
@@ -475,9 +503,16 @@ class DefaultSignaturePropertiesCoordinator:
             preset = self._build_current_preset(name)
         except ValueError as exc:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
-        self.preset_catalog = self.preset_catalog.upsert_preset(preset)
-        if self.preset_catalog_store is not None:
-            self.preset_catalog_store.save_catalog(self.preset_catalog)
+        self.reusable_objects.execute(
+            SavePreset(
+                name=name,
+                appearance=preset.appearance,
+                placement_defaults=preset.placement_defaults,
+                certificate_configuration_id=preset.preset.certificate_configuration_id,
+                overwrite=command.overwrite,
+            )
+        )
+        self._refresh_catalogs()
         self._selected_signature_preset_name = preset.name
 
     def _save_current_appearance_profile(self, command: SaveCurrentAppearanceProfile) -> None:
@@ -487,14 +522,13 @@ class DefaultSignaturePropertiesCoordinator:
             raise SignaturePropertiesCoordinatorError(
                 "A signature appearance must exist before saving an appearance profile."
             )
-        if self.preset_catalog_store is None:
-            raise SignaturePropertiesCoordinatorError("Appearance profile storage is unavailable.")
         try:
-            self.preset_catalog = self.preset_catalog_store.save_appearance_profile(
-                name, appearance, overwrite=command.overwrite
+            self.reusable_objects.execute(
+                SaveAppearance(name=name, appearance=appearance, overwrite=command.overwrite)
             )
         except ValueError as exc:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
+        self._refresh_catalogs()
 
     def _compose_signature_preset(self, command: ComposeSignaturePreset) -> None:
         name = _require_name(command.name, "Preset name is required before saving.")
@@ -518,16 +552,22 @@ class DefaultSignaturePropertiesCoordinator:
             )
         except KeyError as exc:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
-        if self.preset_catalog_store is None:
-            raise SignaturePropertiesCoordinatorError("Signature preset storage is unavailable.")
         preset = SignaturePreset.from_profile_parts(
             display_name=name,
             appearance_profile_id=appearance.appearance_profile_id,
             placement_profile_id=(placement.placement_profile_id if placement else None),
             certificate_configuration_id=command.certificate_configuration_id,
         )
-        self.preset_catalog = self.preset_catalog.upsert_reference_preset(preset)
-        self.preset_catalog_store.save_catalog(self.preset_catalog)
+        self.reusable_objects.execute(
+            SavePreset(
+                name=name,
+                appearance_profile_id=preset.appearance_profile_id,
+                placement_profile_id=preset.placement_profile_id,
+                certificate_configuration_id=preset.certificate_configuration_id,
+                overwrite=command.overwrite,
+            )
+        )
+        self._refresh_catalogs()
         self._selected_signature_preset_name = preset.display_name
 
     def _save_current_placement_profile(self, command: SaveCurrentPlacementProfile) -> None:
@@ -537,19 +577,22 @@ class DefaultSignaturePropertiesCoordinator:
             raise SignaturePropertiesCoordinatorError(
                 "Place a signature on the page before saving a placement profile."
             )
-        if self.preset_catalog_store is None:
-            raise SignaturePropertiesCoordinatorError("Placement profile storage is unavailable.")
         try:
-            self.preset_catalog = self.preset_catalog_store.save_placement_profile(
-                name,
-                left_pt=placement.left_pt,
-                bottom_pt=placement.bottom_pt,
-                width_pt=placement.width_pt,
-                height_pt=placement.height_pt,
-                overwrite=command.overwrite,
+            self.reusable_objects.execute(
+                SavePlacement(
+                    name=name,
+                    rect=PlacementProfileRect(
+                        left_pt=placement.left_pt,
+                        bottom_pt=placement.bottom_pt,
+                        width_pt=placement.width_pt,
+                        height_pt=placement.height_pt,
+                    ),
+                    overwrite=command.overwrite,
+                )
             )
         except ValueError as exc:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
+        self._refresh_catalogs()
 
     def _build_current_preset(self, name: str) -> ResolvedSignaturePreset:
         appearance = self.workflow.current_signature_appearance
@@ -572,23 +615,61 @@ class DefaultSignaturePropertiesCoordinator:
 
     def _delete_preset(self, command: DeletePreset) -> None:
         name = _require_name(command.name, "Select a signature preset before deleting it.")
-        try:
-            self.preset_catalog.preset_named(name)
-        except KeyError as exc:
+        ref = self._ref_for_name(ReusableObjectKind.PRESET, name)
+        if ref is None:
             raise SignaturePropertiesCoordinatorError(
                 f"Signature preset '{name}' is not available."
-            ) from exc
-        self.preset_catalog = self.preset_catalog.remove_preset(name)
-        if self.preset_catalog_store is not None:
-            self.preset_catalog_store.delete_preset(name)
+            )
+        self.reusable_objects.execute(DeleteObject(ref=ref))
+        self._refresh_catalogs()
         if self._selected_signature_preset_name == name:
             self._selected_signature_preset_name = None
 
     def _refresh_catalogs(self) -> None:
         if self.certificate_catalog_store is not None:
             self.certificate_catalog = self.certificate_catalog_store.load_catalog()
+        self.preset_catalog = self._reusable_catalog()
+
+    def _reusable_catalog(self) -> SignaturePresetCatalog:
         if self.preset_catalog_store is not None:
-            self.preset_catalog = self.preset_catalog_store.load_catalog()
+            return self.preset_catalog_store.load_catalog()
+        repository = getattr(self.reusable_objects, "_repository", None)
+        if repository is not None:
+            return repository.load_catalog()
+        return self.preset_catalog or SignaturePresetCatalog(schema_version=1)
+
+    def _ref_for_name(
+        self,
+        kind: ReusableObjectKind,
+        name: str,
+    ) -> ReusableObjectRef | None:
+        for item in self.reusable_objects.view().all_items:
+            if item.ref.kind is kind and item.display_name == name:
+                return item.ref
+        return None
+
+    def _partial_preset_notice(self) -> str | None:
+        if (
+            self._selected_signature_preset_name is None
+            or self._selected_certificate_configuration_name is not None
+        ):
+            return None
+        ref = self._ref_for_name(
+            ReusableObjectKind.PRESET,
+            self._selected_signature_preset_name,
+        )
+        if ref is None:
+            return None
+        try:
+            preset = self.reusable_objects.resolve(ref)
+        except (ConfigValidationError, KeyError):
+            return None
+        if preset.preset.certificate_configuration_id is not None:
+            return None
+        return (
+            f"Selected preset '{preset.name}' does not define a certificate; "
+            "choose a certificate configuration before signing."
+        )
 
     def _resolve_signing_material(
         self,

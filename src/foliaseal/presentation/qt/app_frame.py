@@ -11,7 +11,7 @@ from typing import Any
 
 from foliaseal.application import (
     CertificateManager,
-    SignatureProfileLibrary,
+    ReusableSigningObjects,
     SigningDraftWorkflow,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -31,7 +31,7 @@ from foliaseal.presentation.qt.app_frame_certificate_management import (
     CertificateDialogPort,
 )
 from foliaseal.presentation.qt.app_frame_profile_library import (
-    SignatureProfileLibraryDialog,
+    ReusableObjectLibraryDialog,
 )
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
@@ -101,7 +101,7 @@ class AppFrameDialogCompatibilityState:
     certificate_import_dialog: Any | None = None
     certificate_creation_dialog: Any | None = None
     certificate_management_dialog: Any | None = None
-    signature_profile_library_dialog: Any | None = None
+    reusable_object_library_dialog: Any | None = None
 
 
 class AppSettingsDialog:
@@ -269,6 +269,7 @@ class FoliaSealAppFrame:
             )
         )
         self._preset_catalog_store = preset_catalog_store or SignaturePresetCatalogStore.default()
+        self._reusable_objects = ReusableSigningObjects(self._preset_catalog_store)
         self._sign_executor = sign_executor
         self._shell_factory = shell_factory or QtSigningWorkspaceFactory()
         self._render_backend_factory = render_backend_factory
@@ -356,8 +357,8 @@ class FoliaSealAppFrame:
         return self._dialog_compatibility.certificate_management_dialog
 
     @property
-    def signature_profile_library_dialog(self) -> Any | None:
-        return self._dialog_compatibility.signature_profile_library_dialog
+    def reusable_object_library_dialog(self) -> Any | None:
+        return self._dialog_compatibility.reusable_object_library_dialog
 
     def choose_open_pdf(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
@@ -448,23 +449,31 @@ class FoliaSealAppFrame:
         self._apply_certificate_dialog_compatibility(outcome.compatibility)
         return outcome.result
 
-    def show_signature_profile_library(self) -> Any:
+    def show_reusable_object_library(self) -> Any:
         """Open Settings management for reusable signing profiles and presets."""
-        dialog = SignatureProfileLibraryDialog(
+        dialog = ReusableObjectLibraryDialog(
             bindings=self._bindings,
             parent=self.window,
-            library=SignatureProfileLibrary(self._preset_catalog_store),
+            library=self._reusable_objects,
+            on_create=self._open_reusable_object_editor,
+            on_edit=self._open_reusable_object_editor,
         )
         self._dialog_compatibility = AppFrameDialogCompatibilityState(
             settings_dialog=self.settings_dialog,
             certificate_import_dialog=self.certificate_import_dialog,
             certificate_creation_dialog=self.certificate_creation_dialog,
             certificate_management_dialog=self.certificate_management_dialog,
-            signature_profile_library_dialog=dialog,
+            reusable_object_library_dialog=dialog,
         )
         dialog.exec()
         self._refresh_shell_signature_profiles()
         return dialog
+
+    def _open_reusable_object_editor(self) -> bool:
+        if self._current_shell_port is None:
+            self._emit_error("Open a PDF before creating or editing reusable signing objects.")
+            return False
+        return self._current_shell_port.open_reusable_object_editor()
 
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
@@ -502,8 +511,8 @@ class FoliaSealAppFrame:
         settings_menu.addAction(self._action("Application settings", self.show_app_settings))
         settings_menu.addAction(
             self._action(
-                "Manage signing profiles...",
-                self.show_signature_profile_library,
+                "Manage reusable signing objects...",
+                self.show_reusable_object_library,
             )
         )
         settings_menu.addAction(

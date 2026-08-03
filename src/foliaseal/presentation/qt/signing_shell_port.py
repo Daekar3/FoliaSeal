@@ -59,6 +59,9 @@ class SigningWorkspacePort(Protocol):
     def refresh_signature_profiles(self) -> None:
         """Refresh reusable signing-profile and preset choices."""
 
+    def open_reusable_object_editor(self) -> bool:
+        """Open the contextual reusable-object editor for the active PDF."""
+
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         """Toggle document text-selection mode for the live shell."""
 
@@ -101,6 +104,9 @@ class QtSigningWorkspacePort:
 
     def refresh_signature_profiles(self) -> None:
         self.shell_widget.refresh_signature_profiles()
+
+    def open_reusable_object_editor(self) -> bool:
+        return self.shell_widget.open_reusable_object_editor()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self.shell_widget.set_document_text_selection_mode(enabled)

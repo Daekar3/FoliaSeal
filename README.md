@@ -36,13 +36,21 @@ Current capabilities:
 - `SigningDraftWorkflow` owns the in-session signing draft state for Phase 3.
   - It should track the chosen page, placement rectangle, appearance/property settings, and validation state.
   - It should not duplicate viewer coordinate math or Qt event handling.
-- Signature presets are now part of the current Phase 3 shell workflow.
-  - A user can save the current signature setup under a distinct user-provided name.
-  - Saved signature presets can be selected from a dropdown in the shell.
-  - Saving to an existing name uses explicit overwrite confirmation.
-  - Saved signature presets now persist across relaunches in the user-visible `Signature Profiles`
-    storage area.
-  - The shell supports deleting the selected signature preset with explicit confirmation.
+- Reusable signing objects are now part of the current Phase 3 shell workflow.
+  - `ReusableSigningObjects` owns typed `ReusableObjectRef` values and save/rename/delete
+    commands; display labels are presentation only and never identify an object.
+  - The shell can quickly select reference-only signature presets, while
+    `ReusableObjectLibraryDialog` provides dedicated Settings management with contextual
+    create/edit callbacks and reference-guarded deletion.
+  - Appearance and placement are saved independently from the refinement dialog. Placement
+    persistence stores a reusable `current_page` rectangle, not a document page number.
+  - Presets may omit a certificate reference; the shell reports explicit partial-preset
+    certificate guidance and requires a certificate configuration before signing.
+  - Catalog loading validates dangling or appearance-less preset references before exposing
+    them to callers. Repository-only persistence retains the historical user-visible
+    `Signature Profiles/profiles.json` path and legacy read migration.
+  - Saving to an existing name uses explicit overwrite confirmation. Preset overwrite preserves
+    referenced component IDs, and deleting a preset never cascades into its components.
   - The primary shell is preset-first: current-PDF appearance and placement editing is available
     through the explicit `Manual refinement` dialog instead of occupying the default sidebar.
 - `render_signing_preview()` should turn the normalized draft state into a deterministic text

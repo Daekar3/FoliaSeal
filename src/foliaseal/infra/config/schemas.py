@@ -1288,6 +1288,31 @@ class SignaturePresetCatalog:
                     "Field 'signature_presets' must not contain duplicate names."
                 )
             seen_preset_names.add(preset.display_name)
+        appearance_ids = {
+            profile.appearance_profile_id for profile in self.appearance_profiles
+        }
+        placement_ids = {
+            profile.placement_profile_id for profile in self.placement_profiles
+        }
+        for preset in self.signature_presets:
+            if preset.appearance_profile_id is None:
+                raise ConfigValidationError(
+                    f"Signature preset '{preset.display_name}' must reference "
+                    "an appearance profile."
+                )
+            if preset.appearance_profile_id not in appearance_ids:
+                raise ConfigValidationError(
+                    f"Signature preset '{preset.display_name}' references a "
+                    "missing appearance profile."
+                )
+            if (
+                preset.placement_profile_id is not None
+                and preset.placement_profile_id not in placement_ids
+            ):
+                raise ConfigValidationError(
+                    f"Signature preset '{preset.display_name}' references a "
+                    "missing placement profile."
+                )
 
     @staticmethod
     def _validate_object_tuple(

@@ -4,6 +4,9 @@ import pytest
 from PIL import Image
 
 from foliaseal.application import (
+    ReusableSigningObjects,
+    SaveAppearance,
+    SavePlacement,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
@@ -31,7 +34,7 @@ from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
 )
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog, PlacementProfileRect
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module
@@ -2870,13 +2873,18 @@ def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
     bindings.q_input_dialog.next_text = "Contract signing"
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
     appearance = build_signature_appearance()
-    store.save_appearance_profile("Approval appearance", appearance)
-    store.save_placement_profile(
-        "Bottom right",
-        left_pt=11.0,
-        bottom_pt=12.0,
-        width_pt=130.0,
-        height_pt=44.0,
+    objects = ReusableSigningObjects(store)
+    objects.execute(SaveAppearance("Approval appearance", appearance))
+    objects.execute(
+        SavePlacement(
+            "Bottom right",
+            PlacementProfileRect(
+                left_pt=11.0,
+                bottom_pt=12.0,
+                width_pt=130.0,
+                height_pt=44.0,
+            ),
+        )
     )
 
     def _save_then_cancel(dialog):
