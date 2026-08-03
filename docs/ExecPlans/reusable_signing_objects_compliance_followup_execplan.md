@@ -171,4 +171,5 @@ hybrid implementation. The child is intentionally limited to SPEC management,
 reference integrity, and error-boundary closure.
 2026-08-03: Closed after the postfix review, documentation reconciliation,
 1024-test full-suite run, and final clean-tree/process audit; commit hashes are
-recorded by the root agent.
+recorded by the root agent. Implementation commit:
+`d9b29cc178d09d3068fba7691ff9a6f944545c47`.

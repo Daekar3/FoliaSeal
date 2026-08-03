@@ -360,3 +360,4 @@ compatibility pieces are removed.
 2026-08-03: Closed the compliance child, documentation reconciliation, full
 suite validation, and process audit. Final evidence: 183 focused tests and
 1024 full-suite tests passed; Ruff, compileall, and diff checks are clean.
+Implementation commit: `d9b29cc178d09d3068fba7691ff9a6f944545c47`.
