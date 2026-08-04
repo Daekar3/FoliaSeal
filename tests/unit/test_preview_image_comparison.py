@@ -4,11 +4,11 @@ from pathlib import Path
 
 from PIL import Image
 
-import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
+from foliaseal.presentation.qt.preview_image_comparison import PreviewImageComparisonAnalyzer
 
 
 def _helper():
-    return phase3_harness_module._build_phase3_image_comparison_helper()
+    return PreviewImageComparisonAnalyzer()
 
 
 def test_image_comparison_helper_reports_changed_pixel_ratio(tmp_path: Path) -> None:

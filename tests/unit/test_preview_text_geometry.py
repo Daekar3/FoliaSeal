@@ -1,14 +1,24 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
 from PIL import Image
 
-import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
+from foliaseal.application.text_raster_analysis import (
+    detect_text_content_bounds_in_image,
+    detect_text_line_bounds_in_image,
+)
+from foliaseal.presentation.qt.preview_text_geometry import PreviewTextGeometryAnalyzer
 
 
 def _helper():
-    return phase3_harness_module._build_phase3_text_geometry_helper()
+    return PreviewTextGeometryAnalyzer(
+        detect_text_content_bounds_in_image=detect_text_content_bounds_in_image,
+        detect_text_line_bounds_in_image=detect_text_line_bounds_in_image,
+        import_module=importlib.import_module,
+        write_widget_capture_png=lambda _widget, _path: None,
+    )
 
 
 def test_project_content_bounds_to_preview_scales_source_bounds() -> None:
@@ -107,4 +117,3 @@ def test_detect_text_content_bounds_in_preview_uses_reference_envelope_to_reject
 
     assert error is None
     assert bounds == {"x": 28, "y": 16, "width": 24, "height": 6}
-

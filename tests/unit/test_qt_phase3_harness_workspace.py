@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -54,6 +55,73 @@ class _FakeProfileStore:
 
     def load_catalog(self):
         return _FakeCatalog(self._appearance)
+
+
+def _analysis_values(**overrides):
+    values = {
+        "card_bounds_px": None,
+        "text_widget_bounds_px": None,
+        "stamp_pixmap_size_px": None,
+        "layout_spacing_px": 0,
+        "preview_padding_px": 6,
+        "edge_distances_px": None,
+        "text_widget_image_sha256": None,
+        "text_rendered_content_bounds_px": {"x": 6, "y": 7, "width": 28, "height": 9},
+        "text_structural_content_bounds_px": None,
+        "text_content_detection_error": None,
+        "text_rendered_line_bounds_px": (
+            {"x": 6, "y": 7, "width": 16, "height": 4},
+            {"x": 6, "y": 12, "width": 28, "height": 4},
+        ),
+        "text_structural_line_bounds_px": (),
+        "text_line_detection_error": None,
+        "text_reference_content_bounds_px": None,
+        "text_reference_detection_error": None,
+        "stamp_band_bounds_px": None,
+        "stamp_rendered_pixmap_bounds_px": None,
+        "stamp_rendered_content_bounds_px": None,
+        "stamp_debug_image_path": None,
+        "stamp_debug_image_error": None,
+        "text_debug_image_path": None,
+        "text_debug_image_error": None,
+        "requested_text_font_family": None,
+        "requested_text_font_size_pt": None,
+        "effective_text_font_family": None,
+        "effective_text_font_point_size_pt": None,
+        "requested_text_font_category": None,
+        "effective_text_font_category": None,
+        "font_family_direct_preview_mapping_supported": None,
+        "font_family_category_mismatch": None,
+        "stamp_source_image_size_px": None,
+        "stamp_source_content_bounds_px": None,
+        "stamp_source_content_error": None,
+        "stamp_pixmap_edge_distances_px": None,
+        "stamp_content_edge_distances_px": None,
+        "stamp_pixmap_touches_band_edge": None,
+        "stamp_content_touches_band_edge": None,
+        "stamp_content_warning_threshold_px": 0,
+        "stamp_pixmap_min_edge_distance_px": None,
+        "stamp_content_min_edge_distance_px": None,
+        "stamp_content_within_warning_distance": None,
+        "text_content_edge_distances_px": None,
+        "text_content_border_edge_distances_px": None,
+        "text_content_min_edge_distance_px": None,
+        "text_content_min_border_distance_px": None,
+        "text_content_reference_width_loss_px": None,
+        "text_content_reference_height_loss_px": None,
+        "text_content_reference_width_tolerance_px": 3,
+        "text_content_reference_height_tolerance_px": 1,
+        "text_content_border_facing_distance_px": None,
+        "text_content_stamp_facing_distance_px": None,
+        "text_content_touches_widget_edge": None,
+        "text_content_touches_border_facing_edge": None,
+        "text_content_touches_stamp_facing_edge": None,
+        "text_content_overlaps_stamp_band": None,
+        "text_content_overlaps_stamp_content": None,
+        "text_content_clipped_in_preview": None,
+    }
+    values.update(overrides)
+    return values
 
 
 def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer() -> None:
@@ -606,38 +674,32 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
     monkeypatch.setattr(phase3_harness_module, "_label_pixmap_size_snapshot", lambda label: None)
     monkeypatch.setattr(phase3_harness_module, "_layout_spacing", lambda layout: 0)
     monkeypatch.setattr(phase3_harness_module, "_size_hint_snapshot", lambda widget: None)
-    monkeypatch.setattr(phase3_harness_module, "_text_font_diagnostics", lambda **kwargs: {})
-    monkeypatch.setattr(phase3_harness_module, "_preview_edge_distances", lambda **kwargs: None)
-    monkeypatch.setattr(phase3_harness_module, "_stamp_edge_diagnostics", lambda **kwargs: {})
-    monkeypatch.setattr(phase3_harness_module, "_text_edge_diagnostics", lambda **kwargs: {})
-    monkeypatch.setattr(phase3_harness_module, "_analyze_stamp_source_image", lambda path: {})
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_project_content_bounds_to_preview",
-        lambda **kwargs: None,
-    )
     monkeypatch.setattr(
         phase3_harness_module,
         "_project_pixmap_bounds_within_label",
         lambda **kwargs: None,
     )
+    analysis_requests = []
+
+    class _FakeAnalysisEngine:
+        def analyze(self, request):
+            analysis_requests.append(request)
+            return SimpleNamespace(
+                as_mapping=lambda: _analysis_values(
+                    text_structural_content_bounds_px={
+                        "x": 3,
+                        "y": 4,
+                        "width": 30,
+                        "height": 10,
+                    }
+                )
+            )
+
     monkeypatch.setattr(
         phase3_harness_module,
-        "_detect_text_content_bounds_in_preview",
-        lambda **kwargs: ({"x": 6, "y": 7, "width": 28, "height": 9}, None),
+        "_build_preview_analysis_engine",
+        lambda: _FakeAnalysisEngine(),
     )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_detect_text_line_bounds_in_preview",
-        lambda **kwargs: (
-            (
-                {"x": 6, "y": 7, "width": 16, "height": 4},
-                {"x": 6, "y": 12, "width": 28, "height": 4},
-            ),
-            None,
-        ),
-    )
-    monkeypatch.setattr(phase3_harness_module, "_image_crop_sha256", lambda **kwargs: None)
     monkeypatch.setattr(phase3_harness_module, "_write_text_debug_overlay", lambda **kwargs: None)
     monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
 
@@ -681,6 +743,7 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
         "width": 28,
         "height": 9,
     }
+    assert analysis_requests[-1].analysis_image_path.endswith("_analysis.png")
     assert capture["analysis_appearance_snapshot"]["border_style"]["shape"] == "rounded"
     assert render_calls
     assert render_calls[-1]["include_border"] is True
@@ -854,43 +917,22 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
     monkeypatch.setattr(phase3_harness_module, "_label_pixmap_size_snapshot", lambda label: None)
     monkeypatch.setattr(phase3_harness_module, "_layout_spacing", lambda layout: 0)
     monkeypatch.setattr(phase3_harness_module, "_size_hint_snapshot", lambda widget: None)
-    monkeypatch.setattr(phase3_harness_module, "_text_font_diagnostics", lambda **kwargs: {})
-    monkeypatch.setattr(phase3_harness_module, "_preview_edge_distances", lambda **kwargs: None)
-    monkeypatch.setattr(phase3_harness_module, "_stamp_edge_diagnostics", lambda **kwargs: {})
-    monkeypatch.setattr(phase3_harness_module, "_text_edge_diagnostics", lambda **kwargs: {})
-    monkeypatch.setattr(phase3_harness_module, "_analyze_stamp_source_image", lambda path: {})
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_project_content_bounds_to_preview",
-        lambda **kwargs: None,
-    )
     monkeypatch.setattr(
         phase3_harness_module,
         "_project_pixmap_bounds_within_label",
         lambda **kwargs: None,
     )
 
-    def _record_content_detection(**kwargs):
-        detector_calls.append(kwargs)
-        return {"x": 6, "y": 7, "width": 28, "height": 9}, None
+    class _FakeAnalysisEngine:
+        def analyze(self, request):
+            detector_calls.append(request)
+            return SimpleNamespace(as_mapping=lambda: _analysis_values())
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_detect_text_content_bounds_in_preview",
-        _record_content_detection,
+        "_build_preview_analysis_engine",
+        lambda: _FakeAnalysisEngine(),
     )
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_detect_text_line_bounds_in_preview",
-        lambda **kwargs: (
-            (
-                {"x": 6, "y": 7, "width": 16, "height": 4},
-                {"x": 6, "y": 12, "width": 28, "height": 4},
-            ),
-            None,
-        ),
-    )
-    monkeypatch.setattr(phase3_harness_module, "_image_crop_sha256", lambda **kwargs: None)
     monkeypatch.setattr(phase3_harness_module, "_write_text_debug_overlay", lambda **kwargs: None)
     monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
 
@@ -905,8 +947,13 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
     )
 
     assert detector_calls
-    assert detector_calls[-1]["preview_image_path"].endswith("_analysis.png")
-    assert detector_calls[-1]["text_widget_bounds"] == {"x": 1, "y": 2, "width": 48, "height": 20}
+    assert detector_calls[-1].analysis_image_path.endswith("_analysis.png")
+    assert detector_calls[-1].analysis_detection_bounds == {
+        "x": 1,
+        "y": 2,
+        "width": 48,
+        "height": 20,
+    }
 
 
 def test_qt_phase3_harness_workspace_adapter_rejects_missing_testing_adapter() -> None:

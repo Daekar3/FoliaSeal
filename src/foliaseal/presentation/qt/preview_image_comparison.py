@@ -1,4 +1,4 @@
-"""Shared image-comparison helpers for Phase 3 QA."""
+"""Shared preview image-comparison primitives for evidence capture."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from PIL import Image
 
 
 @dataclass(frozen=True)
-class Phase3ImageComparisonHelper:
-    """Own the shared preview/output image comparison primitives."""
+class PreviewImageComparisonAnalyzer:
+    """Own deterministic preview/output image-comparison primitives."""
 
     def image_crop_sha256(
         self,
@@ -221,4 +221,3 @@ class Phase3ImageComparisonHelper:
         canvas.paste(signed_crop, (preview_crop.width + spacer, 0))
         canvas.save(output_path)
         return None
-

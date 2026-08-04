@@ -71,8 +71,9 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py` | Per-scenario signed-acceptance execution boundary for Phase 3 QA. | Owns one signed-acceptance row from scenario application through preview capture, optional signing submission, successful-output snapshotting, and final result shaping while leaving matrix-level looping and expectation evaluation in `phase3_signed_acceptance_matrix_runner.py`. |
 | `src/foliaseal/presentation/qt/phase3_pdf_signature_snapshotter.py` | Pure signed-PDF evidence boundary for Phase 3 QA. | Owns signature counting, signature metadata, cryptographic/certification/timestamp verification projections, visible-appearance stream parsing, and JSON-safe PDF/pyHanko serialization; the harness composition root injects its bound methods into signed-output and capture assemblers. |
 | `src/foliaseal/presentation/qt/phase3_appearance_snapshotter.py` | Shared appearance parity-model boundary for Phase 3 QA. | Owns preview-side and signed-output-side `SignatureAppearanceSnapshot` reconstruction for render-parity comparison. |
-| `src/foliaseal/presentation/qt/phase3_image_comparison_helper.py` | Shared image-comparison boundary for Phase 3 QA. | Owns crop hashing, preview flattening, change-ratio calculations, aspect-ratio delta, and side-by-side comparison artifact writing. |
-| `src/foliaseal/presentation/qt/phase3_text_geometry_helper.py` | Shared preview text-geometry boundary for Phase 3 QA. | Owns source-to-preview bounds projection, rendered-text geometry detection, candidate filtering, and reference-label fallback capture. |
+| `src/foliaseal/presentation/qt/preview_analysis.py` | Neutral preview-analysis engine boundary shared by live Qt and headless capture. | Owns typed analysis requests/results, compatibility payload projection, text/stamp/font diagnostics, image comparison, and capture-transition analysis without owning a Qt lifecycle. |
+| `src/foliaseal/presentation/qt/preview_text_geometry.py` | Pure preview text-geometry adapter used by the neutral analysis engine. | Owns source-to-preview projection, rendered-text geometry detection, candidate filtering, and injected reference-label fallback capture. |
+| `src/foliaseal/presentation/qt/preview_image_comparison.py` | Pure preview image-comparison adapter used by the neutral analysis engine. | Owns crop hashing, preview flattening, change-ratio calculations, aspect-ratio delta, and side-by-side comparison artifact writing. |
 | `src/foliaseal/presentation/qt/phase3_signed_output_snapshotter.py` | Shared successful-output evidence boundary for Phase 3 QA. | Owns successful-output evidence aggregation and compact preview-vs-output comparison projection for both signed-acceptance scenario rows and interactive harness capture payloads. |
 | `src/foliaseal/presentation/qt/phase3_signed_output_render_snapshotter.py` | Signed-output render-analysis boundary for Phase 3 QA. | Owns page rendering, crop normalization, text-detection, appearance snapshotting, parity comparison, and output render artifact writing for one successful signed output. |
 | `src/foliaseal/presentation/qt/signing_workspace_action_bridge.py` | Shell-facing bridge for signing-action dialog and state glue. | Owns output-path dialog handling, overwrite confirmation, sign-submit state application, signed-output reopen forwarding, and certificate-refresh signing-state reload while delegating policy decisions to `signing_action_boundary.py`. |
@@ -519,7 +520,7 @@ The canonical repository document split is:
 - Does not own: interactive Qt session lifecycle, toolbar wiring, signed-run capture assembly, or report finalization.
 - Key collaborators: `phase3_harness.py`, `phase3_signed_acceptance_scenario_executor.py`, `signing_workspace_testing_port.py`, `signing_workspace_compatibility_surface.py`, `SigningDraftWorkflow`, `SignaturePresetCatalogStore`.
 - Main entry points: `Phase3HarnessScenarioCommand.from_mapping()`, `QtPhase3HarnessWorkspaceAdapter.apply_scenario()`, `QtPhase3HarnessWorkspaceAdapter.capture_snapshot()`, `HeadlessPhase3HarnessWorkspaceAdapter.apply_scenario()`, `HeadlessPhase3HarnessWorkspaceAdapter.capture_snapshot()`, and `phase3_harness.py::_apply_preview_matrix_scenario()`.
-- Known constraints: This is still a narrow tracer-bullet seam, not the full harness resolution. The live adapter now translates directly through the explicit `SigningWorkspaceTestingPort` installed as `testing_adapter`, consuming its typed `panel` port rather than the concrete properties panel, and it keeps preview-render capture behind that port even though the lower-level preview-analysis payload builder still lives in `phase3_harness.py`. The helper now receives those collaborators through typed live/headless dependency bundles so the remaining shell-anatomy knowledge stays concentrated in one module instead of being duplicated across preview-matrix, signed-acceptance, and session-runner call sites.
+- Known constraints: This is still a narrow tracer-bullet seam, not the full harness resolution. The live adapter now translates directly through the explicit `SigningWorkspaceTestingPort` installed as `testing_adapter`, consuming its typed `panel` port rather than the concrete properties panel; preview-render capture remains behind that port, while neutral analysis is delegated to `preview_analysis.py`. The helper receives collaborators through typed live/headless dependency bundles so shell-anatomy knowledge stays concentrated in one module instead of being duplicated across preview-matrix, signed-acceptance, and session-runner call sites.
 - Status: Confirmed by code and tests.
 
 ### Phase 3 preview matrix runner
@@ -619,27 +620,34 @@ The canonical repository document split is:
 - Known constraints: The diagnostics snapshotter intentionally stays in the Qt harness package because it still consumes harness-local preview render captures, but it centralizes the backend-fit plus canonical-preview-geometry merge so this capture payload no longer lives inline in `phase3_harness.py`.
 - Status: Confirmed by code and tests.
 
-### Phase 3 image comparison helper
+### Neutral preview-analysis boundary
 
-- Location: `src/foliaseal/presentation/qt/phase3_image_comparison_helper.py`
-- Responsibility: Own the shared preview/output image-comparison primitives used by transition diagnostics and signed-output parity.
-- Owns: `Phase3ImageComparisonHelper`, crop hashing, white-background flattening, raw crop change ratio, normalized crop change ratio, aspect-ratio delta, and side-by-side comparison artifact writing.
-- Does not own: transition-diagnostics policy, signed-output render orchestration, or evidence-contract evaluation.
-- Key collaborators: `phase3_harness.py`, `phase3_signed_output_render_snapshotter.py`, `_analyze_capture_state_transitions()`.
-- Main entry points: `Phase3ImageComparisonHelper.image_crop_sha256()`, `flatten_preview_image_to_white()`, `image_crop_change_ratio()`, `normalized_image_crop_change_ratio()`, `aspect_ratio_delta()`, `write_side_by_side_comparison()`.
-- Known constraints: The image-comparison helper intentionally stays in the Qt harness package because it still serves harness-local transition analysis and signed-output parity, but it centralizes the shared crop/comparison primitives so those behaviors no longer reach back into a large inline helper block in `phase3_harness.py`.
-- Status: Confirmed by code and tests.
+- Location: `src/foliaseal/presentation/qt/preview_analysis.py`
+- Responsibility: Analyze one live or headless preview capture through a typed, Qt-free engine and project the result into the existing evidence payload.
+- Owns: `PreviewAnalysisRequest`, `PreviewAnalysisResult`, `PreviewAnalysisEngine.analyze()`, transition analysis, stamp/text/font diagnostics, image comparison orchestration, stable error/fallback behavior, and `as_mapping()` compatibility projection.
+- Does not own: Qt widget lifecycle, reference-label rasterization, scenario iteration, signed-output analysis, or CLI/DTO/artifact contract publication.
+- Key collaborators: `preview_text_geometry.py`, `preview_image_comparison.py`, `phase3_harness.py`, `phase3_harness_workspace.py`, and injected artifact/reference adapters.
+- Main entry points: `PreviewAnalysisEngine.analyze()` and `PreviewAnalysisEngine.analyze_capture_transitions()`.
+- Known constraints: The engine is an internal presentation boundary and may use Pillow, but must remain free of PySide6 and event-loop ownership. Existing `phase3-signing-*` CLI names, `Phase3*` DTOs, JSON keys, and artifact suffixes remain external compatibility contracts.
+- Status: Confirmed by code and focused tests.
 
-### Phase 3 text geometry helper
+### Preview text-geometry adapter
 
-- Location: `src/foliaseal/presentation/qt/phase3_text_geometry_helper.py`
-- Responsibility: Own the shared preview text-geometry primitives used by preview diagnostics and signed-output parity.
-- Owns: `Phase3TextGeometryHelper`, source-to-preview bounds projection, preview text content/line detection wrappers, candidate-pixel analysis, border-stroke filtering, reference-envelope restriction, and reference-label fallback capture.
-- Does not own: preview-capture orchestration, text-edge policy, or evidence-contract evaluation.
-- Key collaborators: `phase3_harness.py`, `phase3_signed_output_render_snapshotter.py`, `_capture_preview_render()`, `detect_text_content_bounds_in_image()`, `detect_text_line_bounds_in_image()`.
-- Main entry points: `Phase3TextGeometryHelper.project_content_bounds_to_preview()`, `detect_text_content_bounds_in_preview()`, `detect_text_line_bounds_in_preview()`, `detect_text_geometry_in_preview()`, `reference_text_content_bounds()`.
-- Known constraints: The text-geometry helper intentionally stays in the Qt harness package because it still serves harness-local preview diagnostics and signed-output parity, but it centralizes the multi-step preview text-geometry reconstruction so those behaviors no longer reach back into a large inline helper block in `phase3_harness.py`.
-- Status: Confirmed by code and tests.
+- Location: `src/foliaseal/presentation/qt/preview_text_geometry.py`
+- Responsibility: Provide deterministic text-geometry primitives to `PreviewAnalysisEngine`.
+- Owns: `PreviewTextGeometryAnalyzer`, source-to-preview projection, rendered text/line detection, candidate filtering, border/reference-envelope handling, and injected reference-label fallback capture.
+- Does not own: Qt lifecycle, payload shaping, transition policy, or evidence-contract evaluation.
+- Key collaborators: `preview_analysis.py`, application text-raster analysis functions, and injected Qt/reference capture callables.
+- Status: Confirmed by code and focused tests.
+
+### Preview image-comparison adapter
+
+- Location: `src/foliaseal/presentation/qt/preview_image_comparison.py`
+- Responsibility: Provide deterministic image comparison primitives to `PreviewAnalysisEngine` and transition analysis.
+- Owns: `PreviewImageComparisonAnalyzer`, crop hashing, white-background flattening, raw/normalized crop change ratios, aspect-ratio deltas, and optional side-by-side artifact writing.
+- Does not own: scenario iteration, signed-output render orchestration, Qt lifecycle, or evidence-contract evaluation.
+- Key collaborators: `preview_analysis.py`, `phase3_signed_output_render_snapshotter.py`, and injected artifact sinks.
+- Status: Confirmed by code and focused tests.
 
 ### Phase 3 harness capture assembler
 
@@ -1181,8 +1189,8 @@ Default local validation from README:
 | 2026-06-06 | Extracted the Phase 3 signed-output render snapshotter into `phase3_signed_output_render_snapshotter.py`. | Reconciled the architecture doc so `phase3_harness.py` keeps only a thin wrapper while the new boundary owns signed-output render analysis, crop normalization, text detection, appearance parity comparison, and render artifact writing. |
 | 2026-06-06 | Extracted the Phase 3 appearance snapshotter into `phase3_appearance_snapshotter.py`. | Reconciled the architecture doc so `phase3_harness.py` keeps only thin wrappers while the new boundary owns preview-side and signed-output-side `SignatureAppearanceSnapshot` reconstruction for render parity. |
 | 2026-06-06 | Extracted the Phase 3 sign-time diagnostics snapshotter into `phase3_sign_time_diagnostics_snapshotter.py`. | Reconciled the architecture doc so `phase3_harness.py` keeps only a thin wrapper while the new boundary owns the merged backend-fit and canonical-preview-geometry diagnostics payload used in preview evidence. |
-| 2026-06-07 | Extracted the Phase 3 image comparison helper into `phase3_image_comparison_helper.py`. | Reconciled the architecture doc so `phase3_harness.py` keeps only thin wrappers while the new boundary owns the shared preview/output crop hashing, flattening, change-ratio calculations, aspect-ratio delta, and side-by-side comparison artifact writing. |
-| 2026-06-07 | Extracted the Phase 3 text geometry helper into `phase3_text_geometry_helper.py`. | Reconciled the architecture doc so `phase3_harness.py` keeps only thin wrappers while the new boundary owns source-to-preview projection, rendered-text geometry detection, candidate filtering, and reference-label fallback capture. |
+| 2026-06-07 | Historical record: extracted the Phase 3 image comparison helper into `phase3_image_comparison_helper.py`. | Superseded by the neutral `preview_image_comparison.py` adapter and `PreviewAnalysisEngine`; retained only to explain the migration sequence. |
+| 2026-06-07 | Historical record: extracted the Phase 3 text geometry helper into `phase3_text_geometry_helper.py`. | Superseded by the neutral `preview_text_geometry.py` adapter and `PreviewAnalysisEngine`; retained only to explain the migration sequence. |
 | 2026-06-05 | Extracted the Phase 3 preview-matrix runner into `phase3_preview_matrix_runner.py`. | Reconciled the architecture doc so `phase3_harness.py` keeps the top-level preview-matrix entrypoint while the new helper owns the headless scenario loop, summary shaping, and `summary.json` writing. |
 | 2026-06-27 | Moved appearance-only signing-setup mutation fully behind the coordinator boundary. | Reconciled the architecture doc with `DefaultSignaturePropertiesCoordinator.set_signature_appearance()` owning programmatic appearance updates while `SigningSetupSession` stops mutating `workflow` directly. |
 | 2026-06-07 | Documented the extracted app-frame certificate-management boundary. | Reconciled the architecture doc with `app_frame_certificate_management.py` now owning certificate dialog construction/execution and lifecycle delegation while `app_frame.py` remains the `QMainWindow` host, action router, and compatibility-exposure edge. |

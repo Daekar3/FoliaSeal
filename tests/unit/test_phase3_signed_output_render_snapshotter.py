@@ -8,6 +8,8 @@ import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 from foliaseal.presentation.qt.phase3_signed_output_render_snapshotter import (
     Phase3SignedOutputRenderSnapshotter,
 )
+from foliaseal.presentation.qt.preview_image_comparison import PreviewImageComparisonAnalyzer
+from foliaseal.presentation.qt.preview_text_geometry import PreviewTextGeometryAnalyzer
 
 
 def _snapshotter() -> Phase3SignedOutputRenderSnapshotter:
@@ -50,19 +52,19 @@ def test_signed_output_render_snapshotter_captures_output_parity(
     monkeypatch.setattr(phase3_harness_module, "QtPdfRenderBackend", _FakeBackend)
     detect_calls: list[dict[str, object]] = []
 
-    def _fake_detect(**kwargs):
+    def _fake_detect(self, **kwargs):
         detect_calls.append(kwargs)
         return ({"x": 14, "y": 12, "width": 64, "height": 18}, None)
 
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_detect_text_content_bounds_in_preview",
+        PreviewTextGeometryAnalyzer,
+        "detect_text_content_bounds_in_preview",
         _fake_detect,
     )
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_normalized_image_crop_change_ratio",
-        lambda **kwargs: 0.1,
+        PreviewImageComparisonAnalyzer,
+        "normalized_image_crop_change_ratio",
+        lambda self, **kwargs: 0.1,
     )
 
     snapshot = _snapshotter().run(
@@ -181,14 +183,14 @@ def test_signed_output_render_snapshotter_normalizes_to_analysis_surface(
     )
     Image.new("RGBA", (320, 42), (255, 255, 255, 255)).save(tmp_path / "direct.png")
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_detect_text_content_bounds_in_preview",
-        lambda **_: ({"x": 3, "y": 0, "width": 280, "height": 18}, None),
+        PreviewTextGeometryAnalyzer,
+        "detect_text_content_bounds_in_preview",
+        lambda self, **_: ({"x": 3, "y": 0, "width": 280, "height": 18}, None),
     )
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_detect_text_line_bounds_in_preview",
-        lambda **_: (({"x": 3, "y": 0, "width": 280, "height": 9},), None),
+        PreviewTextGeometryAnalyzer,
+        "detect_text_line_bounds_in_preview",
+        lambda self, **_: (({"x": 3, "y": 0, "width": 280, "height": 9},), None),
     )
 
     snapshot = _snapshotter().run(
@@ -292,14 +294,14 @@ def test_signed_output_render_snapshotter_composites_transparent_page_over_white
 
     monkeypatch.setattr(phase3_harness_module, "QtPdfRenderBackend", _FakeBackend)
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_detect_text_content_bounds_in_preview",
-        lambda **kwargs: ({"x": 14, "y": 12, "width": 64, "height": 18}, None),
+        PreviewTextGeometryAnalyzer,
+        "detect_text_content_bounds_in_preview",
+        lambda self, **kwargs: ({"x": 14, "y": 12, "width": 64, "height": 18}, None),
     )
     monkeypatch.setattr(
-        phase3_harness_module,
-        "_normalized_image_crop_change_ratio",
-        lambda **kwargs: 0.0,
+        PreviewImageComparisonAnalyzer,
+        "normalized_image_crop_change_ratio",
+        lambda self, **kwargs: 0.0,
     )
 
     snapshot = _snapshotter().run(

@@ -63,21 +63,15 @@ from foliaseal.presentation.qt.evidence_runner_factories import (
     build_interactive_capture_operation,
 )
 from foliaseal.presentation.qt.phase3_harness import (
-    _analyze_capture_state_transitions,
-    _analyze_stamp_source_image,
     _capture_headless_preview_render,
     _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
-    _preview_edge_distances,
     _preview_matrix_diagnostic_summary,
     _preview_matrix_error_result,
     _render_signed_annotation_appearance_direct,
     _signed_matrix_diagnostic_summary,
     _snapshot_preview,
-    _stamp_edge_diagnostics,
-    _text_edge_diagnostics,
-    _text_font_diagnostics,
     _widget_application,
     _widget_is_visible,
     _write_stamp_debug_overlay,
@@ -91,6 +85,24 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 )
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    analyze_capture_state_transitions as _analyze_capture_state_transitions,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    analyze_stamp_source_image as _analyze_stamp_source_image,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    font_diagnostics as _text_font_diagnostics,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    preview_edge_distances as _preview_edge_distances,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    stamp_edge_diagnostics as _stamp_edge_diagnostics,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    text_edge_diagnostics as _text_edge_diagnostics,
 )
 from tests.support.signing_builders import (
     build_signature_appearance,
@@ -2394,68 +2406,6 @@ def test_snapshot_sign_time_fit_diagnostics_delegates_to_snapshotter(
     assert captured == {
         "preview_render_capture": {"preview": True},
         "backend_reservation_snapshot": {"backend": True},
-    }
-
-
-def test_project_content_bounds_to_preview_delegates_to_text_geometry_helper(
-    monkeypatch,
-) -> None:
-    captured: dict[str, object] = {}
-
-    class FakeHelper:
-        def project_content_bounds_to_preview(self, **kwargs):
-            captured.update(kwargs)
-            return "projected-bounds"
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_build_phase3_text_geometry_helper",
-        lambda: FakeHelper(),
-    )
-
-    summary = phase3_harness_module._project_content_bounds_to_preview(
-        source_image_size={"width": 20, "height": 10},
-        source_content_bounds={"x": 4, "y": 2, "width": 12, "height": 6},
-        pixmap_bounds={"x": 10, "y": 5, "width": 100, "height": 50},
-    )
-
-    assert summary == "projected-bounds"
-    assert captured == {
-        "source_image_size": {"width": 20, "height": 10},
-        "source_content_bounds": {"x": 4, "y": 2, "width": 12, "height": 6},
-        "pixmap_bounds": {"x": 10, "y": 5, "width": 100, "height": 50},
-    }
-
-
-def test_detect_text_content_bounds_in_preview_delegates_to_text_geometry_helper(
-    monkeypatch,
-) -> None:
-    captured: dict[str, object] = {}
-
-    class FakeHelper:
-        def detect_text_content_bounds_in_preview(self, **kwargs):
-            captured.update(kwargs)
-            return ({"x": 18, "y": 12, "width": 28, "height": 9}, None)
-
-    monkeypatch.setattr(
-        phase3_harness_module,
-        "_build_phase3_text_geometry_helper",
-        lambda: FakeHelper(),
-    )
-
-    summary = phase3_harness_module._detect_text_content_bounds_in_preview(
-        preview_image_path="preview.png",
-        text_widget_bounds={"x": 10, "y": 8, "width": 50, "height": 20},
-        text_color_rgba=(0, 0, 0, 255),
-        reference_text_content_bounds={"x": 18, "y": 12, "width": 28, "height": 9},
-    )
-
-    assert summary == ({"x": 18, "y": 12, "width": 28, "height": 9}, None)
-    assert captured == {
-        "preview_image_path": "preview.png",
-        "text_widget_bounds": {"x": 10, "y": 8, "width": 50, "height": 20},
-        "text_color_rgba": (0, 0, 0, 255),
-        "reference_text_content_bounds": {"x": 18, "y": 12, "width": 28, "height": 9},
     }
 
 

@@ -1,4 +1,4 @@
-"""Shared preview text-geometry helpers for Phase 3 QA."""
+"""Shared preview text-geometry analysis for evidence capture."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ WriteWidgetCapturePng = Callable[[Any, str], str | None]
 
 
 @dataclass(frozen=True)
-class Phase3TextGeometryHelper:
-    """Own the shared preview text-geometry primitives."""
+class PreviewTextGeometryAnalyzer:
+    """Own deterministic preview text-geometry primitives."""
 
     detect_text_content_bounds_in_image: DetectTextContentBoundsInImage
     detect_text_line_bounds_in_image: DetectTextLineBoundsInImage
@@ -401,4 +401,3 @@ class Phase3TextGeometryHelper:
 
     def _rgba_luma(self, pixel: tuple[int, int, int, int]) -> int:
         return int(round((0.2126 * pixel[0]) + (0.7152 * pixel[1]) + (0.0722 * pixel[2])))
-

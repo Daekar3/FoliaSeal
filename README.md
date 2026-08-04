@@ -229,6 +229,13 @@ JSON/artifact names are compatibility contracts. Internal runner aliases and dup
 wrappers were removed; importing the direct capture module remains lazy with respect to Qt,
 PyHanko, Pillow, and other optional runtime dependencies.
 
+Preview evidence analysis now crosses the neutral `PreviewAnalysisEngine` boundary in
+`presentation/qt/preview_analysis.py`. Live Qt and headless capture adapters provide typed render
+inputs; `preview_text_geometry.py` and `preview_image_comparison.py` supply deterministic geometry
+and image-analysis primitives, while Qt reference-label capture and debug-artifact writing remain
+injected at the adapter edge. The external `phase3-signing-*` CLI commands, `Phase3*` DTO names,
+serialized JSON fields, and artifact paths intentionally remain unchanged for compatibility.
+
 Not yet production-ready:
 
 - automated preview/output parity is green for the current signed fixture matrices, but still needs

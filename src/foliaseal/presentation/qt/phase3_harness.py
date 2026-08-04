@@ -23,17 +23,12 @@ from foliaseal.application.phase3_signing_backend import (
     _single_line_vertical_outer_margin,
     build_backend_reservation_evidence,
 )
-from foliaseal.application.signature_font_registry import preview_font_family_supported
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
     _layout_rule_bounds_px,
     _structural_line_bounds_px,
     compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
-)
-from foliaseal.application.text_raster_analysis import (
-    detect_text_content_bounds_in_image,
-    detect_text_line_bounds_in_image,
 )
 from foliaseal.application.visible_signature_layout import (
     LayoutRequest,
@@ -79,9 +74,6 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     QtPhase3HarnessWorkspaceDeps,
     capture_qt_preview_render,
 )
-from foliaseal.presentation.qt.phase3_image_comparison_helper import (
-    Phase3ImageComparisonHelper,
-)
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
     snapshot_pdf_rect,
@@ -100,8 +92,11 @@ from foliaseal.presentation.qt.phase3_signed_output_render_snapshotter import (
 from foliaseal.presentation.qt.phase3_signed_output_snapshotter import (
     Phase3SignedOutputSnapshotter,
 )
-from foliaseal.presentation.qt.phase3_text_geometry_helper import (
-    Phase3TextGeometryHelper,
+from foliaseal.presentation.qt.preview_analysis import (
+    PreviewAnalysisEngine,
+    PreviewAnalysisRequest,
+    build_preview_analysis_engine,
+    normalize_visible_text_for_comparison,
 )
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 
@@ -111,13 +106,14 @@ DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_result
 
 def build_capture_assembler() -> Phase3HarnessCaptureAssembler:
     pdf_snapshotter = Phase3PdfSignatureSnapshotter()
+    analysis_engine = _build_preview_analysis_engine()
     return Phase3HarnessCaptureAssembler(
         count_embedded_signatures=pdf_snapshotter.count_embedded_signatures,
         snapshot_output_signature=pdf_snapshotter.snapshot_output_signature,
         snapshot_output_verification=pdf_snapshotter.snapshot_output_verification,
         snapshot_visible_signature_appearance=pdf_snapshotter.snapshot_visible_signature_appearance,
         snapshot_signed_output_render=_snapshot_signed_output_render,
-        analyze_capture_state_transitions=_analyze_capture_state_transitions,
+        analyze_capture_state_transitions=analysis_engine.analyze_capture_transitions,
     )
 
 
@@ -241,6 +237,7 @@ def _build_phase3_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
 
 
 def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRenderSnapshotter:
+    analysis_engine = _build_preview_analysis_engine()
     return Phase3SignedOutputRenderSnapshotter(
         render_backend_factory=QtPdfRenderBackend,
         render_signed_annotation_appearance_direct=_render_signed_annotation_appearance_direct,
@@ -248,13 +245,19 @@ def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRender
         preview_padding_for_capture_from_snapshot=_preview_padding_for_capture_from_snapshot,
         snapshot_preview_card_bounds=_snapshot_preview_card_bounds,
         snapshot_preview_analysis_image=_snapshot_preview_analysis_image,
-        normalized_image_crop_change_ratio=_normalized_image_crop_change_ratio,
-        aspect_ratio_delta=_aspect_ratio_delta,
-        normalize_visible_text_for_comparison=_normalize_visible_text_for_comparison,
+        normalized_image_crop_change_ratio=(
+            analysis_engine.image_comparison.normalized_image_crop_change_ratio
+        ),
+        aspect_ratio_delta=analysis_engine.image_comparison.aspect_ratio_delta,
+        normalize_visible_text_for_comparison=normalize_visible_text_for_comparison,
         snapshot_visible_appearance_text_fragments=_snapshot_visible_appearance_text_fragments,
         snapshot_visible_appearance_image_xobjects=_snapshot_visible_appearance_image_xobjects,
-        detect_text_content_bounds_in_preview=_detect_text_content_bounds_in_preview,
-        detect_text_line_bounds_in_preview=_detect_text_line_bounds_in_preview,
+        detect_text_content_bounds_in_preview=(
+            analysis_engine.text_geometry.detect_text_content_bounds_in_preview
+        ),
+        detect_text_line_bounds_in_preview=(
+            analysis_engine.text_geometry.detect_text_line_bounds_in_preview
+        ),
         preview_text_color_rgba_from_snapshot=_preview_text_color_rgba_from_snapshot,
         preview_appearance_snapshot_from_capture=_preview_appearance_snapshot_from_capture,
         signed_output_appearance_snapshot=_signed_output_appearance_snapshot,
@@ -264,13 +267,16 @@ def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRender
         rect_delta=_rect_delta,
         rect_delta_within_tolerance=_rect_delta_within_tolerance,
         rectangles_within_tolerance=_rectangles_within_tolerance,
-        write_side_by_side_comparison=_write_side_by_side_comparison,
+        write_side_by_side_comparison=(
+            analysis_engine.image_comparison.write_side_by_side_comparison
+        ),
         jsonable_capture=jsonable_capture,
         mapping=_mapping,
     )
 
 
 def _build_phase3_appearance_snapshotter() -> Phase3AppearanceSnapshotter:
+    analysis_engine = _build_preview_analysis_engine()
     return Phase3AppearanceSnapshotter(
         mapping=_mapping,
         signature_text_style_from_snapshot=_signature_text_style_from_snapshot,
@@ -278,7 +284,7 @@ def _build_phase3_appearance_snapshotter() -> Phase3AppearanceSnapshotter:
         visible_appearance_image_xobjects=_snapshot_visible_appearance_image_xobjects,
         visible_appearance_text_fragments=_snapshot_visible_appearance_text_fragments,
         reconstruct_text_box_bounds=_reconstruct_text_box_bounds_px,
-        union_rectangles=_union_rectangles,
+        union_rectangles=analysis_engine.text_geometry.union_rectangles,
     )
 
 
@@ -485,17 +491,8 @@ def _build_phase3_sign_time_diagnostics_snapshotter() -> Phase3SignTimeDiagnosti
     return Phase3SignTimeDiagnosticsSnapshotter(mapping=_mapping)
 
 
-def _build_phase3_image_comparison_helper() -> Phase3ImageComparisonHelper:
-    return Phase3ImageComparisonHelper()
-
-
-def _build_phase3_text_geometry_helper() -> Phase3TextGeometryHelper:
-    return Phase3TextGeometryHelper(
-        detect_text_content_bounds_in_image=detect_text_content_bounds_in_image,
-        detect_text_line_bounds_in_image=detect_text_line_bounds_in_image,
-        import_module=importlib.import_module,
-        write_widget_capture_png=_write_widget_capture_png,
-    )
+def _build_preview_analysis_engine() -> PreviewAnalysisEngine:
+    return build_preview_analysis_engine(write_widget_capture_png=_write_widget_capture_png)
 
 
 def _snapshot_sign_time_fit_diagnostics(
@@ -1144,7 +1141,7 @@ def _build_qt_preview_render_capture_payload(
                 analysis_text_widget_bounds = analysis_snapshot.text_area_bounds_px
             else:
                 analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
-                _flatten_preview_image_to_white(
+                _build_preview_analysis_engine().image_comparison.flatten_preview_image_to_white(
                     source_path=canonical_snapshot.image_path,
                     output_path=analysis_image_path,
                 )
@@ -1187,34 +1184,17 @@ def _build_qt_preview_render_capture_payload(
         pixmap_size=stamp_pixmap_size,
         alignment=stamp_alignment,
     )
-    stamp_source_analysis = _analyze_stamp_source_image(preview.image_stamp_path)
-    stamp_content_bounds = _project_content_bounds_to_preview(
-        source_image_size=stamp_source_analysis.get("stamp_source_image_size_px"),
-        source_content_bounds=stamp_source_analysis.get("stamp_source_content_bounds_px"),
-        pixmap_bounds=stamp_pixmap_bounds,
-    )
     if canonical_snapshot is not None:
-        stamp_content_bounds = canonical_snapshot.stamp_bounds_px
         stamp_pixmap_bounds = canonical_snapshot.stamp_bounds_px
         if canonical_snapshot.stamp_bounds_px is not None:
             stamp_pixmap_size = {
                 "width": canonical_snapshot.stamp_bounds_px["width"],
                 "height": canonical_snapshot.stamp_bounds_px["height"],
             }
-    stamp_diagnostics = _stamp_edge_diagnostics(
-        preview=preview,
-        stamp_band_bounds=stamp_band_bounds,
-        stamp_pixmap_bounds=stamp_pixmap_bounds,
-        stamp_content_bounds=stamp_content_bounds,
-    )
-    text_rendered_content_bounds = None
-    text_rendered_line_bounds: tuple[dict[str, int], ...] = ()
     text_structural_content_bounds = None
     text_structural_line_bounds: tuple[dict[str, int], ...] = ()
-    text_content_error = None
     text_reference_content_bounds = None
     text_reference_error = None
-    text_line_detection_error = None
     if canonical_snapshot is not None:
         text_structural_content_bounds = canonical_snapshot.text_bounds_px
         text_reference_content_bounds = canonical_snapshot.text_bounds_px
@@ -1222,54 +1202,81 @@ def _build_qt_preview_render_capture_payload(
         if base_snapshot is not None:
             text_structural_line_bounds = tuple(base_snapshot.line_bounds_px or ())
     elif text_widget_bounds is not None:
-        text_reference_content_bounds, text_reference_error = _reference_text_content_bounds(
-            source_label=active_detail,
-            text_color_rgba=_preview_text_color_rgba(preview),
+        text_reference_content_bounds, text_reference_error = (
+            _build_preview_analysis_engine().text_geometry.reference_text_content_bounds(
+                source_label=active_detail,
+                text_color_rgba=_preview_text_color_rgba(preview),
+            )
         )
     analysis_text_image_path = analysis_image_path or image_path
     analysis_detection_bounds = analysis_text_widget_bounds or text_widget_bounds
-    if (
-        analysis_text_image_path is not None
-        and image_error is None
-        and analysis_detection_bounds is not None
-    ):
-        text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
-            preview_image_path=analysis_text_image_path,
-            text_widget_bounds=analysis_detection_bounds,
-            text_color_rgba=_preview_text_color_rgba(preview),
+    analysis_values = _build_preview_analysis_engine().analyze(
+        PreviewAnalysisRequest(
+            preview=preview,
+            preview_image_path=image_path,
+            analysis_image_path=analysis_text_image_path,
+            image_error=image_error,
+            card_bounds=image_card_bounds,
+            body_bounds=body_bounds,
+            detail_bounds=detail_bounds,
+            stamp_bounds=stamp_bounds,
+            text_widget_bounds=text_widget_bounds,
+            analysis_detection_bounds=analysis_detection_bounds,
+            stamp_band_bounds=stamp_band_bounds,
+            stamp_pixmap_bounds=stamp_pixmap_bounds,
+            stamp_content_bounds_override=(
+                None if canonical_snapshot is None else canonical_snapshot.stamp_bounds_px
+            ),
+            structural_text_content_bounds=text_structural_content_bounds,
+            structural_line_bounds=text_structural_line_bounds,
             reference_text_content_bounds=text_reference_content_bounds,
-        )
-        if text_rendered_content_bounds is None and canonical_snapshot is not None:
-            text_rendered_content_bounds = text_structural_content_bounds
-    if (
-        analysis_text_image_path is not None
-        and image_error is None
-        and analysis_detection_bounds is not None
-    ):
-        text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
-            preview_image_path=analysis_text_image_path,
-            text_widget_bounds=analysis_detection_bounds,
+            reference_text_detection_error=text_reference_error,
             text_color_rgba=_preview_text_color_rgba(preview),
-            reference_text_content_bounds=text_reference_content_bounds,
+            active_label=active_detail,
+            preview_padding_px=_preview_padding_for_capture(preview),
+            layout_spacing_px=_layout_spacing(active_body),
         )
-        if not text_rendered_line_bounds and canonical_snapshot is not None:
-            text_rendered_line_bounds = text_structural_line_bounds
-    text_diagnostics = _text_edge_diagnostics(
-        preview=preview,
-        card_bounds=image_card_bounds,
-        text_widget_bounds=text_widget_bounds,
-        text_content_bounds=text_rendered_content_bounds,
-        reference_text_content_bounds=text_reference_content_bounds,
-        stamp_band_bounds=stamp_band_bounds,
-        stamp_content_bounds=stamp_content_bounds,
-    )
-    band_distances = _preview_edge_distances(
-        preview=preview,
-        card_bounds=card_bounds,
-        body_bounds=body_bounds,
-        detail_bounds=detail_bounds,
-        stamp_bounds=stamp_bounds,
-    )
+    ).as_mapping()
+    stamp_source_analysis = {
+        key: analysis_values[key]
+        for key in (
+            "stamp_source_image_size_px",
+            "stamp_source_content_bounds_px",
+            "stamp_source_content_error",
+        )
+    }
+    stamp_content_bounds = analysis_values["stamp_rendered_content_bounds_px"]
+    stamp_diagnostics = {
+        key: value
+        for key, value in analysis_values.items()
+        if key.startswith("stamp_")
+        and key
+        not in {
+            "stamp_source_image_size_px",
+            "stamp_source_content_bounds_px",
+            "stamp_source_content_error",
+            "stamp_rendered_content_bounds_px",
+            "stamp_band_bounds_px",
+            "stamp_rendered_pixmap_bounds_px",
+            "stamp_debug_image_path",
+            "stamp_debug_image_error",
+        }
+    }
+    text_rendered_content_bounds = analysis_values["text_rendered_content_bounds_px"]
+    text_rendered_line_bounds = analysis_values["text_rendered_line_bounds_px"]
+    text_content_error = analysis_values["text_content_detection_error"]
+    text_line_detection_error = analysis_values["text_line_detection_error"]
+    text_diagnostics = {
+        key: value
+        for key, value in analysis_values.items()
+        if key.startswith("text_content_")
+    }
+    band_distances = analysis_values["edge_distances_px"]
+    font_diagnostics = {
+        key: value
+        for key, value in analysis_values.items()
+        if key.startswith(("requested_text_font_", "effective_text_font_", "font_family_"))
+    }
     stamp_debug_image_path = None
     stamp_debug_image_error = None
     text_debug_image_path = None
@@ -1305,14 +1312,7 @@ def _build_qt_preview_render_capture_payload(
             stamp_band_bounds=stamp_band_bounds,
             crop_padding=max(6, _preview_padding_for_capture(preview)),
         )
-    text_widget_image_sha256 = _image_crop_sha256(
-        preview_image_path=image_path,
-        crop_bounds=text_widget_bounds,
-    )
-    font_diagnostics = _text_font_diagnostics(
-        preview=preview,
-        active_label=active_detail,
-    )
+    text_widget_image_sha256 = analysis_values["text_widget_image_sha256"]
     analysis_appearance_snapshot = None
     if canonical_snapshot is not None:
         base_snapshot = None
@@ -1448,54 +1448,72 @@ def _capture_headless_preview_render(
                 "height": canonical_snapshot.stamp_bounds_px["height"],
             }
 
-    stamp_source_analysis = _analyze_stamp_source_image(preview.image_stamp_path)
-    stamp_diagnostics = _stamp_edge_diagnostics(
-        preview=preview,
-        stamp_band_bounds=stamp_band_bounds,
-        stamp_pixmap_bounds=stamp_pixmap_bounds,
-        stamp_content_bounds=stamp_content_bounds,
-    )
     text_structural_content_bounds = text_rendered_content_bounds
     text_structural_line_bounds: tuple[dict[str, int], ...] = ()
     if canonical_snapshot is not None:
         base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
         if base_snapshot is not None:
             text_structural_line_bounds = tuple(base_snapshot.line_bounds_px or ())
-    text_content_error = None
-    text_line_detection_error = None
-    if image_path is not None and image_error is None and text_widget_bounds is not None:
-        text_rendered_content_bounds, text_content_error = _detect_text_content_bounds_in_preview(
-            preview_image_path=analysis_image_path or image_path,
+    analysis_values = _build_preview_analysis_engine().analyze(
+        PreviewAnalysisRequest(
+            preview=preview,
+            preview_image_path=image_path,
+            analysis_image_path=analysis_image_path,
+            image_error=image_error,
+            card_bounds=card_bounds,
+            body_bounds=card_bounds,
+            detail_bounds=text_widget_bounds,
+            stamp_bounds=stamp_band_bounds,
             text_widget_bounds=text_widget_bounds,
-            text_color_rgba=_preview_text_color_rgba(preview),
+            analysis_detection_bounds=text_widget_bounds,
+            stamp_band_bounds=stamp_band_bounds,
+            stamp_pixmap_bounds=stamp_pixmap_bounds,
+            stamp_content_bounds_override=stamp_content_bounds,
+            structural_text_content_bounds=text_structural_content_bounds,
+            structural_line_bounds=text_structural_line_bounds,
             reference_text_content_bounds=text_structural_content_bounds,
-        )
-        if text_rendered_content_bounds is None and canonical_snapshot is not None:
-            text_rendered_content_bounds = text_structural_content_bounds
-        text_rendered_line_bounds, text_line_detection_error = _detect_text_line_bounds_in_preview(
-            preview_image_path=analysis_image_path or image_path,
-            text_widget_bounds=text_widget_bounds,
+            reference_text_detection_error=None,
             text_color_rgba=_preview_text_color_rgba(preview),
-            reference_text_content_bounds=text_structural_content_bounds,
+            active_label=None,
+            preview_padding_px=_preview_padding_for_capture(preview),
+            layout_spacing_px=0,
         )
-        if not text_rendered_line_bounds and canonical_snapshot is not None:
-            text_rendered_line_bounds = text_structural_line_bounds
-    text_diagnostics = _text_edge_diagnostics(
-        preview=preview,
-        card_bounds=card_bounds,
-        text_widget_bounds=text_widget_bounds,
-        text_content_bounds=text_rendered_content_bounds,
-        reference_text_content_bounds=text_rendered_content_bounds,
-        stamp_band_bounds=stamp_band_bounds,
-        stamp_content_bounds=stamp_content_bounds,
-    )
-    band_distances = _preview_edge_distances(
-        preview=preview,
-        card_bounds=card_bounds,
-        body_bounds=card_bounds,
-        detail_bounds=text_widget_bounds,
-        stamp_bounds=stamp_band_bounds,
-    )
+    ).as_mapping()
+    stamp_source_analysis = {
+        key: analysis_values[key]
+        for key in (
+            "stamp_source_image_size_px",
+            "stamp_source_content_bounds_px",
+            "stamp_source_content_error",
+        )
+    }
+    stamp_content_bounds = analysis_values["stamp_rendered_content_bounds_px"]
+    stamp_diagnostics = {
+        key: value
+        for key, value in analysis_values.items()
+        if key.startswith("stamp_")
+        and key
+        not in {
+            "stamp_source_image_size_px",
+            "stamp_source_content_bounds_px",
+            "stamp_source_content_error",
+            "stamp_rendered_content_bounds_px",
+            "stamp_band_bounds_px",
+            "stamp_rendered_pixmap_bounds_px",
+            "stamp_debug_image_path",
+            "stamp_debug_image_error",
+        }
+    }
+    text_rendered_content_bounds = analysis_values["text_rendered_content_bounds_px"]
+    text_rendered_line_bounds = analysis_values["text_rendered_line_bounds_px"]
+    text_content_error = analysis_values["text_content_detection_error"]
+    text_line_detection_error = analysis_values["text_line_detection_error"]
+    text_diagnostics = {
+        key: value
+        for key, value in analysis_values.items()
+        if key.startswith("text_content_")
+    }
+    band_distances = analysis_values["edge_distances_px"]
     stamp_debug_image_path = None
     stamp_debug_image_error = None
     text_debug_image_path = None
@@ -1525,11 +1543,12 @@ def _capture_headless_preview_render(
             stamp_band_bounds=stamp_band_bounds,
             crop_padding=max(6, _preview_padding_for_capture(preview)),
         )
-    text_widget_image_sha256 = _image_crop_sha256(
-        preview_image_path=image_path,
-        crop_bounds=text_widget_bounds,
-    )
-    font_diagnostics = _headless_text_font_diagnostics(preview)
+    text_widget_image_sha256 = analysis_values["text_widget_image_sha256"]
+    font_diagnostics = {
+        key: value
+        for key, value in analysis_values.items()
+        if key.startswith(("requested_text_font_", "effective_text_font_", "font_family_"))
+    }
     analysis_appearance_snapshot = None
     if canonical_snapshot is not None:
         base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
@@ -1956,201 +1975,6 @@ def _project_pixmap_bounds_within_label(
     }
 
 
-def _analyze_stamp_source_image(image_path: str | None) -> dict[str, Any]:
-    result: dict[str, Any] = {
-        "stamp_source_image_size_px": None,
-        "stamp_source_content_bounds_px": None,
-        "stamp_source_content_error": None,
-    }
-    if not image_path:
-        return result
-    try:
-        with Image.open(image_path) as image:
-            width, height = image.size
-            result["stamp_source_image_size_px"] = {"width": width, "height": height}
-            alpha_bounds = image.convert("RGBA").getchannel("A").getbbox()
-            if alpha_bounds is None:
-                result["stamp_source_content_error"] = (
-                    "Stamp source image contains no non-transparent pixels."
-                )
-                return result
-            left, top, right, bottom = alpha_bounds
-            result["stamp_source_content_bounds_px"] = {
-                "x": int(left),
-                "y": int(top),
-                "width": int(right - left),
-                "height": int(bottom - top),
-            }
-    except OSError as exc:
-        result["stamp_source_content_error"] = f"Failed to open stamp source image: {exc}"
-    return result
-
-
-def _project_content_bounds_to_preview(
-    *,
-    source_image_size: dict[str, int] | None,
-    source_content_bounds: dict[str, int] | None,
-    pixmap_bounds: dict[str, int] | None,
-) -> dict[str, int] | None:
-    return _build_phase3_text_geometry_helper().project_content_bounds_to_preview(
-        source_image_size=source_image_size,
-        source_content_bounds=source_content_bounds,
-        pixmap_bounds=pixmap_bounds,
-    )
-
-
-def _detect_text_content_bounds_in_preview(
-    *,
-    preview_image_path: str,
-    text_widget_bounds: dict[str, int],
-    text_color_rgba: tuple[int, int, int, int] | None,
-    reference_text_content_bounds: dict[str, int] | None = None,
-) -> tuple[dict[str, int] | None, str | None]:
-    return _build_phase3_text_geometry_helper().detect_text_content_bounds_in_preview(
-        preview_image_path=preview_image_path,
-        text_widget_bounds=text_widget_bounds,
-        text_color_rgba=text_color_rgba,
-        reference_text_content_bounds=reference_text_content_bounds,
-    )
-
-
-def _detect_text_line_bounds_in_preview(
-    *,
-    preview_image_path: str,
-    text_widget_bounds: dict[str, int],
-    text_color_rgba: tuple[int, int, int, int] | None,
-    reference_text_content_bounds: dict[str, int] | None = None,
-) -> tuple[tuple[dict[str, int], ...], str | None]:
-    return _build_phase3_text_geometry_helper().detect_text_line_bounds_in_preview(
-        preview_image_path=preview_image_path,
-        text_widget_bounds=text_widget_bounds,
-        text_color_rgba=text_color_rgba,
-        reference_text_content_bounds=reference_text_content_bounds,
-    )
-
-
-def _detect_text_geometry_in_preview(
-    *,
-    preview_image_path: str,
-    text_widget_bounds: dict[str, int],
-    text_color_rgba: tuple[int, int, int, int] | None,
-    reference_text_content_bounds: dict[str, int] | None = None,
-) -> tuple[dict[str, int] | None, tuple[dict[str, int], ...], str | None]:
-    return _build_phase3_text_geometry_helper().detect_text_geometry_in_preview(
-        preview_image_path=preview_image_path,
-        text_widget_bounds=text_widget_bounds,
-        text_color_rgba=text_color_rgba,
-        reference_text_content_bounds=reference_text_content_bounds,
-    )
-
-
-def _text_candidate_pixels_in_crop(
-    *,
-    cropped: Image.Image,
-    crop_width: int,
-    crop_height: int,
-    text_color_rgba: tuple[int, int, int, int] | None,
-    reference_text_content_bounds: dict[str, int] | None,
-) -> set[tuple[int, int]]:
-    return _build_phase3_text_geometry_helper()._text_candidate_pixels_in_crop(
-        cropped=cropped,
-        crop_width=crop_width,
-        crop_height=crop_height,
-        text_color_rgba=text_color_rgba,
-        reference_text_content_bounds=reference_text_content_bounds,
-    )
-
-
-def _line_bounds_from_candidate_pixels(
-    candidate_pixels: set[tuple[int, int]],
-    *,
-    crop_left: int,
-    crop_top: int,
-) -> tuple[dict[str, int], ...]:
-    return _build_phase3_text_geometry_helper()._line_bounds_from_candidate_pixels(
-        candidate_pixels,
-        crop_left=crop_left,
-        crop_top=crop_top,
-    )
-
-
-def _union_rectangles(rectangles: tuple[dict[str, int], ...]) -> dict[str, int] | None:
-    return _build_phase3_text_geometry_helper().union_rectangles(rectangles)
-
-
-def _restrict_candidates_to_reference_envelope(
-    candidate_pixels: set[tuple[int, int]],
-    *,
-    reference_text_content_bounds: dict[str, int] | None,
-    crop_width: int,
-    crop_height: int,
-) -> set[tuple[int, int]]:
-    return _build_phase3_text_geometry_helper()._restrict_candidates_to_reference_envelope(
-        candidate_pixels,
-        reference_text_content_bounds=reference_text_content_bounds,
-        crop_width=crop_width,
-        crop_height=crop_height,
-    )
-
-
-def _filter_border_like_candidate_components(
-    candidate_pixels: set[tuple[int, int]],
-    *,
-    crop_width: int,
-    crop_height: int,
-) -> set[tuple[int, int]]:
-    return _build_phase3_text_geometry_helper()._filter_border_like_candidate_components(
-        candidate_pixels,
-        crop_width=crop_width,
-        crop_height=crop_height,
-    )
-
-
-def _component_looks_like_border_stroke(
-    component: set[tuple[int, int]],
-    *,
-    crop_width: int,
-    crop_height: int,
-) -> bool:
-    return _build_phase3_text_geometry_helper()._component_looks_like_border_stroke(
-        component,
-        crop_width=crop_width,
-        crop_height=crop_height,
-    )
-
-
-def _reference_text_content_bounds(
-    *,
-    source_label: Any,
-    text_color_rgba: tuple[int, int, int, int] | None,
-) -> tuple[dict[str, int] | None, str | None]:
-    return _build_phase3_text_geometry_helper().reference_text_content_bounds(
-        source_label=source_label,
-        text_color_rgba=text_color_rgba,
-    )
-
-
-def _estimate_crop_background_rgba(image: Image.Image) -> tuple[int, int, int, int]:
-    width, height = image.size
-    if width <= 0 or height <= 0:
-        return (255, 255, 255, 255)
-    sample_points = {
-        (0, 0),
-        (width - 1, 0),
-        (0, height - 1),
-        (width - 1, height - 1),
-        (width // 2, 0),
-        (width // 2, height - 1),
-        (0, height // 2),
-        (width - 1, height // 2),
-    }
-    samples = [image.getpixel(point) for point in sample_points]
-    return tuple(
-        int(round(sum(component[index] for component in samples) / len(samples)))
-        for index in range(4)
-    )
-
-
 def _preview_text_color_rgba(preview: Any) -> tuple[int, int, int, int] | None:
     text_style = getattr(preview, "text_style", None)
     if text_style is None:
@@ -2170,425 +1994,6 @@ def _preview_text_color_rgba(preview: Any) -> tuple[int, int, int, int] | None:
         )
     except ValueError:
         return None
-
-
-def _is_text_candidate_pixel(
-    pixel: tuple[int, int, int, int],
-    *,
-    text_color_rgba: tuple[int, int, int, int] | None,
-    background_rgba: tuple[int, int, int, int],
-) -> bool:
-    if pixel[3] <= 0:
-        return False
-    pixel_luma = _rgba_luma(pixel)
-    background_luma = _rgba_luma(background_rgba)
-    if text_color_rgba is not None:
-        text_distance = sum(abs(pixel[index] - text_color_rgba[index]) for index in range(3))
-        if text_distance <= 150:
-            return True
-        return (background_luma - pixel_luma) >= 28
-    color_distance = sum(abs(pixel[index] - background_rgba[index]) for index in range(3))
-    return color_distance > 80 or (background_luma - pixel_luma) >= 28
-
-
-def _rgba_luma(pixel: tuple[int, int, int, int]) -> int:
-    return int(round((pixel[0] * 299 + pixel[1] * 587 + pixel[2] * 114) / 1000))
-
-
-def _rect_edge_distances(
-    *,
-    outer_bounds: dict[str, int] | None,
-    inner_bounds: dict[str, int] | None,
-) -> dict[str, int] | None:
-    if outer_bounds is None or inner_bounds is None:
-        return None
-    outer_right = outer_bounds["x"] + outer_bounds["width"]
-    outer_bottom = outer_bounds["y"] + outer_bounds["height"]
-    inner_right = inner_bounds["x"] + inner_bounds["width"]
-    inner_bottom = inner_bounds["y"] + inner_bounds["height"]
-    return {
-        "left": inner_bounds["x"] - outer_bounds["x"],
-        "top": inner_bounds["y"] - outer_bounds["y"],
-        "right": outer_right - inner_right,
-        "bottom": outer_bottom - inner_bottom,
-    }
-
-
-def _stamp_edge_diagnostics(
-    *,
-    preview: Any,
-    stamp_band_bounds: dict[str, int] | None,
-    stamp_pixmap_bounds: dict[str, int] | None,
-    stamp_content_bounds: dict[str, int] | None,
-) -> dict[str, Any]:
-    # Rendered stamp content bounds already include anti-aliased edge pixels, so
-    # a remaining 1px border-facing gap is visually acceptable. Only actual
-    # border contact is treated as a stamp warning; explicit edge-touch remains
-    # separately reported.
-    warning_threshold = 0
-
-    pixmap_distances = _rect_edge_distances(
-        outer_bounds=stamp_band_bounds,
-        inner_bounds=stamp_pixmap_bounds,
-    )
-    content_distances = _rect_edge_distances(
-        outer_bounds=stamp_band_bounds,
-        inner_bounds=stamp_content_bounds,
-    )
-
-    relevant_content_distances = _relevant_stamp_edge_distances(
-        layout_template=getattr(preview, "layout_template", None),
-        stamp_position=getattr(preview, "stamp_position", None),
-        edge_distances=content_distances,
-    )
-
-    def _min_distance(distances: dict[str, int] | None) -> int | None:
-        if distances is None:
-            return None
-        return min(distances.values())
-
-    pixmap_min_distance = _min_distance(pixmap_distances)
-    content_min_distance = _min_distance(relevant_content_distances)
-    return {
-        "stamp_pixmap_edge_distances_px": pixmap_distances,
-        "stamp_content_edge_distances_px": content_distances,
-        "stamp_pixmap_touches_band_edge": (
-            None if pixmap_min_distance is None else pixmap_min_distance <= 0
-        ),
-        "stamp_content_touches_band_edge": (
-            None if content_min_distance is None else content_min_distance <= 0
-        ),
-        "stamp_content_warning_threshold_px": warning_threshold,
-        "stamp_pixmap_min_edge_distance_px": pixmap_min_distance,
-        "stamp_content_min_edge_distance_px": content_min_distance,
-        "stamp_content_within_warning_distance": (
-            None if content_min_distance is None else content_min_distance <= warning_threshold
-        ),
-    }
-
-
-def _text_edge_diagnostics(
-    *,
-    preview: Any,
-    card_bounds: dict[str, int] | None,
-    text_widget_bounds: dict[str, int] | None,
-    text_content_bounds: dict[str, int] | None,
-    reference_text_content_bounds: dict[str, int] | None,
-    stamp_band_bounds: dict[str, int] | None,
-    stamp_content_bounds: dict[str, int] | None,
-) -> dict[str, Any]:
-    widget_distances = _rect_edge_distances(
-        outer_bounds=text_widget_bounds,
-        inner_bounds=text_content_bounds,
-    )
-    border_distances = _rect_edge_distances(
-        outer_bounds=card_bounds,
-        inner_bounds=text_content_bounds,
-    )
-    border_edge, stamp_edge = _text_widget_edge_roles(
-        stamp_position=getattr(preview, "stamp_position", None),
-    )
-    border_facing_distance = None if widget_distances is None else widget_distances.get(border_edge)
-    stamp_facing_distance = None if widget_distances is None else widget_distances.get(stamp_edge)
-    width_loss_tolerance_px = 3
-    height_loss_tolerance_px = 1
-    raster_tolerance_px = 3
-    stamp_band_overlap = _rectangles_overlap_exceeds_tolerance(
-        text_content_bounds,
-        stamp_band_bounds,
-        tolerance_px=raster_tolerance_px,
-    )
-    stamp_content_overlap = _rectangles_overlap_exceeds_tolerance(
-        text_content_bounds,
-        stamp_content_bounds,
-        tolerance_px=raster_tolerance_px,
-    )
-    widget_min_distance = None if widget_distances is None else min(widget_distances.values())
-    border_min_distance = None if border_distances is None else min(border_distances.values())
-    touches_widget_edge = None if widget_min_distance is None else widget_min_distance <= 0
-    touches_border_edge = None if border_min_distance is None else border_min_distance <= 0
-    reference_width_loss = None
-    reference_height_loss = None
-    if text_content_bounds is not None and reference_text_content_bounds is not None:
-        reference_width_loss = max(
-            0,
-            reference_text_content_bounds["width"] - text_content_bounds["width"],
-        )
-        reference_height_loss = max(
-            0,
-            reference_text_content_bounds["height"] - text_content_bounds["height"],
-        )
-    clipped_from_reference = None
-    if reference_width_loss is not None and reference_height_loss is not None:
-        clipped_from_reference = (
-            reference_width_loss > width_loss_tolerance_px
-            or reference_height_loss > height_loss_tolerance_px
-        )
-    clipped_with_edge_contact = None
-    if clipped_from_reference is not None:
-        clipped_with_edge_contact = clipped_from_reference and (
-            touches_widget_edge is True or touches_border_edge is True
-        )
-    return {
-        "text_content_edge_distances_px": widget_distances,
-        "text_content_border_edge_distances_px": border_distances,
-        "text_content_min_edge_distance_px": widget_min_distance,
-        "text_content_min_border_distance_px": border_min_distance,
-        "text_content_reference_width_loss_px": reference_width_loss,
-        "text_content_reference_height_loss_px": reference_height_loss,
-        "text_content_reference_width_tolerance_px": width_loss_tolerance_px,
-        "text_content_reference_height_tolerance_px": height_loss_tolerance_px,
-        "text_content_border_facing_distance_px": border_facing_distance,
-        "text_content_stamp_facing_distance_px": stamp_facing_distance,
-        "text_content_touches_widget_edge": touches_widget_edge,
-        "text_content_touches_border_facing_edge": (
-            None if border_facing_distance is None else border_facing_distance <= 0
-        ),
-        "text_content_touches_stamp_facing_edge": (
-            None if stamp_facing_distance is None else stamp_facing_distance <= 0
-        ),
-        "text_content_overlaps_stamp_band": stamp_band_overlap,
-        "text_content_overlaps_stamp_content": stamp_content_overlap,
-        "text_content_clipped_in_preview": (
-            None
-            if (
-                clipped_from_reference is None
-                and widget_min_distance is None
-                and stamp_band_overlap is None
-                and stamp_content_overlap is None
-            )
-            else (
-                clipped_with_edge_contact is True
-                or stamp_band_overlap is True
-                or stamp_content_overlap is True
-            )
-        ),
-    }
-
-
-def _text_widget_edge_roles(
-    *,
-    stamp_position: SignatureStampPosition | None,
-) -> tuple[str, str]:
-    if stamp_position == SignatureStampPosition.TOP:
-        return ("bottom", "top")
-    if stamp_position == SignatureStampPosition.BOTTOM:
-        return ("top", "bottom")
-    if stamp_position == SignatureStampPosition.LEFT:
-        return ("right", "left")
-    return ("left", "right")
-
-
-def _text_font_diagnostics(
-    *,
-    preview: Any,
-    active_label: Any,
-) -> dict[str, Any]:
-    requested_family = None
-    requested_size = None
-    text_style = getattr(preview, "text_style", None)
-    if text_style is not None:
-        requested_family = getattr(text_style, "font_family", None)
-        requested_size = getattr(text_style, "font_size_pt", None)
-    effective_family = None
-    effective_point_size = None
-    font_getter = getattr(active_label, "font", None)
-    if callable(font_getter):
-        label_font = font_getter()
-        family_getter = getattr(label_font, "family", None)
-        if callable(family_getter):
-            effective_family = family_getter()
-        point_size_getter = getattr(label_font, "pointSizeF", None)
-        if callable(point_size_getter):
-            effective_point_size = point_size_getter()
-    font_info_getter = getattr(active_label, "fontInfo", None)
-    if callable(font_info_getter):
-        font_info = font_info_getter()
-        family_getter = getattr(font_info, "family", None)
-        if callable(family_getter):
-            effective_family = family_getter() or effective_family
-        point_size_getter = getattr(font_info, "pointSizeF", None)
-        if callable(point_size_getter):
-            point_size = point_size_getter()
-            if point_size and point_size > 0:
-                effective_point_size = point_size
-    requested_category = _font_family_category(str(requested_family or ""))
-    effective_category = _font_family_category(str(effective_family or ""))
-    direct_mapping_supported = preview_font_family_supported(str(requested_family or ""))
-    return {
-        "requested_text_font_family": requested_family,
-        "requested_text_font_size_pt": requested_size,
-        "effective_text_font_family": effective_family,
-        "effective_text_font_point_size_pt": effective_point_size,
-        "requested_text_font_category": requested_category,
-        "effective_text_font_category": effective_category,
-        "font_family_direct_preview_mapping_supported": direct_mapping_supported,
-        "font_family_category_mismatch": (
-            None
-            if not requested_category or not effective_category
-            else requested_category != effective_category
-        ),
-    }
-
-
-def _headless_text_font_diagnostics(
-    preview: Any,
-) -> dict[str, Any]:
-    requested_family = None
-    requested_size = None
-    text_style = getattr(preview, "text_style", None)
-    if text_style is not None:
-        requested_family = getattr(text_style, "font_family", None)
-        requested_size = getattr(text_style, "font_size_pt", None)
-    requested_category = _font_family_category(str(requested_family or ""))
-    direct_mapping_supported = preview_font_family_supported(str(requested_family or ""))
-    return {
-        "requested_text_font_family": requested_family,
-        "requested_text_font_size_pt": requested_size,
-        "effective_text_font_family": requested_family,
-        "effective_text_font_point_size_pt": requested_size,
-        "requested_text_font_category": requested_category,
-        "effective_text_font_category": requested_category,
-        "font_family_direct_preview_mapping_supported": direct_mapping_supported,
-        "font_family_category_mismatch": False if requested_category else None,
-    }
-
-
-def _font_family_category(font_family: str) -> str | None:
-    normalized = font_family.strip().lower()
-    if not normalized:
-        return None
-    normalized = re.sub(r"\s*\[[^\]]+\]\s*$", "", normalized)
-    if any(
-        token in normalized
-        for token in (
-            "sans serif",
-            "sans-serif",
-            "sans",
-            "helvetica",
-            "arial",
-            "nimbus sans",
-            "liberation sans",
-            "dejavu sans",
-            "noto sans",
-            "source sans",
-            "verdana",
-        )
-    ):
-        return "sans_serif"
-    if any(token in normalized for token in ("courier", "mono", "code", "consola", "menlo")):
-        return "monospace"
-    if any(
-        token in normalized
-        for token in (
-            "fantasy",
-            "decor",
-            "display",
-            "papyrus",
-            "noto serif display",
-        )
-    ):
-        return "fantasy"
-    if any(
-        token in normalized
-        for token in (
-            "times",
-            "serif",
-            "georgia",
-            "garamond",
-            "cambria",
-            "baskerville",
-            "liberation serif",
-            "noto serif",
-        )
-    ):
-        return "serif"
-    if any(
-        token in normalized
-        for token in ("cursive", "script", "hand", "brush", "callig", "comic", "zapfino")
-    ):
-        return "cursive"
-    return "unknown"
-
-
-def _image_crop_sha256(
-    *,
-    preview_image_path: str | None,
-    crop_bounds: dict[str, int] | None,
-) -> str | None:
-    return _build_phase3_image_comparison_helper().image_crop_sha256(
-        preview_image_path=preview_image_path,
-        crop_bounds=crop_bounds,
-    )
-
-
-def _flatten_preview_image_to_white(*, source_path: str, output_path: str) -> None:
-    _build_phase3_image_comparison_helper().flatten_preview_image_to_white(
-        source_path=source_path,
-        output_path=output_path,
-    )
-
-
-def _image_crop_change_ratio(
-    *,
-    previous_image_path: str | None,
-    previous_bounds: dict[str, int] | None,
-    current_image_path: str | None,
-    current_bounds: dict[str, int] | None,
-) -> float | None:
-    return _build_phase3_image_comparison_helper().image_crop_change_ratio(
-        previous_image_path=previous_image_path,
-        previous_bounds=previous_bounds,
-        current_image_path=current_image_path,
-        current_bounds=current_bounds,
-    )
-
-
-def _normalized_image_crop_change_ratio(
-    *,
-    previous_image_path: str | None,
-    previous_bounds: dict[str, int] | None,
-    current_image_path: str | None,
-    current_bounds: dict[str, int] | None,
-) -> float | None:
-    return _build_phase3_image_comparison_helper().normalized_image_crop_change_ratio(
-        previous_image_path=previous_image_path,
-        previous_bounds=previous_bounds,
-        current_image_path=current_image_path,
-        current_bounds=current_bounds,
-    )
-
-
-def _aspect_ratio_delta(
-    previous_width: int,
-    previous_height: int,
-    current_width: int,
-    current_height: int,
-) -> float | None:
-    return _build_phase3_image_comparison_helper().aspect_ratio_delta(
-        previous_width=previous_width,
-        previous_height=previous_height,
-        current_width=current_width,
-        current_height=current_height,
-    )
-
-
-def _write_side_by_side_comparison(
-    *,
-    preview_image_path: str | None,
-    preview_bounds: dict[str, int] | None,
-    signed_image_path: str | None,
-    signed_bounds: dict[str, int] | None,
-    output_path: str,
-) -> str | None:
-    return _build_phase3_image_comparison_helper().write_side_by_side_comparison(
-        preview_image_path=preview_image_path,
-        preview_bounds=preview_bounds,
-        signed_image_path=signed_image_path,
-        signed_bounds=signed_bounds,
-        output_path=output_path,
-    )
-
 
 def _preview_padding_for_capture_from_snapshot(snapshot: dict[str, Any]) -> int:
     signature_rect = snapshot.get("signature_rect")
@@ -2748,155 +2153,6 @@ def _layout_template_from_snapshot(
         return None
 
 
-def _analyze_capture_state_transitions(
-    states: tuple[dict[str, Any], ...],
-) -> tuple[dict[str, Any], ...]:
-    diagnostics: list[dict[str, Any]] = []
-    for index in range(1, len(states)):
-        previous = states[index - 1]
-        current = states[index]
-        previous_preview = previous.get("preview_snapshot") if isinstance(previous, dict) else None
-        current_preview = current.get("preview_snapshot") if isinstance(current, dict) else None
-        if not isinstance(previous_preview, dict) or not isinstance(current_preview, dict):
-            continue
-        previous_style = previous_preview.get("text_style") or {}
-        current_style = current_preview.get("text_style") or {}
-        previous_render = previous_preview.get("render_capture") or {}
-        current_render = current_preview.get("render_capture") or {}
-        if _normalized_preview_text_for_transition(previous.get("preview_text")) != (
-            _normalized_preview_text_for_transition(current.get("preview_text"))
-        ):
-            continue
-        if (
-            previous_preview.get("layout_template") != current_preview.get("layout_template")
-            or previous_preview.get("stamp_position") != current_preview.get("stamp_position")
-            or previous_preview.get("signature_rect") != current_preview.get("signature_rect")
-        ):
-            continue
-        change_ratio = _image_crop_change_ratio(
-            previous_image_path=previous_render.get("preview_image_path"),
-            previous_bounds=previous_render.get("text_widget_bounds_px"),
-            current_image_path=current_render.get("preview_image_path"),
-            current_bounds=current_render.get("text_widget_bounds_px"),
-        )
-        same_bounds = (
-            previous_render.get("text_rendered_content_bounds_px")
-            == current_render.get("text_rendered_content_bounds_px")
-            and previous_render.get("text_rendered_content_bounds_px") is not None
-        )
-        if (
-            previous_style.get("font_size_pt") != current_style.get("font_size_pt")
-            and same_bounds
-            and change_ratio is not None
-            and change_ratio < 0.005
-        ):
-            diagnostics.append(
-                {
-                    "from_capture_label": previous.get("capture_label"),
-                    "to_capture_label": current.get("capture_label"),
-                    "issue_code": "font_size_change_had_negligible_visual_effect",
-                    "previous_font_size_pt": previous_style.get("font_size_pt"),
-                    "current_font_size_pt": current_style.get("font_size_pt"),
-                    "changed_pixel_ratio": round(change_ratio, 6),
-                }
-            )
-        if (
-            previous_style.get("font_family") != current_style.get("font_family")
-            and previous_render.get("effective_text_font_category")
-            == current_render.get("effective_text_font_category")
-            and change_ratio is not None
-            and change_ratio < 0.01
-        ):
-            diagnostics.append(
-                {
-                    "from_capture_label": previous.get("capture_label"),
-                    "to_capture_label": current.get("capture_label"),
-                    "issue_code": "font_family_change_had_negligible_visual_effect",
-                    "previous_font_family": previous_style.get("font_family"),
-                    "current_font_family": current_style.get("font_family"),
-                    "effective_text_font_category": current_render.get(
-                        "effective_text_font_category"
-                    ),
-                    "changed_pixel_ratio": round(change_ratio, 6),
-                }
-            )
-    return tuple(diagnostics)
-
-
-def _normalized_preview_text_for_transition(preview_text: Any) -> str:
-    text = str(preview_text or "")
-    return re.sub(
-        r"\b\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?(?:\s+[A-Z]{2,5})?\b",
-        "<signing_time>",
-        text,
-    )
-
-
-def _normalize_visible_text_for_comparison(text: Any) -> str:
-    normalized = _normalized_preview_text_for_transition(text)
-    normalized = re.sub(r"\s+", " ", normalized)
-    return normalized.strip()
-
-
-def _rectangles_intersect(
-    first: dict[str, int] | None,
-    second: dict[str, int] | None,
-) -> bool | None:
-    if first is None or second is None:
-        return None
-    first_right = first["x"] + first["width"]
-    first_bottom = first["y"] + first["height"]
-    second_right = second["x"] + second["width"]
-    second_bottom = second["y"] + second["height"]
-    return not (
-        first_right <= second["x"]
-        or second_right <= first["x"]
-        or first_bottom <= second["y"]
-        or second_bottom <= first["y"]
-    )
-
-
-def _rectangles_overlap_exceeds_tolerance(
-    first: dict[str, int] | None,
-    second: dict[str, int] | None,
-    *,
-    tolerance_px: int,
-) -> bool | None:
-    if first is None or second is None:
-        return None
-    if not _rectangles_intersect(first, second):
-        return False
-    overlap_left = max(first["x"], second["x"])
-    overlap_top = max(first["y"], second["y"])
-    overlap_right = min(first["x"] + first["width"], second["x"] + second["width"])
-    overlap_bottom = min(first["y"] + first["height"], second["y"] + second["height"])
-    overlap_width = max(0, overlap_right - overlap_left)
-    overlap_height = max(0, overlap_bottom - overlap_top)
-    return overlap_width > tolerance_px and overlap_height > tolerance_px
-
-
-def _relevant_stamp_edge_distances(
-    *,
-    layout_template: SignatureLayoutTemplate | None,
-    stamp_position: SignatureStampPosition | None,
-    edge_distances: dict[str, int] | None,
-) -> dict[str, int] | None:
-    if edge_distances is None:
-        return None
-    # Stamp warnings are about crowding against the signature border. Text-facing
-    # crowding is covered by the text overlap/clipping diagnostics instead of
-    # inferring it indirectly from stamp-band geometry.
-    if stamp_position == SignatureStampPosition.TOP:
-        return {"top": edge_distances["top"]}
-    if stamp_position == SignatureStampPosition.BOTTOM:
-        return {"bottom": edge_distances["bottom"]}
-    if stamp_position == SignatureStampPosition.LEFT:
-        return {"left": edge_distances["left"]}
-    if stamp_position == SignatureStampPosition.RIGHT:
-        return {"right": edge_distances["right"]}
-    return dict(edge_distances)
-
-
 def _layout_spacing(widget: Any) -> int | None:
     layout = getattr(widget, "layout", None)
     layout = layout() if callable(layout) else layout
@@ -2908,61 +2164,6 @@ def _layout_spacing(widget: Any) -> int | None:
     if isinstance(spacing, int):
         return spacing
     return getattr(layout, "spacing", None)
-
-
-def _preview_edge_distances(
-    *,
-    preview: Any,
-    card_bounds: dict[str, int] | None,
-    body_bounds: dict[str, int] | None,
-    detail_bounds: dict[str, int] | None,
-    stamp_bounds: dict[str, int] | None,
-) -> dict[str, Any]:
-    padding = _preview_padding_for_capture(preview)
-    result = {
-        "preview_padding_px": padding,
-        "text_top_to_border_px": None,
-        "text_bottom_to_border_px": None,
-        "stamp_top_to_border_px": None,
-        "stamp_bottom_to_border_px": None,
-        "content_top_to_border_px": None,
-        "content_bottom_to_border_px": None,
-    }
-    if card_bounds is None or body_bounds is None:
-        return result
-    body_top = body_bounds["y"]
-    card_height = card_bounds["height"]
-    if detail_bounds is not None:
-        detail_top = body_top + detail_bounds["y"]
-        detail_bottom = detail_top + detail_bounds["height"]
-        result["text_top_to_border_px"] = detail_top
-        result["text_bottom_to_border_px"] = max(0, card_height - detail_bottom)
-    if stamp_bounds is not None:
-        stamp_top = body_top + stamp_bounds["y"]
-        stamp_bottom = stamp_top + stamp_bounds["height"]
-        result["stamp_top_to_border_px"] = stamp_top
-        result["stamp_bottom_to_border_px"] = max(0, card_height - stamp_bottom)
-    content_tops = [
-        value
-        for value in (
-            result["text_top_to_border_px"],
-            result["stamp_top_to_border_px"],
-        )
-        if value is not None
-    ]
-    content_bottoms = [
-        value
-        for value in (
-            result["text_bottom_to_border_px"],
-            result["stamp_bottom_to_border_px"],
-        )
-        if value is not None
-    ]
-    if content_tops:
-        result["content_top_to_border_px"] = min(content_tops)
-    if content_bottoms:
-        result["content_bottom_to_border_px"] = min(content_bottoms)
-    return result
 
 
 def _widget_application(widget: Any) -> Any | None:
