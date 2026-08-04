@@ -67,7 +67,8 @@ ambiguous internal aliases.
 - [x] (2026-08-03) Completed two independent architecture/spec compliance
   reviews, reconciled documentation, and inventoried the touched-scope
   `phase3` inventory.
-- [ ] Run full validation, clean-process/artifact audit, and commit closure.
+- [x] (2026-08-03) Ran full validation, clean-process/artifact audit, and
+  implementation commit closure.
 
 ## Surprises & Discoveries
 
@@ -140,8 +141,8 @@ independent compliance reviews passed after architecture and documentation
 reconciliation. The Phase 3 inventory covered the touched lifecycle modules,
 tests, README, and architecture document: no obsolete internal lifecycle
 names remain; stable CLI commands, manifest keys, JSON fields, DTO names, and
-artifact paths remain unchanged. Commit closure remains the parent agent's
-responsibility.
+artifact paths remain unchanged. The implementation commit is
+`2e9caa2458ee124d19b070b7e5bac8424007c889`.
 
 ## Context and Orientation
 
@@ -302,7 +303,8 @@ The completed plan must record evidence in this section:
     phase3 inventory: no obsolete names in touched lifecycle scope; stable external names retained across CLI, manifests, JSON/DTOs, and artifact paths
     git diff --check: clean
     process audit: no FoliaSeal/Python process
-    implementation and closure commit hashes: implementation changes are in the parent working tree; closure hash pending
+    implementation commit: 2e9caa2458ee124d19b070b7e5bac8424007c889
+    plan-closure commit: pending parent-agent update
 
 No generated artifacts, dialogs, certificates, or GUI processes may remain open
 or untracked after the audit.
@@ -346,4 +348,7 @@ the `SigningWorkspaceHost`/`WorkspaceHandle` flow, removal of
 `OpenWorkspaceOutcome`, `WorkspaceCompatibilityState`, duplicate frame state,
 and `SigningWorkspacePort.widget()`, the intentional compatibility/testing
 boundary, two compliance reviews, 140 focused tests, and the Phase 3 inventory
-scope. Full-suite and commit-closure evidence remain with the parent agent.
+scope. Full-suite and commit-closure evidence are complete. Full suite passed
+1026 tests with one pre-existing Pillow deprecation warning; Ruff, compileall,
+diff checks, and the process audit passed. Implementation commit:
+`2e9caa2458ee124d19b070b7e5bac8424007c889`.
