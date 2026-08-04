@@ -141,7 +141,7 @@ Validation: focused capture/evidence slice 112 passed with one existing Pillow
 deprecation warning; full suite 1028 passed with the same warning. Ruff,
 compileall, diff-check, and process/artifact audits passed. The implementation
 and documentation were committed together; the final commit hash is recorded
-in the closure revision below.
+in the closure revision below (`7cd6b28cf`).
 
 ## Context and Orientation
 
@@ -320,3 +320,6 @@ common-caller/minimal hybrid comparison. Bounded the slice to interactive
 capture finalization and dead composition-wrapper removal, explicitly keeping
 Qt lifecycle, matrices, stable evidence fields, and external Phase 3 names
 outside the destructive rename scope.
+
+2026-08-03: Completed implementation, architecture review, documentation
+reconciliation, full validation, and process cleanup in commit `7cd6b28cf`.
