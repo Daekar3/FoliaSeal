@@ -368,6 +368,20 @@ For lower-level viewer regression checks, you can still run:
 .venv/bin/python -m foliaseal phase2-evidence --write-markdown-file artifacts/phase2_runtime_evidence.md
 ```
 
+## Signing-workspace lifecycle
+
+The app frame owns one `SigningWorkspaceHost`. Opening a PDF composes a
+`WorkspaceHandle`, mounts its widget through the lifecycle boundary, publishes
+that handle as the active workspace, and only then disposes the previous
+widget. Failed composition or mounting cleans up only the candidate and keeps
+the previous workspace active; closing is idempotent. The handle is the single
+source for the production `SigningWorkspacePort`, the explicit
+`SigningWorkspaceTestingPort`, and the viewer/signing workflows. The production
+port no longer exposes `widget()`; widget inspection and Phase 3 mutation stay
+behind the intentional `compat_surface`/`testing_adapter` compatibility and
+testing boundary. Stable Phase 3 command names, manifest keys, JSON fields,
+and artifact paths remain unchanged for automation.
+
 ## Phase 3 acceptance harness
 
 To make Phase 3 acceptance easier, there is also an interactive signing-shell harness that writes a structured capture and a partially completed FR-3B worksheet for you.

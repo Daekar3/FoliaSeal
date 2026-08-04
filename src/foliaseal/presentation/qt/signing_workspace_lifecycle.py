@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
-    OpenWorkspaceOutcome,
+    WorkspaceHandle,
     WorkspaceOpenPort,
 )
 
@@ -32,7 +32,7 @@ class QtWorkspaceMount:
 class SigningWorkspaceLifecyclePort(Protocol):
     """Frame-facing lifecycle commands for one active signing workspace."""
 
-    def replace(self, command: OpenWorkspaceCommand) -> OpenWorkspaceOutcome:
+    def replace(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
         """Compose and mount a workspace, replacing the current one atomically."""
 
     def close(self) -> None:
@@ -41,8 +41,7 @@ class SigningWorkspaceLifecyclePort(Protocol):
 
 @dataclass
 class _ActiveWorkspace:
-    outcome: OpenWorkspaceOutcome
-    widget: Any
+    handle: WorkspaceHandle
 
 
 class SigningWorkspaceLifecycle:
@@ -64,11 +63,11 @@ class SigningWorkspaceLifecycle:
         self._mount_port = mount_port
         self._active: _ActiveWorkspace | None = None
 
-    def replace(self, command: OpenWorkspaceCommand) -> OpenWorkspaceOutcome:
+    def replace(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
         """Compose and mount a candidate before disposing the old workspace."""
 
-        outcome = self._workspace_open_port.open_workspace(command)
-        candidate = outcome.compatibility.shell_widget
+        handle = self._workspace_open_port.open_workspace(command)
+        candidate = handle.widget
         previous = self._active
 
         try:
@@ -77,10 +76,15 @@ class SigningWorkspaceLifecycle:
             self._dispose_widget(candidate)
             raise
 
-        if previous is not None and previous.widget is not candidate:
-            self._dispose_widget(previous.widget)
-        self._active = _ActiveWorkspace(outcome=outcome, widget=candidate)
-        return outcome
+        self._active = _ActiveWorkspace(handle=handle)
+        if previous is not None and previous.handle.widget is not candidate:
+            self._dispose_widget(previous.handle.widget)
+        return handle
+
+    def active(self) -> WorkspaceHandle | None:
+        """Return the published handle, or ``None`` before/after close."""
+
+        return None if self._active is None else self._active.handle
 
     def close(self) -> None:
         """Dispose the active workspace once and clear the active record."""
@@ -88,7 +92,7 @@ class SigningWorkspaceLifecycle:
         active = self._active
         self._active = None
         if active is not None:
-            self._dispose_widget(active.widget)
+            self._dispose_widget(active.handle.widget)
 
     @staticmethod
     def _dispose_widget(widget: Any) -> None:

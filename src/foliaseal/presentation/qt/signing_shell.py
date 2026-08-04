@@ -88,7 +88,6 @@ from foliaseal.presentation.qt.viewer_widget import (
     build_qt_pdf_viewer_widget as _build_qt_pdf_viewer_widget,
 )
 
-SIGNATURE_PRESET_PLACEHOLDER = "Current document setup"
 CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate configuration"
 SigningDraftPreview = _SigningDraftPreview
 SignatureFieldKey = _SignatureFieldKey
@@ -140,52 +139,6 @@ class SigningRequestExecutor(Protocol):
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Apply the signing request and return the result."""
-
-
-def _format_appearance_summary(appearance: SignatureAppearance) -> str:
-    labels = {
-        SignatureFieldKey.DISTINGUISHED_NAME: "Distinguished name",
-        SignatureFieldKey.COMMON_NAME: "Common name",
-        SignatureFieldKey.EMAIL: "Email",
-        SignatureFieldKey.SIGNING_TIME: "Signing time",
-        SignatureFieldKey.REASON: "Reason",
-        SignatureFieldKey.LOCATION: "Location",
-        SignatureFieldKey.TITLE: "Title",
-        SignatureFieldKey.COMPANY: "Company",
-    }
-    visible_fields = [
-        labels[field_key]
-        for field_key, binding in appearance.iter_field_bindings()
-        if binding.show_in_visible_appearance
-    ]
-    visible_fields_text = ", ".join(visible_fields) if visible_fields else "None"
-    text_style = appearance.text_style
-    box_style = appearance.box_style
-    border_text = "on" if box_style.show_border else "off"
-    stamp_text = appearance.image_stamp_path or "None"
-    return "\n".join(
-        [
-            "Current appearance draft",
-            f"Layout: {appearance.layout_template.value}",
-            f"Stamp position: {appearance.stamp_position.value}",
-            f"Timezone: {appearance.timezone_display_mode.value}",
-            f"Datetime format: {appearance.datetime_format}",
-            f"Visible fields: {visible_fields_text}",
-            (
-                "Text style: "
-                f"{text_style.font_family}, {text_style.font_size_pt:g}pt, "
-                f"{'bold' if text_style.bold else 'regular'}, "
-                f"{'italic' if text_style.italic else 'upright'}, "
-                f"{text_style.text_color_hex}"
-            ),
-            (
-                "Box style: "
-                f"border {border_text}, {box_style.border_color_hex}, "
-                f"{box_style.border_width_pt:g}pt, {box_style.background_color_hex}"
-            ),
-            f"Image stamp: {stamp_text}",
-        ]
-    )
 
 
 def _build_close_aware_widget(

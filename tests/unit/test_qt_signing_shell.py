@@ -40,6 +40,9 @@ from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
+from foliaseal.presentation.qt.signing_workspace_properties_panel import (
+    SIGNATURE_PRESET_PLACEHOLDER,
+)
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
@@ -3531,9 +3534,6 @@ def test_signing_shell_stamp_position_control_updates_workflow(
     assert appearance is not None
     assert appearance.stamp_position == SignatureStampPosition.RIGHT
     assert panel.preview.stamp_position == SignatureStampPosition.RIGHT
-    assert "Stamp position: right" in signing_shell_module._format_appearance_summary(
-        appearance
-    )
 
 
 def test_signing_shell_preview_respects_small_font_sizes(
@@ -4975,7 +4975,7 @@ def test_signing_shell_signature_preset_selection_cancel_reloads_current_state(
     assert workflow.certificate_path == str(default_path)
     assert workflow.passphrase == "default-secret"
     assert panel._signature_preset_controls.preset_combo.currentText() == (
-        signing_shell_module.SIGNATURE_PRESET_PLACEHOLDER
+        SIGNATURE_PRESET_PLACEHOLDER
     )
     assert panel._certificate_controls.configuration_combo.currentText() == "Default Signing"
 

@@ -1,151 +1,349 @@
-# Add an atomic signing-workspace lifecycle boundary
+# Deepen the app-frame signing-workspace lifecycle boundary
 
-This ExecPlan is a living document and must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`. It describes one complete implementation slice: introduce a small lifecycle coordinator and Qt mount adapter so opening a second PDF deterministically disposes the first workspace, while failed opens preserve the current workspace. The existing production shell port, testing adapter, compatibility surface, and user-visible app-frame actions remain available.
+This ExecPlan is a living document and must be maintained in accordance with
+`.agents/skills/write-execplan/PLANS.md`. It is intentionally a complete
+one-slice DevLoop: interface migration, legacy compatibility removal, focused
+tests, architecture/spec review, documentation reconciliation, nomenclature
+audit, and commit closure all belong to this plan. Milestones organize the
+work; they are not stopping points.
 
 ## Purpose / Big Picture
 
-Today the app frame composes a new signing workspace and calls `QMainWindow.setCentralWidget()` directly, but it does not explicitly close the previous shell. A user who opens several PDFs in one session can therefore retain stale Qt widgets and signing-panel resources until Qt happens to destroy them. After this slice, opening a PDF is an atomic replacement: the candidate workspace is fully composed before it becomes active, the previous workspace is explicitly closed exactly once after successful mounting, and an invalid or unmountable candidate leaves the existing PDF open. Closing the frame-level workspace is idempotent.
+Opening a PDF currently crosses an app-frame service, a composition service, a
+Qt shell factory, a lifecycle coordinator, a compatibility payload, and a
+second set of frame-owned state fields. The application frame receives a
+workspace outcome, extracts `compatibility.shell_widget`, stores the shell port
+and compatibility snapshot separately, and later has to keep both synchronized.
+This makes replacement failures, widget disposal, and stale shell state harder
+to reason about than the user-visible operation warrants.
 
-The behavior is observable without a real desktop display. The focused fake-Qt tests will record central-widget mounting and shell cleanup, and the full project suite will continue to pass. A manual GUI smoke test, when a display is available, should show that opening PDF B replaces PDF A without stale dialogs or shells remaining.
+After this slice, the frame will depend on one typed `SigningWorkspaceHost`.
+`open(path)` will compose, mount, publish, and return one `WorkspaceHandle`;
+`close()` will be idempotent; and `active()` will be the sole source of the
+current workspace. The host will preserve the existing atomic behavior: a new
+workspace is mounted before the old one is disposed, and a failed candidate is
+disposed while the old workspace remains active. The old
+`WorkspaceCompatibilityState`, duplicated frame state, and compatibility-only
+widget extraction will be removed or quarantined behind a migration adapter.
+
+The slice also audits and strips obsolete `phase3` nomenclature in the touched
+lifecycle cluster. The cluster currently has no behavior-bearing `phase3`
+names. Stable Phase 3 CLI commands, manifest keys, JSON fields, artifact paths,
+acceptance DTOs, and historical records remain unchanged because renaming
+those serialized/external contracts without a migration would break existing
+automation. The plan records that boundary and creates a concrete inventory
+for a later external-contract migration rather than silently preserving
+ambiguous internal aliases.
 
 ## Child ExecPlan Dependencies
 
-There are no child ExecPlans. The existing `app_frame_workspace_open` and `signing_shell_port` boundaries are prerequisites already present at the start of this slice.
+- [x] Fresh DevLoop explorer reviewed the live lifecycle, app-frame, shell,
+  tests, architecture, and nomenclature contracts on 2026-08-03.
+- [x] Minimal, flexible, and common-caller interface designs were reviewed;
+  the recommended hybrid is selected for implementation.
+- [ ] If compliance review identifies a requirement that cannot be fixed in
+  this lifecycle slice, create a child compliance ExecPlan before unrelated
+  edits. No child is required at authoring time.
 
 ## Progress
 
-- [x] (2026-07-30) Reviewed the live checkout with an `explorer-light` subagent and confirmed the missing behavior is explicit old-shell teardown during replacement.
-- [x] (2026-07-30) Chosen design: hybrid of a minimal atomic lifecycle facade and a Qt-specific mount adapter; preserve the existing production/testing split.
-- [x] (2026-07-30) Added `signing_workspace_lifecycle.py` with Qt-free lifecycle/mount protocols, atomic replacement, candidate cleanup, and idempotent close.
-- [x] (2026-07-30) Routed `FoliaSealAppFrame.open_pdf_path()` and placeholder/close handling through the coordinator.
-- [x] (2026-07-30) Added focused lifecycle and app-frame tests for successful replacement, failed composition, mount failure, idempotent close, and action/current-state preservation; focused run passed 29 tests.
-- [x] (2026-07-30) Ran the shell/app-frame regression set; 121 tests passed in 10.99 seconds.
-- [x] (2026-07-30) Ran the full suite; 1,004 tests passed in 44.02 seconds with one pre-existing Pillow deprecation warning.
-- [x] (2026-07-30) Compliance review identified and fixed a redundant direct central-widget install and added the missing close-before-open test; `docs/ARCHITECTURE.md` remains the final documentation update.
-- [x] (2026-07-30) Updated `docs/ARCHITECTURE.md` through the architecture-steward documentation worker and corrected the remaining historical direct-mount wording.
-- [x] (2026-07-30) Re-ran the full suite after remediation; 1,005 tests passed in 44.05 seconds with one pre-existing Pillow deprecation warning.
-- [x] (2026-07-30) `git diff --check` passed and the working tree contains only the planned implementation, tests, architecture documentation, and this ExecPlan.
-- [x] (2026-07-30) Committed the complete slice as `f1a824ef7` (`Add atomic signing workspace lifecycle`); the final plan-status amendment is ready to be folded into that commit.
-- [ ] Run focused tests, the complete suite, and architecture/spec compliance review.
-- [ ] Update architecture and relevant README/ExecPlan documentation.
-- [ ] Commit the complete slice and record outcomes here.
+- [x] (2026-08-03) Confirmed clean checkout at `e753c9807` and identified the
+  app-frame/shell lifecycle as the next architectural seam.
+- [x] (2026-08-03) Completed the required fresh `explorer-light` DevLoop
+  review and acknowledged its findings before authoring this plan.
+- [x] (2026-08-03) Selected the common-caller/minimal hybrid: a host with
+  `open`, `close`, and `active`, returning a typed workspace handle.
+- [x] (2026-08-03) Created this living ExecPlan before implementation.
+- [x] (2026-08-03) Added the typed `WorkspaceHandle`/`SigningWorkspaceHost`
+  boundary and migrated app-frame state and
+  workspace-open composition to it.
+- [x] (2026-08-03) Removed obsolete lifecycle compatibility outcome/state,
+  duplicate widget extraction, and the production `SigningWorkspacePort.widget()`
+  contract while retaining the explicit testing boundary.
+  dead shell presentation helpers, and any now-unused forwarding aliases.
+- [x] (2026-08-03) Added boundary tests for atomic replacement, failure cleanup,
+  active-state
+  publication, app-frame behavior, and compatibility removal.
+- [x] (2026-08-03) Completed two independent architecture/spec compliance
+  reviews, reconciled documentation, and inventoried the touched-scope
+  `phase3` inventory.
+- [ ] Run full validation, clean-process/artifact audit, and commit closure.
 
 ## Surprises & Discoveries
 
-- Observation: `WorkspaceOpenService` already composes the page count, viewer/signing workflows, shell port, and compatibility state cleanly.
-  Evidence: `src/foliaseal/presentation/qt/app_frame_workspace_open.py` returns `OpenWorkspaceOutcome`; no new composition abstraction is needed for this slice.
-- Observation: shell-local cleanup is already idempotent, but app-frame replacement does not invoke it.
-  Evidence: `src/foliaseal/presentation/qt/signing_shell.py` uses a close-aware widget and `src/foliaseal/presentation/qt/signing_workspace_compatibility_surface.py` also observes destruction; `FoliaSealAppFrame.open_pdf_path()` only assigns the new central widget.
-- Observation: fake shells in existing tests do not implement a production `close()` method.
-  Evidence: `_FakeShell` in `tests/unit/test_qt_app_frame.py` implements the public shell verbs but no lifecycle verb. Cleanup must therefore duck-call the widget rather than widen `SigningWorkspacePort`.
-- Observation: the repository venv, not the system `pytest`, is the supported validation entrypoint.
-  Evidence: the explorer reported `pytest` is not on PATH and validated the focused suite with `.venv/bin/python -m pytest`.
-- Observation: the first compliance review caught a redundant direct mount and a missing fresh-close test.
-  Evidence: `open_pdf_path()` still called `window.setCentralWidget()` after lifecycle replacement, and the initial lifecycle tests only closed after a successful open; both were corrected before the final suite.
+- Observation: `SigningWorkspaceLifecycle` already enforces mount-before-dispose
+  ordering and disposes failed candidates.
+  Evidence: `src/foliaseal/presentation/qt/signing_workspace_lifecycle.py:67-106`
+  and `tests/unit/test_signing_workspace_lifecycle.py:73-180`.
+- Observation: the lifecycle still extracts `outcome.compatibility.shell_widget`
+  solely to mount a duplicate compatibility field.
+  Evidence: `app_frame_workspace_open.py:150-158` and
+  `signing_workspace_lifecycle.py:67-83`.
+- Observation: `FoliaSealAppFrame` stores `_current_shell_port` and
+  `_current_workspace` separately even though lifecycle owns the active state.
+  Evidence: `app_frame.py:286-300, 380-415`.
+- Observation: `signing_shell.py` has no `phase3` names and is already mostly
+  an outer adapter, but it still contains dead `_format_appearance_summary`
+  and duplicate `SIGNATURE_PRESET_PLACEHOLDER` exports.
+  Evidence: fresh explorer search found no source callers; the canonical
+  placeholder is in `signing_workspace_properties_panel.py`.
+- Observation: `compat_surface` and `testing_adapter` remain active contracts
+  for harness/testing consumers.
+  Evidence: `signing_workspace_compatibility_surface.py:75-126`,
+  `tests/unit/test_qt_phase3_harness_workspace.py`, and the existing shell
+  port ExecPlans. They must be migrated or quarantined before deletion.
+- Observation: external Phase 3 names are serialized or invoked by automation.
+  Evidence: `README.md`, `docs/ARCHITECTURE.md`, CLI parser tests, manifest
+  fixtures, JSON schemas, and artifact paths. This slice must not rename them.
 
 ## Decision Log
 
-- Decision: Add `SigningWorkspaceLifecyclePort` and `WorkspaceMountPort` in a new presentation boundary module, keeping them independent of concrete Qt bindings.
-  Rationale: The lifecycle needs to be unit-testable with fakes, while only the mount adapter needs to know about `QMainWindow.setCentralWidget()`.
-  Date/Author: 2026-07-30 / Codex.
-- Decision: Expose only `replace(command)` and `close()` as lifecycle commands; keep `SigningWorkspacePort.widget()` and `SigningWorkspaceBundle` unchanged.
-  Rationale: This is the smallest complete vertical slice and avoids breaking harness callers or forcing every fake shell to implement disposal.
-  Date/Author: 2026-07-30 / Codex.
-- Decision: Compose the candidate before mounting it, mount the candidate before closing the old widget, and dispose a candidate if mounting fails.
-  Rationale: This gives users atomic replacement: open failures never destroy the currently usable workspace, and mount failures do not leak the candidate.
-  Date/Author: 2026-07-30 / Codex.
-- Decision: The lifecycle catches no open errors; `FoliaSealAppFrame` remains the single place that converts exceptions to its existing error callback/message box.
-  Rationale: Avoid duplicate warnings and preserve current error behavior.
-  Date/Author: 2026-07-30 / Codex.
-- Decision: Keep the broader neutral application-session/capability design deferred.
-  Rationale: It would be a larger migration than necessary for the concrete leak and replacement bug; this slice establishes the seam needed for that future evolution.
-  Date/Author: 2026-07-30 / Codex.
+- Decision: Use a typed `WorkspaceHandle` plus `SigningWorkspaceHost.open`,
+  `close`, and `active` rather than a generalized workspace registry/event bus.
+  Rationale: it makes the dominant app-frame caller deep and testable while
+  avoiding speculative abstractions for future workspace kinds.
+  Date/Author: 2026-08-03 / Codex.
+- Decision: Keep the established mount-before-dispose ordering and frame-level
+  error mapping unchanged.
+  Rationale: these are tested user-visible safety guarantees; the refactor
+  should change ownership, not failure semantics.
+  Date/Author: 2026-08-03 / Codex.
+- Decision: Remove `WorkspaceCompatibilityState` and duplicate frame state;
+  expose workflows only through the typed handle during migration where
+  current frame properties still require them.
+  Rationale: explicit handle fields are product state, while a compatibility
+  snapshot is an accidental transport bundle.
+  Date/Author: 2026-08-03 / Codex.
+- Decision: Move only proven-dead shell presentation helpers in this slice;
+  leave close-aware cleanup, Qt binding loading, and factory construction in
+  their current owner until the new host contract migrates their callers.
+  Rationale: removing active shell seams speculatively would broaden risk and
+  could break harness/testing consumers.
+  Date/Author: 2026-08-03 / Codex.
+- Decision: Strip obsolete `phase3` labels in the touched lifecycle scope and
+  document a separate migration boundary for stable external names.
+  Rationale: CLI/manifest/JSON/artifact compatibility is a user-data and
+  automation contract, not disposable internal terminology.
+  Date/Author: 2026-08-03 / Codex.
 
 ## Outcomes & Retrospective
 
-The slice is complete. `SigningWorkspaceLifecycle` now composes candidates before mounting, disposes the previous widget only after successful mounting, cleans up candidates when mounting fails, and makes close-before-open and repeated close calls safe. `FoliaSealAppFrame` routes replacement and placeholder mounting through the lifecycle/mount seam while preserving current production-port and compatibility behavior. Focused lifecycle/app-frame coverage passes (34 tests), the shell regression set passes (121 tests), and the complete suite passes (1,005 tests, one unchanged Pillow deprecation warning). The architecture document records the new component, contract, control flow, and dependency ownership. Commit `f1a824ef7` contains the implementation, tests, architecture update, and this plan. The broader neutral capability-session redesign remains intentionally deferred for a later architecture slice.
+Implementation is complete for the lifecycle slice. The frame now uses
+`SigningWorkspaceHost.open(path)`, `.active()`, and `.close()` with one typed
+`WorkspaceHandle` containing the widget, production shell port, testing port,
+and workflows. `OpenWorkspaceOutcome`, `WorkspaceCompatibilityState`,
+duplicate `_current_workspace`/shell-port state, and `SigningWorkspacePort.widget()`
+were removed from the production lifecycle path. The intentional
+`compat_surface`/`testing_adapter` boundary remains for Phase 3 and testing
+callers. The focused lifecycle/app-frame/shell set passes 140 tests. Two
+independent compliance reviews passed after architecture and documentation
+reconciliation. The Phase 3 inventory covered the touched lifecycle modules,
+tests, README, and architecture document: no obsolete internal lifecycle
+names remain; stable CLI commands, manifest keys, JSON fields, DTO names, and
+artifact paths remain unchanged. Commit closure remains the parent agent's
+responsibility.
 
 ## Context and Orientation
 
-`src/foliaseal/presentation/qt/app_frame.py` owns the top-level `FoliaSealAppFrame`, its menus/actions, the current shell references, and the fakeable Qt bindings. Its `open_pdf_path()` currently builds an `OpenWorkspaceCommand`, invokes `WorkspaceOpenPort.open_workspace()`, stores the returned `SigningWorkspacePort` and `WorkspaceCompatibilityState`, and calls `window.setCentralWidget()`.
+`src/foliaseal/presentation/qt/app_frame.py` owns the top-level window and
+menus. It constructs `SigningWorkspaceHost` and updates action state after
+opening or closing a PDF; active workspace state comes only from the host
+handle.
 
-`src/foliaseal/presentation/qt/app_frame_workspace_open.py` owns page-count loading and workspace composition. `WorkspaceOpenService.open_workspace()` returns an `OpenWorkspaceOutcome` containing `shell_port` and `compatibility`. `WorkspaceCompatibilityState.shell_widget` is the concrete widget that must be mounted, while `shell_port` is the production caller contract.
+`app_frame_workspace_open.py` loads the PDF page count, composes
+`ViewerWorkflow` and `SigningDraftWorkflow`, calls `SigningWorkspaceFactory`,
+and returns a typed `WorkspaceHandle` containing the mount widget, production
+port, testing adapter, and both workflows.
 
-`src/foliaseal/presentation/qt/signing_shell_port.py` defines `SigningWorkspacePort`, `SigningWorkspaceFactory`, `SigningWorkspaceBundle`, and `QtSigningWorkspaceFactory`. The bundle separates the production port from `SigningWorkspaceTestingPort`; do not remove or rename those types.
+`signing_workspace_lifecycle.py` is the atomic coordinator used by the host. It
+asks a workspace-open port to build a candidate, mounts the candidate, disposes
+the previous widget only after successful mounting, and disposes failed
+candidates. The host publishes one explicit handle.
 
-`src/foliaseal/presentation/qt/signing_shell.py` creates a close-aware shell widget whose close path disposes the properties panel. `signing_workspace_compatibility_surface.py` retains compatibility exports and connects widget destruction to the same disposal boundary. The new lifecycle must invoke the widget close path once and must tolerate a second close call.
-
-The relevant tests are `tests/unit/test_qt_app_frame.py`, `tests/unit/test_qt_app_frame_workspace_open.py`, `tests/unit/test_qt_signing_shell.py`, and `tests/unit/test_signing_workspace_shell_surface.py`. They use fake bindings and fake shells, so the new lifecycle tests must remain headless and must not import PySide6 eagerly.
+`signing_shell_port.py` defines the production shell port, testing port, and
+Qt factory. `signing_shell.py` builds the Qt widget and installs the already
+extracted composition/runtime/surface collaborators. The shell remains a Qt
+implementation module, but dead presentation helpers and compatibility-only
+exports may move to their canonical module or disappear.
 
 ## Plan of Work
 
-First create `src/foliaseal/presentation/qt/signing_workspace_lifecycle.py`. Define a `WorkspaceMountPort` protocol with `mount(widget: Any) -> None` and a `QtWorkspaceMount` adapter that calls `window.setCentralWidget(widget)`. Define `SigningWorkspaceLifecyclePort` with `replace(command: OpenWorkspaceCommand) -> OpenWorkspaceOutcome` and `close() -> None`. Define an internal active-workspace record containing the outcome and widget. The concrete lifecycle receives an existing `WorkspaceOpenPort`, a mount port, and an optional activation callback used by the frame to publish the returned outcome and enable/disable actions.
+Implemented: `WorkspaceHandle` and `SigningWorkspaceHost` now define the
+lifecycle/open boundary, using the existing `SigningWorkspacePort`,
+`SigningWorkspaceTestingPort`, viewer workflow, signing workflow, source path,
+and mount target as explicit fields. `OpenWorkspaceOutcome` and
+`WorkspaceCompatibilityState` are no longer frame-facing contracts; if a temporary
+adapter is needed for a remaining harness caller, name it explicitly as a
+legacy adapter and keep it out of the production host API.
 
-Implement `replace()` transactionally. Delegate composition to the existing open port first. Obtain the candidate widget from `outcome.compatibility.shell_widget`. Call the mount port. If mounting raises, close/dispose the candidate widget and re-raise, leaving the prior active record untouched. After successful mounting, close/dispose the prior active widget, replace the active record, invoke the activation callback with the new outcome, and return the outcome. Closing must be idempotent: if no active workspace exists it does nothing; otherwise it clears the active record, closes the widget if it has a callable `close`, and calls `deleteLater` when available without requiring either method on test doubles. Keep disposal guarded so repeated lifecycle calls cannot invoke cleanup twice for the same widget.
+`SigningWorkspaceCompositionService` now returns a handle directly from
+the factory bundle. The mount target comes from the bundle/handle; no production
+caller invokes `shell_port.widget()`.
+Keep `WorkspaceCompositionRequest` and the broad command internally injected
+behind the host so `FoliaSealAppFrame.open_pdf_path()` only supplies a PDF path
+to the host. The host may construct the existing command/environment internally
+until all collaborators are migrated.
 
-Then update `src/foliaseal/presentation/qt/app_frame.py`. Construct a `QtWorkspaceMount` around `self.window` and a lifecycle coordinator around the existing `_workspace_open_port`. Move the existing outcome assignment, central-widget installation, and action enabling into a small frame activation callback invoked only after a successful mount. Change `open_pdf_path()` to build the same `OpenWorkspaceCommand` and call lifecycle `replace()`, retaining its current exception-to-`_emit_error()` behavior and return value. Add a frame-level `close_workspace()` method that delegates to the lifecycle and resets `_current_shell_port`, `_current_workspace`, central placeholder, and disabled action state. Ensure `_set_placeholder()` does not accidentally close a newly mounted widget and that menu/action behavior is unchanged. Wire signed-output reopen callbacks through `open_pdf_path()` as today so they use the same atomic replacement path.
+`SigningWorkspaceHost.open(path)` now always
+performs atomic replacement, publishes the new handle only after mount succeeds,
+and disposes the previous handle after publication. `close()` clears the active
+handle and disposes it exactly once. Preserve the current frame behavior of
+catching open errors, emitting `Unable to open PDF: ...`, and leaving the prior
+workspace intact.
 
-Add or adjust fake helpers in `tests/unit/test_qt_app_frame.py` and create focused lifecycle tests in `tests/unit/test_signing_workspace_lifecycle.py`. Test that a successful second open mounts the second widget, closes the first exactly once, updates `current_shell`/`current_workspace`, and keeps Save As/text-selection/copy actions enabled. Test that page-count/composition failure leaves the first widget mounted and unclosed. Test that a mount failure closes the candidate, preserves the first widget and frame state, and still emits exactly one existing error. Test that `close_workspace()` is safe before any open and safe when called twice after an open. Test that a shell without `close` or `deleteLater` remains supported. Preserve existing factory, compatibility-surface, and reopen-callback assertions.
+`FoliaSealAppFrame` now uses one `_workspace_host`/active-handle source. It removed
+`_current_shell_port`, `_current_workspace`, compatibility-derived state
+properties, and duplicate shell-widget extraction. Update save-as, text
+selection, certificate refresh, reusable-object refresh, and settings actions to
+read the active handle's explicit shell port. Keep public `current_shell`,
+`current_viewer_workflow`, and `current_signing_workflow` only as narrow typed
+read-only projections if existing callers still require them; they must derive
+from the active handle rather than storing parallel state.
 
-Update `docs/ARCHITECTURE.md` in the Qt presentation map, major-components section, contracts, and open-document control flow to describe the lifecycle coordinator, the Qt mount adapter, atomic replacement order, and the fact that the production shell/testing adapter split remains unchanged. Update the relevant signing-shell section in `README.md` only if its current wording claims the frame directly owns widget replacement. Add implementation evidence and final status to this ExecPlan.
+Remove dead `_format_appearance_summary` and duplicate placeholder exports from
+`signing_shell.py` after migrating or deleting tests that import them. Move any
+remaining composition-only contract that is proven unused from `signing_shell.py`
+to a focused module; do not move active Qt binding or close-aware disposal code
+without a caller migration and regression test. Quarantine, rather than delete,
+the broad `compat_surface` and `testing_adapter` only where Phase 3/testing
+callers still depend on them.
+
+Boundary tests prove open success, replacement ordering, composition
+failure preservation, mount failure cleanup, idempotent close, active-handle
+publication, app-frame action routing through the active handle, and no stale
+parallel state after close. Delete tests whose only purpose was asserting the
+removed compatibility bundle or dead shell helper, replacing them with behavior
+assertions through the host/handle boundary.
+
+The touched-scope nomenclature inventory removed obsolete `phase3` names from
+new/current lifecycle code and documentation. Record stable external names that
+remain in `README.md`, `docs/ARCHITECTURE.md`, CLI/parser tests, fixtures, and
+artifact paths as an explicit follow-up migration boundary; do not rename them
+in this slice.
+
+## Milestones
+
+### Milestone 1: Typed workspace handle
+
+Introduce the handle and host-facing contracts while preserving the current
+composition implementation. Add in-memory/fake mount and factory tests proving
+the handle contains the mount target and explicit ports. Existing lifecycle
+tests must remain green.
+
+### Milestone 2: App-frame migration and compatibility removal
+
+Route open/close and all frame shell actions through the host's active handle.
+Remove the compatibility outcome, duplicated state, duplicate widget extraction,
+and dead shell presentation helpers. Keep active harness/testing adapters behind
+explicit compatibility boundaries.
+
+### Milestone 3: Compliance, nomenclature, and closure
+
+Run the full test suite, lint, compilation, diff checks, architecture/spec
+review, docs reconciliation, `phase3` inventory, and process/temporary-artifact
+cleanup. Resolve any review finding in a child ExecPlan before commit closure.
 
 ## Concrete Steps
 
-All commands run from `/home/daekar/FoliaSeal`.
+Run every command from `/home/daekar/FoliaSeal`.
 
-1. Add the lifecycle module and tests using the existing type/style conventions. Run the focused new and existing tests:
+    rg -n "WorkspaceCompatibilityState|OpenWorkspaceOutcome|shell_widget|_current_shell_port|_current_workspace|SIGNATURE_PRESET_PLACEHOLDER|_format_appearance_summary" src tests docs/ARCHITECTURE.md
+    .venv/bin/python -m pytest -q tests/unit/test_signing_workspace_lifecycle.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_qt_app_frame.py tests/unit/test_qt_signing_shell.py
 
-    .venv/bin/python -m pytest -q tests/unit/test_signing_workspace_lifecycle.py tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_signing_workspace_shell_surface.py
-
-   Expected result: all focused tests pass, including new assertions for one-time cleanup and failed replacement preservation.
-
-2. Run the shell/GUI boundary regression set:
-
-    .venv/bin/python -m pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_signing_workspace_shell_surface.py tests/unit/test_qt_app_frame_certificate_management.py
-
-3. Run the complete suite:
+After implementation, run:
 
     .venv/bin/python -m pytest -q
-
-   Expected result: the full suite passes; a pre-existing Pillow warning is acceptable if it remains unchanged.
-
-4. Inspect the diff and architecture/spec requirements:
-
+    .venv/bin/ruff check src tests
+    .venv/bin/python -m compileall -q src tests
     git diff --check
+    rg -n -i "phase3" src/foliaseal/presentation/qt/signing_workspace_lifecycle.py src/foliaseal/presentation/qt/app_frame_workspace_open.py src/foliaseal/presentation/qt/signing_workspace_host.py src/foliaseal/presentation/qt/signing_shell.py tests/unit/test_signing_workspace_lifecycle.py tests/unit/test_qt_app_frame_workspace_open.py || true
+    ps -eo comm= | rg '^(python|python3|foliaseal)$' || true
     git status --short
-    rg -n "SigningWorkspaceLifecycle|WorkspaceMount|setCentralWidget|close_workspace" src tests docs/ARCHITECTURE.md README.md
 
-5. After documentation and review are complete, stage only the lifecycle implementation, its tests, documentation, and this ExecPlan, then commit with the repository’s normal commit tooling.
+The expected final result is a green full suite, clean Ruff/compile/diff
+checks, no obsolete compatibility names in the current lifecycle boundary, no
+`phase3` names in the touched lifecycle scope, no project processes, and a
+clean working tree after commit.
 
 ## Validation and Acceptance
 
-The slice is accepted when opening PDF B after PDF A causes the fake or real frame to mount B and invokes A’s close/disposal path exactly once; the frame’s current shell/workflow properties refer to B; and the Save As, text-selection, and copy actions remain enabled. If B cannot be composed or mounted, A remains the central widget and current workspace, B is disposed if it was created, and the user receives the existing single error notification. Calling frame `close_workspace()` before opening anything or more than once after opening is harmless and leaves the placeholder/actions disabled.
+Opening a valid PDF through the app frame must return and mount a
+`WorkspaceHandle`, expose its shell port to save-as/text-selection/settings
+actions, and publish it as the only active workspace. Opening a second PDF must
+mount the second candidate before disposing the first. A page-count, composition,
+or mount failure must dispose only the candidate and leave the first workspace
+active. Closing twice must not raise or dispose the same widget twice.
 
-The focused lifecycle and app-frame tests must pass, the shell/compatibility regression set must pass, and `.venv/bin/python -m pytest -q` must pass. `git diff --check` must report no whitespace errors. The architecture document must describe the implementation as it exists, not an aspirational future session API.
+The focused lifecycle/app-frame/shell tests and the full project suite must pass.
+Ruff, compileall, and `git diff --check` must be clean. Architecture review must
+confirm that app-frame state is sourced from the host handle, compatibility
+payloads are removed or explicitly quarantined, and no active testing/harness
+contract was silently deleted. Documentation must describe the new boundary and
+the deliberate preservation of stable external Phase 3 names.
 
 ## Idempotence and Recovery
 
-The changes are additive and safe to rerun. Tests use temporary paths and fake widgets; they do not open real documents or mutate user configuration. If a focused test fails, rerun only that test with `-vv`, inspect the lifecycle state transition, and update this plan’s `Surprises & Discoveries` and `Decision Log` before changing behavior. Do not use destructive Git commands. If implementation must be reverted before commit, remove only the new lifecycle module, its tests, and the app-frame/docs edits made by this plan.
+The refactor is safe to repeat because tests use fake factories, fake mount
+ports, and temporary data. Keep the existing lifecycle tests while migrating;
+remove old tests only after equivalent boundary tests pass. If a Qt constructor
+fails after creating a candidate widget, dispose that candidate before re-raising.
+If any caller still needs compatibility fields, add a named adapter and record
+the caller rather than restoring the old production outcome. Never delete or
+rename serialized Phase 3 command/manifest/JSON/artifact contracts without a
+separate migration plan and fixtures.
 
 ## Artifacts and Notes
 
-The key evidence to preserve in this plan is the focused test count, full-suite test count, `git diff --check` result, and the final commit hash. Keep generated GUI screenshots or artifacts out of the commit unless the existing test harness explicitly requires a tracked fixture.
+The completed plan must record evidence in this section:
+
+    focused lifecycle/app-frame/shell tests: 140 passed
+    full suite: 1026 passed, one pre-existing Pillow deprecation warning
+    architecture/spec review: two independent reviews passed; no child plan required
+    phase3 inventory: no obsolete names in touched lifecycle scope; stable external names retained across CLI, manifests, JSON/DTOs, and artifact paths
+    git diff --check: clean
+    process audit: no FoliaSeal/Python process
+    implementation and closure commit hashes: implementation changes are in the parent working tree; closure hash pending
+
+No generated artifacts, dialogs, certificates, or GUI processes may remain open
+or untracked after the audit.
 
 ## Interfaces and Dependencies
 
-The new module must use only standard-library typing/dataclasses plus existing FoliaSeal presentation contracts. Its stable interfaces are:
+The new frame-facing contract should be equivalent to:
 
-    class WorkspaceMountPort(Protocol):
-        def mount(self, widget: Any) -> None: ...
+    @dataclass(frozen=True)
+    class WorkspaceHandle:
+        source_pdf: Path
+        widget: Any
+        shell: SigningWorkspacePort
+        testing: SigningWorkspaceTestingPort
+        viewer_workflow: ViewerWorkflow
+        signing_workflow: SigningDraftWorkflow
 
-    class SigningWorkspaceLifecyclePort(Protocol):
-        def replace(self, command: OpenWorkspaceCommand) -> OpenWorkspaceOutcome: ...
+    class SigningWorkspaceHost:
+        def open(self, source_pdf: Path) -> WorkspaceHandle: ...
         def close(self) -> None: ...
+        def active(self) -> WorkspaceHandle | None: ...
 
-The concrete lifecycle depends on `WorkspaceOpenPort` and `OpenWorkspaceCommand` from `app_frame_workspace_open.py`, but it must not import PySide6. `QtWorkspaceMount` is the only new object that calls `QMainWindow.setCentralWidget()`. The existing `SigningWorkspacePort` remains the production app-frame contract, and `SigningWorkspaceTestingPort` remains the harness contract. Real Qt widgets and PySide6 are external presentation dependencies; fake widgets, fake mount ports, and fake workspace-open services are local substitutes used by unit tests.
+The implementation may keep `OpenWorkspaceCommand` and the existing composition
+ports internally, but the app frame must not construct or inspect them. The
+production Qt adapter remains responsible for widgets and `deleteLater()`;
+tests use fake workspace factories, fake mount hosts, and plain disposable
+objects. `SigningWorkspacePort` remains explicit and typed; `widget()` is
+removed from the production caller contract. The remaining
+`compat_surface`/`testing_adapter` seam is intentional for legacy widget
+exports and Phase 3/testing callers.
 
-## Change-slice Boundaries
+## Revision Notes
 
-The primary change class is behavior: deterministic workspace replacement and cleanup. The same commit may include the necessary architecture/status documentation because the new lifecycle boundary changes documented control flow. Do not mix certificate/profile redesign, neutral capability-session migration, Phase 3 harness refactors, visible-signature layout work, dependency upgrades, generated artifacts, or unrelated formatting changes into this slice.
+2026-08-03: Created after the required fresh DevLoop explorer review and the
+recommended common-caller/minimal hybrid comparison. Added explicit legacy
+compatibility-removal scope and a touched-scope `phase3` nomenclature audit
+while preserving stable external evidence contracts.
 
-Plan revision note (2026-07-30): created after the live explorer confirmed that composition and shell/testing boundaries already exist; narrowed the implementation to lifecycle cleanup and atomic replacement rather than introducing a second broad application-session abstraction.
+2026-08-03: Closed implementation and documentation reconciliation. Recorded
+the `SigningWorkspaceHost`/`WorkspaceHandle` flow, removal of
+`OpenWorkspaceOutcome`, `WorkspaceCompatibilityState`, duplicate frame state,
+and `SigningWorkspacePort.widget()`, the intentional compatibility/testing
+boundary, two compliance reviews, 140 focused tests, and the Phase 3 inventory
+scope. Full-suite and commit-closure evidence remain with the parent agent.

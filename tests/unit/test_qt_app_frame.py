@@ -389,6 +389,7 @@ class _FakeShellFactory:
         return SigningWorkspaceBundle(
             port=_FakeShellPort(self.shell_widget),
             testing_adapter=self.shell_widget.testing_adapter,
+            widget=self.shell_widget,
         )
 
 
@@ -403,6 +404,7 @@ class _SequenceShellFactory:
         return SigningWorkspaceBundle(
             port=_FakeShellPort(shell),
             testing_adapter=shell.testing_adapter,
+            widget=shell,
         )
 
 
@@ -509,7 +511,7 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
 
     bundle = signing_shell_port_module.QtSigningWorkspaceFactory().create(bootstrap)
 
-    assert bundle.port.widget() is shell
+    assert bundle.widget is shell
     assert bundle.testing_adapter is shell.testing_adapter
     assert captured == {
         "viewer_workflow": bootstrap.viewer_workflow,
@@ -532,7 +534,6 @@ def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path
     port = QtSigningWorkspacePort(shell_widget=shell)
     settings = _settings(tmp_path)
 
-    assert port.widget() is shell
     assert port.choose_output_pdf_path() == "/tmp/signed-output.pdf"
 
     port.apply_app_settings(settings)

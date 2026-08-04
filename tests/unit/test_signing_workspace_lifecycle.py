@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from foliaseal.presentation.qt.app_frame_workspace_open import (
-    WorkspaceCompatibilityState,
+    WorkspaceHandle,
 )
 from foliaseal.presentation.qt.signing_workspace_lifecycle import (
     SigningWorkspaceLifecycle,
@@ -32,12 +32,14 @@ class _WidgetWithoutCleanup:
 
 class _Outcome:
     def __init__(self, widget) -> None:
-        self.compatibility = WorkspaceCompatibilityState(
-            shell_widget=widget,
+        self.handle = WorkspaceHandle(
+            source_pdf=object(),
+            widget=widget,
+            shell=object(),
+            testing=object(),
             viewer_workflow=object(),
             signing_workflow=object(),
         )
-        self.shell_port = object()
 
 
 class _OpenPort:
@@ -50,7 +52,7 @@ class _OpenPort:
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, BaseException):
             raise outcome
-        return outcome
+        return outcome.handle
 
 
 class _Mount:
@@ -81,9 +83,10 @@ def test_replace_mounts_candidate_before_closing_previous_workspace() -> None:
     )
 
     lifecycle.replace(_command())
-    outcome = lifecycle.replace(_command())
+    handle = lifecycle.replace(_command())
 
-    assert outcome.compatibility.shell_widget is second
+    assert handle.widget is second
+    assert lifecycle.active() is handle
     assert mount.widgets == [first, second]
     assert events == ["mount:first", "mount:second", "close:first", "delete:first"]
     assert first.close_calls == 1

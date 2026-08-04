@@ -34,10 +34,9 @@ from foliaseal.presentation.qt.app_frame_profile_library import (
     ReusableObjectLibraryDialog,
 )
 from foliaseal.presentation.qt.app_frame_workspace_open import (
-    OpenWorkspaceCommand,
     QtPdfPageCountLoader,
     SigningWorkspaceCompositionService,
-    WorkspaceCompatibilityState,
+    WorkspaceHandle,
     WorkspaceOpenPort,
     WorkspaceOpenService,
 )
@@ -49,10 +48,11 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceFactory,
     SigningWorkspacePort,
 )
-from foliaseal.presentation.qt.signing_workspace_lifecycle import (
-    QtWorkspaceMount,
-    SigningWorkspaceLifecycle,
+from foliaseal.presentation.qt.signing_workspace_host import (
+    SigningWorkspaceEnvironment,
+    SigningWorkspaceHost,
 )
+from foliaseal.presentation.qt.signing_workspace_lifecycle import QtWorkspaceMount
 from foliaseal.resources.icons import icon_path
 
 
@@ -283,8 +283,6 @@ class FoliaSealAppFrame:
                 shell_factory=self._shell_factory,
             ),
         )
-        self._current_shell_port: SigningWorkspacePort | None = None
-        self._current_workspace: WorkspaceCompatibilityState | None = None
         self._dialog_compatibility = AppFrameDialogCompatibilityState()
         self._open_action: Any | None = None
         self._save_as_action: Any | None = None
@@ -294,7 +292,19 @@ class FoliaSealAppFrame:
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
         self._workspace_mount = QtWorkspaceMount(self.window)
-        self._workspace_lifecycle = SigningWorkspaceLifecycle(
+        self._workspace_host = SigningWorkspaceHost(
+            environment=SigningWorkspaceEnvironment(
+                app_settings=lambda: self._app_settings,
+                app_settings_store=self._app_settings_store,
+                certificate_catalog_store=self._certificate_catalog_store,
+                certificate_secret_provider=self._certificate_secret_provider,
+                preset_catalog_store=self._preset_catalog_store,
+                sign_executor=self._sign_executor,
+                on_sign_request=self._on_sign_request,
+                reopen_target=self.open_pdf_path,
+                on_error=self._emit_error,
+                on_status_change=self._on_status_change,
+            ),
             workspace_open_port=self._workspace_open_port,
             mount_port=self._workspace_mount,
         )
@@ -318,22 +328,22 @@ class FoliaSealAppFrame:
         return self._app_settings
 
     @property
-    def current_workspace(self) -> WorkspaceCompatibilityState | None:
-        return self._current_workspace
+    def current_workspace(self) -> WorkspaceHandle | None:
+        return self._workspace_host.active()
 
     @property
     def current_shell(self) -> Any | None:
-        workspace = self._current_workspace
-        return None if workspace is None else workspace.shell_widget
+        workspace = self._workspace_host.active()
+        return None if workspace is None else workspace.widget
 
     @property
     def current_viewer_workflow(self) -> ViewerWorkflow | None:
-        workspace = self._current_workspace
+        workspace = self._workspace_host.active()
         return None if workspace is None else workspace.viewer_workflow
 
     @property
     def current_signing_workflow(self) -> SigningDraftWorkflow | None:
-        workspace = self._current_workspace
+        workspace = self._workspace_host.active()
         return None if workspace is None else workspace.signing_workflow
 
     @property
@@ -379,39 +389,21 @@ class FoliaSealAppFrame:
 
     def open_pdf_path(self, pdf_path: str | Path) -> Any | None:
         try:
-            outcome = self._workspace_lifecycle.replace(
-                OpenWorkspaceCommand(
-                    source_pdf=Path(pdf_path),
-                    app_settings=self._app_settings,
-                    app_settings_store=self._app_settings_store,
-                    certificate_catalog_store=self._certificate_catalog_store,
-                    certificate_secret_provider=self._certificate_secret_provider,
-                    preset_catalog_store=self._preset_catalog_store,
-                    sign_executor=self._sign_executor,
-                    on_sign_request=self._on_sign_request,
-                    reopen_target=self.open_pdf_path,
-                    on_error=self._emit_error,
-                    on_status_change=self._on_status_change,
-                )
-            )
+            handle = self._workspace_host.open(pdf_path)
         except Exception as exc:
             self._emit_error(f"Unable to open PDF: {exc}")
             return None
 
-        self._current_shell_port = outcome.shell_port
-        self._current_workspace = outcome.compatibility
         self._set_save_as_enabled(True)
         self._set_text_selection_action_enabled(True)
         self._set_text_selection_action_checked(False)
         self._set_copy_selected_text_action_enabled(True)
-        return outcome.compatibility.shell_widget
+        return handle.widget
 
     def close_workspace(self) -> None:
         """Close the active signing workspace and restore the placeholder view."""
 
-        self._workspace_lifecycle.close()
-        self._current_shell_port = None
-        self._current_workspace = None
+        self._workspace_host.close()
         self._set_placeholder()
 
     def show_app_settings(self) -> AppSettings | None:
@@ -470,10 +462,11 @@ class FoliaSealAppFrame:
         return dialog
 
     def _open_reusable_object_editor(self) -> bool:
-        if self._current_shell_port is None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
             self._emit_error("Open a PDF before creating or editing reusable signing objects.")
             return False
-        return self._current_shell_port.open_reusable_object_editor()
+        return workspace.shell.open_reusable_object_editor()
 
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
@@ -666,10 +659,10 @@ class FoliaSealAppFrame:
         self,
         action: Callable[[SigningWorkspacePort], Any | None],
     ) -> Any | None:
-        shell_port = self._current_shell_port
-        if shell_port is None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
             return None
-        return action(shell_port)
+        return action(workspace.shell)
 
 
 class QtAppFrameAdapter:

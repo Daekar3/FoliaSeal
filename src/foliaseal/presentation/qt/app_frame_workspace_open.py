@@ -21,6 +21,9 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceFactory,
     SigningWorkspacePort,
 )
+from foliaseal.presentation.qt.signing_workspace_testing_port import (
+    SigningWorkspaceTestingPort,
+)
 
 
 @dataclass(frozen=True)
@@ -41,26 +44,22 @@ class OpenWorkspaceCommand:
 
 
 @dataclass(frozen=True)
-class WorkspaceCompatibilityState:
-    """Compatibility payload owned by the frame snapshot."""
+class WorkspaceHandle:
+    """The one active workspace record published after a successful mount."""
 
-    shell_widget: Any
+    source_pdf: Path
+    widget: Any
+    shell: SigningWorkspacePort
+    testing: SigningWorkspaceTestingPort
     viewer_workflow: ViewerWorkflow
     signing_workflow: SigningDraftWorkflow
 
 
 @dataclass(frozen=True)
-class OpenWorkspaceOutcome:
-    """Observable result of opening one signing workspace."""
-
-    shell_port: SigningWorkspacePort
-    compatibility: WorkspaceCompatibilityState
-
-
 class WorkspaceOpenPort(Protocol):
     """Open one signing workspace from app-frame command inputs."""
 
-    def open_workspace(self, command: OpenWorkspaceCommand) -> OpenWorkspaceOutcome:
+    def open_workspace(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
         """Build the workspace or raise."""
 
 
@@ -82,7 +81,7 @@ class WorkspaceCompositionRequest:
 class WorkspaceCompositionPort(Protocol):
     """Compose one live signing workspace from open inputs."""
 
-    def compose(self, request: WorkspaceCompositionRequest) -> OpenWorkspaceOutcome:
+    def compose(self, request: WorkspaceCompositionRequest) -> WorkspaceHandle:
         """Build the workspace outcome or raise."""
 
 
@@ -110,7 +109,7 @@ class SigningWorkspaceCompositionService:
     render_backend_factory: Callable[[], Any]
     shell_factory: SigningWorkspaceFactory
 
-    def compose(self, request: WorkspaceCompositionRequest) -> OpenWorkspaceOutcome:
+    def compose(self, request: WorkspaceCompositionRequest) -> WorkspaceHandle:
         command = request.command
         source_path = command.source_pdf
         viewer_workflow = ViewerWorkflow(
@@ -147,15 +146,13 @@ class SigningWorkspaceCompositionService:
                 on_status_change=command.on_status_change,
             )
         )
-        shell_port = bundle.port
-        shell_widget = shell_port.widget()
-        return OpenWorkspaceOutcome(
-            shell_port=shell_port,
-            compatibility=WorkspaceCompatibilityState(
-                shell_widget=shell_widget,
-                viewer_workflow=viewer_workflow,
-                signing_workflow=signing_workflow,
-            ),
+        return WorkspaceHandle(
+            source_pdf=source_path,
+            widget=bundle.widget,
+            shell=bundle.port,
+            testing=bundle.testing_adapter,
+            viewer_workflow=viewer_workflow,
+            signing_workflow=signing_workflow,
         )
 
 
@@ -166,7 +163,7 @@ class WorkspaceOpenService:
     page_count_port: PdfPageCountPort
     composition_port: WorkspaceCompositionPort
 
-    def open_workspace(self, command: OpenWorkspaceCommand) -> OpenWorkspaceOutcome:
+    def open_workspace(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
         page_count = self.page_count_port.load_page_count(command.source_pdf)
         return self.composition_port.compose(
             WorkspaceCompositionRequest(command=command, page_count=page_count)

@@ -44,9 +44,6 @@ class SigningWorkspaceBootstrap:
 class SigningWorkspacePort(Protocol):
     """Explicit caller-facing contract for an active signing workspace."""
 
-    def widget(self) -> Any:
-        """Return the concrete widget to install as the central widget."""
-
     def choose_output_pdf_path(self) -> str | None:
         """Drive the shell's Save As behavior."""
 
@@ -82,6 +79,7 @@ class SigningWorkspaceBundle:
 
     port: SigningWorkspacePort
     testing_adapter: SigningWorkspaceTestingPort
+    widget: Any
 
 
 @dataclass(frozen=True)
@@ -89,9 +87,6 @@ class QtSigningWorkspacePort:
     """Port adapter over the concrete Qt signing shell widget."""
 
     shell_widget: Any
-
-    def widget(self) -> Any:
-        return self.shell_widget
 
     def choose_output_pdf_path(self) -> str | None:
         return self.shell_widget.choose_output_pdf_path()
@@ -141,4 +136,5 @@ class QtSigningWorkspaceFactory:
         return SigningWorkspaceBundle(
             port=QtSigningWorkspacePort(shell_widget=shell_widget),
             testing_adapter=testing_adapter,
+            widget=shell_widget,
         )

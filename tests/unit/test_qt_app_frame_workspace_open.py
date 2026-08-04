@@ -76,6 +76,7 @@ class _FakeShellFactory:
         return SigningWorkspaceBundle(
             port=_FakeShellPort(self.shell_widget),
             testing_adapter=self.shell_widget.testing_adapter,
+            widget=self.shell_widget,
         )
 
 
@@ -135,12 +136,11 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     )
 
     assert _FakeQPdfDocument.load_calls == [str(selected_pdf)]
-    assert outcome.shell_port.widget() is shell
-    assert outcome.compatibility.shell_widget is shell
-    assert outcome.compatibility.viewer_workflow.document_path == str(selected_pdf)
-    assert outcome.compatibility.viewer_workflow.session.page_count == 3
-    assert outcome.compatibility.signing_workflow.input_pdf_path == str(selected_pdf)
-    assert outcome.compatibility.signing_workflow.output_pdf_path == str(
+    assert outcome.widget is shell
+    assert outcome.viewer_workflow.document_path == str(selected_pdf)
+    assert outcome.viewer_workflow.session.page_count == 3
+    assert outcome.signing_workflow.input_pdf_path == str(selected_pdf)
+    assert outcome.signing_workflow.output_pdf_path == str(
         tmp_path / "signed" / "contract-signed.pdf"
     )
     assert shell_factory.bootstrap_calls[0].app_settings == _settings(tmp_path)
