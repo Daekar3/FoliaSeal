@@ -211,15 +211,23 @@ signed = session.signed_acceptance("/path/to/signed-acceptance-manifest.json")
 The session defaults matrix artifacts to `artifacts/phase3`; pass `artifacts_dir=` per call when
 isolating a run. Preview and signed matrices are injected as separate lazy operations built by
 `evidence_runner_factories.py`; interactive capture is installed through the neutral
-`build_interactive_evidence_runner()` factory. These factories construct their
+`build_interactive_capture_operation()` factory. These factories construct their
 Qt/runtime graphs only on first use. Application package exports
 are also lazy so importing a focused presentation module does not eagerly load optional GUI/runtime
 dependencies. `evidence_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
-interactive runner, JSON normalization, and artifact policy; `evidence_runner_factories.py` owns
-neutral lazy runner and operation construction; `evidence_artifacts.py` owns preview/signed summary
-artifact publication; `phase3_harness.py`
+`InteractiveCaptureEngine`, `build_capture_from_payload()` projection, JSON normalization, and
+artifact policy; `evidence_runner_factories.py` owns
+`build_interactive_capture_engine()`, `build_interactive_capture_operation()`, and neutral lazy
+runner/operation construction; `evidence_artifacts.py` owns preview/signed summary artifact
+publication; `phase3_harness.py`
 remains the Qt composition root that builds the concrete runner dependencies. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
 scenario sweep, processes events between scenarios, and closes that shell in its cleanup path.
+
+The external Phase 3 surface remains stable: CLI command names such as
+`phase3-signing-harness`, request/result DTO names such as `Phase3HarnessCapture`, and serialized
+JSON/artifact names are compatibility contracts. Internal runner aliases and duplicate forwarding
+wrappers were removed; importing the direct capture module remains lazy with respect to Qt,
+PyHanko, Pillow, and other optional runtime dependencies.
 
 Not yet production-ready:
 

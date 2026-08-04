@@ -53,13 +53,9 @@ from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.presentation.qt.evidence_interactive_capture import (
-    Phase3HarnessCapture as _Phase3HarnessCapture,
-)
-from foliaseal.presentation.qt.evidence_interactive_capture import (
+    Phase3HarnessCapture,
     default_harness_output_pdf_path,
-)
-from foliaseal.presentation.qt.evidence_interactive_capture import (
-    jsonable_capture as _jsonable_capture,
+    jsonable_capture,
 )
 from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
     Phase3AppearanceSnapshotter,
@@ -113,63 +109,7 @@ DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_check
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
 
 
-def _build_phase3_harness_capture(
-    *,
-    capture_payload: dict[str, Any],
-    contract,
-    summary_json_path: str | None,
-    checklist_results_path: str,
-    checklist_results_written: bool,
-) -> _Phase3HarnessCapture:
-    return _Phase3HarnessCapture(
-        pdf_path=capture_payload["pdf_path"],
-        summary_json_path=summary_json_path,
-        summary_json_written=summary_json_path is not None,
-        checklist_results_path=checklist_results_path,
-        checklist_results_written=checklist_results_written,
-        first_render_ms=capture_payload["first_render_ms"],
-        selection_count=capture_payload["selection_count"],
-        sign_request_count=capture_payload["sign_request_count"],
-        last_signature_page_index=capture_payload["last_signature_page_index"],
-        last_signature_page_number=capture_payload["last_signature_page_number"],
-        last_signature_has_visible_appearance=capture_payload[
-            "last_signature_has_visible_appearance"
-        ],
-        last_signature_output_path=capture_payload["last_signature_output_path"],
-        last_signing_result_message=capture_payload["last_signing_result_message"],
-        last_signing_result_success=capture_payload["last_signing_result_success"],
-        preview_snapshot=capture_payload["preview_snapshot"],
-        sign_request_snapshot=capture_payload["sign_request_snapshot"],
-        backend_reservation_snapshot=capture_payload["backend_reservation_snapshot"],
-        backend_reservation_error=capture_payload["backend_reservation_error"],
-        output_file_exists=capture_payload["output_file_exists"],
-        output_file_size_bytes=capture_payload["output_file_size_bytes"],
-        output_signature_count=capture_payload["output_signature_count"],
-        output_signature_snapshot=capture_payload["output_signature_snapshot"],
-        output_verification_snapshot=capture_payload["output_verification_snapshot"],
-        output_visible_appearance_snapshot=capture_payload["output_visible_appearance_snapshot"],
-        signed_output_render_snapshot=capture_payload["signed_output_render_snapshot"],
-        signed_output_preview_comparison=capture_payload["signed_output_preview_comparison"],
-        signed_runs=capture_payload["signed_runs"],
-        preview_available=capture_payload["preview_available"],
-        preview_text=capture_payload["preview_text"],
-        validation_text=capture_payload["validation_text"],
-        evidence_contract_version=contract.contract_version,
-        acceptance_tier=contract.acceptance_tier,
-        gate_verdict=contract.gate_verdict,
-        evidence_validation_passed=contract.passed,
-        evidence_validation_errors=contract.errors,
-        evidence_validation_warnings=contract.warnings,
-        interaction_counts=capture_payload["interaction_counts"],
-        errors=capture_payload["errors"],
-        captured_states=capture_payload["captured_states"],
-        captured_state_transition_diagnostics=capture_payload[
-            "captured_state_transition_diagnostics"
-        ],
-    )
-
-
-def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
+def build_capture_assembler() -> Phase3HarnessCaptureAssembler:
     pdf_snapshotter = Phase3PdfSignatureSnapshotter()
     return Phase3HarnessCaptureAssembler(
         count_embedded_signatures=pdf_snapshotter.count_embedded_signatures,
@@ -181,7 +121,7 @@ def _build_phase3_harness_capture_assembler() -> Phase3HarnessCaptureAssembler:
     )
 
 
-def _build_phase3_harness_session_runner() -> Phase3HarnessSessionRunner:
+def build_interactive_session_runner() -> Phase3HarnessSessionRunner:
     return Phase3HarnessSessionRunner(
         deps=Phase3HarnessSessionRunnerDeps(
             build_qt_signing_shell=build_qt_signing_shell,
@@ -325,7 +265,7 @@ def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRender
         rect_delta_within_tolerance=_rect_delta_within_tolerance,
         rectangles_within_tolerance=_rectangles_within_tolerance,
         write_side_by_side_comparison=_write_side_by_side_comparison,
-        jsonable_capture=_jsonable_capture,
+        jsonable_capture=jsonable_capture,
         mapping=_mapping,
     )
 
@@ -367,7 +307,7 @@ def _load_page_count(*, bindings: _QtHarnessBindings, pdf_path: str) -> int:
     return int(document.pageCount())
 
 
-def _derive_phase3_auto_checked_items(capture: _Phase3HarnessCapture) -> set[str]:
+def _derive_phase3_auto_checked_items(capture: Phase3HarnessCapture) -> set[str]:
     auto_checked: set[str] = set()
 
     if capture.preview_available:
@@ -1421,7 +1361,7 @@ def _build_qt_preview_render_capture_payload(
         "analysis_appearance_snapshot": (
             None
             if analysis_appearance_snapshot is None
-            else _jsonable_capture(analysis_appearance_snapshot)
+            else jsonable_capture(analysis_appearance_snapshot)
         ),
         "preview_image_error": image_error,
         "card_bounds_px": card_bounds,
@@ -1634,7 +1574,7 @@ def _capture_headless_preview_render(
         "analysis_appearance_snapshot": (
             None
             if analysis_appearance_snapshot is None
-            else _jsonable_capture(analysis_appearance_snapshot)
+            else jsonable_capture(analysis_appearance_snapshot)
         ),
         "preview_image_error": image_error,
         "card_bounds_px": card_bounds,
@@ -3321,7 +3261,7 @@ def _snapshot_sign_request_appearance(
     return appearance
 
 
-def _snapshot_request_origin(capture: _Phase3HarnessCapture) -> str:
+def _snapshot_request_origin(capture: Phase3HarnessCapture) -> str:
     if capture.sign_request_snapshot is None:
         return "not captured"
     if capture.sign_request_count > 0:

@@ -121,6 +121,49 @@ print(json.dumps(loaded))
     assert json.loads(completed.stdout) == []
 
 
+def test_interactive_capture_engine_import_and_construction_stay_lazy() -> None:
+    script = """
+import json
+import sys
+from foliaseal.presentation.qt.evidence_interactive_capture import (
+    InteractiveCaptureEngine,
+    InteractiveEvidenceArtifactPolicy,
+)
+InteractiveCaptureEngine(
+    load_qt_harness_bindings=lambda: None,
+    load_page_count=lambda **_: 1,
+    render_backend_factory=lambda: None,
+    profile_store_factory=lambda: None,
+    build_phase3_signing_executor=lambda: None,
+    session_runner=None,
+    capture_assembler=None,
+    contract_evaluator=lambda **_: None,
+    capture_factory=lambda **_: None,
+    checklist_renderer=lambda **_: "",
+    report_finalizer=lambda **_: None,
+    artifact_policy=InteractiveEvidenceArtifactPolicy(
+        default_artifacts_dir=lambda **_: None,
+        output_pdf_path=lambda **_: "output.pdf",
+        write_text=lambda **_: None,
+    ),
+)
+heavy = ("PySide6", "PIL", "pyhanko")
+loaded = sorted(
+    name for name in sys.modules
+    if any(name == prefix or name.startswith(prefix + ".") for prefix in heavy)
+)
+print(json.dumps(loaded))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == []
+
+
 def test_matrix_operation_preserves_raw_mapping_results() -> None:
     expected = {"scenario_count": 8, "results": [{"name": "baseline"}]}
     operation = evidence_runner_factories._build_matrix_operation(

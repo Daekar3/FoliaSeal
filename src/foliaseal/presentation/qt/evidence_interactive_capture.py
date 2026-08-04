@@ -1,28 +1,24 @@
-"""Interactive Phase 3 capture contract and lazy composition boundary."""
+"""Interactive evidence capture contract and lazy composition boundary."""
 
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.evidence_service import EvidenceCaptureRequest
-from foliaseal.application.viewer_session import ViewerSession
-from foliaseal.application.viewer_workflow import ViewerWorkflow
-from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
-    Phase3HarnessCaptureAssembler,
-)
-from foliaseal.presentation.qt.phase3_harness_reporting import (
-    Phase3HarnessReportRequest,
-)
-from foliaseal.presentation.qt.phase3_harness_session_runner import (
-    Phase3HarnessSessionRunner,
-    _QtHarnessBindings,
-)
+
+if TYPE_CHECKING:
+    from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
+        Phase3HarnessCaptureAssembler,
+    )
+    from foliaseal.presentation.qt.phase3_harness_session_runner import (
+        Phase3HarnessSessionRunner,
+        _QtHarnessBindings,
+    )
 
 
 @dataclass(frozen=True)
@@ -76,6 +72,68 @@ class Phase3HarnessCapture:
         return json.dumps(jsonable_capture(self), indent=2, sort_keys=True)
 
 
+def build_capture_from_payload(
+    *,
+    capture_payload: Mapping[str, Any],
+    contract: Any,
+    summary_json_path: str | None,
+    checklist_results_path: str,
+    checklist_results_written: bool,
+) -> Phase3HarnessCapture:
+    """Project the stable assembler payload into the public capture DTO."""
+
+    return Phase3HarnessCapture(
+        pdf_path=capture_payload["pdf_path"],
+        summary_json_path=summary_json_path,
+        summary_json_written=summary_json_path is not None,
+        checklist_results_path=checklist_results_path,
+        checklist_results_written=checklist_results_written,
+        first_render_ms=capture_payload["first_render_ms"],
+        selection_count=capture_payload["selection_count"],
+        sign_request_count=capture_payload["sign_request_count"],
+        last_signature_page_index=capture_payload["last_signature_page_index"],
+        last_signature_page_number=capture_payload["last_signature_page_number"],
+        last_signature_has_visible_appearance=capture_payload[
+            "last_signature_has_visible_appearance"
+        ],
+        last_signature_output_path=capture_payload["last_signature_output_path"],
+        last_signing_result_message=capture_payload["last_signing_result_message"],
+        last_signing_result_success=capture_payload["last_signing_result_success"],
+        preview_snapshot=capture_payload["preview_snapshot"],
+        sign_request_snapshot=capture_payload["sign_request_snapshot"],
+        backend_reservation_snapshot=capture_payload["backend_reservation_snapshot"],
+        backend_reservation_error=capture_payload["backend_reservation_error"],
+        output_file_exists=capture_payload["output_file_exists"],
+        output_file_size_bytes=capture_payload["output_file_size_bytes"],
+        output_signature_count=capture_payload["output_signature_count"],
+        output_signature_snapshot=capture_payload["output_signature_snapshot"],
+        output_verification_snapshot=capture_payload["output_verification_snapshot"],
+        output_visible_appearance_snapshot=capture_payload[
+            "output_visible_appearance_snapshot"
+        ],
+        signed_output_render_snapshot=capture_payload["signed_output_render_snapshot"],
+        signed_output_preview_comparison=capture_payload[
+            "signed_output_preview_comparison"
+        ],
+        signed_runs=capture_payload["signed_runs"],
+        preview_available=capture_payload["preview_available"],
+        preview_text=capture_payload["preview_text"],
+        validation_text=capture_payload["validation_text"],
+        evidence_contract_version=contract.contract_version,
+        acceptance_tier=contract.acceptance_tier,
+        gate_verdict=contract.gate_verdict,
+        evidence_validation_passed=contract.passed,
+        evidence_validation_errors=contract.errors,
+        evidence_validation_warnings=contract.warnings,
+        interaction_counts=capture_payload["interaction_counts"],
+        errors=capture_payload["errors"],
+        captured_states=capture_payload["captured_states"],
+        captured_state_transition_diagnostics=capture_payload[
+            "captured_state_transition_diagnostics"
+        ],
+    )
+
+
 @dataclass(frozen=True)
 class InteractiveEvidenceArtifactPolicy:
     """Artifact-path and optional-text policy for one interactive capture."""
@@ -86,8 +144,8 @@ class InteractiveEvidenceArtifactPolicy:
 
 
 @dataclass(frozen=True)
-class InteractiveEvidenceRunner:
-    """Interactive capture runner hiding session, artifact, and report choreography."""
+class InteractiveCaptureEngine:
+    """Interactive capture engine hiding session, artifact, and report choreography."""
 
     load_qt_harness_bindings: Callable[[], _QtHarnessBindings]
     load_page_count: Callable[..., int]
@@ -103,6 +161,13 @@ class InteractiveEvidenceRunner:
     artifact_policy: InteractiveEvidenceArtifactPolicy
 
     def run(self, request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
+        from foliaseal.application import SigningDraftWorkflow
+        from foliaseal.application.viewer_session import ViewerSession
+        from foliaseal.application.viewer_workflow import ViewerWorkflow
+        from foliaseal.presentation.qt.phase3_harness_reporting import (
+            Phase3HarnessReportRequest,
+        )
+
         bindings = self.load_qt_harness_bindings()
         source_path = Path(request.pdf_path)
         if not source_path.exists():
@@ -181,26 +246,6 @@ class InteractiveEvidenceRunner:
         print("Review the pre-checked items, complete the remaining manual-only checks, and")
         print("use the generated file as the acceptance worksheet for Phase 3.")
         return capture
-
-
-def build_interactive_evidence_capture_runner() -> Callable[
-    [EvidenceCaptureRequest], Phase3HarnessCapture
-]:
-    """Build the interactive runner lazily without importing the Qt harness graph."""
-
-    runner: InteractiveEvidenceRunner | None = None
-
-    def run(request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
-        nonlocal runner
-        if runner is None:
-            from foliaseal.presentation.qt.evidence_runner_factories import (
-                build_interactive_evidence_runner,
-            )
-
-            runner = build_interactive_evidence_runner()
-        return runner.run(request)
-
-    return run
 
 
 def jsonable_capture(value: Any) -> Any:

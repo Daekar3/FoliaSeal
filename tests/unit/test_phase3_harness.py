@@ -1,5 +1,6 @@
 import importlib
 import json
+from dataclasses import fields
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -50,13 +51,16 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
 )
 from foliaseal.presentation.qt.evidence_interactive_capture import (
+    InteractiveCaptureEngine,
     InteractiveEvidenceArtifactPolicy,
-    InteractiveEvidenceRunner,
     Phase3HarnessCapture,
-    build_interactive_evidence_capture_runner,
+    build_capture_from_payload,
     default_harness_artifacts_dir,
     default_harness_output_pdf_path,
     write_optional_text,
+)
+from foliaseal.presentation.qt.evidence_runner_factories import (
+    build_interactive_capture_operation,
 )
 from foliaseal.presentation.qt.phase3_harness import (
     _analyze_capture_state_transitions,
@@ -604,6 +608,72 @@ def test_phase3_harness_capture_to_json_handles_nested_non_json_objects(
         payload = json.loads(capture.to_json())
 
     assert payload["preview_snapshot"]["opaque"].startswith("<_io.BufferedReader")
+
+
+def test_build_capture_from_payload_preserves_every_stable_capture_field() -> None:
+    metadata_fields = {
+        "summary_json_path",
+        "summary_json_written",
+        "checklist_results_path",
+        "checklist_results_written",
+        "evidence_contract_version",
+        "acceptance_tier",
+        "gate_verdict",
+        "evidence_validation_passed",
+        "evidence_validation_errors",
+        "evidence_validation_warnings",
+    }
+    payload: dict[str, object] = {}
+    for index, field in enumerate(fields(Phase3HarnessCapture)):
+        if field.name in metadata_fields:
+            continue
+        if field.name in {
+            "evidence_validation_errors",
+            "evidence_validation_warnings",
+            "errors",
+            "signed_runs",
+            "captured_states",
+            "captured_state_transition_diagnostics",
+        }:
+            value: object = (f"{field.name}-{index}",)
+        elif field.name == "interaction_counts":
+            value = {field.name: index}
+        elif field.name.endswith("_snapshot") or field.name == "preview_snapshot":
+            value = {field.name: index}
+        else:
+            value = f"{field.name}-{index}"
+        payload[field.name] = value
+
+    contract = SimpleNamespace(
+        contract_version="evidence-contract-test",
+        acceptance_tier="gate_candidate",
+        gate_verdict="gate_candidate",
+        passed=True,
+        errors=(),
+        warnings=(),
+    )
+    capture = build_capture_from_payload(
+        capture_payload=payload,
+        contract=contract,
+        summary_json_path="artifacts/summary.json",
+        checklist_results_path="artifacts/checklist.md",
+        checklist_results_written=True,
+    )
+
+    for field in fields(Phase3HarnessCapture):
+        if field.name in metadata_fields:
+            continue
+        assert getattr(capture, field.name) == payload[field.name]
+    assert capture.evidence_contract_version == contract.contract_version
+    assert capture.acceptance_tier == contract.acceptance_tier
+    assert capture.gate_verdict == contract.gate_verdict
+    assert capture.evidence_validation_passed is contract.passed
+    assert capture.evidence_validation_errors == contract.errors
+    assert capture.evidence_validation_warnings == contract.warnings
+    assert capture.summary_json_written is True
+    assert capture.checklist_results_written is True
+    serialized = capture.to_json()
+    assert serialized == json.dumps(json.loads(serialized), indent=2, sort_keys=True)
 
 
 def test_phase3_harness_capture_to_json_serializes_captured_states() -> None:
@@ -1159,7 +1229,7 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
             )
         )
 
-    runner = InteractiveEvidenceRunner(
+    runner = InteractiveCaptureEngine(
         load_qt_harness_bindings=phase3_harness_module._load_qt_harness_bindings,
         load_page_count=phase3_harness_module._load_page_count,
         render_backend_factory=phase3_harness_module.QtPdfRenderBackend,
@@ -1188,9 +1258,9 @@ def test_run_phase3_signing_harness_orchestrates_session_and_reporting(
                 last_signing_result=None,
             )
         ),
-        capture_assembler=phase3_harness_module._build_phase3_harness_capture_assembler(),
+        capture_assembler=phase3_harness_module.build_capture_assembler(),
         contract_evaluator=evaluate_phase3_evidence_contract,
-        capture_factory=phase3_harness_module._build_phase3_harness_capture,
+        capture_factory=build_capture_from_payload,
         checklist_renderer=lambda *_args, **_kwargs: "",
         report_finalizer=fake_finalize,
         artifact_policy=InteractiveEvidenceArtifactPolicy(
@@ -1242,10 +1312,10 @@ def test_phase3_harness_capture_orchestrates_session_and_reporting(
             )
 
     monkeypatch.setattr(
-        "foliaseal.presentation.qt.evidence_runner_factories.build_interactive_evidence_runner",
+        "foliaseal.presentation.qt.evidence_runner_factories.build_interactive_capture_engine",
         lambda: _FakeInteractivePort(),
     )
-    capture = build_interactive_evidence_capture_runner()(
+    capture = build_interactive_capture_operation()(
         EvidenceCaptureRequest(
             pdf_path=str(input_pdf),
             certificate_path=str(cert_path),

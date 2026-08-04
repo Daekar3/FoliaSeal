@@ -19,7 +19,7 @@ from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
 )
 from foliaseal.presentation.qt.evidence_runner_factories import (
-    build_interactive_evidence_operation,
+    build_interactive_capture_operation,
     build_preview_evidence_operation,
     build_signed_acceptance_evidence_operation,
 )
@@ -134,7 +134,7 @@ def build_default_evidence_service(
         )
 
     return EvidenceService(
-        harness_runner=build_interactive_evidence_operation(),
+        harness_runner=build_interactive_capture_operation(),
         preview_matrix_runner=build_preview_evidence_operation(),
         signed_acceptance_matrix_runner=(
             matrix_runner or build_signed_acceptance_evidence_operation()

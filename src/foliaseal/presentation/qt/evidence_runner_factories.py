@@ -31,7 +31,7 @@ class _LazyOperation:
 
 if TYPE_CHECKING:
     from foliaseal.presentation.qt.evidence_interactive_capture import (
-        InteractiveEvidenceRunner,
+        InteractiveCaptureEngine,
         Phase3HarnessCapture,
     )
     from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
@@ -42,20 +42,21 @@ if TYPE_CHECKING:
     )
 else:
     Phase3HarnessCapture = Any
-    InteractiveEvidenceRunner = Any
+    InteractiveCaptureEngine = Any
     Phase3PreviewMatrixRunner = Any
     Phase3SignedAcceptanceMatrixRunner = Any
 
 
-def build_interactive_evidence_runner() -> InteractiveEvidenceRunner:
-    """Build the interactive runner only after a capture is requested."""
+def build_interactive_capture_engine() -> InteractiveCaptureEngine:
+    """Build the interactive capture engine only after a request is made."""
 
     from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
     from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
     from foliaseal.presentation.qt import phase3_harness as harness
     from foliaseal.presentation.qt.evidence_interactive_capture import (
+        InteractiveCaptureEngine,
         InteractiveEvidenceArtifactPolicy,
-        InteractiveEvidenceRunner,
+        build_capture_from_payload,
         default_harness_artifacts_dir,
         default_harness_output_pdf_path,
         write_optional_text,
@@ -67,16 +68,16 @@ def build_interactive_evidence_runner() -> InteractiveEvidenceRunner:
         finalize_phase3_harness_report,
     )
 
-    return InteractiveEvidenceRunner(
+    return InteractiveCaptureEngine(
         load_qt_harness_bindings=harness._load_qt_harness_bindings,
         load_page_count=harness._load_page_count,
         render_backend_factory=harness.QtPdfRenderBackend,
         profile_store_factory=harness.SignaturePresetCatalogStore.default,
         build_phase3_signing_executor=build_phase3_signing_executor,
-        session_runner=harness._build_phase3_harness_session_runner(),
-        capture_assembler=harness._build_phase3_harness_capture_assembler(),
+        session_runner=harness.build_interactive_session_runner(),
+        capture_assembler=harness.build_capture_assembler(),
         contract_evaluator=evaluate_phase3_evidence_contract,
-        capture_factory=harness._build_phase3_harness_capture,
+        capture_factory=build_capture_from_payload,
         checklist_renderer=render_phase3_checklist_results_markdown,
         report_finalizer=finalize_phase3_harness_report,
         artifact_policy=InteractiveEvidenceArtifactPolicy(
@@ -91,6 +92,7 @@ def build_preview_evidence_runner() -> Phase3PreviewMatrixRunner:
     """Build the headless preview runner lazily."""
 
     from foliaseal.presentation.qt import phase3_harness as harness
+    from foliaseal.presentation.qt.evidence_interactive_capture import jsonable_capture
     from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
         Phase3PreviewMatrixRunner,
         Phase3PreviewMatrixRunnerDeps,
@@ -104,7 +106,7 @@ def build_preview_evidence_runner() -> Phase3PreviewMatrixRunner:
             ),
             preview_matrix_error_result=harness._preview_matrix_error_result,
             preview_matrix_diagnostic_summary=harness._preview_matrix_diagnostic_summary,
-            jsonable_capture=harness._jsonable_capture,
+            jsonable_capture=jsonable_capture,
             profile_store_factory=harness.SignaturePresetCatalogStore.default,
         )
     )
@@ -116,6 +118,7 @@ def build_signed_acceptance_evidence_runner() -> Phase3SignedAcceptanceMatrixRun
     from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
     from foliaseal.infra.tsa import build_dummy_timestamper
     from foliaseal.presentation.qt import phase3_harness as harness
+    from foliaseal.presentation.qt.evidence_interactive_capture import jsonable_capture
     from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
         Phase3SignedAcceptanceMatrixRunner,
         Phase3SignedAcceptanceMatrixRunnerDeps,
@@ -136,23 +139,23 @@ def build_signed_acceptance_evidence_runner() -> Phase3SignedAcceptanceMatrixRun
             evaluate_signed_matrix_acceptance_expectations=(
                 harness._evaluate_signed_matrix_acceptance_expectations
             ),
-            jsonable_capture=harness._jsonable_capture,
+            jsonable_capture=jsonable_capture,
             render_backend_factory=harness.QtPdfRenderBackend,
         )
     )
 
 
-def build_interactive_evidence_operation() -> Callable[
+def build_interactive_capture_operation() -> Callable[
     [EvidenceCaptureRequest], Phase3HarnessCapture
 ]:
     """Return a lazy request callable for interactive capture."""
 
-    runner: InteractiveEvidenceRunner | None = None
+    runner: InteractiveCaptureEngine | None = None
 
     def run(request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
         nonlocal runner
         if runner is None:
-            runner = build_interactive_evidence_runner()
+            runner = build_interactive_capture_engine()
         return runner.run(request)
 
     return run
