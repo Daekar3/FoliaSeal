@@ -292,7 +292,7 @@ Record concise evidence here at completion:
     import isolation: neutral analysis module remains Qt-free
     process/artifact audit: pass; worktree clean, no FoliaSeal/Python process running, and no generated untracked PNG/PDF/JSON artifacts
     implementation commit: 334184d90
-    plan-closure commit: pending this docs-only follow-up commit (record its hash after creation)
+    plan-closure commit: 4a4984ce5 (`docs: close preview analysis execplan`)
 
 Generated PNGs, PDFs, debug overlays, certificates, and dialogs must be
 temporary or ignored and must be removed after validation. No GUI process may
