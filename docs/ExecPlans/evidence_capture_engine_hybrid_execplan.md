@@ -140,8 +140,8 @@ the migration, not as live APIs.
 Validation: focused capture/evidence slice 112 passed with one existing Pillow
 deprecation warning; full suite 1028 passed with the same warning. Ruff,
 compileall, diff-check, and process/artifact audits passed. The implementation
-and documentation were committed together; the final commit hash is recorded
-in the closure revision below (`7cd6b28cf`).
+and architecture documentation were committed together in `7cd6b28cf`; the
+final plan evidence was closed in `8eddbf74c`.
 
 ## Context and Orientation
 
@@ -322,4 +322,5 @@ Qt lifecycle, matrices, stable evidence fields, and external Phase 3 names
 outside the destructive rename scope.
 
 2026-08-03: Completed implementation, architecture review, documentation
-reconciliation, full validation, and process cleanup in commit `7cd6b28cf`.
+reconciliation, full validation, and process cleanup in `7cd6b28cf`; closed
+the final evidence and plan state in `8eddbf74c`.
