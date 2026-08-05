@@ -286,3 +286,120 @@ def test_session_runner_returns_raw_session_state(
     assert len(workspace_holder["workspace"].capture_snapshot_commands) == 3
     assert result.last_signing_result is not None
     assert result.last_signing_result.success is True
+
+
+@pytest.mark.parametrize("failure_stage", ["shell", "workspace", "refresh"])
+def test_session_runner_closes_window_when_setup_fails(
+    tmp_path: Path,
+    failure_stage: str,
+) -> None:
+    window_holder = {}
+
+    class _Signal:
+        def connect(self, callback):
+            self.callback = callback
+
+    class _Button:
+        def __init__(self, label: str) -> None:
+            self.label = label
+            self.clicked = _Signal()
+
+    class _Widget:
+        def setLayout(self, layout):  # noqa: N802
+            self.layout = layout
+
+    class _Layout:
+        def __init__(self, parent=None) -> None:
+            if parent is not None:
+                parent.setLayout(self)
+
+        def addLayout(self, layout, *args):  # noqa: N802
+            return None
+
+        def addWidget(self, widget, *args):  # noqa: N802
+            return None
+
+        def addStretch(self, value):  # noqa: N802
+            return None
+
+    class _Window:
+        def __init__(self) -> None:
+            self.closed = False
+            window_holder["window"] = self
+
+        def setWindowTitle(self, title):  # noqa: N802
+            return None
+
+        def resize(self, width, height):  # noqa: N802
+            return None
+
+        def setCentralWidget(self, widget):  # noqa: N802
+            return None
+
+        def close(self):
+            self.closed = True
+
+    class _Application:
+        @classmethod
+        def instance(cls):
+            return None
+
+        def __init__(self, args=None) -> None:
+            return None
+
+    class _Shell:
+        viewer_widget = SimpleNamespace()
+
+        def refresh_viewer(self):
+            if failure_stage == "refresh":
+                raise RuntimeError("refresh failed")
+
+        def setFocus(self):  # noqa: N802
+            return None
+
+        def submit_sign_request(self):
+            return None
+
+    def build_shell(**kwargs):
+        if failure_stage == "shell":
+            raise RuntimeError("shell failed")
+        return _Shell()
+
+    def build_workspace(shell):
+        if failure_stage == "workspace":
+            raise RuntimeError("workspace failed")
+        return SimpleNamespace()
+
+    bindings = runner_module._QtHarnessBindings(
+        q_application=_Application,
+        q_main_window=_Window,
+        q_widget=_Widget,
+        q_v_box_layout=_Layout,
+        q_h_box_layout=_Layout,
+        q_group_box=_Widget,
+        q_push_button=_Button,
+        q_label=lambda text="": SimpleNamespace(setText=lambda value: None),
+        q_plain_text_edit=_Widget,
+        qpdf_document=object,
+    )
+    runner = runner_module.Phase3HarnessSessionRunner(
+        deps=Phase3HarnessSessionRunnerDeps(
+            build_qt_signing_shell=build_shell,
+            build_workspace=build_workspace,
+            default_harness_output_pdf_path=lambda **kwargs: str(tmp_path / "out.pdf"),
+        )
+    )
+
+    with pytest.raises(RuntimeError, match=failure_stage):
+        runner.run(
+            bindings=bindings,
+            source_path=tmp_path / "input.pdf",
+            artifacts_dir=None,
+            viewer_workflow=SimpleNamespace(),
+            signing_workflow=SimpleNamespace(),
+            profile_store=object(),
+            sign_executor=object(),
+            capture_assembler=SimpleNamespace(),
+        )
+
+    assert window_holder["window"].closed is True

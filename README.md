@@ -184,8 +184,8 @@ Phase 3 evidence command pipeline and signed lifecycle:
   that same path in the persisted mapping.
 - CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
 
-The evidence-harness nomenclature slice passes 135 focused evidence/service/runner/CLI tests and
-1,031 full-suite tests, with Ruff clean and one existing Pillow deprecation warning. The
+The evidence-harness runtime/projection slice passes 143 focused evidence/service/runner/CLI tests and
+1,037 full-suite tests, with Ruff clean and one existing Pillow deprecation warning. The
 release-fidelity contract remains the bounded eight-scenario corpus: all 8 preview scenarios pass;
 the signed matrix covers 8 scenarios with 6 successful signings and 2 intentional fit rejections,
 and `acceptance_expectations_passed=true`.
@@ -215,15 +215,17 @@ isolating a run. Preview and signed matrices are injected as separate lazy opera
 `build_interactive_capture_operation()` factory. These factories construct their
 Qt/runtime graphs only on first use. Application package exports
 are also lazy so importing a focused presentation module does not eagerly load optional GUI/runtime
-dependencies. `evidence_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
+dependencies. `evidence_harness_runtime.py` owns the typed lazy capture/preview/signed operation
+bundle and `evidence_harness_projection.py` owns pure matrix error, diagnostic, and expectation
+projection. `evidence_interactive_capture.py` owns the `Phase3HarnessCapture` result contract,
 `InteractiveCaptureEngine`, `build_capture_from_payload()` projection, JSON normalization, and
 artifact policy; `evidence_runner_factories.py` owns
 `build_interactive_capture_engine()`, `build_interactive_capture_operation()`, and neutral lazy
-runner/operation construction; `evidence_artifacts.py` owns preview/signed summary artifact
-publication; `phase3_harness.py`
-remains the Qt composition root that builds the concrete runner dependencies; its private
-composition helpers use neutral evidence terminology even though the module path and public
-`Phase3*` names remain compatibility contracts. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
+runner construction; `evidence_artifacts.py` owns preview/signed summary artifact publication;
+`phase3_harness.py` remains the Qt composition root that builds concrete runner dependencies. Public
+`phase3-signing-*` commands, `Phase3*` DTOs, serialized fields, artifact paths, and historical module
+paths remain compatibility contracts; internal phase3 nomenclature, duplicate forwarding wrappers,
+and deleted private projection helpers are stripped. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
 scenario sweep, processes events between scenarios, and closes that shell in its cleanup path.
 
 The external Phase 3 surface remains stable: CLI command names such as

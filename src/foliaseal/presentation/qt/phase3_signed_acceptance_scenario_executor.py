@@ -108,14 +108,6 @@ class Phase3SignedAcceptanceScenarioExecutor:
 
     deps: Phase3SignedAcceptanceScenarioExecutorDeps
 
-    def run(
-        self,
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        """Return the legacy mapping shape for existing runner callers."""
-
-        return self.run_result(**kwargs).as_mapping()
-
     def run_result(
         self,
         *,

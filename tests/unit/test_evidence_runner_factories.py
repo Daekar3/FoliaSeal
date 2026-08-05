@@ -6,6 +6,7 @@ import pytest
 
 from foliaseal.application.evidence_service import EvidenceMatrixRequest
 from foliaseal.presentation.qt import evidence_runner_factories
+from foliaseal.presentation.qt.evidence_harness_runtime import EvidenceHarnessRuntime
 
 
 def _request() -> EvidenceMatrixRequest:
@@ -18,6 +19,25 @@ def _request() -> EvidenceMatrixRequest:
     )
 
 
+def test_evidence_harness_runtime_exposes_only_explicit_lazy_operations() -> None:
+    runtime = EvidenceHarnessRuntime(
+        capture_operation=lambda request: ("capture", request),
+        preview_matrix_operation=lambda request: {"kind": "preview", "request": request},
+        signed_acceptance_matrix_operation=lambda request: {
+            "kind": "signed",
+            "request": request,
+        },
+    )
+    request = _request()
+
+    assert runtime.capture("capture-request") == ("capture", "capture-request")
+    assert runtime.preview_matrix(request) == {"kind": "preview", "request": request}
+    assert runtime.signed_acceptance_matrix(request) == {
+        "kind": "signed",
+        "request": request,
+    }
+
+
 def test_matrix_operation_builder_is_lazy_and_forwards_typed_requests() -> None:
     calls: list[str] = []
     request = _request()
@@ -25,16 +45,22 @@ def test_matrix_operation_builder_is_lazy_and_forwards_typed_requests() -> None:
     def build_preview():
         calls.append("preview_factory")
 
-        def preview(received):
-            calls.append(f"preview:{received.pdf_path}")
-            assert received == request
-            return {"scenario_count": 8}
+        class PreviewRunner:
+            def run(self, **kwargs):
+                calls.append(f"preview:{kwargs['pdf_path']}")
+                assert kwargs["pdf_path"] == request.pdf_path
+                return {"scenario_count": 8}
 
-        return preview
+        return PreviewRunner()
 
     def build_signed():
         calls.append("signed_factory")
-        return lambda _received: {"scenario_count": 8}
+
+        class SignedRunner:
+            def run(self, **_kwargs):
+                return {"scenario_count": 8}
+
+        return SignedRunner()
 
     operation = evidence_runner_factories._build_matrix_operation(build_preview)
 
@@ -49,7 +75,11 @@ def test_matrix_operation_constructs_its_runner_once() -> None:
     def preview_factory():
         nonlocal factory_count
         factory_count += 1
-        return lambda _request: {"kind": "preview"}
+        class PreviewRunner:
+            def run(self, **_kwargs):
+                return {"kind": "preview"}
+
+        return PreviewRunner()
 
     operation = evidence_runner_factories._build_matrix_operation(preview_factory)
 
@@ -166,9 +196,11 @@ print(json.dumps(loaded))
 
 def test_matrix_operation_preserves_raw_mapping_results() -> None:
     expected = {"scenario_count": 8, "results": [{"name": "baseline"}]}
-    operation = evidence_runner_factories._build_matrix_operation(
-        lambda: lambda _request: expected
-    )
+    class PreviewRunner:
+        def run(self, **_kwargs):
+            return expected
+
+    operation = evidence_runner_factories._build_matrix_operation(lambda: PreviewRunner())
 
     assert operation(_request()) is expected
 

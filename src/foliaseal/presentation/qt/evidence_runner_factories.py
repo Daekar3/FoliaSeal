@@ -15,6 +15,7 @@ from foliaseal.application.evidence_service import (
     EvidenceCaptureRequest,
     EvidenceMatrixRequest,
 )
+from foliaseal.presentation.qt.evidence_harness_runtime import EvidenceHarnessRuntime
 
 MatrixOperation = Callable[[EvidenceMatrixRequest], Mapping[str, Any]]
 
@@ -92,6 +93,10 @@ def build_preview_evidence_runner() -> Phase3PreviewMatrixRunner:
     """Build the headless preview runner lazily."""
 
     from foliaseal.presentation.qt import phase3_harness as harness
+    from foliaseal.presentation.qt.evidence_harness_projection import (
+        preview_matrix_diagnostic_summary,
+        preview_matrix_error_result,
+    )
     from foliaseal.presentation.qt.evidence_interactive_capture import jsonable_capture
     from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
         Phase3PreviewMatrixRunner,
@@ -104,8 +109,8 @@ def build_preview_evidence_runner() -> Phase3PreviewMatrixRunner:
             execute_headless_preview_matrix_scenario=(
                 harness._execute_headless_preview_matrix_scenario
             ),
-            preview_matrix_error_result=harness._preview_matrix_error_result,
-            preview_matrix_diagnostic_summary=harness._preview_matrix_diagnostic_summary,
+            preview_matrix_error_result=preview_matrix_error_result,
+            preview_matrix_diagnostic_summary=preview_matrix_diagnostic_summary,
             jsonable_capture=jsonable_capture,
             profile_store_factory=harness.SignaturePresetCatalogStore.default,
         )
@@ -118,6 +123,11 @@ def build_signed_acceptance_evidence_runner() -> Phase3SignedAcceptanceMatrixRun
     from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
     from foliaseal.infra.tsa import build_dummy_timestamper
     from foliaseal.presentation.qt import phase3_harness as harness
+    from foliaseal.presentation.qt.evidence_harness_projection import (
+        evaluate_signed_matrix_acceptance_expectations,
+        preview_matrix_error_result,
+        signed_matrix_diagnostic_summary,
+    )
     from foliaseal.presentation.qt.evidence_interactive_capture import jsonable_capture
     from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
         Phase3SignedAcceptanceMatrixRunner,
@@ -134,10 +144,10 @@ def build_signed_acceptance_evidence_runner() -> Phase3SignedAcceptanceMatrixRun
             build_qt_signing_shell=harness.build_qt_signing_shell,
             build_workspace=harness._build_preview_matrix_qt_workspace,
             execute_signed_acceptance_scenario=harness._execute_signed_acceptance_scenario,
-            preview_matrix_error_result=harness._preview_matrix_error_result,
-            signed_matrix_diagnostic_summary=harness._signed_matrix_diagnostic_summary,
+            preview_matrix_error_result=preview_matrix_error_result,
+            signed_matrix_diagnostic_summary=signed_matrix_diagnostic_summary,
             evaluate_signed_matrix_acceptance_expectations=(
-                harness._evaluate_signed_matrix_acceptance_expectations
+                evaluate_signed_matrix_acceptance_expectations
             ),
             jsonable_capture=jsonable_capture,
             render_backend_factory=harness.QtPdfRenderBackend,
@@ -170,8 +180,6 @@ def _build_matrix_operation(
         nonlocal runner
         if runner is None:
             runner = runner_factory()
-        if callable(runner) and not hasattr(runner, "run"):
-            return runner(request)
         return runner.run(
             pdf_path=request.pdf_path,
             certificate_path=request.certificate_path,
@@ -193,3 +201,13 @@ def build_signed_acceptance_evidence_operation() -> MatrixOperation:
     """Return a lazy request callable for signed-acceptance matrices."""
 
     return _build_matrix_operation(build_signed_acceptance_evidence_runner)
+
+
+def build_evidence_harness_runtime() -> EvidenceHarnessRuntime:
+    """Build explicit lazy evidence operations without loading heavy adapters."""
+
+    return EvidenceHarnessRuntime(
+        capture_operation=build_interactive_capture_operation(),
+        preview_matrix_operation=build_preview_evidence_operation(),
+        signed_acceptance_matrix_operation=build_signed_acceptance_evidence_operation(),
+    )

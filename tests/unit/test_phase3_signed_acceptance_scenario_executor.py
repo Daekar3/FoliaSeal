@@ -81,7 +81,7 @@ def test_signed_acceptance_scenario_executor_returns_preview_only_result_without
     execute_calls: list[object] = []
     sign_executor = SimpleNamespace(execute=lambda request: execute_calls.append(request))
 
-    result = executor.run(
+    result = executor.run_result(
         shell=shell,
         scenario={"name": "Scenario A", "expected_outcome": "validation_rejection"},
         profile_store=object(),
@@ -92,15 +92,16 @@ def test_signed_acceptance_scenario_executor_returns_preview_only_result_without
         sign_executor=sign_executor,
     )
 
-    assert result["name"] == "Scenario A"
-    assert result["expected_outcome"] == "validation_rejection"
-    assert result["preview_text"] == "Preview text"
-    assert result["validation_text"] == "Ready to sign."
-    assert result["preview_snapshot"]["render_capture"] == {"rendered": True}
-    assert result["sign_request_snapshot"] is None
-    assert result["backend_reservation_snapshot"] is None
-    assert result["signing_result"] is None
-    assert result["output_file_exists"] is False
+    result_mapping = result.as_mapping()
+    assert result_mapping["name"] == "Scenario A"
+    assert result_mapping["expected_outcome"] == "validation_rejection"
+    assert result_mapping["preview_text"] == "Preview text"
+    assert result_mapping["validation_text"] == "Ready to sign."
+    assert result_mapping["preview_snapshot"]["render_capture"] == {"rendered": True}
+    assert result_mapping["sign_request_snapshot"] is None
+    assert result_mapping["backend_reservation_snapshot"] is None
+    assert result_mapping["signing_result"] is None
+    assert result_mapping["output_file_exists"] is False
     assert execute_calls == []
     assert workspace.capture_snapshot_commands == [
         Phase3HarnessCaptureCommand(
@@ -163,7 +164,7 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
         },
     )
 
-    result = executor.run(
+    result = executor.run_result(
         shell=shell,
         scenario={
             "name": "Scenario B",
@@ -200,17 +201,18 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
         )
     ]
 
-    assert result["profile_name"] == "Default"
-    assert result["expected_outcome"] == "success"
-    assert result["backend_reservation_snapshot"] == {"reserved": True}
-    assert result["sign_request_snapshot"] == {
+    result_mapping = result.as_mapping()
+    assert result_mapping["profile_name"] == "Default"
+    assert result_mapping["expected_outcome"] == "success"
+    assert result_mapping["backend_reservation_snapshot"] == {"reserved": True}
+    assert result_mapping["sign_request_snapshot"] == {
         "input_pdf_path": request.input_pdf_path,
         "output_pdf_path": request.output_pdf_path,
     }
-    assert result["signing_result"] == {"success": True}
-    assert result["output_file_exists"] is True
-    assert result["output_signature_count"] == 2
-    assert result["signed_output_preview_comparison"] == {"comparison_path": "cmp.png"}
+    assert result_mapping["signing_result"] == {"success": True}
+    assert result_mapping["output_file_exists"] is True
+    assert result_mapping["output_signature_count"] == 2
+    assert result_mapping["signed_output_preview_comparison"] == {"comparison_path": "cmp.png"}
 
 
 def test_signed_acceptance_scenario_executor_exposes_typed_result_without_changing_mapping(

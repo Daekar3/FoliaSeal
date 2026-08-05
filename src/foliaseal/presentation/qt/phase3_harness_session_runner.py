@@ -105,6 +105,11 @@ class Phase3HarnessSessionRunner:
         shell: Any
         workspace: Phase3HarnessWorkspacePort
 
+        def close_window() -> None:
+            close = getattr(window, "close", None)
+            if callable(close):
+                close()
+
         def refocus_shell() -> None:
             focus_setter = getattr(shell, "setFocus", None)
             if callable(focus_setter):
@@ -158,16 +163,20 @@ class Phase3HarnessSessionRunner:
                 )
             )
 
-        shell = self.deps.build_qt_signing_shell(
-            viewer_workflow=viewer_workflow,
-            signing_workflow=signing_workflow,
-            preset_catalog_store=profile_store,
-            sign_executor=sign_executor,
-            on_sign_request=on_sign_request,
-            on_error=on_error,
-            on_status_change=on_status_change,
-        )
-        workspace = self.deps.build_workspace(shell)
+        try:
+            shell = self.deps.build_qt_signing_shell(
+                viewer_workflow=viewer_workflow,
+                signing_workflow=signing_workflow,
+                preset_catalog_store=profile_store,
+                sign_executor=sign_executor,
+                on_sign_request=on_sign_request,
+                on_error=on_error,
+                on_status_change=on_status_change,
+            )
+            workspace = self.deps.build_workspace(shell)
+        except Exception:
+            close_window()
+            raise
         body_layout.addWidget(shell, 1)
 
         def do_refresh() -> None:
@@ -240,8 +249,12 @@ class Phase3HarnessSessionRunner:
         toolbar.addStretch(1)
         toolbar.addWidget(capture_count_label)
 
-        shell.refresh_viewer()
-        first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
+        try:
+            shell.refresh_viewer()
+            first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
+        except Exception:
+            close_window()
+            raise
 
         try:
             window.show()
@@ -267,6 +280,4 @@ class Phase3HarnessSessionRunner:
                 last_signing_result=last_signing_result,
             )
         finally:
-            close_window = getattr(window, "close", None)
-            if callable(close_window):
-                close_window()
+            close_window()

@@ -19,9 +19,7 @@ from foliaseal.application.qa_evidence_contract import (
     evaluate_phase3_evidence_contract,
 )
 from foliaseal.presentation.qt.evidence_runner_factories import (
-    build_interactive_capture_operation,
-    build_preview_evidence_operation,
-    build_signed_acceptance_evidence_operation,
+    build_evidence_harness_runtime,
 )
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
@@ -133,11 +131,12 @@ def build_default_evidence_service(
             suppress_layout_warnings=name == "signed_fit_rejection_matrix"
         )
 
+    runtime = build_evidence_harness_runtime()
     return EvidenceService(
-        harness_runner=build_interactive_capture_operation(),
-        preview_matrix_runner=build_preview_evidence_operation(),
+        harness_runner=runtime.capture,
+        preview_matrix_runner=runtime.preview_matrix,
         signed_acceptance_matrix_runner=(
-            matrix_runner or build_signed_acceptance_evidence_operation()
+            matrix_runner or runtime.signed_acceptance_matrix
         ),
         asset_generator=asset_generator,
         capture_contract_evaluator=evaluate_phase3_evidence_contract,

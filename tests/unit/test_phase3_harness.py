@@ -50,6 +50,12 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
+from foliaseal.presentation.qt.evidence_harness_projection import (
+    evaluate_signed_matrix_acceptance_expectations,
+    preview_matrix_diagnostic_summary,
+    preview_matrix_error_result,
+    signed_matrix_diagnostic_summary,
+)
 from foliaseal.presentation.qt.evidence_interactive_capture import (
     InteractiveCaptureEngine,
     InteractiveEvidenceArtifactPolicy,
@@ -64,13 +70,9 @@ from foliaseal.presentation.qt.evidence_runner_factories import (
 )
 from foliaseal.presentation.qt.phase3_harness import (
     _capture_headless_preview_render,
-    _evaluate_signed_matrix_acceptance_expectations,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
-    _preview_matrix_diagnostic_summary,
-    _preview_matrix_error_result,
     _render_signed_annotation_appearance_direct,
-    _signed_matrix_diagnostic_summary,
     _snapshot_preview,
     _widget_application,
     _widget_is_visible,
@@ -851,7 +853,7 @@ def test_pdf_snapshotter_reports_cryptographic_details(tmp_path: Path) -> None:
 
 
 def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
-    summary = _signed_matrix_diagnostic_summary(
+    summary = signed_matrix_diagnostic_summary(
         [
             {
                 "name": "expected_success_but_failed",
@@ -898,7 +900,7 @@ def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
 
 
 def test_evaluate_signed_matrix_acceptance_expectations_flags_contract_failures() -> None:
-    passed, errors = _evaluate_signed_matrix_acceptance_expectations(
+    passed, errors = evaluate_signed_matrix_acceptance_expectations(
         summary={
             "scenario_count": 10,
             "successful_signing_run_count": 6,
@@ -2069,7 +2071,7 @@ def test_widget_is_visible_supports_real_and_fake_widget_shapes() -> None:
 
 
 def test_preview_matrix_error_result_records_scenario_name_and_error_type() -> None:
-    result = _preview_matrix_error_result(
+    result = preview_matrix_error_result(
         scenario={"name": "Broken Scenario", "profile_name": "Saved Profile"},
         error=ValueError("bad border width"),
     )
@@ -2083,7 +2085,7 @@ def test_preview_matrix_error_result_records_scenario_name_and_error_type() -> N
 
 
 def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
-    summary = _preview_matrix_diagnostic_summary(
+    summary = preview_matrix_diagnostic_summary(
         [
             {
                 "preview_snapshot": {
