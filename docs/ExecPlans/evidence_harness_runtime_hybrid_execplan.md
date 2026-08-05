@@ -51,9 +51,8 @@ unless a live source consumer is demonstrated.
   its test-only callers to `run_result()`.
 - [x] (2026-08-05) Ran focused/full validation and reconciled the release preview/signed matrix evidence.
 - [x] (2026-08-05) Completed architecture/spec compliance review and documentation updates.
-- [x] (2026-08-05) Created implementation commit `9a626f1ea`; after the
-  subsequent compliance cleanup, create the plan-closure commit and verify a
-  clean main worktree.
+- [x] (2026-08-05) Created implementation commit `9a626f1ea` and plan-closure
+  commit `956ae34b8`; verified a clean main worktree.
 
 ## Surprises & Discoveries
 
@@ -251,7 +250,7 @@ Record final evidence here:
        removed compatibility/nomenclature: internal phase3 aliases, duplicate forwarding wrappers, private matrix projection helpers, and signed mapping wrapper
        compliance/doc review: complete; ARCHITECTURE.md and README.md reconciled 2026-08-05
        implementation commit: 9a626f1ea (Refactor evidence harness runtime and projections)
-       plan-closure commit: <fill during closure>
+       plan-closure commit: 956ae34b8 (Close evidence harness runtime execution plan)
 
 ## Interfaces and Dependencies
 
