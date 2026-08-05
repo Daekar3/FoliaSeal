@@ -57,6 +57,8 @@ counts and summaries, and import/lifecycle/artifact audits remain clean.
   the signed executor; updated it to the typed `run_result()` entry point.
 - [x] (2026-08-04) Completed compliance review and documentation
   reconciliation; source/test changes are ready for the focused commit.
+- [x] (2026-08-04) Created focused implementation commit `c8c0210d2` and
+  verified the `main` worktree is clean.
 
 ## Surprises & Discoveries
 
@@ -96,7 +98,7 @@ counts and summaries, and import/lifecycle/artifact audits remain clean.
 
 ## Outcomes & Retrospective
 
-The private Qt composition helpers now use neutral evidence terminology, and
+Completed 2026-08-04. The private Qt composition helpers now use neutral evidence terminology, and
 the signed scenario executor has one typed `run_result()` path. The unused
 checklist helper, signed `run(...)` fallback, and duplicate analysis-engine
 assignment were removed or confirmed absent. Public `Phase3*` DTOs, CLI
@@ -267,7 +269,7 @@ Record final evidence here during execution:
        signed matrix: 8 scenarios; 6 successful signings; 2 matched intentional fit rejections; acceptance_expectations_passed=true
        removed private aliases/fallbacks: neutral private composition names; unused checklist helper; signed run(...) fallback; duplicate analysis_engine assignment absent
        documentation/compliance review: README.md, docs/ARCHITECTURE.md, and this ExecPlan reconciled; historical Phase3 module/DTO/CLI references retained where contractual
-       implementation commit: pending focused commit
+       implementation commit: c8c0210d2
 
 ## Interfaces and Dependencies
 
@@ -299,6 +301,7 @@ renaming public Phase 3 DTOs or CLI commands, changing serialized schemas,
 altering signing/layout semantics, broad render-module extraction, certificate
 behavior, or unrelated GUI styling.
 
-Revision note: created 2026-08-04 after the required explorer review. The plan
-intentionally strips obsolete internal nomenclature while preserving external
-evidence compatibility contracts.
+Revision note: created 2026-08-04 after the required explorer review; closed
+2026-08-04 with implementation commit `c8c0210d2`. The plan intentionally
+strips obsolete internal nomenclature while preserving external evidence
+compatibility contracts.
