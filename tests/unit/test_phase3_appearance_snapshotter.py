@@ -4,7 +4,7 @@ import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 
 
 def _snapshotter():
-    return phase3_harness_module._build_phase3_appearance_snapshotter()
+    return phase3_harness_module._build_appearance_snapshotter()
 
 
 def test_preview_appearance_snapshotter_restores_border_style_when_missing() -> None:

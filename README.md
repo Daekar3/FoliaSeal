@@ -184,10 +184,11 @@ Phase 3 evidence command pipeline and signed lifecycle:
   that same path in the persisted mapping.
 - CLI command names, printed labels, exit behavior, and raw summary fields remain unchanged.
 
-The orchestrator slice passes 59 focused evidence/service/runner/CLI tests and 1,032 full-suite
-tests, with Ruff clean and one existing Pillow deprecation warning. The release-fidelity contract
-remains the bounded eight-scenario corpus: six supported signings, two intentional fit rejections,
-zero acceptance failure counters, and zero preview/output comparison or annotation mismatches.
+The evidence-harness nomenclature slice passes 135 focused evidence/service/runner/CLI tests and
+1,031 full-suite tests, with Ruff clean and one existing Pillow deprecation warning. The
+release-fidelity contract remains the bounded eight-scenario corpus: all 8 preview scenarios pass;
+the signed matrix covers 8 scenarios with 6 successful signings and 2 intentional fit rejections,
+and `acceptance_expectations_passed=true`.
 
 Reusable Python callers can bind one PDF and its credentials once, then run the common evidence
 operations through the document-bound session:
@@ -220,7 +221,9 @@ artifact policy; `evidence_runner_factories.py` owns
 `build_interactive_capture_engine()`, `build_interactive_capture_operation()`, and neutral lazy
 runner/operation construction; `evidence_artifacts.py` owns preview/signed summary artifact
 publication; `phase3_harness.py`
-remains the Qt composition root that builds the concrete runner dependencies. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
+remains the Qt composition root that builds the concrete runner dependencies; its private
+composition helpers use neutral evidence terminology even though the module path and public
+`Phase3*` names remain compatibility contracts. The signed-acceptance matrix operation creates one Qt shell/lifecycle for the
 scenario sweep, processes events between scenarios, and closes that shell in its cleanup path.
 
 The external Phase 3 surface remains stable: CLI command names such as

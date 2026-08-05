@@ -37,7 +37,7 @@ def build_phase3_checklist_results_markdown(
     """Render a run-specific Phase 3 checklist seeded from the immutable template."""
 
     template = Path(checklist_template_path).read_text(encoding="utf-8")
-    auto_checked_items = _derive_phase3_auto_checked_items(capture)
+    auto_checked_items = _derive_auto_checked_items(capture)
     visible_appearance_snapshot = capture.output_visible_appearance_snapshot
     preview_content_top_distance = _snapshot_preview_edge_distance(
         capture.preview_snapshot, "content_top_to_border_px"
@@ -371,7 +371,7 @@ def finalize_phase3_harness_report(
     )
 
 
-def _derive_phase3_auto_checked_items(capture: Any) -> set[str]:
+def _derive_auto_checked_items(capture: Any) -> set[str]:
     auto_checked: set[str] = set()
 
     if capture.preview_available:

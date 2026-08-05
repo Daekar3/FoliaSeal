@@ -964,7 +964,7 @@ def test_default_harness_output_pdf_path_falls_back_to_source_directory() -> Non
     assert output_path == "/tmp/input-signed.pdf"
 
 
-def test_build_live_phase3_harness_workspace_wires_shared_qt_adapter_dependencies() -> None:
+def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() -> None:
     captured: dict[str, object] = {}
 
     class _FakeWorkspace:
@@ -979,7 +979,7 @@ def test_build_live_phase3_harness_workspace_wires_shared_qt_adapter_dependencie
     try:
         shell = object()
         profile_store = object()
-        workspace = phase3_harness_module._build_live_phase3_harness_workspace(
+        workspace = phase3_harness_module._build_live_evidence_workspace(
             shell=shell,
             profile_store=profile_store,
         )
@@ -1011,19 +1011,19 @@ def test_qt_phase3_harness_workspace_wrappers_delegate_to_shared_live_builder() 
         calls.append({"shell": shell, "profile_store": profile_store})
         return object()
 
-    original_builder = phase3_harness_module._build_live_phase3_harness_workspace
-    phase3_harness_module._build_live_phase3_harness_workspace = _fake_builder
+    original_builder = phase3_harness_module._build_live_evidence_workspace
+    phase3_harness_module._build_live_evidence_workspace = _fake_builder
     try:
         harness_shell = object()
         preview_shell = object()
         preview_store = object()
-        phase3_harness_module._build_qt_phase3_harness_workspace(harness_shell)
+        phase3_harness_module._build_qt_evidence_workspace(harness_shell)
         phase3_harness_module._build_preview_matrix_qt_workspace(
             shell=preview_shell,
             profile_store=preview_store,
         )
     finally:
-        phase3_harness_module._build_live_phase3_harness_workspace = original_builder
+        phase3_harness_module._build_live_evidence_workspace = original_builder
 
     assert len(calls) == 2
     assert calls[0]["shell"] is harness_shell
@@ -2207,13 +2207,13 @@ def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
     captured: dict[str, object] = {}
 
     class FakeExecutor:
-        def run(self, **kwargs):
+        def run_result(self, **kwargs):
             captured.update(kwargs)
             return {"name": "Scenario A", "signing_result": {"success": True}}
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_signed_acceptance_scenario_executor",
+        "_build_signed_acceptance_scenario_executor",
         lambda: FakeExecutor(),
     )
 
@@ -2241,6 +2241,24 @@ def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
     }
 
 
+def test_private_composition_surface_uses_neutral_evidence_names() -> None:
+    for legacy_name in (
+        "_build_live_phase3_harness_workspace",
+        "_build_qt_phase3_harness_workspace",
+        "_build_phase3_signed_acceptance_scenario_executor",
+        "_build_phase3_signed_output_snapshotter",
+        "_build_phase3_signed_output_render_snapshotter",
+        "_build_phase3_appearance_snapshotter",
+        "_build_phase3_sign_time_diagnostics_snapshotter",
+        "_derive_phase3_auto_checked_items",
+    ):
+        assert not hasattr(phase3_harness_module, legacy_name)
+
+    assert hasattr(phase3_harness_module, "_build_live_evidence_workspace")
+    assert hasattr(phase3_harness_module, "_build_signed_acceptance_scenario_executor")
+    assert hasattr(phase3_harness_module, "_build_signed_output_snapshotter")
+
+
 def test_snapshot_successful_signed_output_delegates_to_shared_snapshotter(
     monkeypatch,
     tmp_path: Path,
@@ -2256,7 +2274,7 @@ def test_snapshot_successful_signed_output_delegates_to_shared_snapshotter(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_signed_output_snapshotter",
+        "_build_signed_output_snapshotter",
         lambda: FakeSnapshotter(),
     )
 
@@ -2295,7 +2313,7 @@ def test_snapshot_signed_output_render_delegates_to_render_snapshotter(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_signed_output_render_snapshotter",
+        "_build_signed_output_render_snapshotter",
         lambda: FakeSnapshotter(),
     )
 
@@ -2333,7 +2351,7 @@ def test_preview_appearance_snapshot_from_capture_delegates_to_snapshotter(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_appearance_snapshotter",
+        "_build_appearance_snapshotter",
         lambda: FakeSnapshotter(),
     )
 
@@ -2357,7 +2375,7 @@ def test_signed_output_appearance_snapshot_delegates_to_snapshotter(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_appearance_snapshotter",
+        "_build_appearance_snapshotter",
         lambda: FakeSnapshotter(),
     )
 
@@ -2393,7 +2411,7 @@ def test_snapshot_sign_time_fit_diagnostics_delegates_to_snapshotter(
 
     monkeypatch.setattr(
         phase3_harness_module,
-        "_build_phase3_sign_time_diagnostics_snapshotter",
+        "_build_sign_time_diagnostics_snapshotter",
         lambda: FakeSnapshotter(),
     )
 

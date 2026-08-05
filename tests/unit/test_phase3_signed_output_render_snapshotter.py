@@ -13,7 +13,7 @@ from foliaseal.presentation.qt.preview_text_geometry import PreviewTextGeometryA
 
 
 def _snapshotter() -> Phase3SignedOutputRenderSnapshotter:
-    return phase3_harness_module._build_phase3_signed_output_render_snapshotter()
+    return phase3_harness_module._build_signed_output_render_snapshotter()
 
 
 def test_signed_output_render_snapshotter_captures_output_parity(

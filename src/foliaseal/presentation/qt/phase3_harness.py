@@ -121,13 +121,13 @@ def build_interactive_session_runner() -> Phase3HarnessSessionRunner:
     return Phase3HarnessSessionRunner(
         deps=Phase3HarnessSessionRunnerDeps(
             build_qt_signing_shell=build_qt_signing_shell,
-            build_workspace=_build_qt_phase3_harness_workspace,
+            build_workspace=_build_qt_evidence_workspace,
             default_harness_output_pdf_path=default_harness_output_pdf_path,
         )
     )
 
 
-def _build_live_phase3_harness_workspace(
+def _build_live_evidence_workspace(
     *,
     shell: Any,
     profile_store: Any,
@@ -149,8 +149,8 @@ def _build_live_phase3_harness_workspace(
     )
 
 
-def _build_qt_phase3_harness_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
-    return _build_live_phase3_harness_workspace(
+def _build_qt_evidence_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
+    return _build_live_evidence_workspace(
         shell=shell,
         profile_store=object(),
     )
@@ -161,7 +161,7 @@ def _build_preview_matrix_qt_workspace(
     shell: Any,
     profile_store: SignaturePresetCatalogStore,
 ) -> Phase3HarnessWorkspacePort:
-    return _build_live_phase3_harness_workspace(
+    return _build_live_evidence_workspace(
         shell=shell,
         profile_store=profile_store,
     )
@@ -202,7 +202,7 @@ def _snapshot_successful_signed_output(
     artifacts_dir: str | None,
     artifact_basename: str | None,
 ) -> dict[str, Any]:
-    return _build_phase3_signed_output_snapshotter().snapshot_successful_signed_output(
+    return _build_signed_output_snapshotter().snapshot_successful_signed_output(
         output_file=output_file,
         page_index=page_index,
         preview_snapshot=preview_snapshot,
@@ -213,7 +213,7 @@ def _snapshot_successful_signed_output(
     )
 
 
-def _build_phase3_signed_acceptance_scenario_executor() -> Phase3SignedAcceptanceScenarioExecutor:
+def _build_signed_acceptance_scenario_executor() -> Phase3SignedAcceptanceScenarioExecutor:
     return Phase3SignedAcceptanceScenarioExecutor(
         deps=Phase3SignedAcceptanceScenarioExecutorDeps(
             apply_preview_matrix_scenario=_apply_preview_matrix_scenario,
@@ -225,7 +225,7 @@ def _build_phase3_signed_acceptance_scenario_executor() -> Phase3SignedAcceptanc
     )
 
 
-def _build_phase3_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
+def _build_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
     pdf_snapshotter = Phase3PdfSignatureSnapshotter()
     return Phase3SignedOutputSnapshotter(
         count_embedded_signatures=pdf_snapshotter.count_embedded_signatures,
@@ -236,7 +236,7 @@ def _build_phase3_signed_output_snapshotter() -> Phase3SignedOutputSnapshotter:
     )
 
 
-def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRenderSnapshotter:
+def _build_signed_output_render_snapshotter() -> Phase3SignedOutputRenderSnapshotter:
     analysis_engine = _build_preview_analysis_engine()
     return Phase3SignedOutputRenderSnapshotter(
         render_backend_factory=QtPdfRenderBackend,
@@ -275,7 +275,7 @@ def _build_phase3_signed_output_render_snapshotter() -> Phase3SignedOutputRender
     )
 
 
-def _build_phase3_appearance_snapshotter() -> Phase3AppearanceSnapshotter:
+def _build_appearance_snapshotter() -> Phase3AppearanceSnapshotter:
     analysis_engine = _build_preview_analysis_engine()
     return Phase3AppearanceSnapshotter(
         mapping=_mapping,
@@ -311,48 +311,6 @@ def _load_page_count(*, bindings: _QtHarnessBindings, pdf_path: str) -> int:
     if status != bindings.qpdf_document.Error.None_:
         raise RuntimeError(f"Failed to load PDF document: {pdf_path}")
     return int(document.pageCount())
-
-
-def _derive_phase3_auto_checked_items(capture: Phase3HarnessCapture) -> set[str]:
-    auto_checked: set[str] = set()
-
-    if capture.preview_available:
-        auto_checked.add(
-            "Confirm the signature properties flow is reachable from the main signing UI."
-        )
-        auto_checked.add(
-            "Confirm the viewer preview renders before any signing action is attempted."
-        )
-        auto_checked.add("The focused properties panel shows the available appearance controls.")
-
-    if not capture.errors:
-        auto_checked.add(
-            "Confirm the selected PDF can be used without unexpected dependency or backend errors."
-        )
-
-    if capture.first_render_ms is not None:
-        auto_checked.add(
-            "Launch the Phase 3 desktop build in an environment with the relevant "
-            "PDF signing UI enabled."
-        )
-
-    if capture.selection_count > 0:
-        auto_checked.add("The user can draw a signature rectangle on the preview.")
-        auto_checked.add("The resulting placement lands on the expected page area.")
-
-    if capture.selection_count > 1:
-        auto_checked.add("The placed rectangle can be resized or repositioned in the workflow.")
-
-    if capture.sign_request_count > 0:
-        auto_checked.add("The sign action is available from the properties flow.")
-        auto_checked.add(
-            "The app shows the expected confirmation or summary before signing, if applicable."
-        )
-
-    if capture.last_signature_page_index is not None:
-        auto_checked.add("The user can choose the target page before placement.")
-
-    return auto_checked
 
 
 def _render_signed_annotation_appearance_direct(
@@ -467,7 +425,7 @@ def _snapshot_signed_output_render(
     artifacts_dir: str | None,
     artifact_basename: str | None,
 ) -> dict[str, Any] | None:
-    return _build_phase3_signed_output_render_snapshotter().run(
+    return _build_signed_output_render_snapshotter().run(
         output_pdf_path=output_pdf_path,
         page_index=page_index,
         preview_snapshot=preview_snapshot,
@@ -482,12 +440,12 @@ def _preview_appearance_snapshot_from_capture(
     *,
     preview_snapshot: dict[str, Any],
 ) -> SignatureAppearanceSnapshot:
-    return _build_phase3_appearance_snapshotter().preview_appearance_snapshot_from_capture(
+    return _build_appearance_snapshotter().preview_appearance_snapshot_from_capture(
         preview_snapshot=preview_snapshot
     )
 
 
-def _build_phase3_sign_time_diagnostics_snapshotter() -> Phase3SignTimeDiagnosticsSnapshotter:
+def _build_sign_time_diagnostics_snapshotter() -> Phase3SignTimeDiagnosticsSnapshotter:
     return Phase3SignTimeDiagnosticsSnapshotter(mapping=_mapping)
 
 
@@ -500,7 +458,7 @@ def _snapshot_sign_time_fit_diagnostics(
     preview_render_capture: dict[str, Any] | None,
     backend_reservation_snapshot: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    return _build_phase3_sign_time_diagnostics_snapshotter().snapshot(
+    return _build_sign_time_diagnostics_snapshotter().snapshot(
         preview_render_capture=preview_render_capture,
         backend_reservation_snapshot=backend_reservation_snapshot,
     )
@@ -515,7 +473,7 @@ def _signed_output_appearance_snapshot(
     visible_appearance_snapshot: dict[str, Any],
     preview_snapshot: dict[str, Any],
 ) -> SignatureAppearanceSnapshot:
-    return _build_phase3_appearance_snapshotter().signed_output_appearance_snapshot(
+    return _build_appearance_snapshotter().signed_output_appearance_snapshot(
         normalized_image_path=normalized_image_path,
         normalized_image_size=normalized_image_size,
         text_bounds_px=text_bounds_px,
@@ -856,20 +814,7 @@ def _execute_signed_acceptance_scenario(
     passphrase: str,
     sign_executor: Any,
 ) -> Phase3SignedAcceptanceScenarioResult | dict[str, Any]:
-    executor = _build_phase3_signed_acceptance_scenario_executor()
-    run_result = getattr(executor, "run_result", None)
-    if callable(run_result):
-        return run_result(
-            shell=shell,
-            scenario=scenario,
-            profile_store=profile_store,
-            artifacts_dir=artifacts_dir,
-            base_input_path=base_input_path,
-            certificate_path=certificate_path,
-            passphrase=passphrase,
-            sign_executor=sign_executor,
-        )
-    return executor.run(
+    return _build_signed_acceptance_scenario_executor().run_result(
         shell=shell,
         scenario=scenario,
         profile_store=profile_store,

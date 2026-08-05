@@ -4,7 +4,7 @@ import foliaseal.presentation.qt.phase3_harness as phase3_harness_module
 
 
 def _snapshotter():
-    return phase3_harness_module._build_phase3_sign_time_diagnostics_snapshotter()
+    return phase3_harness_module._build_sign_time_diagnostics_snapshotter()
 
 
 def test_sign_time_diagnostics_snapshotter_combines_backend_and_canonical_geometry() -> None:
