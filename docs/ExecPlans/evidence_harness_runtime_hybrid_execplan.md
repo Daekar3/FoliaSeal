@@ -31,9 +31,8 @@ unless a live source consumer is demonstrated.
   lazy factory architecture already exist.
 - [x] A fresh DevLoop explorer reviewed the current composition, stable
   contracts, test seams, and remaining compatibility wrapper before this plan.
-- [ ] No child plan is expected. A child is permitted only if compliance review
-  finds a concrete defect that cannot be fixed within this runtime/projection
-  slice.
+- [x] No child plan is required; all compliance findings were fixed within
+  this runtime/projection slice.
 
 ## Progress
 
