@@ -51,7 +51,9 @@ unless a live source consumer is demonstrated.
   its test-only callers to `run_result()`.
 - [x] (2026-08-05) Ran focused/full validation and reconciled the release preview/signed matrix evidence.
 - [x] (2026-08-05) Completed architecture/spec compliance review and documentation updates.
-- [ ] Create the implementation and plan-closure commits; verify a clean tree (parent task owns commit closure).
+- [x] (2026-08-05) Created implementation commit `9a626f1ea`; after the
+  subsequent compliance cleanup, create the plan-closure commit and verify a
+  clean main worktree.
 
 ## Surprises & Discoveries
 
@@ -65,6 +67,11 @@ unless a live source consumer is demonstrated.
   Evidence: `docs/ARCHITECTURE.md` records the removal of the prior tagged
   dispatcher. This slice therefore uses typed explicit operations and
   operation-local capabilities, not a service locator.
+
+- Observation: the subsequent compliance review found one unused `_LazyOperation`
+  helper and stale documentation pointing at already-cleaned temporary release
+  paths. Both were removed/reconciled in the closure pass; the public edge
+  contracts remain unchanged.
 
 ## Decision Log
 
@@ -108,6 +115,10 @@ successful signings, 2 matched intentional validation rejections, and 0 scenario
 errors. Architecture and README now document runtime/projection ownership and
 the intentional public-edge compatibility policy. Render-policy work remains
 unchanged and deferred outside this slice.
+The initial compliance review identified stale ownership references, a
+protocol/documentation mismatch, and an uncovered setup-failure cleanup path;
+the high-risk follow-up added cleanup regression coverage and the subsequent
+compliance re-review found no remaining discrepancies.
 
 ## Context and Orientation
 
@@ -239,7 +250,8 @@ Record final evidence here:
        signed matrix: 8 scenarios, 6 successful signings, 2 matched intentional rejections, 0 scenario errors
        removed compatibility/nomenclature: internal phase3 aliases, duplicate forwarding wrappers, private matrix projection helpers, and signed mapping wrapper
        compliance/doc review: complete; ARCHITECTURE.md and README.md reconciled 2026-08-05
-       implementation commit: parent task commit closure
+       implementation commit: 9a626f1ea (Refactor evidence harness runtime and projections)
+       plan-closure commit: <fill during closure>
 
 ## Interfaces and Dependencies
 

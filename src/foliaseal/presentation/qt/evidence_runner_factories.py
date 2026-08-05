@@ -19,17 +19,6 @@ from foliaseal.presentation.qt.evidence_harness_runtime import EvidenceHarnessRu
 
 MatrixOperation = Callable[[EvidenceMatrixRequest], Mapping[str, Any]]
 
-
-class _LazyOperation:
-    def __init__(self, factory: Callable[[], MatrixOperation]) -> None:
-        self._factory = factory
-        self._operation: MatrixOperation | None = None
-
-    def __call__(self, request: EvidenceMatrixRequest) -> Mapping[str, Any]:
-        if self._operation is None:
-            self._operation = self._factory()
-        return self._operation(request)
-
 if TYPE_CHECKING:
     from foliaseal.presentation.qt.evidence_interactive_capture import (
         InteractiveCaptureEngine,

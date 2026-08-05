@@ -471,7 +471,7 @@ The canonical repository document split is:
 - Does not own: preview rendering, signing, PDF verification, or historical stress-corpus remediation.
 - Key collaborators: Phase 3 preview and signed-acceptance matrix runners, `evidence_service.py`, and the tracked release manifest.
 - Known constraints: This is a bounded release claim, not a universal layout guarantee. The eight scenarios and zero-tolerance comparison fields are the only supported scope; compact or historical stress manifests remain separate, non-comparable evidence.
-- Status: Confirmed by code, tests, and matrix evidence (`/tmp/foliaseal-release-preview-final/summary.json`, `/tmp/foliaseal-release-signed-final/summary.json`; manifest SHA-256 `4dd4545c94398411268589666caf06ee7cdceb3a79f03aeac6591008b5e1085e`).
+- Status: Confirmed by code, tests, and the release-matrix run recorded in the active ExecPlan (the temporary summary directories are removed after validation); manifest SHA-256 `4dd4545c94398411268589666caf06ee7cdceb3a79f03aeac6591008b5e1085e`.
 
 ### Phase 3 harness session runner
 
