@@ -1745,7 +1745,7 @@ PyHanko/Pillow materialization in the backend. The child plan is
 `docs/ExecPlans/visible_signature_fit_validator_boundary_execplan.md`; phase3 nomenclature remains
 the separately versioned atomic migration plan.
 
-### Implementation 28 — in progress, 2026-08-06
+### Implementation 28 — completed 2026-08-06
 
 The selected typed-port slice is implemented and validated, pending its intentional commit. New
 `visible_signature_fit_validator.py` owns the application-facing adapter; it has no module-level
@@ -1756,6 +1756,9 @@ Full validation is `1,111 passed, 1 warning`; offscreen evidence is signed accep
 parity `18/18`, and fit rejection `3/3`. The SPEC is unchanged, cleanup is complete, and conservative
 Actual Improvement is approximately `0.40` versus predicted `0.40`, with no component regression or
 critical/major review finding.
+Commit `b569295ffb917fecb79c188fe2a8ba37d1046d01` (`Extract visible-signature fit validator
+boundary`) contains the six intentional source/test/architecture/plan files; the worktree was clean
+after commit.
 
 ## Context and Orientation
 

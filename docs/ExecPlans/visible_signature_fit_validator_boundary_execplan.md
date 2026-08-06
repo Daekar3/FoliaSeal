@@ -92,4 +92,6 @@ compare issue tuples and prepared-plan identity, and rerun the focused suite bef
   `0.35`, seam reduction `0.50`, boundary-test improvement `0.45`, interface compression `0.20`,
   and boundary isolation `0.65`, for Actual Improvement approximately `0.40` versus predicted `0.40`;
   no component regressed below `-0.10` and no critical/major review finding remains.
-- [ ] Intentional commit and fresh post-commit scan ledger update.
+- [x] (2026-08-06) Committed as `b569295ffb917fecb79c188fe2a8ba37d1046d01`
+  (`Extract visible-signature fit validator boundary`); the post-commit worktree is clean.
+- [ ] Fresh post-commit scan ledger update.
