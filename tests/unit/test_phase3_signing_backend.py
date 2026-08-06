@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from asn1crypto import keys as asn1_keys
@@ -65,15 +66,14 @@ from foliaseal.application.visible_signature_artifact_adapters import (
     build_text_box_style,
     measure_text_box_dimensions,
 )
+from foliaseal.application.visible_signature_fit_policy import VisibleSignatureRenderedFitRequest
 from foliaseal.application.visible_signature_layout import (
-    _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutPolicy,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
     _horizontal_single_line_ink_validation_reservation,
     _layout_reservation_for_template,
-    _single_line_rendered_ink_fits_reservation,
 )
 from foliaseal.application.visible_signature_layout import (
     single_line_horizontal_stamp_vertical_inset as _single_line_horizontal_stamp_vertical_inset,
@@ -85,6 +85,7 @@ from foliaseal.application.visible_signature_layout import (
     single_line_vertical_stamp_border_gap as _single_line_vertical_stamp_border_gap,
 )
 from foliaseal.application.visible_signature_layout_adapters import materialize_background_layout
+from foliaseal.application.visible_signature_rendered_fit_adapters import PyHankoRenderedFitProbe
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -108,6 +109,26 @@ _MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH = (
     / "fixtures"
     / "phase3_horizontal_single_line_manual_replay.json"
 )
+
+_TEST_RENDERED_FIT_PROBE = PyHankoRenderedFitProbe()
+
+
+def _probe_single_line_rendered_fit(
+    *,
+    signature_rect,
+    signature_appearance,
+    stamp_text: str,
+    render_port=None,
+) -> bool:
+    return _TEST_RENDERED_FIT_PROBE.single_line_fits(
+        VisibleSignatureRenderedFitRequest(
+            signature_rect=signature_rect,
+            appearance=signature_appearance,
+            stamp_text=stamp_text,
+            layout_plan=SimpleNamespace(fit_issues=(object(),)),
+            render_port=render_port,
+        )
+    )
 
 
 def _prepared_stamp_style(
@@ -1068,8 +1089,8 @@ def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compac
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend._single_line_rendered_ink_fits_reservation",
-        lambda **_kwargs: False,
+        "foliaseal.application.phase3_signing_backend._DEFAULT_RENDERED_FIT_PROBE.single_line_fits",
+        lambda _request: False,
     )
     monkeypatch.setattr(
         "foliaseal.application.phase3_signing_backend."
@@ -1127,8 +1148,8 @@ def test_horizontal_single_line_backend_validation_falls_back_without_ink_refere
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.phase3_signing_backend._single_line_rendered_ink_fits_reservation",
-        lambda **_kwargs: False,
+        "foliaseal.application.phase3_signing_backend._DEFAULT_RENDERED_FIT_PROBE.single_line_fits",
+        lambda _request: False,
     )
     monkeypatch.setattr(
         "foliaseal.application.phase3_signing_backend."
@@ -4044,7 +4065,7 @@ def test_single_line_rendered_ink_fallback_caches_identical_checks(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+    _TEST_RENDERED_FIT_PROBE.clear_cache()
     stamp_path = tmp_path / "stamp.png"
     current_png = tmp_path / "current.png"
     Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
@@ -4109,12 +4130,12 @@ def test_single_line_rendered_ink_fallback_caches_identical_checks(
         "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
     )
 
-    assert _single_line_rendered_ink_fits_reservation(
+    assert _probe_single_line_rendered_fit(
         signature_rect=signature_rect,
         signature_appearance=appearance,
         stamp_text=stamp_text,
     )
-    assert _single_line_rendered_ink_fits_reservation(
+    assert _probe_single_line_rendered_fit(
         signature_rect=signature_rect,
         signature_appearance=appearance,
         stamp_text=stamp_text,
@@ -4126,7 +4147,7 @@ def test_single_line_rendered_ink_fallback_rejects_border_flush_text(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+    _TEST_RENDERED_FIT_PROBE.clear_cache()
     stamp_path = tmp_path / "stamp.png"
     current_png = tmp_path / "current.png"
     Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
@@ -4183,11 +4204,11 @@ def test_single_line_rendered_ink_fallback_rejects_border_flush_text(
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.visible_signature_layout._single_line_text_only_ink_bounds",
+        "foliaseal.application.visible_signature_rendered_fit_adapters._single_line_text_only_ink_bounds",
         lambda **kwargs: next(text_only_bounds),
     )
 
-    assert not _single_line_rendered_ink_fits_reservation(
+    assert not _probe_single_line_rendered_fit(
         signature_rect=build_signature_rect(
             page_index=0,
             left_pt=35.0,
@@ -4206,7 +4227,7 @@ def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    _SINGLE_LINE_RENDERED_INK_FIT_CACHE.clear()
+    _TEST_RENDERED_FIT_PROBE.clear_cache()
     stamp_path = tmp_path / "stamp.png"
     current_png = tmp_path / "current.png"
     Image.new("RGBA", (320, 80), color=(255, 255, 255, 255)).save(stamp_path, format="PNG")
@@ -4257,11 +4278,11 @@ def test_single_line_rendered_ink_fallback_rejects_reference_text_loss(
         )
     )
     monkeypatch.setattr(
-        "foliaseal.application.visible_signature_layout._single_line_text_only_ink_bounds",
+        "foliaseal.application.visible_signature_rendered_fit_adapters._single_line_text_only_ink_bounds",
         lambda **kwargs: next(text_only_bounds),
     )
 
-    assert not _single_line_rendered_ink_fits_reservation(
+    assert not _probe_single_line_rendered_fit(
         signature_rect=build_signature_rect(
             page_index=0,
             left_pt=35.0,

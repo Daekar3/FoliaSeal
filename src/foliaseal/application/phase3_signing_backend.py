@@ -53,6 +53,9 @@ from foliaseal.application.visible_signature_artifact_adapters import (
 )
 from foliaseal.application.visible_signature_color import text_style_color_rgba
 from foliaseal.application.visible_signature_fit_policy import (
+    VisibleSignatureRenderedFitPolicy,
+    VisibleSignatureRenderedFitProbe,
+    VisibleSignatureRenderedFitRequest,
     apply_visible_signature_fit_gate,
     decide_visible_signature_fit,
 )
@@ -67,8 +70,9 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
     VisibleSignaturePreparation,
-    _horizontal_multi_line_rendered_layout_fits_reservation,
-    _single_line_rendered_ink_fits_reservation,
+)
+from foliaseal.application.visible_signature_rendered_fit_adapters import (
+    PyHankoRenderedFitProbe,
 )
 from foliaseal.application.visible_signature_semantics import (
     CertificateFieldValues,
@@ -100,6 +104,7 @@ from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validati
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
 detect_text_content_bounds_in_image = _text_raster_analysis.detect_text_content_bounds_in_image
+_DEFAULT_RENDERED_FIT_PROBE = PyHankoRenderedFitProbe()
 
 
 def _next_signature_field_name(input_path: Path) -> str:
@@ -424,6 +429,7 @@ def _prepare_backend_layout(
     stamp_text: str,
     stamp_background: PdfImage | None,
     render_port: PreviewRasterRenderer | None = None,
+    rendered_fit_probe: VisibleSignatureRenderedFitProbe | None = None,
 ) -> _BackendLayoutPreparation:
     """Prepare and fit-gate one canonical backend layout for all visible callers."""
 
@@ -443,6 +449,7 @@ def _prepare_backend_layout(
         signature_appearance=signature_appearance,
         stamp_text=stamp_text,
         render_port=render_port,
+        rendered_fit_probe=rendered_fit_probe,
     )
     return _BackendLayoutPreparation(
         preparation=apply_visible_signature_fit_gate(
@@ -553,23 +560,27 @@ def _layout_fit_issues(
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
     render_port: PreviewRasterRenderer | None = None,
+    rendered_fit_probe: VisibleSignatureRenderedFitProbe | None = None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
     """Apply the existing rendered-ink fallback ladder to one prepared plan."""
 
     if not layout_plan.fit_issues:
         return ()
-    if _single_line_rendered_ink_fits_reservation(
-        signature_rect=signature_rect,
-        signature_appearance=signature_appearance,
-        stamp_text=stamp_text,
-        render_port=render_port,
-    ) or _horizontal_multi_line_rendered_layout_fits_reservation(
-        signature_rect=signature_rect,
-        signature_appearance=signature_appearance,
-        stamp_text=stamp_text,
-        layout_plan=layout_plan,
-        render_port=render_port,
-    ):
+    decision = VisibleSignatureRenderedFitPolicy.decide(
+        VisibleSignatureRenderedFitRequest(
+            signature_rect=signature_rect,
+            appearance=signature_appearance,
+            stamp_text=stamp_text,
+            layout_plan=layout_plan,
+            render_port=render_port,
+        ),
+        probe=(
+            rendered_fit_probe
+            if rendered_fit_probe is not None
+            else _DEFAULT_RENDERED_FIT_PROBE
+        ),
+    )
+    if decision.accepted:
         return ()
     return tuple(
         SigningDraftValidationIssue(
@@ -746,6 +757,7 @@ def validate_visible_signature_fit(
     stamp_text: str,
     stamp_background: PdfImage | None,
     render_port: PreviewRasterRenderer | None = None,
+    rendered_fit_probe: VisibleSignatureRenderedFitProbe | None = None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
     try:
         layout_result = _prepare_backend_layout(
@@ -754,6 +766,7 @@ def validate_visible_signature_fit(
             stamp_text=stamp_text,
             stamp_background=stamp_background,
             render_port=render_port,
+            rendered_fit_probe=rendered_fit_probe,
         )
         _build_stamp_style(
             signature_appearance,

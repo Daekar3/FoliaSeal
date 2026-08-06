@@ -143,6 +143,11 @@ created.
 - [x] Accepted the reusable catalog boundary at `b3276a78b` and completed Scan Round 46; the next
   candidate is threading canonical `ReusableSigningObjects` through the Qt workspace graph at about
   `64` priority.
+- [x] Completed Scan Round 56 after `9f961dc6e`; the rendered-preview fit boundary is the next
+  qualifying architectural candidate at approximately `68.0` priority.
+- [x] Completed Design Selection 56; selected the common-caller policy/probe boundary and created
+  `visible_signature_rendered_fit_boundary_execplan.md`.
+- [ ] Execute and close the rendered-preview fit boundary child plan through the complete DevLoop.
 
 ## Scan and Candidate Ledger
 
@@ -2682,3 +2687,100 @@ was added during closure. The source retirement gate is narrowed to backend/harn
 the intentional canonical-owner delegates are not treated as duplicate implementations. The
 residual candidate set should be rescored in the next architecture-loop round; the next likely seam
 is the highest-scoring candidate that does not reopen the separate phase3 nomenclature migration.
+
+### Scan Round 56 — completed 2026-08-06 after `9f961dc6e`
+
+Three independent explorers reviewed the clean post-layout-policy checkout without sharing reports.
+Two reports converge on `visible-signature-rendered-fit-boundary`: the neutral
+`src/foliaseal/application/visible_signature_layout.py` still embeds approximately 340 lines of
+rendered-preview fit orchestration, raster analysis, cache policy, and temporary-preview cleanup
+(`_single_line_rendered_ink_fits_reservation`, `_horizontal_multi_line_rendered_layout_fits_reservation`,
+`_single_line_text_only_ink_bounds`, `_SINGLE_LINE_RENDERED_INK_FIT_CACHE`). The signing backend's
+`_apply_layout_fit_fallback()` calls those private helpers, and backend tests import and monkeypatch
+the private cache/helper seam. Existing `PreviewRasterRenderer`, `RenderedInkMeasurementPort`,
+`signing_preview_renderer`, and `text_raster_analysis` seams provide local substitutes.
+
+The independent rendered-fit score record is `(4.5,4.0,4.0,4.5,4.0,4.5,3.0,2.5)`. The orchestrator
+verified the complete call path, test coupling, and available substitutes and independently scored
+`(4.5,4.0,4.25,4.5,4.0,4.5,3.0,2.5)`. Medians are `(4.5,4.0,4.125,4.5,4.0,4.5,3.0,2.5)`;
+agreement is approximately `0.975`, evidence coverage `1.0`, and confidence approximately `0.983`.
+Benefit is `4.294`, penalty `2.80`, and Candidate Priority is approximately `68.0/100`, above the
+continuation threshold. Dependency category is local-substitutable. The bounded slice is to extract
+one typed rendered-fit evaluator/cache boundary, migrate backend callers and tests, and preserve fit
+issue codes/messages, fallback ordering, cache keys, cleanup, preview/signed parity, CLI/JSON/
+artifact contracts, and the separate phase3 nomenclature plan.
+
+The other fresh candidates were `signing-workspace-compat-surface-retirement` (one independent
+record, approximately `61.1`, deferred for lack of convergence) and the atomic phase3 nomenclature
+migration (high navigation payoff but contract-heavy and not itself a deep-module refactor). The
+rendered-fit seam wins the credibility and architectural-improvement gates. Problem framing and
+design selection for the child plan are the next steps.
+
+### Problem Frame 56 — rendered-preview fit boundary
+
+The representative workflow is final signing -> backend layout preparation -> rendered-ink fallback
+fit -> PDF signing, mirrored by preview/evidence rendering. The neutral layout module currently owns
+geometry contracts and target-independent preparation plus target-sensitive rendered-preview fitting.
+That fit path lazily imports rendering/raster modules, owns a global cache and temporary-directory
+cleanup, and exposes private functions directly to the backend and tests. As a result, changing
+rendered-fit policy requires understanding the geometry module, backend fallback choreography, and
+test monkeypatch points together; the neutral boundary is not actually neutral.
+
+The dependency is local-substitutable: preview rendering and text-raster analysis already have
+injected ports/fakes. The refactor must preserve all fit decisions, error codes/messages, fallback
+ordering, cache-key semantics, cleanup guarantees, current-page placement, signed-output parity,
+CLI/JSON/artifact contracts, and import isolation for the geometry module. The expected improvement
+is ownership compression and a stable test boundary, not a generic renderer manager or a rename-only
+move. Illustrative target:
+
+    evaluator = VisibleSignatureRenderedFitEvaluator(
+        preview_renderer=preview_renderer,
+        text_ink_detector=text_ink_detector,
+        cache=fit_cache,
+    )
+    evaluator.single_line_fits(request)
+
+The design round must decide the smallest typed evaluator/cache interface that hides rendering,
+raster, temporary-artifact, and cache details without moving geometry or signing orchestration into a
+new shallow manager.
+
+### Design Selection 56 — completed 2026-08-06
+
+Three radically different designs were generated for the rendered-fit cluster and independently
+scored. Design A is a minimal one-entry `RenderedSignatureFitPolicy.fit(request)` facade with a
+private injected dependency record; its orchestrator score is approximately `90.0`. Design B is a
+flexible evaluator with a rendered-preview probe protocol, rendered-preview DTO, and existing ink
+measurement port; its reviewed score is `87.0` because it adds a second variation surface and a
+broader DTO migration. Design C is the common-caller policy/probe design: a neutral
+`VisibleSignatureRenderedFitPolicy.decide(request, probe=...)` owns template dispatch and typed fit
+decision, while `PyHankoRenderedFitProbe` owns canonical rasterization, raster analysis, cache, and
+temporary cleanup. Its independent reviewer score is
+`(4.75,4.75,4.5,4.75,4.5,3.5,4.75)`, for BaseShapeScore `91.0`; the orchestrator independently
+confirmed the same ownership and scored `91.0`. No evidence-backed penalties or hard-gate risks
+apply, and no hybrid is needed. The child plan is
+`docs/ExecPlans/visible_signature_rendered_fit_boundary_execplan.md`.
+
+### Implementation 56 — rendered-preview fit boundary (implementation complete; closure pending)
+
+The selected common-caller policy/probe shape is implemented. `visible_signature_fit_policy.py`
+now exposes the third-party-free `VisibleSignatureRenderedFitRequest`,
+`VisibleSignatureRenderedFitDecision`, `VisibleSignatureRenderedFitProbe`, and
+`VisibleSignatureRenderedFitPolicy`; the existing immutable fit-gate API was preserved. The new
+`visible_signature_rendered_fit_adapters.py` owns canonical preview rendering, exact prior raster
+fit thresholds, bounded 256-entry cache identity/eviction, and owned temporary-directory cleanup.
+`phase3_signing_backend.py` now maps the policy decision to the unchanged validation issues, while
+`visible_signature_layout.py` retains only neutral geometry/structural fit helpers and is 1,657
+lines instead of 2,009. Backend characterization tests were migrated to the new probe seam and two
+direct adapter boundary tests cover cache reuse and cleanup ownership.
+
+Validation completed in this slice: focused rendered-fit policy/adapter/backend/layout coverage
+`151 passed`; full suite `1,163 passed, 1 warning`; Ruff, compileall, neutral import isolation, diff
+checks, and frozen `docs/SPEC.md` checks pass. The unchanged offscreen acceptance command passed
+with `10` scenarios/`7` successful signings, preview parity `18/18`, and fit rejection `3/3`.
+The process audit was empty. The required generated-output cleanup command was attempted but
+rejected by the local execution approval limit, leaving the generated acceptance directory and
+summary as a concrete handoff blocker. The separate
+`docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` was refreshed to the current inventory
+(`106` tracked path names, `256` active files, approximately `5,963` occurrences) and remains the
+next atomic contract migration; no phase3 module, CLI, DTO, JSON, fixture, or artifact names were
+renamed in this behavior-preserving slice. Commit and post-commit three-explorer closure remain.

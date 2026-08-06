@@ -51,7 +51,7 @@ not a permanent alias; any retained reader must have a dated retirement criterio
 ## Current inventory and replacement mapping (2026-08-06)
 
 The live checkout inventory on 2026-08-06 contains `phase3` in `106` tracked path names and in
-`254` tracked files when content is searched case-insensitively (about `6,570` broad occurrences,
+`256` active files when content is searched case-insensitively (about `5,963` broad occurrences,
 excluding this plan itself). The count includes historical ExecPlans and archival evidence; it is
 intentionally recorded before any rename:
 
@@ -118,8 +118,8 @@ an unbounded compatibility layer.
   as a neutral internal evidence module. Its durable `PreviewEvidenceFrame` and projection names
   do not carry `phase3`; the neighboring `phase3_preview_render_capture.py` request/port names
   remain contract-coupled and are still scheduled for the atomic migration.
-- [x] Inventory and replacement mapping refreshed on 2026-08-06 (`106` tracked path names, `254`
-  tracked files, and about `6,570` occurrences before excluding this plan).
+- [x] Inventory and replacement mapping refreshed on 2026-08-06 (`106` tracked path names, `256`
+  active files, and about `5,963` occurrences before excluding this plan).
 - [x] (2026-08-06) Reconfirmed as the dedicated next atomic migration after the Qt reusable-service
   threading slice. The current slice intentionally leaves public `phase3` names untouched so this
   plan can rename modules, symbols, CLI branches, fixtures, and active documentation together.

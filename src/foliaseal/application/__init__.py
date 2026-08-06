@@ -190,6 +190,16 @@ _EXPORT_MODULES = {
     ),
     **dict.fromkeys(
         (
+            "VisibleSignatureFitDecision",
+            "VisibleSignatureRenderedFitDecision",
+            "VisibleSignatureRenderedFitPolicy",
+            "VisibleSignatureRenderedFitProbe",
+            "VisibleSignatureRenderedFitRequest",
+        ),
+        "visible_signature_fit_policy",
+    ),
+    **dict.fromkeys(
+        (
             "CertificateFieldReader",
             "CertificateFieldValues",
             "NoopVisibleSignatureFitValidator",
@@ -374,6 +384,11 @@ __all__ = [
     "VisibleSignaturePreparation",
     "VisibleSignatureLayoutService",
     "VisibleSignatureLayoutPolicy",
+    "VisibleSignatureFitDecision",
+    "VisibleSignatureRenderedFitDecision",
+    "VisibleSignatureRenderedFitPolicy",
+    "VisibleSignatureRenderedFitProbe",
+    "VisibleSignatureRenderedFitRequest",
     "VisibleSignatureSemantics",
     "VisibleSignatureSemanticsMode",
     "VisibleSignatureSemanticsRequest",
