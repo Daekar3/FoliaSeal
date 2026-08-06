@@ -682,6 +682,71 @@ five-cycle cap. The next scan must be fresh; coordinated `phase3` nomenclature r
 leading contract-sensitive candidate, but public commands/DTOs/JSON/artifact names stay frozen until
 its atomic migration is executed.
 
+### Post-cap continuation scan 5 — completed after `5e396932a`
+
+Three independent explorers reviewed the clean post-Phase-2 checkout. The highest qualifying bounded
+candidate is the residual mixed responsibility in
+`src/foliaseal/presentation/qt/phase3_harness_workspace.py` (540 lines): it combines normalized
+scenario/capture DTOs, live-shell and headless adapters, appearance/placement mutation, preview
+capture, backend reservation/sign-time diagnostics, and Qt event pumping. The live adapter still
+reaches through the testing panel and mount-target process-events path in both `apply_scenario()` and
+`capture_snapshot()`, while callback/materializer dependency records carry broad policy bundles.
+
+The strongest scan scored `(4.5,4.5,4.5,4.5,4.0,4.5,3.0,2.5)` for
+`(NF,CA,SR,TG,IC,CC,MR,BU)`, confidence `0.88`, and Candidate Priority approximately `66`. The
+remaining `phase3_harness.py` preview/evidence composition root scored about `64.87`; the signing
+backend seam about `63`; compatibility-surface retirement about `61`; and phase3 nomenclature
+retirement about `45` because CLI/DTO/JSON/artifact contracts are explicitly frozen. The shared
+workspace seam is therefore the next design target; all public phase3 names and serialized contracts
+remain frozen pending an atomic nomenclature migration plan.
+
+### Post-cap continuation design selection 5 — completed after `5e396932a`
+
+Three independent designs were reviewed for the shared workspace seam:
+
+- Pure snapshot builder: move `Phase3HarnessWorkspaceSnapshot` and `as_mapping()` to a Qt-free
+  builder module, leaving both adapters' reads/effects in place; shape score approximately `90`.
+- Flexible scenario resolver: extract profile/appearance/timestamp/rectangle mutation into a pure
+  `ScenarioMutation` resolver reused by live and headless adapters; shape score approximately `90.5`,
+  but profile-reader/API and import-cycle risk make it a broader behavioral migration.
+- Common-caller capture service: accept one typed input record from each adapter and centralize only
+  stable snapshot construction/mapping, leaving workflow/render/event-pump/sign-time effects in the
+  existing boundary; shape score approximately `90`, Candidate Priority approximately `72` at
+  confidence `0.90`.
+
+Selected design: the common-caller `Phase3HarnessWorkspaceCaptureService`. It is a single base design,
+not a hybrid, so no hybrid bonus gate applies. Child
+`docs/ExecPlans/phase3_harness_workspace_capture_service_execplan.md` records the exact interface,
+contract-preservation map, retirement grep, and acceptance gates. The coordinated phase3 nomenclature
+plan remains separate; no public names, DTOs, JSON keys, or artifact paths are renamed here.
+
+### Post-cap continuation slice 5 — accepted 2026-08-06
+
+Child `docs/ExecPlans/phase3_harness_workspace_capture_service_execplan.md` is implemented and
+closed. New Qt-free `Phase3HarnessWorkspaceCaptureInput` and
+`Phase3HarnessWorkspaceCaptureService` own the pure construction and stable `as_mapping()` projection
+of `Phase3HarnessWorkspaceSnapshot`. Both live and headless workspace adapters now delegate that
+field-transfer policy; they retain request/workflow reads, scenario mutation, render adapters, Qt
+event pumping, sign-time diagnostics, and all existing `Phase3HarnessWorkspacePort` callers. The
+snapshot class remains import-compatible from the workspace module, and no public phase3 name or
+serialized evidence contract changed.
+
+Focused workspace/harness/session/scenario/capture coverage passed `105` tests with one skipped test;
+the full suite passed `1,047` tests with `11` skipped and one pre-existing warning. Ruff, diff checks,
+application and capture-service import isolation, and CLI help checks passed. Offscreen acceptance
+passed signed acceptance (`10` scenarios, `7` successful signings, `3` matched intentional
+rejections), signed preview parity (`18/18` successful), and signed fit rejection (`3/3` matched),
+with no cryptographic, annotation, preview-comparison, or expectation failures. The explicit
+`/tmp/foliaseal-workspace-capture-acceptance` root was removed and the process audit was clean.
+
+Continuation-slice proxy measurement: navigation friction `0.25`, change amplification `0.50`,
+seam-risk reduction `0.50`, boundary-test improvement `0.50`, interface compression `0.50`,
+cohesion `0.50`, and behavioral-uncertainty reduction `0.25`; `Actual Improvement = 0.43`, predicted
+`0.25`, with no component regression below `-0.10`. This accepts the slice without changing the fixed
+five-cycle cap. The next fresh scan must reassess the residual workspace scenario policy, the
+composition-root preview helpers, the signing backend, compatibility-surface debris, and the atomic
+phase3 nomenclature plan; external names remain frozen until that migration is explicitly executed.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
