@@ -404,7 +404,8 @@ boundary-test improvement `0.25`, interface compression `0.5`, boundary isolatio
 `-0.10`. This reaches the fixed five-cycle cap; the loop stops after the intentional commit and
 final clean-worktree audit. Remaining backend adapter concentration, workspace compatibility
 exports, app-to-infra DTO coupling, and phase nomenclature migration are ranked follow-on plans,
-not silently ignored work.
+not silently ignored work. Implementation commit `597efea39` and architecture-documentation commit
+`f308bbe30` are on `main`.
 
 ## Context and Orientation
 
