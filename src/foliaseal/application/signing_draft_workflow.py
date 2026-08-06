@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Self
 
 from foliaseal.application import signing_draft_contracts as _contracts
@@ -22,9 +21,12 @@ from foliaseal.application.coordinate_transform import (
 )
 from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
 from foliaseal.application.signing_material_resolver import SigningMaterial
+from foliaseal.application.visible_signature_fit_validator import (
+    BackendVisibleSignatureFitValidator,
+)
 from foliaseal.application.visible_signature_semantics import (
     CertificateFieldValues,
-    VisibleSignatureFitRequest,
+    VisibleSignatureFitValidator,
     VisibleSignatureSemanticsRequest,
     VisibleSignatureSemanticsService,
 )
@@ -79,6 +81,7 @@ class SigningDraftWorkflow:
         default_factory=Pkcs12CertificatePreviewReader,
         repr=False,
     )
+    fit_validator: VisibleSignatureFitValidator | None = field(default=None, repr=False)
     _certificate_preview_values: dict[SignatureFieldKey, str] | None = field(
         default=None,
         init=False,
@@ -533,48 +536,11 @@ class SigningDraftWorkflow:
                     values=values,
                 )
 
-        class _WorkflowVisibleSignatureFitValidator:
-            def validate(
-                self,
-                request: VisibleSignatureFitRequest,
-            ) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
-                if not Path(workflow.certificate_path).exists():
-                    return ()
-                from foliaseal.application.phase3_signing_backend import (
-                    validate_visible_signature_fit,
-                )
-                from foliaseal.application.sign_pdf_use_case import (
-                    SigningBackendAppearance,
-                )
-                from foliaseal.application.stamp_background import stamp_background_for_path
-
-                if workflow.signature_appearance is None:
-                    return ()
-                try:
-                    stamp_background = stamp_background_for_path(
-                        workflow.signature_appearance.image_stamp_path
-                    )
-                except ValueError as exc:
-                    return (
-                        _issue(
-                            "visible_signature_layout_unavailable",
-                            str(exc),
-                            field_name="signature_appearance",
-                        ),
-                    )
-                return validate_visible_signature_fit(
-                    signature_rect=request.signature_rect,
-                    signature_appearance=SigningBackendAppearance.from_signature_appearance(
-                        workflow.signature_appearance
-                    ),
-                    stamp_text=request.stamp_text,
-                    stamp_background=stamp_background,
-                )
-
         semantics = VisibleSignatureSemanticsService(
             certificate_reader=_WorkflowCertificateFieldReader(),
             clock=clock,
-            fit_validator=_WorkflowVisibleSignatureFitValidator(),
+            fit_validator=self.fit_validator
+            or BackendVisibleSignatureFitValidator(certificate_path=self.certificate_path),
         ).resolve(
             VisibleSignatureSemanticsRequest(
                 certificate_path=self.certificate_path,

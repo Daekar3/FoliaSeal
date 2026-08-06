@@ -1690,7 +1690,7 @@ service or generic extension surface. The child plan is
 `docs/ExecPlans/signing_draft_contract_boundary_execplan.md`, with baseline `215b37818`, exact DTO
 signatures, import-firewall gates, full caller migration, and immutable Phase 3/CLI/JSON behavior.
 
-### Implementation 25 — in progress, 2026-08-06
+### Implementation 25 — completed 2026-08-06
 
 The child implementation has completed its source migration and final validation pass but is awaiting
 the intentional commit. `src/foliaseal/application/signing_draft_contracts.py` now owns the six
@@ -1702,7 +1702,60 @@ offscreen evidence is signed acceptance `10/7`, preview parity `18/18`, and fit 
 The contracts firewall is free of workflow, backend, Qt, Pillow, and PyHanko; semantics remains free of
 workflow, backend, and Qt while retaining its characterized PyHanko transitive import through
 `sign_pdf_use_case`. Independent reviews found no unresolved critical or major findings after alias
-retirement and documentation correction.
+retirement and documentation correction. Commit `f9f339919` (`Extract signing draft contracts
+boundary`) contains the 31 intentional source, test, architecture, parent/child-plan, and nomenclature
+inventory files. The worktree was clean after commit and no FoliaSeal/Python/Qt processes or named
+evidence roots remained.
+
+### Scan Round 26 — completed 2026-08-06
+
+Three independent explorers rescanned clean commit `f9f339919`. Two reports converge on a rendered-ink
+fit-validation seam at Priority about `68–69`, confidence `.90–.97`: the mutable workflow still
+constructs `_WorkflowVisibleSignatureFitValidator`, lazily imports `phase3_signing_backend`, maps
+stamp-background failures, and delegates to a backend validator that owns layout preparation,
+rendered-ink fallback, and PyHanko/Pillow-facing conversion. The application fit-policy module only
+applies decisions; the workflow's `_validate_visible_signature_fit` wrapper is dead and can be
+retired with evidence. The bounded candidate is an application-owned fit-validation adapter/service
+with exact issue preservation, injected into the workflow, plus existing backend tests and an import
+firewall. The third report independently found a higher-scoring pure snapshot projection cluster in
+`phase3_harness.py` (Priority `72.32`, confidence `.945`), but it lacked a second convergent report;
+it remains the next alternate rather than the selected seam.
+
+All explorers agree that `phase3_nomenclature_retirement_execplan.md` is not suitable for this slice:
+public CLI, DTO, JSON, fixture, artifact, and archival names require one versioned migration. The
+nomenclature plan remains the atomic follow-up and was refreshed with the live `106` path / `254`
+file / approximately `6,570` occurrence inventory.
+
+Next action: obtain a three-shape design review for the convergent fit-validation seam and write a
+self-contained child plan before implementation.
+
+### Design Selection 27 — completed 2026-08-06
+
+Two independent reviewers evaluated three shapes for the fit seam. Shape A is a minimal lazy adapter
+(about `70`): low risk but weak ownership improvement. Shape B makes the existing
+`VisibleSignatureFitValidator` protocol explicit with an injected backend adapter (about `80`),
+removing the workflow's direct backend dependency while preserving the backend's authoritative
+rendered-ink implementation. Shape C is a constrained common-caller service (about `84` only when
+layout preparation remains behind an injected callable); both reviewers flagged cycle and duplicate
+layout-owner risk if broadened.
+
+Shape B is selected for bounded one-slice delivery. It retires the dead workflow wrapper, keeps exact
+issue/error and prepared-plan behavior, adds a no-heavy-dependency adapter firewall, and leaves
+PyHanko/Pillow materialization in the backend. The child plan is
+`docs/ExecPlans/visible_signature_fit_validator_boundary_execplan.md`; phase3 nomenclature remains
+the separately versioned atomic migration plan.
+
+### Implementation 28 — in progress, 2026-08-06
+
+The selected typed-port slice is implemented and validated, pending its intentional commit. New
+`visible_signature_fit_validator.py` owns the application-facing adapter; it has no module-level
+workflow, Qt, Pillow, or PyHanko imports and delegates lazily to the backend. `SigningDraftWorkflow`
+now accepts the existing `VisibleSignatureFitValidator` protocol, defaults to the adapter, and no
+longer imports `phase3_signing_backend` or carries the dead `_validate_visible_signature_fit` wrapper.
+Full validation is `1,111 passed, 1 warning`; offscreen evidence is signed acceptance `10/7`, preview
+parity `18/18`, and fit rejection `3/3`. The SPEC is unchanged, cleanup is complete, and conservative
+Actual Improvement is approximately `0.40` versus predicted `0.40`, with no component regression or
+critical/major review finding.
 
 ## Context and Orientation
 
