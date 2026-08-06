@@ -85,8 +85,8 @@ contract and is not a production service locator.
 - [x] Current app-frame lifecycle preserves compose-before-mount and dispose-after-success semantics;
   those invariants are characterized by `tests/unit/test_signing_workspace_lifecycle.py`.
 - [x] Implementation and boundary-test migration complete.
-- [ ] DevLoop compliance review, architecture documentation, full validation, and commit closure
-  complete.
+- [x] DevLoop compliance review, architecture documentation, full validation, and commit closure
+  complete in `9ce248fd3`.
 
 ## Progress
 
@@ -103,7 +103,7 @@ contract and is not a production service locator.
 - [x] Add equivalent or stronger boundary tests, then remove the retired caller-side aliases and
   dynamic access.
 - [x] Run full validation, release matrices, process/artifact cleanup, architecture compliance review,
-  and documentation reconciliation. Commit closure remains pending.
+  documentation reconciliation, and commit closure.
 - [x] Measure post-refactor proxies and record Actual Improvement and prediction accuracy.
 
 ## Problem Frame and Constraints
@@ -351,7 +351,8 @@ Validation evidence: full suite `1,039 passed, 1 pre-existing Pillow deprecation
 signed matrix executes 8 scenarios with 6 successful signings, 2 matched intentional rejections,
 zero cryptographic/annotation/preview-output failures, and `acceptance_expectations_passed=True`.
 Named `/tmp/foliaseal-workspace-preview` and `/tmp/foliaseal-workspace-signed` directories were
-removed and no FoliaSeal process remains after cleanup. The slice is ready for intentional commit.
+removed and no FoliaSeal process remains after cleanup. Commit `9ce248fd3` contains the complete
+slice; the main worktree is clean.
 
 ## Idempotence and Recovery
 

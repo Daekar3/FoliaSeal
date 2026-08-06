@@ -52,8 +52,8 @@ created.
 - [x] The current checkout baseline is `main` at commit `ca6857ef9` (clean at loop start).
 - [x] Child plan `signing_workspace_primary_session_hybrid_execplan.md` records the hybrid interface,
   baseline proxies, behavior map, predicted improvement, and acceptance gates.
-- [ ] The selected child DevLoop has completed implementation, validation, compliance review,
-  documentation reconciliation, and commit closure.
+- [x] The selected child DevLoop has completed implementation, validation, compliance review,
+  documentation reconciliation, and commit closure in `9ce248fd3`.
 
 ## Progress
 
@@ -70,9 +70,9 @@ created.
   common-caller designs; selected the constrained hybrid at Refactor Shape Score 95.5.
 - [x] Execute the implementation portion of `signing_workspace_primary_session_hybrid_execplan.md`
   through `$dev-loop`; typed bundle/session/view callers and boundary tests are present.
-- [ ] Complete the child DevLoop's final validation, compliance review, measurement, documentation,
+- [x] Complete the child DevLoop's final validation, compliance review, measurement, documentation,
   and commit closure before accepting the cycle.
-- [ ] Independently measure the completed slice, update the parent and child plans, and rescan.
+- [ ] Independently rescan the live checkout after the accepted cycle.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -177,9 +177,17 @@ certificate/profile maintenance into a generic manager.
 
 ## Cycle Ledger
 
-No architecture cycle has been accepted yet. Each cycle record will name its child ExecPlan, baseline
-and implementation commits, predicted and actual component improvements, hard-gate results, prediction
-accuracy, accepted/corrected/redesigned/abandoned status, and the strongest residual opportunity.
+### Cycle 1 — accepted 2026-08-05
+
+- Child: `signing_workspace_primary_session_hybrid_execplan.md`
+- Baseline: `ca6857ef9`; implementation/docs commit: `9ce248fd3`
+- Shape: constrained `typed-capabilities-plus-primary-session` hybrid, score `95.5`
+- Improvement: predicted `0.1925`, actual `0.2125` (`1.10x`), no component regression over `0.10`
+- Gates: frozen SPEC unchanged; 1,039 tests passed; Ruff/diff/import isolation passed; preview 8/0;
+  signed 8 with 6 successes and 2 matched intentional rejections; no leftover artifacts/processes;
+  caller seam grep 4 -> 0; docs and plans reconciled; main clean after commit.
+- Status: accepted. The strongest residual opportunity is the tracked
+  `phase3_nomenclature_retirement_execplan.md`, pending a fresh scan and contract inventory.
 
 ## Surprises & Discoveries
 
