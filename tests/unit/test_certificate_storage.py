@@ -67,6 +67,35 @@ def test_certificate_catalog_store_saves_human_readable_json_without_password(
     assert reloaded == original
 
 
+def test_certificate_catalog_store_commit_restores_file_and_catalog_on_save_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    original = build_certificate_catalog(certificate_configurations=())
+    store.save_catalog(original)
+    managed = original.managed_certificates[0]
+    managed_path = store.managed_certificate_dir / managed.storage_filename
+    managed_path.write_bytes(b"old-certificate")
+    original_save = CertificateCatalogStore.save_catalog
+
+    def fail_save(self, catalog):
+        raise OSError("catalog write failed")
+
+    monkeypatch.setattr(CertificateCatalogStore, "save_catalog", fail_save)
+    with pytest.raises(OSError, match="catalog write failed"):
+        store.commit_managed_certificate(
+            payload=b"new-certificate",
+            managed_certificate=managed,
+            catalog=original,
+        )
+    monkeypatch.setattr(CertificateCatalogStore, "save_catalog", original_save)
+
+    assert managed_path.read_bytes() == b"old-certificate"
+    assert store.load_catalog() == original
+    assert not list(store.managed_certificate_dir.glob(".*.tmp"))
+
+
 def test_certificate_catalog_store_removes_temp_file_when_replace_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -402,6 +431,21 @@ def test_certificate_catalog_store_export_rejects_symlink_destination(
         store.export_managed_certificate_by_id("managed-cert-default", symlink)
 
     assert target.read_bytes() == b"other-managed-pkcs12"
+
+
+def test_certificate_catalog_store_rejects_broken_symlink_destination(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / CERTIFICATE_DIRECTORY_NAME)
+    source = store.managed_certificate_dir / "cert_default.p12"
+    symlink = tmp_path / "broken-link.p12"
+    store.managed_certificate_dir.mkdir(parents=True)
+    source.write_bytes(b"managed-pkcs12")
+    symlink.symlink_to(tmp_path / "missing-target.p12")
+    store.save_catalog(build_certificate_catalog())
+
+    with pytest.raises(ConfigValidationError, match="symbolic link"):
+        store.export_managed_certificate_by_id("managed-cert-default", symlink)
 
 
 def test_certificate_catalog_store_rejects_invalid_json(tmp_path: Path) -> None:

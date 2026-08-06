@@ -7,8 +7,10 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from foliaseal.application.certificate_secret_store import CertificateSecretStoreError
 
-class SecretStorageError(RuntimeError):
+
+class SecretStorageError(CertificateSecretStoreError):
     """Raised when secure secret storage cannot complete an operation."""
 
 

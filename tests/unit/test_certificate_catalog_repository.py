@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
+
+import pytest
 
 from foliaseal.application.certificate_catalog_repository import (
     CertificateCatalogRepository,
@@ -14,6 +17,7 @@ from foliaseal.application.certificate_models import (
     ManagedCertificate,
     ManagedCertificateSubjectSummary,
 )
+from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 
 
@@ -71,13 +75,54 @@ def test_real_store_structurally_conforms_to_application_repository(tmp_path: Pa
     )
 
 
+def test_in_memory_managed_file_transaction_tracks_bytes_and_validates_record(
+    tmp_path: Path,
+) -> None:
+    managed = _managed()
+    original = CertificateCatalog(schema_version=1, managed_certificates=(managed,))
+    repository = InMemoryCertificateCatalogRepository(
+        catalog=original,
+        storage_dir=tmp_path / "Certificates",
+    )
+
+    committed = repository.commit_managed_certificate(
+        payload=b"pkcs12",
+        managed_certificate=managed,
+        catalog=original,
+    )
+    assert committed.catalog == original
+    assert repository._managed_files[managed.storage_filename] == b"pkcs12"
+    destination = tmp_path / "backup.p12"
+    repository.export_managed_certificate_by_id(managed.managed_certificate_id, destination)
+    assert destination.read_bytes() == b"pkcs12"
+
+    updated = original.remove_managed_certificate_by_id(managed.managed_certificate_id)
+    mismatched = replace(managed, storage_filename="other.p12")
+    with pytest.raises(ConfigValidationError, match="supplied managed certificate"):
+        repository.delete_managed_certificate(
+            managed_certificate=mismatched,
+            original_catalog=original,
+            updated_catalog=updated,
+        )
+
+    repository.delete_managed_certificate(
+        managed_certificate=managed,
+        original_catalog=original,
+        updated_catalog=updated,
+    )
+    assert managed.storage_filename not in repository._managed_files
+
+
 def test_application_certificate_modules_do_not_import_infra_store() -> None:
     script = """
 import sys
+from foliaseal.application import CertificateSecretStoreError
 import foliaseal.application.certificate_catalog_repository
 import foliaseal.application.certificate_manager
 import foliaseal.application.signature_properties_coordinator
+assert CertificateSecretStoreError.__module__ == 'foliaseal.application.certificate_secret_store'
 assert 'foliaseal.infra.config.certificate_storage' not in sys.modules
+assert 'foliaseal.infra.secret_storage' not in sys.modules
 """
     result = subprocess.run(
         [sys.executable, "-c", script],

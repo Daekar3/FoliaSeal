@@ -18,7 +18,6 @@ _EXPORT_MODULES = {
         (
             "CertificateManager",
             "CertificateManagerError",
-            "CertificateSecretStore",
             "CertificateOperationResult",
             "CreateCertificateRequest",
             "ImportCertificateRequest",
@@ -27,6 +26,9 @@ _EXPORT_MODULES = {
         ),
         "certificate_manager",
     ),
+    "CertificateSecretStore": "certificate_secret_store",
+    "CertificateSecretStoreError": "certificate_secret_store",
+    "ManagedCertificateCommit": "certificate_catalog_repository",
     **dict.fromkeys(
         (
             "DocumentReviewCardState",

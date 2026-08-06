@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -11,12 +12,15 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
 from foliaseal.application import (
+    CertificateCatalog,
     CertificateManager,
+    CertificateManagerError,
     CreateCertificateRequest,
     ExportCertificateRequest,
     ImportCertificateRequest,
     SaveConfigurationRequest,
 )
+from foliaseal.application.certificate_catalog_repository import ManagedCertificateCommit
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from tests.support.signing_builders import (
     build_certificate_catalog,
@@ -44,6 +48,12 @@ class FakeSecretStore:
         self.values.pop(secret_ref, None)
 
 
+class _FailAfterDeleteSecretStore(FakeSecretStore):
+    def delete_secret(self, secret_ref: str) -> None:
+        super().delete_secret(secret_ref)
+        raise RuntimeError("secret delete failed after side effect")
+
+
 def _manager(
     store: CertificateCatalogStore,
     *,
@@ -57,6 +67,44 @@ def _manager(
         id_factory=lambda: next(id_values),
         clock=lambda: datetime(2026, 5, 13, 12, 0, tzinfo=UTC),
     )
+
+
+class _NoPathRepository:
+    """Application fake proving the manager never composes repository paths."""
+
+    def __init__(self, catalog: CertificateCatalog) -> None:
+        self.catalog = catalog
+        self.commit_calls = []
+        self.delete_calls = []
+
+    def load_catalog(self) -> CertificateCatalog:
+        return self.catalog
+
+    def save_catalog(self, catalog: CertificateCatalog) -> None:
+        self.catalog = catalog
+
+    def save_configuration(self, configuration):
+        self.catalog = self.catalog.upsert_configuration(configuration)
+        return self.catalog
+
+    def delete_configuration_by_id(self, configuration_id: str) -> CertificateCatalog:
+        self.catalog = self.catalog.remove_configuration_by_id(configuration_id)
+        return self.catalog
+
+    def export_managed_certificate_by_id(self, certificate_id: str, destination_path):
+        raise AssertionError("export is not part of this boundary test")
+
+    def commit_managed_certificate(self, **kwargs) -> ManagedCertificateCommit:
+        self.commit_calls.append(kwargs)
+        self.catalog = kwargs["catalog"]
+        return ManagedCertificateCommit(
+            catalog=self.catalog,
+            managed_file_path=Path("/virtual/managed.p12"),
+        )
+
+    def delete_managed_certificate(self, **kwargs) -> None:
+        self.delete_calls.append(kwargs)
+        self.catalog = kwargs["updated_catalog"]
 
 
 def _write_pkcs12(path: Path, *, passphrase: str, common_name: str) -> None:
@@ -106,6 +154,69 @@ def test_manager_create_and_import_return_typed_operations(tmp_path: Path) -> No
     assert imported.operation == "imported"
     assert imported.managed_certificate is not None
     assert imported.managed_certificate.subject_summary.common_name == "Alice Imported"
+
+
+def test_manager_uses_atomic_repository_verb_without_path_properties() -> None:
+    repository = _NoPathRepository(CertificateCatalog(schema_version=1))
+    manager = CertificateManager(
+        store=repository,
+        id_factory=iter(("managed-fake", "config-fake")).__next__,
+        clock=lambda: datetime(2026, 5, 13, 12, 0, tzinfo=UTC),
+    )
+
+    result = manager.create(CreateCertificateRequest("Fake Boundary", "secret"))
+
+    assert result.operation == "created"
+    assert len(repository.commit_calls) == 1
+    assert not hasattr(repository, "managed_certificate_dir")
+
+
+def test_manager_removes_saved_secret_when_repository_commit_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = _NoPathRepository(CertificateCatalog(schema_version=1))
+    secret_store = FakeSecretStore()
+    manager = CertificateManager(
+        store=repository,
+        secret_store=secret_store,
+        id_factory=iter(("managed-fake", "config-fake")).__next__,
+        clock=lambda: datetime(2026, 5, 13, 12, 0, tzinfo=UTC),
+    )
+
+    def fail_commit(**kwargs):
+        raise OSError("catalog write failed")
+
+    monkeypatch.setattr(repository, "commit_managed_certificate", fail_commit)
+
+    with pytest.raises(OSError, match="catalog write failed"):
+        manager.create(CreateCertificateRequest("Fake Boundary", "secret", save_password=True))
+
+    assert secret_store.values == {}
+
+
+def test_manager_restores_secret_when_delete_reports_failure_after_side_effect(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    configuration = replace(
+        catalog.certificate_configurations[0],
+        save_password=True,
+        password_secret_ref="secret://test/config-default",
+    )
+    catalog = replace(catalog, certificate_configurations=(configuration,))
+    store.save_catalog(catalog)
+    secret_store = _FailAfterDeleteSecretStore()
+    secret_ref = catalog.certificate_configurations[0].password_secret_ref
+    assert secret_ref is not None
+    secret_store.values[secret_ref] = "secret"
+
+    with pytest.raises(CertificateManagerError, match="saved password was restored"):
+        _manager(store, secret_store=secret_store).delete_configuration(
+            catalog.certificate_configurations[0].certificate_configuration_id
+        )
+
+    assert secret_store.values[secret_ref] == "secret"
 
 
 def test_manager_save_and_delete_configuration_preserves_managed_certificate(

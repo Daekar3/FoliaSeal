@@ -7,7 +7,12 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
+from foliaseal.application.certificate_catalog_repository import (
+    CertificateRepositoryError,
+    ManagedCertificateCommit,
+)
 from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
@@ -138,11 +143,144 @@ class CertificateCatalogStore:
         catalog = self.load_catalog()
         certificate = catalog.managed_certificate_by_id(certificate_id)
         updated_catalog = catalog.remove_managed_certificate_by_id(certificate_id)
-        self.save_catalog(updated_catalog)
-        managed_file = self.managed_certificate_dir / certificate.storage_filename
-        if managed_file.exists():
-            managed_file.unlink()
+        self.delete_managed_certificate(
+            managed_certificate=certificate,
+            original_catalog=catalog,
+            updated_catalog=updated_catalog,
+        )
         return updated_catalog
+
+    def commit_managed_certificate(
+        self,
+        *,
+        payload: bytes,
+        managed_certificate: ManagedCertificate,
+        catalog: CertificateCatalog,
+    ) -> ManagedCertificateCommit:
+        """Atomically persist a managed PKCS#12 payload and candidate catalog."""
+        if not isinstance(payload, bytes):
+            raise ConfigValidationError("payload must be bytes.")
+        stored = catalog.managed_certificate_by_id(managed_certificate.managed_certificate_id)
+        if stored != managed_certificate:
+            raise ConfigValidationError(
+                "catalog does not contain the supplied managed certificate."
+            )
+        managed_path = self.managed_certificate_dir / managed_certificate.storage_filename
+        previous_catalog = self._snapshot_file(self.catalog_path)
+        previous_managed = self._snapshot_file(managed_path)
+        staging_path = managed_path.with_name(f".{managed_path.name}.{uuid4().hex}.tmp")
+        try:
+            self.storage_dir.mkdir(parents=True, exist_ok=True)
+            self.managed_certificate_dir.mkdir(parents=True, exist_ok=True)
+            staging_path.write_bytes(payload)
+            staging_path.replace(managed_path)
+            self.save_catalog(catalog)
+        except Exception as exc:
+            self._recover_transaction(
+                operation_error=exc,
+                catalog_snapshot=previous_catalog,
+                managed_snapshot=previous_managed,
+                catalog_path=self.catalog_path,
+                managed_path=managed_path,
+                staging_path=staging_path,
+            )
+            raise
+        return ManagedCertificateCommit(catalog=catalog, managed_file_path=managed_path)
+
+    def delete_managed_certificate(
+        self,
+        *,
+        managed_certificate: ManagedCertificate,
+        original_catalog: CertificateCatalog,
+        updated_catalog: CertificateCatalog,
+    ) -> None:
+        """Atomically remove a managed file and its catalog record."""
+        stored = original_catalog.managed_certificate_by_id(
+            managed_certificate.managed_certificate_id
+        )
+        if stored != managed_certificate:
+            raise ConfigValidationError(
+                "catalog does not contain the supplied managed certificate."
+            )
+        expected = original_catalog.remove_managed_certificate_by_id(
+            managed_certificate.managed_certificate_id
+        )
+        if expected != updated_catalog:
+            raise ConfigValidationError(
+                "updated catalog does not match managed certificate removal."
+            )
+        managed_path = self.managed_certificate_dir / managed_certificate.storage_filename
+        previous_catalog = self._snapshot_file(self.catalog_path)
+        previous_managed = self._snapshot_file(managed_path)
+        quarantine_path = managed_path.with_name(f".{managed_path.name}.{uuid4().hex}.deleting")
+        try:
+            if managed_path.exists():
+                managed_path.replace(quarantine_path)
+            self.save_catalog(updated_catalog)
+            if quarantine_path.exists():
+                quarantine_path.unlink()
+        except Exception as exc:
+            self._recover_transaction(
+                operation_error=exc,
+                catalog_snapshot=previous_catalog,
+                managed_snapshot=previous_managed,
+                catalog_path=self.catalog_path,
+                managed_path=managed_path,
+                staging_path=quarantine_path,
+            )
+            raise
+
+    @staticmethod
+    def _snapshot_file(path: Path) -> bytes | None:
+        return path.read_bytes() if path.exists() else None
+
+    @classmethod
+    def _recover_transaction(
+        cls,
+        *,
+        operation_error: Exception,
+        catalog_snapshot: bytes | None,
+        managed_snapshot: bytes | None,
+        catalog_path: Path,
+        managed_path: Path,
+        staging_path: Path,
+    ) -> None:
+        recovery_errors: list[str] = []
+        try:
+            if staging_path.exists():
+                if managed_path.exists():
+                    managed_path.unlink()
+                staging_path.replace(managed_path)
+        except Exception as exc:
+            recovery_errors.append(f"managed staging recovery failed: {exc}")
+        try:
+            cls._restore_file(managed_path, managed_snapshot)
+        except Exception as exc:
+            recovery_errors.append(f"managed file recovery failed: {exc}")
+        try:
+            cls._restore_file(catalog_path, catalog_snapshot)
+        except Exception as exc:
+            recovery_errors.append(f"catalog recovery failed: {exc}")
+        if recovery_errors:
+            raise CertificateRepositoryError(
+                "Managed certificate transaction failed and recovery was incomplete: "
+                + "; ".join(recovery_errors)
+            ) from operation_error
+
+    @staticmethod
+    def _restore_file(path: Path, previous: bytes | None) -> None:
+        if previous is None:
+            if path.exists():
+                path.unlink()
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        restore_path = path.with_name(f".{path.name}.{uuid4().hex}.restore")
+        try:
+            restore_path.write_bytes(previous)
+            restore_path.replace(path)
+        finally:
+            if restore_path.exists():
+                restore_path.unlink()
 
     def export_managed_certificate_by_id(
         self,
@@ -164,7 +302,7 @@ class CertificateCatalogStore:
             raise ConfigValidationError(
                 "Export destination must be different from the managed certificate file."
             )
-        if destination.exists() and destination.is_symlink():
+        if destination.is_symlink():
             raise ConfigValidationError("Export destination must not be a symbolic link.")
         if (
             destination_resolved == managed_dir_resolved

@@ -126,6 +126,11 @@ created.
 - [x] Implemented the app-frame projection slice, boundary tests, architecture reconciliation, full
   validation, offscreen evidence, and exact generated-artifact/process cleanup; commit closure and
   post-commit rescan remain.
+- [x] Completed Scan Round 35 and Design Selection 36 for the managed-certificate transaction
+  boundary; selected the common-caller atomic repository-verb shape and created its child plan.
+- [x] Implemented the certificate transaction boundary, focused/full validation, architecture
+  reconciliation, offscreen evidence, and generated-artifact/process cleanup; intentional commit
+  and the post-commit three-explorer rescan remain.
 
 ## Scan and Candidate Ledger
 
@@ -1889,6 +1894,79 @@ viewer-render contract extraction at Priority `61–64`, confidence `.75–.85`.
 plan remains separate: its `106` path / `254` file / roughly `6,570` reference inventory spans public
 CLI, DTO, JSON, fixture, artifact, and historical contracts and requires one atomic versioned
 migration rather than a piecemeal rename.
+
+### Problem Frame 35 — certificate transaction boundary
+
+The selected candidate is the application-owned certificate workflow spanning
+`src/foliaseal/application/certificate_manager.py`,
+`src/foliaseal/application/certificate_catalog_repository.py`, and
+`src/foliaseal/infra/config/certificate_storage.py`, with secure-password recovery through
+`src/foliaseal/infra/secret_storage.py`. Representative workflows are create/import with optional
+password saving, delete configuration with secret restoration, and delete managed certificate with
+file/catalog rollback. The manager currently coordinates `Path.mkdir`, `write_bytes`, `replace`,
+`unlink`, and rollback itself while also catching an infra exception type. This is a local-
+substitutable boundary: in-memory repository and fake secret stores already exist.
+
+The design must preserve `CertificateOperationResult`, catalog JSON, managed PKCS#12 filenames,
+secret references, user-facing errors, and GUI behavior. It must keep cryptography/certificate policy
+in the application manager while moving filesystem mutation and recovery into an application-owned
+repository contract implemented by the infra store. An illustrative target is:
+
+    result = self.store.commit_managed_certificate(payload, managed, updated_catalog)
+    self.store.remove_managed_certificate_file(certificate.storage_filename)
+
+This sketch is deliberately not the selected interface; the design review must decide whether the
+repository owns a transaction object, operation-scoped verbs, or a single atomic commit result.
+
+### Design Selection 36 — completed 2026-08-06
+
+Three designs and two independent reviewers were scored against the fixed Refactor Shape formula:
+
+- Shape A, minimal repository atomic verbs (`commit_new_certificate` and
+  `delete_managed_certificate_by_id`) scored `86.0–88.5`. It hides file/catalog sequencing but leaves
+  secret-error translation and result/path compatibility decisions distributed.
+- Shape B, a flexible generic transaction/context object, scored `67.0–74.5` before penalties and
+  approximately `22–44.5` after the evidence-backed generic-transaction and caller-coordination
+  penalties. It was rejected as an over-broad rollback state machine for only two workflows.
+- Shape C, common-caller optimized operation-scoped atomic verbs plus an application-owned secret
+  error protocol, scored `90.5` with no penalties. It preserves `CertificateManager` methods and
+  results while moving filesystem/catalog sequencing behind the repository and making the dominant
+  create/import/delete calls one operation each.
+
+Shape C is selected. The repository will expose narrow behavior-bearing commit/delete operations;
+the manager will retain certificate policy, PKCS#12 generation/import, IDs, duplicate checks, secret
+save policy, and `CertificateOperationResult`. The concrete adapter will own directory creation,
+managed-file staging, catalog persistence, finalization, and recovery. An application-owned secret
+error replaces the manager's direct import of `infra.secret_storage.SecretStorageError`. Existing
+repository path properties remain only where the signature-properties/material-resolution seam still
+needs them; their retirement is explicitly deferred to that follow-up rather than silently widening
+this child. No generic transaction, lifecycle registry, phase3 rename, JSON change, or CLI change is
+allowed. The child plan is
+`docs/ExecPlans/managed_certificate_transaction_boundary_execplan.md`.
+
+### Implementation 37 — validation complete, closure pending — 2026-08-06
+
+The selected certificate transaction slice is implemented. `CertificateManager` now retains
+certificate policy, PKCS#12 generation/parsing, saved-secret compensation, export, and typed
+operation results, while `CertificateCatalogRepository` owns atomic managed-certificate
+commit/delete verbs. `CertificateCatalogStore` stages files, persists catalogs, finalizes or
+quarantines changes, and recovers both sides on failure. The in-memory adapter mirrors the contract
+with an isolated filename-to-bytes map. `CertificateSecretStoreError` is application-owned and
+`SecretStorageError` remains only as its infrastructure subclass. Broken-symlink export, missing-
+file/delete parity, partial-secret-delete compensation, rollback, no-path fakes, and import
+isolation are covered by tests. Resolver path properties remain only for the existing material
+resolver seam, and no phase3 nomenclature/path/CLI/JSON/fixture/artifact was changed.
+
+Focused boundary validation passes (`38` tests); the full suite passes (`1127` tests, one pre-
+existing Pillow deprecation warning). Ruff, compileall, CLI help, and `git diff --check` pass.
+The unchanged offscreen evidence command passes signed acceptance `10/7`, preview parity `18/18`,
+and fit rejection `3/3`; its generated summary was removed and the product process audit is clean.
+Architecture documentation and the child plan now record ownership, recovery, adapter parity, and
+the explicit resolver/phase3 follow-ups. Conservative before/after proxies are navigation `.55`,
+change amplification `.65`, seam reduction `.75`, boundary-test improvement `.70`, interface
+compression `.60`, cohesion `.55`, and isolation `.80`, for weighted Actual Improvement about
+`.67` versus predicted `.50`; no component regressed below `-.10`, so the hard improvement gates
+pass. Intentional commit and the three-explorer post-commit rescan remain as the final closure gates.
 
 ## Context and Orientation
 
