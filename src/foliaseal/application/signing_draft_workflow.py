@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Self
@@ -159,6 +160,8 @@ class SigningDraftWorkflow:
         repr=False,
     )
     _certificate_preview_available: bool = field(default=False, init=False, repr=False)
+    _preview_signing_time: datetime | None = field(default=None, init=False, repr=False)
+    _preview_fingerprint: tuple[object, ...] | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_signing_request(
@@ -168,7 +171,7 @@ class SigningDraftWorkflow:
         placement_context: SignaturePlacementContext | None = None,
     ) -> Self:
         """Create a draft workflow seeded from an existing signing request."""
-        return cls(
+        workflow = cls(
             input_pdf_path=request.input_pdf_path,
             output_pdf_path=request.output_pdf_path,
             certificate_path=request.certificate_path,
@@ -182,6 +185,9 @@ class SigningDraftWorkflow:
             signature_placement_defaults=None,
             placement_context=placement_context,
         )
+        workflow._preview_signing_time = request.signing_time
+        workflow._preview_fingerprint = workflow._current_preview_fingerprint()
+        return workflow
 
     @property
     def current_signature_rect(self) -> SignatureRect | None:
@@ -204,12 +210,14 @@ class SigningDraftWorkflow:
     def set_signature_rect(self, signature_rect: SignatureRect | None) -> None:
         """Set the PDF-space rectangle used for the visible signature."""
         self.signature_rect = signature_rect
+        self._invalidate_preview_snapshot()
         self.selected_placement_profile_id = None
         self.selected_signature_preset_id = None
 
     def clear_signature_rect(self) -> None:
         """Remove the current signature rectangle."""
         self.signature_rect = None
+        self._invalidate_preview_snapshot()
         self.selected_placement_profile_id = None
         self.selected_signature_preset_id = None
 
@@ -252,6 +260,7 @@ class SigningDraftWorkflow:
                 height_pt=height_pt if height_pt is not None else current.height_pt,
             )
         self.signature_rect = new_rect
+        self._invalidate_preview_snapshot()
         return new_rect
 
     def set_signature_rect_from_view_selection(
@@ -279,6 +288,7 @@ class SigningDraftWorkflow:
             height_pt=pdf_rect.y2 - pdf_rect.y1,
         )
         self.signature_rect = rect
+        self._invalidate_preview_snapshot()
         return rect
 
     def set_signature_appearance(
@@ -287,12 +297,14 @@ class SigningDraftWorkflow:
     ) -> None:
         """Set the normalized visible-signature appearance."""
         self.signature_appearance = signature_appearance
+        self._invalidate_preview_snapshot()
         self.selected_appearance_profile_id = None
         self.selected_signature_preset_id = None
 
     def clear_signature_appearance(self) -> None:
         """Remove the current visible-signature appearance draft."""
         self.signature_appearance = None
+        self._invalidate_preview_snapshot()
         self.selected_appearance_profile_id = None
 
     def capture_current_signature_setup(
@@ -348,6 +360,7 @@ class SigningDraftWorkflow:
     ) -> None:
         """Apply draft-facing signature preset values without requiring a schema DTO."""
         self.signature_appearance = appearance
+        self._invalidate_preview_snapshot()
         self.signature_placement_defaults = placement_defaults
         self.selected_signature_preset_id = signature_preset_id
         if certificate_configuration_id is not None:
@@ -369,9 +382,17 @@ class SigningDraftWorkflow:
         self.certificate_alias = signing_material.certificate_alias
         self._certificate_preview_values = None
         self._certificate_preview_available = False
+        self._invalidate_preview_snapshot()
 
     def validation_issues(self) -> tuple[SigningDraftValidationIssue, ...]:
         """Return blocking and non-blocking problems for the current draft."""
+        semantics = self._resolve_visible_signature_semantics()
+        return self._validation_issues_for_semantics(semantics)
+
+    def _validation_issues_for_semantics(
+        self,
+        semantics,
+    ) -> tuple[SigningDraftValidationIssue, ...]:
         issues: list[SigningDraftValidationIssue] = []
         if self.signature_rect is None:
             issues.append(
@@ -393,7 +414,7 @@ class SigningDraftWorkflow:
                 )
             )
         elif self.signature_rect is not None:
-            issues.extend(self._validate_visible_signature_fit())
+            issues.extend(semantics.issues)
 
         return tuple(issues)
 
@@ -407,8 +428,8 @@ class SigningDraftWorkflow:
     def preview(self) -> SigningDraftPreview:
         """Return a normalized, UI-friendly preview payload."""
         appearance = self.signature_appearance
-        issues = self.validation_issues()
-        semantics = self._resolve_visible_signature_semantics()
+        semantics = self._resolve_visible_signature_semantics(capture_signing_time=True)
+        issues = self._validation_issues_for_semantics(semantics)
         fields = tuple(
             SigningDraftPreviewField(
                 field_key=field.field_key,
@@ -439,7 +460,9 @@ class SigningDraftWorkflow:
             fields=fields,
             detail_text=detail_text,
             issues=issues,
-            can_submit=self.can_build_request(),
+            can_submit=not any(
+                issue.severity == SigningDraftValidationSeverity.ERROR for issue in issues
+            ),
             stamp_text=semantics.text.stamp_text,
         )
 
@@ -463,7 +486,26 @@ class SigningDraftWorkflow:
             certificate_alias=self.certificate_alias,
             signature_rect=self.signature_rect,
             signature_appearance=self.signature_appearance,
+            signing_time=(
+                self._preview_signing_time
+                if self._preview_fingerprint == self._current_preview_fingerprint()
+                else None
+            ),
         )
+
+    def _current_preview_fingerprint(self) -> tuple[object, ...]:
+        appearance = self.signature_appearance
+        return (
+            self.certificate_path,
+            self.signature_rect,
+            appearance,
+            self.certificate_alias,
+            self.timestamp_required,
+        )
+
+    def _invalidate_preview_snapshot(self) -> None:
+        self._preview_signing_time = None
+        self._preview_fingerprint = None
 
     def _certificate_values_for_preview(self) -> dict[SignatureFieldKey, str]:
         if self._certificate_preview_values is not None:
@@ -530,7 +572,12 @@ class SigningDraftWorkflow:
     def _validate_visible_signature_fit(self) -> tuple[SigningDraftValidationIssue, ...]:
         return self._resolve_visible_signature_semantics().issues
 
-    def _resolve_visible_signature_semantics(self):
+    def _resolve_visible_signature_semantics(
+        self,
+        *,
+        signing_time: datetime | None = None,
+        capture_signing_time: bool = False,
+    ):
         from foliaseal.application.visible_signature_semantics import (
             CertificateFieldValues,
             VisibleSignatureFitRequest,
@@ -539,6 +586,20 @@ class SigningDraftWorkflow:
         )
 
         workflow = self
+
+        class _WorkflowSigningClock:
+            def __init__(self, value: datetime | None) -> None:
+                self.value = value
+
+            def now(self, mode: SignatureTimezoneDisplayMode) -> datetime:
+                if self.value is None:
+                    value = datetime.now(UTC)
+                    if mode == SignatureTimezoneDisplayMode.LOCAL:
+                        value = value.astimezone()
+                    self.value = value
+                return self.value
+
+        clock = _WorkflowSigningClock(signing_time)
 
         class _WorkflowCertificateFieldReader:
             def read_fields(
@@ -591,8 +652,9 @@ class SigningDraftWorkflow:
                     stamp_background=stamp_background,
                 )
 
-        return VisibleSignatureSemanticsService(
+        semantics = VisibleSignatureSemanticsService(
             certificate_reader=_WorkflowCertificateFieldReader(),
+            clock=clock,
             fit_validator=_WorkflowVisibleSignatureFitValidator(),
         ).resolve(
             VisibleSignatureSemanticsRequest(
@@ -603,3 +665,7 @@ class SigningDraftWorkflow:
                 placement_context=self.placement_context,
             )
         )
+        if capture_signing_time:
+            self._preview_signing_time = clock.value
+            self._preview_fingerprint = self._current_preview_fingerprint()
+        return semantics

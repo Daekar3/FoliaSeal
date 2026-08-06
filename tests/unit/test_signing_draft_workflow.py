@@ -146,6 +146,7 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert preview.text_style == _appearance().text_style
     assert preview.box_style == _appearance().box_style
     assert preview.image_stamp_path == "/tmp/stamp.png"
+    assert request.signing_time is not None
     assert [field.field_key.value for field in preview.fields] == [
         "distinguished_name",
         "common_name",
@@ -167,6 +168,22 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert request.certificate_alias == "signing-cert"
     assert request.signature_appearance == workflow.current_signature_appearance
     assert request.signature_rect == workflow.current_signature_rect
+
+
+def test_preview_signing_time_is_invalidated_by_draft_mutation(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(page_index=0, left_pt=10.0, bottom_pt=10.0, width_pt=220.0, height_pt=80.0)
+    )
+
+    workflow.preview()
+    unchanged_request = workflow.build_signing_request()
+    assert unchanged_request.signing_time is not None
+
+    workflow.update_signature_rect(left_pt=12.0)
+    changed_request = workflow.build_signing_request()
+    assert changed_request.signing_time is None
 
 
 def test_workflow_preview_uses_certificate_values_when_pkcs12_is_readable(tmp_path: Path) -> None:

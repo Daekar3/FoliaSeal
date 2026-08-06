@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from math import isfinite
 from typing import Protocol
@@ -476,6 +477,7 @@ class SigningRequest:
     certificate_alias: str | None = None
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
+    signing_time: datetime | None = None
 
     def __post_init__(self) -> None:
         input_pdf_path = _require_non_empty_str(self.input_pdf_path, "input_pdf_path")
@@ -506,6 +508,9 @@ class SigningRequest:
             self.signature_appearance, SignatureAppearance
         ):
             raise ValueError("signature_appearance must be a SignatureAppearance value.")
+        if self.signing_time is not None:
+            if not isinstance(self.signing_time, datetime) or self.signing_time.tzinfo is None:
+                raise ValueError("signing_time must be a timezone-aware datetime value.")
 
     def has_visible_signature_settings(self) -> bool:
         """Return whether the request includes visible signature instructions."""

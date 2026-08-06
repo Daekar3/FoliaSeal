@@ -1054,6 +1054,74 @@ weighted `Actual Improvement = 0.63` versus predicted `0.40` (`1.56x`), with no 
 below `-0.10`. Commit `3370748b7` is on `main`; the accepted slice is closed and a fresh
 three-explorer scan is required before selecting the next candidate.
 
+### Post-cap continuation scan 11 — completed after `4c834e9bc`
+
+Three independent explorers reviewed the clean preview-finalization checkout. The highest bounded
+and SPEC-relevant candidate is strict preview-to-signing-time handoff. `SigningDraftWorkflow.preview()`
+resolves visible semantics through an injectable signing clock, but `build_signing_request()` does
+not retain that timestamp and `prepare_phase3_signing_plan()` later calls `_current_signing_time()`
+again. A clock rollover can therefore change timestamp text between the canonical preview and final
+output, contrary to the frozen preview/output-fidelity principle in `docs/SPEC.md:107-118` and the
+explicit debt note in `docs/ARCHITECTURE.md:1318`.
+
+The timestamp candidate scored approximately `(NF,CA,SR,TG,IC,CC,MR,BU) = (4,4.5,4,4.5,4,4.5,2.5,2)`,
+confidence `0.95`, and Candidate Priority `75`. It is local-substitutable through the existing
+`SigningClock` and `_FixedSigningClock`; direct headless `SigningRequest` callers can retain current-
+time defaults. Alternatives were the signing-shell composition root (~70), private scalar snapshot
+projection (~66–68), evidence-runner private factory access (~65–69), and test-only dialog bridge
+cleanup (~63–66). Phase3 nomenclature remains an atomic external-contract migration and is not
+inflated into this behavior-sensitive slice.
+
+Selected next candidate: `preview_signing_time_snapshot_handoff`. The next design round must compare
+minimal additive request propagation, a flexible prepared-signing context port, and a common-caller
+workflow session shape, then choose a one-slice design that preserves direct-call defaults, explicit
+preview invalidation after draft edits, timezone semantics, and all serialized contracts.
+
+### Post-cap continuation design selection 11 — completed 2026-08-06
+
+Three independent designs were reviewed for the timestamp handoff:
+
+- Minimal additive propagation: add an optional timezone-aware `signing_time` to the in-memory
+  `SigningRequest`, carry it through `SigningBackendRequest`, and let the draft workflow cache and
+  invalidate it. Shape score approximately `91`.
+- Flexible prepared-submission context: keep `SigningRequest` unchanged and introduce
+  `SigningTimeSnapshot`/`PreparedSigningSubmission` plus a new use-case execution path. Shape score
+  approximately `82` because the second submission surface expands the Qt migration.
+- Common-caller workflow session: expose one prepared submission from the dominant signing action
+  path while preserving a legacy execute wrapper. Shape score approximately `91`, but it duplicates
+  the minimal path's context without improving direct headless callers.
+
+Selected minimal additive design. It reuses the existing `SigningClock` and private `_FixedSigningClock`,
+fixes the existing double semantics resolution in `SigningDraftWorkflow.preview()`, invalidates the
+cached timestamp on every draft mutation, and carries the optional value through the backend only.
+The external CLI/JSON/profile contracts remain unchanged; direct requests with `signing_time=None`
+retain current-clock behavior. No hybrid is justified because the two high-scoring designs solve the
+same dominant handoff and the flexible context adds no independent weakness fix.
+
+### Post-cap continuation slice 11 — accepted 2026-08-06
+
+Child `docs/ExecPlans/preview_signing_time_snapshot_handoff_execplan.md` is implemented. The draft
+workflow now resolves visible semantics once per preview, stores a timezone-aware timestamp with a
+typed current-input fingerprint, invalidates that cache on placement/appearance/preset/certificate
+mutations, and copies a matching timestamp into the in-memory `SigningRequest`. The backend carries
+it through `SigningBackendRequest` and uses the existing fixed-clock adapter; direct requests with
+`None` retain current-clock behavior. The UI preview DTO, persisted schemas, CLI/JSON/artifact
+contracts, invisible-signature path, and phase3 nomenclature remain unchanged.
+
+Evidence: focused workflow/backend/semantics tests `135 passed`; full suite `1,062 passed`, `11
+skipped`, one pre-existing warning; Ruff, diff checks, CLI/import checks, and offscreen evidence
+passed signed acceptance `10/7/3`, preview parity `18/18`, and fit rejection `3/3`, with zero
+cryptographic, annotation, preview-comparison, or expectation failures. Temporary evidence roots
+were removed and the process audit was clean. A first full-suite pass exposed two UI preview-equality
+regressions from adding the timestamp to the preview DTO; removing that UI field preserved the
+established snapshot contract, and the corrected suite passed.
+
+Proxy measurement: navigation `0.25`, change amplification `0.40`, seam reduction `0.50`,
+boundary-test improvement `0.75`, interface compression `0.25`, and boundary isolation `0.50`; the
+weighted `Actual Improvement = 0.45` versus predicted `0.35` (`1.29x`), with no component regression
+below `-0.10`. The implementation and documentation are ready for commit, followed by a fresh
+three-explorer scan.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

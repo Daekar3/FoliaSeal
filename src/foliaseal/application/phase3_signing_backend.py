@@ -601,7 +601,7 @@ def prepare_phase3_signing_plan(
         raise ValueError("A visible signature rectangle and appearance are required.")
 
     signer = _load_simple_signer(request.certificate_path, request.passphrase)
-    signing_time = _current_signing_time(appearance.timezone_display_mode)
+    signing_time = request.signing_time or _current_signing_time(appearance.timezone_display_mode)
     semantics = _resolve_visible_signature_semantics(
         certificate_path=request.certificate_path,
         passphrase=request.passphrase,

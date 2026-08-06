@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Protocol
@@ -151,6 +152,7 @@ class SigningBackendRequest:
     certificate_alias: str | None
     signature_rect: SignatureRect | None
     signature_appearance: SigningBackendAppearance | None
+    signing_time: datetime | None = None
 
     @classmethod
     def from_signing_request(cls, request: SigningRequest) -> SigningBackendRequest:
@@ -177,6 +179,7 @@ class SigningBackendRequest:
             certificate_alias=request.certificate_alias,
             signature_rect=request.signature_rect,
             signature_appearance=appearance,
+            signing_time=request.signing_time,
         )
 
 

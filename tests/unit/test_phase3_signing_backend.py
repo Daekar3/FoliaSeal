@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from fractions import Fraction
 from pathlib import Path
@@ -399,6 +400,32 @@ def test_prepared_signing_plan_contains_one_visible_layout_result(tmp_path: Path
     assert prepared.layout_plan is not None
     assert prepared.stamp_text == prepared.visible_semantics.text.stamp_text
     assert prepared.fit_issues == ()
+
+
+def test_prepared_signing_plan_uses_supplied_preview_signing_time(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(page_index=0, width_pt=620.0, height_pt=180.0),
+        signature_appearance=build_signature_appearance(image_stamp_path=None),
+    )
+    frozen_time = datetime(2024, 1, 2, 3, 4, tzinfo=UTC)
+    backend_request = SigningBackendRequest.from_signing_request(
+        replace(request, signing_time=frozen_time)
+    )
+
+    prepared = prepare_phase3_signing_plan(backend_request)
+
+    assert prepared.visible_semantics is not None
+    assert "2024-01-02 03:04" in prepared.stamp_text
 
 
 def test_prepared_signing_plan_converts_layout_issues_to_application_issues(
