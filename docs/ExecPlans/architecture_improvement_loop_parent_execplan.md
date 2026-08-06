@@ -747,6 +747,25 @@ five-cycle cap. The next fresh scan must reassess the residual workspace scenari
 composition-root preview helpers, the signing backend, compatibility-surface debris, and the atomic
 phase3 nomenclature plan; external names remain frozen until that migration is explicitly executed.
 
+### Post-cap continuation scan 6 — completed after `c6b0d1efa`
+
+Three independent explorers reviewed the clean workspace-capture checkout. The strongest consensus
+candidate is the remaining mixed scenario/effect policy in
+`src/foliaseal/presentation/qt/phase3_harness_workspace.py` (520 lines): both live and headless
+adapters still coordinate profile/appearance override parsing, workflow or panel mutation, preview
+state reads, rendering, Qt event pumping, backend reservation/sign-time diagnostics, and capture
+delegation behind one workspace port. The new capture service removed only snapshot assembly; the
+remaining policy/effect bundle is the next deeper boundary.
+
+The consensus scenario/effect candidate scored `(4.5,4.5,4.5,4.5,4.0,4.5,3.0,2.5)`, confidence
+`0.88`, and Candidate Priority approximately `69.0`. The narrower event-pump seam scored about
+`67.54`, the preview-capture composition extraction about `67.6`, the signing backend below `57`,
+compatibility-surface retirement about `53`, and atomic phase3 nomenclature about `28` because the
+current inventory is roughly `4,480` active references and external CLI/DTO/JSON/fixture/artifact
+contracts are explicitly frozen. The next design round should target scenario/effect policy or prove
+that event pumping is the safer tracer bullet; the nomenclature plan remains deferred and must not be
+renamed piecemeal.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
