@@ -72,7 +72,6 @@ from foliaseal.presentation.qt.signing_action_boundary import (
     SigningActionBoundary as _SigningActionBoundary,
 )
 from foliaseal.presentation.qt.signing_workspace_composition import (
-    SigningWorkspaceComposition,
     build_signing_workspace_composition,
 )
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
@@ -80,6 +79,9 @@ from foliaseal.presentation.qt.signing_workspace_diagnostics import (
 )
 from foliaseal.presentation.qt.signing_workspace_runtime import (
     SigningWorkspaceRuntime,
+)
+from foliaseal.presentation.qt.signing_workspace_shell_controller import (
+    SigningWorkspaceShellController,
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar as _SigningWorkspaceSidebar,
@@ -226,68 +228,48 @@ class SigningWorkspaceWidget:
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
-        composition = build_signing_workspace_composition(
-            bindings=bindings,
+        self._shell_controller = SigningWorkspaceShellController.build(
             widget=self.widget,
-            layout=self._layout,
-            viewer_workflow=viewer_workflow,
-            signing_workflow=signing_workflow,
-            certificate_catalog=certificate_catalog,
-            certificate_catalog_store=certificate_catalog_store,
-            certificate_secret_provider=certificate_secret_provider,
-            preset_catalog=preset_catalog,
-            preset_catalog_store=preset_catalog_store,
-            app_settings=self._app_settings,
-            app_settings_store=app_settings_store,
-            document_review_inspector=document_review_inspector,
-            document_text_selection_engine=document_text_selection_engine,
-            document_text_search_engine=document_text_search_engine,
-            sign_executor=sign_executor,
-            on_sign_request=on_sign_request,
-            on_open_signed_output=on_open_signed_output,
-            on_copy_text=on_copy_text,
-            on_error=on_error,
-            on_status_change=on_status_change,
-            viewer_widget_builder=build_qt_pdf_viewer_widget,
-            runtime=self._runtime,
-            choose_output_pdf_path=self.choose_output_pdf_path,
-            submit_sign_request=self.submit_sign_request,
-            open_signed_output=self.open_signed_output,
-            search_document_text=self.search_document_text,
-            previous_document_text_match=self.previous_document_text_match,
-            next_document_text_match=self.next_document_text_match,
-            copy_current_document_text_match=self.copy_current_document_text_match,
-            set_document_text_selection_mode=self.set_document_text_selection_mode,
-            copy_selected_document_text=self.copy_selected_document_text,
-            clear_selected_document_text=self.clear_selected_document_text,
-            get_app_settings=lambda: self._app_settings,
-            set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
+            compose=lambda: build_signing_workspace_composition(
+                bindings=bindings,
+                widget=self.widget,
+                layout=self._layout,
+                viewer_workflow=viewer_workflow,
+                signing_workflow=signing_workflow,
+                certificate_catalog=certificate_catalog,
+                certificate_catalog_store=certificate_catalog_store,
+                certificate_secret_provider=certificate_secret_provider,
+                preset_catalog=preset_catalog,
+                preset_catalog_store=preset_catalog_store,
+                app_settings=self._app_settings,
+                app_settings_store=app_settings_store,
+                document_review_inspector=document_review_inspector,
+                document_text_selection_engine=document_text_selection_engine,
+                document_text_search_engine=document_text_search_engine,
+                sign_executor=sign_executor,
+                on_sign_request=on_sign_request,
+                on_open_signed_output=on_open_signed_output,
+                on_copy_text=on_copy_text,
+                on_error=on_error,
+                on_status_change=on_status_change,
+                viewer_widget_builder=build_qt_pdf_viewer_widget,
+                runtime=self._runtime,
+                choose_output_pdf_path=self.choose_output_pdf_path,
+                submit_sign_request=self.submit_sign_request,
+                open_signed_output=self.open_signed_output,
+                search_document_text=self.search_document_text,
+                previous_document_text_match=self.previous_document_text_match,
+                next_document_text_match=self.next_document_text_match,
+                copy_current_document_text_match=self.copy_current_document_text_match,
+                set_document_text_selection_mode=self.set_document_text_selection_mode,
+                copy_selected_document_text=self.copy_selected_document_text,
+                clear_selected_document_text=self.clear_selected_document_text,
+                get_app_settings=lambda: self._app_settings,
+                set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
+            ),
         )
-        self._install_composition(composition)
-        composition.bootstrap()
-
-    def _install_composition(self, composition: SigningWorkspaceComposition) -> None:
-        self._document_review_inspector = composition.document_review_inspector
-        self._viewer_interaction_session = composition.viewer_interaction_session
-        self._document_review_workspace = composition.document_review_workspace
-        self._workspace_interaction_session = composition.workspace_interaction_session
-        self._viewer_navigation_controls = composition.viewer_navigation_controls
-        self._viewer_widget = composition.viewer_widget
-        self.properties_panel = composition.properties_panel
-        self._sidebar = composition.sidebar
-        self._document_text_controls = composition.document_text_controls
-        self._properties_scroll = composition.properties_scroll
-        self._sign_button = composition.sign_button
-        self._result_label = composition.result_label
-        self._review_bridge = composition.review_bridge
-        self._signing_action_coordinator = composition.signing_action_coordinator
-        self._signing_action_boundary = composition.signing_action_boundary
-        self._action_bridge = composition.action_bridge
-        self._orchestrator = composition.orchestrator
-        self._runtime = composition.runtime
-        self._compatibility_surface = composition.compatibility_surface
-        self._shell_surface = composition.shell_surface
-        self._main_row = composition.main_row
+        self._shell_controller.install_into(self)
+        self._shell_controller.bootstrap()
 
     @property
     def container(self) -> Any:
@@ -295,7 +277,7 @@ class SigningWorkspaceWidget:
 
     def close(self) -> Any:
         """Close the mounted Qt container and release shell-owned resources."""
-        return self.widget.close()
+        return self._shell_controller.close()
 
     @property
     def viewer_widget(self) -> Any:

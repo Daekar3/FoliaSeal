@@ -1123,6 +1123,58 @@ below `-0.10`. Implementation commit `0391d9eb7` (`fix: preserve preview signing
 `main`; the child is accepted and a fresh three-explorer scan is required before selecting the next
 candidate.
 
+### Post-cap continuation scan 12 — completed after `5a9ff5840`
+
+Three independent explorers reviewed the clean timestamp-handoff checkout. The strongest bounded
+presentation seam is the top-level signing-shell composition/lifecycle concentration in
+`src/foliaseal/presentation/qt/signing_shell.py:180-426`: construction wires roughly twenty
+collaborators, `_install_composition()` re-exposes a large graph, and more than thirty methods
+forward runtime, shell-surface, compatibility, and action behavior. Existing fake-Qt shell and
+app-frame tests make it locally substitutable while preserving the frozen Open→Review→Choose→Place→
+Preview→Sign workflow.
+
+Independent shell scoring was approximately `(NF,CA,SR,TG,IC,CC,MR,BU) = (4.5,4.25,4,4.5,4,4.25,2.5,2)`
+with confidence `0.85` and Candidate Priority near `70`. The application-to-infra DTO boundary ranked
+approximately `64–67`, the scalar harness projection `65–67`, private factory access `67`, and
+test-only compatibility bridges below `60`. Phase3 nomenclature remains atomic-contract blocked.
+
+Selected next candidate: `signing_shell_composition_boundary`. The design round must compare a
+minimal shell controller port, a flexible composition graph record, and a common-caller lifecycle
+session shape, preserving callback ordering, widget teardown, app-frame open behavior, and all shell
+surface/test contracts in one slice.
+
+### Post-cap continuation design selection 12 — completed 2026-08-06
+
+Three independent design reviews compared the selected shell seam. The minimal concrete controller
+scored approximately `89` with confidence `0.91`: it owns composition construction, collaborator
+publication, one-time bootstrap, and close delegation while preserving the widget's public/private
+attribute contract. A flexible graph-record/port design scored approximately `79` but widened the
+interface surface without another consumer. A common-caller lifecycle-session design scored roughly
+`74` (Priority below the gate) because `SigningWorkspaceHost` already owns atomic compose→mount→
+publish→dispose ordering. No hybrid exceeded the minimal design by five points, so the minimal
+controller was selected. The separate `phase3_nomenclature_retirement_execplan.md` remains the
+single atomic plan for removing historical labels, compatibility aliases, and stale nomenclature;
+this child performs no piecemeal rename.
+
+### Post-cap continuation slice 12 — accepted 2026-08-06
+
+Child `docs/ExecPlans/signing_shell_composition_boundary_execplan.md` is implemented. New
+`SigningWorkspaceShellController` owns construction of the existing composition record, exact
+collaborator publication (including `interaction_bridge`), idempotent orchestrator bootstrap, and
+close delegation. `SigningWorkspaceWidget` retains its Qt container setup, callbacks, public methods,
+and established attribute names; the duplicated `_install_composition()` body is removed. Focused
+controller/shell/app-frame tests passed `110`; Ruff passed; full suite passed `1,064` with `11` skipped
+and one pre-existing warning. CLI help/import checks and `git diff --check` passed. Offscreen evidence
+passed signed acceptance `10` scenarios with `7` successful signings, preview parity `18/18`, and fit
+rejection `3/3`; the explicit temporary root was removed and process audit was clean.
+
+Proxy measurement: navigation `0.25`, change amplification `0.50`, seam reduction `0.75`, boundary
+test improvement `0.75`, interface compression `0.50`, and boundary isolation `0.75`; weighted
+`Actual Improvement = 0.50` versus predicted `0.40`, with no component regression below `-0.10`.
+Implementation/docs are ready for an intentional commit, after which the loop must run a fresh
+three-explorer scan. The phase3 retirement plan remains outstanding and must be executed atomically,
+not treated as complete by this shell slice.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
