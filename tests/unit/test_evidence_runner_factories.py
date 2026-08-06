@@ -1,12 +1,19 @@
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from foliaseal.application.evidence_service import EvidenceMatrixRequest
 from foliaseal.presentation.qt import evidence_runner_factories
 from foliaseal.presentation.qt.evidence_harness_runtime import EvidenceHarnessRuntime
+from foliaseal.presentation.qt.evidence_runner_providers import (
+    EvidenceRunnerProviders,
+    InteractiveEvidenceProviders,
+    PreviewMatrixEvidenceProviders,
+    SignedAcceptanceEvidenceProviders,
+)
 
 
 def _request() -> EvidenceMatrixRequest:
@@ -16,6 +23,52 @@ def _request() -> EvidenceMatrixRequest:
         passphrase="secret",
         scenario_manifest_path="manifest.json",
         artifacts_dir="artifacts",
+    )
+
+
+def _fake_providers() -> EvidenceRunnerProviders:
+    def callback(*_args, **_kwargs):
+        return None
+
+    return EvidenceRunnerProviders(
+        interactive=InteractiveEvidenceProviders(
+            load_qt_harness_bindings=callback,
+            load_page_count=callback,
+            render_backend_factory=callback,
+            profile_store_factory=callback,
+            build_phase3_signing_executor=callback,
+            session_runner=object(),
+            capture_assembler=object(),
+            contract_evaluator=callback,
+            capture_factory=callback,
+            checklist_renderer=callback,
+            report_finalizer=callback,
+            artifact_policy=object(),
+        ),
+        preview=PreviewMatrixEvidenceProviders(
+            load_preview_matrix_manifest=callback,
+            execute_headless_preview_matrix_scenario=callback,
+            preview_matrix_error_result=callback,
+            preview_matrix_diagnostic_summary=callback,
+            jsonable_capture=callback,
+            profile_store_factory=callback,
+        ),
+        signed=SignedAcceptanceEvidenceProviders(
+            load_qt_harness_bindings=callback,
+            load_preview_matrix_manifest=callback,
+            build_phase3_signing_executor=callback,
+            build_dummy_timestamper=callback,
+            load_page_count=callback,
+            build_qt_signing_shell=callback,
+            build_workspace=callback,
+            execute_signed_acceptance_scenario=callback,
+            preview_matrix_error_result=callback,
+            signed_matrix_diagnostic_summary=callback,
+            evaluate_signed_matrix_acceptance_expectations=callback,
+            jsonable_capture=callback,
+            render_backend_factory=callback,
+            profile_store_factory=callback,
+        ),
     )
 
 
@@ -67,6 +120,97 @@ def test_matrix_operation_builder_is_lazy_and_forwards_typed_requests() -> None:
     assert calls == []
     assert operation(request) == {"scenario_count": 8}
     assert calls == ["preview_factory", "preview:fixture.pdf"]
+
+
+def test_preview_factory_consumes_injected_provider_record() -> None:
+    providers = _fake_providers()
+
+    runner = evidence_runner_factories.build_preview_evidence_runner(
+        providers=providers,
+    )
+
+    assert runner.deps.load_preview_matrix_manifest is (
+        providers.preview.load_preview_matrix_manifest
+    )
+    assert runner.deps.execute_headless_preview_matrix_scenario is (
+        providers.preview.execute_headless_preview_matrix_scenario
+    )
+    assert runner.deps.preview_matrix_error_result is (
+        providers.preview.preview_matrix_error_result
+    )
+    assert runner.deps.preview_matrix_diagnostic_summary is (
+        providers.preview.preview_matrix_diagnostic_summary
+    )
+    assert runner.deps.jsonable_capture is providers.preview.jsonable_capture
+    assert runner.deps.profile_store_factory is providers.preview.profile_store_factory
+
+
+def test_interactive_factory_consumes_injected_provider_record() -> None:
+    providers = _fake_providers()
+
+    engine = evidence_runner_factories.build_interactive_capture_engine(
+        providers=providers,
+    )
+
+    assert engine.load_qt_harness_bindings is (
+        providers.interactive.load_qt_harness_bindings
+    )
+    assert engine.load_page_count is providers.interactive.load_page_count
+    assert engine.render_backend_factory is providers.interactive.render_backend_factory
+    assert engine.profile_store_factory is providers.interactive.profile_store_factory
+    assert engine.session_runner is providers.interactive.session_runner
+    assert engine.capture_assembler is providers.interactive.capture_assembler
+    assert engine.artifact_policy is providers.interactive.artifact_policy
+
+
+def test_signed_factory_consumes_injected_provider_record() -> None:
+    providers = _fake_providers()
+
+    runner = evidence_runner_factories.build_signed_acceptance_evidence_runner(
+        providers=providers,
+    )
+
+    assert runner.deps.load_qt_harness_bindings is (
+        providers.signed.load_qt_harness_bindings
+    )
+    assert runner.deps.load_preview_matrix_manifest is (
+        providers.signed.load_preview_matrix_manifest
+    )
+    assert runner.deps.build_workspace is providers.signed.build_workspace
+    assert runner.deps.execute_signed_acceptance_scenario is (
+        providers.signed.execute_signed_acceptance_scenario
+    )
+    assert runner.deps.render_backend_factory is providers.signed.render_backend_factory
+    assert runner.deps.profile_store_factory is providers.signed.profile_store_factory
+
+
+def test_provider_module_stays_headless_until_harness_builder_is_requested() -> None:
+    script = """
+import json
+import sys
+import foliaseal.presentation.qt.evidence_runner_providers
+import foliaseal.presentation.qt.evidence_runner_factories
+heavy = ("PySide6", "PIL", "pyhanko", "foliaseal.presentation.qt.phase3_harness")
+loaded = sorted(
+    name for name in sys.modules
+    if any(name == prefix or name.startswith(prefix + ".") for prefix in heavy)
+)
+print(json.dumps(loaded))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == []
+
+
+def test_factory_has_no_private_harness_reach_through() -> None:
+    source = evidence_runner_factories.__file__
+    assert source is not None
+    assert "harness._" not in Path(source).read_text(encoding="utf-8")
 
 
 def test_matrix_operation_constructs_its_runner_once() -> None:

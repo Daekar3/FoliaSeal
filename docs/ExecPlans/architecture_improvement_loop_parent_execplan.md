@@ -104,6 +104,13 @@ created.
   is the next qualifying seam.
 - [x] Completed three Phase 2 lifecycle design reviews and created the child ExecPlan reusing the
   existing shared harness lifecycle port.
+- [x] Completed scan round 15 with three independent explorers after `dab5b7e59`; the private
+  evidence-runner provider seam is the next qualifying candidate at Priority `68–71`.
+- [x] Completed three design variants and two independent reviews for the evidence-runner provider
+  seam; selected the constrained operation-scoped provider hybrid at shape score `91`.
+- [x] Execute `evidence_runner_provider_boundary_execplan.md` through implementation, focused/full
+  validation, offscreen evidence, cleanup, and documentation; commit closure and the fresh rescan
+  remain before accepting the slice.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -1276,6 +1283,80 @@ Proxy measurement: navigation `0.35`, change amplification `0.65`, seam-risk red
 boundary-test improvement `0.75`, interface compression `0.75`, and boundary isolation `0.85`;
 weighted `Actual Improvement = 0.55` versus predicted `0.45`, with no component regression below
 `-0.10`. The cycle is accepted; commit and a fresh exact three-explorer rescan are required next.
+
+### Scan Round 15 — completed 2026-08-06
+
+Baseline commit: `dab5b7e59`; the worktree was clean after the certificate-model boundary commit.
+Three independent explorers inspected the checkout without sharing reports. All three agreed that
+the certificate boundary is closed and that the strongest remaining bounded seam is the private
+provider mesh between `src/foliaseal/presentation/qt/evidence_runner_factories.py` and the large
+`phase3_harness.py` composition root. The factories currently reach through private helpers such as
+`_load_qt_harness_bindings`, `_load_page_count`, `_load_preview_matrix_manifest`,
+`_execute_headless_preview_matrix_scenario`, `_build_preview_matrix_qt_workspace`, and
+`_execute_signed_acceptance_scenario`, while also binding concrete Qt and profile-store classes.
+
+The independent score records were approximately `(4.25,4.0,4.25,4.25,4.0,4.0,2.0,2.0)`,
+`(4.5,4.25,4.5,4.5,4.25,4.0,2.0,2.0)`, and `(4.5,4.5,4.5,4.5,4.0,4.5,3.0,2.5)` for
+`(NF,CA,SR,TG,IC,CC,MR,BU)`. Consensus confidence is `0.91`, evidence coverage is `1.0`, and
+Candidate Priority is approximately `68–71`, above the fixed `60` gate. The seam is
+local-substitutable: fake callables can stand in for the Qt/composition adapters while existing
+runner dependency records and matrix lifecycles remain unchanged.
+
+Phase3 nomenclature remains a separate contract-aware migration. The explorers found roughly 75
+live source/test/script/README references and stable CLI, DTO, JSON-key, fixture, and artifact
+contracts; a rename-only slice is therefore below the credibility threshold for this round. The
+selected candidate is `evidence_runner_provider_boundary`; it does not rename phase3 symbols.
+
+### Design Selection 15 — completed 2026-08-06
+
+Three independent designs were compared and reviewed by two independent reviewers. Design A was a
+single frozen bindings record that relocates private imports; it scored about `74–76` but leaves a
+broad parameter bag and weaker operation ownership. Design B used three operation-specific provider
+protocols/records; reviewers scored it about `82–86`, with strong testability but some duplication of
+the existing runner dependency records. Design C centralized all runner construction in one common
+composition service; one reviewer scored it `90–91`, while the other scored it `72–76` because moving
+lifecycle policy into a broad service risks duplicating the existing matrix/session ownership.
+
+Selected design: a constrained hybrid of B and C. Add one Qt-free `EvidenceRunnerProviders` aggregate
+whose fields are three explicit, frozen, operation-scoped provider records matching the existing
+interactive, preview-matrix, and signed-acceptance dependency shapes. Add one late-import production
+builder that binds the current phase3 helpers exactly once. Factories obtain the aggregate lazily and
+populate the existing runner dependency dataclasses; they do not gain a generic dispatcher, lifecycle
+methods, or a service-locator map. The orchestrator shape score is `91`, exceeding the best base
+review score of `86` by `5` points, with no new hard-gate risk. This preserves the runner lifecycle and
+all external phase3 contracts while removing the private-helper mesh from the factory module.
+
+Hard gates are: importing `evidence_runner_factories` alone loads neither PySide6 nor
+`phase3_harness`; production binding construction remains deferred; callable signatures and object
+identity match current runner wiring; preview/signed scenario counts, JSON summaries, artifacts, and
+CLI exit behavior remain unchanged; and `rg 'harness\\._' evidence_runner_factories.py` returns no
+matches.
+
+### Post-cap continuation slice 15 — implementation complete, acceptance pending commit — 2026-08-06
+
+Child `docs/ExecPlans/evidence_runner_provider_boundary_execplan.md` is implemented. The new
+`evidence_runner_providers.py` module contains Qt-free immutable interactive, preview, and signed
+provider records plus their aggregate. `phase3_harness.build_evidence_runner_providers()` now binds
+the existing private helpers once at the composition root. The three factory functions accept an
+optional provider aggregate for tests, retain no-argument behavior, and map provider fields into the
+unchanged runner dependency records. No `harness._` reference remains in the factory module, no
+phase3 CLI/DTO/JSON/artifact name was changed, and no compatibility alias was added.
+
+Validation passed: focused factory/provider tests `16 passed`; runner/harness focused tests `107
+passed, 1 skipped`; full suite `1,074 passed, 11 skipped, 1 warning` (the existing Pillow
+deprecation); Ruff, CLI help, import isolation, and `git diff --check` passed. `docs/SPEC.md` hash
+remained `d929e189269f0f057c6a72b43fd2d430965a975be720b55139fdb1d92afe282b`. Offscreen evidence under
+an explicit temporary root passed preview parity `18/18` with zero errors, signed acceptance `10`
+scenarios with `7` successful signings and zero scenario errors, and fit rejection `3` scenarios with
+zero scenario errors. The signed command emitted expected self-signed TSA validation diagnostics but
+exited successfully; the exact temporary root was removed and the process audit found no FoliaSeal,
+Python, Qt, or dialog process.
+
+Proxy measurement: navigation `0.30`, change amplification `0.70`, seam-risk reduction `0.75`,
+boundary-test improvement `0.80`, interface compression `0.75`, and boundary isolation `0.85`; weighted
+Actual Improvement is `0.52` against predicted `0.45`, with no component regression below `-0.10`.
+The slice qualifies for acceptance after the intentional commit and a fresh exact three-explorer
+rescan.
 
 ## Context and Orientation
 

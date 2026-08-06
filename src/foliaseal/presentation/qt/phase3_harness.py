@@ -21,7 +21,9 @@ from foliaseal.application.phase3_signing_backend import (
     _effective_layout_edge_margin,
     _single_line_vertical_outer_margin,
     build_backend_reservation_evidence,
+    build_phase3_signing_executor,
 )
+from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
     _layout_rule_bounds_px,
@@ -46,10 +48,27 @@ from foliaseal.domain.models import (
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.infra.tsa import build_dummy_timestamper
+from foliaseal.presentation.qt.evidence_harness_projection import (
+    evaluate_signed_matrix_acceptance_expectations,
+    preview_matrix_diagnostic_summary,
+    preview_matrix_error_result,
+    signed_matrix_diagnostic_summary,
+)
 from foliaseal.presentation.qt.evidence_interactive_capture import (
+    InteractiveEvidenceArtifactPolicy,
     Phase3HarnessCapture,
+    build_capture_from_payload,
+    default_harness_artifacts_dir,
     default_harness_output_pdf_path,
     jsonable_capture,
+    write_optional_text,
+)
+from foliaseal.presentation.qt.evidence_runner_providers import (
+    EvidenceRunnerProviders,
+    InteractiveEvidenceProviders,
+    PreviewMatrixEvidenceProviders,
+    SignedAcceptanceEvidenceProviders,
 )
 from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
     Phase3AppearanceSnapshotter,
@@ -57,6 +76,10 @@ from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
     snapshot_signing_result_payload,
+)
+from foliaseal.presentation.qt.phase3_harness_reporting import (
+    build_phase3_checklist_results_markdown,
+    finalize_phase3_harness_report,
 )
 from foliaseal.presentation.qt.phase3_harness_session_runner import (
     Phase3HarnessSessionRunner,
@@ -157,6 +180,59 @@ def build_interactive_session_runner() -> Phase3HarnessSessionRunner:
             build_workspace=_build_qt_evidence_workspace,
             default_harness_output_pdf_path=default_harness_output_pdf_path,
         )
+    )
+
+
+def build_evidence_runner_providers() -> EvidenceRunnerProviders:
+    """Build the complete evidence-runner provider bundle at the composition root."""
+
+    return EvidenceRunnerProviders(
+        interactive=InteractiveEvidenceProviders(
+            load_qt_harness_bindings=_load_qt_harness_bindings,
+            load_page_count=_load_page_count,
+            render_backend_factory=QtPdfRenderBackend,
+            profile_store_factory=SignaturePresetCatalogStore.default,
+            build_phase3_signing_executor=build_phase3_signing_executor,
+            session_runner=build_interactive_session_runner(),
+            capture_assembler=build_capture_assembler(),
+            contract_evaluator=evaluate_phase3_evidence_contract,
+            capture_factory=build_capture_from_payload,
+            checklist_renderer=build_phase3_checklist_results_markdown,
+            report_finalizer=finalize_phase3_harness_report,
+            artifact_policy=InteractiveEvidenceArtifactPolicy(
+                default_artifacts_dir=default_harness_artifacts_dir,
+                output_pdf_path=default_harness_output_pdf_path,
+                write_text=write_optional_text,
+            ),
+        ),
+        preview=PreviewMatrixEvidenceProviders(
+            load_preview_matrix_manifest=_load_preview_matrix_manifest,
+            execute_headless_preview_matrix_scenario=(
+                _execute_headless_preview_matrix_scenario
+            ),
+            preview_matrix_error_result=preview_matrix_error_result,
+            preview_matrix_diagnostic_summary=preview_matrix_diagnostic_summary,
+            jsonable_capture=jsonable_capture,
+            profile_store_factory=SignaturePresetCatalogStore.default,
+        ),
+        signed=SignedAcceptanceEvidenceProviders(
+            load_qt_harness_bindings=_load_qt_harness_bindings,
+            load_preview_matrix_manifest=_load_preview_matrix_manifest,
+            build_phase3_signing_executor=build_phase3_signing_executor,
+            build_dummy_timestamper=build_dummy_timestamper,
+            load_page_count=_load_page_count,
+            build_qt_signing_shell=build_qt_signing_shell,
+            build_workspace=_build_preview_matrix_qt_workspace,
+            execute_signed_acceptance_scenario=_execute_signed_acceptance_scenario,
+            preview_matrix_error_result=preview_matrix_error_result,
+            signed_matrix_diagnostic_summary=signed_matrix_diagnostic_summary,
+            evaluate_signed_matrix_acceptance_expectations=(
+                evaluate_signed_matrix_acceptance_expectations
+            ),
+            jsonable_capture=jsonable_capture,
+            render_backend_factory=QtPdfRenderBackend,
+            profile_store_factory=SignaturePresetCatalogStore.default,
+        ),
     )
 
 

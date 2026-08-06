@@ -16,6 +16,7 @@ from foliaseal.application.evidence_service import (
     EvidenceMatrixRequest,
 )
 from foliaseal.presentation.qt.evidence_harness_runtime import EvidenceHarnessRuntime
+from foliaseal.presentation.qt.evidence_runner_providers import EvidenceRunnerProviders
 
 MatrixOperation = Callable[[EvidenceMatrixRequest], Mapping[str, Any]]
 
@@ -37,109 +38,104 @@ else:
     Phase3SignedAcceptanceMatrixRunner = Any
 
 
-def build_interactive_capture_engine() -> InteractiveCaptureEngine:
+def build_interactive_capture_engine(
+    *, providers: EvidenceRunnerProviders | None = None
+) -> InteractiveCaptureEngine:
     """Build the interactive capture engine only after a request is made."""
 
-    from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
-    from foliaseal.application.qa_evidence_contract import evaluate_phase3_evidence_contract
-    from foliaseal.presentation.qt import phase3_harness as harness
     from foliaseal.presentation.qt.evidence_interactive_capture import (
         InteractiveCaptureEngine,
-        InteractiveEvidenceArtifactPolicy,
-        build_capture_from_payload,
-        default_harness_artifacts_dir,
-        default_harness_output_pdf_path,
-        write_optional_text,
     )
-    from foliaseal.presentation.qt.phase3_harness_reporting import (
-        build_phase3_checklist_results_markdown as render_phase3_checklist_results_markdown,
-    )
-    from foliaseal.presentation.qt.phase3_harness_reporting import (
-        finalize_phase3_harness_report,
-    )
+    if providers is None:
+        from foliaseal.presentation.qt.phase3_harness import (
+            build_evidence_runner_providers,
+        )
+
+        providers = build_evidence_runner_providers()
+    interactive = providers.interactive
 
     return InteractiveCaptureEngine(
-        load_qt_harness_bindings=harness._load_qt_harness_bindings,
-        load_page_count=harness._load_page_count,
-        render_backend_factory=harness.QtPdfRenderBackend,
-        profile_store_factory=harness.SignaturePresetCatalogStore.default,
-        build_phase3_signing_executor=build_phase3_signing_executor,
-        session_runner=harness.build_interactive_session_runner(),
-        capture_assembler=harness.build_capture_assembler(),
-        contract_evaluator=evaluate_phase3_evidence_contract,
-        capture_factory=build_capture_from_payload,
-        checklist_renderer=render_phase3_checklist_results_markdown,
-        report_finalizer=finalize_phase3_harness_report,
-        artifact_policy=InteractiveEvidenceArtifactPolicy(
-            default_artifacts_dir=default_harness_artifacts_dir,
-            output_pdf_path=default_harness_output_pdf_path,
-            write_text=write_optional_text,
-        ),
+        load_qt_harness_bindings=interactive.load_qt_harness_bindings,
+        load_page_count=interactive.load_page_count,
+        render_backend_factory=interactive.render_backend_factory,
+        profile_store_factory=interactive.profile_store_factory,
+        build_phase3_signing_executor=interactive.build_phase3_signing_executor,
+        session_runner=interactive.session_runner,
+        capture_assembler=interactive.capture_assembler,
+        contract_evaluator=interactive.contract_evaluator,
+        capture_factory=interactive.capture_factory,
+        checklist_renderer=interactive.checklist_renderer,
+        report_finalizer=interactive.report_finalizer,
+        artifact_policy=interactive.artifact_policy,
     )
 
 
-def build_preview_evidence_runner() -> Phase3PreviewMatrixRunner:
+def build_preview_evidence_runner(
+    *, providers: EvidenceRunnerProviders | None = None
+) -> Phase3PreviewMatrixRunner:
     """Build the headless preview runner lazily."""
 
-    from foliaseal.presentation.qt import phase3_harness as harness
-    from foliaseal.presentation.qt.evidence_harness_projection import (
-        preview_matrix_diagnostic_summary,
-        preview_matrix_error_result,
-    )
-    from foliaseal.presentation.qt.evidence_interactive_capture import jsonable_capture
     from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
         Phase3PreviewMatrixRunner,
         Phase3PreviewMatrixRunnerDeps,
     )
+    if providers is None:
+        from foliaseal.presentation.qt.phase3_harness import (
+            build_evidence_runner_providers,
+        )
+
+        providers = build_evidence_runner_providers()
+    preview = providers.preview
 
     return Phase3PreviewMatrixRunner(
         deps=Phase3PreviewMatrixRunnerDeps(
-            load_preview_matrix_manifest=harness._load_preview_matrix_manifest,
+            load_preview_matrix_manifest=preview.load_preview_matrix_manifest,
             execute_headless_preview_matrix_scenario=(
-                harness._execute_headless_preview_matrix_scenario
+                preview.execute_headless_preview_matrix_scenario
             ),
-            preview_matrix_error_result=preview_matrix_error_result,
-            preview_matrix_diagnostic_summary=preview_matrix_diagnostic_summary,
-            jsonable_capture=jsonable_capture,
-            profile_store_factory=harness.SignaturePresetCatalogStore.default,
+            preview_matrix_error_result=preview.preview_matrix_error_result,
+            preview_matrix_diagnostic_summary=preview.preview_matrix_diagnostic_summary,
+            jsonable_capture=preview.jsonable_capture,
+            profile_store_factory=preview.profile_store_factory,
         )
     )
 
 
-def build_signed_acceptance_evidence_runner() -> Phase3SignedAcceptanceMatrixRunner:
+def build_signed_acceptance_evidence_runner(
+    *, providers: EvidenceRunnerProviders | None = None
+) -> Phase3SignedAcceptanceMatrixRunner:
     """Build the Qt-backed signed matrix runner lazily."""
 
-    from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
-    from foliaseal.infra.tsa import build_dummy_timestamper
-    from foliaseal.presentation.qt import phase3_harness as harness
-    from foliaseal.presentation.qt.evidence_harness_projection import (
-        evaluate_signed_matrix_acceptance_expectations,
-        preview_matrix_error_result,
-        signed_matrix_diagnostic_summary,
-    )
-    from foliaseal.presentation.qt.evidence_interactive_capture import jsonable_capture
     from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
         Phase3SignedAcceptanceMatrixRunner,
         Phase3SignedAcceptanceMatrixRunnerDeps,
     )
+    if providers is None:
+        from foliaseal.presentation.qt.phase3_harness import (
+            build_evidence_runner_providers,
+        )
+
+        providers = build_evidence_runner_providers()
+    signed = providers.signed
 
     return Phase3SignedAcceptanceMatrixRunner(
         deps=Phase3SignedAcceptanceMatrixRunnerDeps(
-            load_qt_harness_bindings=harness._load_qt_harness_bindings,
-            load_preview_matrix_manifest=harness._load_preview_matrix_manifest,
-            build_phase3_signing_executor=build_phase3_signing_executor,
-            build_dummy_timestamper=build_dummy_timestamper,
-            load_page_count=harness._load_page_count,
-            build_qt_signing_shell=harness.build_qt_signing_shell,
-            build_workspace=harness._build_preview_matrix_qt_workspace,
-            execute_signed_acceptance_scenario=harness._execute_signed_acceptance_scenario,
-            preview_matrix_error_result=preview_matrix_error_result,
-            signed_matrix_diagnostic_summary=signed_matrix_diagnostic_summary,
+            load_qt_harness_bindings=signed.load_qt_harness_bindings,
+            load_preview_matrix_manifest=signed.load_preview_matrix_manifest,
+            build_phase3_signing_executor=signed.build_phase3_signing_executor,
+            build_dummy_timestamper=signed.build_dummy_timestamper,
+            load_page_count=signed.load_page_count,
+            build_qt_signing_shell=signed.build_qt_signing_shell,
+            build_workspace=signed.build_workspace,
+            execute_signed_acceptance_scenario=signed.execute_signed_acceptance_scenario,
+            preview_matrix_error_result=signed.preview_matrix_error_result,
+            signed_matrix_diagnostic_summary=signed.signed_matrix_diagnostic_summary,
             evaluate_signed_matrix_acceptance_expectations=(
-                evaluate_signed_matrix_acceptance_expectations
+                signed.evaluate_signed_matrix_acceptance_expectations
             ),
-            jsonable_capture=jsonable_capture,
-            render_backend_factory=harness.QtPdfRenderBackend,
+            jsonable_capture=signed.jsonable_capture,
+            render_backend_factory=signed.render_backend_factory,
+            profile_store_factory=signed.profile_store_factory,
         )
     )
 
