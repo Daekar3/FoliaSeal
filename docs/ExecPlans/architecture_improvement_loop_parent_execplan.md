@@ -1760,6 +1760,23 @@ Commit `b569295ffb917fecb79c188fe2a8ba37d1046d01` (`Extract visible-signature fi
 boundary`) contains the six intentional source/test/architecture/plan files; the worktree was clean
 after commit.
 
+### Scan Round 29 — completed 2026-08-06; fixed cycle cap reached
+
+Three independent explorers rescanned clean commit `2ceab399`. Two reports converge on a neutral
+snapshot/projection boundary shared by `presentation/qt/phase3_harness.py` and
+`phase3_harness_reporting.py`, at Priority about `72`, confidence `.90`: roughly 20 duplicated
+`_snapshot_*` helpers and 200 lines drift on nested `render_capture.edge_distances_px`, modern versus
+legacy layout keys, and reservation/appearance readouts. The bounded next shape is a Qt-free
+`evidence_snapshot_projection.py` with parity fixtures; phase3 module names and external JSON/CLI/
+artifact contracts remain unchanged. A third explorer found an app-frame workspace/action-state seam
+at Priority `78–82`, confidence `.82`, but it lacks a second independent report and remains an
+alternate for a future planning cycle.
+
+The loop has now reached its fixed five accepted implementation-cycle cap (18, 19, 22, 25, and 28).
+The next projection seam is recorded for a future continuation rather than starting a sixth cycle.
+The dedicated `phase3_nomenclature_retirement_execplan.md` remains the atomic versioned migration
+plan; its live inventory is `106` path names, `254` files, and approximately `6,570` references.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

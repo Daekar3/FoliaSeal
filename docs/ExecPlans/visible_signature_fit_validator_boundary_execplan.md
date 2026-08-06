@@ -94,4 +94,6 @@ compare issue tuples and prepared-plan identity, and rerun the focused suite bef
   no component regressed below `-0.10` and no critical/major review finding remains.
 - [x] (2026-08-06) Committed as `b569295ffb917fecb79c188fe2a8ba37d1046d01`
   (`Extract visible-signature fit validator boundary`); the post-commit worktree is clean.
-- [ ] Fresh post-commit scan ledger update.
+- [x] (2026-08-06) Fresh post-commit Scan Round 29 completed. Two independent reports converge on
+  a future neutral snapshot/projection boundary at Priority about `72`, confidence `.90`; the loop's
+  fixed five-cycle cap was reached, so no sixth child was started.
