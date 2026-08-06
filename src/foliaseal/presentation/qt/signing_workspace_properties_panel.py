@@ -15,7 +15,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
-from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator,
     SignaturePropertiesCoordinatorError,
@@ -313,13 +313,14 @@ class SignaturePropertiesPanel:
         certificate_catalog: CertificateCatalog | None = None,
         certificate_catalog_store: CertificateCatalogRepository | None = None,
         certificate_material_port: CertificateSigningMaterialPort | None = None,
-        preset_catalog: SignaturePresetCatalog | None = None,
-        preset_catalog_store: Any | None = None,
+        reusable_objects: ReusableSigningObjects | None = None,
         app_settings: AppSettings | None = None,
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
         on_error: Callable[[str], None] | None = None,
     ) -> None:
+        if reusable_objects is None:
+            raise ValueError("reusable_objects is required for the signature properties panel.")
         self._bindings = bindings
         _ensure_preview_fonts_registered()
         self._workflow = workflow
@@ -329,8 +330,7 @@ class SignaturePropertiesPanel:
             certificate_catalog=certificate_catalog,
             certificate_catalog_store=certificate_catalog_store,
             certificate_material_port=certificate_material_port,
-            preset_catalog=preset_catalog,
-            preset_catalog_store=preset_catalog_store,
+            reusable_objects=reusable_objects,
         )
         self._app_settings = app_settings or AppSettings.default()
         self._on_change = on_change

@@ -27,7 +27,7 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionEngine,
     DocumentTextSelectionSession,
 )
-from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
@@ -37,7 +37,6 @@ from foliaseal.domain.models import (
     SigningRequest,
 )
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
-from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
 from foliaseal.infra.document_text_selection import QtPdfDocumentTextSelectionEngine
@@ -128,8 +127,7 @@ def build_signing_workspace_composition(
     certificate_catalog: CertificateCatalog | None = None,
     certificate_catalog_store: CertificateCatalogRepository | None = None,
     certificate_material_port: CertificateSigningMaterialPort | None = None,
-    preset_catalog: SignaturePresetCatalog | None = None,
-    preset_catalog_store: SignaturePresetCatalogStore | None = None,
+    reusable_objects: ReusableSigningObjects | None = None,
     app_settings: AppSettings,
     app_settings_store: AppSettingsStore | None = None,
     document_review_inspector: DocumentReviewInspector | None = None,
@@ -156,6 +154,9 @@ def build_signing_workspace_composition(
     get_app_settings: Callable[[], AppSettings],
     set_app_settings: Callable[[AppSettings], None],
 ) -> SigningWorkspaceComposition:
+    if reusable_objects is None:
+        raise ValueError("reusable_objects is required to compose a signing workspace.")
+
     def _safe_int(text: str) -> int | None:
         try:
             return int(text)
@@ -336,8 +337,7 @@ def build_signing_workspace_composition(
         certificate_catalog=certificate_catalog,
         certificate_catalog_store=certificate_catalog_store,
         certificate_material_port=certificate_material_port,
-        preset_catalog=preset_catalog,
-        preset_catalog_store=preset_catalog_store,
+        reusable_objects=reusable_objects,
         app_settings=app_settings,
         on_change=runtime.on_panel_change,
         on_page_change=runtime.on_page_change,

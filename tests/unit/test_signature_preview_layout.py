@@ -2,6 +2,11 @@ from pathlib import Path
 
 from PIL import Image
 
+from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import (
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.application.signing_preview_renderer import (
     CanonicalSignaturePreviewSnapshot,
 )
@@ -32,6 +37,9 @@ def _panel_and_layout(tmp_path: Path):
     panel = properties_panel_module.SignaturePropertiesPanel(
         bindings=bindings,
         workflow=_workflow(tmp_path),
+        reusable_objects=ReusableSigningObjects(
+            InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+        ),
     )
     layout = preview_layout_module.QtSignaturePreviewLayout(bindings=bindings)
     return panel, layout

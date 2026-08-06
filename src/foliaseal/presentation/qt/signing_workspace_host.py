@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
-from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
@@ -32,12 +32,12 @@ class SigningWorkspaceEnvironment:
     app_settings: Callable[[], AppSettings]
     app_settings_store: AppSettingsStore | None
     certificate_catalog_store: CertificateCatalogRepository | None
-    preset_catalog_store: SignaturePresetCatalogStore | None
     sign_executor: SigningRequestExecutor | None
     on_sign_request: Callable[[SigningRequest], None] | None
     reopen_target: Callable[[str | Path], Any | None] | None
     on_error: Callable[[str], None] | None
     on_status_change: Callable[[str], None] | None
+    reusable_objects: ReusableSigningObjects | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
 
     def command_for(self, source_pdf: Path) -> OpenWorkspaceCommand:
@@ -47,7 +47,7 @@ class SigningWorkspaceEnvironment:
             app_settings_store=self.app_settings_store,
             certificate_catalog_store=self.certificate_catalog_store,
             certificate_material_port=self.certificate_material_port,
-            preset_catalog_store=self.preset_catalog_store,
+            reusable_objects=self.reusable_objects,
             sign_executor=self.sign_executor,
             on_sign_request=self.on_sign_request,
             reopen_target=self.reopen_target,

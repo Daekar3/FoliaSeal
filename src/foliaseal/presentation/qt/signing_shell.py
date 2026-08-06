@@ -31,6 +31,10 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionState,
 )
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import (
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinatorError as _SignaturePropertiesCoordinatorError,
 )
@@ -189,8 +193,7 @@ class SigningWorkspaceWidget:
         certificate_catalog: CertificateCatalog | None = None,
         certificate_catalog_store: CertificateCatalogRepository | None = None,
         certificate_material_port: CertificateSigningMaterialPort | None = None,
-        preset_catalog: SignaturePresetCatalog | None = None,
-        preset_catalog_store: SignaturePresetCatalogStore | None = None,
+        reusable_objects: ReusableSigningObjects | None = None,
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         document_review_inspector: DocumentReviewInspector | None = None,
@@ -203,6 +206,8 @@ class SigningWorkspaceWidget:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> None:
+        if reusable_objects is None:
+            raise ValueError("reusable_objects is required for the signing workspace widget.")
         self._bindings = bindings
         self._viewer_workflow = viewer_workflow
         self._draft_workflow = signing_workflow
@@ -242,8 +247,7 @@ class SigningWorkspaceWidget:
                 certificate_catalog=certificate_catalog,
                 certificate_catalog_store=certificate_catalog_store,
                 certificate_material_port=certificate_material_port,
-                preset_catalog=preset_catalog,
-                preset_catalog_store=preset_catalog_store,
+                reusable_objects=reusable_objects,
                 app_settings=self._app_settings,
                 app_settings_store=app_settings_store,
                 document_review_inspector=document_review_inspector,
@@ -422,6 +426,7 @@ class SigningShellAdapter:
         certificate_catalog: CertificateCatalog | None = None,
         certificate_catalog_store: CertificateCatalogRepository | None = None,
         certificate_material_port: CertificateSigningMaterialPort | None = None,
+        reusable_objects: ReusableSigningObjects | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: SignaturePresetCatalogStore | None = None,
         app_settings: AppSettings | None = None,
@@ -436,6 +441,18 @@ class SigningShellAdapter:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> Any:
+        if reusable_objects is not None and (
+            preset_catalog is not None or preset_catalog_store is not None
+        ):
+            raise ValueError(
+                "reusable_objects cannot be combined with legacy preset catalog inputs."
+            )
+        if reusable_objects is None:
+            reusable_objects = ReusableSigningObjects(
+                preset_catalog_store or InMemoryCatalogRepository(
+                    preset_catalog or SignaturePresetCatalog(schema_version=1)
+                )
+            )
         copy_text_callback = on_copy_text or self._load_copy_text_callback()
         return SigningWorkspaceWidget(
             bindings=self._bindings,
@@ -444,8 +461,7 @@ class SigningShellAdapter:
             certificate_catalog=certificate_catalog,
             certificate_catalog_store=certificate_catalog_store,
             certificate_material_port=certificate_material_port,
-            preset_catalog=preset_catalog,
-            preset_catalog_store=preset_catalog_store,
+            reusable_objects=reusable_objects,
             app_settings=app_settings,
             app_settings_store=app_settings_store,
             document_review_inspector=document_review_inspector,
@@ -519,6 +535,7 @@ def build_qt_signing_shell(
     certificate_catalog: CertificateCatalog | None = None,
     certificate_catalog_store: CertificateCatalogRepository | None = None,
     certificate_material_port: CertificateSigningMaterialPort | None = None,
+    reusable_objects: ReusableSigningObjects | None = None,
     preset_catalog: SignaturePresetCatalog | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     app_settings: AppSettings | None = None,
@@ -542,6 +559,7 @@ def build_qt_signing_shell(
         certificate_catalog=certificate_catalog,
         certificate_catalog_store=certificate_catalog_store,
         certificate_material_port=certificate_material_port,
+        reusable_objects=reusable_objects,
         preset_catalog=preset_catalog,
         preset_catalog_store=preset_catalog_store,
         app_settings=app_settings,

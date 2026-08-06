@@ -3,6 +3,11 @@ from pathlib import Path
 import pytest
 
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import (
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
@@ -121,6 +126,9 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     def _reopen_target(_path) -> None:
         return None
 
+    reusable_objects = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
     outcome = service.open_workspace(
         OpenWorkspaceCommand(
             source_pdf=selected_pdf,
@@ -130,7 +138,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
                 storage_dir=tmp_path / "Certificates"
             ),
             certificate_material_port=material_port,
-            preset_catalog_store=object(),
+            reusable_objects=reusable_objects,
             sign_executor=sign_executor,
             on_sign_request=_on_sign_request,
             reopen_target=_reopen_target,
@@ -149,6 +157,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     )
     assert shell_factory.bootstrap_calls[0].app_settings == _settings(tmp_path)
     assert shell_factory.bootstrap_calls[0].certificate_material_port is material_port
+    assert shell_factory.bootstrap_calls[0].reusable_objects is reusable_objects
     assert shell_factory.bootstrap_calls[0].sign_executor is sign_executor
     assert shell_factory.bootstrap_calls[0].on_open_signed_output is _reopen_target
 
@@ -164,6 +173,21 @@ def test_workspace_open_service_raises_when_pdf_load_fails(tmp_path: Path) -> No
                 source_pdf=tmp_path / "broken.pdf",
                 app_settings=_settings(tmp_path),
                 reopen_target=lambda path: None,
+            )
+        )
+
+    assert shell_factory.bootstrap_calls == []
+
+
+def test_workspace_open_service_requires_canonical_reusable_service(tmp_path: Path) -> None:
+    shell_factory = _FakeShellFactory(_FakeShell())
+    service = _workspace_open_service(shell_factory=shell_factory)
+
+    with pytest.raises(ValueError, match="reusable_objects is required"):
+        service.open_workspace(
+            OpenWorkspaceCommand(
+                source_pdf=tmp_path / "source.pdf",
+                app_settings=_settings(tmp_path),
             )
         )
 

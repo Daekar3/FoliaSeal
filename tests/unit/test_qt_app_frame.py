@@ -3,6 +3,11 @@ from pathlib import Path
 import pytest
 
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import (
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
@@ -508,7 +513,9 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
             storage_dir=tmp_path / "Certificates"
         ),
         certificate_material_port=object(),
-        preset_catalog_store=object(),
+        reusable_objects=ReusableSigningObjects(
+            InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+        ),
         sign_executor=object(),
         on_sign_request=lambda request: None,
         on_open_signed_output=lambda path: None,
@@ -525,7 +532,7 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
         "signing_workflow": bootstrap.signing_workflow,
         "certificate_catalog_store": bootstrap.certificate_catalog_store,
         "certificate_material_port": bootstrap.certificate_material_port,
-        "preset_catalog_store": bootstrap.preset_catalog_store,
+        "reusable_objects": bootstrap.reusable_objects,
         "app_settings": bootstrap.app_settings,
         "app_settings_store": bootstrap.app_settings_store,
         "sign_executor": bootstrap.sign_executor,

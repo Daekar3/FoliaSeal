@@ -315,7 +315,7 @@ class FoliaSealAppFrame:
                 app_settings_store=self._app_settings_store,
                 certificate_catalog_store=self._certificate_catalog_store,
                 certificate_material_port=self._certificate_material_port,
-                preset_catalog_store=self._preset_catalog_store,
+                reusable_objects=self._reusable_objects,
                 sign_executor=self._sign_executor,
                 on_sign_request=self._on_sign_request,
                 reopen_target=self.open_pdf_path,

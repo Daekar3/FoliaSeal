@@ -9,12 +9,12 @@ from typing import Any, Protocol
 
 from foliaseal.application import SigningDraftWorkflow, suggest_signed_output_path
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
-from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signing_shell import SigningRequestExecutor
 from foliaseal.presentation.qt.signing_shell_port import (
@@ -38,7 +38,7 @@ class OpenWorkspaceCommand:
     app_settings_store: AppSettingsStore | None = None
     certificate_catalog_store: CertificateCatalogRepository | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
-    preset_catalog_store: SignaturePresetCatalogStore | None = None
+    reusable_objects: ReusableSigningObjects | None = None
     sign_executor: SigningRequestExecutor | None = None
     on_sign_request: Callable[[SigningRequest], None] | None = None
     reopen_target: Callable[[str | Path], Any | None] | None = None
@@ -134,13 +134,16 @@ class SigningWorkspaceCompositionService:
             tsa_url="",
             timestamp_required=False,
         )
+        reusable_objects = command.reusable_objects
+        if reusable_objects is None:
+            raise ValueError("reusable_objects is required to open a signing workspace.")
         bundle = self.shell_factory.create(
             SigningWorkspaceBootstrap(
                 viewer_workflow=viewer_workflow,
                 signing_workflow=signing_workflow,
                 certificate_catalog_store=command.certificate_catalog_store,
                 certificate_material_port=command.certificate_material_port,
-                preset_catalog_store=command.preset_catalog_store,
+                reusable_objects=reusable_objects,
                 app_settings=command.app_settings,
                 app_settings_store=command.app_settings_store,
                 sign_executor=command.sign_executor,

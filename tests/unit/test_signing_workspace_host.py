@@ -1,5 +1,10 @@
 from pathlib import Path
 
+from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import (
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.app_frame_workspace_open import WorkspaceHandle
 from foliaseal.presentation.qt.signing_workspace_host import (
@@ -65,7 +70,9 @@ def _environment() -> SigningWorkspaceEnvironment:
         app_settings=_settings,
         app_settings_store=None,
         certificate_catalog_store=None,
-        preset_catalog_store=None,
+        reusable_objects=ReusableSigningObjects(
+            InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+        ),
         sign_executor=None,
         on_sign_request=None,
         reopen_target=None,

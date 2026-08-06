@@ -120,6 +120,9 @@ an unbounded compatibility layer.
   remain contract-coupled and are still scheduled for the atomic migration.
 - [x] Inventory and replacement mapping refreshed on 2026-08-06 (`106` tracked path names, `254`
   tracked files, and about `6,570` occurrences before excluding this plan).
+- [x] (2026-08-06) Reconfirmed as the dedicated next atomic migration after the Qt reusable-service
+  threading slice. The current slice intentionally leaves public `phase3` names untouched so this
+  plan can rename modules, symbols, CLI branches, fixtures, and active documentation together.
 - [ ] Atomic rename/migration implemented.
 - [ ] Compatibility debris removed and validation completed.
 - [ ] Architecture/README/ExecPlans reconciled and committed.

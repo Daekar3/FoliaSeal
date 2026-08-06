@@ -2224,6 +2224,51 @@ from material resolution), placement-profile/current-page semantics that deserve
 contract, and the larger phase3 nomenclature migration. The phase3 migration remains atomic and
 contract-blocked; it is not mixed into the next child.
 
+### Design Selection 48 — completed 2026-08-06
+
+Three designs were generated for `qt-reusable-catalog-service-threading` and reviewed independently.
+
+- Design A, optional concrete service threading with legacy fields throughout the graph, scored about
+  `65–80` before penalties. It remains vulnerable to optional legacy paths and concrete coupling and
+  is invalid as an endpoint if production callers can still construct a second service.
+- Design B, a narrow application-owned `ReusableSigningObjectsPort` protocol threaded through the
+  graph, scored about `79–82` adjusted. It is valid and highly fakeable, but adds a second public
+  abstraction and a protocol maintenance seam without current cross-process variation.
+- Design C, constrained common-caller threading, requires one `ReusableSigningObjects` identity on
+  the production AppFrame/workspace path, removes legacy catalog/store kwargs from production Qt
+  signatures, and keeps one-way adapters only at explicit test/harness edges. Review one scored this
+  shape `87.5`; review two's lower `64.4` score applied to a rejected broad service-context aggregate,
+  not this constrained direct-service design. The orchestrator score is `88`; no penalty applies when
+  the service is a single required field rather than a registry/context.
+
+Design C is selected. Exact production signatures add `reusable_objects: ReusableSigningObjects` to
+`SigningWorkspaceEnvironment`, `OpenWorkspaceCommand`, `SigningWorkspaceBootstrap`,
+`SigningShellAdapter.create()`, `SigningWorkspaceWidget`, `build_qt_signing_shell()`,
+`build_signing_workspace_composition()`, and `SignaturePropertiesPanel`. The same object is forwarded
+unchanged to `DefaultSignaturePropertiesCoordinator`; no Qt graph function accepts a store/catalog for
+reusable objects. Low-level builder compatibility shims may accept legacy kwargs only when the
+canonical service is absent, reject mixed inputs, and have a grep-verifiable retirement condition.
+No generic service context, locator, or phase3 contract change is allowed.
+
+### Problem Frame 47 — Qt reusable-service threading
+
+The active GUI graph has two ways to describe reusable signing catalogs. `FoliaSealAppFrame` creates
+one canonical `ReusableSigningObjects` for the reusable-object library, but
+`SigningWorkspaceEnvironment`, `OpenWorkspaceCommand`, `SigningWorkspaceBootstrap`, shell builders,
+composition, and `SignaturePropertiesPanel` still carry `preset_catalog` and/or
+`preset_catalog_store`. The panel's coordinator then constructs a second service around the same
+store. Understanding one signing-properties workflow requires following these duplicated transport
+fields across at least seven Qt modules and several tests/harnesses.
+
+The bounded workflow is app-frame PDF open -> workspace environment/command -> shell bootstrap ->
+properties panel -> coordinator -> reusable-object snapshot/compose. The selected service is an
+in-process, local-substitutable dependency with `ReusableSigningObjects` as its test stand-in. The
+new graph must pass the existing service object by protocol/type, preserve library refresh and
+signing-properties behavior, leave certificate repository/material-port threading unchanged, and
+not rename phase3 commands, DTOs, JSON keys, fixtures, or artifacts. Improvement comes from one
+canonical service instance, fewer caller arguments, no duplicate construction, and a testable
+composition seam; persisted profile data and user-visible state must remain byte/behavior compatible.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
@@ -2336,3 +2381,30 @@ and speculative public APIs are forbidden from being mixed into a child slice.
 
 Revision note: created 2026-08-05 after confirming no existing architecture-loop parent plan and
 reading the frozen product specification and fixed loop reference.
+
+### Implementation 49 — completed 2026-08-06: Qt reusable-service threading
+
+Executed child plan `docs/ExecPlans/qt_reusable_service_threading_execplan.md` from the selected
+constrained direct-service design. `FoliaSealAppFrame` now passes its one `ReusableSigningObjects`
+instance through `SigningWorkspaceEnvironment`, `OpenWorkspaceCommand`, `SigningWorkspaceBootstrap`,
+the production Qt factory/widget/composition, `SignaturePropertiesPanel`, and
+`DefaultSignaturePropertiesCoordinator`. The production workspace modules no longer transport
+`preset_catalog` or `preset_catalog_store`; the low-level shell builder is the only explicit
+one-way compatibility edge for direct harness callers, and mixed canonical/legacy inputs fail fast.
+Missing-service guards were added at open, factory, composition, panel, and widget boundaries, while
+identity and boundary tests were updated to inject the same service.
+
+Evidence: focused Qt/reusable/coordinator/preview set `194 passed`; full suite `1,142 passed, 1
+warning`; Ruff, compileall, Qt import isolation, CLI help, and `git diff --check` passed. Offscreen
+signed acceptance evidence passed `10` scenarios with `7` successful signings, preview parity `18/18`,
+and fit rejection `3/3`. `docs/SPEC.md` remained byte-identical, no FoliaSeal/Python process remained,
+and the transient acceptance summary was cleaned up. The predicted improvement `.48` is retained as
+the measured qualitative score because navigation, change-amplification, seam-reduction, boundary,
+cohesion, and isolation gains all landed without a regression over `.10`.
+
+The next nomenclature slice is explicitly tracked by
+`docs/ExecPlans/phase3_nomenclature_retirement_execplan.md`. It is intentionally not mixed into this
+implementation: the plan now records the refreshed inventory (`106` path names, `254` files, about
+`6,570` occurrences before excluding itself), replacement map, contract boundaries, and one-slice
+atomic migration/compatibility-removal gate. No phase3 CLI, DTO, JSON, fixture, or artifact contract
+was renamed here.
