@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest, SigningResult
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
@@ -160,10 +161,11 @@ class Phase3HarnessSessionRunner:
             )
 
         try:
+            reusable_objects = ReusableSigningObjects(profile_store)
             shell = self.deps.build_qt_signing_shell(
                 viewer_workflow=viewer_workflow,
                 signing_workflow=signing_workflow,
-                preset_catalog_store=profile_store,
+                reusable_objects=reusable_objects,
                 sign_executor=sign_executor,
                 on_sign_request=on_sign_request,
                 on_error=on_error,

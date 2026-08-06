@@ -30,6 +30,7 @@ class SigningWorkspaceEnvironment:
     """Injected app dependencies used to build each open command."""
 
     app_settings: Callable[[], AppSettings]
+    reusable_objects: ReusableSigningObjects
     app_settings_store: AppSettingsStore | None
     certificate_catalog_store: CertificateCatalogRepository | None
     sign_executor: SigningRequestExecutor | None
@@ -37,7 +38,6 @@ class SigningWorkspaceEnvironment:
     reopen_target: Callable[[str | Path], Any | None] | None
     on_error: Callable[[str], None] | None
     on_status_change: Callable[[str], None] | None
-    reusable_objects: ReusableSigningObjects | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
 
     def command_for(self, source_pdf: Path) -> OpenWorkspaceCommand:

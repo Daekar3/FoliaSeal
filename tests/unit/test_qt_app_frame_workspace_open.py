@@ -112,6 +112,12 @@ def _workspace_open_service(*, shell_factory: _FakeShellFactory) -> WorkspaceOpe
     )
 
 
+def _reusable_objects() -> ReusableSigningObjects:
+    return ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+
+
 def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path) -> None:
     shell = _FakeShell()
     shell_factory = _FakeShellFactory(shell)
@@ -126,9 +132,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     def _reopen_target(_path) -> None:
         return None
 
-    reusable_objects = ReusableSigningObjects(
-        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
-    )
+    reusable_objects = _reusable_objects()
     outcome = service.open_workspace(
         OpenWorkspaceCommand(
             source_pdf=selected_pdf,
@@ -172,6 +176,7 @@ def test_workspace_open_service_raises_when_pdf_load_fails(tmp_path: Path) -> No
             OpenWorkspaceCommand(
                 source_pdf=tmp_path / "broken.pdf",
                 app_settings=_settings(tmp_path),
+                reusable_objects=_reusable_objects(),
                 reopen_target=lambda path: None,
             )
         )
@@ -181,14 +186,11 @@ def test_workspace_open_service_raises_when_pdf_load_fails(tmp_path: Path) -> No
 
 def test_workspace_open_service_requires_canonical_reusable_service(tmp_path: Path) -> None:
     shell_factory = _FakeShellFactory(_FakeShell())
-    service = _workspace_open_service(shell_factory=shell_factory)
 
-    with pytest.raises(ValueError, match="reusable_objects is required"):
-        service.open_workspace(
-            OpenWorkspaceCommand(
-                source_pdf=tmp_path / "source.pdf",
-                app_settings=_settings(tmp_path),
-            )
+    with pytest.raises(TypeError, match="reusable_objects"):
+        OpenWorkspaceCommand(
+            source_pdf=tmp_path / "source.pdf",
+            app_settings=_settings(tmp_path),
         )
 
     assert shell_factory.bootstrap_calls == []
@@ -204,6 +206,7 @@ def test_workspace_open_service_raises_when_pdf_has_no_pages(tmp_path: Path) -> 
             OpenWorkspaceCommand(
                 source_pdf=tmp_path / "empty.pdf",
                 app_settings=_settings(tmp_path),
+                reusable_objects=_reusable_objects(),
                 reopen_target=lambda path: None,
             )
         )

@@ -2408,3 +2408,24 @@ implementation: the plan now records the refreshed inventory (`106` path names, 
 `6,570` occurrences before excluding itself), replacement map, contract boundaries, and one-slice
 atomic migration/compatibility-removal gate. No phase3 CLI, DTO, JSON, fixture, or artifact contract
 was renamed here.
+
+### Scan Round 50 — completed after `d4f09f666` and audit follow-up
+
+Three fresh explorer-light agents independently confirmed the canonical AppFrame-to-coordinator
+identity path and found no SPEC or runtime regression. Two reviewers identified closure gaps: the
+environment/open-command/bootstrap service fields were still nullable, and the two first-party
+acceptance harness callers still entered through the low-level legacy store adapter. The follow-up
+implementation tightened those fields to required constructor inputs, migrated both harness callers
+to construct `ReusableSigningObjects(profile_store)` explicitly, and added a direct panel-to-
+coordinator identity assertion. The low-level shell builder remains the sole documented compatibility
+edge for direct old callers; it rejects mixed canonical/legacy inputs and is tracked for removal by
+the atomic nomenclature/compatibility migration.
+
+Post-follow-up evidence: 206 focused tests and the full suite `1,142 passed, 1 warning`; Ruff,
+compileall, Qt import isolation, CLI help, and diff checks pass. The offscreen acceptance command
+reproduced signed acceptance `10` scenarios / `7` successful signings, preview parity `18/18`, and
+fit rejection `3/3`; its generated summary was removed and no FoliaSeal/Python process remained.
+`docs/SPEC.md` remains byte-identical. The next ranked candidate is the dedicated atomic
+`phase3_nomenclature_retirement_execplan.md` (inventory `106` path names, `254` files, about `6,570`
+occurrences before excluding the plan), followed by collapsing the low-level shell compatibility edge
+once that migration has renamed its first-party callers.

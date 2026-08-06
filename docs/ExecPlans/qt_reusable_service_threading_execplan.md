@@ -46,6 +46,9 @@ JSON/artifact contracts, and certificate repository/material-port threading rema
   preserving existing signing/phase3 evidence behavior.
 - [x] (2026-08-06) Run focused/full validation, offscreen evidence, SPEC/import/process audits, and
   reconcile docs. Commit and the three fresh post-commit explorers remain the closure gate.
+- [x] (2026-08-06) Incorporated the post-commit audit: required service fields are now non-optional,
+  first-party acceptance harness callers construct the service explicitly, and panel-to-coordinator
+  identity is asserted directly.
 
 ## Surprises & Discoveries
 
@@ -88,13 +91,14 @@ JSON/artifact contracts, and certificate repository/material-port threading rema
 
 ## Outcomes & Retrospective
 
-Implementation is complete pending commit and post-commit scan. Baseline evidence was 12 production
+Implementation is complete pending the audit follow-up commit and closure scan. Baseline evidence was 12 production
 Qt transport sites forwarding `preset_catalog`/`preset_catalog_store` across eight modules, one
 AppFrame-owned service that did not reach the active panel, and 45 focused reusable/coordinator/
 workspace tests from the prior slice. Measured results are one identity from AppFrame through the
 workspace bootstrap to the properties coordinator, zero legacy transport in the production workspace
-modules, explicit missing-service failures at open/factory/composition/panel/widget boundaries, 194
-focused tests passing, and 1,142 full tests passing with one pre-existing Pillow deprecation warning.
+modules, explicit required-service typing plus missing-service guards at open/factory/composition/
+panel/widget boundaries, 206 focused tests passing, and 1,142 full tests passing with one pre-existing
+Pillow deprecation warning.
 Ruff, compileall, Qt import isolation, CLI help, diff-check, and the offscreen acceptance matrices all
 pass (`10/7`, `18/18`, `3/3`). The qualitative improvement is accepted at `.48` predicted with no
 observed regression over `.10`; the phase3 nomenclature migration remains a separately governed
@@ -187,8 +191,11 @@ models, and persistence paths. Workspace close/reopen leaves the shared service 
 followed by panel refresh sees the same names, and a panel save followed by library view sees the same
 snapshot. Existing signing, reusable-object, Qt, phase3 evidence, JSON, CLI, and `current_page`
 behavior remain green. Full tests, static/import checks, offscreen matrices, SPEC diff, process audit,
-and generated-summary cleanup must pass. Actual Improvement must be at least `.15` with no component
-regression beyond `.10` before accepting the cycle.
+and generated-summary cleanup must pass. The low-level `SigningShellAdapter`/`build_qt_signing_shell`
+edge is the only documented compatibility exception: it may synthesize one service when invoked
+directly by an old harness with a store/catalog, and rejects mixed inputs; production workspace
+boundaries are strict. Actual Improvement must be at least `.15` with no component regression beyond
+`.10` before accepting the cycle.
 
 ## Idempotence and Recovery
 

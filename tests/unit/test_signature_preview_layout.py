@@ -34,13 +34,15 @@ from tests.unit.test_qt_signing_shell import (
 
 def _panel_and_layout(tmp_path: Path):
     bindings = _fake_bindings()
+    reusable_objects = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
     panel = properties_panel_module.SignaturePropertiesPanel(
         bindings=bindings,
         workflow=_workflow(tmp_path),
-        reusable_objects=ReusableSigningObjects(
-            InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
-        ),
+        reusable_objects=reusable_objects,
     )
+    assert panel._coordinator.reusable_objects is reusable_objects
     layout = preview_layout_module.QtSignaturePreviewLayout(bindings=bindings)
     return panel, layout
 

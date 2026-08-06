@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
@@ -126,6 +127,7 @@ class Phase3SignedAcceptanceMatrixRunner:
             timestamp_required=False,
         )
         profile_store = self.deps.profile_store_factory()
+        reusable_objects = ReusableSigningObjects(profile_store)
 
         lifecycle_factory = self.deps.lifecycle_factory or QtPhase3SignedAcceptanceLifecycle
         lifecycle = lifecycle_factory(bindings)
@@ -136,7 +138,7 @@ class Phase3SignedAcceptanceMatrixRunner:
             shell = self.deps.build_qt_signing_shell(
                 viewer_workflow=viewer_workflow,
                 signing_workflow=signing_workflow,
-                preset_catalog_store=profile_store,
+                reusable_objects=reusable_objects,
                 sign_executor=sign_executor,
             )
             lifecycle.attach_shell(shell)

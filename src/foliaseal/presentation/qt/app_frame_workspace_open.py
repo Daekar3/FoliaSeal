@@ -35,10 +35,10 @@ class OpenWorkspaceCommand:
 
     source_pdf: Path
     app_settings: AppSettings
+    reusable_objects: ReusableSigningObjects
     app_settings_store: AppSettingsStore | None = None
     certificate_catalog_store: CertificateCatalogRepository | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
-    reusable_objects: ReusableSigningObjects | None = None
     sign_executor: SigningRequestExecutor | None = None
     on_sign_request: Callable[[SigningRequest], None] | None = None
     reopen_target: Callable[[str | Path], Any | None] | None = None
