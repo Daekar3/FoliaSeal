@@ -114,6 +114,38 @@ def test_signed_acceptance_scenario_executor_returns_preview_only_result_without
     ]
 
 
+def test_signed_acceptance_scenario_executor_reuses_typed_bundle_for_mutation_and_capture(
+    tmp_path: Path,
+) -> None:
+    bundle = object()
+    mutation_calls: list[dict[str, object]] = []
+    workspace = _FakeWorkspace()
+
+    def apply_preview_matrix_scenario(**kwargs: object) -> None:
+        mutation_calls.append(kwargs)
+
+    executor = _executor(
+        apply_preview_matrix_scenario=apply_preview_matrix_scenario,
+        build_workspace=lambda **kwargs: (
+            workspace if kwargs.get("workspace") is bundle else _FakeWorkspace()
+        ),
+    )
+    executor.run_result(
+        shell=_FakeShell(),
+        workspace=bundle,  # type: ignore[arg-type]
+        scenario={"name": "Shared Bundle"},
+        profile_store=object(),
+        artifacts_dir=tmp_path,
+        base_input_path=tmp_path / "input.pdf",
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        sign_executor=SimpleNamespace(execute=lambda _request: None),
+    )
+
+    assert mutation_calls[0]["workspace"] is bundle
+    assert workspace.capture_snapshot_commands
+
+
 def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_snapshot(
     tmp_path: Path,
 ) -> None:

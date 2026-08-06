@@ -2566,4 +2566,8 @@ and capture. The compatibility-only fallback remains available only when the typ
 for characterization tests and low-level Qt edges. Wrapper helpers omit an optional `workspace=None`
 keyword so existing fakes retain their narrow call contract. Full pytest was rerun at `1,142 passed,
 1 warning`; offscreen evidence again passed `10/7`, `18/18`, and `3/3`; generated acceptance outputs
-were removed. The correction is ready for its follow-up commit and fresh closure scan.
+were removed. The correction is committed at `468e9e4be`; three independent post-commit scans
+confirmed the one-bundle construction invariant, green validation gates, SPEC immutability, clean
+artifact/process state, and the intentional separation of the phase3 nomenclature plan.
+An explicit regression test now asserts that the exact typed bundle reaches both signed-scenario
+mutation and capture; the full suite is `1,143 passed, 1 warning` after that coverage addition.

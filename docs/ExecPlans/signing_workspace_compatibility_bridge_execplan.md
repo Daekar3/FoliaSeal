@@ -53,8 +53,8 @@ the production/harness graph.
   acceptance construction paths; the legacy raw-shell fallback remains only for compatibility tests
   and low-level Qt edges and is recorded as the next retirement gate.
 - [x] Migrated boundary wiring and preserved compatibility characterization coverage.
-- [x] Acceptance audit found no missing adapter/installer identity or lifecycle invariant; existing
-  characterization and full harness coverage remain green.
+- [x] Added explicit signed-scenario regression coverage proving the exact typed bundle reaches both
+  scenario mutation and capture; existing adapter/installer lifecycle characterization remains green.
 - [x] Ran focused/full/offscreen validation, removed generated artifacts/processes, reconciled parent
   and architecture docs, committed the slice, and completed the fresh three-explorer closure scan.
 
@@ -108,7 +108,8 @@ the production/harness graph.
 
 ## Outcomes & Retrospective
 
-The implementation is complete at commit `e8e9c99f4`. The focused inventory
+The implementation is complete at commit `468e9e4be` (with the initial seam split recorded at
+`e8e9c99f4`). The focused inventory
 now reports 157 compatibility/export/factory construction references (including characterization
 tests and the documented transitional fallbacks) and 20 broader `compat_surface` or
 `install_widget_exports` references. The testing adapter no longer stores a compatibility-surface
@@ -128,17 +129,19 @@ trees were removed after the audit.
 
 `signing_workspace_composition.py` builds the viewer, properties panel, runtime, bridges, shell
 surface, and orchestrator. `SigningWorkspaceCompatibilitySurface` currently receives those objects,
-creates `SigningWorkspaceTestingAdapter(self)`, and `install_widget_exports()` assigns runtime and
-shell methods to the raw QWidget. `SigningWorkspaceOrchestrator.bootstrap()` calls that installer
-before refresh/review/action state initialization. `signing_shell.py` exposes both
+constructs `SigningWorkspaceTestingAdapter` from explicit runtime, panel, and live-result-reader
+dependencies, and delegates `install_widget_exports()` to the Qt-local legacy installer. The
+`SigningWorkspaceOrchestrator.bootstrap()` call remains the bootstrap-order owner before
+refresh/review/action state initialization. `signing_shell.py` exposes both
 `testing_adapter` and historical `compat_surface` properties. `signing_shell_port.py` adapts the
 widget into `SigningWorkspaceBundle`; the bundle's `testing` capability is the supported harness
 boundary.
 
-The Phase 3 interactive runner currently receives `build_qt_signing_shell` and `build_workspace`,
-constructs a shell, builds a workspace adapter from it, and then calls
-`build_qt_signing_workspace_bundle(shell)` a second time. `QtPhase3HarnessWorkspaceAdapter` accepts
-either a typed bundle or a raw shell and performs the same duplicate wrapping. The target is a
+The Phase 3 interactive and signed-acceptance runners receive a typed factory path and create one
+`SigningWorkspaceBundle`; the bundle view is mounted and reused for workspace construction, scenario
+mutation, and capture. When the typed factory is intentionally absent, characterization tests retain
+the low-level raw-shell fallback. `QtPhase3HarnessWorkspaceAdapter` therefore accepts either a typed
+bundle or that explicitly bounded fallback. The target is a
 single typed factory call returning one bundle, with the raw-shell adapter retained only at the
 low-level Qt edge until all direct tests are migrated.
 
