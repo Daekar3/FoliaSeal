@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -12,6 +11,11 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureRect,
     SigningRequest,
+)
+from foliaseal.presentation.qt.phase3_harness_event_pump import (
+    HarnessEventPumpPort,
+    NoOpHarnessEventPump,
+    QtHarnessEventPump,
 )
 from foliaseal.presentation.qt.phase3_harness_scenario_policy import (
     Phase3HarnessScenarioResolver,
@@ -31,20 +35,6 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBundle,
     build_qt_signing_workspace_bundle,
 )
-
-
-def _widget_application(widget: Any) -> Any | None:
-    app_getter = getattr(type(widget), "window", None)
-    _ = app_getter
-    try:
-        app_module = importlib.import_module("PySide6.QtWidgets")
-    except ModuleNotFoundError:
-        return None
-    q_application = getattr(app_module, "QApplication", None)
-    if q_application is None:
-        return None
-    instance = getattr(q_application, "instance", None)
-    return instance() if callable(instance) else None
 
 
 @dataclass(frozen=True)
@@ -108,6 +98,7 @@ class HeadlessPhase3HarnessWorkspaceDeps:
     snapshot_preview: Callable[..., dict[str, Any]]
     snapshot_signing_request: Callable[[SigningRequest | None], dict[str, Any] | None]
     build_backend_reservation_evidence: Callable[[SigningRequest | None], Any]
+    event_pump: HarnessEventPumpPort | None = None
 
 
 class HeadlessPhase3HarnessWorkspaceAdapter:
@@ -133,6 +124,7 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
         )
         self._capture_service = Phase3HarnessWorkspaceCaptureService()
         self._scenario_resolver = Phase3HarnessScenarioResolver(profile_store=profile_store)
+        self._event_pump = self._deps.event_pump or NoOpHarnessEventPump()
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
         resolved = self._scenario_resolver.resolve(
@@ -147,6 +139,7 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
             self._workflow.timestamp_required = resolved.timestamp_required
         if resolved.signature_rect is not None:
             self._workflow.set_signature_rect(resolved.signature_rect)
+        self._event_pump.process_events()
 
     def refresh_viewer(self) -> None:
         return None
@@ -160,6 +153,7 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
             else snapshot_current_draft_request(self._workflow)
         )
         preview = self._workflow.preview()
+        self._event_pump.process_events()
         render_capture_result = self._deps.capture_headless_preview_render.capture(
             PreviewRenderCaptureRequest(
                 preview=preview,
@@ -204,6 +198,7 @@ class QtPhase3HarnessWorkspaceDeps:
     build_backend_reservation_evidence: Callable[[SigningRequest | None], Any]
     snapshot_sign_time_fit_diagnostics: Callable[..., dict[str, Any] | None]
     interactive_capture_label: Callable[..., str]
+    event_pump: HarnessEventPumpPort | None = None
 
 
 class QtPhase3HarnessWorkspaceAdapter:
@@ -234,6 +229,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         )
         self._capture_service = Phase3HarnessWorkspaceCaptureService()
         self._scenario_resolver = Phase3HarnessScenarioResolver(profile_store=profile_store)
+        self._event_pump = self._deps.event_pump or _default_qt_event_pump(self._workspace)
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
         testing_surface = self._workspace.testing
@@ -251,9 +247,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         if resolved.signature_rect is not None:
             testing_surface.apply_signature_rect_placement(resolved.signature_rect)
         self.refresh_viewer()
-        app = _widget_application(self._workspace.view.mount_target())
-        if app is not None and hasattr(app, "processEvents"):
-            app.processEvents()
+        self._event_pump.process_events()
 
     def refresh_viewer(self) -> None:
         try:
@@ -273,9 +267,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         )
         signing_result = workspace_state.last_signing_result
         preview = testing_surface.panel.refresh_preview()
-        app = _widget_application(self._workspace.view.mount_target())
-        if app is not None and hasattr(app, "processEvents"):
-            app.processEvents()
+        self._event_pump.process_events()
         render_capture_result = self._deps.capture_preview_render.capture(
             PreviewRenderCaptureRequest(
                 workspace=self._workspace,
@@ -344,6 +336,14 @@ def capture_qt_preview_render(
         artifact_basename=artifact_basename,
         build_preview_render_capture_payload=build_preview_render_capture_payload,
     )
+
+
+def _default_qt_event_pump(workspace: SigningWorkspaceBundle) -> HarnessEventPumpPort:
+    try:
+        mount_target = workspace.view.mount_target()
+    except (AttributeError, TypeError):
+        return NoOpHarnessEventPump()
+    return QtHarnessEventPump(widget=mount_target)
 
 
 def snapshot_current_draft_request(workflow: SigningDraftWorkflow) -> SigningRequest | None:

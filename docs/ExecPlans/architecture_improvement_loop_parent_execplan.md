@@ -815,6 +815,66 @@ five-cycle cap. The next scan must reassess the remaining event-pump and preview
 atomic phase3 nomenclature plan remains deferred because external CLI/DTO/JSON/fixture/artifact
 contracts are still frozen.
 
+### Post-cap continuation scan 7 — completed after `5c89e171d`
+
+Three independent explorers reviewed the clean scenario-policy checkout. Two bounded candidates clear
+the continuation threshold: the remaining live/headless event-pump dependency in
+`phase3_harness_workspace.py`, and the larger preview-capture composition cluster in
+`phase3_harness.py`. The event-pump candidate is the smaller, lower-uncertainty tracer bullet: the
+workspace still dynamically discovers `QApplication` and repeats `processEvents()` after live scenario
+mutation and before live preview capture, while the headless path has no explicit stand-in. The
+preview-capture candidate remains important but mixes Qt geometry, Pillow artifacts, and evidence
+policy across a 2,255-line composition root.
+
+Event-pump explorer scores were `(3.5,3.5,4,4.5,4,4,1.5,1.5)`, confidence `0.90`, and Candidate
+Priority approximately `67.54`. Preview-capture scores were `(4.5,4.5,4.5,4.5,4,4,3,2.5)`,
+confidence `0.88`, and Priority approximately `67.6`. The scores are within two points; deterministic
+tie-breakers select event pumping because it has lower Behavioral Uncertainty and Migration Risk and
+is independently deliverable in one narrow slice. Signing backend (~63), compatibility surface (~61),
+and phase3 nomenclature (~45) remain lower or contract-blocked. Public phase3 CLI/DTO/JSON/fixture/
+artifact contracts remain frozen; no nomenclature rename is authorized in this slice.
+
+### Post-cap continuation design selection 7 — completed after `5c89e171d`
+
+Three independent designs were reviewed for the event-pump seam:
+
+- Minimal one-method port with Qt and no-op adapters scored approximately `90.5`; it removes direct
+  `QApplication` discovery while preserving the existing call sites.
+- Flexible `EventPump` protocol/factory scored approximately `84`; it supports alternate application
+  getters but adds extension surface not required by current callers.
+- Common-caller optimized `HarnessEventPumpPort.process_events()` injected into the live workspace
+  dependency bundle, with a Qt adapter bound to the current application and a headless no-op, scored
+  approximately `93` at Candidate Priority ~70 and confidence ~0.93.
+
+Selected design: the common-caller event-pump port. It is a single base design, not a hybrid, so no
+hybrid bonus gate applies. The port has one method, owns no refresh/render/lifecycle policy, and keeps
+the exact sequences `apply scenario → refresh viewer → pump` and `refresh preview → pump → capture`.
+The workspace port, DTOs, CLI, JSON, artifacts, and phase3 nomenclature contracts remain unchanged.
+
+### Post-cap continuation slice 7 — accepted 2026-08-06
+
+Child `docs/ExecPlans/phase3_harness_event_pump_execplan.md` is implemented and closed. The new
+`HarnessEventPumpPort` isolates event processing behind `QtHarnessEventPump` and
+`NoOpHarnessEventPump`; `phase3_harness_workspace.py` no longer imports or discovers Qt directly.
+Both live and headless adapters use the one-method boundary, preserving the exact existing sequences:
+scenario effects → viewer refresh → pump, and preview refresh → pump → render/capture. Workspace port,
+DTO, CLI, JSON, artifact, and phase3 naming contracts remain unchanged.
+
+Focused event-pump/workspace coverage passed `22` tests; the full suite passed `1,054` tests with `11`
+skipped and one pre-existing warning. Ruff, diff checks, application/event-pump import isolation,
+and CLI help checks passed. Offscreen acceptance passed signed acceptance (`10` scenarios, `7`
+successful signings, `3` matched intentional rejections), signed preview parity (`18/18` successful),
+and signed fit rejection (`3/3` matched), with no cryptographic, annotation, preview-comparison, or
+expectation failures. The explicit `/tmp/foliaseal-event-pump-acceptance` root was removed and the
+process audit was clean.
+
+Continuation-slice proxy measurement: navigation friction `0.20`, change amplification `0.35`,
+seam-risk reduction `0.40`, boundary-test improvement `0.45`, interface compression `0.30`,
+cohesion `0.40`, and behavioral-uncertainty reduction `0.20`; `Actual Improvement = 0.31`, predicted
+`0.23`, with no component regression below `-0.10`. This accepts the slice without changing the fixed
+five-cycle cap. The next scan must reassess the preview-capture composition cluster and signing-backend
+boundary; phase3 nomenclature remains deferred until its external contracts can migrate atomically.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
