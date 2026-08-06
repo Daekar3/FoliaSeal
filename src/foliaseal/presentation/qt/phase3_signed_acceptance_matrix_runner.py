@@ -12,6 +12,7 @@ from foliaseal.application.reusable_signing_objects import ReusableSigningObject
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.evidence_artifacts import (
     EvidenceArtifactPort,
     FilesystemEvidenceArtifactPort,
@@ -26,6 +27,10 @@ from foliaseal.presentation.qt.phase3_signed_acceptance_lifecycle import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioResult,
 )
+from foliaseal.presentation.qt.signing_shell_port import (
+    SigningWorkspaceBootstrap,
+    SigningWorkspaceBundle,
+)
 
 LoadQtHarnessBindings = Callable[[], Any]
 LoadPreviewMatrixManifest = Callable[[str], dict[str, Any]]
@@ -34,6 +39,7 @@ BuildDummyTimestamper = Callable[[], Any]
 LoadPageCount = Callable[..., int]
 BuildQtSigningShell = Callable[..., Any]
 BuildWorkspace = Callable[..., Phase3HarnessWorkspacePort]
+CreateWorkspace = Callable[[SigningWorkspaceBootstrap], SigningWorkspaceBundle]
 ExecuteSignedAcceptanceScenario = Callable[
     ..., Phase3SignedAcceptanceScenarioResult | dict[str, Any]
 ]
@@ -67,6 +73,7 @@ class Phase3SignedAcceptanceMatrixRunnerDeps:
     profile_store_factory: Callable[[], Any] = SignaturePresetCatalogStore.default
     lifecycle_factory: LifecycleFactory | None = None
     artifact_port_factory: ArtifactPortFactory | None = None
+    create_workspace: CreateWorkspace | None = None
 
 
 @dataclass(frozen=True)
@@ -142,7 +149,23 @@ class Phase3SignedAcceptanceMatrixRunner:
                 sign_executor=sign_executor,
             )
             lifecycle.attach_shell(shell)
-            workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
+            workspace_bundle: SigningWorkspaceBundle | None = None
+            if self.deps.create_workspace is not None:
+                workspace_bundle = self.deps.create_workspace(
+                    SigningWorkspaceBootstrap(
+                        viewer_workflow=viewer_workflow,
+                        signing_workflow=signing_workflow,
+                        app_settings=AppSettings.default(),
+                        reusable_objects=reusable_objects,
+                        sign_executor=sign_executor,
+                    )
+                )
+                workspace = self.deps.build_workspace(
+                    workspace=workspace_bundle,
+                    profile_store=profile_store,
+                )
+            else:
+                workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
             workspace.refresh_viewer()
             lifecycle.process_events()
 
@@ -151,6 +174,7 @@ class Phase3SignedAcceptanceMatrixRunner:
                 try:
                     scenario_result = self.deps.execute_signed_acceptance_scenario(
                         shell=shell,
+                        workspace=workspace_bundle,
                         scenario=scenario,
                         profile_store=profile_store,
                         artifacts_dir=artifact_root,

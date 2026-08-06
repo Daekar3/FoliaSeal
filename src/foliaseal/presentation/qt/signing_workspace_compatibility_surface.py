@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from foliaseal.domain.models import (
@@ -49,7 +50,24 @@ class SigningWorkspaceCompatibilitySurface:
         self._sidebar_container = sidebar_container
         self._sidebar_surface = sidebar_surface
         self._shell_surface = shell_surface
-        self._testing_adapter = SigningWorkspaceTestingAdapter(self)
+        self._testing_adapter = SigningWorkspaceTestingAdapter(
+            runtime=runtime,
+            properties_panel=properties_panel,
+            last_signing_result=lambda: getattr(widget, "last_signing_result", None),
+        )
+        self._legacy_exports = SigningWorkspaceLegacyWidgetExports(
+            widget=widget,
+            runtime=runtime,
+            properties_panel=properties_panel,
+            viewer_widget=viewer_widget,
+            viewer_navigation_controls=viewer_navigation_controls,
+            properties_scroll=properties_scroll,
+            sidebar_container=sidebar_container,
+            sidebar_surface=sidebar_surface,
+            shell_surface=shell_surface,
+            testing_adapter=self._testing_adapter,
+            compatibility_surface=self,
+        )
 
     @property
     def properties_panel(self) -> SignaturePropertiesPanel:
@@ -75,101 +93,131 @@ class SigningWorkspaceCompatibilitySurface:
         return self._runtime.snapshot(last_signing_result=self.last_signing_result)
 
     def install_widget_exports(self) -> None:
-        self._widget.compat_surface = self  # type: ignore[attr-defined]
-        self._widget.testing_adapter = self._testing_adapter  # type: ignore[attr-defined]
-        self._widget.properties_panel = self._properties_panel  # type: ignore[attr-defined]
-        self._widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
-        self._widget.viewer_navigation_controls = self._viewer_navigation_controls  # type: ignore[attr-defined]
-        self._widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
-        self._widget.sidebar = self._sidebar_container  # type: ignore[attr-defined]
-        self._widget.sidebar_surface = self._sidebar_surface  # type: ignore[attr-defined]
-        destroyed_signal = getattr(self._widget, "destroyed", None)
+        """Install the transitional aliases through the explicit Qt-local installer."""
+        self._legacy_exports.install()
+
+class SigningWorkspaceLegacyWidgetExports:
+    """Qt-local installer for transitional widget aliases."""
+
+    def __init__(
+        self,
+        *,
+        widget: Any,
+        runtime: SigningWorkspaceRuntime,
+        properties_panel: SignaturePropertiesPanel,
+        viewer_widget: Any,
+        viewer_navigation_controls: Any,
+        properties_scroll: Any,
+        sidebar_container: Any,
+        sidebar_surface: Any,
+        shell_surface: Any,
+        testing_adapter: SigningWorkspaceTestingAdapter,
+        compatibility_surface: Any,
+    ) -> None:
+        self._widget = widget
+        self._runtime = runtime
+        self._properties_panel = properties_panel
+        self._viewer_widget = viewer_widget
+        self._viewer_navigation_controls = viewer_navigation_controls
+        self._properties_scroll = properties_scroll
+        self._sidebar_container = sidebar_container
+        self._sidebar_surface = sidebar_surface
+        self._shell_surface = shell_surface
+        self._testing_adapter = testing_adapter
+        self._compatibility_surface = compatibility_surface
+        self._installed = False
+
+    def install(self) -> None:
+        if self._installed:
+            return
+        self._installed = True
+        widget = self._widget
+        widget.compat_surface = self._compatibility_surface  # type: ignore[attr-defined]
+        widget.testing_adapter = self._testing_adapter  # type: ignore[attr-defined]
+        widget.properties_panel = self._properties_panel  # type: ignore[attr-defined]
+        widget.viewer_widget = self._viewer_widget  # type: ignore[attr-defined]
+        widget.viewer_navigation_controls = self._viewer_navigation_controls  # type: ignore[attr-defined]
+        widget.properties_scroll = self._properties_scroll  # type: ignore[attr-defined]
+        widget.sidebar = self._sidebar_container  # type: ignore[attr-defined]
+        widget.sidebar_surface = self._sidebar_surface  # type: ignore[attr-defined]
+        destroyed_signal = getattr(widget, "destroyed", None)
         destroy_connect = getattr(destroyed_signal, "connect", None)
         if callable(destroy_connect):
             destroy_connect(lambda *_args: self._properties_panel.dispose())
-        self._widget.last_signing_result = None  # type: ignore[attr-defined]
-        self._widget.refresh_viewer = self._runtime.refresh_viewer  # type: ignore[attr-defined]
-        self._widget.refresh_document_review = (  # type: ignore[attr-defined]
-            self._runtime.refresh_document_review
-        )
-        self._widget.search_document_text = self._runtime.search_document_text  # type: ignore[attr-defined]
-        self._widget.next_document_text_match = (  # type: ignore[attr-defined]
-            self._runtime.next_document_text_match
-        )
-        self._widget.previous_document_text_match = (  # type: ignore[attr-defined]
-            self._runtime.previous_document_text_match
-        )
-        self._widget.copy_current_document_text_match = (  # type: ignore[attr-defined]
-            self._runtime.copy_current_document_text_match
-        )
-        self._widget.set_document_text_selection_mode = (  # type: ignore[attr-defined]
-            self._runtime.set_document_text_selection_mode
-        )
-        self._widget.copy_selected_document_text = (  # type: ignore[attr-defined]
-            self._runtime.copy_selected_document_text
-        )
-        self._widget.clear_selected_document_text = (  # type: ignore[attr-defined]
-            self._runtime.clear_selected_document_text
-        )
-        self._widget.set_logical_page_index = self._runtime.set_logical_page_index  # type: ignore[attr-defined]
-        self._widget.logical_page_index = self._runtime.logical_page_index  # type: ignore[attr-defined]
-        self._widget.set_signature_rect = self._runtime.set_signature_rect  # type: ignore[attr-defined]
-        self._widget.signature_rect = self._runtime.signature_rect  # type: ignore[attr-defined]
-        self._widget.set_selected_certificate_configuration_id = (  # type: ignore[attr-defined]
+        widget.last_signing_result = None  # type: ignore[attr-defined]
+        widget.refresh_viewer = self._runtime.refresh_viewer  # type: ignore[attr-defined]
+        widget.refresh_document_review = self._runtime.refresh_document_review  # type: ignore[attr-defined]
+        widget.search_document_text = self._runtime.search_document_text  # type: ignore[attr-defined]
+        widget.next_document_text_match = self._runtime.next_document_text_match  # type: ignore[attr-defined]
+        widget.previous_document_text_match = self._runtime.previous_document_text_match  # type: ignore[attr-defined]
+        widget.copy_current_document_text_match = self._runtime.copy_current_document_text_match  # type: ignore[attr-defined]
+        widget.set_document_text_selection_mode = self._runtime.set_document_text_selection_mode  # type: ignore[attr-defined]
+        widget.copy_selected_document_text = self._runtime.copy_selected_document_text  # type: ignore[attr-defined]
+        widget.clear_selected_document_text = self._runtime.clear_selected_document_text  # type: ignore[attr-defined]
+        widget.set_logical_page_index = self._runtime.set_logical_page_index  # type: ignore[attr-defined]
+        widget.logical_page_index = self._runtime.logical_page_index  # type: ignore[attr-defined]
+        widget.set_signature_rect = self._runtime.set_signature_rect  # type: ignore[attr-defined]
+        widget.signature_rect = self._runtime.signature_rect  # type: ignore[attr-defined]
+        widget.set_selected_certificate_configuration_id = (  # type: ignore[attr-defined]
             self._runtime.set_selected_certificate_configuration_id
         )
-        self._widget.selected_certificate_configuration_id = (  # type: ignore[attr-defined]
+        widget.selected_certificate_configuration_id = (  # type: ignore[attr-defined]
             self._runtime.selected_certificate_configuration_id
         )
-        self._widget.signature_appearance = self._runtime.signature_appearance  # type: ignore[attr-defined]
-        self._widget.set_timestamp_required = self._runtime.set_timestamp_required  # type: ignore[attr-defined]
-        self._widget.current_request = self._runtime.current_request  # type: ignore[attr-defined]
-        self._widget.is_sign_action_enabled = self._runtime.is_sign_action_enabled  # type: ignore[attr-defined]
-        self._widget.choose_output_pdf_path = self._shell_surface.choose_output_pdf_path  # type: ignore[attr-defined]
-        self._widget.apply_app_settings = self._shell_surface.apply_app_settings  # type: ignore[attr-defined]
-        self._widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
+        widget.signature_appearance = self._runtime.signature_appearance  # type: ignore[attr-defined]
+        widget.set_timestamp_required = self._runtime.set_timestamp_required  # type: ignore[attr-defined]
+        widget.current_request = self._runtime.current_request  # type: ignore[attr-defined]
+        widget.is_sign_action_enabled = self._runtime.is_sign_action_enabled  # type: ignore[attr-defined]
+        widget.choose_output_pdf_path = self._shell_surface.choose_output_pdf_path  # type: ignore[attr-defined]
+        widget.apply_app_settings = self._shell_surface.apply_app_settings  # type: ignore[attr-defined]
+        widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
             self._shell_surface.refresh_certificate_configurations
         )
-        self._widget.refresh_signature_profiles = self._shell_surface.refresh_signature_profiles  # type: ignore[attr-defined]
-        self._widget.open_reusable_object_editor = self._shell_surface.open_reusable_object_editor  # type: ignore[attr-defined]
-        self._widget.submit_sign_request = self._shell_surface.submit_sign_request  # type: ignore[attr-defined]
-        self._widget.open_signed_output = self._shell_surface.open_signed_output  # type: ignore[attr-defined]
+        widget.refresh_signature_profiles = self._shell_surface.refresh_signature_profiles  # type: ignore[attr-defined]
+        widget.open_reusable_object_editor = self._shell_surface.open_reusable_object_editor  # type: ignore[attr-defined]
+        widget.submit_sign_request = self._shell_surface.submit_sign_request  # type: ignore[attr-defined]
+        widget.open_signed_output = self._shell_surface.open_signed_output  # type: ignore[attr-defined]
 
 
 class SigningWorkspaceTestingAdapter:
     """Dedicated harness/testing adapter over the live runtime/controller seam."""
 
-    def __init__(self, compatibility_surface: SigningWorkspaceCompatibilitySurface) -> None:
-        self._compatibility_surface = compatibility_surface
-        self._panel = SigningWorkspaceTestingPanelAdapter(
-            compatibility_surface.properties_panel
-        )
+    def __init__(
+        self,
+        *,
+        runtime: SigningWorkspaceRuntime,
+        properties_panel: SignaturePropertiesPanel,
+        last_signing_result: Callable[[], SigningResult | None],
+    ) -> None:
+        self._runtime = runtime
+        self._last_signing_result = last_signing_result
+        self._panel = SigningWorkspaceTestingPanelAdapter(properties_panel)
 
     @property
     def panel(self) -> SigningWorkspaceTestingPanelPort:
         return self._panel
 
     def signature_appearance(self) -> SignatureAppearance | None:
-        return self._compatibility_surface._runtime.signature_appearance()
+        return self._runtime.signature_appearance()
 
     def set_timestamp_required(self, required: bool) -> None:
-        self._compatibility_surface._runtime.set_timestamp_required(required)
+        self._runtime.set_timestamp_required(required)
 
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
-        self._compatibility_surface._runtime.apply_signature_rect_placement(signature_rect)
+        self._runtime.apply_signature_rect_placement(signature_rect)
 
     def refresh_viewer(self) -> None:
-        self._compatibility_surface._runtime.refresh_viewer()
+        self._runtime.refresh_viewer()
 
     def current_request(self) -> SigningRequest | None:
-        return self._compatibility_surface._runtime.current_request()
+        return self._runtime.current_request()
 
     def last_signing_result(self) -> SigningResult | None:
-        signing_result = self._compatibility_surface.last_signing_result
+        signing_result = self._last_signing_result()
         return signing_result if isinstance(signing_result, SigningResult) else None
 
     def snapshot(self) -> SigningWorkspaceSnapshot:
-        return self._compatibility_surface.snapshot()
+        return self._runtime.snapshot(last_signing_result=self.last_signing_result())
 
 
 class SigningWorkspaceTestingPanelAdapter:

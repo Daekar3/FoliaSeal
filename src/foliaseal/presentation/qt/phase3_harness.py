@@ -212,7 +212,11 @@ from foliaseal.presentation.qt.preview_widget_evidence import (
     widget_rect_snapshot as _widget_rect_snapshot,
 )
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
-from foliaseal.presentation.qt.signing_shell_port import build_qt_signing_workspace_bundle
+from foliaseal.presentation.qt.signing_shell_port import (
+    QtSigningWorkspaceFactory,
+    SigningWorkspaceBundle,
+    build_qt_signing_workspace_bundle,
+)
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
@@ -246,6 +250,7 @@ def build_interactive_session_runner() -> Phase3HarnessSessionRunner:
             build_qt_signing_shell=build_qt_signing_shell,
             build_workspace=_build_qt_evidence_workspace,
             default_harness_output_pdf_path=default_harness_output_pdf_path,
+            create_workspace=QtSigningWorkspaceFactory().create,
         )
     )
 
@@ -299,17 +304,23 @@ def build_evidence_runner_providers() -> EvidenceRunnerProviders:
             jsonable_capture=jsonable_capture,
             render_backend_factory=QtPdfRenderBackend,
             profile_store_factory=SignaturePresetCatalogStore.default,
+            create_workspace=QtSigningWorkspaceFactory().create,
         ),
     )
 
 
 def _build_live_evidence_workspace(
     *,
-    shell: Any,
+    workspace: SigningWorkspaceBundle | None = None,
+    shell: Any | None = None,
     profile_store: Any,
 ) -> Phase3HarnessWorkspacePort:
+    if workspace is None:
+        if shell is None:
+            raise TypeError("A typed workspace bundle is required.")
+        workspace = build_qt_signing_workspace_bundle(shell)
     return QtPhase3HarnessWorkspaceAdapter(
-        workspace=build_qt_signing_workspace_bundle(shell),
+        workspace=workspace,
         profile_store=profile_store,
         deps=QtPhase3HarnessWorkspaceDeps(
             capture_preview_render=QtPreviewRenderCaptureAdapter(
@@ -327,22 +338,26 @@ def _build_live_evidence_workspace(
     )
 
 
-def _build_qt_evidence_workspace(shell: Any) -> Phase3HarnessWorkspacePort:
+def _build_qt_evidence_workspace(
+    workspace: SigningWorkspaceBundle | Any,
+) -> Phase3HarnessWorkspacePort:
+    if isinstance(workspace, SigningWorkspaceBundle):
+        return _build_live_evidence_workspace(workspace=workspace, profile_store=object())
     return _build_live_evidence_workspace(
-        shell=shell,
+        shell=workspace,
         profile_store=object(),
     )
 
 
 def _build_preview_matrix_qt_workspace(
     *,
-    shell: Any,
+    shell: Any | None = None,
+    workspace: SigningWorkspaceBundle | None = None,
     profile_store: SignaturePresetCatalogStore,
 ) -> Phase3HarnessWorkspacePort:
-    return _build_live_evidence_workspace(
-        shell=shell,
-        profile_store=profile_store,
-    )
+    if workspace is not None:
+        return _build_live_evidence_workspace(workspace=workspace, profile_store=profile_store)
+    return _build_live_evidence_workspace(shell=shell, profile_store=profile_store)
 
 
 def _build_preview_matrix_headless_workspace(
@@ -986,6 +1001,7 @@ def _headless_validation_text(preview: Any) -> str:
 def _execute_signed_acceptance_scenario(
     *,
     shell: Any,
+    workspace: SigningWorkspaceBundle | None = None,
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
     artifacts_dir: Path,
@@ -996,6 +1012,7 @@ def _execute_signed_acceptance_scenario(
 ) -> Phase3SignedAcceptanceScenarioResult | dict[str, Any]:
     return _build_signed_acceptance_scenario_executor().run_result(
         shell=shell,
+        workspace=workspace,
         scenario=scenario,
         profile_store=profile_store,
         artifacts_dir=artifacts_dir,
@@ -1009,11 +1026,13 @@ def _execute_signed_acceptance_scenario(
 def _apply_preview_matrix_scenario(
     *,
     shell: Any,
+    workspace: SigningWorkspaceBundle | None = None,
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
 ) -> None:
     _build_preview_matrix_qt_workspace(
         shell=shell,
+        workspace=workspace,
         profile_store=profile_store,
     ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
 

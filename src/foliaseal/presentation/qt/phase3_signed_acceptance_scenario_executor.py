@@ -11,6 +11,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessCaptureCommand,
     Phase3HarnessWorkspacePort,
 )
+from foliaseal.presentation.qt.signing_shell_port import SigningWorkspaceBundle
 
 ApplyPreviewMatrixScenario = Callable[..., None]
 BuildHarnessWorkspace = Callable[..., Phase3HarnessWorkspacePort]
@@ -112,6 +113,7 @@ class Phase3SignedAcceptanceScenarioExecutor:
         self,
         *,
         shell: Any,
+        workspace: SigningWorkspaceBundle | None = None,
         scenario: dict[str, Any],
         profile_store: Any,
         artifacts_dir: Path,
@@ -125,9 +127,13 @@ class Phase3SignedAcceptanceScenarioExecutor:
             scenario=scenario,
             profile_store=profile_store,
         )
-        workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
+        harness_workspace = (
+            self.deps.build_workspace(workspace=workspace, profile_store=profile_store)
+            if workspace is not None
+            else self.deps.build_workspace(shell=shell, profile_store=profile_store)
+        )
         artifact_basename = self.deps.scenario_slug(str(scenario["name"]))
-        snapshot = workspace.capture_snapshot(
+        snapshot = harness_workspace.capture_snapshot(
             Phase3HarnessCaptureCommand(
                 request=None,
                 artifacts_dir=str(artifacts_dir),

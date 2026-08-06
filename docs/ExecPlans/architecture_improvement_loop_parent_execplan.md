@@ -2447,3 +2447,111 @@ compatibility seam is intentional and bounded: direct low-level shell callers ma
 catalog inputs until the atomic `phase3_nomenclature_retirement_execplan.md` migration renames its
 first-party callers and removes that edge. The next architecture-loop candidate is that nomenclature
 migration, with shell compatibility removal as its immediate retirement gate.
+
+### Scan Round 52 — completed at `658586222`
+
+Three independent explorers reviewed the clean checkout. Two reports independently converge on the
+remaining Qt signing-workspace compatibility bridge:
+`src/foliaseal/presentation/qt/signing_workspace_compatibility_surface.py` still mixes the historical
+dynamic widget-export family (roughly 30–40 rebound attributes) with the typed testing adapter. The
+composition function constructs it only to let `SigningWorkspaceOrchestrator.install_widget_exports()`
+mutate the shell; production `SigningWorkspacePort` callers and the Phase 3 workspace already require
+the typed `testing_adapter`, while tests identify `compat_surface` as historical. The prior
+`signing_workspace_hybrid_runtime_refactor_execplan.md` records the same residual seam and explicitly
+calls for shrinking/removing the compatibility surface.
+
+Independent score records were:
+
+| explorer | NF | CA | SR | TG | IC | CC | MR | BU |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `arch_scan_52_one` | 4.5 | 4.0 | 4.0 | 4.0 | 4.5 | 3.5 | 3.0 | 2.5 |
+| `arch_scan_52_two` | 4.5 | 4.0 | 4.0 | 4.0 | 4.0 | 4.0 | 4.0 | 2.5 |
+| `arch_scan_52_three` | 4.5 | 4.0 | 4.0 | 4.0 | 4.0 | 4.0 | 4.0 | 2.5 |
+
+Medians are `(4.5, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 2.5)`. Agreement is approximately `0.95`,
+evidence coverage is `1.0`, and confidence is approximately `0.965`. Benefit is `4.10`, penalty
+is `3.40`, and the fixed Candidate Priority formula yields approximately `60.9/100`, clearing the
+continuation threshold narrowly. Dependency category is local-substitutable Qt/fake-Qt. The bounded
+slice is to make typed production/testing capabilities the only active shell seam, migrate or replace
+compatibility characterization tests, remove dynamic exports and `compat_surface`, and preserve
+widget behavior, app-frame lifecycle, harness snapshots, CLI/JSON/artifact contracts, and phase3
+nomenclature.
+
+The third report also identified a real snapshot-serializer extraction in `phase3_harness.py` at
+approximately Priority `63`, but it lacks a second independent score record and is deferred under
+the credibility gate. A further visible-layout fit split and a typed CLI registry are similarly
+credible follow-ons but lack two-record convergence or clear one-slice superiority. The separate
+phase3 nomenclature migration remains contract-sensitive and is not inflated into this candidate.
+
+### Problem Frame 52 — signing-workspace compatibility bridge
+
+The representative workflow is app-frame PDF open -> Qt shell composition -> orchestrator bootstrap
+-> dynamic compatibility export installation -> typed workspace bundle/testing adapter -> Phase 3
+harness snapshot capture. `SigningWorkspaceCompatibilitySurface` currently owns both legacy widget
+attribute publication and a `SigningWorkspaceTestingAdapter` facade, so a historical compatibility
+surface remains a live construction dependency even though current production/harness callers consume
+typed ports. This creates navigation friction, broadens the widget's apparent public API, and makes
+retiring an export require tracing dynamic assignment plus shell properties and tests.
+
+The dependency is local-substitutable: fake Qt bindings and existing workspace/testing adapters can
+exercise the boundary without a live display. The design must preserve the `SigningWorkspaceBundle`
+maintenance/session/testing/view capabilities, widget lifecycle/bootstrap ordering, current harness
+snapshot behavior, and all public CLI/JSON/artifact contracts. The expected improvement is ownership
+compression and retirement of a real compatibility layer, not a rename-only move or a new generic
+shell manager. A useful illustrative target is:
+
+    bundle = build_qt_signing_workspace_bundle(shell)
+    # typed `bundle.testing` is the only harness seam; no dynamic widget exports
+
+This sketch grounds the desired invariant without selecting the final interface; the design round
+must decide how orchestrator bootstrap and shell/controller publication can be retained without
+reintroducing a broad compatibility facade.
+
+### Design Selection 53 — completed at `658586222`
+
+Three designs were generated and two independent reviewers scored them under the fixed Refactor
+Shape formula. Design A is a minimal split: a standalone `SigningWorkspaceTestingAdapter` receives
+`runtime`, `properties_panel`, and a `last_signing_result` reader, while a narrowly scoped legacy
+export installer owns only dynamic widget assignments and destroyed-to-panel disposal; a temporary
+facade can preserve bootstrap ordering. Its reviewed BaseShapeScore is about `83.5`, with a
+transitional-facade penalty yielding approximately `78.5` when the retirement gate is explicit.
+
+Design B is a flexible explicit `WidgetExports` record plus tiny Qt/fake-Qt installer protocol,
+standalone testing adapter, and injected surface factory. It isolates legitimate Qt variation but
+adds DTO/protocol ceremony without another current consumer. Its BaseShapeScore is approximately
+`79`, and the speculative-surface penalty reduces it to `69–74`.
+
+Design C makes the typed `SigningWorkspaceBundle` the sole dominant shell/app-frame/harness contract:
+`create_workspace(SigningWorkspaceBootstrap) -> SigningWorkspaceBundle`, no raw shell fallback in
+Phase 3 workspace adapters, and no duplicate shell-to-bundle wrapping. Its BaseShapeScore is about
+`85`, reduced to approximately `80` for migration churn.
+
+The selected constrained A+C hybrid scores approximately `(4.75, 4.5, 4.75, 4.5, 4.5, 4.0, 4.5)`
+across the seven shape dimensions, for BaseShapeScore `90.75`. It exceeds the highest valid base
+Design C by `5.75` points and introduces no hard-gate risk. The hybrid adopts C for the dominant
+typed factory/bundle migration and A for the seam-local standalone testing adapter plus a
+Qt-local `LegacyWidgetExports` installer. Dynamic attributes remain quarantined to that installer
+for one explicit migration window; `compat_surface` is removed from bundles and caller contracts,
+and the installer/facade retirement grep is recorded in the child plan. The child plan is
+`docs/ExecPlans/signing_workspace_compatibility_bridge_execplan.md`.
+
+### Implementation 52 — signing-workspace compatibility bridge
+
+Implemented the selected constrained A+C hybrid in the child plan. `SigningWorkspaceTestingAdapter`
+now receives explicit runtime, properties-panel, and live-result-reader dependencies and no longer
+holds a compatibility-surface back-reference. `SigningWorkspaceLegacyWidgetExports` owns the
+transitional dynamic widget aliases and destroyed-to-panel disposal behind an idempotent installer;
+the existing facade remains only as a bootstrap-compatible composition wrapper. Interactive and
+signed-acceptance construction roots now have a typed `SigningWorkspaceBootstrap ->
+SigningWorkspaceBundle` path, and the resulting bundle is reused by the harness workspace adapter
+and per-scenario executor instead of rebuilding it for each boundary. `AppSettings.default()` is
+provided explicitly at the typed Phase 3 factory edge, preserving the previous indirect default.
+
+The raw-shell path remains only as an explicit compatibility fallback for existing characterization
+tests and low-level Qt edges; it is called out in the child plan as the next retirement gate rather
+than being silently propagated. `docs/ARCHITECTURE.md` now documents the adapter/installer split,
+typed runner path, and bounded retirement condition. Validation passed: focused compatibility/harness
+coverage `105 passed`, full suite `1,142 passed, 1 warning`, Ruff, compileall, CLI help, import
+isolation, and diff checks. The unchanged offscreen signed-acceptance command passed with `10`
+scenarios/`7` successful signings, preview parity `18/18`, and fit rejection `3/3`; its transient
+summary was removed and no FoliaSeal/Qt/test process remains.

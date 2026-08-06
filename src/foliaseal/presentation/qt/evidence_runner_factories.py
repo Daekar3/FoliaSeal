@@ -136,6 +136,7 @@ def build_signed_acceptance_evidence_runner(
             jsonable_capture=signed.jsonable_capture,
             render_backend_factory=signed.render_backend_factory,
             profile_store_factory=signed.profile_store_factory,
+            create_workspace=signed.create_workspace,
         )
     )
 

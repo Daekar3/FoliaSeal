@@ -12,6 +12,7 @@ from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest, SigningResult
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
 )
@@ -29,12 +30,14 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
 )
 from foliaseal.presentation.qt.signing_shell_port import (
+    SigningWorkspaceBootstrap,
     SigningWorkspaceBundle,
     build_qt_signing_workspace_bundle,
 )
 
 BuildQtSigningShell = Callable[..., Any]
 BuildWorkspace = Callable[[Any], Phase3HarnessWorkspacePort]
+CreateWorkspace = Callable[[SigningWorkspaceBootstrap], SigningWorkspaceBundle]
 DefaultHarnessOutputPdfPath = Callable[..., str]
 
 
@@ -61,6 +64,7 @@ class Phase3HarnessSessionRunnerDeps:
     build_workspace: BuildWorkspace
     default_harness_output_pdf_path: DefaultHarnessOutputPdfPath
     lifecycle_factory: Callable[[Any], HarnessQtLifecyclePort] | None = None
+    create_workspace: CreateWorkspace | None = None
 
 
 @dataclass(frozen=True)
@@ -171,8 +175,23 @@ class Phase3HarnessSessionRunner:
                 on_error=on_error,
                 on_status_change=on_status_change,
             )
-            workspace = self.deps.build_workspace(shell)
-            workspace_bundle = build_qt_signing_workspace_bundle(shell)
+            if self.deps.create_workspace is not None:
+                workspace_bundle = self.deps.create_workspace(
+                    SigningWorkspaceBootstrap(
+                        viewer_workflow=viewer_workflow,
+                        signing_workflow=signing_workflow,
+                        app_settings=AppSettings.default(),
+                        reusable_objects=reusable_objects,
+                        sign_executor=sign_executor,
+                        on_sign_request=on_sign_request,
+                        on_error=on_error,
+                        on_status_change=on_status_change,
+                    )
+                )
+                workspace = self.deps.build_workspace(workspace_bundle)
+            else:
+                workspace = self.deps.build_workspace(shell)
+                workspace_bundle = build_qt_signing_workspace_bundle(shell)
         except Exception:
             close_lifecycle()
             raise

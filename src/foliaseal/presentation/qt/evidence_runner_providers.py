@@ -55,6 +55,7 @@ class SignedAcceptanceEvidenceProviders:
     jsonable_capture: Callable[..., Any]
     render_backend_factory: Callable[..., Any]
     profile_store_factory: Callable[..., Any]
+    create_workspace: Callable[..., Any] | None = None
 
 
 @dataclass(frozen=True)
