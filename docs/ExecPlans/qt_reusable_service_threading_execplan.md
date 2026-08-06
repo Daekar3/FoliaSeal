@@ -91,7 +91,7 @@ JSON/artifact contracts, and certificate repository/material-port threading rema
 
 ## Outcomes & Retrospective
 
-Implementation is complete pending the audit follow-up commit and closure scan. Baseline evidence was 12 production
+Implementation is closed at commit `7c21d4fc2`. Baseline evidence was 12 production
 Qt transport sites forwarding `preset_catalog`/`preset_catalog_store` across eight modules, one
 AppFrame-owned service that did not reach the active panel, and 45 focused reusable/coordinator/
 workspace tests from the prior slice. Measured results are one identity from AppFrame through the
@@ -102,7 +102,9 @@ Pillow deprecation warning.
 Ruff, compileall, Qt import isolation, CLI help, diff-check, and the offscreen acceptance matrices all
 pass (`10/7`, `18/18`, `3/3`). The qualitative improvement is accepted at `.48` predicted with no
 observed regression over `.10`; the phase3 nomenclature migration remains a separately governed
-atomic one-slice plan.
+atomic one-slice plan. Three final closure explorers found no blocker; they confirmed a clean worktree,
+unchanged SPEC, no product processes, and the documented low-level shell compatibility edge as the
+only remaining legacy seam.
 
 ## Context and Orientation
 
