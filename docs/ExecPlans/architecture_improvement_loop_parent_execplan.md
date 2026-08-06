@@ -96,6 +96,10 @@ created.
   acceptance evidence, cleanup, and documentation reconciliation.
 - [x] Complete the post-cap continuation slice's improvement measurement and record the explicit
   `QT_QPA_PLATFORM=offscreen` acceptance invocation required by this headless environment.
+- [x] Completed the next fresh three-explorer scan after `4c8570724`; the interactive harness Qt
+  lifecycle is the next qualifying seam.
+- [x] Completed three independent lifecycle design reviews and created the child ExecPlan for the
+  selected constrained lifecycle-port design.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -545,6 +549,73 @@ component regression below `-0.10`. This accepts the post-cap continuation slice
 the fixed five-cycle cap. The coordinated `phase3_nomenclature_retirement_execplan.md` remains the
 next contract-sensitive cleanup plan; its public CLI/DTO/JSON/artifact names stay frozen until an
 atomic migration is approved.
+
+### Post-cap continuation scan 3 — completed after `4c8570724`
+
+Three independent explorers reviewed the clean checkout. The highest valid bounded candidate is the
+interactive evidence harness lifecycle in
+`src/foliaseal/presentation/qt/phase3_harness_session_runner.py` (291 lines). Its `run()` method
+still creates/reuses `QApplication`, constructs and sizes `QMainWindow`, builds the central toolbar /
+body layouts, calls `setCentralWidget`, shows/executes the event loop, and closes the window across
+several failure paths while also coordinating shell callbacks, capture assembly, and signing state.
+The existing `phase3_signed_acceptance_lifecycle.py` demonstrates a local fakeable lifecycle seam,
+and `tests/unit/test_phase3_harness_session_runner.py` already asserts title, size, mount, show, and
+cleanup behavior.
+
+The lifecycle-focused explorer scored `(4.5,4,4.5,4.5,4,4,3,2.5)` for
+`(NF,CA,SR,TG,IC,CC,MR,BU)`, confidence `0.88`, and Candidate Priority approximately `67`. The
+other independent scans ranked the broad evidence composition root at approximately `64.87` and
+the rendered-fit/layout suggestion as already completed or below-gate after rechecking the live
+checkout. Render-cache integration scored approximately `55` because its tested `RenderCachePolicy`
+has no production caller and lacks measured invalidation semantics. The `phase3` nomenclature
+migration remains a broad external-contract change and is not inflated into this lifecycle slice.
+
+### Post-cap continuation design selection 3 — completed after `4c8570724`
+
+Three independent designs were reviewed:
+
+- Minimal lifecycle port: add `Phase3HarnessLifecyclePort` with opaque toolbar/body targets and
+  `start/mount/show/exec/close`; BaseShapeScore `85`. This is tightly bounded but leaves the runner
+  dependent on lifecycle-specific bindings and does not provide a reusable context/cleanup shape.
+- Flexible ports/adapters context: add `QtHarnessSurface`, separate application/window ports, and a
+  context-managed `Phase3HarnessQtLifecycle.session(...)`; BaseShapeScore `84.5`. It maximizes
+  substitution but risks a generic Qt service and broadens the surface with separate port objects.
+- Common-caller lifecycle design: generalize the existing fakeable harness lifecycle pattern to a
+  `HarnessQtLifecyclePort` with typed window specification, mount/show/exec/process-events/close,
+  while leaving toolbar/capture/signing orchestration in the runner; BaseShapeScore `88`.
+
+Selected constrained hybrid: use the common-caller lifecycle port with the flexible context-managed
+cleanup/session implementation, but scope it to the interactive evidence harness and do not merge it
+with the app-frame `SigningWorkspaceLifecycle` or migrate Phase 2 in this slice. Rescored dimensions
+`(4.75,4.75,4.75,4.75,4.5,4.5,4.5)` produce BaseShapeScore `93.5`, exceeding the strongest base by
+`5.5` points with no hard-gate risk. The child plan preserves all CLI/JSON/artifact contracts and
+records the exact retirement grep for direct Qt lifecycle calls in the runner.
+
+### Post-cap continuation slice 3 — accepted 2026-08-06
+
+Child `docs/ExecPlans/phase3_harness_qt_lifecycle_hybrid_execplan.md` is implemented. The
+interactive session runner now consumes `HarnessQtLifecyclePort`; `QtHarnessLifecycle` owns
+QApplication reuse/creation, QMainWindow setup, central/toolbar/body layout construction, mount,
+show/exec, and idempotent close. The runner retains callback, signing, workspace, capture, and
+result orchestration, and no direct QApplication/QMainWindow/setCentralWidget/local-close calls
+remain in it. The runner source fell from `291` to `284` lines while the new lifecycle adapter is
+`105` lines and its boundary tests are `111` lines; this is an ownership/depth improvement rather
+than a file move alone.
+
+Focused lifecycle/session/harness coverage passed `108` tests; the full suite passed `1,051` tests
+with one pre-existing warning. Ruff, diff checks, application import isolation, and CLI help/parser
+checks passed. Offscreen acceptance evidence passed signed acceptance (`10` scenarios, `7` successful
+signings, `3` matched intentional rejections), signed preview parity (`18/18` successful), and
+signed fit rejection (`3/3` matched), with zero cryptographic, annotation, or preview-comparison
+failures and `acceptance_expectations_passed=true`. Explicit `/tmp` matrix directories were removed
+and the process audit was clean.
+
+Continuation-slice proxy measurement: navigation friction `0.25`, change amplification `0.50`,
+seam-risk reduction `0.50`, boundary-test improvement `0.50`, interface compression `0.50`,
+cohesion `0.50`, and behavioral-uncertainty reduction `0.25`; `Actual Improvement = 0.43`, predicted
+`0.25`, with no component regression below `-0.10`. This accepts the slice without altering the
+fixed five-cycle cap. The `phase3` nomenclature plan remains the next contract-sensitive cleanup
+candidate; public commands/DTOs/JSON/artifact names remain frozen until its atomic migration.
 
 ## Context and Orientation
 

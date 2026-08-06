@@ -14,6 +14,14 @@ from foliaseal.domain.models import SigningRequest, SigningResult
 from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
     Phase3HarnessCaptureAssembler,
 )
+from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import (
+    HarnessQtBindings as _QtHarnessBindings,
+)
+from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import (
+    HarnessQtLifecyclePort,
+    HarnessWindowSpec,
+    QtHarnessLifecycle,
+)
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessCaptureCommand,
     Phase3HarnessWorkspacePort,
@@ -45,26 +53,13 @@ class Phase3HarnessSessionResult:
 
 
 @dataclass(frozen=True)
-class _QtHarnessBindings:
-    q_application: type[Any]
-    q_main_window: type[Any]
-    q_widget: type[Any]
-    q_v_box_layout: type[Any]
-    q_h_box_layout: type[Any]
-    q_group_box: type[Any]
-    q_push_button: type[Any]
-    q_label: type[Any]
-    q_plain_text_edit: type[Any]
-    qpdf_document: type[Any]
-
-
-@dataclass(frozen=True)
 class Phase3HarnessSessionRunnerDeps:
     """Typed collaborator bundle for one interactive harness session."""
 
     build_qt_signing_shell: BuildQtSigningShell
     build_workspace: BuildWorkspace
     default_harness_output_pdf_path: DefaultHarnessOutputPdfPath
+    lifecycle_factory: Callable[[Any], HarnessQtLifecyclePort] | None = None
 
 
 @dataclass(frozen=True)
@@ -90,30 +85,28 @@ class Phase3HarnessSessionRunner:
         errors: list[str] = []
         interaction_counts: Counter[str] = Counter()
 
-        app = bindings.q_application.instance() or bindings.q_application([])
-        window = bindings.q_main_window()
-        window.setWindowTitle(f"FoliaSeal Phase 3 Harness - {source_path.name}")
-        window.resize(1440, 980)
+        lifecycle = (self.deps.lifecycle_factory or QtHarnessLifecycle)(bindings)
+        surface = lifecycle.start(
+            spec=HarnessWindowSpec(
+                title=f"FoliaSeal Phase 3 Harness - {source_path.name}",
+            )
+        )
+        closed = False
 
-        central = bindings.q_widget()
-        layout = bindings.q_v_box_layout(central)
-        toolbar = bindings.q_h_box_layout()
-        layout.addLayout(toolbar)
-        body_layout = bindings.q_h_box_layout()
-        layout.addLayout(body_layout, 1)
+        def close_lifecycle() -> None:
+            nonlocal closed
+            if closed:
+                return
+            closed = True
+            lifecycle.close(surface)
 
-        window.setCentralWidget(central)
+        toolbar = surface.toolbar
 
         captured_states: list[dict[str, Any]] = []
 
         shell: Any
         workspace_bundle: SigningWorkspaceBundle
         workspace: Phase3HarnessWorkspacePort
-
-        def close_window() -> None:
-            close = getattr(window, "close", None)
-            if callable(close):
-                close()
 
         def refocus_shell() -> None:
             workspace_bundle.session.focus()
@@ -179,9 +172,9 @@ class Phase3HarnessSessionRunner:
             workspace = self.deps.build_workspace(shell)
             workspace_bundle = build_qt_signing_workspace_bundle(shell)
         except Exception:
-            close_window()
+            close_lifecycle()
             raise
-        body_layout.addWidget(workspace_bundle.view.mount_target(), 1)
+        lifecycle.mount(surface, workspace_bundle.view.mount_target())
 
         def do_refresh() -> None:
             workspace_bundle.session.refresh_viewer()
@@ -261,13 +254,13 @@ class Phase3HarnessSessionRunner:
             workspace_bundle.session.refresh_viewer()
             first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
         except Exception:
-            close_window()
+            close_lifecycle()
             raise
 
         try:
-            window.show()
+            lifecycle.show(surface)
             refocus_shell()
-            app.exec()
+            lifecycle.exec(surface)
 
             final_snapshot = capture_current_state(
                 capture_kind="final",
@@ -288,4 +281,4 @@ class Phase3HarnessSessionRunner:
                 last_signing_result=last_signing_result,
             )
         finally:
-            close_window()
+            close_lifecycle()
