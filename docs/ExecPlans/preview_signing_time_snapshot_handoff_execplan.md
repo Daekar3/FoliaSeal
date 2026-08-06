@@ -34,7 +34,7 @@ do not change.
   Ruff, diff checks, CLI/import validation, and offscreen matrices passed (`10/7/3`, `18/18`,
   `3/3`). Temporary evidence roots were removed and the process audit was clean.
 - [x] (2026-08-06) Actual Improvement is `0.45` versus predicted `0.35` (`1.29x`), with no component
-  regression below `-0.10`; documentation and parent closure remain to be committed.
+  regression below `-0.10`; implementation committed on `main` as `0391d9eb7`.
 
 ## Surprises & Discoveries
 
@@ -83,6 +83,9 @@ Proxy measurements before -> after were navigation `0.25`, change amplification 
 reduction `0.50`, boundary-test improvement `0.75`, interface compression `0.25`, and boundary
 isolation `0.50`; weighted `Actual Improvement = 0.45` versus predicted `0.35` (`1.29x`), with no
 component regression below `-0.10`.
+
+Implementation commit: `0391d9eb7` (`fix: preserve preview signing time`). A fresh three-explorer
+scan is required before selecting the next candidate.
 
 ## Context and Orientation
 

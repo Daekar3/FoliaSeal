@@ -1119,8 +1119,9 @@ established snapshot contract, and the corrected suite passed.
 Proxy measurement: navigation `0.25`, change amplification `0.40`, seam reduction `0.50`,
 boundary-test improvement `0.75`, interface compression `0.25`, and boundary isolation `0.50`; the
 weighted `Actual Improvement = 0.45` versus predicted `0.35` (`1.29x`), with no component regression
-below `-0.10`. The implementation and documentation are ready for commit, followed by a fresh
-three-explorer scan.
+below `-0.10`. Implementation commit `0391d9eb7` (`fix: preserve preview signing time`) is on
+`main`; the child is accepted and a fresh three-explorer scan is required before selecting the next
+candidate.
 
 ## Context and Orientation
 
