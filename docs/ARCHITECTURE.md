@@ -70,6 +70,7 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/phase3_harness_workspace.py` | Narrow Phase 3 harness workspace boundary. | Owns preview-matrix and signed-acceptance scenario application plus viewer priming refresh and snapshot-returning capture assembly for live-shell and headless workflow paths. The Qt adapter consumes one `SigningWorkspaceSnapshot` from the explicit `SigningWorkspaceTestingPort` for current request, appearance, and last-result reads; compatibility serializers remain only at the evidence edge, and interactive session lifecycle/callback wiring stays in `phase3_harness_session_runner.py`. |
 | `src/foliaseal/presentation/qt/phase3_harness_session_runner.py` | Interactive Qt session-runner boundary for the Phase 3 harness. | Owns the Qt window lifecycle, toolbar wiring, shell callback cluster, typed session-runner dependency bundle, and `Phase3HarnessSessionResult` while leaving payload shaping and report writing to the extracted helpers. |
 | `src/foliaseal/presentation/qt/phase3_harness_qt_lifecycle.py` | Fakeable standalone Qt lifecycle adapter for the interactive evidence harness. | Owns QApplication reuse/creation, QMainWindow setup, central mounting, show/exec, and idempotent close while exposing only opaque toolbar/body targets to the session runner. |
+| `src/foliaseal/presentation/qt/phase2_harness.py` | Interactive Phase 2 viewer evidence harness. | Retains viewer controls, capture/checklist/evidence reporting, and manual QA orchestration while consuming the shared `HarnessQtLifecyclePort` for application/window lifecycle and cleanup. |
 | `src/foliaseal/presentation/qt/phase3_preview_matrix_runner.py` | Headless preview-matrix runner boundary for Phase 3 QA. | Owns preview-matrix manifest loading, scenario iteration, exception mapping, summary shaping, `summary.json` writing, and the typed dependency bundle that injects manifest/scenario/json collaborators while leaving scenario-specific preview capture logic in `phase3_harness.py` and `phase3_harness_workspace.py`. |
 | `src/foliaseal/presentation/qt/phase3_signed_acceptance_matrix_runner.py` | Qt-backed signed-acceptance matrix runner boundary for Phase 3 QA. | Owns signed-acceptance manifest loading, `timestamping_mode` validation, one shell/lifecycle setup for scenario iteration, exception mapping, acceptance-expectation evaluation, summary shaping, `summary.json` writing, and the typed dependency bundle that injects shell/workspace/scenario collaborators while leaving scenario-specific preview capture and signed-output shaping in `phase3_harness_workspace.py` and `phase3_signed_acceptance_scenario_executor.py`. The lazy signed operation in `evidence_runner_factories.py` is the composition entrypoint. |
 | `src/foliaseal/presentation/qt/phase3_signed_acceptance_scenario_executor.py` | Per-scenario signed-acceptance execution boundary for Phase 3 QA. | Owns one signed-acceptance row from scenario application through preview capture, optional signing submission, successful-output snapshotting, and final result shaping while leaving matrix-level looping and expectation evaluation in `phase3_signed_acceptance_matrix_runner.py`. |
@@ -562,6 +563,26 @@ The canonical repository document split is:
   exposes only opaque toolbar/body targets and does not become a general Qt service. The `phase3`
   naming remains an external migration concern owned by the nomenclature ExecPlan.
 - Status: Implemented and confirmed by focused lifecycle/session tests.
+
+### Phase 2 viewer harness
+
+- Location: `src/foliaseal/presentation/qt/phase2_harness.py`
+- Responsibility: Run the interactive PDF viewer session used by the Phase 2 manual QA checklist
+  and emit the existing capture, checklist, and evidence-command artifacts.
+- Owns: Viewer workflow/callback orchestration, toolbar actions, timing and selection capture,
+  checklist rendering, evidence-command construction, and optional report writes.
+- Does not own: QApplication/QMainWindow construction, central/toolbar/body layout lifecycle,
+  event-loop dispatch, or window cleanup; those operations belong to the shared
+  `phase3_harness_qt_lifecycle.py` adapter through `HarnessQtLifecyclePort`.
+- Key collaborators: `ViewerWorkflow`, `build_qt_pdf_viewer_widget()`, `HarnessQtLifecyclePort`,
+  `QtPdfRenderBackend`, and `phase2-evidence`.
+- Main entry point: `run_phase2_viewer_harness()`.
+- Known constraints: The public Phase 2 command, capture JSON/checklist shape, artifact paths,
+  1280x900 window dimensions, and manual-only interaction scope remain stable. The lifecycle
+  adapter is shared with the Phase 3 interactive harness without widening the app-frame lifecycle
+  contract; historical `phase3` naming remains a separate atomic migration concern.
+- Status: Implemented and confirmed by focused lifecycle-migration tests (`14 passed`), full
+  acceptance validation, and the clean committed slice recorded in the active ExecPlan.
 
 ### Phase 3 interactive capture boundary
 
@@ -1289,6 +1310,7 @@ Default local validation from README:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-08-06 | Extracted the interactive evidence-harness Qt lifecycle adapter. | `phase3_harness_session_runner.py` now keeps signing/capture orchestration while `phase3_harness_qt_lifecycle.py` owns application/window setup, central mounting, event-loop execution, and idempotent cleanup behind a fakeable port; the historical phase nomenclature remains an atomic follow-up migration. |
+| 2026-08-06 | Reused the interactive Qt lifecycle adapter for the Phase 2 viewer harness. | `phase2_harness.py` now retains viewer/capture/checklist orchestration while the shared lifecycle owns QApplication/QMainWindow setup, mounting, event-loop execution, and idempotent cleanup; Phase 2 dimensions and evidence contracts remain unchanged. |
 | 2026-08-06 | Added the signing-workspace setup port and extracted the contextual refinement dialog. | Shell action confirmation now reads typed setup state instead of the panel's private session; modal profile/preset persistence is owned by a focused Qt adapter, while the coordinated `phase3` nomenclature retirement remains a separate atomic migration. |
 | 2026-08-05 | Reconciled the typed signing-workspace bundle/session/view seam and lifecycle ownership. | `SigningWorkspaceBundle` now documents separate maintenance, primary-workflow session, testing, and opaque lifecycle-view capabilities; `SigningWorkspaceHost`/`SigningWorkspaceLifecycle` remain the active-handle and compose→mount→dispose owners, while the legacy compatibility surface is explicitly Qt-local. The phase3 nomenclature retirement remains a follow-up plan because current CLI/DTO/artifact names are still external contracts. |
 | 2026-08-04 | Neutralized private evidence-harness composition names and removed the unused checklist helper plus signed-executor fallback. | Current Qt composition wiring now uses evidence terminology and the typed `run_result()` path; public `Phase3*` evidence/CLI contracts and historical records remain unchanged. |

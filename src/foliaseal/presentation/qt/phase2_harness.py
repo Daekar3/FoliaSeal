@@ -7,6 +7,7 @@ import json
 import re
 import shlex
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter
@@ -16,6 +17,14 @@ from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
+from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import (
+    HarnessQtBindings as _QtHarnessBindings,
+)
+from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import (
+    HarnessQtLifecyclePort,
+    HarnessWindowSpec,
+    QtHarnessLifecycle,
+)
 from foliaseal.presentation.qt.viewer_widget import build_qt_pdf_viewer_widget
 
 DEFAULT_CHECKLIST_TEMPLATE_PATH = "docs/ExecPlans/phase2_manual_qa_checklist.md"
@@ -120,6 +129,7 @@ def run_phase2_viewer_harness(
     evidence_command_path: str | None = None,
     checklist_results_path: str = DEFAULT_CHECKLIST_RESULTS_PATH,
     checklist_template_path: str = DEFAULT_CHECKLIST_TEMPLATE_PATH,
+    lifecycle_factory: Callable[[Any], HarnessQtLifecyclePort] | None = None,
 ) -> HarnessCapture:
     """Launch an interactive Qt viewer harness for manual Phase 2 validation."""
 
@@ -144,25 +154,38 @@ def run_phase2_viewer_harness(
     errors: list[str] = []
     interaction_counts: Counter[str] = Counter()
 
-    app = bindings.q_application.instance() or bindings.q_application([])
-    window = bindings.q_main_window()
-    window.setWindowTitle(f"FoliaSeal Phase 2 Harness - {source_path.name}")
-    window.resize(1280, 900)
+    lifecycle = (lifecycle_factory or QtHarnessLifecycle)(bindings)
+    surface = lifecycle.start(
+        spec=HarnessWindowSpec(
+            title=f"FoliaSeal Phase 2 Harness - {source_path.name}",
+            width=1280,
+            height=900,
+        )
+    )
+    closed = False
 
-    central = bindings.q_widget()
-    layout = bindings.q_v_box_layout(central)
-    toolbar = bindings.q_h_box_layout()
-    layout.addLayout(toolbar)
+    def close_lifecycle() -> None:
+        nonlocal closed
+        if closed:
+            return
+        closed = True
+        lifecycle.close(surface)
 
-    instructions = bindings.q_label(_instructions_text(source_path=source_path))
-    instructions.setWordWrap(True)
-    metrics_label = bindings.q_label()
+    try:
+        toolbar = surface.toolbar
+        content = bindings.q_widget()
+        content_layout = bindings.q_v_box_layout(content)
 
-    status = bindings.q_plain_text_edit()
-    status.setReadOnly(True)
-    status.setMaximumBlockCount(200)
+        instructions = bindings.q_label(_instructions_text(source_path=source_path))
+        instructions.setWordWrap(True)
+        metrics_label = bindings.q_label()
 
-    window.setCentralWidget(central)
+        status = bindings.q_plain_text_edit()
+        status.setReadOnly(True)
+        status.setMaximumBlockCount(200)
+    except Exception:
+        close_lifecycle()
+        raise
 
     def append_status(message: str) -> None:
         status.appendPlainText(message)
@@ -198,21 +221,26 @@ def run_phase2_viewer_harness(
         interaction_counts[name] += 1
         refresh_metrics()
 
-    selections.clear()
-    errors.clear()
-    interaction_counts.clear()
+    try:
+        selections.clear()
+        errors.clear()
+        interaction_counts.clear()
 
-    viewer = build_qt_pdf_viewer_widget(
-        workflow=workflow,
-        on_selection=on_selection,
-        on_error=on_error,
-        on_interaction=on_interaction,
-    )
-    layout.addWidget(viewer, 1)
-    layout.addWidget(metrics_label)
-    layout.addWidget(instructions)
-    layout.addWidget(status)
-    refresh_metrics()
+        viewer = build_qt_pdf_viewer_widget(
+            workflow=workflow,
+            on_selection=on_selection,
+            on_error=on_error,
+            on_interaction=on_interaction,
+        )
+        content_layout.addWidget(viewer, 1)
+        content_layout.addWidget(metrics_label)
+        content_layout.addWidget(instructions)
+        content_layout.addWidget(status)
+        lifecycle.mount(surface, content)
+        refresh_metrics()
+    except Exception:
+        close_lifecycle()
+        raise
 
     def do_refresh() -> None:
         viewer.refresh()
@@ -257,32 +285,37 @@ def run_phase2_viewer_harness(
         refresh_metrics()
         refocus_viewer()
 
-    controls = [
-        ("Refresh", do_refresh),
-        ("Prev Page", lambda: navigate("go_to_previous_page")),
-        ("Next Page", lambda: navigate("go_to_next_page")),
-        ("Reset Zoom", lambda: navigate("reset_zoom_view")),
-        ("Fit Width", fit_width),
-        ("Fit Page", fit_page),
-    ]
-    for label, callback in controls:
-        button = bindings.q_push_button(label)
-        button.clicked.connect(callback)
-        toolbar.addWidget(button)
+    try:
+        controls = [
+            ("Refresh", do_refresh),
+            ("Prev Page", lambda: navigate("go_to_previous_page")),
+            ("Next Page", lambda: navigate("go_to_next_page")),
+            ("Reset Zoom", lambda: navigate("reset_zoom_view")),
+            ("Fit Width", fit_width),
+            ("Fit Page", fit_page),
+        ]
+        for label, callback in controls:
+            button = bindings.q_push_button(label)
+            button.clicked.connect(callback)
+            toolbar.addWidget(button)
 
-    toolbar.addStretch(1)
+        toolbar.addStretch(1)
+    except Exception:
+        close_lifecycle()
+        raise
 
-    start = perf_counter()
-    viewer.refresh()
-    elapsed_ms = (perf_counter() - start) * 1000.0
-    append_status(f"Initial render completed in {elapsed_ms:.2f} ms.")
-    refresh_metrics()
+    try:
+        start = perf_counter()
+        viewer.refresh()
+        elapsed_ms = (perf_counter() - start) * 1000.0
+        append_status(f"Initial render completed in {elapsed_ms:.2f} ms.")
+        refresh_metrics()
 
-    window.show()
-    refocus_viewer()
-    app.exec()
+        lifecycle.show(surface)
+        refocus_viewer()
+        lifecycle.exec(surface)
 
-    capture = HarnessCapture(
+        capture = HarnessCapture(
         pdf_path=str(source_path),
         first_render_ms=workflow.timing_tracker.snapshot().first_render_ms,
         navigation_samples_ms=workflow.timing_tracker.navigation_samples_ms,
@@ -299,48 +332,37 @@ def run_phase2_viewer_harness(
         ),
         interaction_counts=dict(sorted(interaction_counts.items())),
         errors=tuple(errors),
-    )
-    _write_optional_text(
-        target_path=summary_json_path,
-        content=capture.to_json() + "\n",
-    )
-    checklist_results = build_checklist_results_markdown(
-        capture,
-        checklist_template_path=checklist_template_path,
-    )
-    _write_optional_text(
-        target_path=checklist_results_path,
-        content=checklist_results,
-    )
-    evidence_command = build_phase2_evidence_command(
-        capture,
-        checklist_path=checklist_results_path,
-    )
-    _write_optional_text(
-        target_path=evidence_command_path,
-        content=evidence_command + "\n",
-    )
-    print("Phase 2 harness capture")
-    print(capture.to_json())
-    print()
-    print(f"Checklist results file: {checklist_results_path}")
-    print("Review it, check any remaining manual-only items, then run:")
-    print("Evidence command:")
-    print(evidence_command)
-    return capture
-
-
-@dataclass(frozen=True)
-class _QtHarnessBindings:
-    q_application: type[Any]
-    q_main_window: type[Any]
-    q_widget: type[Any]
-    q_v_box_layout: type[Any]
-    q_h_box_layout: type[Any]
-    q_push_button: type[Any]
-    q_label: type[Any]
-    q_plain_text_edit: type[Any]
-    qpdf_document: type[Any]
+        )
+        _write_optional_text(
+            target_path=summary_json_path,
+            content=capture.to_json() + "\n",
+        )
+        checklist_results = build_checklist_results_markdown(
+            capture,
+            checklist_template_path=checklist_template_path,
+        )
+        _write_optional_text(
+            target_path=checklist_results_path,
+            content=checklist_results,
+        )
+        evidence_command = build_phase2_evidence_command(
+            capture,
+            checklist_path=checklist_results_path,
+        )
+        _write_optional_text(
+            target_path=evidence_command_path,
+            content=evidence_command + "\n",
+        )
+        print("Phase 2 harness capture")
+        print(capture.to_json())
+        print()
+        print(f"Checklist results file: {checklist_results_path}")
+        print("Review it, check any remaining manual-only items, then run:")
+        print("Evidence command:")
+        print(evidence_command)
+        return capture
+    finally:
+        close_lifecycle()
 
 
 def _load_qt_harness_bindings() -> _QtHarnessBindings:
@@ -352,6 +374,7 @@ def _load_qt_harness_bindings() -> _QtHarnessBindings:
         q_widget=getattr(widgets, "QWidget"),
         q_v_box_layout=getattr(widgets, "QVBoxLayout"),
         q_h_box_layout=getattr(widgets, "QHBoxLayout"),
+        q_group_box=getattr(widgets, "QGroupBox"),
         q_push_button=getattr(widgets, "QPushButton"),
         q_label=getattr(widgets, "QLabel"),
         q_plain_text_edit=getattr(widgets, "QPlainTextEdit"),

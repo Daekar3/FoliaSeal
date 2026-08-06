@@ -100,6 +100,10 @@ created.
   lifecycle is the next qualifying seam.
 - [x] Completed three independent lifecycle design reviews and created the child ExecPlan for the
   selected constrained lifecycle-port design.
+- [x] Completed the post-lifecycle three-explorer scan; duplicate Phase 2 harness lifecycle wiring
+  is the next qualifying seam.
+- [x] Completed three Phase 2 lifecycle design reviews and created the child ExecPlan reusing the
+  existing shared harness lifecycle port.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -616,6 +620,67 @@ cohesion `0.50`, and behavioral-uncertainty reduction `0.25`; `Actual Improvemen
 `0.25`, with no component regression below `-0.10`. This accepts the slice without altering the
 fixed five-cycle cap. The `phase3` nomenclature plan remains the next contract-sensitive cleanup
 candidate; public commands/DTOs/JSON/artifact names remain frozen until its atomic migration.
+
+### Post-cap continuation scan 4 — completed after `c246d9b02`
+
+Three independent explorers reviewed the clean lifecycle-boundary checkout. The highest qualifying
+candidate is duplicate Qt lifecycle wiring in `src/foliaseal/presentation/qt/phase2_harness.py`
+(447 lines): it independently creates/reuses QApplication/QMainWindow, sizes the window to 1280x900,
+constructs the central/toolbar layout, mounts via `setCentralWidget`, shows/executes the event loop,
+and never guarantees close on report or setup failures. The shared, tested
+`phase3_harness_qt_lifecycle.py` seam now provides exactly the fakeable lifecycle contract needed by
+both harnesses.
+
+The lifecycle scan scored `(4,4.5,4,4.5,4.5,4.5,2.5,2.5)` for
+`(NF,CA,SR,TG,IC,CC,MR,BU)`, confidence `0.90`, and Candidate Priority approximately `69.34`.
+The compatibility-surface retirement alternative scored about `66` but remains more test-coupled;
+the signing-backend adapter boundary scored about `63.3`; render-cache integration and a new agent
+CLI remained below gate. The existing shared lifecycle makes this candidate local-substitutable and
+keeps Phase 2 behavior/CLI/artifact contracts bounded.
+
+### Post-cap continuation design selection 4 — completed after `c246d9b02`
+
+Three designs were independently reviewed:
+
+- Minimal direct migration to `HarnessQtLifecyclePort` scored `90.5`; it removes duplicate lifecycle
+  calls while keeping Phase 2 orchestration in place.
+- Flexible dependency-injected Phase 2 runner extraction scored `84.5`; it improves unit seams but
+  adds a broad request/dependency bundle and is unnecessary for this bounded ownership fix.
+- Common-caller shared-lifecycle migration scored `92`; it reuses the existing port unchanged,
+  preserves Phase 2-specific vertical content/control ordering, and keeps lifecycle policy identical
+  across Phase 2 and Phase 3.
+
+Selected design: the common-caller shared-lifecycle migration. It is a single base design (not a
+hybrid), so no hybrid bonus gate applies. The child plan keeps the Phase 2 public wrapper, capture
+JSON/checklist/evidence command, CLI names, artifact paths, and dimensions unchanged while removing
+all direct Qt lifecycle calls and guaranteeing idempotent cleanup.
+
+### Post-cap continuation slice 4 — accepted 2026-08-06
+
+Child `docs/ExecPlans/phase2_harness_shared_lifecycle_execplan.md` is implemented and closed. The
+Phase 2 viewer harness now reuses `HarnessQtLifecyclePort` and the shared `HarnessQtBindings` instead
+of maintaining a second QApplication/QMainWindow binding and lifecycle implementation. It retains
+the viewer workflow, toolbar callbacks, metrics, selection/error capture, checklist rendering,
+evidence-command generation, public defaults, and 1280x900 window contract. One content QWidget/VBox
+preserves the established viewer → metrics → instructions → status order, while controls remain on
+the shared toolbar. Setup, event-loop, report, and artifact failures all close the lifecycle exactly
+once; the local direct lifecycle calls and duplicate binding dataclass are retired.
+
+Focused Phase 2/shared lifecycle/session coverage passed `14` tests; the full suite passed `1,054`
+tests with one pre-existing warning. Ruff, diff checks, application import isolation, and CLI
+help/parser checks passed. Offscreen acceptance passed signed acceptance (`10` scenarios, `7`
+successful signings, `3` matched intentional rejections), signed preview parity (`18/18` successful),
+and signed fit rejection (`3/3` matched), with zero cryptographic, annotation, preview-comparison, or
+expectation failures. The explicit `/tmp/foliaseal-phase2-acceptance` root and generated repository
+acceptance artifacts were removed; no FoliaSeal/Python process or dialog remained.
+
+Continuation-slice proxy measurement: navigation friction `0.25`, change amplification `0.50`,
+seam-risk reduction `0.50`, boundary-test improvement `0.50`, interface compression `0.50`,
+cohesion `0.50`, and behavioral-uncertainty reduction `0.25`; `Actual Improvement = 0.43`, predicted
+`0.25`, with no component regression below `-0.10`. This accepts the slice without changing the fixed
+five-cycle cap. The next scan must be fresh; coordinated `phase3` nomenclature retirement remains the
+leading contract-sensitive candidate, but public commands/DTOs/JSON/artifact names stay frozen until
+its atomic migration is executed.
 
 ## Context and Orientation
 
