@@ -27,7 +27,6 @@ from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
 )
 from foliaseal.application.visible_signature_layout import (
-    PyHankoTextMeasurer,
     RectBounds,
     TextMetrics,
     VisibleSignatureLayoutOptions,
@@ -35,6 +34,7 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutService,
     structural_line_bounds,
 )
+from foliaseal.application.visible_signature_layout_adapters import PyHankoTextMeasurer
 from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureFieldSource,
@@ -361,16 +361,21 @@ def test_canonical_preview_rendered_ink_matrix_documents_all_layout_positions(
         stamp_text=stamp_text,
         stamp_background=stamp_background,
     )
-    pdf_style = VisibleSignatureLayoutService.production().prepare(
-        VisibleSignatureLayoutRequest(
-            appearance=appearance,
-            stamp_text=stamp_text,
-            stamp_background=stamp_background,
-            signature_rect=preview.signature_rect,
-            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+    pdf_style = (
+        VisibleSignatureLayoutService.production()
+        .prepare(
+            VisibleSignatureLayoutRequest(
+                appearance=appearance,
+                stamp_text=stamp_text,
+                stamp_background=stamp_background,
+                signature_rect=preview.signature_rect,
+                options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+                ink_measurer=_BackendHorizontalInkMeasurer(appearance),
+            )
         )
-    ).signing().stamp_style
+        .signing()
+        .stamp_style
+    )
     preview_layout = _canonical_preview_layout(
         preview,
         include_text=True,
@@ -382,9 +387,7 @@ def test_canonical_preview_rendered_ink_matrix_documents_all_layout_positions(
     assert text_bounds is not None
     assert stamp_bounds is not None
     assert backend_issues == ()
-    assert pdf_style.inner_content_layout.margins == (
-        preview_layout.inner_content_layout.margins
-    )
+    assert pdf_style.inner_content_layout.margins == (preview_layout.inner_content_layout.margins)
     assert pdf_style.background_layout.margins == preview_layout.background_layout.margins
     assert not _rectangles_overlap(text_bounds, stamp_bounds)
     assert (
@@ -446,8 +449,7 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         for line in snapshot.lines
     )
     assert any(
-        line.kind.value == "field" and line.text == "[hidden] Location"
-        for line in snapshot.lines
+        line.kind.value == "field" and line.text == "[hidden] Location" for line in snapshot.lines
     )
     assert any(
         line.kind.value == "summary" and "Text style: Source Sans 3" in line.text
@@ -466,8 +468,7 @@ def test_preview_renderer_formats_semantics_deterministically(tmp_path: Path) ->
         for line in snapshot.lines
     )
     assert any(
-        line.kind.value == "status" and line.text == "Ready to sign"
-        for line in snapshot.lines
+        line.kind.value == "status" and line.text == "Ready to sign" for line in snapshot.lines
     )
 
 
@@ -730,9 +731,7 @@ def test_canonical_preview_renderer_optically_centers_no_stamp_single_line_text(
     assert snapshot.text_bounds_px is not None
 
     top_gap = snapshot.text_bounds_px["y"] - snapshot.text_area_bounds_px["y"]
-    bottom_gap = (
-        snapshot.text_area_bounds_px["y"] + snapshot.text_area_bounds_px["height"]
-    ) - (
+    bottom_gap = (snapshot.text_area_bounds_px["y"] + snapshot.text_area_bounds_px["height"]) - (
         snapshot.text_bounds_px["y"] + snapshot.text_bounds_px["height"]
     )
 
@@ -751,9 +750,7 @@ def test_canonical_preview_renderer_can_preserve_transparency_for_gui_use(
             image_stamp_path=None,
         )
     )
-    workflow.set_signature_rect(
-        build_signature_rect(page_index=2, width_pt=260.0, height_pt=24.0)
-    )
+    workflow.set_signature_rect(build_signature_rect(page_index=2, width_pt=260.0, height_pt=24.0))
 
     snapshot = render_canonical_signature_preview(
         workflow.preview(),
@@ -765,9 +762,7 @@ def test_canonical_preview_renderer_can_preserve_transparency_for_gui_use(
     assert snapshot is not None
     with Image.open(snapshot.image_path).convert("RGBA") as image:
         alpha_values = {
-            image.getpixel((x, y))[3]
-            for y in range(image.height)
-            for x in range(image.width)
+            image.getpixel((x, y))[3] for y in range(image.height) for x in range(image.width)
         }
 
     assert 0 in alpha_values
@@ -1342,8 +1337,9 @@ def test_canonical_preview_renderer_sizes_horizontal_single_line_stamp_from_rema
     assert snapshot.text_area_bounds_px["width"] >= 254
     assert snapshot.stamp_area_bounds_px["width"] < 115
     assert snapshot.stamp_bounds_px["width"] <= snapshot.stamp_area_bounds_px["width"]
-    assert snapshot.text_area_bounds_px["x"] + snapshot.text_area_bounds_px["width"] <= (
-        snapshot.stamp_area_bounds_px["x"]
+    assert (
+        snapshot.text_area_bounds_px["x"] + snapshot.text_area_bounds_px["width"]
+        <= (snapshot.stamp_area_bounds_px["x"])
     )
 
 
@@ -1399,9 +1395,10 @@ def test_canonical_preview_renderer_uses_ink_reservation_for_horizontal_single_l
     assert structural_snapshot.stamp_area_bounds_px is not None
     assert ink_snapshot is not None
     assert ink_snapshot.stamp_area_bounds_px is not None
-    assert ink_snapshot.stamp_area_bounds_px["width"] > structural_snapshot.stamp_area_bounds_px[
-        "width"
-    ]
+    assert (
+        ink_snapshot.stamp_area_bounds_px["width"]
+        > structural_snapshot.stamp_area_bounds_px["width"]
+    )
     assert ink_snapshot.stamp_bounds_px is not None
     assert ink_snapshot.text_area_bounds_px is not None
     text_bounds = _render_text_only_bounds_for_preview(
@@ -1571,9 +1568,7 @@ def test_canonical_preview_renderer_aligns_left_stamp_text_ink_to_border(
     )
 
     assert text_bounds is not None
-    right_border_gap_px = snapshot.width_px - (
-        text_bounds["x"] + text_bounds["width"]
-    )
+    right_border_gap_px = snapshot.width_px - (text_bounds["x"] + text_bounds["width"])
     assert 1 <= right_border_gap_px <= 6
     assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px)
 
@@ -1644,9 +1639,7 @@ def test_canonical_preview_renderer_keeps_left_stamp_close_to_text_ink(
     stamp_to_text_gap_px = text_bounds["x"] - (
         snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
     )
-    right_border_gap_px = snapshot.width_px - (
-        text_bounds["x"] + text_bounds["width"]
-    )
+    right_border_gap_px = snapshot.width_px - (text_bounds["x"] + text_bounds["width"])
     assert 1 <= right_border_gap_px <= 8
     assert 1 <= stamp_to_text_gap_px <= max_stamp_to_text_gap_px
     assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px)
@@ -1774,14 +1767,13 @@ def test_canonical_preview_renderer_preserves_both_horizontal_text_edges(
     assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px)
     if stamp_position == SignatureStampPosition.LEFT:
         assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0
-        assert text_bounds["x"] - (
-            snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
-        ) > 0
+        assert (
+            text_bounds["x"] - (snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"])
+            > 0
+        )
     else:
         assert text_bounds["x"] > 0
-        assert snapshot.stamp_bounds_px["x"] - (
-            text_bounds["x"] + text_bounds["width"]
-        ) > 0
+        assert snapshot.stamp_bounds_px["x"] - (text_bounds["x"] + text_bounds["width"]) > 0
 
 
 def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
@@ -1841,21 +1833,19 @@ def test_manual_caps_4_to_8_replay_preserves_preview_geometry(
         )
 
         assert text_bounds is not None, case["label"]
-        assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0, (
-            case["label"]
-        )
+        assert snapshot.width_px - (text_bounds["x"] + text_bounds["width"]) > 0, case["label"]
         if snapshot.stamp_bounds_px is not None:
-            assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px), (
-                case["label"]
-            )
+            assert not _rectangles_overlap(text_bounds, snapshot.stamp_bounds_px), case["label"]
             if stamp_position == SignatureStampPosition.LEFT:
-                assert text_bounds["x"] - (
-                    snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"]
-                ) > 0, case["label"]
+                assert (
+                    text_bounds["x"]
+                    - (snapshot.stamp_bounds_px["x"] + snapshot.stamp_bounds_px["width"])
+                    > 0
+                ), case["label"]
             else:
-                assert snapshot.stamp_bounds_px["x"] - (
-                    text_bounds["x"] + text_bounds["width"]
-                ) > 0, case["label"]
+                assert (
+                    snapshot.stamp_bounds_px["x"] - (text_bounds["x"] + text_bounds["width"]) > 0
+                ), case["label"]
 
 
 def test_compare_signature_appearance_snapshots_reports_layer_specific_mismatch() -> None:

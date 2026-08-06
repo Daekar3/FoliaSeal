@@ -67,7 +67,6 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
-    _background_layout_for_stamp,
     _horizontal_single_line_ink_validation_reservation,
     _layout_reservation_for_template,
     _single_line_rendered_ink_fits_reservation,
@@ -81,6 +80,7 @@ from foliaseal.application.visible_signature_layout import (
 from foliaseal.application.visible_signature_layout import (
     single_line_vertical_stamp_border_gap as _single_line_vertical_stamp_border_gap,
 )
+from foliaseal.application.visible_signature_layout_adapters import materialize_background_layout
 from foliaseal.domain.errors import CertificateLoadError, FailureCode
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -498,9 +498,7 @@ def test_invisible_signing_preserves_required_timestamp_behavior(tmp_path: Path)
     result = SignPdfUseCase(
         inspector=PyHankoPdfInspector(),
         certificate_loader=PyHankoCertificateLoader(),
-        signer=PyHankoPdfSigner(
-            timestamper_factory=lambda _request: _build_dummy_timestamper()
-        ),
+        signer=PyHankoPdfSigner(timestamper_factory=lambda _request: _build_dummy_timestamper()),
         verifier=PyHankoSignatureVerifier(),
     ).execute(request)
 
@@ -1272,7 +1270,7 @@ def test_background_layout_for_stamp_left_aligns_vertical_single_line_image(
     Image.new("RGBA", (40, 120), color=(32, 48, 96, 255)).save(stamp_path)
     stamp_background = stamp_background_for_path(str(stamp_path))
 
-    layout = _background_layout_for_stamp(
+    layout = materialize_background_layout(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.TOP,
         stamp_background=stamp_background,
@@ -1894,9 +1892,7 @@ def test_signature_text_box_engine_preserves_face_color_and_trailing_line_metric
     assert prepared.metrics.line_count == 2
     assert prepared.metrics.height_pt >= 18
     assert prepared.render_style.font.font_file.endswith("NotoSerif-BoldItalic.ttf")
-    assert prepared.render_style.text_color == pytest.approx(
-        (0x12 / 255, 0x34 / 255, 0x56 / 255)
-    )
+    assert prepared.render_style.text_color == pytest.approx((0x12 / 255, 0x34 / 255, 0x56 / 255))
 
 
 def test_signature_text_box_engine_preserves_missing_font_error() -> None:
@@ -2188,7 +2184,7 @@ def test_background_layout_for_single_line_bottom_preserves_border_facing_gap(
         stamp_aspect_ratio=2.0,
     )
 
-    layout = _background_layout_for_stamp(
+    layout = materialize_background_layout(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.BOTTOM,
         stamp_background=stamp_background_for_path(str(stamp_path)),
@@ -2213,7 +2209,7 @@ def test_single_line_top_and_bottom_use_distinct_vertical_layout_paths(tmp_path:
         background_color_hex="#FFFFFF",
     )
 
-    top_layout = _background_layout_for_stamp(
+    top_layout = materialize_background_layout(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.TOP,
         stamp_background=stamp_background,
@@ -2222,7 +2218,7 @@ def test_single_line_top_and_bottom_use_distinct_vertical_layout_paths(tmp_path:
         text_box_height=10,
         box_style=box_style,
     )
-    bottom_layout = _background_layout_for_stamp(
+    bottom_layout = materialize_background_layout(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.BOTTOM,
         stamp_background=stamp_background,
@@ -2559,7 +2555,7 @@ def test_background_layout_for_horizontal_single_line_keeps_stamp_vertically_ins
         stamp_aspect_ratio=1400 / 334,
     )
 
-    layout = _background_layout_for_stamp(
+    layout = materialize_background_layout(
         SignatureLayoutTemplate.SINGLE_LINE,
         stamp_position=SignatureStampPosition.LEFT,
         stamp_background=stamp_background,

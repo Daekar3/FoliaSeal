@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import inspect
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
@@ -14,12 +18,12 @@ from foliaseal.application import (
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signature_text_measurement import PreparedTextBox
 from foliaseal.application.visible_signature_layout import (
-    PyHankoTextMeasurer,
     TextMetrics,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
 )
+from foliaseal.application.visible_signature_layout_adapters import PyHankoTextMeasurer
 from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
 from foliaseal.presentation.qt import signature_preview_layout
 from tests.support.signing_builders import build_signature_appearance, build_signature_rect
@@ -273,6 +277,59 @@ def test_layout_module_uses_the_public_text_measurement_port() -> None:
 
     assert "_build_text_box_style" not in source
     assert "_measure_text_box_dimensions" not in source
+
+
+def test_neutral_layout_module_import_isolation() -> None:
+    script = """
+import importlib
+import sys
+import foliaseal.application.visible_signature_layout
+blocked = (
+    'PIL',
+    'pyhanko',
+    'PyQt',
+    'foliaseal.application.phase3_signing_backend',
+)
+loaded = sorted(
+    name for name in sys.modules
+    if any(name == prefix or name.startswith(prefix + '.') for prefix in blocked)
+)
+if loaded:
+    raise SystemExit(','.join(loaded))
+"""
+    environment = os.environ.copy()
+    source_root = str(Path(__file__).resolve().parents[2] / "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        (source_root, environment.get("PYTHONPATH", ""))
+    ).rstrip(os.pathsep)
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+@pytest.mark.parametrize(
+    "imports",
+    [
+        "import foliaseal.application.visible_signature_layout_adapters\n"
+        "import foliaseal.application.phase3_signing_backend",
+        "import foliaseal.application.phase3_signing_backend\n"
+        "import foliaseal.application.visible_signature_layout_adapters",
+    ],
+)
+def test_layout_adapter_and_backend_import_order_is_stable(imports: str) -> None:
+    completed = subprocess.run(
+        [sys.executable, "-c", imports],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=os.environ.copy(),
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
 def test_production_consumers_use_public_layout_adapter_names() -> None:

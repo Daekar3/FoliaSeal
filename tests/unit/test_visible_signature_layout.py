@@ -13,16 +13,18 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     ImageMetrics,
     LayoutRequest,
-    PyHankoSignatureAppearanceAdapter,
-    PyHankoVisibleSignatureStyle,
     RectBounds,
     SignatureLayoutPlan,
+    SigningVisibleSignatureStyle,
     TextMetrics,
     VisibleSignatureLayoutEngine,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
-    _background_layout_for_stamp,
+)
+from foliaseal.application.visible_signature_layout_adapters import (
+    PyHankoSignatureAppearanceAdapter,
+    materialize_background_layout,
 )
 from foliaseal.domain.models import (
     SignatureBoxStyle,
@@ -785,7 +787,7 @@ def test_layout_service_builds_backend_signing_style_from_public_facade(tmp_path
         options=VisibleSignatureLayoutOptions(),
     )
 
-    assert isinstance(service_result, PyHankoVisibleSignatureStyle)
+    assert isinstance(service_result, SigningVisibleSignatureStyle)
     assert service_result.layout_plan == expected_plan
     assert service_result.fit_issues == ()
     assert service_result.content_layout is service_result.stamp_style.inner_content_layout
@@ -848,10 +850,7 @@ def test_layout_service_exposes_background_layout_policy_through_public_facade(
 
     assert service_result.background_layout.x_align.name == expected_x_align
     assert service_result.background_layout.y_align.name == expected_y_align
-    assert (
-        service_result.background_layout.inner_content_scaling.name
-        == "SHRINK_TO_FIT"
-    )
+    assert service_result.background_layout.inner_content_scaling.name == "SHRINK_TO_FIT"
 
 
 def test_layout_service_keeps_distinct_top_and_bottom_single_line_stamp_layouts(
@@ -892,13 +891,9 @@ def test_layout_service_keeps_distinct_top_and_bottom_single_line_stamp_layouts(
     )
 
     assert top_result.background_layout.y_align != bottom_result.background_layout.y_align
+    assert top_result.background_layout.margins.top < top_result.background_layout.margins.bottom
     assert (
-        top_result.background_layout.margins.top
-        < top_result.background_layout.margins.bottom
-    )
-    assert (
-        bottom_result.background_layout.margins.bottom
-        < bottom_result.background_layout.margins.top
+        bottom_result.background_layout.margins.bottom < bottom_result.background_layout.margins.top
     )
 
 
@@ -1048,7 +1043,7 @@ def test_background_layout_helper_adds_border_facing_inset_for_top_multi_line_st
         )
     )
 
-    background_layout = _background_layout_for_stamp(
+    background_layout = materialize_background_layout(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
         stamp_background=_stamp_background(stamp_path),
@@ -1140,15 +1135,20 @@ def _existing_stamp_style(
     signature_rect: SignatureRect,
     ink_measurer: FakeHorizontalInkMeasurer | None = None,
 ):
-    return VisibleSignatureLayoutService.production().prepare(
-        VisibleSignatureLayoutRequest(
-            appearance=appearance,
-            stamp_text=stamp_text,
-            stamp_background=_stamp_background(appearance.image_stamp_path),
-            signature_rect=signature_rect,
-            ink_measurer=ink_measurer,
+    return (
+        VisibleSignatureLayoutService.production()
+        .prepare(
+            VisibleSignatureLayoutRequest(
+                appearance=appearance,
+                stamp_text=stamp_text,
+                stamp_background=_stamp_background(appearance.image_stamp_path),
+                signature_rect=signature_rect,
+                ink_measurer=ink_measurer,
+            )
         )
-    ).signing().stamp_style
+        .signing()
+        .stamp_style
+    )
 
 
 def _stamp_background(image_stamp_path: str | None):

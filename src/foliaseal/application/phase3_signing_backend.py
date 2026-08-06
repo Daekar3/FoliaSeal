@@ -66,7 +66,6 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
     VisibleSignaturePreparation,
-    _background_layout_for_stamp,
     _ensure_layout_can_fit,
     _horizontal_multi_line_rendered_layout_fits_reservation,
     _layout_reservation_for_template,
@@ -354,8 +353,7 @@ class PyHankoPdfSigner:
         signature_field_name = _next_signature_field_name(input_path)
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         if any(
-            issue.severity == SigningDraftValidationSeverity.ERROR
-            for issue in prepared.fit_issues
+            issue.severity == SigningDraftValidationSeverity.ERROR for issue in prepared.fit_issues
         ):
             raise ValueError("; ".join(issue.message for issue in prepared.fit_issues))
 
@@ -1145,7 +1143,7 @@ class PyHankoSignatureTextBoxEngine:
             metrics=TextMetrics(
                 width_pt=width_pt,
                 height_pt=height_pt,
-            line_count=max(1, text.count("\n") + 1),
+                line_count=max(1, text.count("\n") + 1),
             ),
             render_style=text_box_style,
         )
@@ -1205,16 +1203,22 @@ def _content_layout_for_template(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
-    return _layout_reservation_for_template(
-        layout_template,
-        stamp_position=stamp_position,
-        signature_rect=signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=box_style,
-        has_visible_stamp_image=stamp_background is not None,
-        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
-    ).inner_content_layout
+    from foliaseal.application.visible_signature_layout_adapters import (
+        pyhanko_layout_rule_from_spec,
+    )
+
+    return pyhanko_layout_rule_from_spec(
+        _layout_reservation_for_template(
+            layout_template,
+            stamp_position=stamp_position,
+            signature_rect=signature_rect,
+            text_box_width=text_box_width,
+            text_box_height=text_box_height,
+            box_style=box_style,
+            has_visible_stamp_image=stamp_background is not None,
+            stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
+        ).inner_content_layout
+    )
 
 
 def _background_layout_for_template(
@@ -1227,16 +1231,22 @@ def _background_layout_for_template(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
 ) -> SimpleBoxLayoutRule:
-    return _layout_reservation_for_template(
-        layout_template,
-        stamp_position=stamp_position,
-        signature_rect=signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
-        box_style=box_style,
-        has_visible_stamp_image=stamp_background is not None,
-        stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
-    ).background_layout
+    from foliaseal.application.visible_signature_layout_adapters import (
+        pyhanko_layout_rule_from_spec,
+    )
+
+    return pyhanko_layout_rule_from_spec(
+        _layout_reservation_for_template(
+            layout_template,
+            stamp_position=stamp_position,
+            signature_rect=signature_rect,
+            text_box_width=text_box_width,
+            text_box_height=text_box_height,
+            box_style=box_style,
+            has_visible_stamp_image=stamp_background is not None,
+            stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
+        ).background_layout
+    )
 
 
 def _measure_text_box_dimensions_impl(
@@ -1372,7 +1382,11 @@ def build_backend_reservation_evidence(
         fit_gate_passed = layout_preparation.fit_gate_passed
         if not fit_gate_passed:
             snapshot["error"] = layout_preparation.fit_gate_error
-        background_layout = _background_layout_for_stamp(
+        from foliaseal.application.visible_signature_layout_adapters import (
+            materialize_background_layout,
+        )
+
+        background_layout = materialize_background_layout(
             layout_template=appearance.layout_template,
             stamp_position=appearance.stamp_position,
             stamp_background=stamp_background,

@@ -253,11 +253,36 @@ preview/signing projections, and explicit stamp suppression are hard gates.
 
 ## Outcomes & Retrospective
 
-The loop has just been initialized. This section will record accepted cycles, measured architectural
-improvement, cumulative performance and friction changes, residual opportunities, and the exact
-stopping condition. It must not be replaced with a claim of completion before the requirement-by-
-requirement audit proves full scope or the fixed confirmation rule proves that remaining candidates
-fall below the intervention threshold.
+Cycle 2 implementation and documentation reconciliation are complete pending the final commit. The child
+plan moved third-party layout materialization out of the neutral core without changing the plan,
+preview, signing, CLI, JSON, or artifact contracts. The neutral module now imports without PIL,
+PyHanko, Qt, or the signing backend; the adapter edge owns concrete rule/materializer construction.
+
+Implementation evidence so far:
+
+- Child: `docs/ExecPlans/visible_signature_layout_adapter_boundary_execplan.md`.
+- New composition edge: `src/foliaseal/application/visible_signature_layout_adapters.py`.
+- Neutral core reduced from `1,959` LOC to `1,876` LOC; the adapter edge is `177` LOC. The former
+  `_SignatureLayoutReservation` now carries only `LayoutRuleSpec` values.
+- Boundary, layout, backend, and preview tests pass; the final full suite is `1042 passed` with one
+  pre-existing Pillow deprecation warning. Ruff, `git diff --check`, and subprocess import-isolation
+  checks are clean.
+- Compliance review identified and resolved adapter/backend import-order risk, duplicated private
+  background-layout wrappers, weak neutral appearance typing, backend-vendor result naming, and
+  stale direct adapter imports. The two Qt `VisibleSignatureLayoutEngine.plan()` callers are
+  documented as geometry-only consumers rather than target materializers.
+
+Release evidence is also green: the preview matrix executed 8 scenarios with 0 error rows; the
+signed matrix executed 8 scenarios with 6 successful signings, 2 matched intentional rejections,
+zero cryptographic/annotation/preview-output failures, and `acceptance_expectations_passed=True`.
+The explicit `/tmp/foliaseal-layout-preview` and `/tmp/foliaseal-layout-signed` directories were
+removed and the process audit is clean. The child records the same six-component proxy measurement:
+`Actual Improvement = 0.34`, predicted `0.25`, prediction accuracy `1.36x`, with no component below
+`-0.10`; all major compliance findings are resolved. Cycle 2 is accepted.
+
+The worktree remains uncommitted. The loop is not globally complete: the parent still requires the
+intentional final commit, then a fresh three-explorer rescan after this accepted cycle and the fixed
+below-threshold confirmation rule before stopping.
 
 ## Context and Orientation
 

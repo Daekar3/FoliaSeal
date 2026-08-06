@@ -95,12 +95,17 @@ Current capabilities:
   - Qt code should orchestrate user interaction and dispatch, not reinterpret the model.
 - The visible-signature layout path now has one prepare-once application boundary before either
   target adapter.
-  - `VisibleSignatureLayoutPort` and the concrete `VisibleSignatureLayoutService` own the shared
-    geometry plan, fit decision, and reservation evidence.
-  - `visible_signature_color.py` owns the shared RGBA conversion helper used by horizontal
-    measurement.
-  - `_text_style_color_rgba` remains only as a delegating compatibility shim while older callers
-    migrate.
+  - `VisibleSignatureLayoutPort` and `VisibleSignatureLayoutService` own neutral geometry, fit
+    policy, and reservation evidence; `VisibleSignaturePreparation` freezes that decision and
+    memoizes signing/preview projections.
+  - `visible_signature_layout_adapters.py` owns Pillow image probing plus PyHanko text/style and
+    layout-rule materialization. The neutral layout module imports no Pillow, PyHanko, Qt, or
+    `phase3_signing_backend`.
+  - The two Qt `VisibleSignatureLayoutEngine.plan()` callers are geometry-only consumers of the
+    neutral plan; they do not materialize artifacts or duplicate fit policy.
+  - Concrete names are no longer imported directly from the neutral layout module; package-level
+    lazy exports remain for supported callers while retired direct concrete-module imports stay
+    removed.
 - Visible-signature typography now uses bundled OpenType font assets as the canonical source of
   truth.
   - Backend fit validation and final signed rendering use pyHanko's OpenType shaping path instead
@@ -113,10 +118,9 @@ Current capabilities:
   `TextMetrics` plus an opaque render-style token. `PyHankoSignatureTextBoxEngine` owns the
   concrete PyHanko style construction, bundled-font resolution, color conversion, rounding, and
   multiline descender correction used by both preview/layout and signing reservation checks.
-  `PyHankoTextMeasurer` remains a metrics-only compatibility wrapper and accepts an injected engine
-  for deterministic layout tests. The default wrapper lazily imports the PyHanko adapter to keep
-  the layout module's optional adapter construction localized; a future import-purity extraction
-  remains tracked architecture debt.
+  `PyHankoTextMeasurer` remains a metrics-only adapter in `visible_signature_layout_adapters.py`
+  and accepts an injected engine for deterministic layout tests. The default wrapper lazily imports
+  the backend text engine at the concrete edge.
   Backend fit helpers that remain are behavior-bearing implementation policy for the authoritative
   fit gate, not a compatibility facade. A capability-aware multi-provider measurement registry is
   intentionally deferred until a second provider exists.
