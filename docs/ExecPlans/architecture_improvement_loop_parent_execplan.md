@@ -109,8 +109,8 @@ created.
 - [x] Completed three design variants and two independent reviews for the evidence-runner provider
   seam; selected the constrained operation-scoped provider hybrid at shape score `91`.
 - [x] Execute `evidence_runner_provider_boundary_execplan.md` through implementation, focused/full
-  validation, offscreen evidence, cleanup, and documentation; commit closure and the fresh rescan
-  remain before accepting the slice.
+  validation, offscreen evidence, cleanup, documentation, and commit closure in `435b41312`;
+  fresh rescan remains before accepting the slice.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -1332,7 +1332,7 @@ identity match current runner wiring; preview/signed scenario counts, JSON summa
 CLI exit behavior remain unchanged; and `rg 'harness\\._' evidence_runner_factories.py` returns no
 matches.
 
-### Post-cap continuation slice 15 — implementation complete, acceptance pending commit — 2026-08-06
+### Post-cap continuation slice 15 — accepted 2026-08-06
 
 Child `docs/ExecPlans/evidence_runner_provider_boundary_execplan.md` is implemented. The new
 `evidence_runner_providers.py` module contains Qt-free immutable interactive, preview, and signed
@@ -1350,13 +1350,13 @@ an explicit temporary root passed preview parity `18/18` with zero errors, signe
 scenarios with `7` successful signings and zero scenario errors, and fit rejection `3` scenarios with
 zero scenario errors. The signed command emitted expected self-signed TSA validation diagnostics but
 exited successfully; the exact temporary root was removed and the process audit found no FoliaSeal,
-Python, Qt, or dialog process.
+Python, Qt, or dialog process. Implementation/docs commit: `435b41312`.
 
 Proxy measurement: navigation `0.30`, change amplification `0.70`, seam-risk reduction `0.75`,
 boundary-test improvement `0.80`, interface compression `0.75`, and boundary isolation `0.85`; weighted
 Actual Improvement is `0.52` against predicted `0.45`, with no component regression below `-0.10`.
-The slice qualifies for acceptance after the intentional commit and a fresh exact three-explorer
-rescan.
+The slice is accepted under the parent threshold after the intentional commit. A fresh exact
+three-explorer rescan is now required before selecting the next candidate.
 
 ## Context and Orientation
 

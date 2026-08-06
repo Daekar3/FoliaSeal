@@ -41,7 +41,7 @@ offscreen preview/signed evidence matrices.
 - [x] (2026-08-06) Added provider/factory/import-isolation tests and updated existing assertions without changing
   runner dependency dataclasses or external output contracts.
 - [x] (2026-08-06) Ran focused/full validation, offscreen evidence, process/temp-root cleanup, and
-  docs reconciliation; parent ledger update and commit closure remain in progress.
+  docs reconciliation; parent ledger update and commit closure completed in `435b41312`.
 
 ## Surprises & Discoveries
 
