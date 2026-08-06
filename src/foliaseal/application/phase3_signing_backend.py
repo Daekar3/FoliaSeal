@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from fractions import Fraction
 from io import BytesIO
@@ -56,6 +56,10 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftValidationSeverity,
 )
 from foliaseal.application.visible_signature_color import text_style_color_rgba
+from foliaseal.application.visible_signature_fit_policy import (
+    apply_visible_signature_fit_gate,
+    decide_visible_signature_fit,
+)
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
@@ -583,10 +587,9 @@ def prepare_phase3_signing_plan(
         signature_appearance=appearance,
         stamp_text=stamp_text,
     )
-    layout_preparation = replace(
+    layout_preparation = apply_visible_signature_fit_gate(
         layout_preparation,
-        fit_gate_passed=not fit_issues,
-        fit_gate_error=fit_issues[0].message if fit_issues else None,
+        decide_visible_signature_fit(fit_issues),
     )
     return PreparedSigningPlan(
         backend_request=request,
@@ -966,10 +969,9 @@ def validate_visible_signature_fit(
             signature_appearance=signature_appearance,
             stamp_text=stamp_text,
         )
-        preparation = replace(
+        preparation = apply_visible_signature_fit_gate(
             preparation,
-            fit_gate_passed=not fit_issues,
-            fit_gate_error=fit_issues[0].message if fit_issues else None,
+            decide_visible_signature_fit(fit_issues),
         )
         _build_stamp_style(
             signature_appearance,

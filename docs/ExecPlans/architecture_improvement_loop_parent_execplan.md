@@ -352,7 +352,7 @@ unification (`76.0`), and constrained hybrid (`90.1`; independent 23/25 safety s
 Cycle 4 child keeps live/headless lifecycles and the typed capture port unchanged while extracting
 only shared preview-widget evidence policy into a presentation-edge module.
 
-### Cycle 4 — accepted pending commit 2026-08-05
+### Cycle 4 — accepted 2026-08-05
 
 Child `docs/ExecPlans/preview_widget_evidence_boundary_execplan.md` is implemented. New module
 `src/foliaseal/presentation/qt/preview_widget_evidence.py` owns shared duck-typed geometry, text
@@ -369,7 +369,42 @@ were removed and the process audit is clean.
 Cycle 4 proxy measurement: navigation `0.0`, change amplification `0.5`, seam reduction `0.5`,
 boundary-test improvement `0.25`, interface compression `0.5`, boundary isolation `0.5`;
 `Actual Improvement = 0.30`, predicted `0.25`, prediction accuracy `1.20x`, no component below
-`-0.10`. Commit and the next fresh rescan remain before the loop's stopping decision.
+`-0.10`. Commit `8f43bb9a3` (`refactor: isolate preview widget evidence policy`) is on `main`.
+
+### Scan Round 5 — completed after commit `8f43bb9a3`
+
+Two independent explorers and an orchestrator-local scan reviewed the clean checkout. The strongest
+remaining candidate is rendered-ink/visible-signature fit-policy ownership in
+`application/phase3_signing_backend.py` (1,538 lines): duplicated fit-gate mutation, concrete
+measurement wiring, and preview/output fidelity policy remain concentrated there. Independent
+priority was approximately `65.1` with confidence `0.90+`. Workspace compatibility exports and
+application-to-infra schema coupling are credible debts but broader or lower-confidence; the
+unfinished phase nomenclature migration remains a separate atomic plan because public CLI/DTO/JSON/
+artifact names are frozen contracts.
+
+Design reviews compared minimal gate relocation (`~78.8`), flexible ports/adapters (`~78.8` after
+scope penalty), common-caller backend ownership (`~63`), and constrained hybrid (`~89.5`). The
+selected child keeps concrete PyHanko/Pillow measurement in the backend adapter, introduces one
+neutral decision/gate helper, and preserves the existing prepare-once object as the sole gate.
+
+### Cycle 5 — accepted 2026-08-05
+
+Child `docs/ExecPlans/visible_signature_fit_policy_boundary_execplan.md` is implemented. The new
+`VisibleSignatureFitDecision` and `apply_visible_signature_fit_gate()` policy are used by both
+prepared-plan and public validation paths, removing duplicate gate mutation while leaving fit
+error codes, reservation evidence, and external contracts unchanged. Focused policy and fit suites
+are green. Full suite `1047 passed` with one pre-existing Pillow warning; Ruff and diff checks are
+clean. Preview matrix: 8 scenarios/0 error rows. Signed matrix: 8 scenarios/6 successful signings,
+2 matched intentional rejections, zero cryptographic/annotation/preview-output failures, and
+`acceptance_expectations_passed=True`. Temporary directories and processes are clean.
+
+Cycle 5 measurement: navigation `0.0`, change amplification `0.5`, seam reduction `0.5`,
+boundary-test improvement `0.25`, interface compression `0.5`, boundary isolation `0.5`;
+`Actual Improvement = 0.30`, predicted `0.25`, prediction accuracy `1.20x`, no component below
+`-0.10`. This reaches the fixed five-cycle cap; the loop stops after the intentional commit and
+final clean-worktree audit. Remaining backend adapter concentration, workspace compatibility
+exports, app-to-infra DTO coupling, and phase nomenclature migration are ranked follow-on plans,
+not silently ignored work.
 
 ## Context and Orientation
 
