@@ -1966,7 +1966,8 @@ the explicit resolver/phase3 follow-ups. Conservative before/after proxies are n
 change amplification `.65`, seam reduction `.75`, boundary-test improvement `.70`, interface
 compression `.60`, cohesion `.55`, and isolation `.80`, for weighted Actual Improvement about
 `.67` versus predicted `.50`; no component regressed below `-.10`, so the hard improvement gates
-pass. Intentional commit and the three-explorer post-commit rescan remain as the final closure gates.
+pass. Source/tests/docs commit `081b4087a` and ledger closure commit `28e87b791` are clean, and the
+three-explorer post-commit rescan has closed this cycle.
 
 ### Scan Round 38 — completed 2026-08-06
 
