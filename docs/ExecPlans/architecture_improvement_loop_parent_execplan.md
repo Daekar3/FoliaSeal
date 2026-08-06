@@ -959,6 +959,32 @@ The next design round must focus on one title-band/visible-ink reservation bound
 the change to one complete implementation slice. No new child plan is selected until the independent
 design review records the minimal, flexible, and common-caller shapes.
 
+### Post-cap continuation design and slice 9 — accepted 2026-08-06
+
+Three independent design reviews confirmed that the active production paths already pass the full
+semantics-composed `stamp_text` into the shared layout engine. The minimal design only factored a
+helper (shape ~80); the flexible per-band reservation port scored ~90 but would introduce a second
+geometry model without a current artifact proving it necessary; the common-caller design scored ~90
+and centralizes the existing backend preparation/fit-gate choreography. The common-caller design was
+selected without a hybrid because it had no unresolved weakness requiring the `+5` gate.
+
+Child `docs/ExecPlans/backend_layout_preparation_boundary_execplan.md` is implemented and closed.
+`phase3_signing_backend.py` now owns one typed `_BackendLayoutPreparation` result and
+`_prepare_backend_layout()` helper used by both `prepare_phase3_signing_plan()` and
+`validate_visible_signature_fit()`. This removes the duplicated service/ink/fallback/fit-gate path,
+keeps `prepare_phase3_signing_plan()` as the only semantics/title composition source, and preserves
+`PreparedSigningPlan`, `BackendReservationEvidence`, stable fit errors, CLI/JSON/artifact contracts,
+and phase3 nomenclature.
+
+Focused backend/layout coverage passed `136` tests; the full suite passed `1,058` tests with `11`
+skipped and one pre-existing warning. Ruff, diff checks, import isolation, CLI help, and offscreen
+acceptance passed (`10/7/3`, `18/18`, and `3/3`). Proxy measurement was navigation friction `0.25`,
+change amplification `0.40`, seam-risk reduction `0.40`, boundary-test improvement `0.40`, interface
+compression `0.35`, cohesion `0.40`, and behavioral-uncertainty reduction `0.35`; `Actual Improvement
+= 0.36` versus predicted `0.34`, with no component regression below `-0.10`. A fresh three-explorer
+scan is required after commit; a true title-band DTO remains deferred unless new live artifacts prove
+aggregate metrics cannot represent the GUI contract.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

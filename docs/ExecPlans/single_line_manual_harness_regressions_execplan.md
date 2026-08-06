@@ -19,7 +19,13 @@ The proof is a manual harness run with a realistic full-field profile and signer
 - [x] (2026-04-05 09:48Z) Added focused regressions for signer-label ordering, reduced body-height budgeting, and the new horizontal title placement assumptions.
 - [x] (2026-04-05 13:42Z) Fixed preview-specific wrapping and alignment drift so `single_line` top/bottom stamp images use left alignment again and horizontal preview uses the backend-style body wrapping rules before sizing the stamp band.
 - [x] (2026-04-05 14:12Z) Confirmed the remaining blocker is a backend/output structural mismatch: preview now has a dedicated signer-label row, but backend fit validation and output rendering still budget `signer_label_prefix` inside the body text box.
-- [ ] Design and implement a backend title-band reservation model for `single_line` so fit validation and signed output can honor the same signer-label semantics as the preview.
+- [x] (2026-08-06) Re-audited the live backend and preview callers. Both production paths already pass the
+  semantics-composed full `stamp_text` into the shared layout engine; the concrete remaining duplication
+  was the backend's repeated service/fit-gate choreography, not a second active title-band geometry
+  implementation.
+- [ ] If a fresh live artifact proves aggregate text metrics still diverge from the GUI's signer-label
+  presentation, design a true title-band reservation model as a separate child slice; do not infer that
+  need from the historical manual trace alone.
 
 ## Surprises & Discoveries
 
@@ -61,6 +67,12 @@ The proof is a manual harness run with a realistic full-field profile and signer
 - Decision: restore left alignment for `single_line` top/bottom preview stamps instead of centering them.
   Rationale: the user explicitly expects left alignment there, and the backend reservation snapshots still use `x_align = align_min` for those vertical stamp bands. The preview should match that output-side semantic rather than the centered-matrix experiment.
   Date/Author: 2026-04-05 / Codex
+
+- Decision: centralize backend layout preparation before introducing a title-band DTO.
+  Rationale: current production signing, validation, and preview paths all carry the complete semantic
+  `stamp_text`; adding a second geometry model without a current failing artifact would increase drift
+  and migration risk. The dedicated backend helper now makes the full-text invariant explicit.
+  Date/Author: 2026-08-06 / Codex
 
 ## Outcomes & Retrospective
 

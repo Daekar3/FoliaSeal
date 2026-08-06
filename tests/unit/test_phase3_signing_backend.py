@@ -43,6 +43,7 @@ from foliaseal.application.phase3_signing_backend import (
     _effective_horizontal_text_reservation_width,
     _load_simple_signer,
     _measure_text_box_dimensions,
+    _prepare_backend_layout,
     _resolve_visible_signature_semantics,
     _single_line_text_fits_reservation,
     _visible_signature_fit_issues,
@@ -978,6 +979,39 @@ def test_public_fit_adapter_preserves_stable_issue_mapping() -> None:
     assert issues
     assert issues[0].code == "visible_signature_layout_unavailable"
     assert issues[0].severity.name == "ERROR"
+
+
+def test_backend_layout_preparation_and_validation_share_full_stamp_text_policy() -> None:
+    appearance = SigningBackendAppearance.from_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+        )
+    )
+    signature_rect = build_signature_rect(page_index=0, width_pt=24, height_pt=18)
+    stamp_text = "Digitally signed by\nMorgan Ellery-Prescott | Board Secretary"
+
+    prepared = _prepare_backend_layout(
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=None,
+    )
+    validation_issues = validate_visible_signature_fit(
+        signature_rect=signature_rect,
+        signature_appearance=appearance,
+        stamp_text=stamp_text,
+        stamp_background=None,
+    )
+
+    assert tuple(issue.code for issue in prepared.fit_issues) == tuple(
+        issue.code for issue in validation_issues
+    )
+    assert tuple(issue.message for issue in prepared.fit_issues) == tuple(
+        issue.message for issue in validation_issues
+    )
+    assert prepared.preparation.layout_plan.text_box.line_count == 2
 
 
 def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compact_stamp_lane(

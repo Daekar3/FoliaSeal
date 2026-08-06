@@ -540,6 +540,46 @@ def build_phase3_signing_executor(
     return Phase3SigningExecutor(use_case=use_case)
 
 
+@dataclass(frozen=True)
+class _BackendLayoutPreparation:
+    preparation: VisibleSignaturePreparation
+    fit_issues: tuple[SigningDraftValidationIssue, ...]
+
+
+def _prepare_backend_layout(
+    *,
+    signature_rect: SignatureRect,
+    signature_appearance: SigningBackendAppearance,
+    stamp_text: str,
+    stamp_background: PdfImage | None,
+) -> _BackendLayoutPreparation:
+    """Prepare and fit-gate one canonical backend layout for all visible callers."""
+
+    preparation = VisibleSignatureLayoutService.production().prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=signature_appearance,
+            signature_rect=signature_rect,
+            stamp_text=stamp_text,
+            stamp_background=stamp_background,
+            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
+            ink_measurer=_BackendHorizontalInkMeasurer(signature_appearance),
+        )
+    )
+    fit_issues = _layout_fit_issues(
+        layout_plan=preparation.layout_plan,
+        signature_rect=signature_rect,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
+    )
+    return _BackendLayoutPreparation(
+        preparation=apply_visible_signature_fit_gate(
+            preparation,
+            decide_visible_signature_fit(fit_issues),
+        ),
+        fit_issues=fit_issues,
+    )
+
+
 def prepare_phase3_signing_plan(
     request: SigningBackendRequest,
 ) -> PreparedSigningPlan:
@@ -571,32 +611,18 @@ def prepare_phase3_signing_plan(
         signature_rect=signature_rect,
     )
     stamp_text = semantics.text.stamp_text
-    layout_preparation = VisibleSignatureLayoutService.production().prepare(
-        VisibleSignatureLayoutRequest(
-            appearance=appearance,
-            signature_rect=signature_rect,
-            stamp_text=stamp_text,
-            stamp_background=stamp_background_for_path(appearance.image_stamp_path),
-            options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-            ink_measurer=_BackendHorizontalInkMeasurer(appearance),
-        )
-    )
-    fit_issues = _layout_fit_issues(
-        layout_plan=layout_preparation.layout_plan,
+    layout_result = _prepare_backend_layout(
         signature_rect=signature_rect,
         signature_appearance=appearance,
         stamp_text=stamp_text,
-    )
-    layout_preparation = apply_visible_signature_fit_gate(
-        layout_preparation,
-        decide_visible_signature_fit(fit_issues),
+        stamp_background=stamp_background_for_path(appearance.image_stamp_path),
     )
     return PreparedSigningPlan(
         backend_request=request,
         visible_semantics=semantics,
-        layout_plan=layout_preparation.layout_plan,
-        layout_preparation=layout_preparation,
-        fit_issues=fit_issues,
+        layout_plan=layout_result.preparation.layout_plan,
+        layout_preparation=layout_result.preparation,
+        fit_issues=layout_result.fit_issues,
         stamp_text=stamp_text,
         visible=True,
     )
@@ -953,33 +979,19 @@ def validate_visible_signature_fit(
     stamp_background: PdfImage | None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
     try:
-        preparation = VisibleSignatureLayoutService.production().prepare(
-            VisibleSignatureLayoutRequest(
-                appearance=signature_appearance,
-                signature_rect=signature_rect,
-                stamp_text=stamp_text,
-                stamp_background=stamp_background,
-                options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-                ink_measurer=_BackendHorizontalInkMeasurer(signature_appearance),
-            )
-        )
-        fit_issues = _layout_fit_issues(
-            layout_plan=preparation.layout_plan,
+        layout_result = _prepare_backend_layout(
             signature_rect=signature_rect,
             signature_appearance=signature_appearance,
             stamp_text=stamp_text,
-        )
-        preparation = apply_visible_signature_fit_gate(
-            preparation,
-            decide_visible_signature_fit(fit_issues),
+            stamp_background=stamp_background,
         )
         _build_stamp_style(
             signature_appearance,
             stamp_text=stamp_text,
             stamp_background=stamp_background,
             signature_rect=signature_rect,
-            preparation=preparation,
-            layout_plan=preparation.layout_plan,
+            preparation=layout_result.preparation,
+            layout_plan=layout_result.preparation.layout_plan,
         )
     except Exception as exc:
         return (
