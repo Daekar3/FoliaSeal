@@ -1643,6 +1643,33 @@ boundary isolation `1.00`, for Actual Improvement `0.46` versus predicted `0.42`
 The child has zero unresolved critical or major findings after documentation reconciliation and the
 post-first-pass review.
 
+### Scan Round 23 — completed 2026-08-06
+
+Three independent explorers rescanned clean commit `cf1a8d0a1` after the artifact-boundary slice.
+They agree that phase3 nomenclature retirement is broad contract-governance work, not a bounded
+one-slice rename: current inventory is approximately `106` tracked paths with phase3 in filenames and
+`254` tracked source/test/script/README/doc paths containing case-insensitive phase3 references
+(about `6,595` token occurrences in the broad scan; the narrower retirement plan inventory is stale).
+Public CLI names, DTO/type names, JSON keys, fixtures, and artifact paths require an atomic versioned
+decision, so the nomenclature plan remains separate and unselected.
+
+The strongest convergent product seam is a neutral signing-draft contract boundary. One explorer
+measured Priority about `82` with confidence `.93`: `signing_draft_workflow.py` is a 671-line mutable
+workflow that exports validation/placement/preview DTOs to 11 application modules, while
+`visible_signature_semantics.py` imports those workflow contracts and the workflow uses a method-local
+semantics import to avoid a cycle. The bounded shape is a new `signing_draft_contracts.py`, migration
+of those 11 callers/tests, and an import-firewall test; phase3 names remain unchanged. A second
+explorer independently found the related concrete-fit seam at Priority about `68.23` and confidence
+`.945`: the workflow lazily imports `phase3_signing_backend.validate_visible_signature_fit`, while
+`visible_signature_fit_policy.py` only applies decisions. That report recommends a later neutral
+rendered-ink fit service extraction. The third explorer found a smaller signed-output render helper
+extraction in `phase3_harness.py` at Priority about `63–66`, confidence `.88`, but it is weaker than
+the shared contract/fit cluster.
+
+Next-step recommendation: perform a three-shape design review for the neutral signing-draft contracts
+boundary before selecting the next child plan. Keep the current artifact child closed; do not reopen
+the stabilized signing-shell seam or piggyback phase3 nomenclature changes onto it.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

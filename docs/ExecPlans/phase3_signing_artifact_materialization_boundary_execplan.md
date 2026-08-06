@@ -110,7 +110,9 @@ Implementation and validation evidence (2026-08-06):
 - Independent post-first-pass review found no unresolved critical or major findings after the docs,
   owner-boundary tests, direct import migration, and compatibility cleanup were applied.
 
-Commit hash and fresh architecture-rescan results are appended before closing this plan.
+Commit: `cf1a8d0a1` (`Extract visible-signature artifact adapters`). Fresh Scan Round 23 found no
+remaining critical or major issue in this slice; the next candidate is recorded in the parent loop
+ledger. This child is complete.
 
 ## Context and Orientation
 
