@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from foliaseal.application.signing_draft_workflow import SigningDraftValidationIssue
+from foliaseal.application.signing_draft_contracts import SigningDraftValidationIssue
 from foliaseal.application.visible_signature_fit_policy import (
     apply_visible_signature_fit_gate,
     decide_visible_signature_fit,

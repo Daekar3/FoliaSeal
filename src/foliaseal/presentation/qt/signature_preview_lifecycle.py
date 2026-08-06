@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.signing_preview_renderer import (
     CanonicalSignaturePreviewSnapshot,
     render_canonical_signature_preview,

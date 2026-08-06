@@ -10,7 +10,7 @@ from foliaseal.application.document_review_workspace import (
     DocumentReviewWorkspaceSession,
     DocumentReviewWorkspaceTransition,
 )
-from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
 )

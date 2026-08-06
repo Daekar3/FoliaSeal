@@ -50,9 +50,10 @@ not a permanent alias; any retained reader must have a dated retirement criterio
 
 ## Current inventory and replacement mapping (2026-08-06)
 
-The live checkout contains `phase3` references in 32 source files, 30 test/fixture files, 3 scripts,
-the README, and 162 documentation files (the documentation count includes historical ExecPlans and
-archival evidence). The inventory is intentionally recorded before any rename:
+The live checkout inventory on 2026-08-06 contains `phase3` in `106` tracked path names and in
+`254` tracked files when content is searched case-insensitively (about `6,570` broad occurrences,
+excluding this plan itself). The count includes historical ExecPlans and archival evidence; it is
+intentionally recorded before any rename:
 
 | Occurrence class | Current examples | Replacement decision |
 |---|---|---|
@@ -117,8 +118,8 @@ an unbounded compatibility layer.
   as a neutral internal evidence module. Its durable `PreviewEvidenceFrame` and projection names
   do not carry `phase3`; the neighboring `phase3_preview_render_capture.py` request/port names
   remain contract-coupled and are still scheduled for the atomic migration.
-- [x] Inventory and replacement mapping recorded on 2026-08-06 (32 source files, 30 test/fixture
-  files, 3 scripts, README, and 162 documentation files before excluding this plan).
+- [x] Inventory and replacement mapping refreshed on 2026-08-06 (`106` tracked path names, `254`
+  tracked files, and about `6,570` occurrences before excluding this plan).
 - [ ] Atomic rename/migration implemented.
 - [ ] Compatibility debris removed and validation completed.
 - [ ] Architecture/README/ExecPlans reconciled and committed.

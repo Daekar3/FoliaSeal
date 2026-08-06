@@ -7,7 +7,7 @@ from foliaseal.application.horizontal_signature_reservation import (
     build_horizontal_single_line_ink_reservation,
     measure_horizontal_single_line_rendered_reference,
 )
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureLayoutTemplate,

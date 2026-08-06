@@ -19,7 +19,7 @@ from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
-from foliaseal.application.signing_draft_workflow import SigningDraftValidationIssue
+from foliaseal.application.signing_draft_contracts import SigningDraftValidationIssue
 from foliaseal.domain.models import SignatureAppearance
 
 

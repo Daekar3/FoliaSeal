@@ -116,6 +116,8 @@ created.
 - [x] Completed scan round 17 with no convergent qualifying candidate; rounds 16 and 17 satisfy the
   two-consecutive below-threshold confirmation stop rule. The loop is paused with ranked future
   candidates recorded rather than inventing a child plan.
+- [x] Completed Scan Round 23 and three independent design reports plus two independent reviews for
+  the signing-draft contract boundary; selected Shape C and created its child ExecPlan.
 
 ## Scan and Candidate Ledger
 
@@ -1669,6 +1671,38 @@ the shared contract/fit cluster.
 Next-step recommendation: perform a three-shape design review for the neutral signing-draft contracts
 boundary before selecting the next child plan. Keep the current artifact child closed; do not reopen
 the stabilized signing-shell seam or piggyback phase3 nomenclature changes onto it.
+
+### Design Selection 24 — completed 2026-08-06
+
+Three independent design reports and two independent reviews evaluated the signing-draft contract
+boundary. Shape A is a data-only extraction of the six immutable DTO/error types into
+`application/signing_draft_contracts.py`, scoring `87.5` with no penalty. Shape B adds an explicit
+typed additive-evolution policy and temporary identity bridge, scoring `86.6`; it would incur the
+fixed compatibility penalty if the bridge lacked a grep-based retirement gate. Shape C is the
+common-caller optimized design: it uses the same neutral module, migrates every application,
+presentation, and test consumer, splits package lazy exports, removes the workflow aliases after the
+grep gate, and replaces the method-local workflow-to-semantics import with a safe module-level edge.
+Its reviewed score is `91.8` using medians `(4.2, 4.7, 4.7, 4.8, 4.8, 4.5, 4.9)` and no penalties.
+
+Shape C is selected as a standalone design rather than a hybrid, so the five-point hybrid rule is not
+applicable. Its advantage is lower caller coordination and removal of the cycle workaround, not a new
+service or generic extension surface. The child plan is
+`docs/ExecPlans/signing_draft_contract_boundary_execplan.md`, with baseline `215b37818`, exact DTO
+signatures, import-firewall gates, full caller migration, and immutable Phase 3/CLI/JSON behavior.
+
+### Implementation 25 — in progress, 2026-08-06
+
+The child implementation has completed its source migration and final validation pass but is awaiting
+the intentional commit. `src/foliaseal/application/signing_draft_contracts.py` now owns the six
+immutable contracts; 15 production and 8 test consumers import them directly; the package lazy map
+points to the new module; and `signing_draft_workflow.py` keeps mutable state/request construction
+without exposing compatibility aliases. The semantics module no longer imports the workflow, and the
+workflow's method-local semantics import was removed. Full validation is `1,108 passed, 1 warning`;
+offscreen evidence is signed acceptance `10/7`, preview parity `18/18`, and fit rejection `3/3`.
+The contracts firewall is free of workflow, backend, Qt, Pillow, and PyHanko; semantics remains free of
+workflow, backend, and Qt while retaining its characterized PyHanko transitive import through
+`sign_pdf_use_case`. Independent reviews found no unresolved critical or major findings after alias
+retirement and documentation correction.
 
 ## Context and Orientation
 

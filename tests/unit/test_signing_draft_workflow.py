@@ -11,11 +11,11 @@ from cryptography.x509.oid import NameOID
 from foliaseal.application.certificate_preview import CertificatePreviewValues
 from foliaseal.application.coordinate_transform import PageBox, ViewRect, ViewTransform
 from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
-from foliaseal.application.signing_draft_workflow import (
+from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftValidationError,
-    SigningDraftWorkflow,
 )
+from foliaseal.application.signing_draft_workflow import SigningDraftWorkflow
 from foliaseal.application.signing_material_resolver import SigningMaterial
 from foliaseal.domain.models import (
     SignatureAppearance,

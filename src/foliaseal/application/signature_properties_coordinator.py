@@ -34,10 +34,12 @@ from foliaseal.application.reusable_signing_objects import (
     SavePlacement,
     SavePreset,
 )
-from foliaseal.application.signing_draft_workflow import (
+from foliaseal.application.signing_draft_contracts import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
+)
+from foliaseal.application.signing_draft_workflow import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.signing_material_resolver import (

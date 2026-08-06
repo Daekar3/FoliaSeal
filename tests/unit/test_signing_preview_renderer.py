@@ -12,11 +12,11 @@ from foliaseal.application.phase3_signing_backend import (
     _visible_signature_fit_issues_for_stamp_text,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
-from foliaseal.application.signing_draft_workflow import (
+from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftPreview,
-    SigningDraftWorkflow,
 )
+from foliaseal.application.signing_draft_workflow import SigningDraftWorkflow
 from foliaseal.application.signing_preview_renderer import (
     SignatureAppearanceSnapshot,
     _canonical_preview_layout,

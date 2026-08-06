@@ -37,7 +37,7 @@ from foliaseal.application.sign_pdf_use_case import (
 from foliaseal.application.signature_text_measurement import (
     SignatureTextBoxEngine,
 )
-from foliaseal.application.signing_draft_workflow import (
+from foliaseal.application.signing_draft_contracts import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,

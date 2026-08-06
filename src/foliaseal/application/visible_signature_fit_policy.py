@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from foliaseal.application.signing_draft_workflow import SigningDraftValidationIssue
+from foliaseal.application.signing_draft_contracts import SigningDraftValidationIssue
 from foliaseal.application.visible_signature_layout import VisibleSignaturePreparation
 
 

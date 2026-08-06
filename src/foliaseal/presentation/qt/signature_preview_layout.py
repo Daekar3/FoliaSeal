@@ -11,7 +11,7 @@ from foliaseal.application.signature_font_registry import (
     bundled_font_root,
     resolve_signature_font_face,
 )
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.visible_signature_layout import (
     ImageMetrics,
     LayoutRequest,

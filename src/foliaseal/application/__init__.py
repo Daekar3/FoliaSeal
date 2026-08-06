@@ -98,10 +98,10 @@ _EXPORT_MODULES = {
             "SigningDraftValidationError",
             "SigningDraftValidationIssue",
             "SigningDraftValidationSeverity",
-            "SigningDraftWorkflow",
         ),
-        "signing_draft_workflow",
+        "signing_draft_contracts",
     ),
+    "SigningDraftWorkflow": "signing_draft_workflow",
     **dict.fromkeys(
         (
             "CanonicalSignaturePreviewSnapshot",

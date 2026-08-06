@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
-from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect
 

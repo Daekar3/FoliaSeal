@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
-from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.domain.models import SignatureRect, SigningResult
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
     SigningWorkspaceSnapshot,

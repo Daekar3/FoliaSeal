@@ -12,7 +12,7 @@ from foliaseal.application.preview_render_boundary import (
     RenderedInkMeasurementPort,
     RenderedInkMeasurementRequest,
 )
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.domain.models import SignatureLayoutTemplate, SignatureRect, SignatureStampPosition
 
 

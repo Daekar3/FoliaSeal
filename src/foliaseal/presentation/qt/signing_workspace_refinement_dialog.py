@@ -11,7 +11,7 @@ from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesViewState,
     VisibleSignatureSetupDraft,
 )
-from foliaseal.application.signing_draft_workflow import SigningDraftValidationIssue
+from foliaseal.application.signing_draft_contracts import SigningDraftValidationIssue
 from foliaseal.application.signing_setup_session import SigningSetupSession
 from foliaseal.presentation.qt.visible_signature_setup_form import QtVisibleSignatureSetupForm
 

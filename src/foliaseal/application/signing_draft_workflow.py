@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
 from pathlib import Path
 from typing import Self
 
+from foliaseal.application import signing_draft_contracts as _contracts
 from foliaseal.application.certificate_models import CertificateConfiguration
 from foliaseal.application.certificate_preview import (
     CertificatePreviewReader,
     Pkcs12CertificatePreviewReader,
 )
 from foliaseal.application.coordinate_transform import (
-    PageBox,
     PdfRect,
     ViewRect,
     ViewTransform,
@@ -23,106 +22,32 @@ from foliaseal.application.coordinate_transform import (
 )
 from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
 from foliaseal.application.signing_material_resolver import SigningMaterial
+from foliaseal.application.visible_signature_semantics import (
+    CertificateFieldValues,
+    VisibleSignatureFitRequest,
+    VisibleSignatureSemanticsRequest,
+    VisibleSignatureSemanticsService,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
-    SignatureBoxStyle,
     SignatureFieldKey,
-    SignatureFieldSource,
-    SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureRect,
-    SignatureStampPosition,
-    SignatureTextStyle,
     SignatureTimezoneDisplayMode,
     SigningRequest,
     TimestampTrustPolicy,
 )
 
 
-class SigningDraftValidationError(ValueError):
-    """Raised when the signing draft cannot be converted into a final request."""
-
-    def __init__(self, issues: tuple[SigningDraftValidationIssue, ...]) -> None:
-        self.issues = issues
-        message = "; ".join(issue.message for issue in issues) if issues else "Invalid draft."
-        super().__init__(message)
-
-
-class SigningDraftValidationSeverity(str, Enum):  # noqa: UP042
-    """Severity levels for signing draft validation."""
-
-    ERROR = "error"
-    WARNING = "warning"
-
-
-@dataclass(frozen=True)
-class SigningDraftValidationIssue:
-    """A single validation problem surfaced to the UI."""
-
-    code: str
-    message: str
-    field_name: str | None = None
-    severity: SigningDraftValidationSeverity = SigningDraftValidationSeverity.ERROR
-
-
-@dataclass(frozen=True)
-class SignaturePlacementContext:
-    """Page geometry and rotation used for placement validation."""
-
-    page_index: int
-    page_box: PageBox
-    rotation: int = 0
-
-    def __post_init__(self) -> None:
-        if isinstance(self.page_index, bool) or self.page_index < 0:
-            raise ValueError("page_index must be zero or greater.")
-        if self.rotation % 90 != 0:
-            raise ValueError("rotation must be a multiple of 90 degrees.")
-        self.page_box.validate()
-
-
-@dataclass(frozen=True)
-class SigningDraftPreviewField:
-    """Normalized preview line for one visible signature field."""
-
-    field_key: SignatureFieldKey
-    label: str
-    text: str
-    visible: bool
-    source: SignatureFieldSource
-    hint: str | None = None
-
-
-@dataclass(frozen=True)
-class SigningDraftPreview:
-    """Normalized preview payload for the UI layer."""
-
-    title: str
-    page_index: int | None
-    signature_rect: SignatureRect | None
-    signer_label_prefix: str | None
-    layout_template: SignatureLayoutTemplate | None
-    stamp_position: SignatureStampPosition | None
-    timezone_display_mode: SignatureTimezoneDisplayMode | None
-    show_field_names: bool
-    datetime_format: str | None
-    text_style: SignatureTextStyle | None
-    box_style: SignatureBoxStyle | None
-    image_stamp_path: str | None
-    fields: tuple[SigningDraftPreviewField, ...]
-    detail_text: str
-    issues: tuple[SigningDraftValidationIssue, ...]
-    can_submit: bool
-    stamp_text: str | None = None
-
-
 def _issue(
     code: str,
     message: str,
     field_name: str | None = None,
-    severity: SigningDraftValidationSeverity = SigningDraftValidationSeverity.ERROR,
-) -> SigningDraftValidationIssue:
-    return SigningDraftValidationIssue(
+    severity: _contracts.SigningDraftValidationSeverity = (
+        _contracts.SigningDraftValidationSeverity.ERROR
+    ),
+) -> _contracts.SigningDraftValidationIssue:
+    return _contracts.SigningDraftValidationIssue(
         code=code,
         message=message,
         field_name=field_name,
@@ -149,7 +74,7 @@ class SigningDraftWorkflow:
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
     signature_placement_defaults: SignaturePlacementDefaults | None = None
-    placement_context: SignaturePlacementContext | None = None
+    placement_context: _contracts.SignaturePlacementContext | None = None
     certificate_preview_reader: CertificatePreviewReader = field(
         default_factory=Pkcs12CertificatePreviewReader,
         repr=False,
@@ -168,7 +93,7 @@ class SigningDraftWorkflow:
         cls,
         request: SigningRequest,
         *,
-        placement_context: SignaturePlacementContext | None = None,
+        placement_context: _contracts.SignaturePlacementContext | None = None,
     ) -> Self:
         """Create a draft workflow seeded from an existing signing request."""
         workflow = cls(
@@ -199,7 +124,7 @@ class SigningDraftWorkflow:
         """Return the current visible-signature appearance draft value."""
         return self.signature_appearance
 
-    def set_placement_context(self, context: SignaturePlacementContext | None) -> None:
+    def set_placement_context(self, context: _contracts.SignaturePlacementContext | None) -> None:
         """Store the current page geometry used for placement validation."""
         self.placement_context = context
 
@@ -384,7 +309,7 @@ class SigningDraftWorkflow:
         self._certificate_preview_available = False
         self._invalidate_preview_snapshot()
 
-    def validation_issues(self) -> tuple[SigningDraftValidationIssue, ...]:
+    def validation_issues(self) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
         """Return blocking and non-blocking problems for the current draft."""
         semantics = self._resolve_visible_signature_semantics()
         return self._validation_issues_for_semantics(semantics)
@@ -392,8 +317,8 @@ class SigningDraftWorkflow:
     def _validation_issues_for_semantics(
         self,
         semantics,
-    ) -> tuple[SigningDraftValidationIssue, ...]:
-        issues: list[SigningDraftValidationIssue] = []
+    ) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
+        issues: list[_contracts.SigningDraftValidationIssue] = []
         if self.signature_rect is None:
             issues.append(
                 _issue(
@@ -421,17 +346,17 @@ class SigningDraftWorkflow:
     def can_build_request(self) -> bool:
         """Return whether the current draft is ready for signing."""
         return not any(
-            issue.severity == SigningDraftValidationSeverity.ERROR
+            issue.severity == _contracts.SigningDraftValidationSeverity.ERROR
             for issue in self.validation_issues()
         )
 
-    def preview(self) -> SigningDraftPreview:
+    def preview(self) -> _contracts.SigningDraftPreview:
         """Return a normalized, UI-friendly preview payload."""
         appearance = self.signature_appearance
         semantics = self._resolve_visible_signature_semantics(capture_signing_time=True)
         issues = self._validation_issues_for_semantics(semantics)
         fields = tuple(
-            SigningDraftPreviewField(
+            _contracts.SigningDraftPreviewField(
                 field_key=field.field_key,
                 label=field.label,
                 text=field.text,
@@ -444,7 +369,7 @@ class SigningDraftWorkflow:
         detail_text = ""
         if appearance is not None:
             detail_text = semantics.text.detail_text
-        return SigningDraftPreview(
+        return _contracts.SigningDraftPreview(
             title=appearance.signer_label_prefix if appearance else "Signature draft",
             page_index=self.signature_rect.page_index if self.signature_rect else None,
             signature_rect=self.signature_rect,
@@ -461,7 +386,8 @@ class SigningDraftWorkflow:
             detail_text=detail_text,
             issues=issues,
             can_submit=not any(
-                issue.severity == SigningDraftValidationSeverity.ERROR for issue in issues
+                issue.severity == _contracts.SigningDraftValidationSeverity.ERROR
+                for issue in issues
             ),
             stamp_text=semantics.text.stamp_text,
         )
@@ -470,10 +396,10 @@ class SigningDraftWorkflow:
         """Build the final signing request or raise with validation issues."""
         issues = self.validation_issues()
         if any(
-            issue.severity == SigningDraftValidationSeverity.ERROR
+            issue.severity == _contracts.SigningDraftValidationSeverity.ERROR
             for issue in issues
         ):
-            raise SigningDraftValidationError(issues)
+            raise _contracts.SigningDraftValidationError(issues)
 
         return SigningRequest(
             input_pdf_path=self.input_pdf_path,
@@ -519,12 +445,12 @@ class SigningDraftWorkflow:
         self._certificate_preview_available = preview_values.available
         return self._certificate_preview_values
 
-    def _validate_signature_rect(self) -> tuple[SigningDraftValidationIssue, ...]:
+    def _validate_signature_rect(self) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
         rect = self.signature_rect
         if rect is None:
             return ()
 
-        issues: list[SigningDraftValidationIssue] = []
+        issues: list[_contracts.SigningDraftValidationIssue] = []
         context = self.placement_context
         if context is None:
             issues.append(
@@ -532,7 +458,7 @@ class SigningDraftWorkflow:
                     "signature_rect_geometry_unavailable",
                     "Signature placement geometry is unavailable; bounds cannot be verified yet.",
                     field_name="signature_rect",
-                    severity=SigningDraftValidationSeverity.WARNING,
+                    severity=_contracts.SigningDraftValidationSeverity.WARNING,
                 )
             )
             return tuple(issues)
@@ -564,12 +490,12 @@ class SigningDraftWorkflow:
 
         return tuple(issues)
 
-    def _require_placement_context(self) -> SignaturePlacementContext:
+    def _require_placement_context(self) -> _contracts.SignaturePlacementContext:
         if self.placement_context is None:
             raise ValueError("A placement context is required before converting selections.")
         return self.placement_context
 
-    def _validate_visible_signature_fit(self) -> tuple[SigningDraftValidationIssue, ...]:
+    def _validate_visible_signature_fit(self) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
         return self._resolve_visible_signature_semantics().issues
 
     def _resolve_visible_signature_semantics(
@@ -578,13 +504,6 @@ class SigningDraftWorkflow:
         signing_time: datetime | None = None,
         capture_signing_time: bool = False,
     ):
-        from foliaseal.application.visible_signature_semantics import (
-            CertificateFieldValues,
-            VisibleSignatureFitRequest,
-            VisibleSignatureSemanticsRequest,
-            VisibleSignatureSemanticsService,
-        )
-
         workflow = self
 
         class _WorkflowSigningClock:
@@ -618,7 +537,7 @@ class SigningDraftWorkflow:
             def validate(
                 self,
                 request: VisibleSignatureFitRequest,
-            ) -> tuple[SigningDraftValidationIssue, ...]:
+            ) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
                 if not Path(workflow.certificate_path).exists():
                     return ()
                 from foliaseal.application.phase3_signing_backend import (

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from foliaseal.application.signing_draft_workflow import (
+from foliaseal.application.signing_draft_contracts import (
     SigningDraftValidationIssue,
 )
 from foliaseal.application.visible_signature_semantics import (

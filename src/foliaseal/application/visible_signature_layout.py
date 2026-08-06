@@ -18,7 +18,7 @@ from foliaseal.application.horizontal_signature_reservation import (
     HorizontalSingleLineInkReservation,
     build_horizontal_single_line_ink_reservation,
 )
-from foliaseal.application.signing_draft_workflow import SigningDraftValidationSeverity
+from foliaseal.application.signing_draft_contracts import SigningDraftValidationSeverity
 from foliaseal.application.visible_signature_color import text_style_color_rgba
 from foliaseal.domain.models import (
     SignatureBoxStyle,

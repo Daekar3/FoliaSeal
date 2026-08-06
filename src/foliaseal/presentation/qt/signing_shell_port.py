@@ -10,7 +10,7 @@ from typing import Any, Protocol
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import DocumentReviewSummary
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect, SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore

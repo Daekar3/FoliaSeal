@@ -11,7 +11,7 @@ from foliaseal.application.sign_pdf_use_case import (
     SigningBackendAppearance,
     SigningBackendFieldBinding,
 )
-from foliaseal.application.signing_draft_workflow import (
+from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,

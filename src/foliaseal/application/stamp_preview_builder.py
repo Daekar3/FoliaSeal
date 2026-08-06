@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
-from foliaseal.application.signing_draft_workflow import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.domain.models import SignatureRect
 
 

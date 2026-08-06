@@ -10,7 +10,7 @@ from foliaseal.application.document_review_workspace import (
 )
 from foliaseal.application.document_text_search import DocumentTextSearchState
 from foliaseal.application.document_text_selection import DocumentTextSelectionState
-from foliaseal.application.signing_draft_workflow import SignaturePlacementContext
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.application.workspace_interaction_session import (
     ApplyPlacementContext,
     ApplyReviewTransition,
