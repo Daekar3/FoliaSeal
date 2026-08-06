@@ -1959,8 +1959,8 @@ quarantines changes, and recovers both sides on failure. The in-memory adapter m
 with an isolated filename-to-bytes map. `CertificateSecretStoreError` is application-owned and
 `SecretStorageError` remains only as its infrastructure subclass. Broken-symlink export, missing-
 file/delete parity, partial-secret-delete compensation, rollback, no-path fakes, and import
-isolation are covered by tests. Resolver path properties remain only for the existing material
-resolver seam, and no phase3 nomenclature/path/CLI/JSON/fixture/artifact was changed.
+isolation are covered by tests. Managed-material location now belongs to repository adapters, and
+no phase3 nomenclature/path/CLI/JSON/fixture/artifact was changed.
 
 Focused boundary validation passes (`38` tests); the full suite passes (`1127` tests, one pre-
 existing Pillow deprecation warning). Ruff, compileall, CLI help, and `git diff --check` pass.
@@ -2070,7 +2070,7 @@ then composes the common-caller port from that repository and the secret-provide
 change, or CLI change is allowed through the port. The child plan is
 `docs/ExecPlans/managed_material_resolution_boundary_execplan.md`.
 
-### Implementation 41 — validation complete, closure pending — 2026-08-06
+### Implementation 41 — committed and rescanned — 2026-08-06
 
 The managed-material resolution slice is implemented. `CertificateCatalogRepository` now exposes
 one adapter-owned `material_for(ManagedCertificate)` capability returning an application-owned
@@ -2094,8 +2094,24 @@ Conservative repeated proxies are navigation `.45`, change amplification `.45`, 
 `.50`, boundary-test improvement `.60`, interface compression `.50`, cohesion `.45`, and isolation
 `.65`, for weighted Actual Improvement approximately `.53` versus predicted `.48`; no component
 regressed below `-.10`. The independent compliance review found and the implementation corrected
-one exact error-message drift; no critical/major finding remains. Documentation reconciliation,
-intentional commit, and the fresh three-explorer post-commit rescan remain closure gates.
+one exact error-message drift; no critical/major finding remains. Documentation reconciliation is
+complete, and the implementation is committed as `a8590c0ce` (`Introduce managed material resolution
+boundary`) with a clean worktree.
+
+### Scan Round 42 — completed after commit `a8590c0ce`
+
+Three fresh independent explorers reviewed the clean committed checkout. They converged that the
+managed-material boundary is closed: the removed path-taking resolver has no live source callers,
+the application/Qt graph uses `CertificateSigningMaterialPort`, and concrete path construction and
+existence checks remain in repository adapters. `docs/SPEC.md` is unchanged, no phase3 source or
+external contract changed, and no product process or generated evidence summary remains.
+
+The next ranked non-phase3 seam is the coordinator's fallback construction of an in-memory repository
+with `default_certificate_managed_dir()` (`signature_properties_coordinator.py:261-268`), which is
+fallback/test composition rather than a live resolution leak. Secondary opportunities are collapsing
+the coordinator's dual catalog/store inputs and making material resolution snapshot-aware to avoid a
+small catalog reload/TOCTOU window. The phase3 nomenclature retirement remains the broader atomic
+contract migration and is not mixed into this slice. No blocker prevents accepting this cycle.
 
 ## Context and Orientation
 

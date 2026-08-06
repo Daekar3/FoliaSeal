@@ -62,8 +62,13 @@ coordinator with a fake one-method material port and a repository fake with no d
   fit rejection `3/3`; the generated summary was removed and the process audit is clean.
 - [x] (2026-08-06) Reconciled architecture/parent/child ownership text and recorded the compliance
   correction restoring the exact saved-password provider error message.
-- [ ] Commit implementation and ledger intentionally, then run the fresh three-explorer post-commit
-  rescan.
+- [x] (2026-08-06) Committed the implementation, tests, architecture documentation, and this plan as
+  `a8590c0ce` (`Introduce managed material resolution boundary`); the generated evidence summary is
+  absent and the worktree is clean.
+- [x] (2026-08-06) Completed three independent post-commit explorer scans. They found no source
+  regression or phase3 contract drift; the next ranked cleanup is the coordinator's fallback
+  `default_certificate_managed_dir()` construction, followed by catalog/store source-of-truth and
+  material snapshot review. Those are separate future slices; phase3 retirement remains atomic.
 
 ## Surprises & Discoveries
 
@@ -136,8 +141,8 @@ store or secret-provider resolution plumbing. Boundary tests cover both adapters
 messages, saved/manual/blank/missing secret paths, aliases, dangling/unknown records, and no-path
 fakes. Focused validation is `218` tests and the full suite is `1136` tests with one pre-existing
 Pillow warning. Offscreen evidence is `10/7`, `18/18`, and `3/3`; SPEC is unchanged and cleanup is
-clean. Architecture and parent/child plan reconciliation is complete; intentional commit and
-post-commit rescan remain pending. Repeated proxies moved from three non-infrastructure path-ref
+clean. Architecture and parent/child plan reconciliation is complete; commit `a8590c0ce` and the
+three-explorer post-commit rescan are complete. Repeated proxies moved from three non-infrastructure path-ref
 modules and 16 resolver/path references to zero path-resolution references in the coordinator/Qt
 graph, while boundary-test coverage grew from 27 path/resolver assertions to 30 material-boundary
 assertion sites. Conservative component measurements are navigation `.45`, change amplification
