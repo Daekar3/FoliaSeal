@@ -936,6 +936,29 @@ changing the fixed five-cycle cap. The next loop action is a fresh three-explore
 nomenclature retirement remains a separate atomic plan because public CLI/DTO/JSON/fixture/artifact
 contracts are still frozen.
 
+### Post-cap continuation scan 9 — completed after `87fa47f6a`
+
+Three independent explorers reviewed the clean post-preview-capture checkout. The strongest SPEC-risk
+candidate is the single-line signer-label/title-band reservation gap in
+`src/foliaseal/application/phase3_signing_backend.py`: the preview has a dedicated signer-label row,
+but dense real-field sets can still budget the label inside the body and report
+`visible_signature_layout_unavailable`, risking a WYSIWYG mismatch. Independent SPEC-focused scoring
+gave this candidate Priority approximately `78` at confidence `0.96`; the other scans corroborated
+the signing-backend policy/adaptor concentration as a high-impact bounded seam (approximately
+`63–70` depending on whether the wider extraction is scored).
+
+Other credible candidates were evidence-runner factory dependence on private `phase3_harness.py`
+helpers (~68–72), residual harness snapshot-formatting projection (~65), narrow refinement-dialog
+compatibility cleanup (~60), and the atomic phase3 nomenclature migration (~69 but contract-blocked).
+The scenario-policy, preview-capture, workspace, event-pump, and capture-service seams are already
+extracted. Public phase3 CLI/DTO/JSON/fixture/artifact contracts remain frozen, and the nomenclature
+plan stays deferred until a versioned atomic migration is authorized.
+
+The next design round must focus on one title-band/visible-ink reservation boundary, preserve
+`PreparedSigningPlan`/`BackendReservationEvidence` and intentional fit-rejection semantics, and keep
+the change to one complete implementation slice. No new child plan is selected until the independent
+design review records the minimal, flexible, and common-caller shapes.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

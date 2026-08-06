@@ -133,4 +133,5 @@ second live capture implementation for compatibility.
   testability `0.40`, interface compression `0.30`, cohesion `0.45`, and behavioral-uncertainty
   reduction `0.30`; `Actual Improvement = 0.37` versus predicted `0.37`, with no component
   regression below `-0.10`.
-- [ ] Committed on `main`; fresh three-explorer rescan remains the next loop step.
+- [x] (2026-08-06) Committed on `main` as `87fa47f6a`; the fresh three-explorer rescan is recorded
+  in the parent ledger and this child is closed.
