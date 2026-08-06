@@ -1793,7 +1793,7 @@ Qt/PDF capture and JSON builders; reporting keeps Markdown wording; Phase 3 name
 contracts remain unchanged. No generic manager, filesystem, Qt, Pillow, or PyHanko dependency is
 allowed. The child plan is `docs/ExecPlans/evidence_snapshot_projection_boundary_execplan.md`.
 
-### Implementation 31 — in progress, 2026-08-06
+### Implementation 31 — completed 2026-08-06
 
 The selected typed projection is implemented and passing validation, pending documentation and
 intentional commit. New `evidence_snapshot_projection.py` owns immutable semantic views and modern-
@@ -1803,6 +1803,8 @@ wording remain in their original owners. Focused projection/harness/reporting te
 the full suite passes (`1,115 passed, 1 warning`). The SPEC remains unchanged. The measured source
 diff removes approximately `272` lines of duplicated projection logic; conservative predicted/actual
 component measurements will be finalized in the child outcome after offscreen evidence and cleanup.
+Commit `4916fa839` (`Centralize evidence snapshot projection`) contains the seven intentional source,
+test, architecture, and plan files; the worktree is clean after commit.
 
 ## Context and Orientation
 

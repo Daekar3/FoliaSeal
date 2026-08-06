@@ -112,4 +112,6 @@ projections and restore only the smallest adapter until parity is proven.
   `.70`, seam reduction `.65`, boundary-test improvement `.70`, interface compression `.55`, and
   boundary isolation `.85`, for weighted Actual Improvement approximately `.62` versus predicted
   `.55`; no component regression exceeded `-.10` and no critical/major finding remains.
-- [ ] Intentional commit and final parent ledger closure.
+- [x] (2026-08-06) Committed as `4916fa839` (`Centralize evidence snapshot projection`); the
+  post-commit worktree is clean.
+- [ ] Fresh post-commit scan and final parent ledger closure.
