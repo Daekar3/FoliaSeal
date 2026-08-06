@@ -29,7 +29,10 @@ the old workspace and its actions unchanged.
   of scope; compliance review and commit closure remain.
 - [x] (2026-08-06) Offscreen evidence reports signed acceptance `10/7`, preview parity `18/18`, and
   fit rejection `3/3`; generated summary removed, SPEC diff empty, and no product processes remain.
-- [ ] Commit closure and fresh post-commit explorer rescan.
+- [x] (2026-08-06) Committed as `905d42703` (`Centralize app-frame workspace action state`) with
+  seven intentional files; worktree was clean after commit.
+- [x] (2026-08-06) Fresh three-explorer post-commit scan completed; the next certificate repository
+  boundary is recorded in the parent ledger and phase3 nomenclature remains separate.
 
 ## Progress
 
@@ -93,7 +96,8 @@ Architecture documentation was reconciled to record projection policy versus QAc
 ownership and the unchanged host lifecycle. Offscreen acceptance evidence passed signed acceptance
 `10/7`, preview parity `18/18`, and fit rejection `3/3`; the generated summary was removed, the
 SPEC diff is empty, and the process audit found no FoliaSeal/Python/Qt process. Intentional commit
-closure and the fresh post-commit explorer rescan remain.
+closure and the fresh post-commit explorer rescan completed in commit `905d42703`; the next
+certificate repository-boundary child is a separate plan candidate.
 
 ## Context and Orientation
 

@@ -1849,7 +1849,7 @@ mount succeed. No lifecycle manager, shell-port change, compatibility-surface re
 nomenclature rename belongs in this slice. The child plan is
 `docs/ExecPlans/app_frame_action_state_boundary_execplan.md`.
 
-### Implementation 34 — in progress 2026-08-06
+### Implementation 34 — completed 2026-08-06
 
 The app-frame slice now has a Qt-free frozen `WorkspaceActionState` projection with pure closed,
 open, and selection-result constructors. `FoliaSealAppFrame` applies one state record to the four
@@ -1866,8 +1866,29 @@ Architecture documentation records the projection/QAction/lifecycle ownership sp
 component measurements are navigation `.55`, change amplification `.55`, seam reduction `.60`,
 boundary-test improvement `.65`, interface compression `.55`, and isolation `.90`, for weighted
 Actual Improvement approximately `.60` versus predicted `.50`; no component regression exceeds
-`-.10`, and no critical/major finding remains. Worker documentation is complete; intentional commit
-and post-commit fresh scan remain.
+`-.10`, and no critical/major finding remains. Worker documentation is complete. Intentional commit
+`905d42703` (`Centralize app-frame workspace action state`) is clean, and the fresh three-explorer
+post-commit scan is recorded below.
+
+### Scan Round 35 — completed 2026-08-06
+
+Three independent explorers rescanned clean commit `905d42703`. Two reports converge on the same
+deep application/infra certificate boundary at Priority approximately `78–82`, confidence
+`.94–.96`: `application/certificate_manager.py` still imports `infra.secret_storage.SecretStorageError`
+and directly performs managed-file `mkdir`, `write_bytes`, `replace`, `unlink`, and rollback
+sequencing through repository path properties. This combines certificate policy, secret lifecycle,
+filesystem transactions, and recovery in the application manager even though
+`CertificateCatalogRepository` exists. The bounded next shape is an application-owned secret
+error/protocol plus repository-level transactional file verbs, moving path mutation into the infra
+adapter while preserving operation results, catalog JSON, and GUI behavior.
+
+A second report independently identifies the remaining Qt-facing concrete `CertificateCatalogStore`
+annotations/default wiring across app-frame/workspace composition at Priority `72–75`, confidence
+`.91`; this is a follow-up to the deeper manager transaction boundary. A third report ranks a neutral
+viewer-render contract extraction at Priority `61–64`, confidence `.75–.85`. The phase3 nomenclature
+plan remains separate: its `106` path / `254` file / roughly `6,570` reference inventory spans public
+CLI, DTO, JSON, fixture, artifact, and historical contracts and requires one atomic versioned
+migration rather than a piecemeal rename.
 
 ## Context and Orientation
 
