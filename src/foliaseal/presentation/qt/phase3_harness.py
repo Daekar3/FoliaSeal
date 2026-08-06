@@ -18,8 +18,6 @@ from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.phase3_fidelity_contract import validate_release_fidelity_contract
 from foliaseal.application.phase3_signing_backend import (
-    _effective_layout_edge_margin,
-    _single_line_vertical_outer_margin,
     build_backend_reservation_evidence,
     build_phase3_signing_executor,
 )
@@ -34,6 +32,7 @@ from foliaseal.application.signing_preview_renderer import (
 from foliaseal.application.visible_signature_layout import (
     LayoutRequest,
     VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutPolicy,
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -1119,17 +1118,18 @@ def _preview_padding_for_capture(preview: Any) -> int:
         and preview.layout_template == SignatureLayoutTemplate.SINGLE_LINE
         and preview.stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}
     ):
-        return _single_line_vertical_outer_margin(
-            box_height=max(1, int(round(preview.signature_rect.height_pt))),
+        return VisibleSignatureLayoutPolicy.margins(
+            stamp_position=SignatureStampPosition.TOP,
+            box_height_pt=max(1, int(round(preview.signature_rect.height_pt))),
             box_style=preview.box_style,
-        )
+        ).top
     if preview.signature_rect is None or preview.stamp_position is None:
         return 6
-    return _effective_layout_edge_margin(
+    return VisibleSignatureLayoutPolicy.margins(
         stamp_position=preview.stamp_position,
-        box_height=max(1, int(round(preview.signature_rect.height_pt))),
+        box_height_pt=max(1, int(round(preview.signature_rect.height_pt))),
         box_style=preview.box_style,
-    )
+    ).top
 
 
 def _write_widget_capture_png(widget: Any, output_path: str) -> str | None:

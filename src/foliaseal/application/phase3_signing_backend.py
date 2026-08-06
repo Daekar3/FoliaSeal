@@ -7,7 +7,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from io import BytesIO
-from math import ceil
 from pathlib import Path
 from typing import Any
 
@@ -62,14 +61,13 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     RectBounds,
     SignatureLayoutPlan,
+    SignatureLayoutReservation,
     VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutPolicy,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
     VisibleSignaturePreparation,
-    _ensure_layout_can_fit,
     _horizontal_multi_line_rendered_layout_fits_reservation,
-    _layout_reservation_for_template,
-    _SignatureLayoutReservation,
     _single_line_rendered_ink_fits_reservation,
 )
 from foliaseal.application.visible_signature_semantics import (
@@ -85,7 +83,6 @@ from foliaseal.domain.errors import (
     TsaUnavailableError,
 )
 from foliaseal.domain.models import (
-    SignatureBoxStyle,
     SignatureFieldKey,
     SignatureLayoutTemplate,
     SignatureRect,
@@ -625,98 +622,6 @@ def _rect_bounds_from_mapping(bounds: dict[str, int]) -> RectBounds:
     )
 
 
-def _base_layout_spacing(
-    *,
-    stamp_position: SignatureStampPosition,
-    box_height: int,
-) -> tuple[int, int]:
-    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
-        edge_margin = max(2, min(4, int(round(box_height * 0.08))))
-        gap = max(1, min(6, int(round(box_height * 0.14)) - 2))
-        return edge_margin, gap
-    return 4, 6
-
-
-def _border_safe_inset(box_style: SignatureBoxStyle | None) -> int:
-    if box_style is None or not box_style.show_border:
-        return 0
-    return max(0, int(ceil(box_style.border_width_pt / 2.0)) + 1)
-
-
-def _effective_layout_edge_margin(
-    *,
-    stamp_position: SignatureStampPosition,
-    box_height: int,
-    box_style: SignatureBoxStyle | None,
-) -> int:
-    base_edge_margin, _gap = _base_layout_spacing(
-        stamp_position=stamp_position,
-        box_height=box_height,
-    )
-    return max(base_edge_margin, _border_safe_inset(box_style))
-
-
-def _single_line_vertical_outer_margin(
-    *,
-    box_height: int,
-    box_style: SignatureBoxStyle | None,
-) -> int:
-    """Use the same border-aware outer inset for all vertical single-line content."""
-
-    return _effective_layout_edge_margin(
-        stamp_position=SignatureStampPosition.TOP,
-        box_height=box_height,
-        box_style=box_style,
-    )
-
-
-def _single_line_no_stamp_vertical_optical_shift(
-    *,
-    available_height: int,
-    text_box_height: int,
-    outer_margin: int,
-) -> int:
-    """Shift no-stamp single-line text upward within the reserved box.
-
-    The full signature box already belongs to text in this path, but the
-    rendered glyph ink sits low relative to the nominal text-box metrics.
-    Bound the correction by the existing outer inset so we improve visual
-    centering without inventing a new tolerance regime.
-    """
-
-    free_height = max(0, available_height - text_box_height)
-    return min(free_height, max(0, outer_margin))
-
-
-def _top_stamp_border_facing_inset(
-    *,
-    box_style: SignatureBoxStyle | None,
-) -> int:
-    """Reserve real top clearance for non-single-line top stamp content."""
-
-    if box_style is None or not box_style.show_border:
-        return 1
-    return max(1, min(2, int(round(max(box_style.border_width_pt, 1.0) / 2.0))))
-
-
-def _border_facing_stamp_inset(
-    *,
-    layout_template: SignatureLayoutTemplate,
-    stamp_position: SignatureStampPosition,
-    box_style: SignatureBoxStyle | None,
-) -> int:
-    if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        return 0
-    if stamp_position in {
-        SignatureStampPosition.LEFT,
-        SignatureStampPosition.TOP,
-        SignatureStampPosition.BOTTOM,
-        SignatureStampPosition.RIGHT,
-    }:
-        return _top_stamp_border_facing_inset(box_style=box_style)
-    return 0
-
-
 def _stamp_image_aspect_ratio(stamp_background: PdfImage | None) -> float | None:
     if stamp_background is None:
         return None
@@ -734,7 +639,7 @@ def _horizontal_single_line_ink_reservation_for_stamp_text(
     signature_rect: SignatureRect,
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
-    structural_reservation: _SignatureLayoutReservation,
+    structural_reservation: SignatureLayoutReservation,
     has_visible_stamp_image: bool,
 ) -> HorizontalSingleLineInkReservation | None:
     if (
@@ -756,9 +661,9 @@ def _horizontal_single_line_ink_reservation_for_stamp_text(
     if reference is None:
         return None
 
-    edge_margin = _effective_layout_edge_margin(
+    edge_margin = VisibleSignatureLayoutPolicy.effective_edge_margin(
         stamp_position=signature_appearance.stamp_position,
-        box_height=structural_reservation.container_height_pt,
+        box_height_pt=structural_reservation.container_height_pt,
         box_style=signature_appearance.box_style,
     )
     return build_horizontal_single_line_ink_reservation(
@@ -953,12 +858,12 @@ def _single_line_text_fits_reservation(
     )
     text_box_width = prepared_text.metrics.width_pt
     text_box_height = prepared_text.metrics.height_pt
-    reservation = _layout_reservation_for_template(
+    reservation = VisibleSignatureLayoutPolicy.reservation(
         appearance.layout_template,
         stamp_position=appearance.stamp_position,
         signature_rect=signature_rect,
-        text_box_width=text_box_width,
-        text_box_height=text_box_height,
+        text_box_width_pt=text_box_width,
+        text_box_height_pt=text_box_height,
         box_style=appearance.box_style,
         has_visible_stamp_image=appearance.image_stamp_path is not None,
         stamp_aspect_ratio=_stamp_image_aspect_ratio(
@@ -968,25 +873,13 @@ def _single_line_text_fits_reservation(
         ),
     )
     try:
-        _ensure_layout_can_fit(
+        VisibleSignatureLayoutPolicy.ensure_fit(
             reservation,
             has_visible_stamp_image=appearance.image_stamp_path is not None,
         )
     except ValueError:
         return False
     return True
-
-
-def _effective_horizontal_text_reservation_width(
-    *,
-    layout_template: SignatureLayoutTemplate,
-    stamp_position: SignatureStampPosition,
-    text_box_width: int,
-) -> int:
-    del stamp_position
-    if layout_template != SignatureLayoutTemplate.SINGLE_LINE:
-        return text_box_width
-    return text_box_width
 
 
 def _subject_value(subject: dict[str, object], key: str) -> str | None:

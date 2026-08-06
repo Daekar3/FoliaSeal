@@ -170,7 +170,7 @@ def _layout_rule(
 
 
 @dataclass(frozen=True)
-class _SignatureLayoutReservation:
+class SignatureLayoutReservation:
     """Explicit split of reserved stamp and text space inside the rectangle."""
 
     layout_template: SignatureLayoutTemplate
@@ -188,16 +188,129 @@ class _SignatureLayoutReservation:
     inner_content_layout: LayoutRuleSpec
 
 
+@dataclass(frozen=True)
+class LayoutSpacing:
+    """Neutral spacing facts shared by layout, signing, and evidence callers."""
+
+    edge_margin_pt: int
+    separator_width_pt: int
+
+
+class VisibleSignatureLayoutPolicy:
+    """Stateless facade for the canonical visible-signature geometry policy."""
+
+    @staticmethod
+    def spacing(
+        *,
+        stamp_position: SignatureStampPosition,
+        box_height_pt: int,
+    ) -> LayoutSpacing:
+        if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
+            edge_margin = max(2, min(4, int(round(box_height_pt * 0.08))))
+            separator_width = max(1, min(6, int(round(box_height_pt * 0.14)) - 2))
+            return LayoutSpacing(edge_margin, separator_width)
+        return LayoutSpacing(edge_margin_pt=4, separator_width_pt=6)
+
+    @staticmethod
+    def border_safe_inset(*, box_style: SignatureBoxStyle | None) -> int:
+        if box_style is None or not box_style.show_border:
+            return 0
+        return max(0, int(ceil(box_style.border_width_pt / 2.0)) + 1)
+
+    @classmethod
+    def effective_edge_margin(
+        cls,
+        *,
+        stamp_position: SignatureStampPosition,
+        box_height_pt: int,
+        box_style: SignatureBoxStyle | None,
+    ) -> int:
+        spacing = cls.spacing(
+            stamp_position=stamp_position,
+            box_height_pt=box_height_pt,
+        )
+        return max(spacing.edge_margin_pt, cls.border_safe_inset(box_style=box_style))
+
+    @classmethod
+    def margins(
+        cls,
+        *,
+        stamp_position: SignatureStampPosition,
+        box_height_pt: int,
+        box_style: SignatureBoxStyle | None,
+    ) -> LayoutMargins:
+        edge_margin = cls.effective_edge_margin(
+            stamp_position=stamp_position,
+            box_height_pt=box_height_pt,
+            box_style=box_style,
+        )
+        return LayoutMargins(
+            left=edge_margin,
+            right=edge_margin,
+            top=edge_margin,
+            bottom=edge_margin,
+        )
+
+    @classmethod
+    def reservation(
+        cls,
+        layout_template: SignatureLayoutTemplate,
+        *,
+        stamp_position: SignatureStampPosition,
+        signature_rect: SignatureRect,
+        text_box_width_pt: int,
+        text_box_height_pt: int,
+        box_style: SignatureBoxStyle | None = None,
+        has_visible_stamp_image: bool = True,
+        stamp_aspect_ratio: float | None = None,
+    ) -> SignatureLayoutReservation:
+        return _layout_reservation_for_template(
+            layout_template,
+            stamp_position=stamp_position,
+            signature_rect=signature_rect,
+            text_box_width=text_box_width_pt,
+            text_box_height=text_box_height_pt,
+            box_style=box_style,
+            has_visible_stamp_image=has_visible_stamp_image,
+            stamp_aspect_ratio=stamp_aspect_ratio,
+        )
+
+    @staticmethod
+    def ensure_fit(
+        reservation: SignatureLayoutReservation,
+        *,
+        has_visible_stamp_image: bool = False,
+    ) -> None:
+        _ensure_layout_can_fit(
+            reservation,
+            has_visible_stamp_image=has_visible_stamp_image,
+        )
+
+    @staticmethod
+    def horizontal_text_reservation_width(
+        *,
+        layout_template: SignatureLayoutTemplate,
+        stamp_position: SignatureStampPosition,
+        text_box_width_pt: int,
+    ) -> int:
+        if layout_template == SignatureLayoutTemplate.SINGLE_LINE and stamp_position in {
+            SignatureStampPosition.LEFT,
+            SignatureStampPosition.RIGHT,
+        }:
+            return text_box_width_pt
+        return max(text_box_width_pt, int(round(text_box_width_pt * 0.95)))
+
+
 def _base_layout_spacing(
     *,
     stamp_position: SignatureStampPosition,
     box_height: int,
 ) -> tuple[int, int]:
-    if stamp_position in {SignatureStampPosition.TOP, SignatureStampPosition.BOTTOM}:
-        edge_margin = max(2, min(4, int(round(box_height * 0.08))))
-        gap = max(1, min(6, int(round(box_height * 0.14)) - 2))
-        return edge_margin, gap
-    return 4, 6
+    spacing = VisibleSignatureLayoutPolicy.spacing(
+        stamp_position=stamp_position,
+        box_height_pt=box_height,
+    )
+    return spacing.edge_margin_pt, spacing.separator_width_pt
 
 
 def _effective_layout_edge_margin(
@@ -206,11 +319,11 @@ def _effective_layout_edge_margin(
     box_height: int,
     box_style: SignatureBoxStyle | None,
 ) -> int:
-    base_edge_margin, _gap = _base_layout_spacing(
+    return VisibleSignatureLayoutPolicy.effective_edge_margin(
         stamp_position=stamp_position,
-        box_height=box_height,
+        box_height_pt=box_height,
+        box_style=box_style,
     )
-    return max(base_edge_margin, _border_safe_inset(box_style))
 
 
 def _single_line_vertical_outer_margin(
@@ -218,9 +331,9 @@ def _single_line_vertical_outer_margin(
     box_height: int,
     box_style: SignatureBoxStyle | None,
 ) -> int:
-    return _effective_layout_edge_margin(
+    return VisibleSignatureLayoutPolicy.effective_edge_margin(
         stamp_position=SignatureStampPosition.TOP,
-        box_height=box_height,
+        box_height_pt=box_height,
         box_style=box_style,
     )
 
@@ -241,12 +354,11 @@ def _effective_horizontal_text_reservation_width(
     stamp_position: SignatureStampPosition,
     text_box_width: int,
 ) -> int:
-    if layout_template == SignatureLayoutTemplate.SINGLE_LINE and stamp_position in {
-        SignatureStampPosition.LEFT,
-        SignatureStampPosition.RIGHT,
-    }:
-        return text_box_width
-    return max(text_box_width, int(round(text_box_width * 0.95)))
+    return VisibleSignatureLayoutPolicy.horizontal_text_reservation_width(
+        layout_template=layout_template,
+        stamp_position=stamp_position,
+        text_box_width_pt=text_box_width,
+    )
 
 
 def _layout_reservation_for_template(
@@ -259,7 +371,7 @@ def _layout_reservation_for_template(
     box_style: SignatureBoxStyle | None = None,
     has_visible_stamp_image: bool = True,
     stamp_aspect_ratio: float | None = None,
-) -> _SignatureLayoutReservation:
+) -> SignatureLayoutReservation:
     box_width = max(1, int(round(signature_rect.width_pt)))
     box_height = max(1, int(round(signature_rect.height_pt)))
     base_edge_margin, gap = _base_layout_spacing(
@@ -289,7 +401,7 @@ def _layout_reservation_for_template(
             top=max(0, vertical_margin - optical_shift),
             bottom=vertical_margin + optical_shift,
         )
-        return _SignatureLayoutReservation(
+        return SignatureLayoutReservation(
             layout_template=layout_template,
             stamp_position=stamp_position,
             container_width_pt=box_width,
@@ -366,7 +478,7 @@ def _layout_reservation_for_template(
             background_alignment = "ALIGN_MAX"
             text_alignment = "ALIGN_MIN"
 
-        return _SignatureLayoutReservation(
+        return SignatureLayoutReservation(
             layout_template=layout_template,
             stamp_position=stamp_position,
             container_width_pt=box_width,
@@ -461,7 +573,7 @@ def _layout_reservation_for_template(
             background_y_alignment = "ALIGN_MIN"
             text_y_alignment = "ALIGN_MAX"
 
-    return _SignatureLayoutReservation(
+    return SignatureLayoutReservation(
         layout_template=layout_template,
         stamp_position=stamp_position,
         container_width_pt=box_width,
@@ -1003,14 +1115,14 @@ def _layout_plan_fingerprint(layout_plan: SignatureLayoutPlan) -> tuple[object, 
 
 
 def _horizontal_single_line_ink_validation_reservation(
-    structural_reservation: _SignatureLayoutReservation,
+    structural_reservation: SignatureLayoutReservation,
     *,
     ink_reservation: HorizontalSingleLineInkReservation | None,
     signature_rect: SignatureRect,
     box_style: SignatureBoxStyle | None,
     has_visible_stamp_image: bool,
     stamp_aspect_ratio: float | None,
-) -> _SignatureLayoutReservation:
+) -> SignatureLayoutReservation:
     """Return an ink-informed reservation for validation without changing placement."""
 
     if (
@@ -1037,10 +1149,10 @@ def _horizontal_single_line_ink_validation_reservation(
 
 
 def _apply_horizontal_single_line_ink_text_alignment(
-    reservation: _SignatureLayoutReservation,
+    reservation: SignatureLayoutReservation,
     *,
     ink_reservation: HorizontalSingleLineInkReservation | None,
-) -> _SignatureLayoutReservation:
+) -> SignatureLayoutReservation:
     """Optically align horizontal single-line text ink without changing fit policy."""
 
     if (
@@ -1110,7 +1222,7 @@ def _horizontal_single_line_background_text_width(
 
 
 def _ensure_layout_can_fit(
-    layout_reservation: _SignatureLayoutReservation,
+    layout_reservation: SignatureLayoutReservation,
     *,
     has_visible_stamp_image: bool = False,
 ) -> None:
@@ -1423,9 +1535,7 @@ def _background_layout_spec_for_stamp(
 
 
 def _border_safe_inset(box_style: SignatureBoxStyle | None) -> int:
-    if box_style is None or not box_style.show_border:
-        return 0
-    return max(0, int(ceil(box_style.border_width_pt / 2.0)) + 1)
+    return VisibleSignatureLayoutPolicy.border_safe_inset(box_style=box_style)
 
 
 def _single_line_stamp_content_inset(

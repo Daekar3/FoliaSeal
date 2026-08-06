@@ -2571,3 +2571,111 @@ confirmed the one-bundle construction invariant, green validation gates, SPEC im
 artifact/process state, and the intentional separation of the phase3 nomenclature plan.
 An explicit regression test now asserts that the exact typed bundle reaches both signed-scenario
 mutation and capture; the full suite is `1,143 passed, 1 warning` after that coverage addition.
+
+### Scan Round 54 — completed after `26d05c6d2`
+
+Three independent explorer-light agents reviewed the clean compatibility-bridge checkout. The
+highest credible candidate is `visible-layout-policy-unification`: the application
+`visible_signature_layout.py` is the documented prepare-once layout boundary, but
+`phase3_signing_backend.py` duplicates its base-spacing, border-inset, effective-margin, and
+single-line optical-shift helpers, while `phase3_harness.py` imports those backend-private helpers
+for preview capture padding. This makes rendered-ink signing and evidence preview rely on two policy
+implementations and leaks backend internals into the Qt harness.
+
+The candidate has two concrete score records: explorer `arch_scan_next_three` scored
+`(4.0,4.0,4.0,4.0,4.0,4.5,2.5,1.75)`, and the orchestrator independently verified the duplicate
+implementation/import path and scored `(4.5,4.0,4.0,4.5,4.0,4.5,2.5,1.5)`. Medians are
+`(4.25,4.0,4.0,4.25,4.0,4.5,2.5,1.625)`, agreement `0.96875`, evidence coverage `1.0`, and
+confidence `0.978125`. Benefit is `4.175`, penalty `2.15`, and the fixed Candidate Priority is
+approximately `70.14/100`, comfortably above the continuation threshold. The dependency category
+is in-process/local-substitutable: the policy is pure geometry and existing Qt/Pillow fakes cover
+the surrounding adapters.
+
+Other reports identified two lower candidates: evidence snapshot projection consolidation scored
+about `61.3` but remains broader and more compatibility-sensitive, while signing-shell dynamic
+composition export cleanup scored about `60.0` with higher migration risk. Deterministic selection
+therefore chooses the visible-layout policy seam. The bounded slice is to promote one public
+layout-policy boundary, migrate backend and harness consumers to it, delete the duplicate backend
+helpers/private imports, and add parity tests without changing layout results, CLI/JSON/artifact
+contracts, or the separate phase3 nomenclature migration.
+
+### Problem Frame 54 — visible-layout policy unification
+
+The representative workflow is signing preview or final signing -> text/stamp reservation -> layout
+materialization, plus the live evidence path -> `_preview_padding_for_capture()` -> margin helpers.
+`visible_signature_layout.py` already owns the canonical policy, but `phase3_signing_backend.py`
+reimplements several policy functions and `phase3_harness.py` reaches through its private names. A
+policy change can therefore update one path while leaving rendered-ink fit or evidence padding on a
+different rule, and a GUI/evidence caller must understand backend internals to inspect a neutral
+layout result.
+
+The slice must preserve all existing placement, fit rejection, preview parity, and signed-output
+behavior; current-page semantics and phase3 CLI/DTO/JSON/artifact contracts remain frozen. The
+dependency is pure/in-process with fakeable render callers, so boundary tests can exercise the
+policy without a live display. The expected improvement is one source of truth and a smaller public
+dependency surface, not a file move or a rename-only cleanup. Illustrative target:
+
+    margins = VisibleSignatureLayoutPolicy.margins(
+        stamp_position=preview.stamp_position,
+        box_height=preview.signature_rect.height_pt,
+        box_style=preview.box_style,
+    )
+    # backend and harness consume the same policy result
+
+The design round must decide whether the public boundary is a focused policy module or a typed facade
+over the existing application module, and how temporary test-only wrappers are retired.
+
+### Design Selection 55 — completed 2026-08-06
+
+Three radically different designs were generated and two independent reviewers scored all fixed
+Refactor Shape dimensions. Design A is a minimal `VisibleSignatureLayoutPolicy.margins()`/`spacing()`
+resolver returning a frozen spacing DTO; it minimizes migration but leaves reservation and fit policy
+coordination split across callers. Its median shape score is `81.65`.
+
+Design B is a flexible dedicated policy module with request/result DTOs, an injectable policy port, a
+default implementation, and a separate capture-padding operation. It improves substitution but adds
+two public verbs and a second policy/result surface without a current variation requirement. Its
+median base score is `84.875`; applying the evidence-backed speculative-public-surface penalty yields
+`79.875`.
+
+Design C is a common-caller optimized, stateless `VisibleSignatureLayoutPolicy` facade kept in the
+existing neutral application module. It exposes typed spacing/margins, the canonical reservation,
+and fit-check operations while retaining rendered-ink/materialization internals in their current
+owners. Its two reviewer score records were:
+
+| reviewer | InterfaceDepth | CallerSimplicity | BehavioralTestability | DependencyIsolation | OwnershipClarity | MigrationFeasibility | RequirementCompatibility |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `layout_review_fast_one` | 4.4 | 4.5 | 4.6 | 4.6 | 4.7 | 4.2 | 4.8 |
+| `layout_review_fast_two` | 4.5 | 4.75 | 4.5 | 4.75 | 4.5 | 4.25 | 4.75 |
+
+The median C score is `(4.45,4.625,4.55,4.675,4.6,4.225,4.775)`, for BaseShapeScore `90.775`,
+with no evidence-backed penalties or hard-gate risks. It exceeds the highest valid base (A) by
+`9.125` points and the penalized flexible design by `10.9`; no hybrid is needed. The selected
+architecture is therefore C: one stateless, Qt/Pillow/pyHanko-free policy facade over the existing
+canonical layout implementation, with no generic manager, service locator, or second planner. The
+child plan is `docs/ExecPlans/visible_layout_policy_unification_execplan.md`.
+
+### Implementation 55 — visible-layout policy unification (in progress)
+
+The selected stateless common-caller facade is implemented in the existing neutral
+`visible_signature_layout.py` boundary. `LayoutSpacing`, public `SignatureLayoutReservation`, and
+`VisibleSignatureLayoutPolicy` now expose canonical spacing, border-safe margins, reservation, fit,
+and horizontal text-width operations without importing Qt, Pillow, pyHanko, or the signing backend.
+Canonical private arithmetic remains only as same-module delegates. The signing backend now consumes
+the facade for reservation/fit and rendered-ink edge margins, with its duplicate spacing/border/
+optical helper cluster and dead horizontal-width helper removed. The Qt harness now consumes the
+facade for capture padding and no longer imports backend-private layout policy. Lazy application
+exports and direct policy tests were updated, and `docs/ARCHITECTURE.md` records the ownership rule.
+
+Validation completed before commit: focused layout/backend/harness/boundary coverage `198 passed`,
+full suite `1,149 passed, 1 warning`, Ruff, compileall, CLI help, neutral import isolation, diff
+checks, and frozen `docs/SPEC.md` all pass. The unchanged offscreen signed-acceptance command passed
+with `10` scenarios/`7` successful signings, preview parity `18/18`, and fit rejection `3/3`.
+Generated acceptance outputs were removed and the process audit found no FoliaSeal/Python/Qt/test
+process. The dedicated `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` remains the next
+atomic contract migration; this slice deliberately preserves all phase3 module, CLI, DTO, JSON, and
+artifact names.
+
+Commit and three independent post-commit closure scans remain required. The residual candidate set
+should be rescored only after that audit; the next likely seam is the highest-scoring candidate that
+does not reopen the separate phase3 nomenclature migration.

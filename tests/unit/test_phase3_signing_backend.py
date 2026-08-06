@@ -39,7 +39,6 @@ from foliaseal.application.phase3_signing_backend import (
     _BackendHorizontalInkMeasurer,
     _build_stamp_text,
     _current_signing_time,
-    _effective_horizontal_text_reservation_width,
     _load_simple_signer,
     _prepare_backend_layout,
     _resolve_visible_signature_semantics,
@@ -69,6 +68,7 @@ from foliaseal.application.visible_signature_artifact_adapters import (
 from foliaseal.application.visible_signature_layout import (
     _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
     VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutPolicy,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
     _horizontal_single_line_ink_validation_reservation,
@@ -846,10 +846,10 @@ def test_single_line_horizontal_stamp_vertical_inset_uses_border_safe_spacing() 
 
 def test_single_line_horizontal_text_reservation_width_is_strict_for_left_right() -> None:
     assert (
-        _effective_horizontal_text_reservation_width(
+        VisibleSignatureLayoutPolicy.horizontal_text_reservation_width(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.RIGHT,
-            text_box_width=115,
+            text_box_width_pt=115,
         )
         == 115
     )
@@ -857,10 +857,10 @@ def test_single_line_horizontal_text_reservation_width_is_strict_for_left_right(
 
 def test_single_line_horizontal_text_reservation_width_matches_strict_preview_contract() -> None:
     assert (
-        _effective_horizontal_text_reservation_width(
+        VisibleSignatureLayoutPolicy.horizontal_text_reservation_width(
             layout_template=SignatureLayoutTemplate.SINGLE_LINE,
             stamp_position=SignatureStampPosition.RIGHT,
-            text_box_width=380,
+            text_box_width_pt=380,
         )
         == 380
     )

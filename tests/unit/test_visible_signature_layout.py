@@ -15,10 +15,12 @@ from foliaseal.application.visible_signature_layout import (
     LayoutRequest,
     RectBounds,
     SignatureLayoutPlan,
+    SignatureLayoutReservation,
     SigningVisibleSignatureStyle,
     TextMetrics,
     VisibleSignatureLayoutEngine,
     VisibleSignatureLayoutOptions,
+    VisibleSignatureLayoutPolicy,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
 )
@@ -107,6 +109,61 @@ def _box_style(
         border_width_pt=border_width_pt,
         background_color_hex="#FFFFFF",
     )
+
+
+@pytest.mark.parametrize(
+    ("stamp_position", "height", "expected"),
+    [
+        (SignatureStampPosition.TOP, 72, (4, 6)),
+        (SignatureStampPosition.BOTTOM, 25, (2, 2)),
+        (SignatureStampPosition.LEFT, 72, (4, 6)),
+        (SignatureStampPosition.RIGHT, 72, (4, 6)),
+    ],
+)
+def test_visible_layout_policy_exposes_canonical_spacing(
+    stamp_position: SignatureStampPosition,
+    height: int,
+    expected: tuple[int, int],
+) -> None:
+    spacing = VisibleSignatureLayoutPolicy.spacing(
+        stamp_position=stamp_position,
+        box_height_pt=height,
+    )
+
+    assert (spacing.edge_margin_pt, spacing.separator_width_pt) == expected
+
+
+def test_visible_layout_policy_margins_include_border_safe_inset() -> None:
+    margins = VisibleSignatureLayoutPolicy.margins(
+        stamp_position=SignatureStampPosition.TOP,
+        box_height_pt=72,
+        box_style=_box_style(border_width_pt=8.0),
+    )
+
+    assert (margins.left, margins.right, margins.top, margins.bottom) == (5, 5, 5, 5)
+
+
+def test_visible_layout_policy_reservation_is_public_and_fit_checked() -> None:
+    reservation = VisibleSignatureLayoutPolicy.reservation(
+        SignatureLayoutTemplate.SINGLE_LINE,
+        stamp_position=SignatureStampPosition.RIGHT,
+        signature_rect=SignatureRect(
+            page_index=0,
+            left_pt=20,
+            bottom_pt=40,
+            width_pt=260,
+            height_pt=72,
+        ),
+        text_box_width_pt=120,
+        text_box_height_pt=16,
+        box_style=_box_style(),
+        has_visible_stamp_image=True,
+        stamp_aspect_ratio=4.0,
+    )
+
+    assert isinstance(reservation, SignatureLayoutReservation)
+    VisibleSignatureLayoutPolicy.ensure_fit(reservation, has_visible_stamp_image=True)
+    assert reservation.text_area_width_pt > 0
 
 
 def _request(
