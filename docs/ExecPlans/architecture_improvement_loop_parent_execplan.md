@@ -1575,6 +1575,28 @@ weighted Actual Improvement `0.54` versus predicted `0.40`, with no component re
 `phase3_nomenclature_retirement_execplan.md` plus any fresh-scan candidate; no phase3 CLI/DTO/JSON,
 fixture, or artifact names were changed in this boundary slice.
 
+### Scan Round 20 — completed 2026-08-06
+
+The post-implementation scan ran independently from clean commit `0856739b3`. All three explorers
+confirmed that the neutral preview/render seam is closed. Two reports converge on the next bounded
+cluster, `phase3_signing_backend_deepening`: the 1,538-line
+`src/foliaseal/application/phase3_signing_backend.py` still combines concrete PyHanko/Pillow artifact
+materialization with signing-plan and rendered-fit policy, and
+`visible_signature_layout_adapters.py`/`signing_draft_workflow.py` still reach concrete helpers via
+lazy imports. The common-caller report scores the artifact-materialization extraction at Priority
+about `78` with confidence `0.90`; the flexible report scores the narrower concrete-dependency
+inversion at Priority `63–66` with confidence `0.75–0.80`. These are the same deepening opportunity,
+not a proposal to duplicate the preview port.
+
+The third explorer independently ranked the remaining signing-shell/app-frame lifecycle seam at
+Priority about `59`, below the fixed `60` gate under conservative migration-risk scoring, and ranked
+fit-policy-only extraction around `48`. The transitional Qt compatibility surface is about `45–50`,
+legacy profile migration about `55` because of user-data risk, and the separate phase3 nomenclature
+retirement about `43–45` because CLI/DTO/JSON/artifact contracts require an atomic versioned decision.
+The next design review should compare a minimal `VisibleSignatureArtifactMaterializer` port, a
+constrained concrete-dependency inversion hybrid, and a common-caller adapter shape while preserving
+backend-authoritative fit policy, error DTOs, signing output, and every phase3 external contract.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
