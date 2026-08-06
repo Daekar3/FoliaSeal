@@ -51,7 +51,7 @@ evidence policy without constructing Qt widgets or a full harness.
 - [x] (2026-08-06) Proxy measurements were navigation `0.50`, change amplification `0.50`, seam
   reduction `0.50`, boundary-test improvement `1.00`, interface compression `0.50`, and isolation
   improvement `1.00`; `Actual Improvement = 0.63` versus predicted `0.40`, with no component below
-  `-0.10`. Commit closure remains in the parent loop after the intentional git commit.
+  `-0.10`. Committed on `main` as `3370748b7`; the parent loop records the fresh-rescan requirement.
 
 ## Surprises & Discoveries
 
@@ -114,7 +114,8 @@ adapter edits -> one (`0.50` change amplification), two duplicate finalization s
 no shared boundary coverage -> complete frame/assembler coverage (`1.00`), two policy concepts ->
 one typed projection policy (`0.50`), and no neutral isolation -> one Qt-free module (`1.00`). The
 weighted `Actual Improvement` is `0.63` versus predicted `0.40` (`1.56x`), with no component
-regression below `-0.10`. The parent records the commit and starts the next fresh scan.
+regression below `-0.10`. Commit `3370748b7` is on `main`; the parent records it and starts the next
+fresh scan.
 
 ## Context and Orientation
 

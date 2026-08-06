@@ -1051,7 +1051,8 @@ The explicit evidence roots were removed and the process audit was clean.
 Proxy measurement: navigation `0.50`, change amplification `0.50`, seam reduction `0.50`,
 boundary-test improvement `1.00`, interface compression `0.50`, and boundary isolation `1.00`; the
 weighted `Actual Improvement = 0.63` versus predicted `0.40` (`1.56x`), with no component regression
-below `-0.10`. Commit closure is the next required step, followed by a fresh three-explorer scan.
+below `-0.10`. Commit `3370748b7` is on `main`; the accepted slice is closed and a fresh
+three-explorer scan is required before selecting the next candidate.
 
 ## Context and Orientation
 
