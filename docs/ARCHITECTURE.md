@@ -572,6 +572,22 @@ The canonical repository document split is:
 - Status: Confirmed by focused/full tests and both release matrices; callback-body extraction is a
   ranked follow-on rather than an unreported compatibility layer.
 
+### Preview-widget evidence policy
+
+- Location: `src/foliaseal/presentation/qt/preview_widget_evidence.py`
+- Responsibility: Own shared duck-typed preview geometry, scalar widget snapshots, text-color
+  parsing, pixmap projection, and overlay-coordinate normalization used by the harness capture
+  builders.
+- Owns: `widget_rect_snapshot()`, `size_hint_snapshot()`, `label_pixmap_size_snapshot()`,
+  `label_alignment_snapshot()`, `project_pixmap_bounds_within_label()`,
+  `preview_text_color_rgba()`, `draw_overlay_rect()`, and `offset_rect()`.
+- Does not own: Qt event-loop or ancestor mapping, canonical rendering, Pillow file publication,
+  matrix iteration, or public Phase 3 contracts.
+- Known constraints: The module is presentation-edge code and deliberately receives an injected
+  alignment-flag resolver so PySide6 remains at the Qt edge. The larger capture callbacks remain
+  composition-root orchestration until a later slice justifies a deeper assembler.
+- Status: Confirmed by focused/full tests and both release matrices.
+
 ### Phase 3 preview matrix runner
 
 - Location: `src/foliaseal/presentation/qt/phase3_preview_matrix_runner.py`

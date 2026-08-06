@@ -102,6 +102,30 @@ from foliaseal.presentation.qt.preview_analysis import (
     build_preview_analysis_engine,
     normalize_visible_text_for_comparison,
 )
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    draw_overlay_rect as _draw_overlay_rect,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    label_alignment_snapshot as _label_alignment_snapshot,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    label_pixmap_size_snapshot as _label_pixmap_size_snapshot,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    offset_rect as _offset_rect,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    preview_text_color_rgba as _preview_text_color_rgba,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    project_pixmap_bounds_within_label as _project_pixmap_bounds_within_label,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    size_hint_snapshot as _size_hint_snapshot,
+)
+from foliaseal.presentation.qt.preview_widget_evidence import (
+    widget_rect_snapshot as _widget_rect_snapshot,
+)
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 from foliaseal.presentation.qt.signing_shell_port import build_qt_signing_workspace_bundle
 
@@ -930,6 +954,7 @@ def _build_qt_preview_render_capture_payload(
         label_bounds=stamp_band_bounds,
         pixmap_size=stamp_pixmap_size,
         alignment=stamp_alignment,
+        alignment_flag=_qt_alignment_flag,
     )
     if canonical_snapshot is not None:
         stamp_pixmap_bounds = canonical_snapshot.stamp_bounds_px
@@ -1534,105 +1559,6 @@ def _widget_is_visible(widget: Any) -> bool:
     return True
 
 
-def _draw_overlay_rect(
-    draw: ImageDraw.ImageDraw,
-    bounds: dict[str, int],
-    color: tuple[int, ...],
-) -> None:
-    left = bounds["x"]
-    top = bounds["y"]
-    right = left + max(0, bounds["width"] - 1)
-    bottom = top + max(0, bounds["height"] - 1)
-    draw.rectangle((left, top, right, bottom), outline=color, width=2)
-
-
-def _offset_rect(bounds: dict[str, int], *, dx: int, dy: int) -> dict[str, int]:
-    return {
-        "x": bounds["x"] + dx,
-        "y": bounds["y"] + dy,
-        "width": bounds["width"],
-        "height": bounds["height"],
-    }
-
-
-def _widget_rect_snapshot(widget: Any) -> dict[str, int] | None:
-    geometry = getattr(widget, "geometry", None)
-    if callable(geometry):
-        rect = geometry()
-        x = getattr(rect, "x", None)
-        y = getattr(rect, "y", None)
-        width = getattr(rect, "width", None)
-        height = getattr(rect, "height", None)
-        if all(callable(item) for item in (x, y, width, height)):
-            return {
-                "x": int(x()),
-                "y": int(y()),
-                "width": int(width()),
-                "height": int(height()),
-            }
-    size = getattr(widget, "fixed_size", None)
-    if isinstance(size, tuple) and len(size) == 2:
-        return {"x": 0, "y": 0, "width": int(size[0]), "height": int(size[1])}
-    width = _widget_width(widget)
-    height = None
-    size_hint = getattr(widget, "sizeHint", None)
-    if callable(size_hint):
-        hint = size_hint()
-        hint_height = getattr(hint, "height", None)
-        if callable(hint_height):
-            height = int(hint_height())
-    if width is not None and height is not None:
-        return {"x": 0, "y": 0, "width": int(width), "height": int(height)}
-    return None
-
-
-def _widget_width(widget: Any) -> int | None:
-    width = getattr(widget, "width", None)
-    if callable(width):
-        value = width()
-        if isinstance(value, int):
-            return value
-    fixed_width = getattr(widget, "fixed_width", None)
-    if isinstance(fixed_width, int):
-        return fixed_width
-    return None
-
-
-def _size_hint_snapshot(widget: Any) -> dict[str, int] | None:
-    size_hint = getattr(widget, "sizeHint", None)
-    if not callable(size_hint):
-        return None
-    hint = size_hint()
-    width = getattr(hint, "width", None)
-    height = getattr(hint, "height", None)
-    if callable(width) and callable(height):
-        return {"width": int(width()), "height": int(height())}
-    return None
-
-
-def _label_pixmap_size_snapshot(label: Any) -> dict[str, int] | None:
-    pixmap = getattr(label, "pixmap", None)
-    pixmap = pixmap() if callable(pixmap) else None
-    if pixmap is None:
-        return None
-    width = getattr(pixmap, "width", None)
-    height = getattr(pixmap, "height", None)
-    if callable(width) and callable(height):
-        return {"width": int(width()), "height": int(height())}
-    return None
-
-
-def _label_alignment_snapshot(label: Any) -> int | None:
-    alignment = getattr(label, "alignment", None)
-    if callable(alignment):
-        value = alignment()
-        if isinstance(value, int):
-            return value
-    if isinstance(alignment, int):
-        return alignment
-    return None
-
-
 def _qt_alignment_flag(name: str) -> int:
     try:
         qt_core = importlib.import_module("PySide6.QtCore")
@@ -1649,20 +1575,6 @@ def _qt_alignment_flag(name: str) -> int:
         return 0
     value = getattr(alignment_flag, name, None)
     return int(value) if value is not None else 0
-
-
-def _translate_child_bounds(
-    parent_bounds: dict[str, int] | None,
-    child_bounds: dict[str, int] | None,
-) -> dict[str, int] | None:
-    if parent_bounds is None or child_bounds is None:
-        return None
-    return {
-        "x": parent_bounds["x"] + child_bounds["x"],
-        "y": parent_bounds["y"] + child_bounds["y"],
-        "width": child_bounds["width"],
-        "height": child_bounds["height"],
-    }
 
 
 def _widget_rect_snapshot_relative_to(root_widget: Any, widget: Any) -> dict[str, int] | None:
@@ -1689,62 +1601,6 @@ def _widget_rect_snapshot_relative_to(root_widget: Any, widget: Any) -> dict[str
         "width": bounds["width"],
         "height": bounds["height"],
     }
-
-
-def _project_pixmap_bounds_within_label(
-    *,
-    label_bounds: dict[str, int] | None,
-    pixmap_size: dict[str, int] | None,
-    alignment: int | None,
-) -> dict[str, int] | None:
-    if label_bounds is None or pixmap_size is None:
-        return None
-    width = min(label_bounds["width"], pixmap_size["width"])
-    height = min(label_bounds["height"], pixmap_size["height"])
-    horizontal_space = max(0, label_bounds["width"] - width)
-    vertical_space = max(0, label_bounds["height"] - height)
-    x_offset = horizontal_space // 2
-    y_offset = vertical_space // 2
-    if alignment is not None:
-        align_left = _qt_alignment_flag("AlignLeft")
-        align_right = _qt_alignment_flag("AlignRight")
-        align_top = _qt_alignment_flag("AlignTop")
-        align_bottom = _qt_alignment_flag("AlignBottom")
-        if alignment & align_left:
-            x_offset = 0
-        elif alignment & align_right:
-            x_offset = horizontal_space
-        if alignment & align_top:
-            y_offset = 0
-        elif alignment & align_bottom:
-            y_offset = vertical_space
-    return {
-        "x": label_bounds["x"] + x_offset,
-        "y": label_bounds["y"] + y_offset,
-        "width": width,
-        "height": height,
-    }
-
-
-def _preview_text_color_rgba(preview: Any) -> tuple[int, int, int, int] | None:
-    text_style = getattr(preview, "text_style", None)
-    if text_style is None:
-        return None
-    color_hex = getattr(text_style, "text_color_hex", None)
-    if not isinstance(color_hex, str):
-        return None
-    normalized = color_hex.strip().lstrip("#")
-    if len(normalized) != 6:
-        return None
-    try:
-        return (
-            int(normalized[0:2], 16),
-            int(normalized[2:4], 16),
-            int(normalized[4:6], 16),
-            255,
-        )
-    except ValueError:
-        return None
 
 
 def _preview_padding_for_capture_from_snapshot(snapshot: dict[str, Any]) -> int:

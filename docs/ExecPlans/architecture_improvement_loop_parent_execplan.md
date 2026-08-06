@@ -331,9 +331,45 @@ removed and the process audit is clean. The child records the same six-component
 `-0.10`; all major compliance findings are resolved. Commit `4554c6922` (`refactor: isolate
 visible-signature layout adapters`) is on `main`, and Cycle 2 is accepted.
 
-Cycle 3 source and plan changes are ready for the intentional commit. The loop is not globally
-complete: commit this accepted cycle, then run a fresh three-explorer rescan and apply the fixed
-below-threshold confirmation rule before stopping.
+Cycle 3 was committed as `81c613e4e`. Cycle 4 source and plan changes are ready for the intentional
+commit. The loop is not globally complete: commit this accepted cycle, then run a fresh
+three-explorer rescan and apply the fixed below-threshold confirmation rule before stopping.
+
+### Scan Round 4 — completed after commit `81c613e4e`
+
+Two independent explorers plus an orchestrator-local scan reviewed the clean post-commit checkout.
+The preview/widget evidence residual remains qualifying: `phase3_harness.py` is 2,399 lines and
+still combines widget geometry, scalar snapshot readers, overlay-coordinate policy, canonical
+rendering, and evidence orchestration. Independent priorities were approximately `66.5` and
+`65.7`, confidence at least `0.68`; the strongest alternative was backend fit-policy extraction at
+approximately `60.2`, while app-frame lifecycle and application-to-infra schema coupling ranked
+below threshold or required a broader migration. The scan also confirmed that the public
+`phase3-signing-*` CLI/DTO/JSON/artifact names are compatibility-frozen and must not be renamed
+piecemeal.
+
+Design reviews compared minimal relocation (`61.0`), flexible ports/adapters (`78.5`), common-caller
+unification (`76.0`), and constrained hybrid (`90.1`; independent 23/25 safety score). The selected
+Cycle 4 child keeps live/headless lifecycles and the typed capture port unchanged while extracting
+only shared preview-widget evidence policy into a presentation-edge module.
+
+### Cycle 4 — accepted pending commit 2026-08-05
+
+Child `docs/ExecPlans/preview_widget_evidence_boundary_execplan.md` is implemented. New module
+`src/foliaseal/presentation/qt/preview_widget_evidence.py` owns shared duck-typed geometry, text
+color, pixmap projection, and overlay-coordinate helpers; `phase3_harness.py` retains only Qt
+ancestor mapping, canonical rendering, artifact writers, and orchestration. No public contract or
+phase nomenclature was renamed.
+
+Evidence: full suite `1046 passed` with one pre-existing Pillow warning; Ruff and diff checks clean;
+preview matrix 8 scenarios/0 error rows; signed matrix 8 scenarios/6 successful signings/2 matched
+intentional rejections/zero cryptographic, annotation, or preview-output failures/
+`acceptance_expectations_passed=True`. Temporary `/tmp/foliaseal-widget-evidence-*` directories
+were removed and the process audit is clean.
+
+Cycle 4 proxy measurement: navigation `0.0`, change amplification `0.5`, seam reduction `0.5`,
+boundary-test improvement `0.25`, interface compression `0.5`, boundary isolation `0.5`;
+`Actual Improvement = 0.30`, predicted `0.25`, prediction accuracy `1.20x`, no component below
+`-0.10`. Commit and the next fresh rescan remain before the loop's stopping decision.
 
 ## Context and Orientation
 
