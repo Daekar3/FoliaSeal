@@ -52,7 +52,6 @@ class SigningWorkspaceOrchestrator:
 
     def bootstrap(self) -> None:
         self._compatibility_surface.install_widget_exports()
-        self._shell_surface.install_port_exports()
         self._refresh_viewer()
         self._review_bridge.apply_state(self._document_review_workspace.load())
         self._action_bridge.reload_state()

@@ -30,12 +30,29 @@ class _WidgetWithoutCleanup:
     pass
 
 
+class _View:
+    def __init__(self, widget) -> None:
+        self.widget = widget
+
+    def mount_target(self):
+        return self.widget
+
+    def dispose(self) -> None:
+        close = getattr(self.widget, "close", None)
+        if callable(close):
+            close()
+        delete_later = getattr(self.widget, "deleteLater", None)
+        if callable(delete_later):
+            delete_later()
+
+
 class _Outcome:
     def __init__(self, widget) -> None:
         self.handle = WorkspaceHandle(
             source_pdf=object(),
-            widget=widget,
-            shell=object(),
+            view=_View(widget),
+            maintenance=object(),
+            session=object(),
             testing=object(),
             viewer_workflow=object(),
             signing_workflow=object(),
@@ -85,7 +102,7 @@ def test_replace_mounts_candidate_before_closing_previous_workspace() -> None:
     lifecycle.replace(_command())
     handle = lifecycle.replace(_command())
 
-    assert handle.widget is second
+    assert handle.view.mount_target() is second
     assert lifecycle.active() is handle
     assert mount.widgets == [first, second]
     assert events == ["mount:first", "mount:second", "close:first", "delete:first"]

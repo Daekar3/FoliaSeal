@@ -31,6 +31,20 @@ Canonical repository documents:
 
 Phase 3 builds the first end-user signing workflow on top of the Phase 2 viewer platform.
 
+The live Qt workspace is exposed through a typed `SigningWorkspaceBundle` at the shell edge. Its
+`maintenance` port handles settings, certificate/profile, reusable-object, and document-text
+actions; its `session` port owns the primary review/place/preview/sign/navigation flow; its
+`testing` port is reserved for diagnostics and harness capture; and its opaque `view` port is used
+only to mount and dispose the workspace. `SigningWorkspaceHost` owns the active handle, while
+`SigningWorkspaceLifecycle` owns compose-before-mount, dispose-after-success replacement and
+idempotent close. The legacy `compat_surface`/`testing_adapter` remains a Qt-local compatibility
+edge for older widget exports and is not a caller-facing service locator.
+
+The repository still uses `phase3` in established CLI commands, DTOs, JSON fields, fixtures, and
+artifact paths. Those names are treated as external compatibility contracts for now; the bounded
+`docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` tracks any future rename as one atomic
+migration rather than piecemeal documentation drift.
+
 Current capabilities:
 
 - `SigningDraftWorkflow` owns the in-session signing draft state for Phase 3.

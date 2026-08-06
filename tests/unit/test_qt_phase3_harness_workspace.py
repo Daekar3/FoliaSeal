@@ -349,16 +349,11 @@ def test_qt_phase3_harness_workspace_adapter_rejects_compat_surface_only_shell()
     compat = _FakeCompat()
     shell = type("_Shell", (), {"compat_surface": compat})()
 
-    adapter = QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
-        profile_store=object(),
-    )
-
     with pytest.raises(
         TypeError,
         match="must expose 'testing_adapter'",
     ):
-        adapter.refresh_viewer()
+        QtPhase3HarnessWorkspaceAdapter(shell=shell, profile_store=object())
 
 def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_result() -> None:
     preview = type(
@@ -957,16 +952,14 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
 
 
 def test_qt_phase3_harness_workspace_adapter_rejects_missing_testing_adapter() -> None:
-    adapter = QtPhase3HarnessWorkspaceAdapter(
-        shell=type("_Shell", (), {})(),
-        profile_store=object(),
-    )
-
     with pytest.raises(
         TypeError,
         match="must expose 'testing_adapter'",
     ):
-        adapter.refresh_viewer()
+        QtPhase3HarnessWorkspaceAdapter(
+            shell=type("_Shell", (), {})(),
+            profile_store=object(),
+        )
 
 
 def test_headless_phase3_harness_workspace_adapter_applies_same_scenario_fields() -> None:

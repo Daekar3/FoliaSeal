@@ -334,7 +334,7 @@ class FoliaSealAppFrame:
     @property
     def current_shell(self) -> Any | None:
         workspace = self._workspace_host.active()
-        return None if workspace is None else workspace.widget
+        return None if workspace is None else workspace.view.mount_target()
 
     @property
     def current_viewer_workflow(self) -> ViewerWorkflow | None:
@@ -398,7 +398,7 @@ class FoliaSealAppFrame:
         self._set_text_selection_action_enabled(True)
         self._set_text_selection_action_checked(False)
         self._set_copy_selected_text_action_enabled(True)
-        return handle.widget
+        return handle.view.mount_target()
 
     def close_workspace(self) -> None:
         """Close the active signing workspace and restore the placeholder view."""
@@ -466,7 +466,7 @@ class FoliaSealAppFrame:
         if workspace is None:
             self._emit_error("Open a PDF before creating or editing reusable signing objects.")
             return False
-        return workspace.shell.open_reusable_object_editor()
+        return workspace.maintenance.open_reusable_object_editor()
 
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
@@ -662,7 +662,7 @@ class FoliaSealAppFrame:
         workspace = self._workspace_host.active()
         if workspace is None:
             return None
-        return action(workspace.shell)
+        return action(workspace.maintenance)
 
 
 class QtAppFrameAdapter:

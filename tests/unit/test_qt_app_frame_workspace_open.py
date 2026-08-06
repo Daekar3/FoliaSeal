@@ -12,6 +12,8 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     WorkspaceOpenService,
 )
 from foliaseal.presentation.qt.signing_shell_port import (
+    QtSigningWorkspaceSessionPort,
+    QtWorkspaceView,
     SigningWorkspaceBootstrap,
     SigningWorkspaceBundle,
 )
@@ -74,9 +76,10 @@ class _FakeShellFactory:
     def create(self, bootstrap: SigningWorkspaceBootstrap):
         self.bootstrap_calls.append(bootstrap)
         return SigningWorkspaceBundle(
-            port=_FakeShellPort(self.shell_widget),
-            testing_adapter=self.shell_widget.testing_adapter,
-            widget=self.shell_widget,
+            maintenance=_FakeShellPort(self.shell_widget),
+            session=QtSigningWorkspaceSessionPort(self.shell_widget),
+            testing=self.shell_widget.testing_adapter,
+            view=QtWorkspaceView(self.shell_widget),
         )
 
 
@@ -136,7 +139,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     )
 
     assert _FakeQPdfDocument.load_calls == [str(selected_pdf)]
-    assert outcome.widget is shell
+    assert outcome.view.mount_target() is shell
     assert outcome.viewer_workflow.document_path == str(selected_pdf)
     assert outcome.viewer_workflow.session.page_count == 3
     assert outcome.signing_workflow.input_pdf_path == str(selected_pdf)

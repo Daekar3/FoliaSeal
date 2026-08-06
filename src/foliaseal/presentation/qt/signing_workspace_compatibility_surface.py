@@ -38,6 +38,7 @@ class SigningWorkspaceCompatibilitySurface:
         properties_scroll: Any,
         sidebar_container: Any,
         sidebar_surface: Any,
+        shell_surface: Any,
     ) -> None:
         self._widget = widget
         self._runtime = runtime
@@ -47,6 +48,7 @@ class SigningWorkspaceCompatibilitySurface:
         self._properties_scroll = properties_scroll
         self._sidebar_container = sidebar_container
         self._sidebar_surface = sidebar_surface
+        self._shell_surface = shell_surface
         self._testing_adapter = SigningWorkspaceTestingAdapter(self)
 
     @property
@@ -123,6 +125,15 @@ class SigningWorkspaceCompatibilitySurface:
         self._widget.set_timestamp_required = self._runtime.set_timestamp_required  # type: ignore[attr-defined]
         self._widget.current_request = self._runtime.current_request  # type: ignore[attr-defined]
         self._widget.is_sign_action_enabled = self._runtime.is_sign_action_enabled  # type: ignore[attr-defined]
+        self._widget.choose_output_pdf_path = self._shell_surface.choose_output_pdf_path  # type: ignore[attr-defined]
+        self._widget.apply_app_settings = self._shell_surface.apply_app_settings  # type: ignore[attr-defined]
+        self._widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
+            self._shell_surface.refresh_certificate_configurations
+        )
+        self._widget.refresh_signature_profiles = self._shell_surface.refresh_signature_profiles  # type: ignore[attr-defined]
+        self._widget.open_reusable_object_editor = self._shell_surface.open_reusable_object_editor  # type: ignore[attr-defined]
+        self._widget.submit_sign_request = self._shell_surface.submit_sign_request  # type: ignore[attr-defined]
+        self._widget.open_signed_output = self._shell_surface.open_signed_output  # type: ignore[attr-defined]
 
 
 class SigningWorkspaceTestingAdapter:

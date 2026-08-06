@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.schemas import (
@@ -21,42 +20,23 @@ class SigningWorkspaceShellSurface:
     def __init__(
         self,
         *,
-        widget: Any,
         action_bridge: SigningWorkspaceActionBridge,
         set_app_settings: Callable[[AppSettings], None],
         set_document_text_selection_mode: Callable[[bool], bool],
         copy_selected_document_text: Callable[[], str | None],
+        open_reusable_object_editor: Callable[[], bool],
         initial_app_settings: AppSettings,
     ) -> None:
-        self._widget = widget
         self._action_bridge = action_bridge
         self._set_app_settings = set_app_settings
         self._set_document_text_selection_mode = set_document_text_selection_mode
         self._copy_selected_document_text = copy_selected_document_text
+        self._open_reusable_object_editor = open_reusable_object_editor
         self._app_settings = initial_app_settings
-
-    def install_port_exports(self) -> None:
-        self._widget.app_settings = self._app_settings  # type: ignore[attr-defined]
-        self._widget.apply_app_settings = self.apply_app_settings  # type: ignore[attr-defined]
-        self._widget.choose_output_pdf_path = self.choose_output_pdf_path  # type: ignore[attr-defined]
-        self._widget.refresh_certificate_configurations = (  # type: ignore[attr-defined]
-            self.refresh_certificate_configurations
-        )
-        self._widget.refresh_signature_profiles = self.refresh_signature_profiles  # type: ignore[attr-defined]
-        self._widget.open_reusable_object_editor = (  # type: ignore[attr-defined]
-            self.open_reusable_object_editor
-        )
-        self._widget.set_document_text_selection_mode = (  # type: ignore[attr-defined]
-            self.set_document_text_selection_mode
-        )
-        self._widget.copy_selected_document_text = self.copy_selected_document_text  # type: ignore[attr-defined]
-        self._widget.submit_sign_request = self.submit_sign_request  # type: ignore[attr-defined]
-        self._widget.open_signed_output = self.open_signed_output  # type: ignore[attr-defined]
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
         self._set_app_settings(settings)
-        self._widget.app_settings = settings  # type: ignore[attr-defined]
 
     def choose_output_pdf_path(self) -> str | None:
         return self._action_bridge.choose_output_pdf_path()
@@ -69,11 +49,7 @@ class SigningWorkspaceShellSurface:
         self._action_bridge.refresh_signature_profiles()
 
     def open_reusable_object_editor(self) -> bool:
-        panel = getattr(self._widget, "properties_panel", None)
-        editor = getattr(panel, "open_refinement_dialog", None)
-        if not callable(editor):
-            return False
-        return bool(editor())
+        return bool(self._open_reusable_object_editor())
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self._set_document_text_selection_mode(enabled)

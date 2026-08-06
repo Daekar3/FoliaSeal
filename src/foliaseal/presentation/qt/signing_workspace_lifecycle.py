@@ -67,18 +67,21 @@ class SigningWorkspaceLifecycle:
         """Compose and mount a candidate before disposing the old workspace."""
 
         handle = self._workspace_open_port.open_workspace(command)
-        candidate = handle.widget
+        candidate = handle.view.mount_target()
         previous = self._active
 
         try:
             self._mount_port.mount(candidate)
         except Exception:
-            self._dispose_widget(candidate)
+            handle.view.dispose()
             raise
 
         self._active = _ActiveWorkspace(handle=handle)
-        if previous is not None and previous.handle.widget is not candidate:
-            self._dispose_widget(previous.handle.widget)
+        if (
+            previous is not None
+            and previous.handle.view.mount_target() is not candidate
+        ):
+            previous.handle.view.dispose()
         return handle
 
     def active(self) -> WorkspaceHandle | None:
@@ -92,19 +95,4 @@ class SigningWorkspaceLifecycle:
         active = self._active
         self._active = None
         if active is not None:
-            self._dispose_widget(active.handle.widget)
-
-    @staticmethod
-    def _dispose_widget(widget: Any) -> None:
-        close = getattr(widget, "close", None)
-        if callable(close):
-            try:
-                close()
-            except Exception:
-                pass
-        delete_later = getattr(widget, "deleteLater", None)
-        if callable(delete_later):
-            try:
-                delete_later()
-            except Exception:
-                pass
+            active.handle.view.dispose()

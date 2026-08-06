@@ -12,6 +12,8 @@ from foliaseal.presentation.qt.app_frame import (
 )
 from foliaseal.presentation.qt.signing_shell_port import (
     QtSigningWorkspacePort,
+    QtSigningWorkspaceSessionPort,
+    QtWorkspaceView,
     SigningWorkspaceBootstrap,
     SigningWorkspaceBundle,
 )
@@ -387,9 +389,10 @@ class _FakeShellFactory:
     def create(self, bootstrap: SigningWorkspaceBootstrap):
         self.bootstrap_calls.append(bootstrap)
         return SigningWorkspaceBundle(
-            port=_FakeShellPort(self.shell_widget),
-            testing_adapter=self.shell_widget.testing_adapter,
-            widget=self.shell_widget,
+            maintenance=_FakeShellPort(self.shell_widget),
+            session=QtSigningWorkspaceSessionPort(self.shell_widget),
+            testing=self.shell_widget.testing_adapter,
+            view=QtWorkspaceView(self.shell_widget),
         )
 
 
@@ -402,9 +405,10 @@ class _SequenceShellFactory:
         self.bootstrap_calls.append(bootstrap)
         shell = self.shells.pop(0)
         return SigningWorkspaceBundle(
-            port=_FakeShellPort(shell),
-            testing_adapter=shell.testing_adapter,
-            widget=shell,
+            maintenance=_FakeShellPort(shell),
+            session=QtSigningWorkspaceSessionPort(shell),
+            testing=shell.testing_adapter,
+            view=QtWorkspaceView(shell),
         )
 
 
@@ -511,8 +515,8 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
 
     bundle = signing_shell_port_module.QtSigningWorkspaceFactory().create(bootstrap)
 
-    assert bundle.widget is shell
-    assert bundle.testing_adapter is shell.testing_adapter
+    assert bundle.view.mount_target() is shell
+    assert bundle.testing is shell.testing_adapter
     assert captured == {
         "viewer_workflow": bootstrap.viewer_workflow,
         "signing_workflow": bootstrap.signing_workflow,

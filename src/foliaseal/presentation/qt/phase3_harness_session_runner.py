@@ -19,6 +19,10 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspacePort,
     Phase3HarnessWorkspaceSnapshot,
 )
+from foliaseal.presentation.qt.signing_shell_port import (
+    SigningWorkspaceBundle,
+    build_qt_signing_workspace_bundle,
+)
 
 BuildQtSigningShell = Callable[..., Any]
 BuildWorkspace = Callable[[Any], Phase3HarnessWorkspacePort]
@@ -103,6 +107,7 @@ class Phase3HarnessSessionRunner:
         captured_states: list[dict[str, Any]] = []
 
         shell: Any
+        workspace_bundle: SigningWorkspaceBundle
         workspace: Phase3HarnessWorkspacePort
 
         def close_window() -> None:
@@ -111,9 +116,7 @@ class Phase3HarnessSessionRunner:
                 close()
 
         def refocus_shell() -> None:
-            focus_setter = getattr(shell, "setFocus", None)
-            if callable(focus_setter):
-                focus_setter()
+            workspace_bundle.session.focus()
 
         def on_sign_request(request: SigningRequest) -> None:
             sign_requests.append(request)
@@ -174,18 +177,23 @@ class Phase3HarnessSessionRunner:
                 on_status_change=on_status_change,
             )
             workspace = self.deps.build_workspace(shell)
+            workspace_bundle = build_qt_signing_workspace_bundle(shell)
         except Exception:
             close_window()
             raise
-        body_layout.addWidget(shell, 1)
+        body_layout.addWidget(workspace_bundle.view.mount_target(), 1)
 
         def do_refresh() -> None:
-            shell.refresh_viewer()
+            workspace_bundle.session.refresh_viewer()
             refocus_shell()
 
         def navigate(action_name: str) -> None:
-            action = getattr(shell.viewer_widget, action_name)
-            action()
+            actions = {
+                "go_to_previous_page": workspace_bundle.session.go_to_previous_page,
+                "go_to_next_page": workspace_bundle.session.go_to_next_page,
+                "reset_zoom_view": workspace_bundle.session.reset_zoom_view,
+            }
+            actions[action_name]()
             refocus_shell()
 
         controls = [
@@ -243,14 +251,14 @@ class Phase3HarnessSessionRunner:
         toolbar.addWidget(capture_button)
 
         confirm_button = bindings.q_push_button("Confirm/Sign")
-        confirm_button.clicked.connect(shell.submit_sign_request)
+        confirm_button.clicked.connect(workspace_bundle.session.submit_sign_request)
         toolbar.addWidget(confirm_button)
 
         toolbar.addStretch(1)
         toolbar.addWidget(capture_count_label)
 
         try:
-            shell.refresh_viewer()
+            workspace_bundle.session.refresh_viewer()
             first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
         except Exception:
             close_window()

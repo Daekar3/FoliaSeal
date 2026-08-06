@@ -979,7 +979,7 @@ def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() ->
     original_adapter = phase3_harness_module.QtPhase3HarnessWorkspaceAdapter
     phase3_harness_module.QtPhase3HarnessWorkspaceAdapter = _fake_adapter
     try:
-        shell = object()
+        shell = type("_Shell", (), {"testing_adapter": object()})()
         profile_store = object()
         workspace = phase3_harness_module._build_live_evidence_workspace(
             shell=shell,
@@ -989,7 +989,7 @@ def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() ->
         phase3_harness_module.QtPhase3HarnessWorkspaceAdapter = original_adapter
 
     assert isinstance(workspace, _FakeWorkspace)
-    assert captured["shell"] is shell
+    assert captured["workspace"].view.mount_target() is shell
     assert captured["profile_store"] is profile_store
     deps = captured["deps"]
     assert callable(deps.capture_preview_render)

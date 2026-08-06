@@ -20,6 +20,8 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBootstrap,
     SigningWorkspaceFactory,
     SigningWorkspacePort,
+    SigningWorkspaceSessionPort,
+    WorkspaceViewPort,
 )
 from foliaseal.presentation.qt.signing_workspace_testing_port import (
     SigningWorkspaceTestingPort,
@@ -48,8 +50,9 @@ class WorkspaceHandle:
     """The one active workspace record published after a successful mount."""
 
     source_pdf: Path
-    widget: Any
-    shell: SigningWorkspacePort
+    view: WorkspaceViewPort
+    maintenance: SigningWorkspacePort
+    session: SigningWorkspaceSessionPort
     testing: SigningWorkspaceTestingPort
     viewer_workflow: ViewerWorkflow
     signing_workflow: SigningDraftWorkflow
@@ -148,9 +151,10 @@ class SigningWorkspaceCompositionService:
         )
         return WorkspaceHandle(
             source_pdf=source_path,
-            widget=bundle.widget,
-            shell=bundle.port,
-            testing=bundle.testing_adapter,
+            view=bundle.view,
+            maintenance=bundle.maintenance,
+            session=bundle.session,
+            testing=bundle.testing,
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
         )

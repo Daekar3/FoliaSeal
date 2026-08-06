@@ -4,10 +4,6 @@ from foliaseal.presentation.qt.signing_workspace_shell_surface import (
 )
 
 
-class _Widget:
-    pass
-
-
 class _ActionBridge:
     def __init__(self) -> None:
         self.refresh_profile_calls = 0
@@ -28,8 +24,7 @@ class _ActionBridge:
         return None
 
 
-def test_install_port_exports_exposes_signature_profile_refresh() -> None:
-    widget = _Widget()
+def test_shell_surface_exposes_signature_profile_refresh() -> None:
     action_bridge = _ActionBridge()
     settings = AppSettings(
         schema_version=1,
@@ -39,16 +34,14 @@ def test_install_port_exports_exposes_signature_profile_refresh() -> None:
         ui={},
     )
     surface = SigningWorkspaceShellSurface(
-        widget=widget,
         action_bridge=action_bridge,
         set_app_settings=lambda _settings: None,
         set_document_text_selection_mode=lambda enabled: enabled,
         copy_selected_document_text=lambda: None,
+        open_reusable_object_editor=lambda: True,
         initial_app_settings=settings,
     )
 
-    surface.install_port_exports()
-
-    widget.refresh_signature_profiles()
+    surface.refresh_signature_profiles()
 
     assert action_bridge.refresh_profile_calls == 1

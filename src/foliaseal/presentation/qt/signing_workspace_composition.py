@@ -411,6 +411,14 @@ def build_signing_workspace_composition(
         invalidate_signing_action_state=action_bridge.invalidate_state,
         emit_error=runtime.emit_error,
     )
+    shell_surface = SigningWorkspaceShellSurface(
+        set_app_settings=set_app_settings,
+        set_document_text_selection_mode=runtime.set_document_text_selection_mode,
+        copy_selected_document_text=runtime.copy_selected_document_text,
+        open_reusable_object_editor=properties_panel.open_refinement_dialog,
+        action_bridge=action_bridge,
+        initial_app_settings=app_settings,
+    )
     compatibility_surface = SigningWorkspaceCompatibilitySurface(
         widget=widget,
         runtime=runtime,
@@ -420,14 +428,7 @@ def build_signing_workspace_composition(
         properties_scroll=properties_scroll,
         sidebar_container=sidebar.container,
         sidebar_surface=sidebar.surface,
-    )
-    shell_surface = SigningWorkspaceShellSurface(
-        widget=widget,
-        set_app_settings=set_app_settings,
-        set_document_text_selection_mode=runtime.set_document_text_selection_mode,
-        copy_selected_document_text=runtime.copy_selected_document_text,
-        action_bridge=action_bridge,
-        initial_app_settings=app_settings,
+        shell_surface=shell_surface,
     )
     orchestrator = SigningWorkspaceOrchestrator(
         interaction_bridge=interaction_bridge,

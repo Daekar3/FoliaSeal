@@ -78,6 +78,9 @@ from foliaseal.presentation.qt.signing_workspace_composition import (
     SigningWorkspaceComposition,
     build_signing_workspace_composition,
 )
+from foliaseal.presentation.qt.signing_workspace_diagnostics import (
+    SigningWorkspaceSnapshot,
+)
 from foliaseal.presentation.qt.signing_workspace_runtime import (
     SigningWorkspaceRuntime,
 )
@@ -293,6 +296,10 @@ class SigningWorkspaceWidget:
     def container(self) -> Any:
         return self.widget
 
+    def close(self) -> Any:
+        """Close the mounted Qt container and release shell-owned resources."""
+        return self.widget.close()
+
     @property
     def viewer_widget(self) -> Any:
         return self._viewer_widget
@@ -304,6 +311,16 @@ class SigningWorkspaceWidget:
     @property
     def app_settings(self) -> AppSettings:
         return self._app_settings
+
+    @property
+    def testing_adapter(self) -> Any:
+        """Expose the explicit harness adapter without dynamic widget lookup."""
+        return self._compatibility_surface.testing_adapter
+
+    @property
+    def compat_surface(self) -> Any:
+        """Historical compatibility view retained at the Qt edge only."""
+        return self._compatibility_surface
 
     def refresh_viewer(self) -> None:
         self._runtime.refresh_viewer()
@@ -375,6 +392,14 @@ class SigningWorkspaceWidget:
 
     def current_request(self) -> SigningRequest | None:
         return self._runtime.current_request()
+
+    def preview(self) -> _SigningDraftPreview:
+        """Return the current read-only signing preview."""
+        return self.properties_panel.preview()
+
+    def snapshot(self) -> SigningWorkspaceSnapshot:
+        """Return one coherent primary-workflow snapshot."""
+        return self._runtime.snapshot(last_signing_result=self.last_signing_result)
 
     def is_sign_action_enabled(self) -> bool:
         return self._runtime.is_sign_action_enabled()

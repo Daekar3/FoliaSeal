@@ -99,6 +99,7 @@ from foliaseal.presentation.qt.preview_analysis import (
     normalize_visible_text_for_comparison,
 )
 from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
+from foliaseal.presentation.qt.signing_shell_port import build_qt_signing_workspace_bundle
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
@@ -133,7 +134,7 @@ def _build_live_evidence_workspace(
     profile_store: Any,
 ) -> Phase3HarnessWorkspacePort:
     return QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
+        workspace=build_qt_signing_workspace_bundle(shell),
         profile_store=profile_store,
         deps=QtPhase3HarnessWorkspaceDeps(
             capture_preview_render=partial(

@@ -136,6 +136,7 @@ def test_session_runner_returns_raw_session_state(
 
     class _FakeShell:
         def __init__(self, **kwargs) -> None:
+            self.testing_adapter = object()
             self._on_sign_request = kwargs["on_sign_request"]
             self._on_error = kwargs["on_error"]
             self._on_status_change = kwargs["on_status_change"]
@@ -349,6 +350,7 @@ def test_session_runner_closes_window_when_setup_fails(
 
     class _Shell:
         viewer_widget = SimpleNamespace()
+        testing_adapter = SimpleNamespace()
 
         def refresh_viewer(self):
             if failure_stage == "refresh":

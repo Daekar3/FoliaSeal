@@ -25,18 +25,10 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
-from foliaseal.presentation.qt.signing_workspace_testing_port import (
-    SigningWorkspaceTestingPort,
+from foliaseal.presentation.qt.signing_shell_port import (
+    SigningWorkspaceBundle,
+    build_qt_signing_workspace_bundle,
 )
-
-
-def _testing_surface(shell: Any) -> SigningWorkspaceTestingPort:
-    testing_adapter = getattr(shell, "testing_adapter", None)
-    if testing_adapter is not None:
-        return testing_adapter
-    raise TypeError(
-        "Phase 3 harness shells must expose 'testing_adapter'."
-    )
 
 
 def _widget_application(widget: Any) -> Any | None:
@@ -240,11 +232,16 @@ class QtPhase3HarnessWorkspaceAdapter:
     def __init__(
         self,
         *,
-        shell: Any,
+        workspace: SigningWorkspaceBundle | None = None,
+        shell: Any | None = None,
         profile_store: Any,
         deps: QtPhase3HarnessWorkspaceDeps | None = None,
     ) -> None:
-        self._shell = shell
+        if workspace is None:
+            if shell is None:
+                raise TypeError("A typed workspace bundle is required.")
+            workspace = build_qt_signing_workspace_bundle(shell)
+        self._workspace = workspace
         self._profile_store = profile_store
         self._deps = deps or QtPhase3HarnessWorkspaceDeps(
             capture_preview_render=lambda **_kwargs: None,
@@ -256,7 +253,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         )
 
     def apply_scenario(self, command: Phase3HarnessScenarioCommand) -> None:
-        testing_surface = _testing_surface(self._shell)
+        testing_surface = self._workspace.testing
         workspace_state = testing_surface.snapshot()
         base_appearance = _base_appearance(
             profile_store=self._profile_store,
@@ -273,17 +270,22 @@ class QtPhase3HarnessWorkspaceAdapter:
         if command.signature_rect is not None:
             testing_surface.apply_signature_rect_placement(command.signature_rect)
         self.refresh_viewer()
-        app = _widget_application(self._shell)
+        app = _widget_application(self._workspace.view.mount_target())
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
 
     def refresh_viewer(self) -> None:
-        _testing_surface(self._shell).refresh_viewer()
+        try:
+            self._workspace.session.refresh_viewer()
+        except AttributeError:
+            if self._workspace.testing is None:
+                raise TypeError("Qt signing shells must expose 'testing_adapter'.")
+            self._workspace.testing.refresh_viewer()
 
     def capture_snapshot(
         self, command: Phase3HarnessCaptureCommand
     ) -> Phase3HarnessWorkspaceSnapshot:
-        testing_surface = _testing_surface(self._shell)
+        testing_surface = self._workspace.testing
         workspace_state = testing_surface.snapshot()
         request = (
             command.request
@@ -292,11 +294,11 @@ class QtPhase3HarnessWorkspaceAdapter:
         )
         signing_result = workspace_state.last_signing_result
         preview = testing_surface.panel.refresh_preview()
-        app = _widget_application(self._shell)
+        app = _widget_application(self._workspace.view.mount_target())
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
         render_capture = self._deps.capture_preview_render(
-            shell=self._shell,
+            workspace=self._workspace,
             preview=preview,
             artifacts_dir=command.artifacts_dir,
             artifact_basename=command.artifact_basename,
@@ -336,7 +338,8 @@ class QtPhase3HarnessWorkspaceAdapter:
 
 def capture_qt_preview_render(
     *,
-    shell: Any,
+    workspace: SigningWorkspaceBundle | None = None,
+    shell: Any | None = None,
     preview: Any,
     artifacts_dir: str | None,
     artifact_basename: str,
@@ -344,7 +347,11 @@ def capture_qt_preview_render(
 ) -> dict[str, Any]:
     """Capture the live Qt preview by reading shell anatomy only inside the workspace seam."""
 
-    testing_surface = _testing_surface(shell)
+    if workspace is None:
+        if shell is None:
+            raise TypeError("A typed workspace bundle is required.")
+        workspace = build_qt_signing_workspace_bundle(shell)
+    testing_surface = workspace.testing
     return testing_surface.panel.capture_preview_render(
         preview=preview,
         artifacts_dir=artifacts_dir,

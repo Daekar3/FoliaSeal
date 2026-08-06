@@ -20,6 +20,18 @@ class _Widget:
         self.delete_later_calls += 1
 
 
+class _View:
+    def __init__(self, widget) -> None:
+        self.widget = widget
+
+    def mount_target(self):
+        return self.widget
+
+    def dispose(self) -> None:
+        self.widget.close()
+        self.widget.deleteLater()
+
+
 class _OpenPort:
     def __init__(self, handle: WorkspaceHandle) -> None:
         self.handle = handle
@@ -67,8 +79,9 @@ def test_host_builds_command_and_publishes_active_handle() -> None:
     widget = _Widget()
     handle = WorkspaceHandle(
         source_pdf=Path("source.pdf"),
-        widget=widget,
-        shell=object(),
+        view=_View(widget),
+        maintenance=object(),
+        session=object(),
         testing=object(),
         viewer_workflow=object(),
         signing_workflow=object(),
@@ -92,8 +105,9 @@ def test_host_close_is_idempotent_and_clears_active_handle() -> None:
     widget = _Widget()
     handle = WorkspaceHandle(
         source_pdf=Path("source.pdf"),
-        widget=widget,
-        shell=object(),
+        view=_View(widget),
+        maintenance=object(),
+        session=object(),
         testing=object(),
         viewer_workflow=object(),
         signing_workflow=object(),
