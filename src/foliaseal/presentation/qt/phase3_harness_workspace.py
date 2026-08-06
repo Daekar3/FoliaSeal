@@ -25,6 +25,12 @@ from foliaseal.domain.models import (
     SigningRequest,
     SigningResult,
 )
+from foliaseal.presentation.qt.phase3_preview_render_capture import (
+    HeadlessPreviewRenderCaptureAdapter,
+    PreviewRenderCapturePort,
+    PreviewRenderCaptureRequest,
+    QtPreviewRenderCaptureAdapter,
+)
 from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBundle,
     build_qt_signing_workspace_bundle,
@@ -134,7 +140,7 @@ class HeadlessPhase3HarnessWorkspaceDeps:
 
     headless_preview_text: Callable[[Any], str]
     headless_validation_text: Callable[[Any], str]
-    capture_headless_preview_render: Callable[..., dict[str, Any] | None]
+    capture_headless_preview_render: PreviewRenderCapturePort
     snapshot_preview: Callable[..., dict[str, Any]]
     snapshot_signing_request: Callable[[SigningRequest | None], dict[str, Any] | None]
     build_backend_reservation_evidence: Callable[[SigningRequest | None], Any]
@@ -155,7 +161,9 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
         self._deps = deps or HeadlessPhase3HarnessWorkspaceDeps(
             headless_preview_text=lambda _preview: "",
             headless_validation_text=lambda _preview: "",
-            capture_headless_preview_render=lambda **_kwargs: None,
+            capture_headless_preview_render=HeadlessPreviewRenderCaptureAdapter(
+                callback=lambda **_kwargs: None,
+            ),
             snapshot_preview=lambda _preview, **_kwargs: {},
             snapshot_signing_request=lambda _request: None,
             build_backend_reservation_evidence=lambda _request: None,
@@ -189,10 +197,15 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
             else snapshot_current_draft_request(self._workflow)
         )
         preview = self._workflow.preview()
-        render_capture = self._deps.capture_headless_preview_render(
-            preview=preview,
-            artifacts_dir=command.artifacts_dir,
-            artifact_basename=command.artifact_basename,
+        render_capture_result = self._deps.capture_headless_preview_render.capture(
+            PreviewRenderCaptureRequest(
+                preview=preview,
+                artifacts_dir=command.artifacts_dir,
+                artifact_basename=command.artifact_basename or "preview",
+            )
+        )
+        render_capture = (
+            None if render_capture_result is None else render_capture_result.as_mapping()
         )
         backend_reservation = self._deps.build_backend_reservation_evidence(request)
         return Phase3HarnessWorkspaceSnapshot(
@@ -218,7 +231,7 @@ class HeadlessPhase3HarnessWorkspaceAdapter:
 class QtPhase3HarnessWorkspaceDeps:
     """Typed collaborator bundle for the live Qt harness workspace."""
 
-    capture_preview_render: Callable[..., dict[str, Any] | None]
+    capture_preview_render: PreviewRenderCapturePort
     snapshot_preview: Callable[..., dict[str, Any]]
     snapshot_signing_request: Callable[[SigningRequest | None], dict[str, Any] | None]
     build_backend_reservation_evidence: Callable[[SigningRequest | None], Any]
@@ -244,7 +257,9 @@ class QtPhase3HarnessWorkspaceAdapter:
         self._workspace = workspace
         self._profile_store = profile_store
         self._deps = deps or QtPhase3HarnessWorkspaceDeps(
-            capture_preview_render=lambda **_kwargs: None,
+            capture_preview_render=QtPreviewRenderCaptureAdapter(
+                callback=lambda **_kwargs: None,
+            ),
             snapshot_preview=lambda _preview, **_kwargs: {},
             snapshot_signing_request=lambda _request: None,
             build_backend_reservation_evidence=lambda _request: None,
@@ -288,20 +303,23 @@ class QtPhase3HarnessWorkspaceAdapter:
         testing_surface = self._workspace.testing
         workspace_state = testing_surface.snapshot()
         request = (
-            command.request
-            if command.request is not None
-            else workspace_state.current_request
+            command.request if command.request is not None else workspace_state.current_request
         )
         signing_result = workspace_state.last_signing_result
         preview = testing_surface.panel.refresh_preview()
         app = _widget_application(self._workspace.view.mount_target())
         if app is not None and hasattr(app, "processEvents"):
             app.processEvents()
-        render_capture = self._deps.capture_preview_render(
-            workspace=self._workspace,
-            preview=preview,
-            artifacts_dir=command.artifacts_dir,
-            artifact_basename=command.artifact_basename,
+        render_capture_result = self._deps.capture_preview_render.capture(
+            PreviewRenderCaptureRequest(
+                workspace=self._workspace,
+                preview=preview,
+                artifacts_dir=command.artifacts_dir,
+                artifact_basename=command.artifact_basename or "preview",
+            )
+        )
+        render_capture = (
+            None if render_capture_result is None else render_capture_result.as_mapping()
         )
         backend_reservation = self._deps.build_backend_reservation_evidence(request)
         backend_reservation_snapshot = (
@@ -491,9 +509,7 @@ def _apply_visible_fields_override(
     if not isinstance(visible_fields, list) or not visible_fields:
         raise ValueError("Scenario 'visible_fields' must be a non-empty array.")
 
-    visible_keys = {
-        _signature_field_key_from_manifest_value(value) for value in visible_fields
-    }
+    visible_keys = {_signature_field_key_from_manifest_value(value) for value in visible_fields}
     updates: dict[str, Any] = {}
     for field_key in appearance.field_order:
         binding = appearance.binding_for(field_key)
@@ -505,9 +521,7 @@ def _apply_visible_fields_override(
                 source=source,
                 show_in_visible_appearance=True,
                 override_text=(
-                    binding.override_text
-                    if source == SignatureFieldSource.OVERRIDE
-                    else None
+                    binding.override_text if source == SignatureFieldSource.OVERRIDE else None
                 ),
                 display_label=binding.display_label,
             )

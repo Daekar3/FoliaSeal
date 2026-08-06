@@ -992,7 +992,7 @@ def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() ->
     assert captured["workspace"].view.mount_target() is shell
     assert captured["profile_store"] is profile_store
     deps = captured["deps"]
-    assert callable(deps.capture_preview_render)
+    assert callable(deps.capture_preview_render.capture)
     assert deps.snapshot_preview is phase3_harness_module._snapshot_preview
     assert deps.snapshot_signing_request is phase3_harness_module._snapshot_signing_request
     assert (

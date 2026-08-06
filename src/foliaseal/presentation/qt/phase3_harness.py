@@ -78,6 +78,10 @@ from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
     snapshot_pdf_rect,
 )
+from foliaseal.presentation.qt.phase3_preview_render_capture import (
+    HeadlessPreviewRenderCaptureAdapter,
+    QtPreviewRenderCaptureAdapter,
+)
 from foliaseal.presentation.qt.phase3_sign_time_diagnostics_snapshotter import (
     Phase3SignTimeDiagnosticsSnapshotter,
 )
@@ -137,9 +141,11 @@ def _build_live_evidence_workspace(
         workspace=build_qt_signing_workspace_bundle(shell),
         profile_store=profile_store,
         deps=QtPhase3HarnessWorkspaceDeps(
-            capture_preview_render=partial(
-                capture_qt_preview_render,
-                build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
+            capture_preview_render=QtPreviewRenderCaptureAdapter(
+                callback=partial(
+                    capture_qt_preview_render,
+                    build_preview_render_capture_payload=_build_qt_preview_render_capture_payload,
+                ),
             ),
             snapshot_preview=_snapshot_preview,
             snapshot_signing_request=_snapshot_signing_request,
@@ -179,7 +185,9 @@ def _build_preview_matrix_headless_workspace(
         deps=HeadlessPhase3HarnessWorkspaceDeps(
             headless_preview_text=_headless_preview_text,
             headless_validation_text=_headless_validation_text,
-            capture_headless_preview_render=_capture_headless_preview_render,
+            capture_headless_preview_render=HeadlessPreviewRenderCaptureAdapter(
+                callback=_capture_headless_preview_render,
+            ),
             snapshot_preview=_snapshot_preview,
             snapshot_signing_request=_snapshot_signing_request,
             build_backend_reservation_evidence=build_backend_reservation_evidence,
@@ -949,33 +957,37 @@ def _build_qt_preview_render_capture_payload(
         )
     analysis_text_image_path = analysis_image_path or image_path
     analysis_detection_bounds = analysis_text_widget_bounds or text_widget_bounds
-    analysis_values = _build_preview_analysis_engine().analyze(
-        PreviewAnalysisRequest(
-            preview=preview,
-            preview_image_path=image_path,
-            analysis_image_path=analysis_text_image_path,
-            image_error=image_error,
-            card_bounds=image_card_bounds,
-            body_bounds=body_bounds,
-            detail_bounds=detail_bounds,
-            stamp_bounds=stamp_bounds,
-            text_widget_bounds=text_widget_bounds,
-            analysis_detection_bounds=analysis_detection_bounds,
-            stamp_band_bounds=stamp_band_bounds,
-            stamp_pixmap_bounds=stamp_pixmap_bounds,
-            stamp_content_bounds_override=(
-                None if canonical_snapshot is None else canonical_snapshot.stamp_bounds_px
-            ),
-            structural_text_content_bounds=text_structural_content_bounds,
-            structural_line_bounds=text_structural_line_bounds,
-            reference_text_content_bounds=text_reference_content_bounds,
-            reference_text_detection_error=text_reference_error,
-            text_color_rgba=_preview_text_color_rgba(preview),
-            active_label=active_detail,
-            preview_padding_px=_preview_padding_for_capture(preview),
-            layout_spacing_px=_layout_spacing(active_body),
+    analysis_values = (
+        _build_preview_analysis_engine()
+        .analyze(
+            PreviewAnalysisRequest(
+                preview=preview,
+                preview_image_path=image_path,
+                analysis_image_path=analysis_text_image_path,
+                image_error=image_error,
+                card_bounds=image_card_bounds,
+                body_bounds=body_bounds,
+                detail_bounds=detail_bounds,
+                stamp_bounds=stamp_bounds,
+                text_widget_bounds=text_widget_bounds,
+                analysis_detection_bounds=analysis_detection_bounds,
+                stamp_band_bounds=stamp_band_bounds,
+                stamp_pixmap_bounds=stamp_pixmap_bounds,
+                stamp_content_bounds_override=(
+                    None if canonical_snapshot is None else canonical_snapshot.stamp_bounds_px
+                ),
+                structural_text_content_bounds=text_structural_content_bounds,
+                structural_line_bounds=text_structural_line_bounds,
+                reference_text_content_bounds=text_reference_content_bounds,
+                reference_text_detection_error=text_reference_error,
+                text_color_rgba=_preview_text_color_rgba(preview),
+                active_label=active_detail,
+                preview_padding_px=_preview_padding_for_capture(preview),
+                layout_spacing_px=_layout_spacing(active_body),
+            )
         )
-    ).as_mapping()
+        .as_mapping()
+    )
     stamp_source_analysis = {
         key: analysis_values[key]
         for key in (
@@ -1006,9 +1018,7 @@ def _build_qt_preview_render_capture_payload(
     text_content_error = analysis_values["text_content_detection_error"]
     text_line_detection_error = analysis_values["text_line_detection_error"]
     text_diagnostics = {
-        key: value
-        for key, value in analysis_values.items()
-        if key.startswith("text_content_")
+        key: value for key, value in analysis_values.items() if key.startswith("text_content_")
     }
     band_distances = analysis_values["edge_distances_px"]
     font_diagnostics = {
@@ -1193,31 +1203,35 @@ def _capture_headless_preview_render(
         base_snapshot = getattr(canonical_snapshot, "appearance_snapshot", None)
         if base_snapshot is not None:
             text_structural_line_bounds = tuple(base_snapshot.line_bounds_px or ())
-    analysis_values = _build_preview_analysis_engine().analyze(
-        PreviewAnalysisRequest(
-            preview=preview,
-            preview_image_path=image_path,
-            analysis_image_path=analysis_image_path,
-            image_error=image_error,
-            card_bounds=card_bounds,
-            body_bounds=card_bounds,
-            detail_bounds=text_widget_bounds,
-            stamp_bounds=stamp_band_bounds,
-            text_widget_bounds=text_widget_bounds,
-            analysis_detection_bounds=text_widget_bounds,
-            stamp_band_bounds=stamp_band_bounds,
-            stamp_pixmap_bounds=stamp_pixmap_bounds,
-            stamp_content_bounds_override=stamp_content_bounds,
-            structural_text_content_bounds=text_structural_content_bounds,
-            structural_line_bounds=text_structural_line_bounds,
-            reference_text_content_bounds=text_structural_content_bounds,
-            reference_text_detection_error=None,
-            text_color_rgba=_preview_text_color_rgba(preview),
-            active_label=None,
-            preview_padding_px=_preview_padding_for_capture(preview),
-            layout_spacing_px=0,
+    analysis_values = (
+        _build_preview_analysis_engine()
+        .analyze(
+            PreviewAnalysisRequest(
+                preview=preview,
+                preview_image_path=image_path,
+                analysis_image_path=analysis_image_path,
+                image_error=image_error,
+                card_bounds=card_bounds,
+                body_bounds=card_bounds,
+                detail_bounds=text_widget_bounds,
+                stamp_bounds=stamp_band_bounds,
+                text_widget_bounds=text_widget_bounds,
+                analysis_detection_bounds=text_widget_bounds,
+                stamp_band_bounds=stamp_band_bounds,
+                stamp_pixmap_bounds=stamp_pixmap_bounds,
+                stamp_content_bounds_override=stamp_content_bounds,
+                structural_text_content_bounds=text_structural_content_bounds,
+                structural_line_bounds=text_structural_line_bounds,
+                reference_text_content_bounds=text_structural_content_bounds,
+                reference_text_detection_error=None,
+                text_color_rgba=_preview_text_color_rgba(preview),
+                active_label=None,
+                preview_padding_px=_preview_padding_for_capture(preview),
+                layout_spacing_px=0,
+            )
         )
-    ).as_mapping()
+        .as_mapping()
+    )
     stamp_source_analysis = {
         key: analysis_values[key]
         for key in (
@@ -1248,9 +1262,7 @@ def _capture_headless_preview_render(
     text_content_error = analysis_values["text_content_detection_error"]
     text_line_detection_error = analysis_values["text_line_detection_error"]
     text_diagnostics = {
-        key: value
-        for key, value in analysis_values.items()
-        if key.startswith("text_content_")
+        key: value for key, value in analysis_values.items() if key.startswith("text_content_")
     }
     band_distances = analysis_values["edge_distances_px"]
     stamp_debug_image_path = None
@@ -1733,6 +1745,7 @@ def _preview_text_color_rgba(preview: Any) -> tuple[int, int, int, int] | None:
         )
     except ValueError:
         return None
+
 
 def _preview_padding_for_capture_from_snapshot(snapshot: dict[str, Any]) -> int:
     signature_rect = snapshot.get("signature_rect")

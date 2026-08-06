@@ -123,4 +123,5 @@ import-purity tests or duplicate preparation.
 - [x] Implementation and boundary migration.
 - [x] Full test/Ruff/diff/import-isolation validation and docs reconciliation.
 - [x] Release preview and signed matrices, post-measurement, and docs reconciliation.
-- [ ] Commit and post-commit architecture rescan.
+- [x] Commit `4554c6922` (`refactor: isolate visible-signature layout adapters`).
+- [ ] Post-commit architecture rescan.

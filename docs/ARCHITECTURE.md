@@ -548,12 +548,29 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/presentation/qt/phase3_harness_workspace.py`
 - Responsibility: Own the narrow workspace boundary used by the Phase 3 harness for preview-matrix and signed-acceptance style mutations plus snapshot-returning capture reads.
-- Owns: `Phase3HarnessScenarioCommand`, `Phase3HarnessCaptureCommand`, `Phase3HarnessWorkspaceSnapshot`, `Phase3HarnessWorkspacePort`, `QtPhase3HarnessWorkspaceDeps`, `QtPhase3HarnessWorkspaceAdapter`, `HeadlessPhase3HarnessWorkspaceDeps`, `HeadlessPhase3HarnessWorkspaceAdapter`, `snapshot_current_draft_request(...)`, `capture_qt_preview_render(...)`, and the shared appearance/rect normalization applied to both live-shell and headless workflow paths.
+- Owns: `Phase3HarnessScenarioCommand`, `Phase3HarnessCaptureCommand`, `Phase3HarnessWorkspaceSnapshot`, `Phase3HarnessWorkspacePort`, `QtPhase3HarnessWorkspaceDeps`, `QtPhase3HarnessWorkspaceAdapter`, `HeadlessPhase3HarnessWorkspaceDeps`, `HeadlessPhase3HarnessWorkspaceAdapter`, `snapshot_current_draft_request(...)`, `capture_qt_preview_render(...)`, and the shared appearance/rect normalization applied to both live-shell and headless workflow paths. Preview snapshots delegate through the typed `PreviewRenderCapturePort` request/result seam from `phase3_preview_render_capture.py`.
 - Does not own: interactive Qt session lifecycle, toolbar wiring, signed-run capture assembly, or report finalization.
 - Key collaborators: `phase3_harness.py`, `phase3_signed_acceptance_scenario_executor.py`, `signing_workspace_testing_port.py`, `signing_workspace_compatibility_surface.py`, `SigningDraftWorkflow`, `SignaturePresetCatalogStore`.
 - Main entry points: `Phase3HarnessScenarioCommand.from_mapping()`, `QtPhase3HarnessWorkspaceAdapter.apply_scenario()`, `QtPhase3HarnessWorkspaceAdapter.capture_snapshot()`, `HeadlessPhase3HarnessWorkspaceAdapter.apply_scenario()`, `HeadlessPhase3HarnessWorkspaceAdapter.capture_snapshot()`, and `phase3_harness.py::_apply_preview_matrix_scenario()`.
-- Known constraints: This is still a narrow tracer-bullet seam, not the full harness resolution. The live adapter now translates directly through the explicit `SigningWorkspaceTestingPort` installed as `testing_adapter`, consuming its typed `panel` port rather than the concrete properties panel; preview-render capture remains behind that port, while neutral analysis is delegated to `preview_analysis.py`. The helper receives collaborators through typed live/headless dependency bundles so shell-anatomy knowledge stays concentrated in one module instead of being duplicated across preview-matrix, signed-acceptance, and session-runner call sites.
+- Known constraints: This is still a narrow tracer-bullet seam, not the full harness resolution. The live adapter now translates directly through the explicit `SigningWorkspaceTestingPort` installed as `testing_adapter`, consuming its typed `panel` port rather than the concrete properties panel; preview-render capture is delegated through the typed port, while neutral analysis is delegated to `preview_analysis.py`. The large Qt/headless payload callbacks remain composition-root implementations until a later parity-sensitive extraction slice. The helper receives collaborators through typed live/headless dependency bundles so shell-anatomy knowledge stays concentrated in one module instead of being duplicated across preview-matrix, signed-acceptance, and session-runner call sites.
 - Status: Confirmed by code and tests.
+
+### Phase 3 preview-render capture seam
+
+- Location: `src/foliaseal/presentation/qt/phase3_preview_render_capture.py`
+- Responsibility: Provide the typed request/result boundary used by live Qt and headless workspace
+  snapshot callers while preserving the existing JSON-ready render-capture mapping.
+- Owns: `PreviewRenderCaptureRequest`, `PreviewRenderCaptureResult`, `PreviewRenderCapturePort`,
+  `QtPreviewRenderCaptureAdapter`, and `HeadlessPreviewRenderCaptureAdapter`.
+- Does not own: Qt event-loop lifecycle, matrix iteration, signed-output capture, or the existing
+  artifact-heavy payload callback implementations in `phase3_harness.py`.
+- Key collaborators: `phase3_harness_workspace.py`, `phase3_harness.py`, and `preview_analysis.py`.
+- Known constraints: Live and headless adapters intentionally remain separate. `as_mapping()` is
+  the compatibility projection and `artifact_paths`/`errors` are derived views. Public
+  `phase3-signing-*` CLI names, DTOs, JSON keys, and artifact suffixes remain unchanged; internal
+  `phase3_*` nomenclature is tracked for the atomic retirement plan.
+- Status: Confirmed by focused/full tests and both release matrices; callback-body extraction is a
+  ranked follow-on rather than an unreported compatibility layer.
 
 ### Phase 3 preview matrix runner
 

@@ -24,6 +24,10 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     capture_qt_preview_render,
     snapshot_current_draft_request,
 )
+from foliaseal.presentation.qt.phase3_preview_render_capture import (
+    HeadlessPreviewRenderCaptureAdapter,
+    QtPreviewRenderCaptureAdapter,
+)
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
     SigningWorkspaceSnapshot,
 )
@@ -228,10 +232,7 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
     ).apply_scenario(command)
 
     assert testing_adapter.panel.appearance.signer_label_prefix == "Saved Profile"
-    assert (
-        testing_adapter.panel.appearance.layout_template
-        == SignatureLayoutTemplate.SINGLE_LINE
-    )
+    assert testing_adapter.panel.appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
     assert testing_adapter.panel.appearance.stamp_position == SignatureStampPosition.TOP
     assert testing_adapter.timestamp_required is False
     assert testing_adapter.panel.rect is not None
@@ -355,6 +356,7 @@ def test_qt_phase3_harness_workspace_adapter_rejects_compat_surface_only_shell()
     ):
         QtPhase3HarnessWorkspaceAdapter(shell=shell, profile_store=object())
 
+
 def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_result() -> None:
     preview = type(
         "_Preview",
@@ -418,13 +420,19 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
 
     testing_adapter = _FakeTestingAdapter()
     shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
+    capture_calls: list[dict[str, object]] = []
+
+    def capture_preview_render(**kwargs):
+        capture_calls.append(kwargs)
+        return {"preview_image_path": "artifacts/preview.png"}
+
     adapter = QtPhase3HarnessWorkspaceAdapter(
         shell=shell,
         profile_store=object(),
         deps=QtPhase3HarnessWorkspaceDeps(
-            capture_preview_render=lambda **_kwargs: {
-                "preview_image_path": "artifacts/preview.png"
-            },
+            capture_preview_render=QtPreviewRenderCaptureAdapter(
+                callback=capture_preview_render
+            ),
             snapshot_preview=lambda preview, **kwargs: {
                 "title": preview.title,
                 "render_capture": kwargs["render_capture"],
@@ -476,6 +484,8 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
         "preview_image_path": "artifacts/preview.png"
     }
     assert snapshot.preview_snapshot["sign_time_diagnostics"] == {"fit": "ok"}
+    assert len(capture_calls) == 1
+    assert capture_calls[0]["workspace"] is not None
 
 
 def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_preview(
@@ -999,8 +1009,7 @@ def test_headless_phase3_harness_workspace_adapter_applies_same_scenario_fields(
     assert workflow.current_signature_appearance is not None
     assert workflow.current_signature_appearance.signer_label_prefix == "Saved Profile"
     assert (
-        workflow.current_signature_appearance.layout_template
-        == SignatureLayoutTemplate.SINGLE_LINE
+        workflow.current_signature_appearance.layout_template == SignatureLayoutTemplate.SINGLE_LINE
     )
     assert workflow.current_signature_appearance.stamp_position == SignatureStampPosition.TOP
     assert workflow.timestamp_required is False
@@ -1020,15 +1029,21 @@ def test_headless_phase3_harness_workspace_adapter_captures_preview_state() -> N
             "stamp_position": SignatureStampPosition.BOTTOM,
         },
     )()
+    capture_calls: list[dict[str, object]] = []
+
+    def capture_headless_preview_render(**kwargs):
+        capture_calls.append(kwargs)
+        return {"preview_image_path": "headless.png"}
+
     adapter = HeadlessPhase3HarnessWorkspaceAdapter(
         workflow=workflow,
         profile_store=object(),
         deps=HeadlessPhase3HarnessWorkspaceDeps(
             headless_preview_text=lambda _preview: "Preview text",
             headless_validation_text=lambda _preview: "Ready to sign.",
-            capture_headless_preview_render=lambda **_kwargs: {
-                "preview_image_path": "headless.png"
-            },
+            capture_headless_preview_render=HeadlessPreviewRenderCaptureAdapter(
+                callback=capture_headless_preview_render
+            ),
             snapshot_preview=lambda current_preview, **kwargs: {
                 "title": current_preview.title,
                 "render_capture": kwargs["render_capture"],
@@ -1065,6 +1080,7 @@ def test_headless_phase3_harness_workspace_adapter_captures_preview_state() -> N
     assert snapshot.capture_label is None
     assert snapshot.preview_snapshot["render_capture"] == {"preview_image_path": "headless.png"}
     assert snapshot.sign_request_snapshot == {"output_pdf_path": request.output_pdf_path}
+    assert len(capture_calls) == 1
 
 
 def test_headless_phase3_harness_workspace_adapter_refresh_viewer_is_no_op() -> None:

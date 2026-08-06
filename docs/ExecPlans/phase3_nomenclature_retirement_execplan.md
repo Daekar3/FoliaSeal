@@ -89,6 +89,11 @@ an unbounded compatibility layer.
 - [x] Current external-contract boundary recorded: established `phase3` CLI commands, DTO/type
   names, JSON fields, fixtures, and artifact paths remain unchanged until an atomic migration is
   approved and validated.
+- [x] Internal debt inventory updated: the new
+  `presentation/qt/phase3_preview_render_capture.py` seam and its
+  `PreviewRenderCapture*` types intentionally retain the historical prefix for now; they must be
+  renamed together with the harness/workspace modules during the atomic migration, not via a
+  piecemeal compatibility alias.
 - [ ] Inventory and replacement mapping recorded.
 - [ ] Atomic rename/migration implemented.
 - [ ] Compatibility debris removed and validation completed.

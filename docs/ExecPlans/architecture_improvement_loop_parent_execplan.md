@@ -224,6 +224,56 @@ injected Pillow/PyHanko materializer ports. Two reviewers rejected a standalone 
 as a second planning path and agreed that import isolation, one-time measurement, memoized
 preview/signing projections, and explicit stamp suppression are hard gates.
 
+### Scan Round 3 — completed after commit `4554c6922`
+
+Three fresh independent explorers reviewed the committed checkout. The qualifying residual
+candidate was:
+
+- `phase3-preview-render-capture-boundary`: `presentation/qt/phase3_harness.py` remains a 2,386-line
+  composition root that wires private Qt/headless preview rendering, widget geometry, Pillow overlay
+  drawing, canonical render comparison, analysis diagnostics, artifact writes, and snapshot payload
+  shaping into both live and headless adapters (`_snapshot_preview`,
+  `_build_qt_preview_render_capture_payload`, `_capture_headless_preview_render`, and overlay
+  helpers). Two explorers independently identified this cluster; the third explorer independently
+  verified the main alternative below. Dependency category is local-substitutable presentation
+  infrastructure with injected Qt/Pillow/render/analysis ports. Scores `(NF,CA,SR,TG,IC,CC,MR,BU)`
+  are `(4.5,4,4,4.5,3.5,4,3,2.5)`, confidence `1.00`, Benefit `4.125`, Penalty `2.8`, and
+  Candidate Priority `65.7`.
+- `signing-time-snapshot`: preview and final signing independently read the system clock across
+  `SigningDraftWorkflow`, `VisibleSignatureSemanticsService`, `SigningActionCoordinator`,
+  `SigningRequest`, and `phase3_signing_backend.prepare_phase3_signing_plan()`. It is a credible
+  SPEC/WYSIWYG candidate, but one explorer plus orchestrator verification yields lower confidence;
+  scores `(3.5,3,3.5,4,3.5,4,2.5,2)` and Candidate Priority `55.5`.
+- App-frame/workspace lifecycle plus dialog compatibility scored `56.9` in one independent report
+  and remains below threshold for this round.
+
+Selected next candidate: `phase3-preview-render-capture-boundary` at `65.7`. It wins over the
+signing-time alternative by the fixed threshold and has the strongest independent evidence. The
+next child must leave the signed-matrix lifecycle and external `phase3-signing-*` CLI/JSON/artifact
+contracts unchanged while extracting only the preview/render capture analyzer boundary.
+
+### Cycle 3 — accepted 2026-08-05
+
+Child `docs/ExecPlans/phase3_preview_render_capture_boundary_execplan.md` is implemented. The
+workspace dependency bundles now consume one typed `PreviewRenderCapturePort`, and both live Qt and
+headless snapshot paths make one request/result capture call while retaining separate environment
+adapters and the existing artifact mapping. The large environment-specific callback bodies remain
+in `phase3_harness.py` by explicit scope decision; a future scan may rank their extraction, but this
+cycle is not claiming that file move.
+
+Evidence: focused boundary/harness/workspace tests `96 passed`; full suite `1044 passed` with one
+pre-existing Pillow deprecation warning; Ruff and `git diff --check` clean. The preview matrix ran 8
+scenarios with 0 error rows. The signed acceptance matrix ran 8 scenarios with 6 successful
+signings, 2 matched intentional rejections, zero cryptographic/annotation/preview-output failures,
+and `acceptance_expectations_passed=True`. Explicit temporary matrix directories were removed and
+the process audit found no FoliaSeal, Qt harness, or pytest processes.
+
+Cycle 3 measurement: navigation `0.0`, change amplification `0.5`, seam reduction `1.0`,
+boundary-test improvement `0.25`, interface compression `0.5`, boundary isolation `0.0`;
+`Actual Improvement = 0.35`, predicted `0.30`, prediction accuracy `1.17x`, no component below
+`-0.10`. The cycle is accepted. The internal `phase3_*` names remain external-contract debt and
+are tracked by the atomic nomenclature-retirement plan rather than renamed piecemeal.
+
 ## Surprises & Discoveries
 
 - Observation: the repository has many historical ExecPlans, but no existing parent plan that carries
@@ -253,7 +303,7 @@ preview/signing projections, and explicit stamp suppression are hard gates.
 
 ## Outcomes & Retrospective
 
-Cycle 2 implementation and documentation reconciliation are complete pending the final commit. The child
+Cycle 2 implementation, documentation reconciliation, and commit are complete. The child
 plan moved third-party layout materialization out of the neutral core without changing the plan,
 preview, signing, CLI, JSON, or artifact contracts. The neutral module now imports without PIL,
 PyHanko, Qt, or the signing backend; the adapter edge owns concrete rule/materializer construction.
@@ -278,10 +328,11 @@ zero cryptographic/annotation/preview-output failures, and `acceptance_expectati
 The explicit `/tmp/foliaseal-layout-preview` and `/tmp/foliaseal-layout-signed` directories were
 removed and the process audit is clean. The child records the same six-component proxy measurement:
 `Actual Improvement = 0.34`, predicted `0.25`, prediction accuracy `1.36x`, with no component below
-`-0.10`; all major compliance findings are resolved. Cycle 2 is accepted.
+`-0.10`; all major compliance findings are resolved. Commit `4554c6922` (`refactor: isolate
+visible-signature layout adapters`) is on `main`, and Cycle 2 is accepted.
 
-The worktree remains uncommitted. The loop is not globally complete: the parent still requires the
-intentional final commit, then a fresh three-explorer rescan after this accepted cycle and the fixed
+Cycle 3 source and plan changes are ready for the intentional commit. The loop is not globally
+complete: commit this accepted cycle, then run a fresh three-explorer rescan and apply the fixed
 below-threshold confirmation rule before stopping.
 
 ## Context and Orientation
