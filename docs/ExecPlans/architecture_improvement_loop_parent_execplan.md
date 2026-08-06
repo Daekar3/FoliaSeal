@@ -1491,6 +1491,26 @@ weighted Actual Improvement is `0.52` against predicted `0.38`, with no componen
 tracked by `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md`; this certificate slice did
 not rename phase3 CLI/DTO/JSON/fixture/artifact contracts.
 
+### Scan Round 19 — completed 2026-08-06
+
+The fresh post-acceptance scan ran from clean commit `f4f28793c`. All three explorers confirmed that
+the certificate repository and evidence-provider seams are closed. Two reports converge on a broader
+neutral preview-render boundary: `visible_signature_layout.py` still reaches private rendered-ink
+helpers in `phase3_signing_backend.py`, while `signing_preview_renderer.py` and
+`horizontal_signature_reservation.py` still import or implicitly default the concrete
+`QtPdfRenderBackend`. The third report independently ranked the same backend concentration but scored
+it borderline because rendered-ink policy currently has one concrete consumer.
+
+The strongest bounded cluster is `neutral_preview_render_backend_boundary`, with scores ranging
+`(4.0,4.0,3.75,4.0,3.5,3.5,2.75,3.25)` to `(4.0,4.0,4.5,4.0,4.0,4.0,3.0,3.0)`, confidence
+`0.83–0.86`, and Priority approximately `61–67`. A one-slice shape is to introduce an application
+raster-render port, move private preview DTO/text-bound access behind neutral APIs, and inject the
+concrete Qt renderer at presentation/CLI composition while preserving image alpha/dimensions, fit
+verdicts, cleanup, matrices, and all external contracts. The phase3 nomenclature migration remains
+the separate atomic plan at approximately `50–58` because CLI/DTO/JSON/fixture/artifact contracts
+still require a versioned decision. No implementation was started for this next candidate in the
+completed certificate slice; it is the ranked next recommendation for a new DevLoop request.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
