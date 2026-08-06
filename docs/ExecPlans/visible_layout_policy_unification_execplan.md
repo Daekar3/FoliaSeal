@@ -284,7 +284,7 @@ helpers, PyHanko adapters, Qt capture, and artifact writers remain outside this 
   stateless facade to unify duplicate visible-signature geometry while preserving the separate phase3
   nomenclature migration and all frozen evidence contracts.
 - 2026-08-06: Implemented the facade, backend/harness migration, public lazy exports, focused policy
-  tests, and architecture documentation. Full/offscreen validation passed; commit and post-commit
-  closure scan are the remaining gates. The dedicated
-  `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` remains the follow-on atomic rename
-  plan and is intentionally not mixed into this geometry slice.
+  tests, and architecture documentation. Full/offscreen validation passed; implementation commit
+  `bb9e77b2c` and closure correction commit `c74fa1f3e` are complete, with three post-commit audits
+  confirming clean state. The dedicated `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md`
+  remains the follow-on atomic rename plan and is intentionally not mixed into this geometry slice.
