@@ -113,8 +113,9 @@ created.
   fresh rescan remains before accepting the slice.
 - [x] Accepted provider slice at `435b41312`/`4cd0c2515` and completed scan round 16; no candidate
   passed the two-record and Priority `60` gates, beginning the required below-threshold confirmation.
-- [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
-  rule is actually satisfied.
+- [x] Completed scan round 17 with no convergent qualifying candidate; rounds 16 and 17 satisfy the
+  two-consecutive below-threshold confirmation stop rule. The loop is paused with ranked future
+  candidates recorded rather than inventing a child plan.
 
 ## Scan and Candidate Ledger
 
@@ -1378,6 +1379,23 @@ Priority is approximately `55–60` (confidence `0.99`), below the fixed `60` ga
 candidate is the shallow `_active_refinement_dialog` test bridge at approximately `62`, but it has
 low architectural depth and is not independently confirmed as the strongest seam. This is the first
 consecutive below-threshold confirmation scan; no child plan is selected.
+
+### Scan Round 17 — completed 2026-08-06; stop condition satisfied
+
+Baseline commit: `7c9bf8d32`; the worktree was clean. Three independent explorers found no single
+candidate with two independent current evidence records and a bounded deep-module score that clears
+the credibility gate. One report again ranked concrete certificate-store injection at `65–68`, and
+another identified neutral visible-layout imports of private backend rendered-ink helpers at `61–64`;
+the third substantiated only the shallow `_active_refinement_dialog` test bridge at `61–63`. Because
+these reports do not converge on one candidate, none is selectable under the fixed two-record rule.
+
+The phase3 nomenclature migration remains contract-blocked at approximately `40–60` after accounting
+for 76 live references and frozen CLI/DTO/JSON/fixture/artifact names. The evidence-provider seam is
+closed, the certificate model boundary is closed, and the stale architecture note was reconciled.
+Round 16 and round 17 are two consecutive independent below-threshold confirmation scans. The fixed
+architecture-improvement-loop stop condition is therefore satisfied; do not invent a child plan from
+a single dissenting report. Preserve the ranked certificate-persistence and neutral-layout seams as
+future candidates for a new loop run or explicit user authorization.
 
 ## Context and Orientation
 
