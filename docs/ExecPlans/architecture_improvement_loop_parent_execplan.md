@@ -2096,7 +2096,8 @@ Conservative repeated proxies are navigation `.45`, change amplification `.45`, 
 regressed below `-.10`. The independent compliance review found and the implementation corrected
 one exact error-message drift; no critical/major finding remains. Documentation reconciliation is
 complete, and the implementation is committed as `a8590c0ce` (`Introduce managed material resolution
-boundary`) with a clean worktree.
+boundary`) followed by ledger/architecture closure `972433b46` (`Close managed material architecture
+slice`) with a clean worktree.
 
 ### Scan Round 42 — completed after commit `a8590c0ce`
 

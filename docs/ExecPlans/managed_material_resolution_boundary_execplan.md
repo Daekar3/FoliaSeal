@@ -63,8 +63,9 @@ coordinator with a fake one-method material port and a repository fake with no d
 - [x] (2026-08-06) Reconciled architecture/parent/child ownership text and recorded the compliance
   correction restoring the exact saved-password provider error message.
 - [x] (2026-08-06) Committed the implementation, tests, architecture documentation, and this plan as
-  `a8590c0ce` (`Introduce managed material resolution boundary`); the generated evidence summary is
-  absent and the worktree is clean.
+  `a8590c0ce` (`Introduce managed material resolution boundary`); the ledger and architecture
+  reconciliation then closed in `972433b46` (`Close managed material architecture slice`). The
+  generated evidence summary is absent and the worktree is clean.
 - [x] (2026-08-06) Completed three independent post-commit explorer scans. They found no source
   regression or phase3 contract drift; the next ranked cleanup is the coordinator's fallback
   `default_certificate_managed_dir()` construction, followed by catalog/store source-of-truth and
