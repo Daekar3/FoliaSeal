@@ -5,7 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from foliaseal.application.reusable_signing_models import (
+    PlacementProfileRect,
+    ResolvedSignaturePreset,
+    SignaturePreset,
+    SignaturePresetCatalog,
+)
+from foliaseal.application.reusable_signing_models import (
+    ReusableObjectValidationError as ConfigValidationError,
+)
 from foliaseal.application.reusable_signing_objects import (
+    CatalogRepository,
     DeleteObject,
     InMemoryCatalogRepository,
     ReusableObjectKind,
@@ -32,15 +42,9 @@ from foliaseal.domain.models import (
     SignatureRect,
 )
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
     CertificateCatalog,
     CertificateConfiguration,
-    ConfigValidationError,
-    PlacementProfileRect,
-    ResolvedSignaturePreset,
-    SignaturePreset,
-    SignaturePresetCatalog,
 )
 
 
@@ -244,7 +248,7 @@ class DefaultSignaturePropertiesCoordinator:
     certificate_catalog_store: CertificateCatalogStore | None = None
     certificate_secret_provider: CertificateSecretProvider | None = None
     preset_catalog: SignaturePresetCatalog | None = None
-    preset_catalog_store: SignaturePresetCatalogStore | None = None
+    preset_catalog_store: CatalogRepository | None = None
     reusable_objects: ReusableSigningObjects | None = None
 
     def __post_init__(self) -> None:

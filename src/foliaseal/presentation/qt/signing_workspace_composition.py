@@ -25,6 +25,7 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionEngine,
     DocumentTextSelectionSession,
 )
+from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.signing_material_resolver import CertificateSecretProvider
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
@@ -36,11 +37,7 @@ from foliaseal.domain.models import (
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import (
-    AppSettings,
-    CertificateCatalog,
-    SignaturePresetCatalog,
-)
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
 from foliaseal.infra.document_text_selection import QtPdfDocumentTextSelectionEngine
 from foliaseal.presentation.qt.signing_action_boundary import (

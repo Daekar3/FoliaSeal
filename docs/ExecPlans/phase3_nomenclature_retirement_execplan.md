@@ -48,6 +48,25 @@ not a permanent alias; any retained reader must have a dated retirement criterio
    describe the durable acceptance/evidence capabilities without phase language. Do not rewrite
    immutable historical evidence; annotate archival references only where needed for provenance.
 
+## Current inventory and replacement mapping (2026-08-06)
+
+The live checkout contains `phase3` references in 32 source files, 30 test/fixture files, 3 scripts,
+the README, and 162 documentation files (the documentation count includes historical ExecPlans and
+archival evidence). The inventory is intentionally recorded before any rename:
+
+| Occurrence class | Current examples | Replacement decision |
+|---|---|---|
+| Internal application evidence modules | `application/phase3_evidence_core.py`, `phase3_fidelity_contract.py` | `evidence_core.py`, `fidelity_contract.py` in one atomic import/packaging/test migration |
+| Internal Qt harness modules | `presentation/qt/phase3_harness*.py`, `phase3_*snapshotter.py` | `acceptance_harness*`, `preview_matrix*`, or `signed_acceptance*` by behavior; rename files and symbols together |
+| Public CLI commands | `phase3-signing-harness`, `phase3-signing-preview-matrix`, `phase3-signing-acceptance-matrix`, `phase3-signing-acceptance-evidence`, `phase3-signing-harness-validate` | Preserve in this plan; migrate only with parser, README, scripts, tests, release audit, and an explicit deprecation/removal decision in one slice |
+| JSON/DTO/fixture contracts | `Phase3*` types, `phase3_fidelity_v1`, `tests/fixtures/phase3`, `artifacts/phase3*` | Preserve until a versioned reader/writer and fixture migration is approved; no compatibility alias is added |
+| Active docs | architecture, README, current ExecPlans | Rewrite to durable acceptance/evidence terminology during the atomic rename; keep provenance notes for historical records |
+| Historical evidence/handoffs | dated artifacts and completed plans | Do not rewrite; annotate only when a current document links to them |
+
+The next rename slice must begin by regenerating this inventory, then perform the full mapping
+atomically. A piecemeal rename is explicitly rejected because it would leave mixed imports,
+packaging paths, CLI help, fixture names, or persisted contract labels.
+
 ## Acceptance contract
 
 - `docs/SPEC.md` is byte-for-byte unchanged.
@@ -94,7 +113,8 @@ an unbounded compatibility layer.
   `PreviewRenderCapture*` types intentionally retain the historical prefix for now; they must be
   renamed together with the harness/workspace modules during the atomic migration, not via a
   piecemeal compatibility alias.
-- [ ] Inventory and replacement mapping recorded.
+- [x] Inventory and replacement mapping recorded on 2026-08-06 (32 source files, 30 test/fixture
+  files, 3 scripts, README, and 162 documentation files before excluding this plan).
 - [ ] Atomic rename/migration implemented.
 - [ ] Compatibility debris removed and validation completed.
 - [ ] Architecture/README/ExecPlans reconciled and committed.

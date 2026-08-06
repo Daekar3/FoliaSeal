@@ -18,6 +18,7 @@ from foliaseal.application.document_review import (
 )
 from foliaseal.application.document_text_search import DocumentTextMatch
 from foliaseal.application.document_text_selection import DocumentTextSelection
+from foliaseal.application.reusable_signing_models import PlacementProfileRect
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
@@ -34,7 +35,7 @@ from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
 )
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog, PlacementProfileRect
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module

@@ -7,15 +7,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from foliaseal.infra.config.schemas import (
+from foliaseal.application.reusable_signing_models import (
     AppearanceProfile,
-    ConfigValidationError,
     ResolvedSignaturePreset,
     SignaturePresetCatalog,
     _deserialize_appearance,
     _deserialize_placement_defaults,
     _stable_id,
 )
+from foliaseal.infra.config.schemas import ConfigValidationError
 
 PROFILE_DIRECTORY_NAME = "Signature Profiles"
 PROFILE_CATALOG_FILENAME = "profiles.json"

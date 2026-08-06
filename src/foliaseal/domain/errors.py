@@ -5,6 +5,10 @@ from __future__ import annotations
 from enum import Enum
 
 
+class ConfigValidationError(ValueError):
+    """Raised when a persisted configuration value has an invalid shape or type."""
+
+
 class FailureCode(str, Enum):  # noqa: UP042
     """Stable failure codes surfaced to UI/logging layers."""
 

@@ -28,6 +28,7 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionEngine,
     DocumentTextSelectionState,
 )
+from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinatorError as _SignaturePropertiesCoordinatorError,
 )
@@ -60,11 +61,7 @@ from foliaseal.domain.models import (
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import (
-    AppSettings,
-    CertificateCatalog,
-    SignaturePresetCatalog,
-)
+from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
 from foliaseal.presentation.qt.signature_preview_layout import (
     _preview_stamp_text as _preview_stamp_text_impl,
 )

@@ -10,6 +10,7 @@ from cryptography.x509.oid import NameOID
 
 from foliaseal.application.certificate_preview import CertificatePreviewValues
 from foliaseal.application.coordinate_transform import PageBox, ViewRect, ViewTransform
+from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
 from foliaseal.application.signing_draft_workflow import (
     SignaturePlacementContext,
     SigningDraftValidationError,
@@ -28,7 +29,6 @@ from foliaseal.domain.models import (
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
 )
-from foliaseal.infra.config.schemas import ResolvedSignaturePreset
 from tests.support.signing_builders import build_certificate_configuration
 
 

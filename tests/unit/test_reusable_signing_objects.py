@@ -3,6 +3,10 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.reusable_signing_models import (
+    PlacementProfileRect,
+    _serialize_appearance,
+)
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
     RenameObject,
@@ -13,11 +17,7 @@ from foliaseal.application.reusable_signing_objects import (
     SavePreset,
 )
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import (
-    ConfigValidationError,
-    PlacementProfileRect,
-    _serialize_appearance,
-)
+from foliaseal.infra.config.schemas import ConfigValidationError
 from tests.support.signing_builders import build_signature_appearance
 
 

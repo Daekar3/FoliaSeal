@@ -1,17 +1,19 @@
 import pytest
 
+from foliaseal.application.reusable_signing_models import (
+    AppearanceProfile,
+    PlacementProfile,
+    SignaturePreset,
+    SignaturePresetCatalog,
+)
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.schemas import (
-    AppearanceProfile,
     AppSettings,
     CertificateCatalog,
     CertificateConfiguration,
     ConfigValidationError,
     ManagedCertificate,
     ManagedCertificateSubjectSummary,
-    PlacementProfile,
-    SignaturePreset,
-    SignaturePresetCatalog,
     TimestampPolicy,
     TrustProfile,
 )

@@ -52,6 +52,9 @@ created.
 - [x] The current checkout baseline is `main` at commit `ca6857ef9` (clean at loop start).
 - [x] Child plan `signing_workspace_primary_session_hybrid_execplan.md` records the hybrid interface,
   baseline proxies, behavior map, predicted improvement, and acceptance gates.
+- [x] Child plan `reusable_signing_models_application_boundary_execplan.md` records the persisted-
+  schema boundary, canonical application models, repository protocol, phase3 migration handoff,
+  baseline proxies, and acceptance gates.
 - [x] The selected child DevLoop has completed implementation, validation, compliance review,
   documentation reconciliation, and commit closure in `9ce248fd3`.
 
@@ -76,6 +79,14 @@ created.
   visible-signature-layout boundary for the next design review.
 - [x] Completed scan round 2 with three independent explorers after `9ce248fd3`; the next
   candidate is recorded below and the next child plan is pending design review.
+- [x] Completed fresh scan round 6 and design review after cycle 5; persisted-schema boundary was
+  selected over compatibility-surface, CLI, and nomenclature-only alternatives.
+- [x] Execute `reusable_signing_models_application_boundary_execplan.md` through the complete
+  DevLoop, including duplicate schema deletion, import-boundary tests, full suite, release
+  matrices, cleanup, and documentation reconciliation.
+- [x] Complete the post-cap continuation slice after measuring the reduced schema boundary and
+  confirming no frozen contract or acceptance-matrix regression; this is not counted as a sixth
+  accepted cycle under the fixed five-cycle loop cap.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -406,6 +417,49 @@ final clean-worktree audit. Remaining backend adapter concentration, workspace c
 exports, app-to-infra DTO coupling, and phase nomenclature migration are ranked follow-on plans,
 not silently ignored work. Implementation commit `597efea39` and architecture-documentation commit
 `f308bbe30` are on `main`.
+
+### Post-cap continuation scan — completed 2026-08-06
+
+Three independent design/scan reports and the orchestrator's repository review were consolidated
+after cycle 5. The strongest qualifying seam was `persisted-schema-boundary`: `infra/config/
+schemas.py` had 1,633 lines combining app settings, certificates, reusable signing-object models,
+validation, and JSON codecs, while five application modules imported reusable DTOs from infra.
+Independent candidate dimensions were approximately `(4.5, 4.5, 4, 4.5, 4, 4.5, 3, 3.5)` with
+confidence `0.86`--`0.97` and Candidate Priority approximately `64`--`67`, above the fixed `60`
+gate. The compatibility-surface candidate was lower and the phase3 rename remained an atomic
+external-contract migration rather than a safe rename-only cycle.
+
+Design review compared a minimal schema submodule (83/100), a ports/adapters repository split,
+and a flexible application-owned model plus persistence adapter. The selected constrained hybrid
+kept `CatalogRepository` as the application protocol, moved canonical reusable models and catalog
+policy to `application/reusable_signing_models.py`, and left JSON/path/atomic-write/legacy-reader
+behavior in `infra/config/profile_storage.py`. It exceeded the valid minimal shape on ownership and
+boundary clarity without extracting certificates or changing public contracts.
+
+### Post-cap continuation slice 1 — accepted 2026-08-06
+
+Child `docs/ExecPlans/reusable_signing_models_application_boundary_execplan.md` is implemented.
+`infra/config/schemas.py` fell from `1,633` to `712` lines: the duplicate reusable model block,
+appearance/placement codecs, and infrastructure re-exports were deleted. Application reusable
+callers now import only the canonical model module; the coordinator accepts the `CatalogRepository`
+protocol, and a shared domain `ConfigValidationError` keeps application and infrastructure
+validation behavior coherent without an application-to-infra import.
+
+Evidence: focused reusable-model/storage/coordinator/draft suites passed; the full suite passed
+`1048` tests with one pre-existing warning; Ruff and `git diff --check` passed; application model
+subprocess import isolation passed; CLI help/parser checks passed. The preview matrix executed `8`
+scenarios with `0` errors. The signed matrix executed `8` scenarios with `6` successful signings,
+`2` matched intentional rejections, `0` cryptographic failures, `0` annotation mismatches, `0`
+preview-output comparison failures, and `acceptance_expectations_passed=true`. Explicit temporary
+directories were removed and the process audit was clean.
+
+Continuation-slice proxy measurement: navigation `0.5`, change amplification `0.5`, seam reduction `0.5`,
+boundary-test improvement `0.5`, interface compression `0.5`, boundary isolation `0.75`;
+`Actual Improvement = 0.54`, predicted `0.25`, prediction accuracy `2.16x`, with no component below
+`-0.10`. The phase3 nomenclature plan now contains the live inventory (32 source files, 30 test/
+fixture files, 3 scripts, README, and 162 documentation files) and replacement mapping; no public
+phase3 contract was renamed piecemeal. The implementation commit closes the continuation slice; it
+does not alter the original loop's five-cycle cap.
 
 ## Context and Orientation
 

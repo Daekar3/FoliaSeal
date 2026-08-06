@@ -11,6 +11,13 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
+from foliaseal.application.reusable_signing_models import (
+    AppearanceProfile,
+    PlacementProfile,
+    ResolvedSignaturePreset,
+    SignaturePreset,
+    SignaturePresetCatalog,
+)
 from foliaseal.domain.models import (
     SignatureAnchor,
     SignatureAppearance,
@@ -28,15 +35,10 @@ from foliaseal.domain.models import (
     TimestampTrustPolicy,
 )
 from foliaseal.infra.config.schemas import (
-    AppearanceProfile,
     CertificateCatalog,
     CertificateConfiguration,
     ManagedCertificate,
     ManagedCertificateSubjectSummary,
-    PlacementProfile,
-    ResolvedSignaturePreset,
-    SignaturePreset,
-    SignaturePresetCatalog,
 )
 
 

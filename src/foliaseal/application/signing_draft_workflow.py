@@ -19,6 +19,7 @@ from foliaseal.application.coordinate_transform import (
     validate_pdf_rect_within_page,
     view_rect_to_pdf_rect,
 )
+from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
 from foliaseal.application.signing_material_resolver import SigningMaterial
 from foliaseal.domain.models import (
     SignatureAppearance,
@@ -34,7 +35,7 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
-from foliaseal.infra.config.schemas import CertificateConfiguration, ResolvedSignaturePreset
+from foliaseal.infra.config.schemas import CertificateConfiguration
 
 
 class SigningDraftValidationError(ValueError):

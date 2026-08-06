@@ -6,16 +6,19 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
 
-from foliaseal.domain.models import SignatureAppearance, SignaturePlacementDefaults
-from foliaseal.infra.config.schemas import (
+from foliaseal.application.reusable_signing_models import (
     AppearanceProfile,
-    ConfigValidationError,
     PlacementProfile,
     PlacementProfileRect,
     ResolvedSignaturePreset,
     SignaturePreset,
     SignaturePresetCatalog,
+    _stable_id,
 )
+from foliaseal.application.reusable_signing_models import (
+    ReusableObjectValidationError as ConfigValidationError,
+)
+from foliaseal.domain.models import SignatureAppearance, SignaturePlacementDefaults
 
 
 class ReusableObjectKind(Enum):
@@ -389,12 +392,6 @@ def _require_name(value: str, message: str) -> str:
     if not normalized:
         raise ConfigValidationError(message)
     return normalized
-
-
-def _stable_id(prefix: str, value: str) -> str:
-    from foliaseal.infra.config.schemas import _stable_id as schema_stable_id
-
-    return schema_stable_id(prefix, value)
 
 
 def _appearance_by_id(
