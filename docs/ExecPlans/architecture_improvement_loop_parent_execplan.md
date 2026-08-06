@@ -2555,3 +2555,15 @@ coverage `105 passed`, full suite `1,142 passed, 1 warning`, Ruff, compileall, C
 isolation, and diff checks. The unchanged offscreen signed-acceptance command passed with `10`
 scenarios/`7` successful signings, preview parity `18/18`, and fit rejection `3/3`; its transient
 summary was removed and no FoliaSeal/Qt/test process remains.
+
+### Closure correction 52.1 — completed after post-commit audit
+
+The first post-commit audit found that the new optional factory branch still pre-built a raw shell,
+causing `QtSigningWorkspaceFactory` to build a second shell; signed acceptance mounted the first
+while mutating the second. The correction removes raw-shell construction whenever the typed factory
+is supplied, mounts `bundle.view.mount_target()`, and passes the exact bundle into scenario mutation
+and capture. The compatibility-only fallback remains available only when the typed factory is absent
+for characterization tests and low-level Qt edges. Wrapper helpers omit an optional `workspace=None`
+keyword so existing fakes retain their narrow call contract. Full pytest was rerun at `1,142 passed,
+1 warning`; offscreen evidence again passed `10/7`, `18/18`, and `3/3`; generated acceptance outputs
+were removed. The correction is ready for its follow-up commit and fresh closure scan.

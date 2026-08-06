@@ -166,15 +166,6 @@ class Phase3HarnessSessionRunner:
 
         try:
             reusable_objects = ReusableSigningObjects(profile_store)
-            shell = self.deps.build_qt_signing_shell(
-                viewer_workflow=viewer_workflow,
-                signing_workflow=signing_workflow,
-                reusable_objects=reusable_objects,
-                sign_executor=sign_executor,
-                on_sign_request=on_sign_request,
-                on_error=on_error,
-                on_status_change=on_status_change,
-            )
             if self.deps.create_workspace is not None:
                 workspace_bundle = self.deps.create_workspace(
                     SigningWorkspaceBootstrap(
@@ -190,6 +181,15 @@ class Phase3HarnessSessionRunner:
                 )
                 workspace = self.deps.build_workspace(workspace_bundle)
             else:
+                shell = self.deps.build_qt_signing_shell(
+                    viewer_workflow=viewer_workflow,
+                    signing_workflow=signing_workflow,
+                    reusable_objects=reusable_objects,
+                    sign_executor=sign_executor,
+                    on_sign_request=on_sign_request,
+                    on_error=on_error,
+                    on_status_change=on_status_change,
+                )
                 workspace = self.deps.build_workspace(shell)
                 workspace_bundle = build_qt_signing_workspace_bundle(shell)
         except Exception:

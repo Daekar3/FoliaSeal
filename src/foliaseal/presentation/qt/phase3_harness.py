@@ -1010,16 +1010,20 @@ def _execute_signed_acceptance_scenario(
     passphrase: str,
     sign_executor: Any,
 ) -> Phase3SignedAcceptanceScenarioResult | dict[str, Any]:
+    kwargs: dict[str, Any] = {
+        "shell": shell,
+        "scenario": scenario,
+        "profile_store": profile_store,
+        "artifacts_dir": artifacts_dir,
+        "base_input_path": base_input_path,
+        "certificate_path": certificate_path,
+        "passphrase": passphrase,
+        "sign_executor": sign_executor,
+    }
+    if workspace is not None:
+        kwargs["workspace"] = workspace
     return _build_signed_acceptance_scenario_executor().run_result(
-        shell=shell,
-        workspace=workspace,
-        scenario=scenario,
-        profile_store=profile_store,
-        artifacts_dir=artifacts_dir,
-        base_input_path=base_input_path,
-        certificate_path=certificate_path,
-        passphrase=passphrase,
-        sign_executor=sign_executor,
+        **kwargs,
     )
 
 
@@ -1030,11 +1034,12 @@ def _apply_preview_matrix_scenario(
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
 ) -> None:
-    _build_preview_matrix_qt_workspace(
-        shell=shell,
-        workspace=workspace,
-        profile_store=profile_store,
-    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
+    kwargs: dict[str, Any] = {"shell": shell, "profile_store": profile_store}
+    if workspace is not None:
+        kwargs["workspace"] = workspace
+    _build_preview_matrix_qt_workspace(**kwargs).apply_scenario(
+        Phase3HarnessScenarioCommand.from_mapping(scenario)
+    )
 
 
 def _preview_render_evidence_dependencies() -> PreviewRenderEvidenceDependencies:

@@ -122,11 +122,14 @@ class Phase3SignedAcceptanceScenarioExecutor:
         passphrase: str,
         sign_executor: Any,
     ) -> Phase3SignedAcceptanceScenarioResult:
-        self.deps.apply_preview_matrix_scenario(
-            shell=shell,
-            scenario=scenario,
-            profile_store=profile_store,
-        )
+        scenario_kwargs: dict[str, Any] = {
+            "shell": shell,
+            "scenario": scenario,
+            "profile_store": profile_store,
+        }
+        if workspace is not None:
+            scenario_kwargs["workspace"] = workspace
+        self.deps.apply_preview_matrix_scenario(**scenario_kwargs)
         harness_workspace = (
             self.deps.build_workspace(workspace=workspace, profile_store=profile_store)
             if workspace is not None

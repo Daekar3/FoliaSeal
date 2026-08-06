@@ -142,13 +142,6 @@ class Phase3SignedAcceptanceMatrixRunner:
             lifecycle.start(
                 title=f"FoliaSeal Phase 3 Signed Acceptance Matrix - {source_path.name}"
             )
-            shell = self.deps.build_qt_signing_shell(
-                viewer_workflow=viewer_workflow,
-                signing_workflow=signing_workflow,
-                reusable_objects=reusable_objects,
-                sign_executor=sign_executor,
-            )
-            lifecycle.attach_shell(shell)
             workspace_bundle: SigningWorkspaceBundle | None = None
             if self.deps.create_workspace is not None:
                 workspace_bundle = self.deps.create_workspace(
@@ -164,8 +157,17 @@ class Phase3SignedAcceptanceMatrixRunner:
                     workspace=workspace_bundle,
                     profile_store=profile_store,
                 )
+                shell = workspace_bundle.view.mount_target()
             else:
+                shell = self.deps.build_qt_signing_shell(
+                    viewer_workflow=viewer_workflow,
+                    signing_workflow=signing_workflow,
+                    reusable_objects=reusable_objects,
+                    sign_executor=sign_executor,
+                )
                 workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
+                workspace_bundle = None
+            lifecycle.attach_shell(shell)
             workspace.refresh_viewer()
             lifecycle.process_events()
 

@@ -53,10 +53,10 @@ the production/harness graph.
   acceptance construction paths; the legacy raw-shell fallback remains only for compatibility tests
   and low-level Qt edges and is recorded as the next retirement gate.
 - [x] Migrated boundary wiring and preserved compatibility characterization coverage.
-- [ ] Add explicit standalone adapter/installer identity and lifecycle tests if the acceptance audit
-  identifies a missing invariant.
-- [ ] Run focused/full/offscreen validation, remove generated artifacts/processes, reconcile parent
-  and architecture docs, commit, and complete a fresh three-explorer closure scan.
+- [x] Acceptance audit found no missing adapter/installer identity or lifecycle invariant; existing
+  characterization and full harness coverage remain green.
+- [x] Ran focused/full/offscreen validation, removed generated artifacts/processes, reconciled parent
+  and architecture docs, committed the slice, and completed the fresh three-explorer closure scan.
 
 ## Surprises & Discoveries
 
@@ -108,18 +108,21 @@ the production/harness graph.
 
 ## Outcomes & Retrospective
 
-The implementation is complete locally pending the acceptance/commit gate. The focused inventory
+The implementation is complete at commit `e8e9c99f4`. The focused inventory
 now reports 157 compatibility/export/factory construction references (including characterization
 tests and the documented transitional fallbacks) and 20 broader `compat_surface` or
 `install_widget_exports` references. The testing adapter no longer stores a compatibility-surface
 back-reference; the installer is idempotent and owns dynamic assignments. Interactive and signed
-acceptance production paths can create one typed bundle and reuse it through the harness seam.
+acceptance production paths create one typed bundle and reuse it through the harness seam, including
+scenario mutation and capture.
 Measured validation is `1,142 passed, 1 warning`, Ruff clean, compileall clean, and diff-check clean.
 The provisional component proxies are navigation `.55`, change amplification `.72`, seam reduction
 `.78`, boundary-test improvement `.76`, interface compression `.66`, cohesion `.68`, and isolation
 `.82`, for Actual Improvement approximately `.70`; no observed component regressed beyond `.10`.
-The raw-shell fallback remains explicitly bounded and is the next retirement gate, not a hidden caller
-contract. Replace this paragraph with the final commit ID and offscreen evidence result before closure.
+The raw-shell fallback remains explicitly bounded for characterization tests and low-level Qt edges;
+it is the next retirement gate, not a hidden caller contract. Offscreen evidence passed with signed
+acceptance `10/7`, preview parity `18/18`, and fit rejection `3/3`; the generated summary and matrix
+trees were removed after the audit.
 
 ## Context and Orientation
 
@@ -233,8 +236,9 @@ Run all commands from `/home/daekar/FoliaSeal`.
        git diff --exit-code -- docs/SPEC.md
 
    Any remaining matches must be limited to the documented Qt-local installer/facade, low-level shell
-   edge, dedicated compatibility characterization tests, and architecture/plan rationale. No raw-shell
-   fallback may remain in the Phase 3 workspace adapter or session runner.
+   edge, dedicated compatibility characterization tests, and architecture/plan rationale. The typed
+   factory path must not build a raw shell first or wrap a second shell; compatibility fallbacks are
+   only permitted when the typed factory is intentionally absent.
 
 ## Validation and Acceptance
 
@@ -299,3 +303,7 @@ it is explicitly the legacy edge; the typed adapter and bundle remain the testab
 - 2026-08-06: Created from Scan Round 52 and Design Selection 53. Selected constrained A+C hybrid to
   make typed bundle construction the dominant caller path while isolating, then retiring, the dynamic
   Qt compatibility exports without changing frozen evidence contracts.
+- 2026-08-06: Corrected the first implementation pass after closure review: typed factory runners no
+  longer pre-build a raw shell and create a second one; signed scenario mutation now receives the
+  same bundle used for capture; compatibility wrappers omit optional bundle keywords for legacy fake
+  callers. Full suite and offscreen acceptance were rerun successfully.
