@@ -1397,6 +1397,100 @@ architecture-improvement-loop stop condition is therefore satisfied; do not inve
 a single dissenting report. Preserve the ranked certificate-persistence and neutral-layout seams as
 future candidates for a new loop run or explicit user authorization.
 
+### Scan Round 18 — resumed loop, completed 2026-08-06
+
+The persistent user objective continued after the prior confirmation stop, so this is a fresh scan
+round against clean commit `68ac11807`. Three independent explorers reviewed the repository. One
+explorer and an independent orchestrator verification converge on the same bounded candidate:
+application services still import and type the concrete
+`infra.config.certificate_storage.CertificateCatalogStore`. `CertificateManager` uses concrete
+storage paths for managed-file writes, staged deletion, catalog rollback, and export;
+`DefaultSignaturePropertiesCoordinator` uses the store for catalog reload and to discover the managed
+certificate directory for `CertificateSigningMaterialResolver`; Qt composition/host/shell surfaces
+thread the concrete store through these application services. Existing certificate-storage tests,
+manager tests, coordinator tests, and reusable-object `CatalogRepository` patterns provide local
+stand-ins and characterization coverage.
+
+The explorer score is `(4.25,4.0,4.0,4.5,4.0,4.25,3.0,2.0)` for
+`(NF,CA,SR,TG,IC,CC,MR,BU)`. The orchestrator independently verified the complete path and scored
+`(4.0,4.0,4.0,4.5,4.0,4.0,3.0,2.0)`. The consensus median is approximately
+`(4.125,4.0,4.0,4.5,4.0,4.125,3.0,2.0)`, with agreement about `0.97`, evidence coverage `1.0`,
+confidence about `0.91`, and Candidate Priority approximately `65–68`, above the fixed continuation
+threshold. Dependency category is local-substitutable application/persistence: an in-memory catalog
+and managed-file fake can exercise application policy while `CertificateCatalogStore` remains the
+production infra adapter.
+
+Rejected or deferred alternatives: the neutral-layout/private-render helper leak scored `61–64` in
+one report only; the `_active_refinement_dialog` bridge is shallow/test-only; phase3 nomenclature is
+an atomic contract migration around `55–60`; and backend rendered-ink extraction lacks a second
+consumer. Selected candidate: `certificate_catalog_repository_boundary`. The design round must keep
+catalog invariants, managed-file rollback, export/delete safety, secret rollback, storage paths,
+error strings, Qt behavior, and all phase3 contracts unchanged while removing application imports of
+the concrete storage adapter.
+
+### Design Selection 18 — completed 2026-08-06
+
+Three independent designs were generated and two reviewers scored them. Design A was an
+annotation-only protocol with the coordinator still coupled to concrete paths; it scored about
+`67–73` after an infrastructure-leak penalty and was rejected as incomplete. Design B was a single
+application-owned `CertificateCatalogRepository` protocol covering the current catalog verbs plus a
+read-only managed-certificate directory capability; `CertificateManager` and the coordinator migrate
+to it while `CertificateCatalogStore` remains the production adapter. Reviewer scores ranged
+`77–80`, with the strongest migration and transaction safety. Design C moved all managed-file
+staging, rollback, export, and catalog transaction policy behind a larger application repository;
+one reviewer scored it `90`, but the other scored it `70–74` after migration and atomicity risk. It is
+invalid for this one-slice scope because moving file/secret rollback would alter too many failure
+orders and broaden the contract.
+
+Selected design: Design B, with orchestrator score `82.5`. It removes application imports of
+`CertificateCatalogStore` and exposes only the exact methods already consumed by application code:
+`load_catalog()`, `save_catalog()`, `save_configuration()`, `delete_configuration_by_id()`,
+`export_managed_certificate_by_id()`, and read-only `storage_dir` plus `managed_certificate_dir`.
+The manager retains
+its existing staged-file and secret rollback choreography; the infra store retains codecs, atomic
+JSON writes, path policy, managed-file deletion, and export safety. A small application in-memory
+repository supports coordinator/manager boundary tests without a generic filesystem or transaction
+service. No hybrid is justified: adding C's larger transaction surface would not fix a weakness in B
+without violating the one-slice and behavior-preservation hard gates.
+
+Hard gates: no application import of `infra.config.certificate_storage`; exact catalog JSON,
+schema-version, path, error, rollback, deletion-reference, and export-safety behavior; Qt/app-frame
+composition continues to instantiate the concrete store at the edge; coordinator refresh/reconcile
+semantics remain unchanged; all phase3 CLI/DTO/JSON/artifact contracts remain unchanged; and full
+certificate, coordinator, Qt, offscreen evidence, import-isolation, and cleanup audits pass.
+
+### Implementation 18 — accepted 2026-08-06
+
+Child `docs/ExecPlans/certificate_catalog_repository_boundary_execplan.md` is complete. The
+application-owned `CertificateCatalogRepository` protocol exposes the current catalog/configuration
+verbs plus read-only `storage_dir` and `managed_certificate_dir`; `InMemoryCertificateCatalogRepository`
+provides a small boundary fake, while `CertificateCatalogStore` remains the production filesystem
+adapter. `CertificateManager` and `DefaultSignaturePropertiesCoordinator` no longer import the
+concrete infra store. The coordinator preserves the prior XDG resolver fallback for no-store callers,
+and manager staged-file, catalog, secret rollback, and export sequencing is unchanged.
+
+The compliance review found and the implementation corrected two issues before acceptance: the
+no-store resolver path was restored from `./Managed` to the existing XDG default, and duplicated
+infra export safety checks were removed from the in-memory fake. Architecture docs and both ExecPlans
+now describe the actual boundary. The dedicated tests cover fake operations, real-store structural
+conformance, and application import isolation.
+
+Validation passed: focused certificate/storage/coordinator tests `56 passed`; full suite `1,088
+passed, 1 warning`; Ruff, CLI help, import isolation, and `git diff --check` passed. The frozen
+`docs/SPEC.md` hash remained
+`d929e189269f0f057c6a72b43fd2d430965a975be720b55139fdb1d92afe282b`. Offscreen matrices passed
+preview parity `18/18`, signed acceptance `10` scenarios with `7` successful signings and zero
+errors/mismatches/cryptographic/annotation failures, and fit rejection `3/3` matched intentional
+rejections. The exact temporary root was removed and process cleanup found no FoliaSeal/Python/Qt
+harness processes.
+
+Proxy measurement is navigation `0.30`, change amplification `0.70`, seam-risk reduction `0.75`,
+boundary-test improvement `0.80`, interface compression `0.75`, and boundary isolation `0.85`;
+weighted Actual Improvement is `0.52` against predicted `0.38`, with no component regression below
+`-0.10`. This cycle is accepted. The separate one-slice atomic phase nomenclature migration remains
+tracked by `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md`; this certificate slice did
+not rename phase3 CLI/DTO/JSON/fixture/artifact contracts.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

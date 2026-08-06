@@ -5,6 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from foliaseal.application.certificate_catalog_repository import (
+    CertificateCatalogRepository,
+    InMemoryCertificateCatalogRepository,
+    default_certificate_managed_dir,
+)
 from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
@@ -45,7 +50,6 @@ from foliaseal.domain.models import (
     SignaturePlacementDefaults,
     SignatureRect,
 )
-from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 
 
 class SignaturePropertiesCoordinatorError(ValueError):
@@ -245,28 +249,31 @@ class DefaultSignaturePropertiesCoordinator:
 
     workflow: SigningDraftWorkflow
     certificate_catalog: CertificateCatalog | None = None
-    certificate_catalog_store: CertificateCatalogStore | None = None
+    certificate_catalog_store: CertificateCatalogRepository | None = None
     certificate_secret_provider: CertificateSecretProvider | None = None
     preset_catalog: SignaturePresetCatalog | None = None
     preset_catalog_store: CatalogRepository | None = None
     reusable_objects: ReusableSigningObjects | None = None
 
     def __post_init__(self) -> None:
+        if self.certificate_catalog_store is None:
+            self.certificate_catalog_store = InMemoryCertificateCatalogRepository(
+                catalog=self.certificate_catalog or CertificateCatalog(schema_version=1),
+                storage_dir=default_certificate_managed_dir().parent,
+                managed_certificate_dir=default_certificate_managed_dir(),
+            )
         if self.certificate_catalog is not None:
             self.certificate_catalog = self.certificate_catalog
-        elif self.certificate_catalog_store is not None:
-            self.certificate_catalog = self.certificate_catalog_store.load_catalog()
         else:
-            self.certificate_catalog = CertificateCatalog(schema_version=1)
+            self.certificate_catalog = self.certificate_catalog_store.load_catalog()
         if self.reusable_objects is None:
             repository = self.preset_catalog_store or InMemoryCatalogRepository(
                 self.preset_catalog or SignaturePresetCatalog(schema_version=1)
             )
             self.reusable_objects = ReusableSigningObjects(repository)
         self.preset_catalog = self._reusable_catalog()
-        resolver_store = self.certificate_catalog_store or CertificateCatalogStore.default()
         self._certificate_material_resolver = CertificateSigningMaterialResolver(
-            managed_certificate_dir=resolver_store.managed_certificate_dir,
+            managed_certificate_dir=self.certificate_catalog_store.managed_certificate_dir,
             secret_provider=self.certificate_secret_provider,
         )
         self._selected_certificate_configuration_name: str | None = None
@@ -630,8 +637,7 @@ class DefaultSignaturePropertiesCoordinator:
             self._selected_signature_preset_name = None
 
     def _refresh_catalogs(self) -> None:
-        if self.certificate_catalog_store is not None:
-            self.certificate_catalog = self.certificate_catalog_store.load_catalog()
+        self.certificate_catalog = self.certificate_catalog_store.load_catalog()
         self.preset_catalog = self._reusable_catalog()
 
     def _reusable_catalog(self) -> SignaturePresetCatalog:

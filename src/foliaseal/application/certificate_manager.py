@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
+from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
@@ -22,7 +23,6 @@ from foliaseal.application.certificate_models import (
     ManagedCertificateSubjectSummary,
 )
 from foliaseal.domain.errors import ConfigValidationError
-from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.secret_storage import SecretStorageError
 
 
@@ -98,7 +98,7 @@ class CertificateOperationResult:
 class CertificateManager:
     """Own certificate policy, persistence sequencing, and rollback."""
 
-    store: CertificateCatalogStore
+    store: CertificateCatalogRepository
     secret_store: CertificateSecretStore | None = None
     id_factory: Callable[[], str] | None = None
     clock: Callable[[], datetime] | None = None
