@@ -118,6 +118,14 @@ created.
   candidates recorded rather than inventing a child plan.
 - [x] Completed Scan Round 23 and three independent design reports plus two independent reviews for
   the signing-draft contract boundary; selected Shape C and created its child ExecPlan.
+- [x] Completed Scan Round 32 with three fresh explorers after `a5d1b533f`; the app-frame action-
+  state seam passed the continuation gate while the phase3 nomenclature migration remained a
+  separate atomic plan.
+- [x] Completed Design Selection 33 with three designs and two independent reviews; selected the
+  constrained immutable `WorkspaceActionState` projection and created its child ExecPlan.
+- [x] Implemented the app-frame projection slice, boundary tests, architecture reconciliation, full
+  validation, offscreen evidence, and exact generated-artifact/process cleanup; commit closure and
+  post-commit rescan remain.
 
 ## Scan and Candidate Ledger
 
@@ -1777,6 +1785,24 @@ The next projection seam is recorded for a future continuation rather than start
 The dedicated `phase3_nomenclature_retirement_execplan.md` remains the atomic versioned migration
 plan; its live inventory is `106` path names, `254` files, and approximately `6,570` references.
 
+### Scan Round 32 — completed 2026-08-06
+
+Three independent explorers rescanned clean commit `a5d1b533f` after the snapshot projection slice.
+Two reports converge on a bounded app-frame/workspace action-state seam at Priority approximately
+`64`, confidence `.80–.82`: `FoliaSealAppFrame.open_pdf_path()` sequences
+`SigningWorkspaceHost.open()` with four QAction mutations, `close_workspace()` repeats the reset,
+and text-selection/copy routing reaches through `_with_current_shell_port()`. The host already owns
+workspace lifecycle, so a typed frame action-state result/port can absorb state synchronization while
+leaving Qt actions at the edge. A third report independently confirms the same live compatibility
+surface and rates it higher (`78–82`) but with broad migration risk; the median conservative candidate
+remains above the continuation threshold.
+
+The remaining `signing_workspace_compatibility_surface.py` is live production behavior, not dead
+aliases: the orchestrator installs roughly 30 dynamic attributes and shell tests exercise them. The
+phase3 nomenclature plan remains separate and unsuitable for this slice because its `106` path / `254`
+file / approximately `6,570` reference inventory spans public CLI, DTO, JSON, fixture, artifact, and
+historical contracts requiring one atomic versioned migration.
+
 ### Design Selection 30 — completed 2026-08-06
 
 Three independent design reports and two independent reviewers compared: (A) minimal shared
@@ -1795,16 +1821,53 @@ allowed. The child plan is `docs/ExecPlans/evidence_snapshot_projection_boundary
 
 ### Implementation 31 — completed 2026-08-06
 
-The selected typed projection is implemented and passing validation, pending documentation and
-intentional commit. New `evidence_snapshot_projection.py` owns immutable semantic views and modern-
-over-legacy normalization with no Qt/Pillow/PyHanko/filesystem imports. Both harness and reporting
-now delegate their duplicated snapshot readouts to it; capture, JSON construction, and Markdown
-wording remain in their original owners. Focused projection/harness/reporting tests pass (`86`), and
-the full suite passes (`1,115 passed, 1 warning`). The SPEC remains unchanged. The measured source
-diff removes approximately `272` lines of duplicated projection logic; conservative predicted/actual
-component measurements will be finalized in the child outcome after offscreen evidence and cleanup.
-Commit `4916fa839` (`Centralize evidence snapshot projection`) contains the seven intentional source,
-test, architecture, and plan files; the worktree is clean after commit.
+The selected typed projection is implemented and validated. New `evidence_snapshot_projection.py`
+owns immutable semantic views and modern-over-legacy normalization with no Qt/Pillow/PyHanko/
+filesystem imports. Both harness and reporting now delegate their duplicated snapshot readouts to
+it; capture, JSON construction, and Markdown wording remain in their original owners. Focused
+projection/harness/reporting tests pass (`86`), and the full suite passes (`1,115 passed, 1 warning`).
+The SPEC remains unchanged. Commit `4916fa839` (`Centralize evidence snapshot projection`) contains
+the seven intentional source, test, architecture, and plan files; the worktree was clean after
+commit.
+
+### Design Selection 33 — completed 2026-08-06
+
+Three design reports and two independent reviews evaluated the app-frame/workspace action-state
+seam found in Scan Round 32. Minimal shared setters scored approximately `81.6–82.1` because they
+are low-risk but leave the frame's state policy distributed. A broad common-caller controller
+scored approximately `65.2–65.5` after the duplicate-lifecycle and generic-manager penalties and
+was rejected because `SigningWorkspaceHost` already owns atomic open/replace/close behavior. The
+flexible design scored `90.5` before its scope was constrained.
+
+The selected shape is a constrained immutable typed projection: add a Qt-free frozen
+`WorkspaceActionState` record plus pure open/closed/state-transition constructors, then let
+`FoliaSealAppFrame` remain the only QAction mutator. The projection owns the four action booleans
+and checked state; the frame retains placeholder mounting, error reporting, and maintenance-port
+routing. Failed workspace replacement must leave the prior workspace and action state untouched;
+successful close remains idempotent and resets the projection only after host close and placeholder
+mount succeed. No lifecycle manager, shell-port change, compatibility-surface removal, or phase3
+nomenclature rename belongs in this slice. The child plan is
+`docs/ExecPlans/app_frame_action_state_boundary_execplan.md`.
+
+### Implementation 34 — in progress 2026-08-06
+
+The app-frame slice now has a Qt-free frozen `WorkspaceActionState` projection with pure closed,
+open, and selection-result constructors. `FoliaSealAppFrame` applies one state record to the four
+  QActions; host lifecycle, placeholder mounting order, error behavior, maintenance routing, and
+  phase3 compatibility contracts are unchanged. New boundary tests cover exact values, immutability,
+  selection transitions, and import isolation; app-frame tests cover initial/open/toggle/failed-
+  replacement, candidate-mount failure, and placeholder-mount failure behavior. Focused tests pass
+  (`30`), the full suite passes (`1,121 passed, 1 warning`),
+Ruff, compileall, CLI help, and diff checks pass, and the offscreen evidence command reports signed
+acceptance `10/7`, preview parity `18/18`, and fit rejection `3/3`. The generated summary was
+removed, no FoliaSeal/Python/Qt process remains, and `docs/SPEC.md` has no diff.
+
+Architecture documentation records the projection/QAction/lifecycle ownership split. Conservative
+component measurements are navigation `.55`, change amplification `.55`, seam reduction `.60`,
+boundary-test improvement `.65`, interface compression `.55`, and isolation `.90`, for weighted
+Actual Improvement approximately `.60` versus predicted `.50`; no component regression exceeds
+`-.10`, and no critical/major finding remains. Worker documentation is complete; intentional commit
+and post-commit fresh scan remain.
 
 ## Context and Orientation
 

@@ -33,6 +33,12 @@ from foliaseal.presentation.qt.app_frame_certificate_management import (
 from foliaseal.presentation.qt.app_frame_profile_library import (
     ReusableObjectLibraryDialog,
 )
+from foliaseal.presentation.qt.app_frame_workspace_action_state import (
+    WorkspaceActionState,
+    workspace_action_state_closed,
+    workspace_action_state_open,
+    workspace_action_state_with_selection_result,
+)
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     QtPdfPageCountLoader,
     SigningWorkspaceCompositionService,
@@ -288,6 +294,7 @@ class FoliaSealAppFrame:
         self._save_as_action: Any | None = None
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
+        self._workspace_action_state = workspace_action_state_closed()
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
@@ -326,6 +333,12 @@ class FoliaSealAppFrame:
     @property
     def app_settings(self) -> AppSettings:
         return self._app_settings
+
+    @property
+    def workspace_action_state(self) -> WorkspaceActionState:
+        """Return the immutable state currently applied to workspace actions."""
+
+        return self._workspace_action_state
 
     @property
     def current_workspace(self) -> WorkspaceHandle | None:
@@ -394,10 +407,7 @@ class FoliaSealAppFrame:
             self._emit_error(f"Unable to open PDF: {exc}")
             return None
 
-        self._set_save_as_enabled(True)
-        self._set_text_selection_action_enabled(True)
-        self._set_text_selection_action_checked(False)
-        self._set_copy_selected_text_action_enabled(True)
+        self._apply_workspace_action_state(workspace_action_state_open())
         return handle.view.mount_target()
 
     def close_workspace(self) -> None:
@@ -551,37 +561,28 @@ class FoliaSealAppFrame:
     def _choose_save_as(self) -> str | None:
         return self._with_current_shell_port(lambda shell_port: shell_port.choose_output_pdf_path())
 
-    def _set_save_as_enabled(self, enabled: bool) -> None:
-        action = self._save_as_action
+    def _apply_workspace_action_state(self, state: WorkspaceActionState) -> None:
+        self._workspace_action_state = state
+        self._set_action_enabled(self._save_as_action, state.save_as_enabled)
+        self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
+        self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
+        self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
+
+    @staticmethod
+    def _set_action_enabled(action: Any | None, enabled: bool) -> None:
         if action is None:
             return
         set_enabled = getattr(action, "setEnabled", None)
         if callable(set_enabled):
             set_enabled(enabled)
 
-    def _set_text_selection_action_enabled(self, enabled: bool) -> None:
-        action = self._text_selection_mode_action
-        if action is None:
-            return
-        set_enabled = getattr(action, "setEnabled", None)
-        if callable(set_enabled):
-            set_enabled(enabled)
-
-    def _set_text_selection_action_checked(self, checked: bool) -> None:
-        action = self._text_selection_mode_action
+    @staticmethod
+    def _set_action_checked(action: Any | None, checked: bool) -> None:
         if action is None:
             return
         set_checked = getattr(action, "setChecked", None)
         if callable(set_checked):
             set_checked(checked)
-
-    def _set_copy_selected_text_action_enabled(self, enabled: bool) -> None:
-        action = self._copy_selected_text_action
-        if action is None:
-            return
-        set_enabled = getattr(action, "setEnabled", None)
-        if callable(set_enabled):
-            set_enabled(enabled)
 
     def _toggle_text_selection_mode_from_action(self) -> bool | None:
         action = self._text_selection_mode_action
@@ -593,7 +594,12 @@ class FoliaSealAppFrame:
             lambda shell_port: shell_port.set_document_text_selection_mode(enabled)
         )
         if isinstance(result, bool):
-            self._set_text_selection_action_checked(result)
+            self._apply_workspace_action_state(
+                workspace_action_state_with_selection_result(
+                    self._workspace_action_state,
+                    result,
+                )
+            )
         return result
 
     def _copy_selected_text_from_action(self) -> str | None:
@@ -629,10 +635,7 @@ class FoliaSealAppFrame:
         if hasattr(label, "setWordWrap"):
             label.setWordWrap(True)
         self._workspace_mount.mount(label)
-        self._set_save_as_enabled(False)
-        self._set_text_selection_action_enabled(False)
-        self._set_text_selection_action_checked(False)
-        self._set_copy_selected_text_action_enabled(False)
+        self._apply_workspace_action_state(workspace_action_state_closed())
 
     def _emit_error(self, message: str) -> None:
         if self._on_error is not None:

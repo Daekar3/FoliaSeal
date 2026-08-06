@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -663,6 +665,7 @@ def test_app_frame_failed_replacement_preserves_previous_shell(
         render_backend_factory=lambda: object(),
     )
     frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    prior_action_state = frame.workspace_action_state
     _FakeQPdfDocument.next_status = _FakeQPdfDocument.Error.Failed
 
     result = frame.open_pdf_path(tmp_path / "source" / "broken.pdf")
@@ -670,8 +673,62 @@ def test_app_frame_failed_replacement_preserves_previous_shell(
     assert result is None
     assert frame.window.central_widget is first
     assert frame.current_shell is first
+    assert frame.workspace_action_state is prior_action_state
     assert first.close_calls == 0
     assert len(bindings.q_message_box.warning_calls) == 1
+
+
+def test_app_frame_failed_replacement_mount_preserves_action_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_SequenceShellFactory(_FakeShell(), _FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    prior_action_state = frame.workspace_action_state
+
+    def fail_mount(_mount, widget) -> None:
+        raise RuntimeError("mount failed")
+
+    monkeypatch.setattr(type(frame._workspace_mount), "mount", fail_mount)
+    result = frame.open_pdf_path(tmp_path / "source" / "second.pdf")
+
+    assert result is None
+    assert frame.workspace_action_state is prior_action_state
+    assert frame.current_workspace is not None
+    assert len(bindings.q_message_box.warning_calls) == 1
+
+
+def test_app_frame_placeholder_mount_failure_preserves_action_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    prior_action_state = frame.workspace_action_state
+
+    def fail_mount(_mount, widget) -> None:
+        raise RuntimeError("placeholder mount failed")
+
+    monkeypatch.setattr(type(frame._workspace_mount), "mount", fail_mount)
+    with pytest.raises(RuntimeError, match="placeholder mount failed"):
+        frame.close_workspace()
+
+    assert frame.current_workspace is None
+    assert frame.workspace_action_state is prior_action_state
 
 
 def test_app_frame_close_workspace_is_idempotent_and_restores_placeholder(
@@ -774,6 +831,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert text_selection_action.enabled is False
     assert text_selection_action.checked is False
     assert copy_selection_action.enabled is False
+    assert frame.workspace_action_state.workspace_open is False
 
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
 
@@ -781,6 +839,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert text_selection_action.enabled is True
     assert text_selection_action.checked is False
     assert copy_selection_action.enabled is True
+    assert frame.workspace_action_state.workspace_open is True
 
     save_as_action.trigger()
     text_selection_action.trigger()
@@ -790,6 +849,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert shell.set_document_text_selection_mode_calls == [True]
     assert shell.copy_selected_document_text_calls == 1
     assert text_selection_action.checked is True
+    assert frame.workspace_action_state.text_selection_checked is True
 
 
 def test_app_frame_certificate_creation_routes_to_dialog_port(
