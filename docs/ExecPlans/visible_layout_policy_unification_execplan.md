@@ -40,8 +40,9 @@ source inspection proves that the Qt harness no longer reaches backend-private p
 - [x] (2026-08-06) Added direct spacing/border/reservation/fit policy tests and migrated the dead
   backend-width assertions to the public facade; retained the existing import-firewall suite.
 - [x] (2026-08-06) Focused and full validation passed; architecture documentation is reconciled.
-  Offscreen acceptance passed and generated artifacts/processes were cleaned. Commit and fresh
-  three-explorer closure scan remain pending.
+  Offscreen acceptance passed and generated artifacts/processes were cleaned. Commit `bb9e77b2c`
+  and three independent closure audits passed; the literal retirement gate was narrowed to
+  backend/harness callers so canonical same-module delegates remain intentional.
 
 ## Surprises & Discoveries
 
@@ -93,25 +94,27 @@ signing backend, and 1,832 lines in the Qt harness. After implementation, the mo
 1,118, and 1,832 lines respectively: the neutral facade adds typed surface area while deleting the
 backend duplicate cluster. The backend-private policy import count is zero, and the only remaining
 spacing helper definitions are one-line delegates inside the canonical owner. Direct policy coverage
-adds four spacing cases plus border/reservation/fit tests. Focused coverage is `198 passed`; the full
-suite is `1,149 passed, 1 warning`; Ruff, compileall, CLI help, import isolation, diff checks, and
+adds four spacing cases plus border/reservation/fit tests, and the Qt harness now has a live/snapshot
+capture-padding parity matrix. Focused coverage is `270 passed, 1 warning`; the full suite is
+`1,153 passed, 1 warning`; Ruff, compileall, CLI help, import isolation, diff checks, and
 SPEC immutability pass. Offscreen signed acceptance is `10` scenarios/`7` successful signings,
 preview parity `18/18`, and fit rejection `3/3`; generated artifacts and processes were cleaned.
 Measured Actual Improvement is conservatively `.70` (ownership `.85`, navigation `.70`, change
 amplification `.75`, seam-risk `.75`, testability `.80`, interface compression `.75`, cohesion `.80`,
-isolation `.85`), above the `.15` threshold with no component regression above `.10`. Commit ID and
-three-explorer closure evidence remain pending.
+isolation `.85`), above the `.15` threshold with no component regression above `.10`. Commit
+`bb9e77b2c` is the completed implementation commit. Three closure audits confirmed clean state,
+SPEC immutability, neutral import isolation, backend/harness ownership, and validation parity; the
+only correction was narrowing the source gate below to exclude intentional canonical-owner delegates.
 
 ## Context and Orientation
 
 `visible_signature_layout.py` is the application-layer prepare-once boundary. Its
 `_layout_reservation_for_template()` builds neutral `LayoutRuleSpec` margins and area dimensions;
 `VisibleSignatureLayoutEngine.plan()` and `VisibleSignatureLayoutService.prepare()` use those
-results before target-specific materialization. `phase3_signing_backend.py` prepares signing layout
-and rendered-ink fit checks, but currently repeats margin/optical helpers and imports the private
-reservation/fit functions. `phase3_harness.py` is the Qt evidence composition root; its
-`_preview_padding_for_capture()` uses the backend-private margin helpers when it prepares widget
-capture evidence.
+results before target-specific materialization. Before this slice,
+`phase3_signing_backend.py` repeated margin/optical helpers and imported private reservation/fit
+functions, while `phase3_harness.py` reached those backend-private helpers for widget capture
+evidence. The committed implementation routes both callers through the neutral facade.
 
 The selected facade is stateless and Qt/Pillow/pyHanko-free. It delegates to the canonical functions
 inside the same module, so it does not own rendering or signing. The backend will use it for neutral
@@ -198,9 +201,10 @@ Run all commands from `/home/daekar/FoliaSeal`.
 
 6. Verify retirement and ownership gates:
 
-       rg -n "phase3_signing_backend import.*(_base_layout_spacing|_effective_layout_edge_margin|_single_line_vertical_outer_margin|_single_line_no_stamp_vertical_optical_shift|_border_safe_inset)|^def (_base_layout_spacing|_effective_layout_edge_margin|_single_line_vertical_outer_margin|_single_line_no_stamp_vertical_optical_shift|_border_safe_inset|_effective_horizontal_text_reservation_width)" src tests
+       rg -n "phase3_signing_backend import.*(_base_layout_spacing|_effective_layout_edge_margin|_single_line_vertical_outer_margin|_single_line_no_stamp_vertical_optical_shift|_border_safe_inset)|^def (_base_layout_spacing|_effective_layout_edge_margin|_single_line_vertical_outer_margin|_single_line_no_stamp_vertical_optical_shift|_border_safe_inset|_effective_horizontal_text_reservation_width)" src/foliaseal/application/phase3_signing_backend.py src/foliaseal/presentation/qt/phase3_harness.py tests
 
-   The command must return no source/test matches except explicitly documented historical plan text.
+   The command must return no backend/harness/test matches. Same-module canonical delegates in
+   `visible_signature_layout.py` are intentional and are not part of this retirement gate.
    Confirm no FoliaSeal/Python/Qt process remains and the worktree is clean after commit.
 
 ## Validation and Acceptance

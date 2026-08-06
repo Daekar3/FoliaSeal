@@ -2655,7 +2655,7 @@ architecture is therefore C: one stateless, Qt/Pillow/pyHanko-free policy facade
 canonical layout implementation, with no generic manager, service locator, or second planner. The
 child plan is `docs/ExecPlans/visible_layout_policy_unification_execplan.md`.
 
-### Implementation 55 — visible-layout policy unification (in progress)
+### Implementation 55 — visible-layout policy unification (completed at `bb9e77b2c`)
 
 The selected stateless common-caller facade is implemented in the existing neutral
 `visible_signature_layout.py` boundary. `LayoutSpacing`, public `SignatureLayoutReservation`, and
@@ -2667,8 +2667,8 @@ optical helper cluster and dead horizontal-width helper removed. The Qt harness 
 facade for capture padding and no longer imports backend-private layout policy. Lazy application
 exports and direct policy tests were updated, and `docs/ARCHITECTURE.md` records the ownership rule.
 
-Validation completed before commit: focused layout/backend/harness/boundary coverage `198 passed`,
-full suite `1,149 passed, 1 warning`, Ruff, compileall, CLI help, neutral import isolation, diff
+Validation completed before commit: focused layout/backend/harness/boundary coverage `270 passed, 1 warning`,
+full suite `1,153 passed, 1 warning`, Ruff, compileall, CLI help, neutral import isolation, diff
 checks, and frozen `docs/SPEC.md` all pass. The unchanged offscreen signed-acceptance command passed
 with `10` scenarios/`7` successful signings, preview parity `18/18`, and fit rejection `3/3`.
 Generated acceptance outputs were removed and the process audit found no FoliaSeal/Python/Qt/test
@@ -2676,6 +2676,9 @@ process. The dedicated `docs/ExecPlans/phase3_nomenclature_retirement_execplan.m
 atomic contract migration; this slice deliberately preserves all phase3 module, CLI, DTO, JSON, and
 artifact names.
 
-Commit and three independent post-commit closure scans remain required. The residual candidate set
-should be rescored only after that audit; the next likely seam is the highest-scoring candidate that
-does not reopen the separate phase3 nomenclature migration.
+Three independent closure audits confirmed clean state, SPEC immutability, neutral import isolation,
+backend/harness ownership, and validation parity. A direct live/snapshot capture-padding parity test
+was added during closure. The source retirement gate is narrowed to backend/harness/test callers so
+the intentional canonical-owner delegates are not treated as duplicate implementations. The
+residual candidate set should be rescored in the next architecture-loop round; the next likely seam
+is the highest-scoring candidate that does not reopen the separate phase3 nomenclature migration.

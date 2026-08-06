@@ -43,6 +43,7 @@ from foliaseal.application.qa_signed_acceptance_assets import (
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
+    SignatureBoxStyle,
     SignatureFieldSource,
     SignatureLayoutTemplate,
     SignatureRect,
@@ -72,6 +73,8 @@ from foliaseal.presentation.qt.phase3_harness import (
     _capture_headless_preview_render,
     _interactive_capture_label,
     _load_preview_matrix_manifest,
+    _preview_padding_for_capture,
+    _preview_padding_for_capture_from_snapshot,
     _render_signed_annotation_appearance_direct,
     _snapshot_preview,
     _widget_application,
@@ -279,6 +282,44 @@ def _capture_metadata_defaults(**overrides: object) -> dict[str, object]:
     }
     payload.update(overrides)
     return payload
+
+
+@pytest.mark.parametrize("stamp_position", list(SignatureStampPosition))
+def test_preview_capture_padding_matches_snapshot_projection(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    box_style = {
+        "show_border": True,
+        "border_color_hex": "#000000",
+        "border_width_pt": 1.0,
+        "background_color_hex": "#FFFFFF",
+    }
+    preview = type(
+        "Preview",
+        (),
+        {
+            "signature_rect": SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=260.0,
+                height_pt=72.0,
+            ),
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": stamp_position,
+            "box_style": SignatureBoxStyle(**box_style),
+        },
+    )()
+    snapshot = {
+        "signature_rect": {"height_pt": 72.0},
+        "layout_template": SignatureLayoutTemplate.SINGLE_LINE.value,
+        "stamp_position": stamp_position.value,
+        "box_style": box_style,
+    }
+
+    assert _preview_padding_for_capture(preview) == _preview_padding_for_capture_from_snapshot(
+        snapshot
+    )
 
 
 def test_evidence_contract_rejects_success_without_output_file() -> None:
