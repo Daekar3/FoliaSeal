@@ -35,15 +35,12 @@ from foliaseal.application.phase3_signing_backend import (
     PyHankoCertificateLoader,
     PyHankoPdfInspector,
     PyHankoPdfSigner,
-    PyHankoSignatureTextBoxEngine,
     PyHankoSignatureVerifier,
     _BackendHorizontalInkMeasurer,
     _build_stamp_text,
-    _build_text_box_style,
     _current_signing_time,
     _effective_horizontal_text_reservation_width,
     _load_simple_signer,
-    _measure_text_box_dimensions,
     _prepare_backend_layout,
     _resolve_visible_signature_semantics,
     _single_line_text_fits_reservation,
@@ -52,7 +49,6 @@ from foliaseal.application.phase3_signing_backend import (
     build_backend_reservation_evidence,
     build_phase3_signing_executor,
     prepare_phase3_signing_plan,
-    stamp_background_for_path,
     validate_visible_signature_fit,
 )
 from foliaseal.application.sign_pdf_use_case import (
@@ -63,6 +59,12 @@ from foliaseal.application.sign_pdf_use_case import (
 from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
+)
+from foliaseal.application.stamp_background import stamp_background_for_path
+from foliaseal.application.visible_signature_artifact_adapters import (
+    PyHankoSignatureTextBoxEngine,
+    build_text_box_style,
+    measure_text_box_dimensions,
 )
 from foliaseal.application.visible_signature_layout import (
     _SINGLE_LINE_RENDERED_INK_FIT_CACHE,
@@ -1996,7 +1998,7 @@ def test_single_line_reservation_consumes_injected_text_box_engine() -> None:
 
 
 def test_build_text_box_style_preserves_half_point_font_size() -> None:
-    style = _build_text_box_style(
+    style = build_text_box_style(
         SignatureTextStyle(
             font_family="Serif",
             font_size_pt=8.5,
@@ -2010,7 +2012,7 @@ def test_build_text_box_style_preserves_half_point_font_size() -> None:
 
 
 def test_build_text_box_style_uses_italic_font_variant_for_serif() -> None:
-    style = _build_text_box_style(
+    style = build_text_box_style(
         SignatureTextStyle(
             font_family="Serif",
             font_size_pt=8.0,
@@ -2026,7 +2028,7 @@ def test_build_text_box_style_uses_italic_font_variant_for_serif() -> None:
 
 def test_build_text_box_style_rejects_removed_cursive_family() -> None:
     with pytest.raises(ValueError, match="Unsupported signature font family 'Cursive'"):
-        _build_text_box_style(
+        build_text_box_style(
             SignatureTextStyle(
                 font_family="Cursive",
                 font_size_pt=8.0,
@@ -2053,7 +2055,7 @@ def test_stamp_background_for_gif_preserves_transparency(tmp_path: Path) -> None
 
 
 def test_measure_text_box_dimensions_reserves_nominal_height_per_line() -> None:
-    style = _build_text_box_style(
+    style = build_text_box_style(
         SignatureTextStyle(
             font_family="Serif",
             font_size_pt=8.5,
@@ -2063,7 +2065,7 @@ def test_measure_text_box_dimensions_reserves_nominal_height_per_line() -> None:
         )
     )
 
-    width, height = _measure_text_box_dimensions("Line 1\nLine 2\nLine 3", style)
+    width, height = measure_text_box_dimensions("Line 1\nLine 2\nLine 3", style)
 
     assert width > 0
     assert height == 27

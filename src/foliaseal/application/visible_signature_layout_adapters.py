@@ -11,6 +11,12 @@ from pyhanko.pdf_utils.layout import AxisAlignment, InnerScaling, Margins, Simpl
 
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signature_text_measurement import SignatureTextBoxEngine
+from foliaseal.application.visible_signature_artifact_adapters import (
+    PyHankoSignatureTextBoxEngine,
+    RoundedBorderTextStampStyle,
+    _hex_to_rgb,
+    solid_background_for_color,
+)
 from foliaseal.application.visible_signature_layout import (
     ImageMetrics,
     LayoutRuleSpec,
@@ -28,8 +34,6 @@ class PyHankoTextMeasurer:
         self.engine = engine
 
     def measure(self, text: str, text_style) -> TextMetrics:
-        from foliaseal.application.phase3_signing_backend import PyHankoSignatureTextBoxEngine
-
         engine = self.engine or PyHankoSignatureTextBoxEngine()
         return engine.prepare(text, text_style).metrics
 
@@ -78,13 +82,6 @@ class PyHankoSignatureAppearanceAdapter:
         if layout_plan.fit_issues and not allow_fit_issues:
             raise ValueError("; ".join(issue.message for issue in layout_plan.fit_issues))
 
-        from foliaseal.application.phase3_signing_backend import (
-            PyHankoSignatureTextBoxEngine,
-            RoundedBorderTextStampStyle,
-            _hex_to_rgb,
-            _solid_background_for_color,
-        )
-
         box_style = appearance.box_style
         border_width = (
             max(0, int(round(box_style.border_width_pt)))
@@ -92,18 +89,14 @@ class PyHankoSignatureAppearanceAdapter:
             else 0
         )
         background = (
-            stamp_background or _solid_background_for_color(box_style.background_color_hex)
+            stamp_background or solid_background_for_color(box_style.background_color_hex)
             if include_background
             else None
         )
-        text_box_style = (
-            PyHankoSignatureTextBoxEngine()
-            .prepare(
-                stamp_text,
-                appearance.text_style,
-            )
-            .render_style
-        )
+        text_box_style = PyHankoSignatureTextBoxEngine().prepare(
+            stamp_text,
+            appearance.text_style,
+        ).render_style
         background_layout = self.build_background_layout(
             appearance=appearance,
             stamp_background=stamp_background,

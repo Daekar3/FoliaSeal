@@ -6,32 +6,20 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from fractions import Fraction
 from io import BytesIO
 from math import ceil
 from pathlib import Path
 from typing import Any
 
 from asn1crypto import pkcs12
-from PIL import Image
-from pyhanko.pdf_utils.font.opentype import GlyphAccumulatorFactory
 from pyhanko.pdf_utils.images import PdfImage
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
-from pyhanko.pdf_utils.layout import (
-    AxisAlignment,
-    BoxConstraints,
-    InnerScaling,
-    Margins,
-    SimpleBoxLayoutRule,
-)
 from pyhanko.pdf_utils.reader import PdfFileReader
-from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
-from pyhanko.pdf_utils.writer import PdfFileWriter
 from pyhanko.sign import fields, validation
 from pyhanko.sign.fields import InvisSigSettings
 from pyhanko.sign.signers import PdfSignatureMetadata, PdfSigner, SimpleSigner
 from pyhanko.sign.timestamps.common_utils import TimestampRequestError
-from pyhanko.stamp import TextStamp, TextStampStyle
+from pyhanko.stamp import TextStampStyle
 from pyhanko_certvalidator import ValidationContext
 
 from foliaseal.application import text_raster_analysis as _text_raster_analysis
@@ -46,9 +34,7 @@ from foliaseal.application.sign_pdf_use_case import (
     SigningBackendRequest,
     SignPdfUseCase,
 )
-from foliaseal.application.signature_font_registry import resolve_signature_font_face
 from foliaseal.application.signature_text_measurement import (
-    PreparedTextBox,
     SignatureTextBoxEngine,
 )
 from foliaseal.application.signing_draft_workflow import (
@@ -63,6 +49,9 @@ from foliaseal.application.stamp_preview_builder import (
     signing_draft_preview_for_stamp_text,
     stamp_text_preview_parts,
 )
+from foliaseal.application.visible_signature_artifact_adapters import (
+    PyHankoSignatureTextBoxEngine as _ConcretePyHankoSignatureTextBoxEngine,
+)
 from foliaseal.application.visible_signature_color import text_style_color_rgba
 from foliaseal.application.visible_signature_fit_policy import (
     apply_visible_signature_fit_gate,
@@ -73,7 +62,6 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurementRequest,
     RectBounds,
     SignatureLayoutPlan,
-    TextMetrics,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutRequest,
     VisibleSignatureLayoutService,
@@ -150,130 +138,6 @@ class PreparedSigningPlan:
     fit_issues: tuple[SigningDraftValidationIssue, ...]
     stamp_text: str
     visible: bool
-
-
-def _fmt_pdf_number(value: float) -> bytes:
-    return f"{value:.4f}".rstrip("0").rstrip(".").encode("ascii")
-
-
-def _rounded_border_radius_pt(width: float, height: float) -> float:
-    shortest_edge = max(1.0, min(width, height))
-    return min(6.0, shortest_edge / 4.0)
-
-
-def _rounded_rect_stroke_command(*, width: float, height: float, border_width: float) -> bytes:
-    inset = max(0.0, border_width / 2.0)
-    stroke_width = max(0.0, width - border_width)
-    stroke_height = max(0.0, height - border_width)
-    radius = min(_rounded_border_radius_pt(width, height), stroke_width / 2.0, stroke_height / 2.0)
-    if radius <= 0:
-        return b"%s w %s %s %s %s re S" % (
-            _fmt_pdf_number(border_width),
-            _fmt_pdf_number(inset),
-            _fmt_pdf_number(inset),
-            _fmt_pdf_number(stroke_width),
-            _fmt_pdf_number(stroke_height),
-        )
-    kappa = 0.5522847498
-    control = radius * kappa
-    left = inset
-    bottom = inset
-    right = left + stroke_width
-    top = bottom + stroke_height
-    return b" ".join(
-        [
-            _fmt_pdf_number(border_width),
-            b"w",
-            _fmt_pdf_number(left + radius),
-            _fmt_pdf_number(bottom),
-            b"m",
-            _fmt_pdf_number(right - radius),
-            _fmt_pdf_number(bottom),
-            b"l",
-            _fmt_pdf_number(right - radius + control),
-            _fmt_pdf_number(bottom),
-            _fmt_pdf_number(right),
-            _fmt_pdf_number(bottom + radius - control),
-            _fmt_pdf_number(right),
-            _fmt_pdf_number(bottom + radius),
-            b"c",
-            _fmt_pdf_number(right),
-            _fmt_pdf_number(top - radius),
-            b"l",
-            _fmt_pdf_number(right),
-            _fmt_pdf_number(top - radius + control),
-            _fmt_pdf_number(right - radius + control),
-            _fmt_pdf_number(top),
-            _fmt_pdf_number(right - radius),
-            _fmt_pdf_number(top),
-            b"c",
-            _fmt_pdf_number(left + radius),
-            _fmt_pdf_number(top),
-            b"l",
-            _fmt_pdf_number(left + radius - control),
-            _fmt_pdf_number(top),
-            _fmt_pdf_number(left),
-            _fmt_pdf_number(top - radius + control),
-            _fmt_pdf_number(left),
-            _fmt_pdf_number(top - radius),
-            b"c",
-            _fmt_pdf_number(left),
-            _fmt_pdf_number(bottom + radius),
-            b"l",
-            _fmt_pdf_number(left),
-            _fmt_pdf_number(bottom + radius - control),
-            _fmt_pdf_number(left + radius - control),
-            _fmt_pdf_number(bottom),
-            _fmt_pdf_number(left + radius),
-            _fmt_pdf_number(bottom),
-            b"c",
-            b"S",
-        ]
-    )
-
-
-class RoundedBorderTextStamp(TextStamp):
-    def render(self):
-        command_stream = [b"q"]
-
-        inner_content = self._render_inner_content()
-        if self.style.background:
-            command_stream.append(self._render_background())
-        if inner_content:
-            command_stream.extend(inner_content)
-
-        bbox = self.box
-        border_width = self.style.border_width
-        border_color = self.style.border_color
-        if border_width:
-            if border_color:
-                command_stream.append(b"%g %g %g RG" % border_color)
-            command_stream.append(
-                _rounded_rect_stroke_command(
-                    width=bbox.width,
-                    height=bbox.height,
-                    border_width=border_width,
-                )
-            )
-
-        command_stream.append(b"Q")
-        return b" ".join(command_stream)
-
-
-@dataclass(frozen=True)
-class RoundedBorderTextStampStyle(TextStampStyle):
-    def create_stamp(
-        self,
-        writer: PdfFileWriter,
-        box: BoxConstraints,
-        text_params: dict,
-    ) -> RoundedBorderTextStamp:
-        return RoundedBorderTextStamp(
-            writer=writer,
-            style=self,
-            box=box,
-            text_params=text_params,
-        )
 
 
 class PyHankoPdfInspector:
@@ -383,7 +247,7 @@ class PyHankoPdfSigner:
             stamp_style = _build_stamp_style(
                 appearance,
                 stamp_text=prepared.stamp_text,
-                stamp_background=stamp_background_for_path(appearance.image_stamp_path),
+                stamp_background=_neutral_stamp_background_for_path(appearance.image_stamp_path),
                 signature_rect=signature_rect,
                 layout_plan=prepared.layout_plan,
                 preparation=prepared.layout_preparation,
@@ -627,7 +491,7 @@ def prepare_phase3_signing_plan(
         signature_rect=signature_rect,
         signature_appearance=appearance,
         stamp_text=stamp_text,
-        stamp_background=stamp_background_for_path(appearance.image_stamp_path),
+        stamp_background=_neutral_stamp_background_for_path(appearance.image_stamp_path),
         render_port=request.render_port,
     )
     return PreparedSigningPlan(
@@ -758,25 +622,6 @@ def _rect_bounds_from_mapping(bounds: dict[str, int]) -> RectBounds:
         y=bounds["y"],
         width=bounds["width"],
         height=bounds["height"],
-    )
-
-
-def _build_text_box_style_impl(text_style: SignatureTextStyle) -> TextBoxStyle:
-    # Preserve the user's selected half-point font sizes in backend measurement.
-    # Rounding 8.5pt up to 9pt creates avoidable preview/backend drift in narrow
-    # layouts because the Qt preview renders the actual selected size.
-    font_size = max(Fraction(1, 1), Fraction(int(round(text_style.font_size_pt * 2)), 2))
-    font_factory = _font_factory_for_text_style(text_style, font_size=font_size)
-    return TextBoxStyle(
-        font=font_factory,
-        font_size=font_size,
-        text_color=_hex_to_rgb(text_style.text_color_hex),
-        box_layout_rule=SimpleBoxLayoutRule(
-            AxisAlignment.ALIGN_MIN,
-            AxisAlignment.ALIGN_MAX,
-            margins=Margins.uniform(0),
-            inner_content_scaling=InnerScaling.NO_SCALING,
-        ),
     )
 
 
@@ -954,7 +799,7 @@ def _visible_signature_fit_issues(
             signing_time=resolved_signing_time,
             signature_rect=signature_rect,
         )
-        stamp_background = stamp_background_for_path(signature_appearance.image_stamp_path)
+        stamp_background = _neutral_stamp_background_for_path(signature_appearance.image_stamp_path)
         return _visible_signature_fit_issues_for_stamp_text(
             signature_rect=signature_rect,
             signature_appearance=signature_appearance,
@@ -1102,7 +947,7 @@ def _single_line_text_fits_reservation(
     text: str,
     text_box_engine: SignatureTextBoxEngine | None = None,
 ) -> bool:
-    prepared_text = (text_box_engine or PyHankoSignatureTextBoxEngine()).prepare(
+    prepared_text = (text_box_engine or _ConcretePyHankoSignatureTextBoxEngine()).prepare(
         text,
         appearance.text_style,
     )
@@ -1117,7 +962,7 @@ def _single_line_text_fits_reservation(
         box_style=appearance.box_style,
         has_visible_stamp_image=appearance.image_stamp_path is not None,
         stamp_aspect_ratio=_stamp_image_aspect_ratio(
-            stamp_background_for_path(appearance.image_stamp_path)
+            _neutral_stamp_background_for_path(appearance.image_stamp_path)
             if appearance.image_stamp_path is not None
             else None
         ),
@@ -1144,34 +989,6 @@ def _effective_horizontal_text_reservation_width(
     return text_box_width
 
 
-@dataclass(frozen=True)
-class PyHankoSignatureTextBoxEngine:
-    """Production adapter for atomic PyHanko text style and metric preparation."""
-
-    def prepare(self, text: str, text_style: SignatureTextStyle) -> PreparedTextBox:
-        text_box_style = _build_text_box_style_impl(text_style)
-        width_pt, height_pt = _measure_text_box_dimensions_impl(text, text_box_style)
-        return PreparedTextBox(
-            metrics=TextMetrics(
-                width_pt=width_pt,
-                height_pt=height_pt,
-                line_count=max(1, text.count("\n") + 1),
-            ),
-            render_style=text_box_style,
-        )
-
-
-def stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
-    """Load one optional image stamp for a concrete rendering adapter."""
-    return _neutral_stamp_background_for_path(image_stamp_path)
-
-
-def _solid_background_for_color(color_hex: str) -> PdfImage:
-    red, green, blue = (int(component * 255) for component in _hex_to_rgb(color_hex))
-    image = Image.new("RGB", (16, 16), color=(red, green, blue))
-    return PdfImage(image, writer=None)
-
-
 def _subject_value(subject: dict[str, object], key: str) -> str | None:
     value = subject.get(key)
     if value is None:
@@ -1191,104 +1008,6 @@ def _derived_location(subject: dict[str, object]) -> str:
         if part
     ]
     return ", ".join(location_parts)
-
-
-def _content_layout_for_template(
-    layout_template: SignatureLayoutTemplate,
-    *,
-    stamp_position: SignatureStampPosition,
-    signature_rect: SignatureRect,
-    stamp_background: PdfImage | None,
-    text_box_width: int,
-    text_box_height: int,
-    box_style: SignatureBoxStyle | None = None,
-) -> SimpleBoxLayoutRule:
-    from foliaseal.application.visible_signature_layout_adapters import (
-        pyhanko_layout_rule_from_spec,
-    )
-
-    return pyhanko_layout_rule_from_spec(
-        _layout_reservation_for_template(
-            layout_template,
-            stamp_position=stamp_position,
-            signature_rect=signature_rect,
-            text_box_width=text_box_width,
-            text_box_height=text_box_height,
-            box_style=box_style,
-            has_visible_stamp_image=stamp_background is not None,
-            stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
-        ).inner_content_layout
-    )
-
-
-def _background_layout_for_template(
-    *,
-    layout_template: SignatureLayoutTemplate,
-    stamp_position: SignatureStampPosition,
-    signature_rect: SignatureRect,
-    stamp_background: PdfImage | None,
-    text_box_width: int,
-    text_box_height: int,
-    box_style: SignatureBoxStyle | None = None,
-) -> SimpleBoxLayoutRule:
-    from foliaseal.application.visible_signature_layout_adapters import (
-        pyhanko_layout_rule_from_spec,
-    )
-
-    return pyhanko_layout_rule_from_spec(
-        _layout_reservation_for_template(
-            layout_template,
-            stamp_position=stamp_position,
-            signature_rect=signature_rect,
-            text_box_width=text_box_width,
-            text_box_height=text_box_height,
-            box_style=box_style,
-            has_visible_stamp_image=stamp_background is not None,
-            stamp_aspect_ratio=_stamp_image_aspect_ratio(stamp_background),
-        ).background_layout
-    )
-
-
-def _measure_text_box_dimensions_impl(
-    stamp_text: str,
-    text_box_style: TextBoxStyle,
-) -> tuple[int, int]:
-    writer = PdfFileWriter()
-    text_box = TextBox(
-        text_box_style,
-        writer=writer,
-        resources=None,
-        box=BoxConstraints(),
-    )
-    text_box.content = stamp_text
-    text_box.render()
-    measured_width = int(round(text_box.box.width))
-    measured_height = int(round(text_box.box.height))
-    line_count = max(1, stamp_text.count("\n") + 1)
-    nominal_line_height = float(text_box_style.font_size)
-    minimum_height = int(ceil(line_count * nominal_line_height))
-    if line_count > 1:
-        # Reserve one extra point for stacked-text descenders. This is a
-        # measurement correction for the backend's line-box model, not a fit
-        # tolerance: Qt/PDF rasterization consistently needs a touch more
-        # vertical room than the nominal per-line font size alone captures.
-        minimum_height += 1
-    return measured_width, max(measured_height, minimum_height)
-
-
-def _build_text_box_style(text_style: SignatureTextStyle) -> TextBoxStyle:
-    """Compatibility wrapper for the public text-box engine."""
-
-    return _build_text_box_style_impl(text_style)
-
-
-def _measure_text_box_dimensions(
-    stamp_text: str,
-    text_box_style: TextBoxStyle,
-) -> tuple[int, int]:
-    """Compatibility wrapper for the public text-box engine."""
-
-    return _measure_text_box_dimensions_impl(stamp_text, text_box_style)
 
 
 def _reserved_space(container_length: int, content_length: int, gap: int) -> int:
@@ -1373,7 +1092,7 @@ def build_backend_reservation_evidence(
         if layout_preparation is None:
             raise ValueError("Visible signature preparation is unavailable.")
         stamp_text = prepared.stamp_text
-        stamp_background = stamp_background_for_path(appearance.image_stamp_path)
+        stamp_background = _neutral_stamp_background_for_path(appearance.image_stamp_path)
         layout_plan = layout_preparation.layout_plan
         text_box_width = layout_plan.text_box.width_pt
         text_box_height = layout_plan.text_box.height_pt
@@ -1451,38 +1170,6 @@ def _rect_to_box(signature_rect) -> tuple[int, int, int, int]:
     right = int(round(signature_rect.left_pt + signature_rect.width_pt))
     top = int(round(signature_rect.bottom_pt + signature_rect.height_pt))
     return (left, bottom, right, top)
-
-
-def _font_factory_for_text_style(
-    text_style: SignatureTextStyle,
-    *,
-    font_size: Fraction,
-) -> GlyphAccumulatorFactory:
-    return _font_factory_for_family(
-        text_style.font_family,
-        bold=text_style.bold,
-        italic=text_style.italic,
-        font_size=font_size,
-    )
-
-
-def _font_factory_for_family(
-    font_family: str,
-    *,
-    bold: bool = False,
-    italic: bool = False,
-    font_size: Fraction,
-) -> GlyphAccumulatorFactory:
-    face = resolve_signature_font_face(font_family, bold=bold, italic=italic)
-    return GlyphAccumulatorFactory(
-        font_file=str(face.font_file),
-        font_size=float(font_size),
-    )
-
-
-def _hex_to_rgb(color_hex: str) -> tuple[float, float, float]:
-    normalized = color_hex.strip().lstrip("#")
-    return tuple(int(normalized[index : index + 2], 16) / 255.0 for index in (0, 2, 4))  # type: ignore[return-value]
 
 
 def _read_pdf_version_from_bytes(output_bytes: bytes) -> str | None:

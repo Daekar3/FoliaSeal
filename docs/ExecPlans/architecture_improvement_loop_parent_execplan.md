@@ -1597,6 +1597,52 @@ The next design review should compare a minimal `VisibleSignatureArtifactMateria
 constrained concrete-dependency inversion hybrid, and a common-caller adapter shape while preserving
 backend-authoritative fit policy, error DTOs, signing output, and every phase3 external contract.
 
+### Design Selection 21 — completed 2026-08-06
+
+Three independent design reports and two independent reviewers evaluated the qualifying backend
+deepening cluster. Design A, the minimal move, completes the existing adapter methods by moving
+concrete helpers but leaves the current `build_stamp_style()` surface and some materialization
+coordination dispersed; its measured Refactor Shape Score is `73.7`. Design B, a new flexible
+`SignatureArtifactMaterializer` request/result port, improves fake-driven testing but duplicates the
+existing `SignatureAppearanceMaterializer` and `VisibleSignaturePreparation` lifecycle; its base
+score is `78.6`, reduced to `73.6` for a speculative second public surface. Design C, the
+common-caller shape, reuses the existing typed `SignatureAppearanceMaterializer` and memoized
+`VisibleSignaturePreparation.signing()`/`preview()` boundary while moving all concrete PyHanko/Pillow
+implementation behind `visible_signature_layout_adapters.py`; its score is `87.7` with no
+evidence-backed penalty. The orchestrator selects Design C, which exceeds the best penalized
+alternative by `14.0` points without adding a new public port or service locator.
+
+The exact selected boundary is unchanged at the application level: layout policy owns neutral plans,
+fit policy remains in `phase3_signing_backend.py`, and `SignatureAppearanceMaterializer.build_stamp_style`
+remains the only materialization entry point. The adapter will own `RoundedBorderTextStamp`, its
+style, PyHanko text-box measurement/font/color helpers, stamp-background loading, and PDF layout-rule
+materialization. Backend names remain thin wrappers only until `rg` proves that no production or test
+caller imports them; then they may be removed in a follow-up retirement slice. The selected design
+must preserve plan identity, fit errors, WYSIWYG preview/signed output, evidence JSON, invisible signing,
+phase3 CLI/DTO/artifact contracts, and all existing cleanup behavior.
+
+### Implementation 22 — completed 2026-08-06
+
+The selected child plan `docs/ExecPlans/phase3_signing_artifact_materialization_boundary_execplan.md`
+was executed end to end. Concrete PyHanko/Pillow materialization now lives in
+`src/foliaseal/application/visible_signature_artifact_adapters.py`; the layout adapter is a thin
+composition edge over the neutral plan, and the signing backend retains signing, rendered-fit, and
+evidence orchestration only. The backend's dead template-layout helpers and all moved concrete-helper
+compatibility aliases were removed after `rg` found no first-party consumers; tests now import the
+new owner or `application.stamp_background` directly. No phase3 CLI, DTO, JSON, fixture, or artifact
+contract changed, and the separate `phase3_nomenclature_retirement_execplan.md` remains the tracked
+atomic rename plan.
+
+Validation: focused `249 passed`; full `1,097 passed, 1 warning`; Ruff, compileall, diff checks, and
+adapter import firewalls passed. Offscreen evidence passed signed acceptance `10` scenarios / `7`
+successful signings, preview parity `18/18`, and fit rejection `3/3`. Exact evidence roots and
+canonical-preview directories were removed, and no FoliaSeal/Python/Qt process remained outside the
+active Codex sandbox. Conservative measured components were navigation `0.00`, change amplification
+`0.00`, seam reduction `1.00`, boundary-test improvement `0.50`, interface compression `0.50`, and
+boundary isolation `1.00`, for Actual Improvement `0.46` versus predicted `0.42`; all hard gates pass.
+The child has zero unresolved critical or major findings after documentation reconciliation and the
+post-first-pass review.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

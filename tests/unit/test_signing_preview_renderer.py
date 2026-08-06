@@ -10,7 +10,6 @@ from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.phase3_signing_backend import (
     _BackendHorizontalInkMeasurer,
     _visible_signature_fit_issues_for_stamp_text,
-    stamp_background_for_path,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_workflow import (
@@ -26,6 +25,7 @@ from foliaseal.application.signing_preview_renderer import (
     compare_signature_appearance_snapshots,
     render_canonical_signature_preview,
 )
+from foliaseal.application.stamp_background import stamp_background_for_path
 from foliaseal.application.visible_signature_layout import (
     RectBounds,
     TextMetrics,

@@ -6,6 +6,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,7 +14,9 @@ from foliaseal.application import (
     horizontal_signature_reservation,
     signing_draft_workflow,
     signing_preview_renderer,
+    visible_signature_artifact_adapters,
     visible_signature_layout,
+    visible_signature_layout_adapters,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signature_text_measurement import PreparedTextBox
@@ -24,7 +27,11 @@ from foliaseal.application.visible_signature_layout import (
     VisibleSignatureLayoutService,
 )
 from foliaseal.application.visible_signature_layout_adapters import PyHankoTextMeasurer
-from foliaseal.domain.models import SignatureLayoutTemplate, SignatureStampPosition
+from foliaseal.domain.models import (
+    SignatureLayoutTemplate,
+    SignatureStampPosition,
+    SignatureTextStyle,
+)
 from foliaseal.presentation.qt import signature_preview_layout
 from tests.support.signing_builders import build_signature_appearance, build_signature_rect
 
@@ -277,6 +284,87 @@ def test_layout_module_uses_the_public_text_measurement_port() -> None:
 
     assert "_build_text_box_style" not in source
     assert "_measure_text_box_dimensions" not in source
+
+
+def test_layout_adapter_does_not_reach_back_into_signing_backend() -> None:
+    source = inspect.getsource(visible_signature_layout_adapters)
+
+    assert "phase3_signing_backend" not in source
+
+
+def test_artifact_adapter_owns_concrete_metrics_and_style_helpers() -> None:
+    style = SignatureTextStyle(
+        font_family="Serif",
+        font_size_pt=8.5,
+        bold=False,
+        italic=True,
+        text_color_hex="#123456",
+    )
+    prepared = visible_signature_artifact_adapters.PyHankoSignatureTextBoxEngine().prepare(
+        "Line 1\nLine 2\nLine 3",
+        style,
+    )
+
+    assert prepared.render_style.font_size == 17 / 2
+    assert prepared.metrics.line_count == 3
+    assert prepared.metrics.height_pt >= 27
+    assert prepared.render_style.text_color == pytest.approx(
+        (0x12 / 255, 0x34 / 255, 0x56 / 255)
+    )
+
+
+def test_artifact_adapter_import_isolated_from_signing_backend() -> None:
+    source = inspect.getsource(visible_signature_artifact_adapters)
+    assert "phase3_signing_backend" not in source
+
+    script = """
+import sys
+import foliaseal.application.visible_signature_artifact_adapters
+if 'foliaseal.application.phase3_signing_backend' in sys.modules:
+    raise SystemExit('backend imported')
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=os.environ.copy(),
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+def test_prepared_materializer_preserves_options_and_memoizes_targets() -> None:
+    calls: list[dict[str, object]] = []
+
+    class _RecordingMaterializer:
+        def build_stamp_style(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(inner_content_layout="content", background_layout="background")
+
+    preparation = VisibleSignatureLayoutService(
+        appearance_materializer=_RecordingMaterializer(),
+    ).prepare(
+        VisibleSignatureLayoutRequest(
+            appearance=_appearance(),
+            signature_rect=build_signature_rect(page_index=0, width_pt=420, height_pt=86),
+            stamp_text="Digitally signed by\nMorgan Ellery",
+            stamp_background=object(),
+            options=VisibleSignatureLayoutOptions(
+                include_border=False,
+                include_background=False,
+            ),
+        )
+    )
+
+    signing = preparation.signing()
+    assert preparation.signing() is signing
+    preview = preparation.preview()
+    assert preparation.preview() is preview
+    assert len(calls) == 2
+    assert calls[0]["layout_plan"] is preparation.layout_plan
+    assert calls[0]["include_border"] is False
+    assert calls[0]["include_background"] is False
+    assert calls[1]["layout_plan"] is preparation.layout_plan
 
 
 def test_neutral_layout_module_import_isolation() -> None:

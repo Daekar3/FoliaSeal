@@ -1152,7 +1152,7 @@ def _existing_stamp_style(
 
 
 def _stamp_background(image_stamp_path: str | None):
-    from foliaseal.application.phase3_signing_backend import stamp_background_for_path
+    from foliaseal.application.stamp_background import stamp_background_for_path
 
     return stamp_background_for_path(image_stamp_path)
 

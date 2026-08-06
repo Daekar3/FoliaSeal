@@ -622,12 +622,12 @@ class SigningDraftWorkflow:
                 if not Path(workflow.certificate_path).exists():
                     return ()
                 from foliaseal.application.phase3_signing_backend import (
-                    stamp_background_for_path,
                     validate_visible_signature_fit,
                 )
                 from foliaseal.application.sign_pdf_use_case import (
                     SigningBackendAppearance,
                 )
+                from foliaseal.application.stamp_background import stamp_background_for_path
 
                 if workflow.signature_appearance is None:
                     return ()
