@@ -82,8 +82,6 @@ from foliaseal.presentation.qt.phase3_harness import (
 from foliaseal.presentation.qt.phase3_harness_session_runner import Phase3HarnessSessionResult
 from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessWorkspaceSnapshot,
-    _apply_appearance_overrides,
-    _apply_visible_fields_override,
 )
 from foliaseal.presentation.qt.phase3_pdf_signature_snapshotter import (
     Phase3PdfSignatureSnapshotter,
@@ -2888,71 +2886,6 @@ def test_stress_preview_manifests_preserve_expected_family_variants() -> None:
             assert any(token in name for name in names)
         for token in expectation.get("name_tokens", set()):
             assert any(token in name for name in names)
-
-
-def test_apply_appearance_overrides_updates_common_preview_controls() -> None:
-    appearance = build_signature_appearance()
-
-    updated = _apply_appearance_overrides(
-        appearance,
-        {
-            "layout_template": "single_line",
-            "stamp_position": "bottom",
-            "image_stamp_path": "/tmp/stamp.png",
-            "box_style": {
-                "border_width_pt": 3.5,
-                "background_color_hex": "#EEEEEE",
-            },
-            "text_style": {
-                "font_size_pt": 8.5,
-                "italic": True,
-            },
-        },
-    )
-
-    assert updated.layout_template == SignatureLayoutTemplate.SINGLE_LINE
-    assert updated.stamp_position == SignatureStampPosition.BOTTOM
-    assert updated.image_stamp_path == "/tmp/stamp.png"
-    assert updated.box_style.border_width_pt == 3.5
-    assert updated.box_style.background_color_hex == "#EEEEEE"
-
-
-def test_apply_appearance_overrides_can_apply_stress_fixture_profile() -> None:
-    updated = _apply_appearance_overrides(
-        build_signature_appearance(),
-        {"fixture_profile": STRESS_VISIBLE_APPEARANCE_PROFILE},
-    )
-
-    assert updated.common_name.override_text == "Morgan Ellery"
-    assert updated.email.override_text == "records.operations@northwindledger.org"
-    assert updated.company.override_text == "Northwind Ledger Holdings"
-
-
-def test_apply_appearance_overrides_can_limit_visible_fields() -> None:
-    appearance = build_signature_appearance()
-
-    updated = _apply_appearance_overrides(
-        appearance,
-        {
-            "visible_fields": ["common_name", "signing_time"],
-        },
-    )
-
-    assert updated.common_name.show_in_visible_appearance is True
-    assert updated.signing_time.show_in_visible_appearance is True
-    assert updated.distinguished_name.source.value == "hidden"
-    assert updated.email.source.value == "hidden"
-    assert updated.title.source.value == "hidden"
-    assert updated.company.source.value == "hidden"
-
-
-def test_apply_visible_fields_override_rejects_empty_or_unknown_values() -> None:
-    appearance = build_signature_appearance()
-
-    with pytest.raises(ValueError):
-        _apply_visible_fields_override(appearance, [])
-    with pytest.raises(ValueError):
-        _apply_visible_fields_override(appearance, ["not_a_field"])
 
 
 def test_pdf_snapshotter_extracts_visible_appearance_facts(

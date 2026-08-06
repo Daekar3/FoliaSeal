@@ -766,6 +766,55 @@ contracts are explicitly frozen. The next design round should target scenario/ef
 that event pumping is the safer tracer bullet; the nomenclature plan remains deferred and must not be
 renamed piecemeal.
 
+### Post-cap continuation design selection 6 — completed after `a1dec0e27`
+
+Three independent designs were reviewed for the remaining scenario/effect policy:
+
+- Minimal policy boundary: `Phase3HarnessScenarioPolicy.build(...)` returns one immutable
+  `Phase3HarnessScenarioPlan`, keeping the command and adapters in the existing workspace module;
+  shape score approximately `92`.
+- Flexible resolver boundary: `ScenarioResolver.resolve(...)` accepts a profile-reader protocol and
+  fallback appearance, returning a `ResolvedScenario` with an optional refresh flag; shape score
+  approximately `88` because the extra extension surface risks a generic resolver/manager.
+- Common-caller optimized resolver: `Phase3HarnessScenarioResolver.resolve(...)` returns one
+  immutable `Phase3HarnessResolvedScenario`; adapters apply the resolved effects in their existing
+  target-specific order while the resolver owns all profile/appearance override policy; shape score
+  approximately `92`, Candidate Priority approximately `73.2` at confidence `0.92`.
+
+Selected design: the common-caller optimized pure scenario resolver. It is a single base design, not a
+hybrid, so no hybrid bonus gate applies. The resolver has one behavior-bearing entry point, imports no
+Qt/Pillow/pyHanko/workflow code, and leaves event pumping, rendering, capture, and adapter effects in
+the existing workspace module. The child plan preserves `Phase3HarnessScenarioCommand`, current-page
+placement semantics, exact validation errors, CLI/JSON/artifact contracts, and the separate atomic
+phase3 nomenclature migration boundary.
+
+### Post-cap continuation slice 6 — accepted 2026-08-06
+
+Child `docs/ExecPlans/phase3_harness_scenario_policy_execplan.md` is implemented and closed. The new
+Qt-free `Phase3HarnessScenarioResolver` owns named-profile lookup and fixture/direct/text/box/
+visible-field override composition, returning one immutable `Phase3HarnessResolvedScenario`. The
+headless and live workspace adapters now resolve policy once and retain only target-specific
+workflow/testing mutations, refresh, Qt event pumping, rendering, and capture. The old duplicated
+policy helpers were removed from `phase3_harness_workspace.py`; their former tests were migrated to
+resolver-boundary coverage before deletion. Existing scenario command, current-page placement,
+CLI/DTO/JSON/artifact, and phase3 external naming contracts remain unchanged.
+
+Focused policy/workspace/harness/scenario coverage passed `98` tests with one skipped test; the full
+suite passed `1,049` tests with `11` skipped and one pre-existing warning. Ruff, diff checks,
+application/resolver import isolation, and CLI help checks passed. Offscreen acceptance passed signed
+acceptance (`10` scenarios, `7` successful signings, `3` matched intentional rejections), signed
+preview parity (`18/18` successful), and signed fit rejection (`3/3` matched), with no cryptographic,
+annotation, preview-comparison, or expectation failures. The explicit `/tmp/foliaseal-scenario-policy-
+acceptance` root was removed and the process audit was clean.
+
+Continuation-slice proxy measurement: navigation friction `0.25`, change amplification `0.50`,
+seam-risk reduction `0.50`, boundary-test improvement `0.50`, interface compression `0.50`,
+cohesion `0.50`, and behavioral-uncertainty reduction `0.25`; `Actual Improvement = 0.43`, predicted
+`0.25`, with no component regression below `-0.10`. This accepts the slice without changing the fixed
+five-cycle cap. The next scan must reassess the remaining event-pump and preview-capture seams; the
+atomic phase3 nomenclature plan remains deferred because external CLI/DTO/JSON/fixture/artifact
+contracts are still frozen.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
