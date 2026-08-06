@@ -1175,6 +1175,29 @@ Implementation/docs are ready for an intentional commit, after which the loop mu
 three-explorer scan. The phase3 retirement plan remains outstanding and must be executed atomically,
 not treated as complete by this shell slice.
 
+### Post-cap continuation scan 13 — completed after `98adf8827`
+
+Three independent explorers reviewed the clean post-shell checkout. All agree the signing-shell
+composition/lifecycle candidate is closed by `SigningWorkspaceShellController`. The strongest
+consensus-backed next seam is application-to-infra certificate/configuration model ownership:
+`SigningDraftWorkflow`, `SignaturePropertiesCoordinator`, and `SigningMaterialResolver` still import
+infra configuration DTOs/adapters, with the debt recorded in `docs/ARCHITECTURE.md:208,1269,1328`.
+The bounded first family is `CertificateConfiguration` plus certificate-catalog resolution while
+preserving `infra/config/schemas.py` JSON and storage APIs. One explorer scored it Priority `64–67`
+with confidence `0.93`; a second independent architecture record is required before selection under
+the evidence gate.
+
+The historical `phase3` cluster remains explicitly planned but risk-disputed. One explorer scored an
+internal-only atomic rename (preserving CLI/DTO/JSON/fixture/artifact contracts) near `72`, while two
+independent reviews scored the full migration approximately `40–60` after external-contract and
+compatibility risk. The current average does not establish a qualifying consensus candidate. The
+retirement plan remains unchecked for implementation and must not be executed piecemeal or by adding
+aliases. A remaining `phase3_harness.py` scalar projection extraction also lacks a second consumer.
+
+No next candidate is selected from this scan; run the next exact three-explorer scan to confirm the
+certificate/configuration boundary or produce a second below-threshold result. The architecture loop
+remains active and the phase3 nomenclature plan remains an outstanding atomic work item.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
