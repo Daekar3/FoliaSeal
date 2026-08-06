@@ -1968,6 +1968,26 @@ compression `.60`, cohesion `.55`, and isolation `.80`, for weighted Actual Impr
 `.67` versus predicted `.50`; no component regressed below `-.10`, so the hard improvement gates
 pass. Intentional commit and the three-explorer post-commit rescan remain as the final closure gates.
 
+### Scan Round 38 — completed 2026-08-06
+
+Three independent explorers rescanned clean commit `081b4087a`. No source regression, stale
+certificate ownership statement, or critical/major finding remains. One explorer independently
+confirmed the explicitly deferred managed-material resolver seam: `CertificateSigningMaterialResolver`
+still owns raw directory/existence checks and `DefaultSignaturePropertiesCoordinator` reaches
+through repository path properties, while the repository protocol now owns certificate transactions.
+That bounded candidate is Priority approximately `78` with confidence approximately `.90` and is
+the recommended next design-review target. A second explorer scored a tightly bounded
+certificate-generation/source adapter extraction around `64` but a broad application/infra cleanup
+below threshold; the third emphasized the resolver seam and found no regression.
+
+All three reports agree that phase3 nomenclature and the 1,808-line phase3 harness remain a separate
+atomic/high-migration-risk effort: public CLI/DTO/JSON/artifact names and many backend tests still
+exercise those contracts, so piecemeal renaming or opportunistic wrapper deletion is not accepted.
+The signing-shell compatibility surface is documented transitional debt and currently below the
+continuation threshold. The current cycle is closed at `081b4087a`; the next slice should begin with
+three designs for repository-owned managed-material resolution, while the dedicated
+`docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` remains the future atomic migration.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

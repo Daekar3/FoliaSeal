@@ -25,7 +25,13 @@ acceptance matrices.
 - [x] Implementation, focused/full validation, compliance review, and documentation.
 - [x] (2026-08-06) Offscreen acceptance evidence passes; generated summary removed and product
   process audit is clean.
-- [ ] Intentional commit and fresh three-explorer rescan.
+- [x] (2026-08-06) Intentional commit `081b4087a` created with the source, tests, architecture
+  documentation, and parent/child plan updates; the worktree is clean.
+- [x] (2026-08-06) Fresh three-explorer post-commit rescan completed. No regression or critical/
+  major finding remains; the strongest next seam is the explicitly deferred material-path resolver
+  boundary (one report, Priority about `78`, confidence about `.90`). Other reports rank phase3
+  nomenclature/harness debt as a separate higher-MR migration and signing-shell compatibility as
+  below threshold.
 
 ## Progress
 
@@ -49,7 +55,10 @@ acceptance matrices.
 - [x] (2026-08-06) Offscreen evidence passes: signed acceptance `10/7`, preview parity `18/18`,
   and fit rejection `3/3`; the generated summary was removed and no product Python/Qt process
   remains.
-- [ ] Intentional commit and fresh three-explorer rescan.
+- [x] (2026-08-06) Created focused commit `081b4087a`; worktree is clean.
+- [x] (2026-08-06) Completed the fresh three-explorer rescan. The transaction boundary has no
+  remaining critical/major finding; the material-path resolver follow-up is the next candidate,
+  while phase3 nomenclature remains a separate atomic migration.
 
 ## Surprises & Discoveries
 
@@ -120,7 +129,10 @@ Ruff, compileall, CLI help, and diff checks. Offscreen evidence passes signed ac
 preview parity `18/18`, and fit rejection `3/3`; its generated summary was removed and the product
 process audit is clean. Architecture and this child plan were reconciled. Commit and the fresh
 three-explorer rescan remain pending; resolver path properties and phase3 nomenclature/contracts
-are explicit follow-ups rather than part of this slice.
+are explicit follow-ups rather than part of this slice. The post-commit scan found no regression or
+critical/major finding; one explorer scored the material-path resolver follow-up around Priority
+`78` with confidence `.90`, while independent reports placed phase3 harness/compatibility work at
+higher migration risk or below the continuation threshold.
 
 ## Context and Orientation
 
