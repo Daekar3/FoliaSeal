@@ -1,4 +1,5 @@
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signing_workspace_shell_surface import (
     SigningWorkspaceShellSurface,
 )

@@ -14,7 +14,7 @@ from foliaseal.application import (
     ImportCertificateRequest,
     SaveConfigurationRequest,
 )
-from foliaseal.infra.config.schemas import CertificateConfiguration, ManagedCertificate
+from foliaseal.application.certificate_models import CertificateConfiguration, ManagedCertificate
 
 
 def _accepted_dialog_code(bindings: Any) -> Any:

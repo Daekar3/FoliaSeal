@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.domain.models import SigningRequest
-from foliaseal.infra.config.schemas import (
-    AppSettings,
-    CertificateCatalog,
-)
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signing_workspace_action_bridge import (
     SigningWorkspaceActionBridge,
 )

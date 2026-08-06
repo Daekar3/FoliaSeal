@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from foliaseal.application import SigningDraftPreview
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesViewState,
 )
 from foliaseal.domain.models import SignatureAppearance, SignatureRect
-from foliaseal.infra.config.schemas import CertificateCatalog
 
 
 @runtime_checkable

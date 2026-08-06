@@ -11,6 +11,7 @@ from foliaseal.application import (
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
 )
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
     DocumentReviewSummary,
@@ -35,7 +36,7 @@ from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
 )
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from foliaseal.presentation.qt import build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module

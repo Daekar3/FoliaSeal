@@ -7,6 +7,7 @@ from foliaseal.application import (
     SigningDraftValidationSeverity,
     SigningDraftWorkflow,
 )
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
@@ -29,7 +30,6 @@ from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
     SignaturePresetCatalogStore,
 )
-from foliaseal.infra.config.schemas import CertificateCatalog
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,

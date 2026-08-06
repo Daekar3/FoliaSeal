@@ -6,11 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from foliaseal.infra.config.schemas import (
+from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
-    ConfigValidationError,
 )
+from foliaseal.domain.errors import ConfigValidationError
 
 
 class SigningMaterialResolutionError(ValueError):

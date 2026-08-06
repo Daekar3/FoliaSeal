@@ -15,14 +15,14 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
 
-from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import (
+from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
-    ConfigValidationError,
     ManagedCertificate,
     ManagedCertificateSubjectSummary,
 )
+from foliaseal.domain.errors import ConfigValidationError
+from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.secret_storage import SecretStorageError
 
 

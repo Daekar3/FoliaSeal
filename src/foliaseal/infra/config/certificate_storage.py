@@ -8,11 +8,15 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from foliaseal.infra.config.schemas import (
+from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
-    ConfigValidationError,
     ManagedCertificate,
+)
+from foliaseal.domain.errors import ConfigValidationError
+from foliaseal.infra.config.certificate_codecs import (
+    decode_certificate_catalog,
+    encode_certificate_catalog,
 )
 
 CERTIFICATE_DIRECTORY_NAME = "Certificates"
@@ -78,7 +82,7 @@ class CertificateCatalogStore:
             ) from exc
         if not isinstance(payload, dict):
             raise ConfigValidationError("Certificate catalog must be a JSON object.")
-        return CertificateCatalog.from_dict(payload)
+        return decode_certificate_catalog(payload)
 
     def save_catalog(self, catalog: CertificateCatalog) -> None:
         """Persist the full certificate catalog to disk as human-readable JSON."""
@@ -86,7 +90,7 @@ class CertificateCatalogStore:
             raise ConfigValidationError("catalog must be a CertificateCatalog value.")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.managed_certificate_dir.mkdir(parents=True, exist_ok=True)
-        payload_text = json.dumps(catalog.to_dict(), indent=2, sort_keys=True)
+        payload_text = json.dumps(encode_certificate_catalog(catalog), indent=2, sort_keys=True)
         temp_path = self.catalog_path.with_name(f"{self.catalog_path.name}.tmp")
         try:
             temp_path.write_text(f"{payload_text}\n", encoding="utf-8")

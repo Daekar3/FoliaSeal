@@ -7,6 +7,15 @@ from importlib import import_module
 _EXPORT_MODULES = {
     **dict.fromkeys(
         (
+            "CertificateCatalog",
+            "CertificateConfiguration",
+            "ManagedCertificate",
+            "ManagedCertificateSubjectSummary",
+        ),
+        "certificate_models",
+    ),
+    **dict.fromkeys(
+        (
             "CertificateManager",
             "CertificateManagerError",
             "CertificateSecretStore",
@@ -248,6 +257,10 @@ __all__ = [
     "CanonicalSignaturePreviewSnapshot",
     "BackendReservationEvidence",
     "CanonicalPreviewLayout",
+    "CertificateCatalog",
+    "CertificateConfiguration",
+    "ManagedCertificate",
+    "ManagedCertificateSubjectSummary",
     "CertificateManager",
     "CertificateManagerError",
     "CertificateSecretStore",

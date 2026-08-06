@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Self
 
+from foliaseal.application.certificate_models import CertificateConfiguration
 from foliaseal.application.certificate_preview import (
     CertificatePreviewReader,
     Pkcs12CertificatePreviewReader,
@@ -36,7 +37,6 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
-from foliaseal.infra.config.schemas import CertificateConfiguration
 
 
 class SigningDraftValidationError(ValueError):

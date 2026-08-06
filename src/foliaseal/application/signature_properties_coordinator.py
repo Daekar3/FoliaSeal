@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from foliaseal.application.certificate_models import (
+    CertificateCatalog,
+    CertificateConfiguration,
+)
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
     ResolvedSignaturePreset,
@@ -42,10 +46,6 @@ from foliaseal.domain.models import (
     SignatureRect,
 )
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import (
-    CertificateCatalog,
-    CertificateConfiguration,
-)
 
 
 class SignaturePropertiesCoordinatorError(ValueError):

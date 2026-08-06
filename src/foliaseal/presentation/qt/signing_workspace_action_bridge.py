@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application import suggest_signed_output_path
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.domain.models import SigningRequest
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signing_action_boundary import (
     SigningActionBoundary,
 )

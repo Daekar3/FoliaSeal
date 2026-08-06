@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.app_frame_workspace_open import (
     OpenWorkspaceCommand,
     QtPdfPageCountLoader,

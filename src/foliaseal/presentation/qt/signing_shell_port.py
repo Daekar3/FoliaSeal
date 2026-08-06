@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.signing_draft_workflow import SigningDraftPreview
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -15,7 +16,7 @@ from foliaseal.domain.models import SignatureRect, SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
     build_qt_signing_shell,

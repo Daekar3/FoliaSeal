@@ -13,6 +13,7 @@ from foliaseal.application import (
     SigningDraftWorkflow,
     SigningSetupSession,
 )
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator,
@@ -25,7 +26,7 @@ from foliaseal.domain.models import (
     SignatureRect,
 )
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signature_preview_layout import (
     QtSignaturePreviewLayout,
     _ensure_preview_fonts_registered,

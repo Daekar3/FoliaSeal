@@ -1,19 +1,23 @@
 import pytest
 
+from foliaseal.application.certificate_models import (
+    CertificateCatalog,
+    ManagedCertificateSubjectSummary,
+)
 from foliaseal.application.reusable_signing_models import (
     AppearanceProfile,
     PlacementProfile,
     SignaturePreset,
     SignaturePresetCatalog,
 )
+from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
+from foliaseal.infra.config.certificate_codecs import (
+    decode_certificate_catalog,
+    encode_certificate_catalog,
+)
 from foliaseal.infra.config.schemas import (
     AppSettings,
-    CertificateCatalog,
-    CertificateConfiguration,
-    ConfigValidationError,
-    ManagedCertificate,
-    ManagedCertificateSubjectSummary,
     TimestampPolicy,
     TrustProfile,
 )
@@ -129,13 +133,15 @@ def test_app_settings_rejects_non_mapping_ui() -> None:
 def test_managed_certificate_round_trip() -> None:
     original = build_managed_certificate()
 
-    payload = original.to_dict()
-    reconstructed = ManagedCertificate.from_dict(payload)
+    catalog = CertificateCatalog(schema_version=1, managed_certificates=(original,))
+    payload = encode_certificate_catalog(catalog)
+    reconstructed = decode_certificate_catalog(payload).managed_certificates[0]
 
     assert reconstructed == original
-    assert payload["managed_certificate_id"] == "managed-cert-default"
-    assert payload["storage_filename"] == "cert_default.p12"
-    assert payload["subject_summary"]["common_name"] == "Morgan Ellery"
+    entry = payload["managed_certificates"][0]
+    assert entry["managed_certificate_id"] == "managed-cert-default"
+    assert entry["storage_filename"] == "cert_default.p12"
+    assert entry["subject_summary"]["common_name"] == "Morgan Ellery"
 
 
 def test_managed_certificate_subject_summary_round_trip_allows_missing_fields() -> None:
@@ -146,12 +152,16 @@ def test_managed_certificate_subject_summary_round_trip_allows_missing_fields() 
         company="Northwind Ledger Holdings",
     )
 
-    payload = original.to_dict()
-    reconstructed = ManagedCertificateSubjectSummary.from_dict(payload)
+    managed = build_managed_certificate(subject_summary=original)
+    payload = encode_certificate_catalog(
+        CertificateCatalog(schema_version=1, managed_certificates=(managed,))
+    )
+    reconstructed = decode_certificate_catalog(payload).managed_certificates[0].subject_summary
 
     assert reconstructed == original
-    assert payload["email"] is None
-    assert payload["title"] is None
+    subject_payload = payload["managed_certificates"][0]["subject_summary"]
+    assert subject_payload["email"] is None
+    assert subject_payload["title"] is None
 
 
 def test_managed_certificate_rejects_path_like_storage_filename() -> None:
@@ -165,14 +175,17 @@ def test_certificate_configuration_round_trip_without_plain_password() -> None:
         password_secret_ref="secret://foliaseal/cert-config-default",
     )
 
-    payload = original.to_dict()
-    reconstructed = CertificateConfiguration.from_dict(payload)
+    payload = encode_certificate_catalog(
+        CertificateCatalog(schema_version=1, certificate_configurations=(original,))
+    )
+    reconstructed = decode_certificate_catalog(payload).certificate_configurations[0]
 
     assert reconstructed == original
-    assert payload["save_password"] is True
-    assert payload["password_secret_ref"] == "secret://foliaseal/cert-config-default"
-    assert "password" not in payload
-    assert "passphrase" not in payload
+    entry = payload["certificate_configurations"][0]
+    assert entry["save_password"] is True
+    assert entry["password_secret_ref"] == "secret://foliaseal/cert-config-default"
+    assert "password" not in entry
+    assert "passphrase" not in entry
 
 
 def test_certificate_configuration_rejects_saved_password_without_secret_ref() -> None:
@@ -183,8 +196,8 @@ def test_certificate_configuration_rejects_saved_password_without_secret_ref() -
 def test_certificate_catalog_round_trip_and_lookup() -> None:
     original = build_certificate_catalog()
 
-    payload = original.to_dict()
-    reconstructed = CertificateCatalog.from_dict(payload)
+    payload = encode_certificate_catalog(original)
+    reconstructed = decode_certificate_catalog(payload)
 
     assert reconstructed == original
     assert payload["managed_certificates"][0]["display_name"] == "Board Secretary 2026"

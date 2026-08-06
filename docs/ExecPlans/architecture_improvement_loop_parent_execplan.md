@@ -1198,6 +1198,85 @@ No next candidate is selected from this scan; run the next exact three-explorer 
 certificate/configuration boundary or produce a second below-threshold result. The architecture loop
 remains active and the phase3 nomenclature plan remains an outstanding atomic work item.
 
+### Post-cap continuation scan 14 — completed after `ad3a5b446`
+
+Three independent explorers rescanned the clean checkout. The application-to-infra certificate model
+boundary now has independent support from all three reports. `SigningDraftWorkflow`,
+`SignaturePropertiesCoordinator`, `CertificateSigningMaterialResolver`, and `CertificateManager`
+consume `CertificateConfiguration`, `CertificateCatalog`, `ManagedCertificate`, and related subject
+models directly from `infra/config/schemas.py`, while the same schema module combines application
+objects, catalog lookup/upsert/delete policy, validation, and JSON codecs. Representative paths are
+`src/foliaseal/application/signing_draft_workflow.py:39,373`,
+`signature_properties_coordinator.py:44-47,248+`, `signing_material_resolver.py:9-123`, and
+`certificate_manager.py:18-21,89-354`; storage and coordinator/resolver tests cover the behavior.
+
+Two complete score records were `(4.0,4.25,3.75,4.0,4.0,4.25,3.5,2.5)` and
+`(4.5,4.0,4.0,4.5,4.0,4.5,3.0,3.0)` for `(NF,CA,SR,TG,IC,CC,MR,BU)`, with the third report
+independently confirming the same cluster and Priority near `66`. The median/consensus profile is
+approximately `(4.25,4.125,3.875,4.25,4.0,4.375,3.25,2.75)`, confidence `0.90` (conservative
+independent report agreement), and Candidate Priority approximately `64–67`. Dependency category
+is local-substitutable/cross-layer: application models can be tested in-process while the filesystem
+store remains an injected infra adapter. The one-slice boundary is the certificate model/catalog
+family, not every infra import.
+
+The phase3 nomenclature cluster remains risk-disputed: one report scores an internal-only atomic
+rename near `72`, while two independent reports score the full contract-aware migration around
+`40–60`; it remains a separate atomic plan and no aliases or piecemeal renames are authorized. The
+large harness scalar projection and app-frame compatibility snapshots remain below or lack a second
+consumer. Selected next candidate: `application_certificate_model_boundary`. The design round must
+compare an application-owned model/codec split, a protocol-plus-mapper seam, and a common-caller
+certificate-session shape while preserving JSON keys, schema versions, store APIs, validation errors,
+Qt behavior, and application import isolation.
+
+### Post-cap continuation design selection 14 — completed 2026-08-06
+
+Three independent designs and two independent reviewers compared the certificate boundary:
+
+- Minimal app-owned models retaining `to_dict`/`from_dict` with infra re-exports: shape scores ranged
+  `68–79`. It is easy to migrate but leaves persistence codec policy in application models and keeps
+  a second legacy vocabulary alive.
+- Flexible read-only `CertificateCatalogPort` plus an infra adapter, migrating only the resolver:
+  shape scores ranged `68–74`. It isolates one caller but leaves the coordinator, workflow, and
+  certificate manager coupled and adds a shallow port without retiring the source of friction.
+- Common-caller canonical application models/catalog policy with infra-only codecs, migration of all
+  four application callers, and removal of the old certificate model definitions: shape scores ranged
+  `69–91` depending on migration-risk weighting; the orchestrator's score is `90`, with the strongest
+  dependency isolation, ownership clarity, and behavioral testability. The risk is bounded to one
+  certificate family and is mitigated by golden codec tests, import isolation, and complete first-party
+  import migration.
+
+Selected common-caller canonical-model design. It is not a hybrid: no lower-scoring design element
+addresses an unresolved weakness without reintroducing compatibility debris. Create
+`application/certificate_models.py` for the four immutable models and catalog policy, create an
+infra-only codec module for exact JSON encode/decode, migrate application/presentation/tests to the
+canonical module, and remove certificate model definitions from `infra/config/schemas.py`. Preserve
+store paths/APIs, schema versions, JSON keys, validation/error strings, Qt behavior, and all phase3
+contracts. No compatibility re-export is retained after first-party inventory is clean; any external
+import break is documented as an intentional internal-module cleanup, not papered over with an alias.
+
+### Post-cap continuation slice 14 — accepted 2026-08-06
+
+Child `docs/ExecPlans/application_certificate_model_boundary_execplan.md` is implemented. The four
+certificate records and catalog mutation/reference policy now live in
+`src/foliaseal/application/certificate_models.py`; `from_dict`/`to_dict` persistence knowledge was
+removed from those models and replaced by `infra/config/certificate_codecs.py`. `CertificateCatalogStore`
+retains its paths, atomic writes, managed-file deletion/export, and public methods while using the
+new codecs. Application, Qt, support, and test callers no longer import certificate DTOs from
+`infra/config/schemas.py`; the old definitions and aliases were removed after inventory.
+
+Focused certificate/model/storage/manager/coordinator/resolver/workflow/Qt coverage passed `256`
+tests; Ruff passed; full pytest passed `1,069` tests with `11` skipped and one pre-existing Pillow
+warning. SPEC hash, CLI help, import isolation, canonical-definition inventory, and diff checks passed.
+Offscreen evidence passed signed acceptance `10` scenarios with `7` successful signings, preview
+parity `18/18`, and fit rejection `3/3`; the explicit temporary root was removed and process audit
+was clean. Persisted JSON keys/schema versions, validation/error strings, Qt behavior, and phase3
+CLI/DTO/fixture/artifact contracts remain unchanged.
+
+Proxy measurement: navigation `0.35`, change amplification `0.65`, seam-risk reduction `0.75`,
+boundary-test improvement `0.75`, interface compression `0.75`, and boundary isolation `0.85`;
+weighted `Actual Improvement = 0.55` versus predicted `0.45`, with no component regression below
+`-0.10`. The cycle is accepted; commit and a fresh exact three-explorer rescan are required next.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

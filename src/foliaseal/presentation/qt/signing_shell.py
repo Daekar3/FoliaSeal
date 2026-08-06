@@ -16,6 +16,7 @@ from foliaseal.application import (
 from foliaseal.application import (
     WorkspaceInteractionSession as _WorkspaceInteractionSession,
 )
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
     DocumentReviewSummary,
@@ -61,7 +62,7 @@ from foliaseal.domain.models import (
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
-from foliaseal.infra.config.schemas import AppSettings, CertificateCatalog
+from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signature_preview_layout import (
     _preview_stamp_text as _preview_stamp_text_impl,
 )
