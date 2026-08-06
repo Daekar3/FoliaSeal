@@ -34,6 +34,10 @@ from foliaseal.presentation.qt.signature_preview_layout import (
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
     QtCanonicalPreviewLifecycle,
 )
+from foliaseal.presentation.qt.signing_workspace_refinement_dialog import (
+    RefinementDialogState,
+    SignatureRefinementDialog,
+)
 from foliaseal.presentation.qt.visible_signature_setup_form import (
     QtVisibleSignatureSetupForm,
 )
@@ -88,21 +92,6 @@ class RefinementControls:
     container: Any
     helper_label: Any
     refine_button: Any
-
-
-@dataclass(frozen=True)
-class RefinementDialogState:
-    """Ephemeral dialog state retained only while the refinement dialog is open."""
-
-    dialog: Any
-    setup_form: QtVisibleSignatureSetupForm
-    apply_button: Any
-    save_appearance_button: Any
-    save_placement_button: Any
-    save_preset_button: Any
-    appearance_profile_combo: Any
-    placement_profile_combo: Any
-    cancel_button: Any
 
 
 class _QtCertificatePassphrasePrompter:
@@ -424,6 +413,10 @@ class SignaturePropertiesPanel:
     def load_from_workflow(self) -> None:
         self._render_setup_state()
 
+    def load_setup_state(self) -> SignaturePropertiesViewState:
+        """Return the current setup through the shell-facing capability boundary."""
+        return self._setup_session.load(control_issue=self._control_issue)
+
     def apply_changes(self) -> SigningDraftPreview:
         self._control_issue = None
         try:
@@ -728,187 +721,39 @@ class SignaturePropertiesPanel:
         return True
 
     def open_refinement_dialog(self) -> bool:
-        draft = self._setup_session.load(
-            control_issue=self._control_issue
-        ).visible_signature_setup_draft
-        dialog = self._bindings.q_dialog(self.widget)
-        if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Refine current PDF setup")
-        layout = self._bindings.q_vbox_layout(dialog)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
-
-        helper_label = self._bindings.q_label(
-            "Use this dialog to adjust the current PDF's visible signature "
-            "without reopening the old inline editor in the main window."
+        state = self._setup_session.load(control_issue=self._control_issue)
+        dialog = SignatureRefinementDialog(
+            bindings=self._bindings,
+            parent=self.widget,
+            setup_session=self._setup_session,
+            control_issue_getter=lambda: self._control_issue,
+            apply_state=self._apply_coordinator_state,
+            on_error=self._show_signature_preset_error,
+            certificate_configuration_id_getter=lambda: (
+                self._coordinator.workflow.selected_certificate_configuration_id
+            ),
+            active_state_changed=self._set_active_refinement_dialog,
         )
-        if hasattr(helper_label, "setWordWrap"):
-            helper_label.setWordWrap(True)
-        layout.addWidget(helper_label)
-
-        setup_form = QtVisibleSignatureSetupForm(bindings=self._bindings)
-        setup_form.load(draft)
-        layout.addWidget(setup_form.visible_signature_controls.container)
-        layout.addWidget(setup_form.placement_controls.container)
-
-        profile_state = self._setup_session.load(control_issue=self._control_issue)
-        appearance_profile_combo = self._bindings.q_combo_box()
-        appearance_profile_combo.addItems(profile_state.appearance_profile_names)
-        placement_profile_combo = self._bindings.q_combo_box()
-        placement_profile_combo.addItem("No saved placement profile")
-        placement_profile_combo.addItems(profile_state.placement_profile_names)
-        profile_row = _compose_row(
-            self._bindings,
-            self._bindings.q_label("Appearance profile"),
-            appearance_profile_combo,
-            self._bindings.q_label("Placement profile"),
-            placement_profile_combo,
-        )
-        layout.addWidget(profile_row)
-
-        def _refresh_profile_choices(state: SignaturePropertiesViewState) -> None:
-            appearance_profile_combo.clear()
-            appearance_profile_combo.addItems(state.appearance_profile_names)
-            placement_profile_combo.clear()
-            placement_profile_combo.addItem("No saved placement profile")
-            placement_profile_combo.addItems(state.placement_profile_names)
-
-        apply_button = self._bindings.q_push_button("Apply")
-        save_appearance_button = self._bindings.q_push_button("Save appearance for reuse...")
-        save_placement_button = self._bindings.q_push_button("Save placement for reuse...")
-        save_preset_button = self._bindings.q_push_button("Save signature preset for reuse...")
-        cancel_button = self._bindings.q_push_button("Cancel")
-        action_row = _compose_row(
-            self._bindings,
-            save_appearance_button,
-            save_placement_button,
-            save_preset_button,
-            apply_button,
-            cancel_button,
-        )
-        layout.addWidget(action_row)
-
-        def _accept() -> None:
-            dialog._selected_draft = setup_form.build_draft()  # type: ignore[attr-defined]
-            accept = getattr(dialog, "accept", None)
-            if callable(accept):
-                accept()
-
-        def _reject() -> None:
-            reject = getattr(dialog, "reject", None)
-            if callable(reject):
-                reject()
-
-        apply_button.clicked.connect(_accept)  # type: ignore[attr-defined]
-
-        def _save_appearance() -> None:
-            get_text = getattr(self._bindings.q_input_dialog, "getText", None)
-            if not callable(get_text):
-                return
-            name, accepted = get_text(dialog, "Save appearance profile", "Profile name")
-            if not accepted:
-                return
-            try:
-                state = self._setup_session.save_appearance_profile(
-                    str(name),
-                    setup_form.build_draft().appearance,
-                    control_issue=self._control_issue,
-                )
-                _refresh_profile_choices(state)
-            except SignaturePropertiesCoordinatorError as exc:
-                self._show_signature_preset_error(str(exc))
-
-        save_appearance_button.clicked.connect(_save_appearance)  # type: ignore[attr-defined]
-
-        def _save_placement() -> None:
-            get_text = getattr(self._bindings.q_input_dialog, "getText", None)
-            if not callable(get_text):
-                return
-            name, accepted = get_text(dialog, "Save placement profile", "Profile name")
-            if not accepted:
-                return
-            try:
-                state = self._setup_session.save_placement_profile(
-                    str(name),
-                    setup_form.build_draft().placement,
-                    control_issue=self._control_issue,
-                )
-                _refresh_profile_choices(state)
-            except SignaturePropertiesCoordinatorError as exc:
-                self._show_signature_preset_error(str(exc))
-
-        save_placement_button.clicked.connect(_save_placement)  # type: ignore[attr-defined]
-
-        def _save_preset() -> None:
-            appearance_name = _combo_text(appearance_profile_combo).strip()
-            if not appearance_name:
-                self._show_signature_preset_error(
-                    "Save an appearance profile before composing a signature preset."
-                )
-                return
-            get_text = getattr(self._bindings.q_input_dialog, "getText", None)
-            if not callable(get_text):
-                return
-            name, accepted = get_text(dialog, "Save signature preset", "Preset name")
-            if not accepted:
-                return
-            placement_name = _combo_text(placement_profile_combo).strip()
-            if placement_name == "No saved placement profile":
-                placement_name = ""
-            try:
-                state = self._setup_session.compose_signature_preset(
-                    str(name),
-                    appearance_name,
-                    placement_profile_name=placement_name or None,
-                    certificate_configuration_id=self._coordinator.workflow.selected_certificate_configuration_id,
-                    control_issue=self._control_issue,
-                )
-                self._apply_coordinator_state(state)
-            except SignaturePropertiesCoordinatorError as exc:
-                self._show_signature_preset_error(str(exc))
-
-        save_preset_button.clicked.connect(_save_preset)  # type: ignore[attr-defined]
-        cancel_button.clicked.connect(_reject)  # type: ignore[attr-defined]
-
-        self._active_refinement_dialog = RefinementDialogState(
-            dialog=dialog,
-            setup_form=setup_form,
-            apply_button=apply_button,
-            save_appearance_button=save_appearance_button,
-            save_placement_button=save_placement_button,
-            save_preset_button=save_preset_button,
-            appearance_profile_combo=appearance_profile_combo,
-            placement_profile_combo=placement_profile_combo,
-            cancel_button=cancel_button,
-        )
-
-        dialog_exec = getattr(dialog, "exec", None)
-        result = dialog_exec() if callable(dialog_exec) else None
-        self._active_refinement_dialog = None
-        if result != self._accepted_dialog_code():
+        result = dialog.open(state.visible_signature_setup_draft)
+        if not result.accepted or result.draft is None:
             return False
-
-        selected_draft = getattr(dialog, "_selected_draft", None)
-        if selected_draft is None:
-            return False
-        state = self._setup_session.apply_visible_setup(
-            selected_draft,
+        applied_state = self._setup_session.apply_visible_setup(
+            result.draft,
             control_issue=self._control_issue,
         )
-        self._apply_coordinator_state(state)
+        self._apply_coordinator_state(applied_state)
         self._notify_change()
         return True
+
+    def _set_active_refinement_dialog(
+        self,
+        state: RefinementDialogState | None,
+    ) -> None:
+        self._active_refinement_dialog = state
 
     @property
     def app_settings(self) -> AppSettings:
         return self._app_settings
-
-    def _accepted_dialog_code(self) -> Any:
-        accepted = getattr(self._bindings.q_dialog, "Accepted", None)
-        if accepted is not None:
-            return accepted
-        dialog_code = getattr(self._bindings.q_dialog, "DialogCode", None)
-        return getattr(dialog_code, "Accepted", None)
 
     def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
         bindings = self._bindings

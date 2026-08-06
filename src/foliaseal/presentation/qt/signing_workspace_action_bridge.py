@@ -14,6 +14,9 @@ from foliaseal.presentation.qt.signing_action_boundary import (
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionState,
 )
+from foliaseal.presentation.qt.signing_workspace_setup_port import (
+    SigningWorkspaceSetupPort,
+)
 
 
 class SigningWorkspaceActionBridge:
@@ -25,7 +28,7 @@ class SigningWorkspaceActionBridge:
         widget: Any,
         bindings: Any,
         sidebar: Any,
-        properties_panel: Any,
+        setup_port: SigningWorkspaceSetupPort,
         signing_action_boundary: SigningActionBoundary,
         draft_workflow: Any,
         app_settings_getter: Any,
@@ -33,7 +36,7 @@ class SigningWorkspaceActionBridge:
         self._widget = widget
         self._bindings = bindings
         self._sidebar = sidebar
-        self._properties_panel = properties_panel
+        self._setup_port = setup_port
         self._signing_action_boundary = signing_action_boundary
         self._draft_workflow = draft_workflow
         self._app_settings_getter = app_settings_getter
@@ -57,7 +60,7 @@ class SigningWorkspaceActionBridge:
         state = self._signing_action_boundary.load()
         if not state.can_sign:
             return True
-        setup = self._properties_panel._setup_session.load()
+        setup = self._setup_port.load_setup_state()
         certificate = setup.selected_certificate_configuration_name or "No certificate selected"
         preset = setup.selected_signature_preset_name or "Current-document custom setup"
         message_box = self._bindings.q_message_box
@@ -106,13 +109,13 @@ class SigningWorkspaceActionBridge:
         return selected_path
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:
-        catalog = self._properties_panel.refresh_certificate_configurations()
+        catalog = self._setup_port.refresh_certificate_configurations()
         self.reload_state()
         return catalog
 
     def refresh_signature_profiles(self) -> None:
         """Reload reusable profiles and presets in the mounted shell."""
-        self._properties_panel.refresh_signature_profiles()
+        self._setup_port.refresh_signature_profiles()
         self.reload_state()
 
     def _apply_signing_action_state(self, state: SigningActionState) -> None:

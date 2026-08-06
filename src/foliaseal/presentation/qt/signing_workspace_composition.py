@@ -67,6 +67,9 @@ from foliaseal.presentation.qt.signing_workspace_review_bridge import (
 from foliaseal.presentation.qt.signing_workspace_runtime import (
     SigningWorkspaceRuntime,
 )
+from foliaseal.presentation.qt.signing_workspace_setup_port import (
+    PanelSigningWorkspaceSetupAdapter,
+)
 from foliaseal.presentation.qt.signing_workspace_shell_surface import (
     SigningWorkspaceShellSurface,
 )
@@ -339,6 +342,7 @@ def build_signing_workspace_composition(
         on_page_change=runtime.on_page_change,
         on_error=runtime.emit_error,
     )
+    setup_port = PanelSigningWorkspaceSetupAdapter(properties_panel)
     sidebar = SigningWorkspaceSidebar(
         bindings=bindings,
         properties_widget=properties_panel.container,
@@ -386,7 +390,7 @@ def build_signing_workspace_composition(
         widget=widget,
         bindings=bindings,
         sidebar=sidebar,
-        properties_panel=properties_panel,
+        setup_port=setup_port,
         signing_action_boundary=signing_action_boundary,
         draft_workflow=signing_workflow,
         app_settings_getter=get_app_settings,
@@ -397,13 +401,13 @@ def build_signing_workspace_composition(
         viewer_interaction_session=viewer_interaction_session,
         apply_placement_context=runtime.apply_placement_context,
         apply_signature_rect=lambda signature_rect, notify: (
-            properties_panel.set_signature_rect(
+            setup_port.set_signature_rect(
                 signature_rect,
                 notify=notify,
             )
         ),
         sync_signature_overlay=runtime.sync_signature_overlay,
-        refresh_preview=lambda: properties_panel.refresh_preview(),
+        refresh_preview=setup_port.refresh_preview,
         load_signing_action_state=action_bridge.reload_state,
         invalidate_signing_action_state=action_bridge.invalidate_state,
         emit_error=runtime.emit_error,
@@ -412,7 +416,7 @@ def build_signing_workspace_composition(
         set_app_settings=set_app_settings,
         set_document_text_selection_mode=runtime.set_document_text_selection_mode,
         copy_selected_document_text=runtime.copy_selected_document_text,
-        open_reusable_object_editor=properties_panel.open_refinement_dialog,
+        open_reusable_object_editor=setup_port.open_refinement_dialog,
         action_bridge=action_bridge,
         initial_app_settings=app_settings,
     )

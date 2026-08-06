@@ -87,6 +87,15 @@ created.
 - [x] Complete the post-cap continuation slice after measuring the reduced schema boundary and
   confirming no frozen contract or acceptance-matrix regression; this is not counted as a sixth
   accepted cycle under the fixed five-cycle loop cap.
+- [x] Completed the next post-cap scan with three independent explorers and recorded the
+  signature-properties surface as the highest qualifying candidate.
+- [x] Completed minimal, flexible, and common-caller design reviews; selected the constrained
+  properties-surface hybrid and created its child ExecPlan.
+- [x] Execute `signature_properties_surface_hybrid_execplan.md` through the complete DevLoop,
+  including the setup port, refinement-dialog extraction, boundary tests, full validation,
+  acceptance evidence, cleanup, and documentation reconciliation.
+- [x] Complete the post-cap continuation slice's improvement measurement and record the explicit
+  `QT_QPA_PLATFORM=offscreen` acceptance invocation required by this headless environment.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -460,6 +469,82 @@ boundary-test improvement `0.5`, interface compression `0.5`, boundary isolation
 fixture files, 3 scripts, README, and 162 documentation files) and replacement mapping; no public
 phase3 contract was renamed piecemeal. The implementation commit closes the continuation slice; it
 does not alter the original loop's five-cycle cap.
+
+### Post-cap continuation scan 2 — completed 2026-08-06
+
+Three independent explorers reviewed the clean post-schema-boundary checkout. The qualifying
+candidate was the `SignaturePropertiesPanel` surface (`src/foliaseal/presentation/qt/
+signing_workspace_properties_panel.py`, 1,163 lines): its constructor and handlers still combine
+certificate/preset selection, contextual refinement persistence, preview lifecycle/layout handoff,
+Qt control rendering, and application-session orchestration. `SigningWorkspaceComposition` passes
+many concrete panel callbacks into the action/interaction/shell bridges, and
+`SigningWorkspaceActionBridge._confirm_signing_request()` still reaches the panel's private
+`_setup_session`.
+
+The primary explorer scored `(4.5,4,4,4,3.5,4.5,3,2.5)` for
+`(NF,CA,SR,TG,IC,CC,MR,BU)`; the orchestrator independently verified the same call paths and scored
+`(4,4,4.5,4.5,3.5,4.5,3,2.5)`. Medians are `(4.25,4,4.25,4.25,3.5,4.5,3,2.5)`, confidence
+`0.92`, Benefit `4.1375`, Penalty `2.8`, and Candidate Priority approximately `64.3`. The
+candidate is local-substitutable through fake Qt bindings, an in-memory setup session, and existing
+coordinator tests.
+
+Other credible or verified alternatives were below the fixed gate or less bounded: application /
+infra certificate DTO coupling (`~59.7`), the broad phase3 evidence composition root (`~55`), the
+signing-shell lifecycle surface (`~56`), render-cache integration (`~50`), and a new agent-safe
+sign/verify CLI (`~58`). The phase3 nomenclature migration remains a coordinated external-contract
+plan and is not used to inflate this candidate's score.
+
+### Post-cap continuation design selection 2 — completed 2026-08-06
+
+Three designs were reviewed independently:
+
+- Minimal dialog extraction: move the ~170-line `open_refinement_dialog()` workflow to a Qt-local
+  `SignatureRefinementDialog` with `RefinementDialogResult`; BaseShapeScore `78`. It sharply
+  reduces panel orchestration and preserves the existing modal behavior, but does not remove the
+  composition/action bridge's concrete-panel and private-session coupling.
+- Flexible application session port: expose a variation-neutral `SigningPropertiesSessionPort`
+  returning `SignaturePropertiesViewState` / typed transitions and hide coordinator/workflow/store
+  details behind an injected adapter. BaseShapeScore `84`; risk is a broad capability interface
+  that duplicates the already-existing `SigningSetupSession`.
+- Common-caller setup port: add a `SigningWorkspaceSetupPort` for the dominant shell/action/
+  interaction callers, replacing private `_setup_session` access and concrete-panel callback
+  wiring. BaseShapeScore `82`; risk is a read/command/dialog surface that could grow into a generic
+  manager.
+
+Selected constrained hybrid: combine the minimal dialog extraction with only the common-caller
+setup port elements that remove the verified private-panel leak. The hybrid keeps all domain
+decisions in `SigningSetupSession`/`DefaultSignaturePropertiesCoordinator`, keeps Qt dialog/error/
+preview policy at the presentation edge, and exposes no widget, coordinator, workflow, store, or
+private-session objects. Rescored dimensions `(4.5,4.5,4.5,4,4.5,4,5)` produce BaseShapeScore
+`87.5`, exceeding the highest base by `5.5` points with no hard-gate risk. The exact interface,
+retirement rule, and behavior map are recorded in
+`docs/ExecPlans/signature_properties_surface_hybrid_execplan.md`.
+
+### Post-cap continuation slice 2 — accepted 2026-08-06
+
+Child `docs/ExecPlans/signature_properties_surface_hybrid_execplan.md` is implemented. The
+1,163-line `SignaturePropertiesPanel` fell to 1,008 lines as the modal refinement workflow moved to
+`signing_workspace_refinement_dialog.py` (247 lines) and shell callers moved behind
+`SigningWorkspaceSetupPort`/`PanelSigningWorkspaceSetupAdapter` (88 lines). The action bridge no
+longer reaches `_setup_session`; the only remaining active-dialog bridge is explicitly temporary
+for existing acceptance tests and has a retirement criterion in the child plan.
+
+Focused setup/shell/coordinator coverage passed `158` tests; the full suite passed `1,049` tests with
+one pre-existing warning. Ruff, `git diff --check`, CLI help/parser checks, and application-boundary
+imports passed. Offscreen release evidence passed signed acceptance (`10` scenarios, `7` successful
+signings, `3` matched intentional rejections), signed preview parity (`18/18` successful), and
+signed fit rejection (`3/3` matched), with zero cryptographic, annotation, or preview-comparison
+failures and `acceptance_expectations_passed=true`. Explicit preview/signed `/tmp` directories were
+removed and the process audit was clean. The initial non-offscreen invocation failed before matrix
+execution because `xcb` could not connect to display `:0`; the supported offscreen rerun passed.
+
+Continuation-slice proxy measurement: navigation `0.25`, change amplification `0.25`, seam-risk
+reduction `0.25`, boundary-test improvement `0.50`, interface compression `0.25`, cohesion `0.25`,
+and behavioral-uncertainty reduction `0.25`; `Actual Improvement = 0.25`, predicted `0.25`, with no
+component regression below `-0.10`. This accepts the post-cap continuation slice without reopening
+the fixed five-cycle cap. The coordinated `phase3_nomenclature_retirement_execplan.md` remains the
+next contract-sensitive cleanup plan; its public CLI/DTO/JSON/artifact names stay frozen until an
+atomic migration is approved.
 
 ## Context and Orientation
 
