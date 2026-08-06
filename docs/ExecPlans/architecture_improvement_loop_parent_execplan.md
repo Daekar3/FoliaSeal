@@ -111,6 +111,8 @@ created.
 - [x] Execute `evidence_runner_provider_boundary_execplan.md` through implementation, focused/full
   validation, offscreen evidence, cleanup, documentation, and commit closure in `435b41312`;
   fresh rescan remains before accepting the slice.
+- [x] Accepted provider slice at `435b41312`/`4cd0c2515` and completed scan round 16; no candidate
+  passed the two-record and Priority `60` gates, beginning the required below-threshold confirmation.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -1357,6 +1359,25 @@ boundary-test improvement `0.80`, interface compression `0.75`, and boundary iso
 Actual Improvement is `0.52` against predicted `0.45`, with no component regression below `-0.10`.
 The slice is accepted under the parent threshold after the intentional commit. A fresh exact
 three-explorer rescan is now required before selecting the next candidate.
+
+### Scan Round 16 — completed 2026-08-06
+
+Baseline commit: `4cd0c2515`; the worktree was clean. Three independent explorers confirmed that
+the evidence-provider and certificate-model seams are closed. The strongest new bounded seam is
+application persistence coupling: `SignaturePropertiesCoordinator` and `CertificateManager` still
+type/default-construct the concrete `infra.config.certificate_storage.CertificateCatalogStore`,
+while the reusable-object application already demonstrates an application-owned repository protocol
+and in-memory fake. One explorer scored this candidate approximately `(4.25,4.0,4.0,4.5,4.0,4.25,3.0,2.0)`
+with confidence `0.92` and Priority `65–68`; the other two did not independently confirm it, so it
+does not pass the two-record credibility gate for selection this round.
+
+The two independent nomenclature records agree that phase3 retirement remains broad but contract-risk
+disputed: roughly 76 live source/test/script/README references remain, and stable CLI commands,
+`Phase3*` DTOs, JSON keys, fixtures, and artifact paths require one atomic migration. Consensus
+Priority is approximately `55–60` (confidence `0.99`), below the fixed `60` gate. The only other
+candidate is the shallow `_active_refinement_dialog` test bridge at approximately `62`, but it has
+low architectural depth and is not independently confirmed as the strongest seam. This is the first
+consecutive below-threshold confirmation scan; no child plan is selected.
 
 ## Context and Orientation
 
