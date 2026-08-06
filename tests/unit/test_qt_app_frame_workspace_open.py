@@ -111,7 +111,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     shell = _FakeShell()
     shell_factory = _FakeShellFactory(shell)
     service = _workspace_open_service(shell_factory=shell_factory)
-    secret_provider = object()
+    material_port = object()
     sign_executor = object()
     selected_pdf = tmp_path / "source" / "contract.pdf"
 
@@ -129,7 +129,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
             certificate_catalog_store=CertificateCatalogStore(
                 storage_dir=tmp_path / "Certificates"
             ),
-            certificate_secret_provider=secret_provider,
+            certificate_material_port=material_port,
             preset_catalog_store=object(),
             sign_executor=sign_executor,
             on_sign_request=_on_sign_request,
@@ -148,7 +148,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
         tmp_path / "signed" / "contract-signed.pdf"
     )
     assert shell_factory.bootstrap_calls[0].app_settings == _settings(tmp_path)
-    assert shell_factory.bootstrap_calls[0].certificate_secret_provider is secret_provider
+    assert shell_factory.bootstrap_calls[0].certificate_material_port is material_port
     assert shell_factory.bootstrap_calls[0].sign_executor is sign_executor
     assert shell_factory.bootstrap_calls[0].on_open_signed_output is _reopen_target
 

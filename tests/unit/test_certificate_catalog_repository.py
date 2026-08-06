@@ -75,6 +75,48 @@ def test_real_store_structurally_conforms_to_application_repository(tmp_path: Pa
     )
 
 
+def test_in_memory_material_for_uses_byte_map_without_writing_a_file(tmp_path: Path) -> None:
+    managed = _managed()
+    catalog = CertificateCatalog(schema_version=1, managed_certificates=(managed,))
+    repository = InMemoryCertificateCatalogRepository(
+        catalog=catalog,
+        storage_dir=tmp_path / "Certificates",
+    )
+    repository.commit_managed_certificate(
+        payload=b"pkcs12",
+        managed_certificate=managed,
+        catalog=catalog,
+    )
+
+    material = repository.material_for(managed)
+
+    assert material.certificate_path == str(
+        repository.managed_certificate_dir / managed.storage_filename
+    )
+    assert not Path(material.certificate_path).exists()
+
+
+def test_in_memory_material_for_rejects_mismatched_record(tmp_path: Path) -> None:
+    managed = _managed()
+    catalog = CertificateCatalog(schema_version=1, managed_certificates=(managed,))
+    repository = InMemoryCertificateCatalogRepository(
+        catalog=catalog,
+        storage_dir=tmp_path / "Certificates",
+    )
+
+    with pytest.raises(ConfigValidationError, match="supplied managed certificate"):
+        repository.material_for(replace(managed, storage_filename="other.p12"))
+
+
+def test_real_store_material_for_requires_existing_managed_file(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = CertificateCatalog(schema_version=1, managed_certificates=(_managed(),))
+    store.save_catalog(catalog)
+
+    with pytest.raises(FileNotFoundError, match="Managed certificate file is missing"):
+        store.material_for(_managed())
+
+
 def test_in_memory_managed_file_transaction_tracks_bytes_and_validates_record(
     tmp_path: Path,
 ) -> None:

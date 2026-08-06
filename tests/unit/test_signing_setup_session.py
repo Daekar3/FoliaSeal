@@ -8,6 +8,9 @@ from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
+from foliaseal.application.signing_material_resolver import (
+    RepositoryBackedCertificateSigningMaterialPort,
+)
 from foliaseal.application.signing_setup_session import SigningSetupSession
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from tests.support.signing_builders import (
@@ -133,7 +136,10 @@ def test_signing_setup_session_uses_saved_secret_without_prompt(
     coordinator = DefaultSignaturePropertiesCoordinator(
         workflow=_workflow(tmp_path),
         certificate_catalog_store=store,
-        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        certificate_material_port=RepositoryBackedCertificateSigningMaterialPort(
+            repository=store,
+            secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        ),
         preset_catalog=build_signature_preset_catalog(),
     )
     prompter = _FakePrompter([])

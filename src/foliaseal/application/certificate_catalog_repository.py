@@ -39,11 +39,26 @@ class ManagedCertificateCommit:
     managed_file_path: Path
 
 
+@dataclass(frozen=True)
+class ManagedCertificateMaterial:
+    """Backend-ready location of a managed certificate file.
+
+    The path is intentionally produced only by repository adapters; application
+    callers need not know how managed files are laid out.
+    """
+
+    certificate_path: str
+
+
 @runtime_checkable
 class CertificateCatalogRepository(Protocol):
     """Persistence operations required by certificate application services."""
 
     def load_catalog(self) -> CertificateCatalog: ...
+
+    def material_for(
+        self, managed_certificate: ManagedCertificate
+    ) -> ManagedCertificateMaterial: ...
 
     def save_catalog(self, catalog: CertificateCatalog) -> None: ...
 
@@ -95,6 +110,25 @@ class InMemoryCertificateCatalogRepository:
 
     def load_catalog(self) -> CertificateCatalog:
         return self.catalog
+
+    def material_for(
+        self, managed_certificate: ManagedCertificate
+    ) -> ManagedCertificateMaterial:
+        if not isinstance(managed_certificate, ManagedCertificate):
+            raise ConfigValidationError(
+                "managed_certificate must be a ManagedCertificate value."
+            )
+        stored = self.catalog.managed_certificate_by_id(
+            managed_certificate.managed_certificate_id
+        )
+        if stored != managed_certificate:
+            raise ConfigValidationError(
+                "catalog does not contain the supplied managed certificate."
+            )
+        path = self.managed_certificate_dir / managed_certificate.storage_filename
+        if managed_certificate.storage_filename not in self._managed_files and not path.exists():
+            raise FileNotFoundError(f"Managed certificate file is missing: {path}")
+        return ManagedCertificateMaterial(certificate_path=str(path))
 
     def save_catalog(self, catalog: CertificateCatalog) -> None:
         if not isinstance(catalog, CertificateCatalog):

@@ -131,6 +131,11 @@ created.
 - [x] Implemented the certificate transaction boundary, focused/full validation, architecture
   reconciliation, offscreen evidence, and generated-artifact/process cleanup; intentional commit
   and the post-commit three-explorer rescan remain.
+- [x] Completed Scan Round 39 and Design Selection 40 for the managed-material resolution boundary;
+  selected the standalone common-caller material port and created its child plan.
+- [x] Implemented the material port, repository material verb, coordinator/Qt migration, boundary
+  tests, full validation, offscreen evidence, cleanup, and compliance correction; commit and the
+  post-commit three-explorer rescan remain.
 
 ## Scan and Candidate Ledger
 
@@ -1944,7 +1949,7 @@ this child. No generic transaction, lifecycle registry, phase3 rename, JSON chan
 allowed. The child plan is
 `docs/ExecPlans/managed_certificate_transaction_boundary_execplan.md`.
 
-### Implementation 37 — validation complete, closure pending — 2026-08-06
+### Implementation 37 — accepted — 2026-08-06
 
 The selected certificate transaction slice is implemented. `CertificateManager` now retains
 certificate policy, PKCS#12 generation/parsing, saved-secret compensation, export, and typed
@@ -1988,6 +1993,109 @@ The signing-shell compatibility surface is documented transitional debt and curr
 continuation threshold. The current cycle is closed at `081b4087a`; the next slice should begin with
 three designs for repository-owned managed-material resolution, while the dedicated
 `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` remains the future atomic migration.
+
+### Scan Round 39 — completed 2026-08-06
+
+Three independent explorers rescanned clean commit `33e95421e`. The convergent highest-ranked
+candidate is `managed-material-resolution-boundary`, spanning
+`application/signing_material_resolver.py`,
+`application/signature_properties_coordinator.py`,
+`application/certificate_catalog_repository.py`, and the concrete certificate store plus its Qt
+composition callers. The coordinator types its dependency as `CertificateCatalogRepository` but
+dereferences undeclared `managed_certificate_dir`; the resolver then joins a concrete filesystem
+path and checks existence itself. The app-frame/workspace graph threads a concrete
+`CertificateCatalogStore` through shell/bootstrap/panel composition, while tests split path and
+secret behavior across resolver and coordinator internals rather than one repository/material
+boundary.
+
+Independent dimension scores were:
+
+| explorer | NF | CA | SR | TG | IC | CC | MR | BU |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `arch_scan_39_one` | 4.5 | 4.5 | 4.5 | 4.5 | 4.5 | 4.5 | 2.5 | 2.0 |
+| `arch_scan_39_two` | 4.5 | 4.0 | 4.0 | 4.0 | 3.5 | 4.0 | 2.5 | 2.0 |
+| `arch_scan_39_three` | 4.5 | 4.0 | 4.0 | 4.0 | 3.5 | 4.0 | 2.5 | 2.0 |
+
+Medians are `(4.5, 4.0, 4.0, 4.0, 3.5, 4.0, 2.5, 2.0)`. Benefit is `4.025`, penalty is
+`2.30`, agreement is `0.925`, evidence coverage is `1.0`, confidence is `0.948`, and the fixed
+Candidate Priority formula yields approximately `65.6/100`, clearing the `60` threshold. The
+dependency category is local-substitutable: the in-memory repository and fake secret provider
+already provide deterministic stand-ins. This candidate wins over the secondary shell lifecycle
+(`~63`, one report), properties-panel (`~62`, one report), and concrete application/infra firewall
+(`~47`, below threshold) candidates because it has three-record convergence, lower uncertainty, and
+is the explicitly deferred follow-up to the accepted transaction boundary.
+
+The phase3 nomenclature/harness debt remains a separate atomic migration with public CLI/DTO/JSON/
+artifact contracts and high migration risk; compatibility-surface cleanup remains below threshold.
+
+### Problem Frame 39 — managed-material resolution boundary
+
+The selected workflow is app-frame startup/open-PDF through shell bootstrap into
+`DefaultSignaturePropertiesCoordinator`, then saved-certificate selection and
+`CertificateSigningMaterialResolver.resolve`. The coordinator currently passes a concrete managed
+directory through a protocol-typed repository; the resolver repeats managed-record lookup, filename
+joining, filesystem existence checks, saved-password lookup, and user-facing error mapping. This
+leaks storage layout into application/Qt callers and makes valid repository fakes fail at
+construction. The boundary must preserve `SigningMaterial`, `SigningMaterialResolutionError`, saved
+password semantics, certificate alias handling, missing-file behavior, and existing signing-shell
+behavior while removing path properties from application-facing composition.
+
+The dependency is local-substitutable. A bounded design may add an application-owned material port
+or repository verb returning a typed material handle/backend-ready `SigningMaterial`, migrate the
+coordinator and Qt composition to it, and retire the concrete path properties. It must not rename
+phase3 contracts, alter signing policy, or broaden into a general application/infra import cleanup.
+
+### Design Selection 40 — completed 2026-08-06
+
+Three designs were generated for the managed-material-resolution boundary and reviewed independently
+by two agents:
+
+- Shape A, minimal source verb plus the existing resolver, scored `47` when its public path/string
+  material leak is penalized. It leaves catalog/secret policy split across caller and resolver and
+  is rejected; an opaque-handle variant remains weaker and adds migration ambiguity.
+- Shape B, flexible `CertificateMaterialRepository.resolve_signing_material(request)`, scored
+  `87.8–91`. It is valid and keeps a single request verb, but adds a request abstraction and risks
+  broadening the persistence repository into secret/policy ownership.
+- Shape C, common-caller `CertificateSigningMaterialPort.resolve(configuration_id, passphrase,
+  alias) -> SigningMaterial`, scored `91.6–93` with no evidence-backed penalty. A repository-backed
+  adapter owns catalog lookup, managed-material resolution, saved-secret access, validation, and
+  error mapping; the coordinator makes one intent-level call.
+
+Shape C is selected as the highest-scoring standalone design. No hybrid is permitted because
+combining B and C would add redundant public surfaces and does not clear
+the fixed five-point hybrid improvement rule. The selected implementation adds one repository
+`material_for(ManagedCertificate)` capability returning an application-owned backend-ready value,
+then composes the common-caller port from that repository and the secret-provider protocol. No
+`Path`, concrete store, secret-storage exception, directory property, Qt type, phase3 rename, JSON
+change, or CLI change is allowed through the port. The child plan is
+`docs/ExecPlans/managed_material_resolution_boundary_execplan.md`.
+
+### Implementation 41 — validation complete, closure pending — 2026-08-06
+
+The managed-material resolution slice is implemented. `CertificateCatalogRepository` now exposes
+one adapter-owned `material_for(ManagedCertificate)` capability returning an application-owned
+backend-ready value; production and in-memory adapters agree on record validation and missing-file
+behavior. The path-taking `CertificateSigningMaterialResolver` was removed and replaced by
+`CertificateSigningMaterialPort` plus `RepositoryBackedCertificateSigningMaterialPort`, which owns
+catalog lookup, saved-secret retrieval, password validation, alias passthrough, and established
+resolution errors. `DefaultSignaturePropertiesCoordinator` now makes one port call, and the Qt
+workspace graph carries only the repository protocol and material port; its resolution path no
+longer imports or annotates the concrete store or secret provider.
+
+Boundary tests cover explicit/saved/blank/missing passwords, provider failure with the exact legacy
+message, unknown/dangling configurations, aliases, missing files, repository parity, and no-path
+fakes. Focused material/coordinator/repository coverage is `218` tests; the full suite passes
+`1136` tests with one pre-existing Pillow deprecation warning. Ruff, compileall, CLI help, import
+isolation, and diff checks pass. The unchanged offscreen evidence command passes signed acceptance
+`10/7`, preview parity `18/18`, and fit rejection `3/3`; its generated summary was removed and no
+product process remains. `docs/SPEC.md` is unchanged.
+
+Conservative repeated proxies are navigation `.45`, change amplification `.45`, seam reduction
+`.50`, boundary-test improvement `.60`, interface compression `.50`, cohesion `.45`, and isolation
+`.65`, for weighted Actual Improvement approximately `.53` versus predicted `.48`; no component
+regressed below `-.10`. The independent compliance review found and the implementation corrected
+one exact error-message drift; no critical/major finding remains. Documentation reconciliation,
+intentional commit, and the fresh three-explorer post-commit rescan remain closure gates.
 
 ## Context and Orientation
 

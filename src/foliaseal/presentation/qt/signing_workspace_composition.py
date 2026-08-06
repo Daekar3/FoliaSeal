@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from foliaseal.application import (
     WorkspaceInteractionSession,
 )
+from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
@@ -27,7 +28,7 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionSession,
 )
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
-from foliaseal.application.signing_material_resolver import CertificateSecretProvider
+from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
 )
@@ -36,7 +37,6 @@ from foliaseal.domain.models import (
     SigningRequest,
 )
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
-from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
@@ -126,8 +126,8 @@ def build_signing_workspace_composition(
     viewer_workflow: ViewerWorkflow,
     signing_workflow: SigningDraftWorkflow,
     certificate_catalog: CertificateCatalog | None = None,
-    certificate_catalog_store: CertificateCatalogStore | None = None,
-    certificate_secret_provider: CertificateSecretProvider | None = None,
+    certificate_catalog_store: CertificateCatalogRepository | None = None,
+    certificate_material_port: CertificateSigningMaterialPort | None = None,
     preset_catalog: SignaturePresetCatalog | None = None,
     preset_catalog_store: SignaturePresetCatalogStore | None = None,
     app_settings: AppSettings,
@@ -335,7 +335,7 @@ def build_signing_workspace_composition(
         workflow=signing_workflow,
         certificate_catalog=certificate_catalog,
         certificate_catalog_store=certificate_catalog_store,
-        certificate_secret_provider=certificate_secret_provider,
+        certificate_material_port=certificate_material_port,
         preset_catalog=preset_catalog,
         preset_catalog_store=preset_catalog_store,
         app_settings=app_settings,

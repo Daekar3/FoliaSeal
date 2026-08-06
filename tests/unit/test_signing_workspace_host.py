@@ -65,7 +65,6 @@ def _environment() -> SigningWorkspaceEnvironment:
         app_settings=_settings,
         app_settings_store=None,
         certificate_catalog_store=None,
-        certificate_secret_provider=None,
         preset_catalog_store=None,
         sign_executor=None,
         on_sign_request=None,

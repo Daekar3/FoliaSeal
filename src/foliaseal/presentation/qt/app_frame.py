@@ -14,6 +14,10 @@ from foliaseal.application import (
     ReusableSigningObjects,
     SigningDraftWorkflow,
 )
+from foliaseal.application.signing_material_resolver import (
+    CertificateSigningMaterialPort,
+    RepositoryBackedCertificateSigningMaterialPort,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -268,6 +272,12 @@ class FoliaSealAppFrame:
         self._certificate_secret_provider = (
             certificate_secret_provider or SecretToolCertificateSecretStore()
         )
+        self._certificate_material_port: CertificateSigningMaterialPort = (
+            RepositoryBackedCertificateSigningMaterialPort(
+                repository=self._certificate_catalog_store,
+                secret_provider=self._certificate_secret_provider,
+            )
+        )
         self._certificate_manager = certificate_manager or (
             CertificateManager(
                 store=self._certificate_catalog_store,
@@ -304,7 +314,7 @@ class FoliaSealAppFrame:
                 app_settings=lambda: self._app_settings,
                 app_settings_store=self._app_settings_store,
                 certificate_catalog_store=self._certificate_catalog_store,
-                certificate_secret_provider=self._certificate_secret_provider,
+                certificate_material_port=self._certificate_material_port,
                 preset_catalog_store=self._preset_catalog_store,
                 sign_executor=self._sign_executor,
                 on_sign_request=self._on_sign_request,

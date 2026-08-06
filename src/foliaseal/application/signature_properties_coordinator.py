@@ -43,8 +43,8 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.signing_material_resolver import (
-    CertificateSecretProvider,
-    CertificateSigningMaterialResolver,
+    CertificateSigningMaterialPort,
+    RepositoryBackedCertificateSigningMaterialPort,
     SigningMaterialResolutionError,
 )
 from foliaseal.domain.models import (
@@ -252,7 +252,7 @@ class DefaultSignaturePropertiesCoordinator:
     workflow: SigningDraftWorkflow
     certificate_catalog: CertificateCatalog | None = None
     certificate_catalog_store: CertificateCatalogRepository | None = None
-    certificate_secret_provider: CertificateSecretProvider | None = None
+    certificate_material_port: CertificateSigningMaterialPort | None = None
     preset_catalog: SignaturePresetCatalog | None = None
     preset_catalog_store: CatalogRepository | None = None
     reusable_objects: ReusableSigningObjects | None = None
@@ -274,9 +274,10 @@ class DefaultSignaturePropertiesCoordinator:
             )
             self.reusable_objects = ReusableSigningObjects(repository)
         self.preset_catalog = self._reusable_catalog()
-        self._certificate_material_resolver = CertificateSigningMaterialResolver(
-            managed_certificate_dir=self.certificate_catalog_store.managed_certificate_dir,
-            secret_provider=self.certificate_secret_provider,
+        self._certificate_material_port = self.certificate_material_port or (
+            RepositoryBackedCertificateSigningMaterialPort(
+                repository=self.certificate_catalog_store,
+            )
         )
         self._selected_certificate_configuration_name: str | None = None
         self._selected_signature_preset_name: str | None = None
@@ -690,9 +691,8 @@ class DefaultSignaturePropertiesCoordinator:
         passphrase: str | None,
     ):
         try:
-            return self._certificate_material_resolver.resolve(
-                self.certificate_catalog,
-                configuration,
+            return self._certificate_material_port.resolve(
+                certificate_configuration_id=configuration.certificate_configuration_id,
                 passphrase=passphrase,
             )
         except (SigningMaterialResolutionError, ValueError) as exc:

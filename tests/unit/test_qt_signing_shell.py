@@ -20,6 +20,9 @@ from foliaseal.application.document_review import (
 from foliaseal.application.document_text_search import DocumentTextMatch
 from foliaseal.application.document_text_selection import DocumentTextSelection
 from foliaseal.application.reusable_signing_models import PlacementProfileRect
+from foliaseal.application.signing_material_resolver import (
+    RepositoryBackedCertificateSigningMaterialPort,
+)
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.errors import FailureCode
@@ -1111,7 +1114,10 @@ def test_signing_shell_certificate_selection_empty_password_uses_saved_secret(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=workflow,
         certificate_catalog_store=store,
-        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        certificate_material_port=RepositoryBackedCertificateSigningMaterialPort(
+            repository=store,
+            secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        ),
     )
 
     panel = widget.properties_panel

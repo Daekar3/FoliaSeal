@@ -13,6 +13,7 @@ from foliaseal.application import (
     SigningDraftWorkflow,
     SigningSetupSession,
 )
+from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.signature_properties_coordinator import (
@@ -20,12 +21,13 @@ from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
 )
-from foliaseal.application.signing_material_resolver import CertificateSecretProvider
+from foliaseal.application.signing_material_resolver import (
+    CertificateSigningMaterialPort,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureRect,
 )
-from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signature_preview_layout import (
     QtSignaturePreviewLayout,
@@ -309,8 +311,8 @@ class SignaturePropertiesPanel:
         bindings: Any,
         workflow: SigningDraftWorkflow,
         certificate_catalog: CertificateCatalog | None = None,
-        certificate_catalog_store: CertificateCatalogStore | None = None,
-        certificate_secret_provider: CertificateSecretProvider | None = None,
+        certificate_catalog_store: CertificateCatalogRepository | None = None,
+        certificate_material_port: CertificateSigningMaterialPort | None = None,
         preset_catalog: SignaturePresetCatalog | None = None,
         preset_catalog_store: Any | None = None,
         app_settings: AppSettings | None = None,
@@ -326,7 +328,7 @@ class SignaturePropertiesPanel:
             workflow=workflow,
             certificate_catalog=certificate_catalog,
             certificate_catalog_store=certificate_catalog_store,
-            certificate_secret_provider=certificate_secret_provider,
+            certificate_material_port=certificate_material_port,
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
         )

@@ -1,15 +1,12 @@
-"""Resolve reusable certificate configurations into runtime signing inputs."""
+"""Resolve reusable certificate configurations into signing inputs."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
-from foliaseal.application.certificate_models import (
-    CertificateCatalog,
-    CertificateConfiguration,
-)
+from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
+from foliaseal.application.certificate_models import CertificateCatalog, CertificateConfiguration
 from foliaseal.domain.errors import ConfigValidationError
 
 
@@ -18,43 +15,40 @@ class SigningMaterialResolutionError(ValueError):
 
 
 class CertificateSecretProvider(Protocol):
-    """Read saved certificate passwords from a secure provider."""
-
-    def is_available(self) -> bool:
-        """Return whether saved-password retrieval is available."""
-
-    def get_secret(self, secret_ref: str) -> str | None:
-        """Return the secret for a reference, or None if no secret exists."""
+    def is_available(self) -> bool: ...
+    def get_secret(self, secret_ref: str) -> str | None: ...
 
 
 @dataclass(frozen=True)
 class SigningMaterial:
-    """Runtime certificate material required by the current signing backend."""
-
     certificate_path: str
     passphrase: str
     certificate_alias: str | None = None
 
 
-@dataclass(frozen=True)
-class CertificateSigningMaterialResolver:
-    """Resolve certificate configurations to backend-ready certificate inputs."""
+class CertificateSigningMaterialPort(Protocol):
+    def resolve(
+        self,
+        *,
+        certificate_configuration_id: str,
+        passphrase: str | None = None,
+        certificate_alias: str | None = None,
+    ) -> SigningMaterial: ...
 
-    managed_certificate_dir: Path
+
+@dataclass(frozen=True)
+class RepositoryBackedCertificateSigningMaterialPort:
+    repository: CertificateCatalogRepository
     secret_provider: CertificateSecretProvider | None = None
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "managed_certificate_dir", Path(self.managed_certificate_dir))
-
-    def resolve_by_configuration_id(
+    def resolve(
         self,
-        catalog: CertificateCatalog,
-        certificate_configuration_id: str,
         *,
+        certificate_configuration_id: str,
         passphrase: str | None = None,
         certificate_alias: str | None = None,
     ) -> SigningMaterial:
-        """Resolve a certificate configuration by stable id."""
+        catalog = self.repository.load_catalog()
         if not isinstance(catalog, CertificateCatalog):
             raise ConfigValidationError("catalog must be a CertificateCatalog value.")
         try:
@@ -63,28 +57,6 @@ class CertificateSigningMaterialResolver:
             raise SigningMaterialResolutionError(
                 f"Certificate configuration '{certificate_configuration_id}' was not found."
             ) from exc
-        return self.resolve(
-            catalog,
-            configuration,
-            passphrase=passphrase,
-            certificate_alias=certificate_alias,
-        )
-
-    def resolve(
-        self,
-        catalog: CertificateCatalog,
-        configuration: CertificateConfiguration,
-        *,
-        passphrase: str | None = None,
-        certificate_alias: str | None = None,
-    ) -> SigningMaterial:
-        """Resolve a certificate configuration object to runtime signing material."""
-        if not isinstance(catalog, CertificateCatalog):
-            raise ConfigValidationError("catalog must be a CertificateCatalog value.")
-        if not isinstance(configuration, CertificateConfiguration):
-            raise ConfigValidationError(
-                "configuration must be a CertificateConfiguration value."
-            )
         try:
             managed_certificate = catalog.managed_certificate_by_id(
                 configuration.managed_certificate_id
@@ -95,28 +67,26 @@ class CertificateSigningMaterialResolver:
                 "that no longer exists. Edit the certificate configuration or import the "
                 "certificate again."
             ) from exc
-
-        certificate_path = self.managed_certificate_dir / managed_certificate.storage_filename
-        if not certificate_path.exists():
+        try:
+            material = self.repository.material_for(managed_certificate)
+        except (FileNotFoundError, KeyError) as exc:
             raise SigningMaterialResolutionError(
                 "The selected managed certificate file is missing. Edit the certificate "
                 "configuration, restore the certificate from backup, or import it again."
-            )
-
-        resolved_passphrase = passphrase
-        if resolved_passphrase is None and configuration.save_password:
-            resolved_passphrase = self._read_saved_password(configuration)
-        if resolved_passphrase is None:
+            ) from exc
+        resolved = passphrase
+        if resolved is None and configuration.save_password:
+            resolved = self._read_saved_password(configuration)
+        if resolved is None:
             raise SigningMaterialResolutionError(
                 "The selected certificate configuration requires a certificate password. "
                 "Enter the password or edit the configuration to save it securely."
             )
-        if not isinstance(resolved_passphrase, str) or not resolved_passphrase:
+        if not isinstance(resolved, str) or not resolved:
             raise SigningMaterialResolutionError("The certificate password cannot be blank.")
-
         return SigningMaterial(
-            certificate_path=str(certificate_path),
-            passphrase=resolved_passphrase,
+            certificate_path=material.certificate_path,
+            passphrase=resolved,
             certificate_alias=certificate_alias,
         )
 

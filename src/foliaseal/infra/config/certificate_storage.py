@@ -12,6 +12,7 @@ from uuid import uuid4
 from foliaseal.application.certificate_catalog_repository import (
     CertificateRepositoryError,
     ManagedCertificateCommit,
+    ManagedCertificateMaterial,
 )
 from foliaseal.application.certificate_models import (
     CertificateCatalog,
@@ -88,6 +89,26 @@ class CertificateCatalogStore:
         if not isinstance(payload, dict):
             raise ConfigValidationError("Certificate catalog must be a JSON object.")
         return decode_certificate_catalog(payload)
+
+    def material_for(
+        self, managed_certificate: ManagedCertificate
+    ) -> ManagedCertificateMaterial:
+        """Return backend material for a catalog-managed certificate."""
+        if not isinstance(managed_certificate, ManagedCertificate):
+            raise ConfigValidationError(
+                "managed_certificate must be a ManagedCertificate value."
+            )
+        stored = self.load_catalog().managed_certificate_by_id(
+            managed_certificate.managed_certificate_id
+        )
+        if stored != managed_certificate:
+            raise ConfigValidationError(
+                "catalog does not contain the supplied managed certificate."
+            )
+        path = self.managed_certificate_dir / managed_certificate.storage_filename
+        if not path.exists():
+            raise FileNotFoundError(f"Managed certificate file is missing: {path}")
+        return ManagedCertificateMaterial(certificate_path=str(path))
 
     def save_catalog(self, catalog: CertificateCatalog) -> None:
         """Persist the full certificate catalog to disk as human-readable JSON."""

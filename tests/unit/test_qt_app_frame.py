@@ -507,7 +507,7 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
         certificate_catalog_store=CertificateCatalogStore(
             storage_dir=tmp_path / "Certificates"
         ),
-        certificate_secret_provider=object(),
+        certificate_material_port=object(),
         preset_catalog_store=object(),
         sign_executor=object(),
         on_sign_request=lambda request: None,
@@ -524,7 +524,7 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
         "viewer_workflow": bootstrap.viewer_workflow,
         "signing_workflow": bootstrap.signing_workflow,
         "certificate_catalog_store": bootstrap.certificate_catalog_store,
-        "certificate_secret_provider": bootstrap.certificate_secret_provider,
+        "certificate_material_port": bootstrap.certificate_material_port,
         "preset_catalog_store": bootstrap.preset_catalog_store,
         "app_settings": bootstrap.app_settings,
         "app_settings_store": bootstrap.app_settings_store,

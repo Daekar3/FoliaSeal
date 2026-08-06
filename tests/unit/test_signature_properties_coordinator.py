@@ -24,6 +24,9 @@ from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
+from foliaseal.application.signing_material_resolver import (
+    RepositoryBackedCertificateSigningMaterialPort,
+)
 from foliaseal.domain.models import SignaturePlacementDefaults, SignatureRect
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import (
@@ -507,7 +510,10 @@ def test_coordinator_applies_certificate_configuration_with_saved_password(
     coordinator = DefaultSignaturePropertiesCoordinator(
         workflow=workflow,
         certificate_catalog_store=store,
-        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        certificate_material_port=RepositoryBackedCertificateSigningMaterialPort(
+            repository=store,
+            secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        ),
         preset_catalog=build_signature_preset_catalog(),
     )
 
@@ -539,7 +545,10 @@ def test_coordinator_apply_certificate_configuration_wrapper_uses_saved_password
     coordinator = DefaultSignaturePropertiesCoordinator(
         workflow=workflow,
         certificate_catalog_store=store,
-        certificate_secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        certificate_material_port=RepositoryBackedCertificateSigningMaterialPort(
+            repository=store,
+            secret_provider=_FakeSecretProvider({"secret-ref-1": "stored-secret"}),
+        ),
         preset_catalog=build_signature_preset_catalog(),
     )
 
