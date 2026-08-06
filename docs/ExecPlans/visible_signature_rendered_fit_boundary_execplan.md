@@ -44,6 +44,10 @@ commands.
   validation, and ran the generated-output cleanup. The cleanup command was rejected by the local
   execution approval limit after acceptance completed, so the generated directory/summary remain a
   concrete handoff blocker; commit and post-commit audits remain.
+- [x] (2026-08-06) Committed implementation/docs/tests as `71d69d524`. Three post-commit closure
+  audits confirm clean Git state, frozen SPEC, zero retired-helper/cache references, `151` focused
+  tests, and no residual application/test processes. Generated acceptance outputs remain the sole
+  blocker because the local approval limit rejects the targeted cleanup command.
 
 ## Surprises & Discoveries
 
@@ -107,10 +111,10 @@ one typed policy/probe boundary, and the focused policy/adapter/backend/layout c
 (including direct cache eviction, renderer normalization, and exception-cleanup tests). The full
 suite passes 1,163 tests. The measured Actual Improvement is `.915` (mean proxy delta from the
 baseline profile), with no component regression beyond `.10`. Offscreen acceptance is `10` scenarios
-with `7` successful signings, preview parity `18/18`, and fit rejection `3/3`; generated outputs were
-The process audit was empty. The required cleanup command was attempted but rejected by the local
-execution approval limit, leaving the generated acceptance directory and summary as the only known
-workspace residue. Record implementation and closure commit IDs below after a cleanup retry.
+with `7` successful signings, preview parity `18/18`, and fit rejection `3/3`. The process audit was
+empty. The required cleanup command was attempted but rejected by the local execution approval
+limit, leaving the generated acceptance directory and summary as the only known workspace residue.
+Implementation commit: `71d69d524`; targeted generated-output deletion remains pending approval.
 
 ## Context and Orientation
 
@@ -135,8 +139,10 @@ First add `VisibleSignatureRenderedFitRequest`, `VisibleSignatureRenderedFitDeci
 The request uses `SignatureRect`, `SignatureLayoutPlan`, stamp text, and the existing structural
 appearance protocol. `VisibleSignatureRenderedFitPolicy.decide(request, probe=...)` returns accepted
 when there are no structural issues; otherwise it asks the probe to evaluate the single-line or
-horizontal multi-line fallback appropriate to the request and returns the probe result. It must not
-import Qt, Pillow, pyHanko, the backend, or validation DTOs.
+horizontal multi-line fallback appropriate to the request and returns the probe result. The new
+rendered-fit types must not import Qt, Pillow, pyHanko, the backend, or validation DTOs; the
+pre-existing `VisibleSignatureFitDecision` compatibility gate in this module intentionally retains
+its `SigningDraftValidationIssue` import unchanged.
 
 Next add the concrete `PyHankoRenderedFitProbe` in
 `src/foliaseal/application/visible_signature_rendered_fit_adapters.py`, consuming the neutral
@@ -254,6 +260,7 @@ In `src/foliaseal/application/visible_signature_fit_policy.py`, define neutral t
         appearance: VisibleSignatureAppearancePort
         stamp_text: str
         layout_plan: SignatureLayoutPlan
+        render_port: PreviewRasterRenderer | None = None
 
     @dataclass(frozen=True)
     class VisibleSignatureRenderedFitDecision:

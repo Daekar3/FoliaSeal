@@ -2770,8 +2770,9 @@ now exposes the third-party-free `VisibleSignatureRenderedFitRequest`,
 fit thresholds, bounded 256-entry cache identity/eviction, and owned temporary-directory cleanup.
 `phase3_signing_backend.py` now maps the policy decision to the unchanged validation issues, while
 `visible_signature_layout.py` retains only neutral geometry/structural fit helpers and is 1,657
-lines instead of 2,009. Backend characterization tests were migrated to the new probe seam and two
-direct adapter boundary tests cover cache reuse and cleanup ownership.
+lines instead of 2,009. Backend characterization tests were migrated to the new probe seam and five
+direct adapter boundary tests cover cache reuse, renderer normalization, bounded eviction, exception
+cleanup, and owned cleanup.
 
 Validation completed in this slice: focused rendered-fit policy/adapter/backend/layout coverage
 `151 passed`; full suite `1,163 passed, 1 warning`; Ruff, compileall, neutral import isolation, diff
@@ -2783,4 +2784,7 @@ summary as a concrete handoff blocker. The separate
 `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md` was refreshed to the current inventory
 (`106` tracked path names, `256` active files, approximately `5,963` occurrences) and remains the
 next atomic contract migration; no phase3 module, CLI, DTO, JSON, fixture, or artifact names were
-renamed in this behavior-preserving slice. Commit and post-commit three-explorer closure remain.
+renamed in this behavior-preserving slice. Implementation commit: `71d69d524`. Three post-commit
+audits confirm clean Git state, frozen SPEC, zero retired-helper/cache references, `151` focused
+tests, and no residual application/test processes; only targeted generated-output deletion remains
+blocked by the local approval limit.
