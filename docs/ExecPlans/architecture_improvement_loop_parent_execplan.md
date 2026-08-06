@@ -72,7 +72,10 @@ created.
   through `$dev-loop`; typed bundle/session/view callers and boundary tests are present.
 - [x] Complete the child DevLoop's final validation, compliance review, measurement, documentation,
   and commit closure before accepting the cycle.
-- [ ] Independently rescan the live checkout after the accepted cycle.
+- [x] Independently rescan the live checkout after the accepted cycle; scan round 2 selected the
+  visible-signature-layout boundary for the next design review.
+- [x] Completed scan round 2 with three independent explorers after `9ce248fd3`; the next
+  candidate is recorded below and the next child plan is pending design review.
 - [ ] Stop only after the fixed threshold confirmation rule, cycle cap, or prediction-underperformance
   rule is actually satisfied.
 
@@ -188,6 +191,38 @@ certificate/profile maintenance into a generic manager.
   caller seam grep 4 -> 0; docs and plans reconciled; main clean after commit.
 - Status: accepted. The strongest residual opportunity is the tracked
   `phase3_nomenclature_retirement_execplan.md`, pending a fresh scan and contract inventory.
+
+### Scan Round 2 — completed 2026-08-05
+
+Three independent explorers reviewed the post-cycle checkout at `a8c41d954` without sharing
+reports. The qualifying candidates were:
+
+- `visible-signature-layout-boundary`: `application/visible_signature_layout.py` (1,959 LOC) still
+  co-locates neutral layout contracts with Pillow/PyHanko measurers, stamp probes, appearance
+  adapters, layout conversion, and rendered-ink fit/cache helpers. Independent priorities were
+  approximately `64.0`, `62.6`, and `64.0` with confidence `0.82`–`0.90`; the median candidate
+  remains above the `60` threshold and the architecture document explicitly tracks import-purity
+  debt. Existing boundary tests make this locally substitutable.
+- `signing-workspace-lifecycle-surface`: shell/composition/compatibility ownership remains broad;
+  one explorer scored it about `70.4`, but the evidence was less independent than the layout cluster
+  and it is deferred until the new typed bundle has another consumer cycle.
+- `phase3-evidence-composition/nomenclature`: the 2,386-line composition root and historical names
+  remain broad, but CLI/DTO/artifact contracts make a rename-only slice high-risk and below the
+  layout candidate for this round.
+- `persisted-schema-boundary`: 1,633 lines and direct application imports remain a candidate, but
+  migration risk and lower GUI leverage keep it behind layout extraction.
+- Render-cache/performance and CLI inspect/verify were below threshold (approximately `40` and `51`).
+
+Selected next candidate: `visible-signature-layout-boundary`. The required next child must preserve
+the neutral `VisibleSignatureLayoutPort`/`VisibleSignaturePreparation` and prepare-once WYSIWYG
+semantics while moving third-party materializers and backend-only rendered-ink routines behind a
+one-way adapter boundary. It must not reintroduce removed planner facades or optional-plan paths.
+
+Design review selected the constrained A+B shape in
+`visible_signature_layout_adapter_boundary_execplan.md`: a minimal neutral-module split plus narrow
+injected Pillow/PyHanko materializer ports. Two reviewers rejected a standalone common-caller facade
+as a second planning path and agreed that import isolation, one-time measurement, memoized
+preview/signing projections, and explicit stamp suppression are hard gates.
 
 ## Surprises & Discoveries
 
