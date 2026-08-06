@@ -71,6 +71,7 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/phase3_harness_workspace_capture.py` | Qt-free shared workspace-capture boundary for the Phase 3 harness. | Owns `Phase3HarnessWorkspaceCaptureInput`, `Phase3HarnessWorkspaceSnapshot`, stable `as_mapping()` projection, and pure snapshot assembly reused by live and headless workspace adapters; it imports no Qt, Pillow, pyHanko, rendering, or workflow code. |
 | `src/foliaseal/presentation/qt/phase3_harness_scenario_policy.py` | Qt-free scenario-policy boundary for the Phase 3 harness workspace. | Resolves named profiles and appearance/text/box/visible-field overrides into one immutable `Phase3HarnessResolvedScenario`; live/headless adapters retain target-specific mutation and event/render effects. |
 | `src/foliaseal/presentation/qt/phase3_harness_event_pump.py` | Injectable event-processing boundary for the Phase 3 harness workspace. | Owns the one-method `HarnessEventPumpPort`, late-bound Qt `processEvents()` adapter, and headless no-op adapter; it does not own refresh, rendering, capture, or lifecycle policy. |
+| `src/foliaseal/presentation/qt/preview_render_evidence_adapters.py` | Focused live/headless preview-render evidence boundary. | Owns Qt and headless artifact mapping, canonical-preview analysis projection, debug-overlay coordination, and cleanup behind an explicit dependency bundle; the harness only binds collaborators and the typed `PreviewRenderCapturePort` remains unchanged. |
 | `src/foliaseal/presentation/qt/phase3_harness_session_runner.py` | Interactive Qt session-runner boundary for the Phase 3 harness. | Owns the Qt window lifecycle, toolbar wiring, shell callback cluster, typed session-runner dependency bundle, and `Phase3HarnessSessionResult` while leaving payload shaping and report writing to the extracted helpers. |
 | `src/foliaseal/presentation/qt/phase3_harness_qt_lifecycle.py` | Fakeable standalone Qt lifecycle adapter for the interactive evidence harness. | Owns QApplication reuse/creation, QMainWindow setup, central mounting, show/exec, and idempotent close while exposing only opaque toolbar/body targets to the session runner. |
 | `src/foliaseal/presentation/qt/phase2_harness.py` | Interactive Phase 2 viewer evidence harness. | Retains viewer controls, capture/checklist/evidence reporting, and manual QA orchestration while consuming the shared `HarnessQtLifecyclePort` for application/window lifecycle and cleanup. |
@@ -652,15 +653,33 @@ The canonical repository document split is:
   snapshot callers while preserving the existing JSON-ready render-capture mapping.
 - Owns: `PreviewRenderCaptureRequest`, `PreviewRenderCaptureResult`, `PreviewRenderCapturePort`,
   `QtPreviewRenderCaptureAdapter`, and `HeadlessPreviewRenderCaptureAdapter`.
-- Does not own: Qt event-loop lifecycle, matrix iteration, signed-output capture, or the existing
-  artifact-heavy payload callback implementations in `phase3_harness.py`.
-- Key collaborators: `phase3_harness_workspace.py`, `phase3_harness.py`, and `preview_analysis.py`.
+- Does not own: Qt event-loop lifecycle, matrix iteration, signed-output capture, or the concrete
+  render-evidence projection now isolated in `preview_render_evidence_adapters.py`.
+- Key collaborators: `phase3_harness_workspace.py`, `phase3_harness.py`,
+  `preview_render_evidence_adapters.py`, and `preview_analysis.py`.
 - Known constraints: Live and headless adapters intentionally remain separate. `as_mapping()` is
   the compatibility projection and `artifact_paths`/`errors` are derived views. Public
   `phase3-signing-*` CLI names, DTOs, JSON keys, and artifact suffixes remain unchanged; internal
   `phase3_*` nomenclature is tracked for the atomic retirement plan.
-- Status: Confirmed by focused/full tests and both release matrices; callback-body extraction is a
-  ranked follow-on rather than an unreported compatibility layer.
+- Status: Confirmed by focused/full tests and all release matrices; the former harness callback bodies
+  are retired rather than retained as compatibility aliases.
+
+### Preview-render evidence adapters
+
+- Location: `src/foliaseal/presentation/qt/preview_render_evidence_adapters.py`
+- Responsibility: Keep Qt and headless preview artifact construction cohesive while allowing the
+  composition root to substitute widget, analysis, overlay, and cleanup collaborators.
+- Owns: `PreviewRenderEvidenceDependencies`, `QtPreviewRenderEvidenceAdapter`,
+  `HeadlessPreviewRenderEvidenceAdapter`, and the Qt/headless render-capture payload projections.
+- Does not own: workspace refresh, event pumping, signing, lifecycle, matrix iteration, or public
+  CLI/JSON/artifact policy.
+- Key collaborators: `phase3_harness.py` dependency wiring, `phase3_harness_workspace.py` typed
+  capture requests, `phase3_preview_render_capture.py`, and `preview_analysis.py`.
+- Known constraints: The dependency bundle is intentionally one focused seam rather than a family of
+  speculative rasterizer/artifact protocols; public phase3 names and mappings remain frozen for the
+  atomic nomenclature plan.
+- Status: Confirmed by adapter boundary tests, existing widget/capture tests, full suite, and
+  offscreen acceptance matrices.
 
 ### Preview-widget evidence policy
 
@@ -1314,7 +1333,7 @@ Default local validation from README:
 | What is the public stability level of CLI harness commands? | They are documented and tested, but some are engineering acceptance tools. | A: stable developer contract; B: internal tool contract. | Treat command names/required args as stable unless a migration note is added. |
 | Should PySide6 remain an optional package extra instead of a base dependency? | The real GUI now has a stable launch command, but headless CLI and evidence workflows still do not require Qt. | A: keep `gui` extra; B: move PySide6 into base dependencies. | Keep the `gui` extra for now and revisit only when full desktop packaging is defined. |
 | Where should trust/timestamp policy config be persisted outside tests? | Schemas exist, but signature profile and certificate stores are the only obvious stores. | A: add a store; B: keep CLI/request-only for now. | Needs maintainer decision before documenting as settled. |
-| How much of `phase3_harness.py` should become reusable analysis library code? | The file owns many PDF/render/diagnostic helpers. | A: keep as harness-local; B: extract evidence analyzers. | Pure signed-PDF evidence is now extracted into `phase3_pdf_signature_snapshotter.py`; preview/widget/render helpers remain harness-local until reuse pressure justifies another slice. |
+| How much of `phase3_harness.py` should become reusable analysis library code? | The file owns many PDF/render/diagnostic helpers. | A: keep as harness-local; B: extract evidence analyzers. | Pure signed-PDF evidence is now extracted into `phase3_pdf_signature_snapshotter.py`, and preview-render artifact projection is isolated in `preview_render_evidence_adapters.py`; remaining widget probes/diagnostics stay harness-local until reuse pressure justifies another slice. |
 
 ## 14. Change log
 
@@ -1325,6 +1344,7 @@ Default local validation from README:
 | 2026-08-06 | Extracted shared Phase 3 workspace-capture assembly. | `phase3_harness_workspace_capture.py` now owns pure `Phase3HarnessWorkspaceSnapshot` construction and stable mapping projection reused by live and headless adapters; workflow, render, event-pump, and sign-time effects remain in `phase3_harness_workspace.py`. |
 | 2026-08-06 | Extracted shared Phase 3 scenario policy. | `phase3_harness_scenario_policy.py` now owns profile and appearance override composition while live/headless workspace adapters retain target-specific effects and event ordering; historical phase3 external contracts remain unchanged. |
 | 2026-08-06 | Isolated Phase 3 harness event processing. | `phase3_harness_event_pump.py` now owns late QApplication discovery and `processEvents()` delegation behind a fakeable port; workspace refresh/pump/render ordering and headless no-op behavior remain unchanged. |
+| 2026-08-06 | Isolated Phase 3 preview-render evidence adapters. | `preview_render_evidence_adapters.py` now owns live/headless artifact mapping, canonical-preview analysis projection, debug-overlay coordination, and cleanup behind an explicit dependency bundle; `phase3_harness.py` retains only composition wiring and public contracts remain unchanged. |
 | 2026-08-06 | Added the signing-workspace setup port and extracted the contextual refinement dialog. | Shell action confirmation now reads typed setup state instead of the panel's private session; modal profile/preset persistence is owned by a focused Qt adapter, while the coordinated `phase3` nomenclature retirement remains a separate atomic migration. |
 | 2026-08-05 | Reconciled the typed signing-workspace bundle/session/view seam and lifecycle ownership. | `SigningWorkspaceBundle` now documents separate maintenance, primary-workflow session, testing, and opaque lifecycle-view capabilities; `SigningWorkspaceHost`/`SigningWorkspaceLifecycle` remain the active-handle and compose→mount→dispose owners, while the legacy compatibility surface is explicitly Qt-local. The phase3 nomenclature retirement remains a follow-up plan because current CLI/DTO/artifact names are still external contracts. |
 | 2026-08-04 | Neutralized private evidence-harness composition names and removed the unused checklist helper plus signed-executor fallback. | Current Qt composition wiring now uses evidence terminology and the typed `run_result()` path; public `Phase3*` evidence/CLI contracts and historical records remain unchanged. |

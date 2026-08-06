@@ -875,6 +875,67 @@ cohesion `0.40`, and behavioral-uncertainty reduction `0.20`; `Actual Improvemen
 five-cycle cap. The next scan must reassess the preview-capture composition cluster and signing-backend
 boundary; phase3 nomenclature remains deferred until its external contracts can migrate atomically.
 
+### Post-cap continuation scan 8 — completed after `075007eaa`
+
+Three independent explorers reviewed the clean event-pump checkout. The strongest remaining bounded
+cluster is preview-capture/render projection in `src/foliaseal/presentation/qt/phase3_harness.py`
+(2,255 lines): the composition root still owns Qt/Pillow render payload construction, widget geometry
+and PNG/text/stamp overlays, temporary-directory cleanup, and artifact policy used by workspace and
+interactive/matrix callers. The workspace lifecycle, capture service, scenario policy, and event-pump
+seams are now extracted, leaving this composition cluster as the next deepening opportunity.
+
+Preview-capture explorer scores were `(4.5,4.5,4.5,4.5,4,4,3,2.5)`, confidence `0.88`, and
+Candidate Priority approximately `67.6`; the broader composition-root score was `(4.75,4.5,4.5,4.5,
+4,3.5,3.5,2.5)`, confidence `0.86`, Priority approximately `64.87`. Tie-breaking favors the
+focused preview-capture cluster because it has higher testability and a bounded existing
+`PreviewRenderCapturePort` seam. Signing backend (~63), compatibility surface (~61), render cache
+(~55), and phase3 nomenclature (~45) remain lower or contract-blocked. Public phase3 CLI/DTO/JSON/
+fixture/artifact contracts remain frozen; no nomenclature rename is authorized in this slice.
+
+### Post-cap continuation design selection 8 — completed after `075007eaa`
+
+Three independent designs were reviewed for the preview-capture cluster:
+
+- Minimal payload builder: extract `_build_qt_preview_render_capture_payload` behind one typed builder
+  request while retaining the existing render-capture port; shape score approximately `85`.
+- Flexible provider bundle: introduce rasterizer/widget-probe/artifact-sink providers and typed
+  observations behind separate Qt/headless adapters; shape score approximately `85.5`, but its
+  provider surface risks over-abstraction and a large migration.
+- Common-caller optimized render-evidence adapters: keep `PreviewRenderCapturePort` unchanged and
+  move Qt/headless render execution, artifact mapping, canonical temp cleanup, and capture projection
+  into focused adapters with capped, cohesive dependency bundles; shape score approximately `91`,
+  Candidate Priority approximately `71.5` at confidence `0.90`.
+
+Selected design: common-caller optimized Qt/headless render-evidence adapters. It is a single base
+design, not a hybrid, so no hybrid bonus gate applies. Existing workspace/matrix callers continue to
+use `PreviewRenderCapturePort`; `phase3_harness.py` becomes composition wiring, while artifact paths,
+error fields, cleanup, CLI/JSON contracts, and historical phase3 names remain unchanged.
+
+### Post-cap continuation slice 8 — accepted 2026-08-06
+
+Child `docs/ExecPlans/phase3_preview_capture_adapters_execplan.md` is implemented and closed. The
+new `preview_render_evidence_adapters.py` owns Qt/headless canonical-preview rendering, artifact
+mapping, analysis projection, debug-overlay coordination, and cleanup behind one explicit dependency
+bundle. `phase3_harness.py` retains only composition wrappers that bind current collaborators, and
+the existing `PreviewRenderCapturePort`, workspace DTOs, CLI/JSON/artifact contracts, and historical
+phase3 names remain unchanged. The old inline capture-projection bodies were removed rather than
+left as compatibility aliases.
+
+Focused adapter/workspace/harness coverage passed `92` tests with one skipped; the full suite passed
+`1,057` tests with `11` skipped and one pre-existing warning. Ruff, diff checks, import isolation,
+and CLI help checks passed. Offscreen acceptance passed signed acceptance (`10` scenarios, `7`
+successful signings, `3` matched intentional rejections), signed preview parity (`18/18`), and
+signed fit rejection (`3/3`), with the explicit `/tmp/foliaseal-preview-capture-acceptance` root
+removed and no FoliaSeal/Python application process left behind.
+
+Continuation-slice proxy measurement: navigation friction `0.35`, change amplification `0.40`,
+seam-risk reduction `0.40`, boundary-test improvement `0.40`, interface compression `0.30`,
+cohesion `0.45`, and behavioral-uncertainty reduction `0.30`; `Actual Improvement = 0.37`, matching
+the predicted `0.37`, with no component regression below `-0.10`. This accepts the slice without
+changing the fixed five-cycle cap. The next loop action is a fresh three-explorer scan; phase3
+nomenclature retirement remains a separate atomic plan because public CLI/DTO/JSON/fixture/artifact
+contracts are still frozen.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`
