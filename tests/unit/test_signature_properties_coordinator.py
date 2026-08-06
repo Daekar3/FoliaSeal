@@ -9,6 +9,10 @@ from foliaseal.application import (
 )
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
+from foliaseal.application.reusable_signing_objects import (
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
@@ -102,6 +106,71 @@ def test_coordinator_load_reports_catalog_names_and_initial_readiness(tmp_path: 
     assert state.visible_signature_setup_draft.placement.enabled is False
     assert state.visible_signature_setup_draft.placement.width_pt == 72.0
     assert state.visible_signature_setup_draft.placement.height_pt == 24.0
+
+
+def test_coordinator_rejects_canonical_reusable_service_with_legacy_catalog_inputs(
+    tmp_path: Path,
+) -> None:
+    service = ReusableSigningObjects(InMemoryCatalogRepository(build_signature_preset_catalog()))
+
+    with pytest.raises(ValueError, match="cannot be combined"):
+        DefaultSignaturePropertiesCoordinator(
+            workflow=_workflow(tmp_path),
+            certificate_catalog=build_certificate_catalog(),
+            reusable_objects=service,
+            preset_catalog=build_signature_preset_catalog(),
+        )
+
+
+def test_coordinator_default_certificate_repository_does_not_consult_host_xdg_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "host-data"))
+
+    DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    assert not (tmp_path / "host-data").exists()
+    assert not (tmp_path / ".foliaseal").exists()
+
+
+def test_coordinator_accepts_reusable_boundary_without_repository_attribute(tmp_path: Path) -> None:
+    service = ReusableSigningObjects(InMemoryCatalogRepository(build_signature_preset_catalog()))
+
+    class BoundaryOnlyReusableObjects:
+        def snapshot(self):
+            return service.snapshot()
+
+        def refresh(self):
+            return service.refresh()
+
+        def resolve(self, ref):
+            return service.resolve(ref)
+
+        def resolve_name(self, kind, name):
+            return service.resolve_name(kind, name)
+
+        def ensure_name_available(self, kind, name, overwrite=False):
+            return service.ensure_name_available(kind, name, overwrite)
+
+        def execute(self, command):
+            return service.execute(command)
+
+        def compose_preset(self, **kwargs):
+            return service.compose_preset(**kwargs)
+
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        certificate_catalog=build_certificate_catalog(),
+        reusable_objects=BoundaryOnlyReusableObjects(),
+    )
+
+    assert coordinator.load().signature_preset_names == ("Default", "Compact")
 
 
 def test_coordinator_load_reports_visible_signature_setup_draft(tmp_path: Path) -> None:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Protocol
 
 from foliaseal.application.reusable_signing_models import (
@@ -72,6 +74,81 @@ class ReusableObjectsView:
 
 
 @dataclass(frozen=True)
+class ReusableCatalogSnapshot:
+    """Immutable, service-owned view of one committed catalog state."""
+
+    view: ReusableObjectsView
+    _resolved_by_ref: Mapping[ReusableObjectRef, ResolvedReusableObject]
+    _refs_by_name: Mapping[ReusableObjectKind, Mapping[str, ReusableObjectRef]]
+
+    @property
+    def appearances(self) -> tuple[ReusableObjectSummary, ...]:
+        return self.view.appearances
+
+    @property
+    def placements(self) -> tuple[ReusableObjectSummary, ...]:
+        return self.view.placements
+
+    @property
+    def presets(self) -> tuple[ReusableObjectSummary, ...]:
+        return self.view.presets
+
+    @property
+    def appearance_names(self) -> tuple[str, ...]:
+        return self.view.appearance_names
+
+    @property
+    def placement_names(self) -> tuple[str, ...]:
+        return self.view.placement_names
+
+    @property
+    def preset_names(self) -> tuple[str, ...]:
+        return self.view.preset_names
+
+    def resolve(self, ref: ReusableObjectRef) -> ResolvedReusableObject:
+        try:
+            return self._resolved_by_ref[ref]
+        except KeyError as exc:
+            raise ConfigValidationError(
+                f"{ref.kind.value.title()} object '{ref.object_id}' is not available."
+            ) from exc
+
+    def resolve_name(self, kind: ReusableObjectKind, name: str) -> ReusableObjectRef | None:
+        return self._refs_by_name[kind].get(name)
+
+    def resolve_preset_selection(
+        self, preferred_name: str | None = None, selected_id: str | None = None
+    ) -> PresetSelection | None:
+        ref = (
+            self.resolve_name(ReusableObjectKind.PRESET, preferred_name)
+            if preferred_name is not None
+            else None
+        )
+        if ref is None and selected_id is not None:
+            ref = ReusableObjectRef(ReusableObjectKind.PRESET, selected_id)
+        if ref is None:
+            return None
+        try:
+            preset = self.resolve(ref)
+            if not isinstance(preset, ResolvedSignaturePreset):
+                return None
+            return PresetSelection(name=preset.name, ref=ref, preset=preset)
+        except ConfigValidationError:
+            return None
+
+    def ensure_name_available(
+        self, kind: ReusableObjectKind, name: str, overwrite: bool = False
+    ) -> None:
+        normalized = _require_name(name, f"{kind.value.title()} name is required.")
+        if self.resolve_name(kind, normalized) is not None and not overwrite:
+            label = (
+                "Signature preset"
+                if kind is ReusableObjectKind.PRESET
+                else f"{kind.value.title()} profile"
+            )
+            raise ConfigValidationError(f"{label} '{normalized}' already exists.")
+
+@dataclass(frozen=True)
 class SaveAppearance:
     name: str
     appearance: SignatureAppearance
@@ -111,6 +188,15 @@ ReusableObjectCommand = SaveAppearance | SavePlacement | SavePreset | RenameObje
 ResolvedReusableObject = AppearanceProfile | PlacementProfile | ResolvedSignaturePreset
 
 
+@dataclass(frozen=True)
+class PresetSelection:
+    """One resolved preset paired with its stable typed reference."""
+
+    name: str
+    ref: ReusableObjectRef
+    preset: ResolvedSignaturePreset
+
+
 class CatalogRepository(Protocol):
     """Minimal persistence port used by the reusable-object application boundary."""
 
@@ -139,26 +225,109 @@ class ReusableSigningObjects:
 
     def __init__(self, repository: CatalogRepository) -> None:
         self._repository = repository
+        self._snapshot: ReusableCatalogSnapshot | None = None
+
+    def snapshot(self) -> ReusableCatalogSnapshot:
+        if self._snapshot is None:
+            self._snapshot = self._snapshot_for(self._repository.load_catalog())
+        return self._snapshot
+
+    def refresh(self) -> ReusableCatalogSnapshot:
+        self._snapshot = self._snapshot_for(self._repository.load_catalog())
+        return self._snapshot
 
     def view(self) -> ReusableObjectsView:
-        return self._view(self._repository.load_catalog())
+        return self.snapshot().view
 
     def resolve(self, ref: ReusableObjectRef) -> ResolvedReusableObject:
-        catalog = self._repository.load_catalog()
-        if ref.kind is ReusableObjectKind.APPEARANCE:
-            return self._resolve_by_id(catalog.appearance_profiles, ref.object_id, ref.kind)
-        if ref.kind is ReusableObjectKind.PLACEMENT:
-            return self._resolve_by_id(catalog.placement_profiles, ref.object_id, ref.kind)
-        return catalog.resolve_preset(
-            self._resolve_by_id(catalog.signature_presets, ref.object_id, ref.kind)
-        )
+        return self.snapshot().resolve(ref)
 
-    def execute(self, command: ReusableObjectCommand) -> ReusableObjectsView:
+    def resolve_name(self, kind: ReusableObjectKind, name: str) -> ReusableObjectRef | None:
+        return self.snapshot().resolve_name(kind, name)
+
+    def resolve_preset_selection(
+        self, preferred_name: str | None = None, selected_id: str | None = None
+    ) -> PresetSelection | None:
+        return self.snapshot().resolve_preset_selection(preferred_name, selected_id)
+
+    def ensure_name_available(
+        self, kind: ReusableObjectKind, name: str, overwrite: bool = False
+    ) -> None:
+        self.snapshot().ensure_name_available(kind, name, overwrite)
+
+    def compose_preset(
+        self,
+        name: str,
+        appearance_name: str,
+        placement_name: str | None = None,
+        certificate_configuration_id: str | None = None,
+        overwrite: bool = False,
+    ) -> PresetSelection:
+        current = self.snapshot()
+        current.ensure_name_available(ReusableObjectKind.PRESET, name, overwrite)
+        appearance_ref = current.resolve_name(ReusableObjectKind.APPEARANCE, appearance_name)
+        if appearance_ref is None:
+            raise ConfigValidationError(f"Appearance profile '{appearance_name}' is not available.")
+        placement_ref = (
+            current.resolve_name(ReusableObjectKind.PLACEMENT, placement_name)
+            if placement_name
+            else None
+        )
+        if placement_name and placement_ref is None:
+            raise ConfigValidationError(f"Placement profile '{placement_name}' is not available.")
+        snapshot = self.execute(
+            SavePreset(
+                name=name,
+                appearance_profile_id=appearance_ref.object_id,
+                placement_profile_id=placement_ref.object_id if placement_ref else None,
+                certificate_configuration_id=certificate_configuration_id,
+                overwrite=overwrite,
+            )
+        )
+        selection = snapshot.resolve_preset_selection(preferred_name=name)
+        if selection is None:
+            raise ConfigValidationError(f"Signature preset '{name}' was not committed.")
+        return selection
+
+    def execute(self, command: ReusableObjectCommand) -> ReusableCatalogSnapshot:
         catalog = self._repository.load_catalog()
         updated = self._apply(catalog, command)
         if updated is not catalog:
             self._repository.save_catalog(updated)
-        return self._view(updated)
+        self._snapshot = self._snapshot_for(updated)
+        return self._snapshot
+
+    @classmethod
+    def _snapshot_for(cls, catalog: SignaturePresetCatalog) -> ReusableCatalogSnapshot:
+        view = cls._view(catalog)
+        resolved: dict[ReusableObjectRef, ResolvedReusableObject] = {}
+        for profile in catalog.appearance_profiles:
+            ref = ReusableObjectRef(ReusableObjectKind.APPEARANCE, profile.appearance_profile_id)
+            resolved[ref] = profile
+        for profile in catalog.placement_profiles:
+            ref = ReusableObjectRef(ReusableObjectKind.PLACEMENT, profile.placement_profile_id)
+            resolved[ref] = profile
+        for preset in catalog.signature_presets:
+            ref = ReusableObjectRef(ReusableObjectKind.PRESET, preset.signature_preset_id)
+            resolved[ref] = catalog.resolve_preset(preset)
+        refs_by_name = {
+            ReusableObjectKind.APPEARANCE: {
+                item.display_name: item.ref for item in view.appearances
+            },
+            ReusableObjectKind.PLACEMENT: {
+                item.display_name: item.ref for item in view.placements
+            },
+            ReusableObjectKind.PRESET: {
+                item.display_name: item.ref for item in view.presets
+            },
+        }
+        return ReusableCatalogSnapshot(
+            view=view,
+            _resolved_by_ref=MappingProxyType(resolved),
+            _refs_by_name=MappingProxyType(
+                {kind: MappingProxyType(index) for kind, index in refs_by_name.items()}
+            ),
+        )
 
     def _apply(
         self,

@@ -206,3 +206,31 @@ def test_catalog_load_rejects_dangling_preset_reference(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigValidationError, match="missing appearance"):
         store.load_catalog()
+
+
+def test_snapshot_indexes_are_reused_until_refresh_and_resolve_names(tmp_path: Path) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles")
+    service = ReusableSigningObjects(store)
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    first = service.snapshot()
+    assert service.snapshot() is first
+    assert not hasattr(first, "catalog")
+    ref = first.resolve_name(ReusableObjectKind.APPEARANCE, "Approval")
+    assert ref is not None
+    assert service.resolve_name(ReusableObjectKind.APPEARANCE, "Approval") == ref
+    refreshed = service.refresh()
+    assert refreshed is not first
+    assert refreshed.resolve_name(ReusableObjectKind.APPEARANCE, "Approval") == ref
+
+
+def test_compose_preset_validates_components_before_one_atomic_write(tmp_path: Path) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles")
+    service = ReusableSigningObjects(store)
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    committed = service.compose_preset("Contract", "Approval")
+    assert committed.name == "Contract"
+    assert committed.preset.preset.signature_preset_id
+    assert service.snapshot().preset_names == ("Contract",)
+    with pytest.raises(ConfigValidationError, match="Placement profile 'Missing'"):
+        service.compose_preset("Broken", "Approval", placement_name="Missing")
+    assert service.snapshot().preset_names == ("Contract",)

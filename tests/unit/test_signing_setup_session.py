@@ -436,7 +436,11 @@ def test_signing_setup_session_save_preset_persists_and_selects_it(
     state = session.save_preset("Team Standard")
 
     assert state.selected_signature_preset_name == "Team Standard"
-    assert coordinator.preset_catalog.preset_named("Team Standard").name == "Team Standard"
+    selection = coordinator.reusable_objects.resolve_preset_selection(
+        preferred_name="Team Standard"
+    )
+    assert selection is not None
+    assert selection.name == "Team Standard"
 
 
 def test_signing_setup_session_delete_preset_removes_it_and_clears_selection(

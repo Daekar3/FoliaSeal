@@ -136,6 +136,10 @@ created.
 - [x] Implemented the material port, repository material verb, coordinator/Qt migration, boundary
   tests, full validation, offscreen evidence, cleanup, and compliance correction; commit and the
   post-commit three-explorer rescan remain.
+- [x] Completed Scan Round 43 after `f6d06f25d`; the coordinator/reusable-signing catalog
+  source-of-truth boundary is the next qualifying candidate at approximately `69.0` priority.
+- [x] Implemented Design C for the reusable catalog boundary; focused validation, full validation,
+  offscreen evidence, and cleanup pass, with docs/commit/rescan still pending.
 
 ## Scan and Candidate Ledger
 
@@ -2113,6 +2117,87 @@ fallback/test composition rather than a live resolution leak. Secondary opportun
 the coordinator's dual catalog/store inputs and making material resolution snapshot-aware to avoid a
 small catalog reload/TOCTOU window. The phase3 nomenclature retirement remains the broader atomic
 contract migration and is not mixed into this slice. No blocker prevents accepting this cycle.
+
+### Scan Round 43 — completed after commit `f6d06f25d`
+
+Three independent explorers reviewed the clean checkout. Their reports converged on the bounded
+`signature-properties-catalog-source-of-truth` cluster: `DefaultSignaturePropertiesCoordinator`
+accepts overlapping certificate and reusable-object catalogs/stores/services, snapshots catalogs
+while executing writes through separate repositories, and reaches into
+`ReusableSigningObjects._repository` during refresh. The dominant workflow is signing-properties
+load/refresh, duplicate protection, preset composition, profile save, and subsequent signing.
+
+The consolidated median scores are `(NF 4.0, CA 4.0, SR 4.5, TG 4.5, IC 4.0, CC 4.5, MR 2.5,
+BU 2.5)`. Dimension ranges produce agreement `0.93125`; all dimensions have at least two concrete
+evidence records, so evidence coverage is `1.0` and confidence is `0.951875`. Benefit is `4.25`,
+Penalty is `2.5`, and the fixed formula gives Candidate Priority approximately `69.0`.
+
+The selected cluster outranks the fallback-only path cleanup (`~63`) because it removes stale
+catalog decisions and private repository reach-through from a user-facing workflow while reusing the
+existing atomic `ReusableSigningObjects` boundary. The phase3 nomenclature migration remains
+contract-blocked and separate; snapshot-aware certificate resolution is deferred as a secondary
+TOCTOU concern. The dependency category is local-substitutable/in-process, with in-memory repository
+adapters and existing reusable-object boundary tests available.
+
+### Design Selection 44 — completed 2026-08-06
+
+Three designs were generated for the selected catalog source-of-truth cluster and reviewed
+independently by `catalog_design_review_one` and `catalog_design_review_two` using the fixed shape
+formula.
+
+- Design A, `catalog-snapshot-delegate`: add `ReusableSigningObjects.snapshot()` returning the full
+  `SignaturePresetCatalog`, then route coordinator reads through it while retaining a compatibility
+  mirror. It is easy to migrate but leaks the persisted aggregate and leaves the coordinator
+  coordinating duplicate checks and composition. Review scores were `40` adjusted and `54.5`
+  adjusted; it fails the deep-boundary/source-of-truth gate and is rejected.
+- Design B, `reusable-catalog-port`: add a flexible immutable snapshot/query port with execute
+  results. It isolates persistence and is testable, but a broad query surface risks recreating the
+  catalog vocabulary and leaving composition sequencing in callers. Review scores were `73` and
+  `75` adjusted (or `80` without speculative-query penalties); it is valid but not the dominant
+  caller's smallest contract.
+- Design C, `indexed-snapshot-and-atomic-commands`: add an application-owned immutable indexed
+  snapshot, explicit refresh, name/ref resolution, and an atomic `compose_preset` operation on
+  `ReusableSigningObjects`. The coordinator consumes only the snapshot and operation results; no
+  persisted catalog, repository, or private field is exposed. Review scores were `80` adjusted and
+  `86.5` adjusted; the orchestrator score is `84` after a bounded facade-breadth penalty. The
+  selected median shape is approximately `84`, above the valid alternatives.
+
+Design C is selected. Its exact public surface is constrained to the current coordinator workflow:
+`snapshot() -> ReusableCatalogSnapshot`, `refresh() -> ReusableCatalogSnapshot`,
+`resolve_name(kind, name) -> ReusableObjectRef | None`,
+`resolve_preset_selection(preferred_name, selected_id) -> PresetSelection | None`,
+`compose_preset(command fields) -> PresetSelection`, and existing `execute(command) ->
+ReusableCatalogSnapshot`. `ReusableCatalogSnapshot` exposes immutable views and typed name/ref indexes,
+not `SignaturePresetCatalogStore`, paths, or the repository. A one-way constructor adapter may accept
+the existing legacy catalog/store arguments while `reusable_objects` is absent; it must have an
+explicit retirement condition and must reject contradictory canonical-plus-legacy inputs. No hybrid
+is used because combining B's generic query surface with C would add API without improving the
+dominant workflow by five points.
+
+### Implementation 45 — validation complete, closure pending — 2026-08-06
+
+The selected indexed-snapshot/atomic-command boundary is implemented in
+`src/foliaseal/application/reusable_signing_objects.py`. `ReusableSigningObjects` now owns an
+immutable snapshot with typed name/ref indexes, explicit refresh, preset selection resolution,
+duplicate checks, and atomic `compose_preset()`; its existing view/resolve/execute callers remain
+delegates during the retirement window. `DefaultSignaturePropertiesCoordinator` no longer reads a
+cached preset catalog or private repository, and its no-store certificate fallback is composed by
+`InMemoryCertificateCatalogRepository.for_catalog()` rather than XDG/home path policy.
+
+The focused reusable/coordinator boundary is `43` passing tests and the full suite is `1141` passing
+with one pre-existing Pillow deprecation warning. Ruff, compileall, CLI help, application import
+isolation, SPEC diff, and `git diff --check` pass. Offscreen evidence passes signed acceptance `10/7`,
+preview parity `18/18`, and fit rejection `3/3`; the generated summary was removed and no product
+process remains. The stale setup-session assertion that inspected `coordinator.preset_catalog` was
+migrated to `resolve_preset_selection()` at the new boundary rather than restoring the mirror.
+
+Baseline repeated proxies were `16` coordinator catalog/private-repository references and `38`
+reusable/coordinator boundary tests; current production references are `5` legacy-constructor
+adapter occurrences and boundary coverage is `43`. Conservative component measurements are
+navigation `.58`, change amplification `.57`, seam reduction `.62`, boundary-test improvement `.68`,
+interface compression `.56`, cohesion `.61`, and isolation `.72`, for weighted Actual Improvement
+approximately `.62` versus predicted `.55`; no component regressed beyond `-.10`. Documentation,
+intentional commit, and three-explorer post-commit rescan remain closure gates.
 
 ## Context and Orientation
 

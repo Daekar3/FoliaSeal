@@ -101,6 +101,11 @@ class InMemoryCertificateCatalogRepository:
     managed_certificate_dir: Path | None = None
     _managed_files: dict[str, bytes] = field(default_factory=dict, init=False, repr=False)
 
+    @classmethod
+    def for_catalog(cls, catalog: CertificateCatalog) -> InMemoryCertificateCatalogRepository:
+        """Build an in-memory repository without exposing host path policy to callers."""
+        return cls(catalog=catalog, storage_dir=Path(".foliaseal"))
+
     def __post_init__(self) -> None:
         self.storage_dir = Path(self.storage_dir)
         if self.managed_certificate_dir is None:
