@@ -40,6 +40,7 @@ from foliaseal.application.horizontal_signature_reservation import (
     build_horizontal_single_line_ink_reservation,
     measure_horizontal_single_line_rendered_reference,
 )
+from foliaseal.application.preview_render_boundary import PreviewRasterRenderer
 from foliaseal.application.sign_pdf_use_case import (
     SigningBackendAppearance,
     SigningBackendRequest,
@@ -54,6 +55,13 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreview,
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
+)
+from foliaseal.application.stamp_background import (
+    stamp_background_for_path as _neutral_stamp_background_for_path,
+)
+from foliaseal.application.stamp_preview_builder import (
+    signing_draft_preview_for_stamp_text,
+    stamp_text_preview_parts,
 )
 from foliaseal.application.visible_signature_color import text_style_color_rgba
 from foliaseal.application.visible_signature_fit_policy import (
@@ -529,6 +537,7 @@ class Phase3SigningExecutor:
 def build_phase3_signing_executor(
     *,
     timestamper_factory: Callable[[str], object] | None = None,
+    render_port: PreviewRasterRenderer | None = None,
 ) -> Phase3SigningExecutor:
     """Build the concrete signing executor used by the Phase 3 shell."""
     use_case = SignPdfUseCase(
@@ -536,6 +545,7 @@ def build_phase3_signing_executor(
         certificate_loader=PyHankoCertificateLoader(),
         signer=PyHankoPdfSigner(timestamper_factory=timestamper_factory),
         verifier=PyHankoSignatureVerifier(),
+        preview_render_port=render_port,
     )
     return Phase3SigningExecutor(use_case=use_case)
 
@@ -552,6 +562,7 @@ def _prepare_backend_layout(
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
     stamp_background: PdfImage | None,
+    render_port: PreviewRasterRenderer | None = None,
 ) -> _BackendLayoutPreparation:
     """Prepare and fit-gate one canonical backend layout for all visible callers."""
 
@@ -562,7 +573,7 @@ def _prepare_backend_layout(
             stamp_text=stamp_text,
             stamp_background=stamp_background,
             options=VisibleSignatureLayoutOptions(allow_fit_issues=True),
-            ink_measurer=_BackendHorizontalInkMeasurer(signature_appearance),
+            ink_measurer=_BackendHorizontalInkMeasurer(signature_appearance, render_port),
         )
     )
     fit_issues = _layout_fit_issues(
@@ -570,6 +581,7 @@ def _prepare_backend_layout(
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,
         stamp_text=stamp_text,
+        render_port=render_port,
     )
     return _BackendLayoutPreparation(
         preparation=apply_visible_signature_fit_gate(
@@ -616,6 +628,7 @@ def prepare_phase3_signing_plan(
         signature_appearance=appearance,
         stamp_text=stamp_text,
         stamp_background=stamp_background_for_path(appearance.image_stamp_path),
+        render_port=request.render_port,
     )
     return PreparedSigningPlan(
         backend_request=request,
@@ -678,6 +691,7 @@ def _layout_fit_issues(
     signature_rect: SignatureRect,
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
+    render_port: PreviewRasterRenderer | None = None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
     """Apply the existing rendered-ink fallback ladder to one prepared plan."""
 
@@ -687,11 +701,13 @@ def _layout_fit_issues(
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,
         stamp_text=stamp_text,
+        render_port=render_port,
     ) or _horizontal_multi_line_rendered_layout_fits_reservation(
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,
         stamp_text=stamp_text,
         layout_plan=layout_plan,
+        render_port=render_port,
     ):
         return ()
     return tuple(
@@ -710,6 +726,7 @@ class _BackendHorizontalInkMeasurer:
     """Adapter from backend stamp text inputs to the layout engine ink port."""
 
     signature_appearance: SigningBackendAppearance
+    render_port: PreviewRasterRenderer | None = None
 
     def measure(
         self,
@@ -722,6 +739,7 @@ class _BackendHorizontalInkMeasurer:
                 stamp_text=request.stamp_text,
             ),
             zoom=1.0,
+            render_port=self.render_port,
         )
         if reference is None:
             return None
@@ -977,6 +995,7 @@ def validate_visible_signature_fit(
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
     stamp_background: PdfImage | None,
+    render_port: PreviewRasterRenderer | None = None,
 ) -> tuple[SigningDraftValidationIssue, ...]:
     try:
         layout_result = _prepare_backend_layout(
@@ -984,6 +1003,7 @@ def validate_visible_signature_fit(
             signature_appearance=signature_appearance,
             stamp_text=stamp_text,
             stamp_background=stamp_background,
+            render_port=render_port,
         )
         _build_stamp_style(
             signature_appearance,
@@ -1011,27 +1031,10 @@ def _signing_draft_preview_for_stamp_text(
     signature_appearance: SigningBackendAppearance,
     stamp_text: str,
 ) -> SigningDraftPreview:
-    title_text, detail_text = _stamp_text_preview_parts(
-        stamp_text,
-        signature_appearance=signature_appearance,
-    )
-    return SigningDraftPreview(
-        title=title_text,
-        page_index=signature_rect.page_index,
+    return signing_draft_preview_for_stamp_text(
         signature_rect=signature_rect,
-        signer_label_prefix=title_text,
-        layout_template=signature_appearance.layout_template,
-        stamp_position=signature_appearance.stamp_position,
-        timezone_display_mode=signature_appearance.timezone_display_mode,
-        show_field_names=signature_appearance.show_field_names,
-        datetime_format=signature_appearance.datetime_format,
-        text_style=signature_appearance.text_style,
-        box_style=signature_appearance.box_style,
-        image_stamp_path=signature_appearance.image_stamp_path,
-        fields=(),
-        detail_text=detail_text,
-        issues=(),
-        can_submit=True,
+        signature_appearance=signature_appearance,
+        stamp_text=stamp_text,
     )
 
 
@@ -1040,15 +1043,10 @@ def _stamp_text_preview_parts(
     *,
     signature_appearance: SigningBackendAppearance,
 ) -> tuple[str, str]:
-    lines = stamp_text.splitlines()
-    if not lines:
-        return signature_appearance.signer_label_prefix, ""
-    if len(lines) == 1:
-        prefix = (signature_appearance.signer_label_prefix or "").strip()
-        if prefix and lines[0].startswith(prefix):
-            return prefix, lines[0][len(prefix) :].lstrip(" \n|")
-        return "", lines[0]
-    return lines[0], "\n".join(lines[1:])
+    return stamp_text_preview_parts(
+        stamp_text,
+        signature_appearance=signature_appearance,
+    )
 
 
 def _text_style_color_rgba(text_style: SignatureTextStyle) -> tuple[int, int, int, int] | None:
@@ -1165,19 +1163,7 @@ class PyHankoSignatureTextBoxEngine:
 
 def stamp_background_for_path(image_stamp_path: str | None) -> PdfImage | None:
     """Load one optional image stamp for a concrete rendering adapter."""
-
-    if image_stamp_path is None:
-        return None
-    try:
-        with Image.open(image_stamp_path) as image:
-            normalized = image.copy()
-            if normalized.mode not in {"RGB", "RGBA"}:
-                normalized = normalized.convert("RGBA")
-            return PdfImage(normalized, writer=None)
-    except FileNotFoundError as exc:
-        raise ValueError(f"Image stamp path not found: {image_stamp_path}") from exc
-    except OSError as exc:
-        raise ValueError(f"Image stamp path is not a readable image: {image_stamp_path}") from exc
+    return _neutral_stamp_background_for_path(image_stamp_path)
 
 
 def _solid_background_for_color(color_hex: str) -> PdfImage:

@@ -4,6 +4,31 @@ from __future__ import annotations
 
 from PIL import Image
 
+from foliaseal.application.preview_render_boundary import (
+    RenderedInkMeasurementRequest,
+    RenderedInkMeasurementResult,
+)
+
+
+class DefaultRenderedInkMeasurementPort:
+    """Application adapter exposing the existing raster analysis as a port."""
+
+    def measure(
+        self,
+        request: RenderedInkMeasurementRequest,
+    ) -> RenderedInkMeasurementResult:
+        bounds, error = detect_text_content_bounds_in_image(
+            preview_image_path=str(request.preview_image_path),
+            text_widget_bounds=dict(request.text_widget_bounds),
+            text_color_rgba=request.text_color_rgba,
+            reference_text_content_bounds=(
+                None
+                if request.reference_text_content_bounds is None
+                else dict(request.reference_text_content_bounds)
+            ),
+        )
+        return RenderedInkMeasurementResult(bounds_px=bounds, error=error)
+
 
 def detect_text_content_bounds_in_image(
     *,

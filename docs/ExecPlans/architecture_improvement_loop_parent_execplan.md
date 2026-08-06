@@ -1511,6 +1511,70 @@ the separate atomic plan at approximately `50–58` because CLI/DTO/JSON/fixture
 still require a versioned decision. No implementation was started for this next candidate in the
 completed certificate slice; it is the ranked next recommendation for a new DevLoop request.
 
+### Design Selection 19 — completed 2026-08-06
+
+Three independent design variants were generated for the neutral preview-render/backend boundary and
+two independent reviewers compared them against the live callers and tests. Design A, the minimal
+raster port, defines only `PreviewRasterRenderer.render_page(request) -> result`; it scores about
+`83` before penalties but leaves `visible_signature_layout.py` and horizontal reservation coupled to
+private preview/backend helpers, so it is incomplete for this candidate. Design B, the flexible
+artifact renderer, adds a broad artifact/ownership contract; it scores about `80–91` depending on
+artifact-width penalties, but risks leaking raster lifecycle details and migrating too many callers.
+Design C, a broad `SignatureVisualService` coordinator, scores about `88` before penalties but risks
+duplicating `VisibleSignatureLayoutService`, changing fit/cache ordering, and exceeding one slice.
+
+Selected design: constrained ports hybrid, with orchestrator score `90` (base minimal `83`, a
+`+7` improvement). It borrows only the common-caller design's explicit cleanup and intent separation
+while keeping Design A's narrow application-owned raster port. The application boundary will expose
+`PreviewRasterRequest`, `PreviewRasterResult`, `PreviewRasterRenderer`, and a small
+`RenderedInkMeasurementPort`; the canonical preview renderer retains snapshot assembly, while the
+measurement port owns the existing roomy-reference, raster-analysis, fallback, and cleanup sequence.
+`VisibleSignatureLayoutService` remains the layout-policy owner. Qt/infra adapters are constructed at
+presentation/CLI composition roots. Existing `render_backend=` calls, lazy application exports,
+snapshot fields, JSON keys, phase3 CLI/DTO/artifact names, cache keys, error strings, and `None`
+fallbacks remain stable through explicitly dated compatibility wrappers. No broad visual coordinator,
+certificate semantics change, or image-asset repository is included.
+
+The selected design's hard gates are: no module-level application import of Qt or infra rendering;
+private `phase3_signing_backend` preview-helper imports removed from neutral layout; byte-for-byte
+RGBA dimensions and alpha/flatten behavior preserved; canonical snapshot cleanup remains safe and
+idempotent; horizontal fit and backend reservation evidence are unchanged; existing monkeypatch and
+lazy-export call points remain valid until all production callers migrate; and full/offscreen matrix
+counts, CLI contracts, and process cleanup remain unchanged.
+
+### Implementation 19 — accepted 2026-08-06
+
+Child `docs/ExecPlans/neutral_preview_render_backend_boundary_execplan.md` is implemented. The
+application layer now owns neutral `PreviewRasterRequest`/`PreviewRasterResult` DTOs, a
+`PreviewRasterRenderer` port, and a rendered-ink measurement port. Canonical preview rendering,
+horizontal reservation, visible-layout fit checks, and backend measurers consume those collaborators;
+private preview-builder/background logic moved to neutral application helpers, and the old phase3
+functions remain only as compatibility wrappers. Qt presentation/evidence composition constructs
+`QtPreviewRasterRenderer` at the edge. `SignPdfUseCase` carries the optional port through
+`SigningBackendRequest`, so actual signing-plan fit checks use the composed renderer rather than
+silently constructing Qt. Application imports no concrete Qt or infra renderer at module load time,
+while the dated lazy fallback and `render_backend=` keyword preserve current callers.
+
+The compliance correction fixed a real missing-backend edge in evidence capture: the adapter now uses
+the neutral port only when a backend is present and otherwise keeps the existing lazy fallback. New
+boundary tests cover DTO validation, neutral request mapping, import isolation, and the application
+surface; the full existing preview/layout/backend/lifecycle coverage remains green. Temporary
+canonical-preview directories created by the run were removed by exact-prefix cleanup, and no
+FoliaSeal/Python/Qt processes remained.
+
+Validation passed: focused neutral/seam tests `225 passed`; full pytest `1,093 passed, 1 warning`;
+Ruff, compileall, CLI help, diff checks, and subprocess import isolation passed. Offscreen release
+evidence passed signed acceptance `10` scenarios with `7` successful signings, signed preview parity
+`18/18`, and signed fit rejection `3/3`. The frozen SPEC hash remains
+`d929e189269f0f057c6a72b43fd2d430965a975be720b55139fdb1d92afe282b`.
+
+Proxy measurement: navigation `0.30`, change amplification `0.75`, seam-risk reduction `0.80`,
+boundary-test improvement `0.85`, interface compression `0.75`, and boundary isolation `0.90`;
+weighted Actual Improvement `0.54` versus predicted `0.40`, with no component regression below
+`-0.10`. This cycle meets the acceptance threshold. Remaining work is the separate atomic
+`phase3_nomenclature_retirement_execplan.md` plus any fresh-scan candidate; no phase3 CLI/DTO/JSON,
+fixture, or artifact names were changed in this boundary slice.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

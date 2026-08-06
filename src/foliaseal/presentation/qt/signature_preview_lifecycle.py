@@ -13,6 +13,7 @@ from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
 )
 from foliaseal.infra.render import QtPdfRenderBackend
+from foliaseal.presentation.qt.preview_render_adapter import QtPreviewRasterRenderer
 
 _CANONICAL_PREVIEW_ACTIVE_STYLE = (
     "QGroupBox { border: none; background: transparent; padding: 0px; }"
@@ -48,6 +49,7 @@ class QtCanonicalPreviewLifecycle:
         self._q_pixmap = q_pixmap
         self._qt = qt
         self._render_backend = render_backend_factory()
+        self._render_port = QtPreviewRasterRenderer(self._render_backend)
         self._render_snapshot = render_snapshot
         self._current_snapshot: CanonicalSignaturePreviewSnapshot | None = None
 
@@ -61,13 +63,18 @@ class QtCanonicalPreviewLifecycle:
         fallback_card_style: str,
     ) -> CanonicalPreviewRenderState:
         try:
-            snapshot = self._render_snapshot(
-                preview,
-                zoom=max(1.0, preview_scale),
-                render_backend=self._render_backend,
-                include_border=True,
-                flatten_to_white=False,
-            )
+            render_kwargs = {
+                "zoom": max(1.0, preview_scale),
+                "include_border": True,
+                "flatten_to_white": False,
+            }
+            if self._render_snapshot is render_canonical_signature_preview:
+                render_kwargs["render_port"] = self._render_port
+            else:
+                # Keep injected test/manual snapshot functions compatible while
+                # the production canonical renderer receives the neutral port.
+                render_kwargs["render_backend"] = self._render_backend
+            snapshot = self._render_snapshot(preview, **render_kwargs)
         except (RuntimeError, ValueError):
             snapshot = None
         self._replace_snapshot(snapshot)

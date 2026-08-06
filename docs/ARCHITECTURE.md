@@ -45,6 +45,8 @@ The canonical repository document split is:
 | `src/foliaseal/application/` | Use cases, workflows, geometry, preview/render evidence logic, neutral visible-signature layout planning, protocol boundaries, and the Phase 3 evidence service. | Layout core is import-isolated from Pillow, PyHanko, Qt, and `phase3_signing_backend`; concrete materialization is at an adapter edge. |
 | `src/foliaseal/application/visible_signature_layout_adapters.py` | Concrete visible-signature layout materializers and production measurement adapters. | Owns Pillow image probing, PyHanko text/style/rule construction, and lazy backend imports; it depends on the neutral layout contracts. |
 | `src/foliaseal/application/visible_signature_color.py` | Shared visible-signature color conversion helper. | Owns the RGBA conversion used by horizontal reservation and preview diagnostics. |
+| `src/foliaseal/application/preview_render_boundary.py` | Neutral application boundary for canonical preview rasterization and rendered-ink measurement. | Owns `PreviewRasterRenderer`/`PreviewRasterRequest`/`PreviewRasterResult` and `RenderedInkMeasurementPort` request/result contracts; these types contain only paths, dimensions, bytes, mappings, and diagnostics, so Qt and image-library objects stay outside the application port. |
+| `src/foliaseal/application/text_raster_analysis.py` | Default application adapter for rendered-ink measurement. | `DefaultRenderedInkMeasurementPort` wraps the existing Pillow-based text geometry analyzer behind the neutral `RenderedInkMeasurementPort`; callers can inject a deterministic fake or another raster analyzer. |
 | `src/foliaseal/application/evidence_service.py` | Explicit injected service boundary for Phase 3 evidence capture, matrix execution, validation, and signed-acceptance evidence generation. | Owns request/result dataclasses and typed service verbs consumed by the canonical orchestrator and concrete adapters. |
 | `src/foliaseal/application/phase3_evidence_core.py` | Qt-free Phase 3 result models and evidence decisions. | Owns typed matrix/evidence results, normalization, summary validation, capture loading, and markdown rendering. |
 | `src/foliaseal/application/evidence_ports.py` | Narrow effect protocols for Phase 3 evidence execution. | Keeps runners, asset generation, capture loading, writers, and runtime contexts behind injectable ports. |
@@ -134,12 +136,12 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/application/sign_pdf_use_case.py`
 - Responsibility: Coordinate PDF signing without Qt and map backend failures to stable `SigningResult` values.
-- Owns: Signing pipeline order, compatibility checks, certification restriction checks, timestamp-required checks, atomic output write, failure-code mapping.
+- Owns: Signing pipeline order, compatibility checks, certification restriction checks, timestamp-required checks, atomic output write, failure-code mapping, and the optional `preview_render_port` handoff used by rendered-fit planning.
 - Does not own: pyHanko implementation details, certificate parsing, PDF rendering, UI state.
-- Key collaborators: `PdfInspector`, `CertificateLoader`, `PdfSigner`, `SignatureVerifier`, `CertificationInspector` protocols; `phase3_signing_backend.py`; `infra.certification`.
+- Key collaborators: `PdfInspector`, `CertificateLoader`, `PdfSigner`, `SignatureVerifier`, `CertificationInspector` protocols; `phase3_signing_backend.py`; `preview_render_boundary.py`; `infra.certification`.
 - Main entry points: `SignPdfUseCase.execute()`, `SigningBackendRequest.from_signing_request()`.
 - Important types/classes/functions: `SigningBackendAppearance`, `SigningBackendRequest`, `PdfInspector`, `PdfSigner`, `SignatureVerifier`.
-- Known constraints: Visible signature requests must include both `signature_rect` and `signature_appearance`; output path must not resolve to input path; writes use temp file plus atomic replace.
+- Known constraints: Visible signature requests must include both `signature_rect` and `signature_appearance`; output path must not resolve to input path; writes use temp file plus atomic replace. `execute()` normalizes to `SigningBackendRequest` and copies the use case's optional `preview_render_port` into its `render_port`; when absent, the backend retains its lazy compatibility renderer fallback.
 - Status: Confirmed by code and tests.
 
 ### pyHanko signing backend
@@ -211,6 +213,17 @@ The canonical repository document split is:
 - Main entry points: `SigningDraftWorkflow.preview()`, `SigningDraftWorkflow.build_signing_request()`, `suggest_signed_output_path()`, `render_signing_preview()`, `render_canonical_signature_preview()`, `compare_preview_to_request()`.
 - Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read through an injected application-layer reader, with `Pkcs12CertificatePreviewReader` as the default implementation. Signed-output path suggestions are computed by application-layer path policy so the app frame and signing shell share the same default filename behavior. The workflow applies the canonical application-owned `CertificateConfiguration`; persistence codecs and stores remain infra adapters, while concrete store injection is a separate follow-up seam.
 - Status: Confirmed by code; certificate model ownership is resolved, with concrete certificate-store coupling tracked as the next candidate.
+
+### Neutral preview raster and rendered-ink boundary
+
+- Location: `src/foliaseal/application/preview_render_boundary.py`, `src/foliaseal/application/horizontal_signature_reservation.py`, and `src/foliaseal/application/text_raster_analysis.py`
+- Responsibility: Keep canonical preview rasterization and rendered-glyph measurement behind application-owned ports used by preview layout and the signing fit policy.
+- Owns: `PreviewRasterRenderer`, `PreviewRasterRequest`, `PreviewRasterResult`, `RenderedInkMeasurementPort`, `RenderedInkMeasurementRequest`, `RenderedInkMeasurementResult`, and the horizontal single-line reservation measurement flow.
+- Does not own: Qt/PDF backend construction, Qt widget lifecycle, or Phase 3 scenario/report orchestration.
+- Composition edge: `src/foliaseal/presentation/qt/preview_render_adapter.py` owns `QtPreviewRasterRenderer`, translating the neutral request/result into the infra `RenderPageRequest` backend call. Qt canonical-preview lifecycle code injects this adapter; the application boundary never imports Qt. The Phase 3 harness's `_build_qt_signing_executor()` passes the same adapter into `build_phase3_signing_executor(render_port=...)`, which stores it on `SignPdfUseCase` and carries it through `SigningBackendRequest.render_port` into production signing-plan preparation.
+- Compatibility rule: `signing_preview_renderer.py` still accepts the historical `render_backend=` argument and lazily wraps it in `_LegacyPreviewRasterRenderer`; its default renderer imports `QtPdfRenderBackend` only when first needed. Horizontal reservation likewise creates `DefaultRenderedInkMeasurementPort` only when no measurement port is injected. These fallbacks keep older callers working without restoring module-level Qt or Pillow coupling to the neutral contracts.
+- Contract rule: The extraction changes ownership and composition only. Existing Phase 3 CLI names, DTOs, JSON keys, evidence mappings, and artifact suffixes remain unchanged; the harness continues to consume the same preview/render capture contracts.
+- Status: Confirmed by code and focused preview/signing tests.
 
 ### Reusable signing-object application boundary
 
@@ -875,7 +888,7 @@ The canonical repository document split is:
 | `SignatureFieldBinding` | `domain/models.py` | One visible field source/display rule. | source, show flag, override text, display label. | Hidden fields cannot be visible. |
 | `SignatureTextStyle` / `SignatureBoxStyle` | `domain/models.py` | Typography, border, and background settings. | font family/size/style/color; border/background settings. | Font family support enforced elsewhere by registry. |
 | `TimestampTrustPolicy` | `domain/models.py` | Runtime timestamp trust validation inputs. | system store flag, CA bundle path, revocation mode. | Converted from config `TrustProfile`. |
-| `SigningBackendRequest` | `application/sign_pdf_use_case.py` | Backend-facing normalized signing payload. | public signing fields plus `SigningBackendAppearance`. | Created by `from_signing_request()`. |
+| `SigningBackendRequest` | `application/sign_pdf_use_case.py` | Backend-facing normalized signing payload. | public signing fields plus `SigningBackendAppearance`, optional `signing_time`, and optional `render_port`. | Created by `from_signing_request()`; `SignPdfUseCase.execute()` carries its configured preview renderer into `render_port` for production fit planning. |
 | `PreparedSigningPlan` | `application/phase3_signing_backend.py` | Immutable application-owned preparation shared by visible signing and layout adapters. | normalized backend request, optional visible semantics/layout plan, typed fit issues, stamp text, visible flag. | `prepare_phase3_signing_plan()` creates it; no PyHanko/Pillow objects cross this boundary. |
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, selected reusable-object ids, rect, appearance, placement context. | Produces preview and final `SigningRequest`; can apply resolved `CertificateConfiguration` material. |
 | `CertificatePreviewReader` / `Pkcs12CertificatePreviewReader` | `application/certificate_preview.py` | Extract certificate-derived visible-signature preview values. | certificate path, passphrase -> field-value map and availability flag. | Injected into draft workflow so PKCS#12 parsing is not implemented inside the draft object. |
@@ -1140,7 +1153,7 @@ The canonical repository document split is:
 
 1. Caller builds a domain `SigningRequest`.
 2. `SignPdfUseCase.execute()` rejects input/output path conflicts.
-3. Public request is normalized to `SigningBackendRequest`.
+3. Public request is normalized to `SigningBackendRequest`; an injected `SignPdfUseCase.preview_render_port`, when present, is carried into `SigningBackendRequest.render_port` for the production signing plan.
 4. PDF compatibility and certification policy are inspected.
 5. Certificate material is validated.
 6. `PyHankoPdfSigner.sign()` calls `prepare_phase3_signing_plan()` when a prepared plan was not supplied; the preparation step resolves visible semantics/layout once (or marks an invisible plan), and exposes fit issues as `SigningDraftValidationIssue` values.

@@ -19,8 +19,10 @@ from pyhanko.stamp import TextStampStyle
 from foliaseal.application.horizontal_signature_reservation import (
     measure_horizontal_single_line_rendered_reference,
 )
-from foliaseal.application.phase3_signing_backend import (
-    stamp_background_for_path,
+from foliaseal.application.preview_render_boundary import (
+    PreviewRasterRenderer,
+    PreviewRasterRequest,
+    PreviewRasterResult,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_workflow import (
@@ -28,6 +30,7 @@ from foliaseal.application.signing_draft_workflow import (
     SigningDraftPreviewField,
     SigningDraftValidationIssue,
 )
+from foliaseal.application.stamp_background import stamp_background_for_path
 from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
@@ -47,8 +50,6 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode,
     SigningRequest,
 )
-from foliaseal.infra.render import QtPdfRenderBackend
-from foliaseal.infra.render.base import RenderPageRequest
 
 
 class SigningPreviewLineKind(str, Enum):  # noqa: UP042
@@ -300,12 +301,18 @@ def render_canonical_signature_preview(
     preview: SigningDraftPreview,
     *,
     zoom: float = 2.0,
-    render_backend: QtPdfRenderBackend | None = None,
+    render_port: PreviewRasterRenderer | None = None,
+    render_backend: Any | None = None,
     include_border: bool = True,
     flatten_to_white: bool = True,
     use_horizontal_ink_reservation: bool = True,
 ) -> CanonicalSignaturePreviewSnapshot | None:
     """Render the visible signature using the canonical stamp engine."""
+
+    if render_port is not None and render_backend is not None:
+        raise ValueError("Provide render_port or render_backend, not both.")
+    if render_port is None and render_backend is not None:
+        render_port = _LegacyPreviewRasterRenderer(render_backend)
 
     if (
         preview.signature_rect is None
@@ -330,6 +337,7 @@ def render_canonical_signature_preview(
         include_text=True,
         include_stamp=True,
         include_border=include_border,
+        render_port=render_port,
         use_horizontal_ink_reservation=use_horizontal_ink_reservation,
     )
     full_render = _render_preview_style(
@@ -337,7 +345,7 @@ def render_canonical_signature_preview(
         signature_rect=preview.signature_rect,
         zoom=zoom,
         output_path=temp_dir / "full.png",
-        render_backend=render_backend,
+        render_port=render_port,
         flatten_to_white=flatten_to_white,
     )
     text_bounds = _render_optional_preview_bounds(
@@ -347,7 +355,7 @@ def render_canonical_signature_preview(
         output_path=temp_dir / "text.png",
         include_text=True,
         include_stamp=False,
-        render_backend=render_backend,
+        render_port=render_port,
         flatten_to_white=flatten_to_white,
     )
     stamp_bounds = _render_optional_preview_bounds(
@@ -357,7 +365,7 @@ def render_canonical_signature_preview(
         output_path=temp_dir / "stamp.png",
         include_text=False,
         include_stamp=True,
-        render_backend=render_backend,
+        render_port=render_port,
         flatten_to_white=flatten_to_white,
     )
     image_size_px = {"width": full_render[1], "height": full_render[2]}
@@ -816,6 +824,7 @@ def _canonical_preview_layout(
     include_text: bool,
     include_stamp: bool,
     include_border: bool,
+    render_port: PreviewRasterRenderer | None = None,
     use_horizontal_ink_reservation: bool = True,
 ) -> _CanonicalPreviewLayout:
     assert preview.signature_rect is not None
@@ -840,7 +849,9 @@ def _canonical_preview_layout(
     stamp_text = _semantic_preview_stamp_text(preview) if include_text else " "
     stamp_background = stamp_background_for_path(appearance.image_stamp_path)
     ink_measurer = (
-        _PreviewHorizontalInkMeasurer(preview) if use_horizontal_ink_reservation else None
+        _PreviewHorizontalInkMeasurer(preview, render_port)
+        if use_horizontal_ink_reservation
+        else None
     )
     preparation = VisibleSignatureLayoutService.production().prepare(
         VisibleSignatureLayoutRequest(
@@ -873,12 +884,17 @@ def _canonical_preview_layout(
 @dataclass(frozen=True)
 class _PreviewHorizontalInkMeasurer:
     preview: SigningDraftPreview
+    render_port: PreviewRasterRenderer | None = None
 
     def measure(
         self,
         request: HorizontalInkMeasurementRequest,
     ) -> HorizontalInkMeasurement | None:
-        reference = measure_horizontal_single_line_rendered_reference(self.preview, zoom=1.0)
+        reference = measure_horizontal_single_line_rendered_reference(
+            self.preview,
+            zoom=1.0,
+            render_port=self.render_port,
+        )
         if reference is None:
             return None
         return HorizontalInkMeasurement(
@@ -917,13 +933,18 @@ def _render_optional_preview_bounds(
     output_path: Path,
     include_text: bool,
     include_stamp: bool,
-    render_backend: QtPdfRenderBackend | None,
     flatten_to_white: bool,
+    render_port: PreviewRasterRenderer | None = None,
+    render_backend: Any | None = None,
 ) -> dict[str, int] | None:
     if not include_text and not include_stamp:
         return None
     if include_stamp and layout.style.background is None:
         return None
+    if render_port is not None and render_backend is not None:
+        raise ValueError("Provide render_port or render_backend, not both.")
+    if render_port is None and render_backend is not None:
+        render_port = _LegacyPreviewRasterRenderer(render_backend)
     style = TextStampStyle(
         border_width=0,
         border_color=layout.style.border_color,
@@ -940,7 +961,7 @@ def _render_optional_preview_bounds(
         signature_rect=preview.signature_rect,
         zoom=zoom,
         output_path=output_path,
-        render_backend=render_backend,
+        render_port=render_port,
         flatten_to_white=flatten_to_white,
     )
     with Image.open(image_path) as image:
@@ -954,7 +975,7 @@ def _render_preview_style(
     signature_rect: SignatureRect,
     zoom: float,
     output_path: Path,
-    render_backend: QtPdfRenderBackend | None,
+    render_port: PreviewRasterRenderer | None,
     flatten_to_white: bool,
 ) -> tuple[Path, int, int]:
     width_pt = max(1, int(round(signature_rect.width_pt)))
@@ -975,9 +996,9 @@ def _render_preview_style(
     pdf_path = output_path.with_suffix(".pdf")
     with pdf_path.open("wb") as handle:
         writer.write(handle)
-    backend = render_backend or QtPdfRenderBackend()
-    render = backend.render_page(
-        RenderPageRequest(
+    renderer = render_port or _default_preview_raster_renderer()
+    render = renderer.render_page(
+        PreviewRasterRequest(
             document_path=str(pdf_path),
             page_index=0,
             zoom=zoom,
@@ -996,6 +1017,37 @@ def _render_preview_style(
         image.save(output_path)
     pdf_path.unlink(missing_ok=True)
     return output_path, render.width_px, render.height_px
+
+
+@dataclass(frozen=True)
+class _LegacyPreviewRasterRenderer:
+    """Temporary adapter for callers that still pass the old backend object."""
+
+    backend: Any
+
+    def render_page(self, request: PreviewRasterRequest) -> PreviewRasterResult:
+        from foliaseal.infra.render.base import RenderPageRequest
+
+        result = self.backend.render_page(
+            RenderPageRequest(
+                document_path=str(request.document_path),
+                page_index=request.page_index,
+                zoom=request.zoom,
+            )
+        )
+        return PreviewRasterResult(
+            width_px=result.width_px,
+            height_px=result.height_px,
+            rgba_bytes=result.rgba_bytes,
+        )
+
+
+def _default_preview_raster_renderer() -> PreviewRasterRenderer:
+    """Build the legacy direct-call renderer without a module-level Qt import."""
+
+    from foliaseal.infra.render import QtPdfRenderBackend
+
+    return _LegacyPreviewRasterRenderer(QtPdfRenderBackend())
 
 
 def _layout_rule_bounds_px(

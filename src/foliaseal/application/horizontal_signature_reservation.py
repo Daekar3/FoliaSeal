@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from pathlib import Path
 
+from foliaseal.application.preview_render_boundary import (
+    PreviewRasterRenderer,
+    RenderedInkMeasurementPort,
+    RenderedInkMeasurementRequest,
+)
 from foliaseal.application.signing_draft_workflow import SigningDraftPreview
 from foliaseal.domain.models import SignatureLayoutTemplate, SignatureRect, SignatureStampPosition
 
@@ -40,6 +47,8 @@ def measure_horizontal_single_line_rendered_reference(
     zoom: float = 1.0,
     roomy_width_padding_pt: float = 384.0,
     roomy_height_padding_pt: float = 64.0,
+    render_port: PreviewRasterRenderer | None = None,
+    ink_measurement_port: RenderedInkMeasurementPort | None = None,
 ) -> HorizontalSingleLineRenderedReference | None:
     """Measure structural and glyph-ink text bounds in a roomy canonical render."""
 
@@ -57,12 +66,13 @@ def measure_horizontal_single_line_rendered_reference(
         width_padding_pt=roomy_width_padding_pt,
         height_padding_pt=roomy_height_padding_pt,
     )
+    snapshot = None
     try:
         from foliaseal.application.signing_preview_renderer import (
             render_canonical_signature_preview,
         )
         from foliaseal.application.text_raster_analysis import (
-            detect_text_content_bounds_in_image,
+            DefaultRenderedInkMeasurementPort,
         )
         from foliaseal.application.visible_signature_color import text_style_color_rgba
 
@@ -72,6 +82,7 @@ def measure_horizontal_single_line_rendered_reference(
             include_border=True,
             flatten_to_white=True,
             use_horizontal_ink_reservation=False,
+            render_port=render_port,
         )
         if (
             snapshot is None
@@ -79,12 +90,16 @@ def measure_horizontal_single_line_rendered_reference(
             or snapshot.text_bounds_px is None
         ):
             return None
-        rendered_ink_bounds_px, _error = detect_text_content_bounds_in_image(
-            preview_image_path=snapshot.image_path,
-            text_widget_bounds=snapshot.text_area_bounds_px,
-            text_color_rgba=text_style_color_rgba(preview.text_style),
-            reference_text_content_bounds=snapshot.text_bounds_px,
+        measurement_port = ink_measurement_port or DefaultRenderedInkMeasurementPort()
+        measurement = measurement_port.measure(
+            RenderedInkMeasurementRequest(
+                preview_image_path=snapshot.image_path,
+                text_widget_bounds=snapshot.text_area_bounds_px,
+                text_color_rgba=text_style_color_rgba(preview.text_style),
+                reference_text_content_bounds=snapshot.text_bounds_px,
+            )
         )
+        rendered_ink_bounds_px = measurement.bounds_px
         if rendered_ink_bounds_px is None:
             return None
         px_to_pt = reference_rect.width_pt / max(1, snapshot.width_px)
@@ -98,6 +113,11 @@ def measure_horizontal_single_line_rendered_reference(
         )
     except Exception:
         return None
+    finally:
+        if snapshot is not None:
+            snapshot_parent = Path(snapshot.image_path).parent
+            if snapshot_parent.name.startswith("foliaseal-canonical-preview-"):
+                shutil.rmtree(snapshot_parent, ignore_errors=True)
 
 
 def build_horizontal_single_line_ink_reservation(

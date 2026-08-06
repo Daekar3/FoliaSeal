@@ -121,6 +121,17 @@ _EXPORT_MODULES = {
         "signing_preview_renderer",
     ),
     **dict.fromkeys(
+        (
+            "PreviewRasterRenderer",
+            "PreviewRasterRequest",
+            "PreviewRasterResult",
+            "RenderedInkMeasurementPort",
+            "RenderedInkMeasurementRequest",
+            "RenderedInkMeasurementResult",
+        ),
+        "preview_render_boundary",
+    ),
+    **dict.fromkeys(
         ("CertificatePassphrasePrompter", "SigningSetupSelectionOutcome", "SigningSetupSession"),
         "signing_setup_session",
     ),

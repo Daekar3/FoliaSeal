@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -12,6 +12,7 @@ from foliaseal.application.pdf_compatibility import (
     PdfCompatibilityError,
     PdfCompatibilityProfile,
 )
+from foliaseal.application.preview_render_boundary import PreviewRasterRenderer
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
@@ -153,6 +154,7 @@ class SigningBackendRequest:
     signature_rect: SignatureRect | None
     signature_appearance: SigningBackendAppearance | None
     signing_time: datetime | None = None
+    render_port: PreviewRasterRenderer | None = None
 
     @classmethod
     def from_signing_request(cls, request: SigningRequest) -> SigningBackendRequest:
@@ -199,6 +201,7 @@ class SignPdfUseCase:
         default_factory=PyHankoCertificationInspector
     )
     compatibility_profile: PdfCompatibilityProfile = PdfCompatibilityProfile()
+    preview_render_port: PreviewRasterRenderer | None = None
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""
@@ -211,6 +214,11 @@ class SignPdfUseCase:
                 )
 
             backend_request = SigningBackendRequest.from_signing_request(request)
+            if self.preview_render_port is not None:
+                backend_request = replace(
+                    backend_request,
+                    render_port=self.preview_render_port,
+                )
             input_pdf_version = self.inspector.get_pdf_version(request.input_pdf_path)
             self.compatibility_profile.ensure_open_version_supported(input_pdf_version)
             certification = CertificationPolicyResult(

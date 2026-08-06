@@ -124,6 +124,7 @@ from foliaseal.presentation.qt.preview_analysis import (
     build_preview_analysis_engine,
     normalize_visible_text_for_comparison,
 )
+from foliaseal.presentation.qt.preview_render_adapter import QtPreviewRasterRenderer
 from foliaseal.presentation.qt.preview_render_evidence_adapters import (
     HeadlessPreviewRenderEvidenceAdapter,
     PreviewRenderEvidenceDependencies,
@@ -160,6 +161,15 @@ DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_check
 DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
 
 
+def _build_qt_signing_executor(*, timestamper_factory: Any | None = None) -> Any:
+    """Compose signing with the neutral preview raster boundary at the Qt edge."""
+
+    return build_phase3_signing_executor(
+        timestamper_factory=timestamper_factory,
+        render_port=QtPreviewRasterRenderer(QtPdfRenderBackend()),
+    )
+
+
 def build_capture_assembler() -> Phase3HarnessCaptureAssembler:
     pdf_snapshotter = Phase3PdfSignatureSnapshotter()
     analysis_engine = _build_preview_analysis_engine()
@@ -192,7 +202,7 @@ def build_evidence_runner_providers() -> EvidenceRunnerProviders:
             load_page_count=_load_page_count,
             render_backend_factory=QtPdfRenderBackend,
             profile_store_factory=SignaturePresetCatalogStore.default,
-            build_phase3_signing_executor=build_phase3_signing_executor,
+            build_phase3_signing_executor=_build_qt_signing_executor,
             session_runner=build_interactive_session_runner(),
             capture_assembler=build_capture_assembler(),
             contract_evaluator=evaluate_phase3_evidence_contract,
@@ -218,7 +228,7 @@ def build_evidence_runner_providers() -> EvidenceRunnerProviders:
         signed=SignedAcceptanceEvidenceProviders(
             load_qt_harness_bindings=_load_qt_harness_bindings,
             load_preview_matrix_manifest=_load_preview_matrix_manifest,
-            build_phase3_signing_executor=build_phase3_signing_executor,
+            build_phase3_signing_executor=_build_qt_signing_executor,
             build_dummy_timestamper=build_dummy_timestamper,
             load_page_count=_load_page_count,
             build_qt_signing_shell=build_qt_signing_shell,

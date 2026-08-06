@@ -10,6 +10,7 @@ from typing import Any
 
 from foliaseal.application.signing_preview_renderer import SignatureAppearanceSnapshot
 from foliaseal.presentation.qt.preview_analysis import PreviewAnalysisRequest
+from foliaseal.presentation.qt.preview_render_adapter import QtPreviewRasterRenderer
 from foliaseal.presentation.qt.preview_render_evidence_projection import (
     PreviewEvidenceFrame,
     assemble_preview_evidence,
@@ -127,13 +128,16 @@ def build_qt_preview_render_capture_payload(
         image_path = str(target_dir / f"{artifact_basename}.png")
         if canonical_snapshot is not None:
             shutil.copyfile(canonical_snapshot.image_path, image_path)
-            analysis_snapshot = render_canonical_signature_preview(
-                preview,
-                zoom=1.0,
-                render_backend=canonical_preview_render_backend,
-                include_border=True,
-                flatten_to_white=True,
-            )
+            render_kwargs: dict[str, Any] = {
+                "zoom": 1.0,
+                "include_border": True,
+                "flatten_to_white": True,
+            }
+            if canonical_preview_render_backend is not None:
+                render_kwargs["render_port"] = QtPreviewRasterRenderer(
+                    canonical_preview_render_backend
+                )
+            analysis_snapshot = render_canonical_signature_preview(preview, **render_kwargs)
             analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
             if analysis_snapshot is not None:
                 shutil.copyfile(analysis_snapshot.image_path, analysis_image_path)

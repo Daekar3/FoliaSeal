@@ -1556,6 +1556,7 @@ def _single_line_text_only_ink_bounds(
     *,
     preview: object,
     output_path: Path,
+    render_port: object | None = None,
 ) -> dict[str, int] | None:
     from foliaseal.application.signing_preview_renderer import (
         _canonical_preview_layout,
@@ -1567,6 +1568,7 @@ def _single_line_text_only_ink_bounds(
         include_text=True,
         include_stamp=True,
         include_border=True,
+        render_port=render_port,
     )
     return _render_optional_preview_bounds(
         preview=preview,
@@ -1575,7 +1577,7 @@ def _single_line_text_only_ink_bounds(
         output_path=output_path,
         include_text=True,
         include_stamp=False,
-        render_backend=None,
+        render_port=render_port,
         flatten_to_white=True,
     )
 
@@ -1585,6 +1587,7 @@ def _single_line_rendered_ink_fits_reservation(
     signature_rect: SignatureRect,
     signature_appearance: object,
     stamp_text: str,
+    render_port: object | None = None,
 ) -> bool:
     if signature_appearance.layout_template != SignatureLayoutTemplate.SINGLE_LINE:
         return False
@@ -1592,6 +1595,7 @@ def _single_line_rendered_ink_fits_reservation(
         signature_rect=signature_rect,
         signature_appearance=signature_appearance,
         stamp_text=stamp_text,
+        render_port=render_port,
     )
     cached = _SINGLE_LINE_RENDERED_INK_FIT_CACHE.get(cache_key)
     if cached is not None:
@@ -1599,14 +1603,14 @@ def _single_line_rendered_ink_fits_reservation(
     snapshot = None
     reference_snapshot = None
     try:
-        from foliaseal.application.phase3_signing_backend import (
-            _signing_draft_preview_for_stamp_text,
-        )
         from foliaseal.application.signing_preview_renderer import (
             render_canonical_signature_preview,
         )
+        from foliaseal.application.stamp_preview_builder import (
+            signing_draft_preview_for_stamp_text,
+        )
 
-        preview = _signing_draft_preview_for_stamp_text(
+        preview = signing_draft_preview_for_stamp_text(
             signature_rect=signature_rect,
             signature_appearance=signature_appearance,
             stamp_text=stamp_text,
@@ -1616,6 +1620,7 @@ def _single_line_rendered_ink_fits_reservation(
             zoom=1.0,
             include_border=True,
             flatten_to_white=True,
+            render_port=render_port,
         )
         if snapshot is None or snapshot.text_area_bounds_px is None:
             return False
@@ -1636,6 +1641,7 @@ def _single_line_rendered_ink_fits_reservation(
         text_bounds = _single_line_text_only_ink_bounds(
             preview=preview,
             output_path=Path(snapshot.image_path).parent / "fit-text-only.png",
+            render_port=render_port,
         )
         if text_bounds is None:
             return False
@@ -1665,7 +1671,7 @@ def _single_line_rendered_ink_fits_reservation(
                     float((snapshot.text_bounds_px or {}).get("height", 0)) + 64.0,
                 ),
             )
-            reference_preview = _signing_draft_preview_for_stamp_text(
+            reference_preview = signing_draft_preview_for_stamp_text(
                 signature_rect=reference_rect,
                 signature_appearance=signature_appearance,
                 stamp_text=stamp_text,
@@ -1675,6 +1681,7 @@ def _single_line_rendered_ink_fits_reservation(
                 zoom=1.0,
                 include_border=True,
                 flatten_to_white=True,
+                render_port=render_port,
             )
             if reference_snapshot is None or reference_snapshot.text_area_bounds_px is None:
                 return False
@@ -1682,6 +1689,7 @@ def _single_line_rendered_ink_fits_reservation(
                 preview=reference_preview,
                 output_path=Path(reference_snapshot.image_path).parent
                 / "fit-reference-text-only.png",
+                render_port=render_port,
             )
             if reference_text_bounds is None:
                 return False
@@ -1718,6 +1726,7 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
     signature_appearance: object,
     stamp_text: str,
     layout_plan: SignatureLayoutPlan,
+    render_port: object | None = None,
 ) -> bool:
     if (
         signature_appearance.layout_template != SignatureLayoutTemplate.MULTI_LINE
@@ -1734,17 +1743,17 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
 
     snapshot = None
     try:
-        from foliaseal.application.phase3_signing_backend import (
-            _signing_draft_preview_for_stamp_text,
-        )
-        from foliaseal.application.phase3_signing_backend import (
-            detect_text_content_bounds_in_image as _detect_text_content_bounds_in_image,
-        )
         from foliaseal.application.signing_preview_renderer import (
             render_canonical_signature_preview,
         )
+        from foliaseal.application.stamp_preview_builder import (
+            signing_draft_preview_for_stamp_text,
+        )
+        from foliaseal.application.text_raster_analysis import (
+            detect_text_content_bounds_in_image as _detect_text_content_bounds_in_image,
+        )
 
-        preview = _signing_draft_preview_for_stamp_text(
+        preview = signing_draft_preview_for_stamp_text(
             signature_rect=signature_rect,
             signature_appearance=signature_appearance,
             stamp_text=stamp_text,
@@ -1754,6 +1763,7 @@ def _horizontal_multi_line_rendered_layout_fits_reservation(
             zoom=1.0,
             include_border=True,
             flatten_to_white=True,
+            render_port=render_port,
         )
         if snapshot.text_area_bounds_px is None:
             return False
@@ -1834,6 +1844,7 @@ def _single_line_rendered_ink_fit_cache_key(
     signature_rect: SignatureRect,
     signature_appearance: object,
     stamp_text: str,
+    render_port: object | None = None,
 ) -> tuple[object, ...]:
     box_style = signature_appearance.box_style
     text_style = signature_appearance.text_style
@@ -1871,6 +1882,7 @@ def _single_line_rendered_ink_fit_cache_key(
         box_style.border_color_hex,
         round(box_style.border_width_pt, 3),
         box_style.background_color_hex,
+        id(render_port) if render_port is not None else None,
     )
 
 
