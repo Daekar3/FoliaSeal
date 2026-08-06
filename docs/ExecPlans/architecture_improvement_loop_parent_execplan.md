@@ -1777,6 +1777,33 @@ The next projection seam is recorded for a future continuation rather than start
 The dedicated `phase3_nomenclature_retirement_execplan.md` remains the atomic versioned migration
 plan; its live inventory is `106` path names, `254` files, and approximately `6,570` references.
 
+### Design Selection 30 — completed 2026-08-06
+
+Three independent design reports and two independent reviewers compared: (A) minimal shared
+functions, (B) a flexible immutable typed projection, and (C) a common-caller manager. Shape A scored
+about `82` in the independent review: safest migration, but weak semantic ownership and a renewed
+stringly-typed drift risk. Shape B scored `89–91` when it owns semantic views and modern-over-legacy
+precedence; Shape C scored `76–80` and incurs over-broad manager/cycle risk.
+
+Shape B is selected as a constrained typed projection boundary. `evidence_snapshot_projection.py`
+will expose immutable `SnapshotView`/`LayoutView`/`ReservationView`/`RenderCaptureView` values and
+pure projection functions. It owns normalization, nested-vs-top-level edge-distance precedence,
+modern-vs-legacy layout and stamp-art precedence, and visible-appearance formatting. Harness keeps
+Qt/PDF capture and JSON builders; reporting keeps Markdown wording; Phase 3 names and serialized
+contracts remain unchanged. No generic manager, filesystem, Qt, Pillow, or PyHanko dependency is
+allowed. The child plan is `docs/ExecPlans/evidence_snapshot_projection_boundary_execplan.md`.
+
+### Implementation 31 — in progress, 2026-08-06
+
+The selected typed projection is implemented and passing validation, pending documentation and
+intentional commit. New `evidence_snapshot_projection.py` owns immutable semantic views and modern-
+over-legacy normalization with no Qt/Pillow/PyHanko/filesystem imports. Both harness and reporting
+now delegate their duplicated snapshot readouts to it; capture, JSON construction, and Markdown
+wording remain in their original owners. Focused projection/harness/reporting tests pass (`86`), and
+the full suite passes (`1,115 passed, 1 warning`). The SPEC remains unchanged. The measured source
+diff removes approximately `272` lines of duplicated projection logic; conservative predicted/actual
+component measurements will be finalized in the child outcome after offscreen evidence and cleanup.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

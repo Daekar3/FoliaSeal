@@ -76,6 +76,7 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/signing_workspace_diagnostics.py` | Qt-free immutable diagnostic read model for one live signing workspace state. | Defines `SigningWorkspaceSnapshot`, the consistent read bundle shared by runtime diagnostics and Phase 3 capture. |
 | `src/foliaseal/presentation/qt/signing_workspace_testing_port.py` | Neutral diagnostics/testing-port contracts for live signing workspace harness callers. | Defines `SigningWorkspaceDiagnosticsPort` and `SigningWorkspaceTestingPort` plus its narrower `panel` port; the testing port adds snapshot reads without widening the production shell port. |
 | `src/foliaseal/presentation/qt/phase3_harness_reporting.py` | Pure Phase 3 harness reporting boundary. | Finalizes raw capture payloads into JSON/checklist evidence without owning the interactive Qt session. |
+| `src/foliaseal/presentation/qt/evidence_snapshot_projection.py` | Immutable semantic projection and compatibility normalization for evidence snapshots. | Stdlib-only dependency firewall; centralizes modern-over-legacy precedence and malformed/missing-value normalization for harness and reporting consumers. |
 | `src/foliaseal/presentation/qt/phase3_harness_workspace.py` | Narrow Phase 3 harness workspace boundary. | Owns preview-matrix and signed-acceptance scenario application plus viewer priming refresh and snapshot-returning capture assembly for live-shell and headless workflow paths. The Qt adapter consumes one `SigningWorkspaceSnapshot` from the explicit `SigningWorkspaceTestingPort` for current request, appearance, and last-result reads; compatibility serializers remain only at the evidence edge, and interactive session lifecycle/callback wiring stays in `phase3_harness_session_runner.py`. |
 | `src/foliaseal/presentation/qt/phase3_harness_workspace_capture.py` | Qt-free shared workspace-capture boundary for the Phase 3 harness. | Owns `Phase3HarnessWorkspaceCaptureInput`, `Phase3HarnessWorkspaceSnapshot`, stable `as_mapping()` projection, and pure snapshot assembly reused by live and headless workspace adapters; it imports no Qt, Pillow, pyHanko, rendering, or workflow code. |
 | `src/foliaseal/presentation/qt/phase3_harness_scenario_policy.py` | Qt-free scenario-policy boundary for the Phase 3 harness workspace. | Resolves named profiles and appearance/text/box/visible-field overrides into one immutable `Phase3HarnessResolvedScenario`; live/headless adapters retain target-specific mutation and event/render effects. |
@@ -628,6 +629,16 @@ The canonical repository document split is:
   contract; historical `phase3` naming remains a separate atomic migration concern.
 - Status: Implemented and confirmed by focused lifecycle-migration tests (`14 passed`), full
   acceptance validation, and the clean committed slice recorded in the active ExecPlan.
+
+### Evidence snapshot projection boundary
+
+- Location: `src/foliaseal/presentation/qt/evidence_snapshot_projection.py`
+- Responsibility: Convert untrusted preview/signed evidence mappings into immutable semantic views consumed by the harness and report renderer.
+- Owns: `RenderCaptureView`, `LayoutView`, `ReservationView`, `VisibleAppearanceView`, `SnapshotView`, `project_snapshot()`, and `project_visible_appearance()` plus the compatibility helper functions retained at the evidence edge.
+- Projection policy: Nested modern fields take precedence over legacy direct fields (`render_capture.edge_distances_px`, `layout_plan.*`, and `stamp_art_enabled`); nested `signature_appearance` values win over absent direct fallbacks. Numeric values reject booleans, and missing or malformed values normalize to the established `None`, `0`, empty-list, `"none"`, and `"not captured"` representations without raising.
+- Dependency firewall: stdlib-only imports (`Mapping`, dataclasses, and mapping proxies); no Qt, Pillow, PyHanko, filesystem, harness, or reporting imports. The views are frozen and mapping-backed values are copied/protected from caller mutation.
+- Responsibility split: `phase3_harness.py` and snapshotter adapters acquire Qt/PDF/render evidence and build raw JSON payloads; `phase3_harness_reporting.py` owns JSON/checklist Markdown rendering. Both consume this projection rather than duplicating schema-precedence or normalization logic.
+- Status: Confirmed by projection, harness, and reporting tests; full suite currently passes with one pre-existing Pillow warning.
 
 ### Phase 3 interactive capture boundary
 

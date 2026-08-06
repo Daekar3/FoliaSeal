@@ -70,6 +70,63 @@ from foliaseal.presentation.qt.evidence_runner_providers import (
     PreviewMatrixEvidenceProviders,
     SignedAcceptanceEvidenceProviders,
 )
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_layout_scaling as _project_layout_scaling,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_layout_template as _project_layout_template,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_preview_edge_distance as _project_preview_edge_distance,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_request_field_count as _project_request_field_count,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_reservation_margin_bottom as _project_reservation_margin_bottom,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_reservation_stamp_background as _project_reservation_stamp_background,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_reservation_text_length as _project_reservation_text_length,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_show_field_names as _project_show_field_names,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_sign_request_appearance as _project_sign_request_appearance,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_stamp_position as _project_stamp_position,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_annotation_rect as _project_visible_annotation_rect,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_bbox as _project_visible_bbox,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_error as _project_visible_error,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_field_name as _project_visible_field_name,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_has_text as _project_visible_has_text,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_image_xobjects as _project_visible_xobjects,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_stream_length as _project_visible_stream_length,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_text_fragments as _project_visible_fragments,
+)
+from foliaseal.presentation.qt.evidence_snapshot_projection import (
+    snapshot_visible_appearance_text_fragments_summary as _project_visible_fragments_summary,
+)
 from foliaseal.presentation.qt.phase3_appearance_snapshotter import (
     Phase3AppearanceSnapshotter,
 )
@@ -1446,15 +1503,7 @@ def _snapshot_preview_card_bounds(snapshot: dict[str, Any] | None) -> dict[str, 
 
 
 def _snapshot_visible_appearance_text_fragments(snapshot: dict[str, Any] | None) -> list[str]:
-    if snapshot is None:
-        return []
-    fragments = snapshot.get("appearance_text_fragments")
-    if isinstance(fragments, list):
-        return [str(item) for item in fragments if isinstance(item, str)]
-    fragments = snapshot.get("text_fragments")
-    if isinstance(fragments, list):
-        return [str(item) for item in fragments if isinstance(item, str)]
-    return []
+    return _project_visible_fragments(snapshot)
 
 
 def _parse_snapshot_rect(snapshot_rect: Any) -> tuple[float, float, float, float] | None:
@@ -1483,16 +1532,8 @@ def _mapping(value: Any) -> dict[str, Any]:
 
 
 def _snapshot_preview_edge_distance(snapshot: dict[str, Any] | None, key: str) -> int | None:
-    if snapshot is None:
-        return None
-    render_capture = snapshot.get("render_capture")
-    if not isinstance(render_capture, dict):
-        return None
-    distances = render_capture.get("edge_distances_px")
-    if not isinstance(distances, dict):
-        return None
-    value = distances.get(key)
-    return value if isinstance(value, int) else None
+    value = _project_preview_edge_distance(snapshot, key)
+    return None if value is None else int(value)
 
 
 def _snapshot_bool_text(snapshot: dict[str, Any] | None, key: str) -> str:
@@ -1673,12 +1714,8 @@ def _snapshot_issue(issue) -> dict[str, Any]:
 def _snapshot_sign_request_appearance(
     snapshot: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    if snapshot is None:
-        return None
-    appearance = snapshot.get("signature_appearance")
-    if not isinstance(appearance, dict):
-        return None
-    return appearance
+    projected = _project_sign_request_appearance(snapshot)
+    return None if projected is None else dict(projected)
 
 
 def _snapshot_request_origin(capture: Phase3HarnessCapture) -> str:
@@ -1690,59 +1727,27 @@ def _snapshot_request_origin(capture: Phase3HarnessCapture) -> str:
 
 
 def _snapshot_layout_template(snapshot: dict[str, Any] | None) -> str | None:
-    if snapshot is None:
-        return None
-    direct_template = snapshot.get("layout_template")
-    if isinstance(direct_template, str):
-        return direct_template
-    appearance = _snapshot_sign_request_appearance(snapshot)
-    if appearance is None:
-        return None
-    layout_template = appearance.get("layout_template")
-    return layout_template if isinstance(layout_template, str) else None
+    return _project_layout_template(snapshot)
 
 
 def _snapshot_stamp_position(snapshot: dict[str, Any] | None) -> str | None:
-    if snapshot is None:
-        return None
-    direct_position = snapshot.get("stamp_position")
-    if isinstance(direct_position, str):
-        return direct_position
-    appearance = _snapshot_sign_request_appearance(snapshot)
-    if appearance is None:
-        return None
-    stamp_position = appearance.get("stamp_position")
-    return stamp_position if isinstance(stamp_position, str) else None
+    return _project_stamp_position(snapshot)
 
 
 def _snapshot_show_field_names(snapshot: dict[str, Any] | None) -> bool:
-    appearance = _snapshot_sign_request_appearance(snapshot)
-    if appearance is None:
-        return False
-    return bool(appearance.get("show_field_names"))
+    return _project_show_field_names(snapshot)
 
 
 def _snapshot_request_field_count(snapshot: dict[str, Any] | None) -> int:
-    appearance = _snapshot_sign_request_appearance(snapshot)
-    if appearance is None:
-        return 0
-    fields = appearance.get("fields")
-    if not isinstance(fields, list):
-        return 0
-    return len(fields)
+    return _project_request_field_count(snapshot)
 
 
 def _snapshot_reservation_text_length(snapshot: dict[str, Any] | None) -> int:
-    if snapshot is None:
-        return 0
-    stamp_text = snapshot.get("stamp_text")
-    return len(stamp_text) if isinstance(stamp_text, str) else 0
+    return _project_reservation_text_length(snapshot)
 
 
 def _snapshot_reservation_stamp_background(snapshot: dict[str, Any] | None) -> bool:
-    if snapshot is None:
-        return False
-    return bool(snapshot.get("stamp_background_present"))
+    return _project_reservation_stamp_background(snapshot)
 
 
 def _snapshot_reservation_stamp_background_text(snapshot: dict[str, Any] | None) -> str:
@@ -1750,26 +1755,12 @@ def _snapshot_reservation_stamp_background_text(snapshot: dict[str, Any] | None)
 
 
 def _snapshot_layout_scaling(snapshot: dict[str, Any] | None, key: str) -> str | None:
-    if snapshot is None:
-        return None
-    layout = snapshot.get(f"{key}_layout")
-    if not isinstance(layout, dict):
-        return None
-    scaling = layout.get("inner_content_scaling")
-    return scaling if isinstance(scaling, str) else None
+    return _project_layout_scaling(snapshot, key)
 
 
 def _snapshot_reservation_margin_bottom(snapshot: dict[str, Any] | None) -> int | None:
-    if snapshot is None:
-        return None
-    layout = snapshot.get("content_layout")
-    if not isinstance(layout, dict):
-        return None
-    margins = layout.get("margins")
-    if not isinstance(margins, dict):
-        return None
-    bottom = margins.get("bottom")
-    return int(bottom) if isinstance(bottom, int) else None
+    value = _project_reservation_margin_bottom(snapshot)
+    return None if value is None else int(value)
 
 
 def _snapshot_preview_show_field_names(snapshot: dict[str, Any] | None) -> bool:
@@ -1786,81 +1777,32 @@ def _snapshot_preview_stamp_position(snapshot: dict[str, Any] | None) -> str | N
 
 
 def _snapshot_visible_appearance_field_name(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    value = snapshot.get("field_name")
-    return str(value) if value is not None else "not captured"
+    return _project_visible_field_name(snapshot)
 
 
 def _snapshot_visible_appearance_annotation_rect(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    value = snapshot.get("annotation_rect")
-    return str(value) if value is not None else "not captured"
+    return _project_visible_annotation_rect(snapshot)
 
 
 def _snapshot_visible_appearance_bbox(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    value = snapshot.get("appearance_bbox")
-    return str(value) if value is not None else "not captured"
+    return _project_visible_bbox(snapshot)
 
 
 def _snapshot_visible_appearance_stream_length(snapshot: dict[str, Any] | None) -> int:
-    if snapshot is None:
-        return 0
-    value = snapshot.get("appearance_stream_length")
-    return int(value) if isinstance(value, int) else 0
+    return _project_visible_stream_length(snapshot)
 
 
 def _snapshot_visible_appearance_has_text(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    value = snapshot.get("visible_text_present", snapshot.get("appearance_has_visible_text"))
-    if isinstance(value, bool):
-        return "yes" if value else "no"
-    return "not captured"
+    return _project_visible_has_text(snapshot)
 
 
 def _snapshot_visible_appearance_text_fragments_summary(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    fragments = snapshot.get("text_fragments", snapshot.get("appearance_text_fragments"))
-    if not isinstance(fragments, list):
-        return "not captured"
-    if not fragments:
-        return "[]"
-    preview = ", ".join(repr(fragment) for fragment in fragments[:6])
-    if len(fragments) > 6:
-        return f"[{preview}, ...]"
-    return f"[{preview}]"
+    return _project_visible_fragments_summary(snapshot)
 
 
 def _snapshot_visible_appearance_image_xobjects(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    xobjects = snapshot.get("image_xobjects", snapshot.get("appearance_xobjects"))
-    if not isinstance(xobjects, list):
-        return "not captured"
-    if not xobjects:
-        return "[]"
-    entries: list[str] = []
-    for item in xobjects[:6]:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        subtype = item.get("subtype")
-        width = item.get("width")
-        height = item.get("height")
-        size = f" {width}x{height}" if width is not None and height is not None else ""
-        entries.append(f"{name}:{subtype}{size}")
-    if len(xobjects) > 6:
-        return f"[{', '.join(entries)}, ...]"
-    return f"[{', '.join(entries)}]"
+    return _project_visible_xobjects(snapshot)
 
 
 def _snapshot_visible_appearance_error(snapshot: dict[str, Any] | None) -> str:
-    if snapshot is None:
-        return "not captured"
-    value = snapshot.get("error")
-    return str(value) if value is not None else "none"
+    return _project_visible_error(snapshot)
