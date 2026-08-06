@@ -140,6 +140,9 @@ created.
   source-of-truth boundary is the next qualifying candidate at approximately `69.0` priority.
 - [x] Implemented Design C for the reusable catalog boundary; focused validation, full validation,
   offscreen evidence, and cleanup pass, with docs/commit/rescan still pending.
+- [x] Accepted the reusable catalog boundary at `b3276a78b` and completed Scan Round 46; the next
+  candidate is threading canonical `ReusableSigningObjects` through the Qt workspace graph at about
+  `64` priority.
 
 ## Scan and Candidate Ledger
 
@@ -2174,7 +2177,7 @@ explicit retirement condition and must reject contradictory canonical-plus-legac
 is used because combining B's generic query surface with C would add API without improving the
 dominant workflow by five points.
 
-### Implementation 45 — validation complete, closure pending — 2026-08-06
+### Implementation 45 — accepted and rescanned — 2026-08-06
 
 The selected indexed-snapshot/atomic-command boundary is implemented in
 `src/foliaseal/application/reusable_signing_objects.py`. `ReusableSigningObjects` now owns an
@@ -2196,8 +2199,30 @@ reusable/coordinator boundary tests; current production references are `5` legac
 adapter occurrences and boundary coverage is `43`. Conservative component measurements are
 navigation `.58`, change amplification `.57`, seam reduction `.62`, boundary-test improvement `.68`,
 interface compression `.56`, cohesion `.61`, and isolation `.72`, for weighted Actual Improvement
-approximately `.62` versus predicted `.55`; no component regressed beyond `-.10`. Documentation,
-intentional commit, and three-explorer post-commit rescan remain closure gates.
+approximately `.62` versus predicted `.55`; no component regressed beyond `-.10`. The implementation
+is committed as `b3276a78b` (`Deepen reusable catalog source of truth`) with a clean worktree.
+
+### Scan Round 46 — completed after commit `b3276a78b`
+
+Three independent explorers reviewed the clean committed checkout. They confirmed that
+`ReusableSigningObjects` owns the snapshot/index/compose boundary, the coordinator has no live
+catalog/private-repository/path reads, `docs/SPEC.md` is unchanged, phase3 contracts are untouched,
+and no product process or generated acceptance summary remains.
+
+The strongest remaining bounded candidate is
+`qt-reusable-catalog-service-threading`: `FoliaSealAppFrame` already constructs one canonical
+`ReusableSigningObjects` for the reusable-object library, but `SigningWorkspaceBootstrap`, shell,
+composition, panel, and phase3 harness callers still forward `preset_catalog`/`preset_catalog_store`
+and the coordinator rebuilds a second service. Two explorers independently scored this cluster at
+approximately Priority `61–65` (consolidated estimate `64`, confidence about `.94`), with the
+dependency category local-substitutable/in-process. It removes production compatibility kwargs and
+turns the canonical service into one graph-wide source without changing persisted profiles or phase3
+contracts.
+
+Secondary findings are a certificate catalog/store mismatch invariant (selector snapshot can diverge
+from material resolution), placement-profile/current-page semantics that deserve an explicit GUI
+contract, and the larger phase3 nomenclature migration. The phase3 migration remains atomic and
+contract-blocked; it is not mixed into the next child.
 
 ## Context and Orientation
 

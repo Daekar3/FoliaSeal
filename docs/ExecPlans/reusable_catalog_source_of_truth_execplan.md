@@ -54,8 +54,13 @@ instance.
   SPEC diff, and process audit pass.
 - [x] (2026-08-06) Offscreen evidence passes signed acceptance `10/7`, preview parity `18/18`, and
   fit rejection `3/3`; the generated summary was removed and no product process remains.
-- [ ] Reconcile final measurements/docs, commit the complete slice, run three fresh post-commit
-  explorers, and record the next ranked candidate in the parent plan.
+- [x] (2026-08-06) Reconciled measurements and architecture/parent/child docs; implementation commit
+  `b3276a78b` (`Deepen reusable catalog source of truth`) is clean.
+- [x] (2026-08-06) Ran three fresh post-commit explorers. They confirmed the slice is behaviorally
+  closed and phase3-safe. The next candidate is threading the canonical `ReusableSigningObjects`
+  through the Qt workspace graph and retiring production legacy catalog kwargs (approximately
+  priority `64`, confidence about `.94`); certificate-source invariant and placement-profile
+  semantics remain separately ranked follow-ups.
 
 ## Surprises & Discoveries
 
@@ -105,7 +110,7 @@ instance.
 
 ## Outcomes & Retrospective
 
-The implementation is complete pending commit and post-commit rescan. It removed coordinator
+The implementation is complete and committed as `b3276a78b`. It removed coordinator
 catalog/private-repository references from `16` baseline occurrences to `5` compatibility-constructor
 occurrences, moved XDG/home path policy out of the coordinator, and grew the reusable/coordinator
 focused boundary from `38` baseline tests to `43`. The full suite is `1141` passed with one
@@ -113,7 +118,8 @@ pre-existing Pillow warning. Conservative component measurements are navigation 
 amplification `.57`, seam reduction `.62`, boundary-test improvement `.68`, interface compression
 `.56`, cohesion `.61`, and isolation `.72`, for weighted Actual Improvement approximately `.62`
 versus predicted `.55`; no component regressed beyond `-.10`. The remaining compatibility arguments
-are one-way adapters with explicit removal criteria; no phase3 contract changed.
+are one-way adapters with explicit removal criteria; they remain in the Qt graph until the next
+canonical-service threading slice. No phase3 contract changed.
 
 ## Context and Orientation
 
