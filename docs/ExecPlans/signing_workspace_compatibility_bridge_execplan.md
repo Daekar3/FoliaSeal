@@ -116,7 +116,7 @@ tests and the documented transitional fallbacks) and 20 broader `compat_surface`
 back-reference; the installer is idempotent and owns dynamic assignments. Interactive and signed
 acceptance production paths create one typed bundle and reuse it through the harness seam, including
 scenario mutation and capture.
-Measured validation is `1,142 passed, 1 warning`, Ruff clean, compileall clean, and diff-check clean.
+Measured validation is `1,143 passed, 1 warning`, Ruff clean, compileall clean, and diff-check clean.
 The provisional component proxies are navigation `.55`, change amplification `.72`, seam reduction
 `.78`, boundary-test improvement `.76`, interface compression `.66`, cohesion `.68`, and isolation
 `.82`, for Actual Improvement approximately `.70`; no observed component regressed beyond `.10`.
