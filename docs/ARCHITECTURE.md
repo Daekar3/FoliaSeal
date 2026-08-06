@@ -670,14 +670,20 @@ The canonical repository document split is:
 - Responsibility: Keep Qt and headless preview artifact construction cohesive while allowing the
   composition root to substitute widget, analysis, overlay, and cleanup collaborators.
 - Owns: `PreviewRenderEvidenceDependencies`, `QtPreviewRenderEvidenceAdapter`,
-  `HeadlessPreviewRenderEvidenceAdapter`, and the Qt/headless render-capture payload projections.
+  `HeadlessPreviewRenderEvidenceAdapter`, and environment-specific image/geometry acquisition.
+- Shared projection: `preview_render_evidence_projection.py` owns the frozen
+  `PreviewEvidenceFrame`, existing `PreviewAnalysisRequest` construction, diagnostic grouping,
+  debug-overlay mapping, appearance-snapshot fallback, and stable JSON-ready payload assembly used
+  by both adapters.
 - Does not own: workspace refresh, event pumping, signing, lifecycle, matrix iteration, or public
   CLI/JSON/artifact policy.
 - Key collaborators: `phase3_harness.py` dependency wiring, `phase3_harness_workspace.py` typed
-  capture requests, `phase3_preview_render_capture.py`, and `preview_analysis.py`.
+  capture requests, `phase3_preview_render_capture.py`, `preview_analysis.py`, and
+  `preview_render_evidence_projection.py`.
 - Known constraints: The dependency bundle is intentionally one focused seam rather than a family of
-  speculative rasterizer/artifact protocols; public phase3 names and mappings remain frozen for the
-  atomic nomenclature plan.
+  speculative rasterizer/artifact protocols; adapters retain canonical rendering and temp cleanup,
+  while the projection module imports no Qt/Pillow/pyHanko. Public phase3 names and mappings remain
+  frozen for the atomic nomenclature plan.
 - Status: Confirmed by adapter boundary tests, existing widget/capture tests, full suite, and
   offscreen acceptance matrices.
 
@@ -1345,6 +1351,7 @@ Default local validation from README:
 | 2026-08-06 | Extracted shared Phase 3 scenario policy. | `phase3_harness_scenario_policy.py` now owns profile and appearance override composition while live/headless workspace adapters retain target-specific effects and event ordering; historical phase3 external contracts remain unchanged. |
 | 2026-08-06 | Isolated Phase 3 harness event processing. | `phase3_harness_event_pump.py` now owns late QApplication discovery and `processEvents()` delegation behind a fakeable port; workspace refresh/pump/render ordering and headless no-op behavior remain unchanged. |
 | 2026-08-06 | Isolated Phase 3 preview-render evidence adapters. | `preview_render_evidence_adapters.py` now owns live/headless artifact mapping, canonical-preview analysis projection, debug-overlay coordination, and cleanup behind an explicit dependency bundle; `phase3_harness.py` retains only composition wiring and public contracts remain unchanged. |
+| 2026-08-06 | Centralized preview-render evidence finalization. | `preview_render_evidence_projection.py` now owns one frozen frame-to-analysis/projection policy reused by Qt and headless adapters; acquisition, canonical rendering, and temp cleanup remain environment-specific and all phase3 contracts remain unchanged. |
 | 2026-08-06 | Added the signing-workspace setup port and extracted the contextual refinement dialog. | Shell action confirmation now reads typed setup state instead of the panel's private session; modal profile/preset persistence is owned by a focused Qt adapter, while the coordinated `phase3` nomenclature retirement remains a separate atomic migration. |
 | 2026-08-05 | Reconciled the typed signing-workspace bundle/session/view seam and lifecycle ownership. | `SigningWorkspaceBundle` now documents separate maintenance, primary-workflow session, testing, and opaque lifecycle-view capabilities; `SigningWorkspaceHost`/`SigningWorkspaceLifecycle` remain the active-handle and compose→mount→dispose owners, while the legacy compatibility surface is explicitly Qt-local. The phase3 nomenclature retirement remains a follow-up plan because current CLI/DTO/artifact names are still external contracts. |
 | 2026-08-04 | Neutralized private evidence-harness composition names and removed the unused checklist helper plus signed-executor fallback. | Current Qt composition wiring now uses evidence terminology and the typed `run_result()` path; public `Phase3*` evidence/CLI contracts and historical records remain unchanged. |

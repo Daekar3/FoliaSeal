@@ -985,6 +985,74 @@ compression `0.35`, cohesion `0.40`, and behavioral-uncertainty reduction `0.35`
 scan is required after commit; a true title-band DTO remains deferred unless new live artifacts prove
 aggregate metrics cannot represent the GUI contract.
 
+### Post-cap continuation scan 10 — completed after `c62b5d1c4`
+
+Three independent explorers reviewed the clean backend-layout checkout. The strongest bounded
+architecture candidate is the duplicated preview-evidence finalization in
+`src/foliaseal/presentation/qt/preview_render_evidence_adapters.py` (668 lines). The Qt and headless
+capture paths independently repeat analysis-result extraction, diagnostic grouping, appearance
+snapshot fallback, debug-overlay projection, and the JSON-ready mapping. Both paths receive the same
+22-callable dependency bundle, so a rendering or evidence-contract change currently requires two
+parallel edits and parity reasoning. Independent priorities were approximately `74`, `75`, and
+`68` with confidence at least `0.86`; the consolidated candidate is above the fixed continuation
+threshold and is locally substitutable through existing fake dependencies and headless capture
+tests.
+
+The broader signing backend adapter concentration scored approximately `78` in one scan but is
+larger and mixes vendor materialization, fit policy, and evidence serialization; the signing-time
+snapshot/WYSIWYG candidate scored approximately `72–78` but requires an additive public request
+contract decision. Private evidence-runner factory access scored approximately `68–72`. The
+phase3 nomenclature migration remains a coordinated external-contract plan and is not a safe
+rename-only slice: public CLI, DTO, JSON, fixture, and artifact labels remain frozen until an
+atomic migration is explicitly executed.
+
+Selected next candidate: `preview-render-evidence-finalization-boundary`. The design round must
+compare a minimal shared assembler, a flexible typed observation/assembler port, and a common-caller
+optimized shape, then select a one-slice design (including a constrained hybrid only if it beats its
+best base by the required five points). The child must preserve every render-capture mapping key,
+artifact suffix, diagnostic/error value, cleanup behavior, and existing `phase3` external name.
+
+### Post-cap continuation design selection 10 — completed 2026-08-06
+
+Three independent designs were reviewed for the duplicate preview-evidence policy:
+
+- Minimal finalizer: a frozen normalized geometry/context record plus one finalization function,
+  retaining analysis-request construction in each adapter. Shape score approximately `86`.
+- Flexible projection/ports: a Qt-free frame, narrow artifact-writer/analysis protocols, and a
+  shared assembler. Shape score approximately `77` after provider-surface and migration penalties.
+- Common-caller service: a target-observation port and service owning rendering, analysis, artifacts,
+  and cleanup. Shape score approximately `89–90`, but it would move canonical rendering and cleanup
+  into a new generic service and enlarge the one-slice behavior change.
+
+Selected constrained A+B hybrid: retain the existing environment adapters for acquisition and
+cleanup, add one frozen `PreviewEvidenceFrame`, and centralize request construction plus diagnostic,
+appearance, overlay, and JSON mapping policy in `preview_render_evidence_projection.py`. The
+rescored shape is `91.5`, 5.5 points above the minimal base, with no new hard-gate risk. This keeps
+the `PreviewRenderCapturePort`, workspace callers, CLI/JSON/artifact contracts, and phase3 names
+unchanged while providing a Qt-free boundary test seam.
+
+### Post-cap continuation slice 10 — accepted 2026-08-06
+
+Child `docs/ExecPlans/preview_render_evidence_finalization_boundary_execplan.md` is implemented.
+The two large Qt/headless finalization bodies now share `PreviewEvidenceFrame`,
+`build_preview_analysis_request()`, and `assemble_preview_evidence()`. Qt/headless adapters retain
+only widget/canonical acquisition, target-specific geometry, and the cleanup of snapshots they
+created; no second renderer or lifecycle service was introduced. The stale preview-capture plan and
+architecture map now describe the actual ownership, and the atomic phase3 nomenclature plan records
+the new durable projection module without attempting a piecemeal rename.
+
+Evidence: focused adapter/harness/workspace tests `94 passed`, `1 skipped`; full suite `1,060 passed`,
+`11 skipped`, one pre-existing Pillow warning; Ruff, diff checks, application/projection import
+isolation, and CLI help passed. Offscreen signed acceptance evidence passed `10` scenarios with `7`
+successful signings and `3` matched intentional rejections, signed preview parity `18/18`, and fit
+rejection `3/3`, with zero cryptographic, annotation, preview-comparison, or expectation failures.
+The explicit evidence roots were removed and the process audit was clean.
+
+Proxy measurement: navigation `0.50`, change amplification `0.50`, seam reduction `0.50`,
+boundary-test improvement `1.00`, interface compression `0.50`, and boundary isolation `1.00`; the
+weighted `Actual Improvement = 0.63` versus predicted `0.40` (`1.56x`), with no component regression
+below `-0.10`. Commit closure is the next required step, followed by a fresh three-explorer scan.
+
 ## Context and Orientation
 
 The repository is a Python/PySide6 Linux desktop PDF signing application. `src/foliaseal/application`

@@ -122,4 +122,5 @@ the Qt preview in this slice.
   reduction `0.40`, boundary testability `0.40`, interface compression `0.35`, cohesion `0.40`, and
   behavioral-uncertainty reduction `0.35`; `Actual Improvement = 0.36` versus predicted `0.34`, with
   no component regression below `-0.10`.
-- [ ] Committed on `main`; fresh three-explorer rescan started.
+- [x] (2026-08-06) Committed on `main` as `c62b5d1c4`; the fresh three-explorer rescan is recorded
+  in the parent ledger and this child is closed.

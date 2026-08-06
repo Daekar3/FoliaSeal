@@ -35,9 +35,10 @@ the same artifact names, summary keys, diagnostics, and zero error rows.
 - [x] (2026-08-05) Migrated both workspace dependency bundles and production harness composition to
   one typed `.capture()` call. The existing environment-specific payload builders remain the
   adapter callbacks for this bounded slice; no duplicate lifecycle or mapping projection was added.
-- [x] Keep the existing environment-specific callback bodies in the composition root for this
-  bounded slice; the typed adapter objects are the accepted boundary and the large-body extraction
-  is explicitly a separately ranked follow-on, not unfinished work in this plan.
+- [x] The original typed boundary slice kept the environment-specific callback bodies together in
+  `phase3_harness.py`; the subsequent accepted adapter extraction moved those bodies to
+  `preview_render_evidence_adapters.py`. Shared analysis/finalization policy is now centralized by
+  `preview_render_evidence_projection.py`; no callback body remains in the composition root.
 - [x] Add boundary forwarding/projection coverage and run focused/full validation plus both release
   matrices. Existing harness/workspace parity tests remain the behavioral parity suite because the
   callback bodies and artifact contract are intentionally unchanged.
@@ -83,12 +84,13 @@ the same artifact names, summary keys, diagnostics, and zero error rows.
 
 ## Outcomes & Retrospective
 
-Implementation and validation completed on 2026-08-05. The accepted slice introduces one typed
-`PreviewRenderCapturePort` request/result seam, keeps Qt and headless adapters separate, and routes
-both workspace snapshot paths through exactly one `.capture()` call. The existing callback bodies
-remain in `phase3_harness.py` by deliberate scope decision: moving the artifact-heavy bodies would
-be a larger parity-sensitive slice, so the fresh architecture scan will rank that residual rather
-than silently treating it as completed extraction.
+Implementation and validation completed on 2026-08-05, with the artifact-body move and shared
+finalization completed by the follow-on adapter/projection slices. The accepted typed
+`PreviewRenderCapturePort` request/result seam keeps Qt and headless adapters separate and routes
+both workspace snapshot paths through exactly one `.capture()` call. The concrete acquisition
+bodies now live in `preview_render_evidence_adapters.py`, and their duplicated analysis/mapping tail
+is owned by `preview_render_evidence_projection.py`; `phase3_harness.py` retains composition wiring
+and compatibility wrappers only.
 
 Evidence:
 

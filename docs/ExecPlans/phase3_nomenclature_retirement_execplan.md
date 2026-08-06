@@ -113,6 +113,10 @@ an unbounded compatibility layer.
   `PreviewRenderCapture*` types intentionally retain the historical prefix for now; they must be
   renamed together with the harness/workspace modules during the atomic migration, not via a
   piecemeal compatibility alias.
+- [x] (2026-08-06) Added `presentation/qt/preview_render_evidence_projection.py` to the inventory
+  as a neutral internal evidence module. Its durable `PreviewEvidenceFrame` and projection names
+  do not carry `phase3`; the neighboring `phase3_preview_render_capture.py` request/port names
+  remain contract-coupled and are still scheduled for the atomic migration.
 - [x] Inventory and replacement mapping recorded on 2026-08-06 (32 source files, 30 test/fixture
   files, 3 scripts, README, and 162 documentation files before excluding this plan).
 - [ ] Atomic rename/migration implemented.
