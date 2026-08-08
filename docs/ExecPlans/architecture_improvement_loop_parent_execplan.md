@@ -2904,7 +2904,7 @@ filesystem-backed repository is composed; the production target grep is empty. T
 fixture corpus is isolated behind a test-only helper in `tests/support/signing_builders.py`, with
 direct production identity and fail-fast tests proving the new boundary.
 
-Focused validation passed `216` tests; full validation passed `1,166` tests with the one pre-existing
+Focused validation passed `217` tests; full validation passed `1,167` tests with the one pre-existing
 Pillow warning. Ruff, compileall, diff checks, and frozen-SPEC checks passed. The offscreen signed
 acceptance evidence command passed `10` scenarios/`7` successful signings, preview parity `18/18`,
 and fit rejection `3/3`; its generated outputs were removed and the process audit is empty. Two

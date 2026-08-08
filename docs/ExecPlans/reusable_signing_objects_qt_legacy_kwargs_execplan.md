@@ -54,7 +54,7 @@ evidence afterward.
 - [x] (2026-08-08) Added direct production identity/fail-fast assertions and centralized the
   test-only fixture normalizer in `tests/support/signing_builders.py`; no unit test imports another
   unit test for the adapter.
-- [x] (2026-08-08) Focused suite passed (`216`), full suite passed (`1166`, one pre-existing
+- [x] (2026-08-08) Focused suite passed (`217`), full suite passed (`1167`, one pre-existing
   Pillow warning), Ruff/compileall/diff/SPEC checks passed, and the offscreen acceptance command
   passed with `10` scenarios/`7` successful signings, preview parity `18/18`, and fit rejection
   `3/3`. The command-generated acceptance directory and summary were removed; unrelated pre-existing
@@ -286,7 +286,7 @@ Baseline evidence:
 
 Closure evidence (2026-08-08): target production legacy references `0`; source/test keyword
 occurrences remain only in the explicitly test-only fixture adapter and AppFrame persistence
-composition; full suite `1,166 passed, 1 warning`; offscreen acceptance `10/7`, parity `18/18`,
+composition; full suite `1,167 passed, 1 warning`; focused seam suite `217 passed`; offscreen acceptance `10/7`, parity `18/18`,
 fit rejection `3/3`; generated acceptance outputs removed; no FoliaSeal/pytest/Qt process remains.
 
 ## Interfaces and Dependencies
