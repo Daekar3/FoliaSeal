@@ -31,10 +31,7 @@ from foliaseal.presentation.qt.phase3_preview_render_capture import (
     PreviewRenderCaptureRequest,
     QtPreviewRenderCaptureAdapter,
 )
-from foliaseal.presentation.qt.signing_shell_port import (
-    SigningWorkspaceBundle,
-    build_qt_signing_workspace_bundle,
-)
+from foliaseal.presentation.qt.signing_shell_port import SigningWorkspaceBundle
 
 
 @dataclass(frozen=True)
@@ -207,15 +204,10 @@ class QtPhase3HarnessWorkspaceAdapter:
     def __init__(
         self,
         *,
-        workspace: SigningWorkspaceBundle | None = None,
-        shell: Any | None = None,
+        workspace: SigningWorkspaceBundle,
         profile_store: Any,
         deps: QtPhase3HarnessWorkspaceDeps | None = None,
     ) -> None:
-        if workspace is None:
-            if shell is None:
-                raise TypeError("A typed workspace bundle is required.")
-            workspace = build_qt_signing_workspace_bundle(shell)
         self._workspace = workspace
         self._deps = deps or QtPhase3HarnessWorkspaceDeps(
             capture_preview_render=QtPreviewRenderCaptureAdapter(
@@ -250,12 +242,7 @@ class QtPhase3HarnessWorkspaceAdapter:
         self._event_pump.process_events()
 
     def refresh_viewer(self) -> None:
-        try:
-            self._workspace.session.refresh_viewer()
-        except AttributeError:
-            if self._workspace.testing is None:
-                raise TypeError("Qt signing shells must expose 'testing_adapter'.")
-            self._workspace.testing.refresh_viewer()
+        self._workspace.session.refresh_viewer()
 
     def capture_snapshot(
         self, command: Phase3HarnessCaptureCommand
@@ -316,8 +303,7 @@ class QtPhase3HarnessWorkspaceAdapter:
 
 def capture_qt_preview_render(
     *,
-    workspace: SigningWorkspaceBundle | None = None,
-    shell: Any | None = None,
+    workspace: SigningWorkspaceBundle,
     preview: Any,
     artifacts_dir: str | None,
     artifact_basename: str,
@@ -325,10 +311,6 @@ def capture_qt_preview_render(
 ) -> dict[str, Any]:
     """Capture the live Qt preview by reading shell anatomy only inside the workspace seam."""
 
-    if workspace is None:
-        if shell is None:
-            raise TypeError("A typed workspace bundle is required.")
-        workspace = build_qt_signing_workspace_bundle(shell)
     testing_surface = workspace.testing
     return testing_surface.panel.capture_preview_render(
         preview=preview,

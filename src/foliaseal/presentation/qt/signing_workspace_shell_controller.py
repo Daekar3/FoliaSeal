@@ -48,12 +48,15 @@ class SigningWorkspaceShellController:
             "interaction_bridge",
             "orchestrator",
             "runtime",
-            "compatibility_surface",
+            "testing_adapter",
             "shell_surface",
             "main_row",
         ):
-            target_name = name if name == "properties_panel" else f"_{name}"
-            setattr(shell, target_name, getattr(composition, name))
+            setattr(shell, f"_{name}", getattr(composition, name))
+        destroyed_signal = getattr(shell, "destroyed", None)
+        destroy_connect = getattr(destroyed_signal, "connect", None)
+        if callable(destroy_connect):
+            destroy_connect(lambda *_args: composition.properties_panel.dispose())
 
     def bootstrap(self) -> None:
         if self._bootstrapped:

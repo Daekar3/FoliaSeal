@@ -37,8 +37,9 @@ actions; its `session` port owns the primary review/place/preview/sign/navigatio
 `testing` port is reserved for diagnostics and harness capture; and its opaque `view` port is used
 only to mount and dispose the workspace. `SigningWorkspaceHost` owns the active handle, while
 `SigningWorkspaceLifecycle` owns compose-before-mount, dispose-after-success replacement and
-idempotent close. The legacy `compat_surface`/`testing_adapter` remains a Qt-local compatibility
-edge for older widget exports and is not a caller-facing service locator.
+idempotent close. `SigningWorkspaceWidget` is the declared Qt facade; its typed testing adapter is
+available only as `SigningWorkspaceBundle.testing`, and no dynamic widget-export compatibility
+surface remains.
 
 The repository still uses `phase3` in established CLI commands, DTOs, JSON fields, fixtures, and
 artifact paths. Those names are treated as external compatibility contracts for now; the bounded
@@ -415,8 +416,7 @@ the previous workspace active; closing is idempotent. The handle is the single
 source for the production `SigningWorkspacePort`, the explicit
 `SigningWorkspaceTestingPort`, and the viewer/signing workflows. The production
 port no longer exposes `widget()`; widget inspection and Phase 3 mutation stay
-behind the intentional `compat_surface`/`testing_adapter` compatibility and
-testing boundary. Stable Phase 3 command names, manifest keys, JSON fields,
+behind the typed testing boundary. Stable Phase 3 command names, manifest keys, JSON fields,
 and artifact paths remain unchanged for automation.
 
 ## Phase 3 acceptance harness
@@ -424,10 +424,10 @@ and artifact paths remain unchanged for automation.
 To make Phase 3 acceptance easier, there is also an interactive signing-shell harness that writes a structured capture and a partially completed FR-3B worksheet for you.
 
 The live shell keeps a small `SigningWorkspacePort` for app-frame operations. Diagnostics and Phase 3
-use the separate `testing_adapter` boundary: it exposes one immutable, Qt-free
+use the separate typed `SigningWorkspaceBundle.testing` boundary: it exposes one immutable, Qt-free
 `SigningWorkspaceSnapshot` containing the current request, placement/appearance, certificate and
-timestamp state, sign readiness, and last signing result. The older `compat_surface` widget exports
-remain transitional compatibility aids; new harness reads should consume the snapshot.
+timestamp state, sign readiness, and last signing result. The older dynamic widget exports were
+deleted; new harness reads consume the snapshot.
 
 Current acceptance note:
 

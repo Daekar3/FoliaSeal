@@ -37,7 +37,6 @@ LoadPreviewMatrixManifest = Callable[[str], dict[str, Any]]
 BuildPhase3SigningExecutor = Callable[..., Any]
 BuildDummyTimestamper = Callable[[], Any]
 LoadPageCount = Callable[..., int]
-BuildQtSigningShell = Callable[..., Any]
 BuildWorkspace = Callable[..., Phase3HarnessWorkspacePort]
 CreateWorkspace = Callable[[SigningWorkspaceBootstrap], SigningWorkspaceBundle]
 ExecuteSignedAcceptanceScenario = Callable[
@@ -60,7 +59,6 @@ class Phase3SignedAcceptanceMatrixRunnerDeps:
     build_phase3_signing_executor: BuildPhase3SigningExecutor
     build_dummy_timestamper: BuildDummyTimestamper
     load_page_count: LoadPageCount
-    build_qt_signing_shell: BuildQtSigningShell
     build_workspace: BuildWorkspace
     execute_signed_acceptance_scenario: ExecuteSignedAcceptanceScenario
     preview_matrix_error_result: PreviewMatrixErrorResult
@@ -70,10 +68,10 @@ class Phase3SignedAcceptanceMatrixRunnerDeps:
     )
     jsonable_capture: JsonableCapture
     render_backend_factory: Callable[[], Any]
+    create_workspace: CreateWorkspace
     profile_store_factory: Callable[[], Any] = SignaturePresetCatalogStore.default
     lifecycle_factory: LifecycleFactory | None = None
     artifact_port_factory: ArtifactPortFactory | None = None
-    create_workspace: CreateWorkspace | None = None
 
 
 @dataclass(frozen=True)
@@ -142,31 +140,20 @@ class Phase3SignedAcceptanceMatrixRunner:
             lifecycle.start(
                 title=f"FoliaSeal Phase 3 Signed Acceptance Matrix - {source_path.name}"
             )
-            workspace_bundle: SigningWorkspaceBundle | None = None
-            if self.deps.create_workspace is not None:
-                workspace_bundle = self.deps.create_workspace(
-                    SigningWorkspaceBootstrap(
-                        viewer_workflow=viewer_workflow,
-                        signing_workflow=signing_workflow,
-                        app_settings=AppSettings.default(),
-                        reusable_objects=reusable_objects,
-                        sign_executor=sign_executor,
-                    )
-                )
-                workspace = self.deps.build_workspace(
-                    workspace=workspace_bundle,
-                    profile_store=profile_store,
-                )
-                shell = workspace_bundle.view.mount_target()
-            else:
-                shell = self.deps.build_qt_signing_shell(
+            workspace_bundle = self.deps.create_workspace(
+                SigningWorkspaceBootstrap(
                     viewer_workflow=viewer_workflow,
                     signing_workflow=signing_workflow,
+                    app_settings=AppSettings.default(),
                     reusable_objects=reusable_objects,
                     sign_executor=sign_executor,
                 )
-                workspace = self.deps.build_workspace(shell=shell, profile_store=profile_store)
-                workspace_bundle = None
+            )
+            workspace = self.deps.build_workspace(
+                workspace=workspace_bundle,
+                profile_store=profile_store,
+            )
+            shell = workspace_bundle.view.mount_target()
             lifecycle.attach_shell(shell)
             workspace.refresh_viewer()
             lifecycle.process_events()
@@ -175,7 +162,6 @@ class Phase3SignedAcceptanceMatrixRunner:
             for scenario in scenarios:
                 try:
                     scenario_result = self.deps.execute_signed_acceptance_scenario(
-                        shell=shell,
                         workspace=workspace_bundle,
                         scenario=scenario,
                         profile_store=profile_store,

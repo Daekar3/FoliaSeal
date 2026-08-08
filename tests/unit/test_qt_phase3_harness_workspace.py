@@ -28,6 +28,7 @@ from foliaseal.presentation.qt.phase3_preview_render_capture import (
     HeadlessPreviewRenderCaptureAdapter,
     QtPreviewRenderCaptureAdapter,
 )
+from foliaseal.presentation.qt.signing_shell_port import SigningWorkspaceBundle
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
     SigningWorkspaceSnapshot,
 )
@@ -59,6 +60,17 @@ class _FakeProfileStore:
 
     def load_catalog(self):
         return _FakeCatalog(self._appearance)
+
+
+def _bundle(testing):
+    return SigningWorkspaceBundle(
+        maintenance=SimpleNamespace(),
+        session=SimpleNamespace(
+            refresh_viewer=getattr(testing, "refresh_viewer", lambda: None),
+        ),
+        testing=testing,
+        view=SimpleNamespace(mount_target=lambda: object(), dispose=lambda: None),
+    )
 
 
 def _analysis_values(**overrides):
@@ -224,10 +236,8 @@ def test_qt_phase3_harness_workspace_adapter_applies_scenario_and_syncs_viewer()
             self.refresh_sign_button_state()
 
     testing_adapter = _FakeTestingAdapter()
-    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
-
     QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
+        workspace=_bundle(testing_adapter),
         profile_store=profile_store,
     ).apply_scenario(command)
 
@@ -285,31 +295,14 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
         def refresh_viewer(self) -> None:
             self.viewer_refreshes += 1
 
-    class _FakeCompat:
-        def __init__(self) -> None:
-            self.used = False
-
-        def signature_appearance(self):
-            self.used = True
-            return build_signature_appearance()
-
     testing_adapter = _FakeTestingAdapter()
 
     def _set_signature_appearance(appearance) -> None:
         testing_adapter.panel.set_signature_appearance_calls.append(appearance)
 
     testing_adapter.panel.set_signature_appearance = _set_signature_appearance
-    shell = type(
-        "_Shell",
-        (),
-        {
-            "testing_adapter": testing_adapter,
-            "compat_surface": _FakeCompat(),
-        },
-    )()
-
     QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
+        workspace=_bundle(testing_adapter),
         profile_store=object(),
     ).apply_scenario(command)
 
@@ -317,7 +310,6 @@ def test_qt_phase3_harness_workspace_adapter_prefers_dedicated_testing_adapter()
     assert testing_adapter.timestamp_required is True
     assert len(testing_adapter.placement_calls) == 1
     assert testing_adapter.viewer_refreshes == 1
-    assert shell.compat_surface.used is False
 
 
 def test_qt_phase3_harness_workspace_adapter_refreshes_viewer_directly() -> None:
@@ -329,32 +321,17 @@ def test_qt_phase3_harness_workspace_adapter_refreshes_viewer_directly() -> None
             self.viewer_refreshes += 1
 
     testing_adapter = _FakeTestingAdapter()
-    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
-
     QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
+        workspace=_bundle(testing_adapter),
         profile_store=object(),
     ).refresh_viewer()
 
     assert testing_adapter.viewer_refreshes == 1
 
 
-def test_qt_phase3_harness_workspace_adapter_rejects_compat_surface_only_shell() -> None:
-    class _FakeCompat:
-        def __init__(self) -> None:
-            self.viewer_refreshes = 0
-
-        def refresh_viewer(self) -> None:
-            self.viewer_refreshes += 1
-
-    compat = _FakeCompat()
-    shell = type("_Shell", (), {"compat_surface": compat})()
-
-    with pytest.raises(
-        TypeError,
-        match="must expose 'testing_adapter'",
-    ):
-        QtPhase3HarnessWorkspaceAdapter(shell=shell, profile_store=object())
+def test_qt_phase3_harness_workspace_adapter_requires_typed_workspace() -> None:
+    with pytest.raises(TypeError):
+        QtPhase3HarnessWorkspaceAdapter(profile_store=object())
 
 
 def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_result() -> None:
@@ -419,7 +396,6 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
             )
 
     testing_adapter = _FakeTestingAdapter()
-    shell = type("_Shell", (), {"testing_adapter": testing_adapter})()
     capture_calls: list[dict[str, object]] = []
 
     def capture_preview_render(**kwargs):
@@ -427,7 +403,7 @@ def test_qt_phase3_harness_workspace_adapter_returns_snapshot_with_request_and_r
         return {"preview_image_path": "artifacts/preview.png"}
 
     adapter = QtPhase3HarnessWorkspaceAdapter(
-        shell=shell,
+        workspace=_bundle(testing_adapter),
         profile_store=object(),
         deps=QtPhase3HarnessWorkspaceDeps(
             capture_preview_render=QtPreviewRenderCaptureAdapter(
@@ -709,7 +685,7 @@ def test_capture_qt_preview_render_preserves_gui_preview_and_bordered_analysis_p
     monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
 
     capture = capture_qt_preview_render(
-        shell=shell,
+        workspace=_bundle(shell.testing_adapter),
         preview=preview,
         artifacts_dir=str(tmp_path),
         artifact_basename="interactive_state_01",
@@ -942,7 +918,7 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
     monkeypatch.setattr(phase3_harness_module, "_write_stamp_debug_overlay", lambda **kwargs: None)
 
     capture_qt_preview_render(
-        shell=shell,
+        workspace=_bundle(shell.testing_adapter),
         preview=preview,
         artifacts_dir=str(tmp_path),
         artifact_basename="interactive_state_01",
@@ -962,14 +938,8 @@ def test_capture_qt_preview_render_uses_analysis_space_bounds_for_raster_detecti
 
 
 def test_qt_phase3_harness_workspace_adapter_rejects_missing_testing_adapter() -> None:
-    with pytest.raises(
-        TypeError,
-        match="must expose 'testing_adapter'",
-    ):
-        QtPhase3HarnessWorkspaceAdapter(
-            shell=type("_Shell", (), {})(),
-            profile_store=object(),
-        )
+    with pytest.raises(TypeError):
+        QtPhase3HarnessWorkspaceAdapter(profile_store=object())
 
 
 def test_headless_phase3_harness_workspace_adapter_applies_same_scenario_fields() -> None:

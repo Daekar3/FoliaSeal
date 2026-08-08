@@ -75,14 +75,13 @@ def _executor(**overrides) -> Phase3SignedAcceptanceScenarioExecutor:
 def test_signed_acceptance_scenario_executor_returns_preview_only_result_without_request(
     tmp_path: Path,
 ) -> None:
-    shell = _FakeShell()
     workspace = _FakeWorkspace()
     executor = _executor(build_workspace=lambda **_kwargs: workspace)
     execute_calls: list[object] = []
     sign_executor = SimpleNamespace(execute=lambda request: execute_calls.append(request))
 
     result = executor.run_result(
-        shell=shell,
+        workspace=object(),
         scenario={"name": "Scenario A", "expected_outcome": "validation_rejection"},
         profile_store=object(),
         artifacts_dir=tmp_path,
@@ -131,7 +130,6 @@ def test_signed_acceptance_scenario_executor_reuses_typed_bundle_for_mutation_an
         ),
     )
     executor.run_result(
-        shell=_FakeShell(),
         workspace=bundle,  # type: ignore[arg-type]
         scenario={"name": "Shared Bundle"},
         profile_store=object(),
@@ -158,7 +156,6 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
         timestamp_required=False,
         signature_rect=build_signature_rect(page_index=2, width_pt=240.0, height_pt=72.0),
     )
-    shell = _FakeShell()
     snapshot_calls: list[dict[str, object]] = []
     sign_requests: list[object] = []
     scenario_output = tmp_path / "scenario-b_signed.pdf"
@@ -197,7 +194,7 @@ def test_signed_acceptance_scenario_executor_rewrites_request_and_merges_output_
     )
 
     result = executor.run_result(
-        shell=shell,
+        workspace=object(),
         scenario={
             "name": "Scenario B",
             "profile_name": "Default",
@@ -251,7 +248,7 @@ def test_signed_acceptance_scenario_executor_exposes_typed_result_without_changi
     tmp_path: Path,
 ) -> None:
     result = _executor().run_result(
-        shell=_FakeShell(),
+        workspace=object(),
         scenario={"name": "Scenario A", "expected_outcome": "validation_rejection"},
         profile_store=object(),
         artifacts_dir=tmp_path,

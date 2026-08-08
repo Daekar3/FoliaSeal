@@ -59,7 +59,6 @@ def _fake_providers() -> EvidenceRunnerProviders:
             build_phase3_signing_executor=callback,
             build_dummy_timestamper=callback,
             load_page_count=callback,
-            build_qt_signing_shell=callback,
             build_workspace=callback,
             execute_signed_acceptance_scenario=callback,
             preview_matrix_error_result=callback,
@@ -68,6 +67,7 @@ def _fake_providers() -> EvidenceRunnerProviders:
             jsonable_capture=callback,
             render_backend_factory=callback,
             profile_store_factory=callback,
+            create_workspace=callback,
         ),
     )
 

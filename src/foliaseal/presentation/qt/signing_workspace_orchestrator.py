@@ -20,9 +20,6 @@ from foliaseal.presentation.qt.signing_workspace_review_bridge import (
 )
 
 if TYPE_CHECKING:
-    from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
-        SigningWorkspaceCompatibilitySurface,
-    )
     from foliaseal.presentation.qt.signing_workspace_shell_surface import (
         SigningWorkspaceShellSurface,
     )
@@ -35,7 +32,6 @@ class SigningWorkspaceOrchestrator:
         self,
         *,
         interaction_bridge: SigningWorkspaceInteractionBridge,
-        compatibility_surface: SigningWorkspaceCompatibilitySurface,
         shell_surface: SigningWorkspaceShellSurface,
         review_bridge: SigningWorkspaceReviewBridge,
         document_review_workspace: DocumentReviewWorkspaceSession,
@@ -43,7 +39,6 @@ class SigningWorkspaceOrchestrator:
         refresh_viewer: Callable[[], None],
     ) -> None:
         self._interaction_bridge = interaction_bridge
-        self._compatibility_surface = compatibility_surface
         self._shell_surface = shell_surface
         self._review_bridge = review_bridge
         self._document_review_workspace = document_review_workspace
@@ -51,7 +46,6 @@ class SigningWorkspaceOrchestrator:
         self._refresh_viewer = refresh_viewer
 
     def bootstrap(self) -> None:
-        self._compatibility_surface.install_widget_exports()
         self._refresh_viewer()
         self._review_bridge.apply_state(self._document_review_workspace.load())
         self._action_bridge.reload_state()

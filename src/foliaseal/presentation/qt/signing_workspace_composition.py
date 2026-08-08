@@ -49,9 +49,6 @@ from foliaseal.presentation.qt.signing_action_coordinator import (
 from foliaseal.presentation.qt.signing_workspace_action_bridge import (
     SigningWorkspaceActionBridge,
 )
-from foliaseal.presentation.qt.signing_workspace_compatibility_surface import (
-    SigningWorkspaceCompatibilitySurface,
-)
 from foliaseal.presentation.qt.signing_workspace_interaction_bridge import (
     SigningWorkspaceInteractionBridge,
 )
@@ -75,6 +72,9 @@ from foliaseal.presentation.qt.signing_workspace_shell_surface import (
 )
 from foliaseal.presentation.qt.signing_workspace_sidebar import (
     SigningWorkspaceSidebar,
+)
+from foliaseal.presentation.qt.signing_workspace_testing_adapter import (
+    SigningWorkspaceTestingAdapter,
 )
 from foliaseal.resources.icons import icon_path
 
@@ -109,7 +109,7 @@ class SigningWorkspaceComposition:
     interaction_bridge: SigningWorkspaceInteractionBridge
     orchestrator: SigningWorkspaceOrchestrator
     runtime: SigningWorkspaceRuntime
-    compatibility_surface: SigningWorkspaceCompatibilitySurface
+    testing_adapter: SigningWorkspaceTestingAdapter
     shell_surface: SigningWorkspaceShellSurface
     main_row: Any
 
@@ -421,20 +421,13 @@ def build_signing_workspace_composition(
         action_bridge=action_bridge,
         initial_app_settings=app_settings,
     )
-    compatibility_surface = SigningWorkspaceCompatibilitySurface(
-        widget=widget,
+    testing_adapter = SigningWorkspaceTestingAdapter(
         runtime=runtime,
         properties_panel=properties_panel,
-        viewer_widget=viewer_widget,
-        viewer_navigation_controls=viewer_navigation_controls,
-        properties_scroll=properties_scroll,
-        sidebar_container=sidebar.container,
-        sidebar_surface=sidebar.surface,
-        shell_surface=shell_surface,
+        last_signing_result=lambda: signing_action_coordinator.last_signing_result,
     )
     orchestrator = SigningWorkspaceOrchestrator(
         interaction_bridge=interaction_bridge,
-        compatibility_surface=compatibility_surface,
         shell_surface=shell_surface,
         review_bridge=review_bridge,
         document_review_workspace=document_review_workspace,
@@ -489,7 +482,7 @@ def build_signing_workspace_composition(
         interaction_bridge=interaction_bridge,
         orchestrator=orchestrator,
         runtime=runtime,
-        compatibility_surface=compatibility_surface,
+        testing_adapter=testing_adapter,
         shell_surface=shell_surface,
         main_row=main_row,
     )

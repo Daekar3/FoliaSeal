@@ -125,7 +125,6 @@ def build_signed_acceptance_evidence_runner(
             build_phase3_signing_executor=signed.build_phase3_signing_executor,
             build_dummy_timestamper=signed.build_dummy_timestamper,
             load_page_count=signed.load_page_count,
-            build_qt_signing_shell=signed.build_qt_signing_shell,
             build_workspace=signed.build_workspace,
             execute_signed_acceptance_scenario=signed.execute_signed_acceptance_scenario,
             preview_matrix_error_result=signed.preview_matrix_error_result,

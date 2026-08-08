@@ -12,11 +12,6 @@ class _Shell:
         self.container = object()
         self.preview_value = object()
         self.snapshot_value = object()
-        self.viewer_navigation_controls = SimpleNamespace(
-            go_to_previous_page=lambda: self.calls.append("previous"),
-            go_to_next_page=lambda: self.calls.append("next"),
-            reset_zoom_view=lambda: self.calls.append("reset_zoom"),
-        )
 
     def refresh_viewer(self) -> None:
         self.calls.append("refresh_viewer")
@@ -47,6 +42,15 @@ class _Shell:
     def open_signed_output(self):
         self.calls.append("open_signed_output")
         return "output.pdf"
+
+    def go_to_previous_page(self):
+        self.calls.append("previous")
+
+    def go_to_next_page(self):
+        self.calls.append("next")
+
+    def reset_zoom_view(self):
+        self.calls.append("reset_zoom")
 
     def setFocus(self):  # noqa: N802
         self.calls.append("focus")

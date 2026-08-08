@@ -112,8 +112,7 @@ class Phase3SignedAcceptanceScenarioExecutor:
     def run_result(
         self,
         *,
-        shell: Any,
-        workspace: SigningWorkspaceBundle | None = None,
+        workspace: SigningWorkspaceBundle,
         scenario: dict[str, Any],
         profile_store: Any,
         artifacts_dir: Path,
@@ -123,17 +122,14 @@ class Phase3SignedAcceptanceScenarioExecutor:
         sign_executor: Any,
     ) -> Phase3SignedAcceptanceScenarioResult:
         scenario_kwargs: dict[str, Any] = {
-            "shell": shell,
+            "workspace": workspace,
             "scenario": scenario,
             "profile_store": profile_store,
         }
-        if workspace is not None:
-            scenario_kwargs["workspace"] = workspace
         self.deps.apply_preview_matrix_scenario(**scenario_kwargs)
-        harness_workspace = (
-            self.deps.build_workspace(workspace=workspace, profile_store=profile_store)
-            if workspace is not None
-            else self.deps.build_workspace(shell=shell, profile_store=profile_store)
+        harness_workspace = self.deps.build_workspace(
+            workspace=workspace,
+            profile_store=profile_store,
         )
         artifact_basename = self.deps.scenario_slug(str(scenario["name"]))
         snapshot = harness_workspace.capture_snapshot(

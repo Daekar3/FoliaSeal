@@ -123,6 +123,11 @@ an unbounded compatibility layer.
 - [x] (2026-08-06) Reconfirmed as the dedicated next atomic migration after the Qt reusable-service
   threading slice. The current slice intentionally leaves public `phase3` names untouched so this
   plan can rename modules, symbols, CLI branches, fixtures, and active documentation together.
+- [x] (2026-08-08) Reconfirmed as the next naming slice after
+  `signing_workspace_compatibility_surface_retirement_execplan.md`. The compatibility-retirement
+  implementation removes the widget/exporter debt without introducing any new `phase3` alias or
+  renaming an external contract; this plan owns the subsequent repository-wide atomic terminology
+  migration.
 - [ ] Atomic rename/migration implemented.
 - [ ] Compatibility debris removed and validation completed.
 - [ ] Architecture/README/ExecPlans reconciled and committed.

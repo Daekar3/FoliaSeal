@@ -218,13 +218,13 @@ class QtSigningWorkspaceSessionPort:
         return self.shell_widget.open_signed_output()
 
     def go_to_previous_page(self) -> None:
-        self.shell_widget.viewer_navigation_controls.go_to_previous_page()
+        self.shell_widget.go_to_previous_page()
 
     def go_to_next_page(self) -> None:
-        self.shell_widget.viewer_navigation_controls.go_to_next_page()
+        self.shell_widget.go_to_next_page()
 
     def reset_zoom_view(self) -> None:
-        self.shell_widget.viewer_navigation_controls.reset_zoom_view()
+        self.shell_widget.reset_zoom_view()
 
     def focus(self) -> None:
         self.shell_widget.setFocus()
@@ -232,9 +232,7 @@ class QtSigningWorkspaceSessionPort:
 
 def build_qt_signing_workspace_bundle(shell_widget: Any) -> SigningWorkspaceBundle:
     """Adapt one Qt shell widget into the typed workspace bundle at the Qt edge."""
-    testing_adapter = getattr(shell_widget, "testing_adapter", None)
-    if testing_adapter is None:
-        raise TypeError("Qt signing shell widgets must expose 'testing_adapter'.")
+    testing_adapter = shell_widget.testing_adapter
     return SigningWorkspaceBundle(
         maintenance=QtSigningWorkspacePort(shell_widget=shell_widget),
         session=QtSigningWorkspaceSessionPort(shell_widget=shell_widget),

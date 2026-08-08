@@ -210,11 +210,9 @@ from foliaseal.presentation.qt.preview_widget_evidence import (
 from foliaseal.presentation.qt.preview_widget_evidence import (
     widget_rect_snapshot as _widget_rect_snapshot,
 )
-from foliaseal.presentation.qt.signing_shell import build_qt_signing_shell
 from foliaseal.presentation.qt.signing_shell_port import (
     QtSigningWorkspaceFactory,
     SigningWorkspaceBundle,
-    build_qt_signing_workspace_bundle,
 )
 
 DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
@@ -246,7 +244,6 @@ def build_capture_assembler() -> Phase3HarnessCaptureAssembler:
 def build_interactive_session_runner() -> Phase3HarnessSessionRunner:
     return Phase3HarnessSessionRunner(
         deps=Phase3HarnessSessionRunnerDeps(
-            build_qt_signing_shell=build_qt_signing_shell,
             build_workspace=_build_qt_evidence_workspace,
             default_harness_output_pdf_path=default_harness_output_pdf_path,
             create_workspace=QtSigningWorkspaceFactory().create,
@@ -292,7 +289,6 @@ def build_evidence_runner_providers() -> EvidenceRunnerProviders:
             build_phase3_signing_executor=_build_qt_signing_executor,
             build_dummy_timestamper=build_dummy_timestamper,
             load_page_count=_load_page_count,
-            build_qt_signing_shell=build_qt_signing_shell,
             build_workspace=_build_preview_matrix_qt_workspace,
             execute_signed_acceptance_scenario=_execute_signed_acceptance_scenario,
             preview_matrix_error_result=preview_matrix_error_result,
@@ -310,14 +306,9 @@ def build_evidence_runner_providers() -> EvidenceRunnerProviders:
 
 def _build_live_evidence_workspace(
     *,
-    workspace: SigningWorkspaceBundle | None = None,
-    shell: Any | None = None,
+    workspace: SigningWorkspaceBundle,
     profile_store: Any,
 ) -> Phase3HarnessWorkspacePort:
-    if workspace is None:
-        if shell is None:
-            raise TypeError("A typed workspace bundle is required.")
-        workspace = build_qt_signing_workspace_bundle(shell)
     return QtPhase3HarnessWorkspaceAdapter(
         workspace=workspace,
         profile_store=profile_store,
@@ -338,25 +329,17 @@ def _build_live_evidence_workspace(
 
 
 def _build_qt_evidence_workspace(
-    workspace: SigningWorkspaceBundle | Any,
+    workspace: SigningWorkspaceBundle,
 ) -> Phase3HarnessWorkspacePort:
-    if isinstance(workspace, SigningWorkspaceBundle):
-        return _build_live_evidence_workspace(workspace=workspace, profile_store=object())
-    return _build_live_evidence_workspace(
-        shell=workspace,
-        profile_store=object(),
-    )
+    return _build_live_evidence_workspace(workspace=workspace, profile_store=object())
 
 
 def _build_preview_matrix_qt_workspace(
     *,
-    shell: Any | None = None,
-    workspace: SigningWorkspaceBundle | None = None,
+    workspace: SigningWorkspaceBundle,
     profile_store: SignaturePresetCatalogStore,
 ) -> Phase3HarnessWorkspacePort:
-    if workspace is not None:
-        return _build_live_evidence_workspace(workspace=workspace, profile_store=profile_store)
-    return _build_live_evidence_workspace(shell=shell, profile_store=profile_store)
+    return _build_live_evidence_workspace(workspace=workspace, profile_store=profile_store)
 
 
 def _build_preview_matrix_headless_workspace(
@@ -881,13 +864,13 @@ def _load_preview_matrix_manifest(path: str) -> dict[str, Any]:
 
 def _execute_preview_matrix_scenario(
     *,
-    shell: Any,
+    workspace: SigningWorkspaceBundle,
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
     artifacts_dir: Path,
 ) -> dict[str, Any]:
     workspace = _build_preview_matrix_qt_workspace(
-        shell=shell,
+        workspace=workspace,
         profile_store=profile_store,
     )
     workspace.apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
@@ -999,8 +982,7 @@ def _headless_validation_text(preview: Any) -> str:
 
 def _execute_signed_acceptance_scenario(
     *,
-    shell: Any,
-    workspace: SigningWorkspaceBundle | None = None,
+    workspace: SigningWorkspaceBundle,
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
     artifacts_dir: Path,
@@ -1010,7 +992,7 @@ def _execute_signed_acceptance_scenario(
     sign_executor: Any,
 ) -> Phase3SignedAcceptanceScenarioResult | dict[str, Any]:
     kwargs: dict[str, Any] = {
-        "shell": shell,
+        "workspace": workspace,
         "scenario": scenario,
         "profile_store": profile_store,
         "artifacts_dir": artifacts_dir,
@@ -1019,8 +1001,6 @@ def _execute_signed_acceptance_scenario(
         "passphrase": passphrase,
         "sign_executor": sign_executor,
     }
-    if workspace is not None:
-        kwargs["workspace"] = workspace
     return _build_signed_acceptance_scenario_executor().run_result(
         **kwargs,
     )
@@ -1028,17 +1008,14 @@ def _execute_signed_acceptance_scenario(
 
 def _apply_preview_matrix_scenario(
     *,
-    shell: Any,
-    workspace: SigningWorkspaceBundle | None = None,
+    workspace: SigningWorkspaceBundle,
     scenario: dict[str, Any],
     profile_store: SignaturePresetCatalogStore,
 ) -> None:
-    kwargs: dict[str, Any] = {"shell": shell, "profile_store": profile_store}
-    if workspace is not None:
-        kwargs["workspace"] = workspace
-    _build_preview_matrix_qt_workspace(**kwargs).apply_scenario(
-        Phase3HarnessScenarioCommand.from_mapping(scenario)
-    )
+    _build_preview_matrix_qt_workspace(
+        workspace=workspace,
+        profile_store=profile_store,
+    ).apply_scenario(Phase3HarnessScenarioCommand.from_mapping(scenario))
 
 
 def _preview_render_evidence_dependencies() -> PreviewRenderEvidenceDependencies:

@@ -2913,3 +2913,120 @@ preview assertion failed once and passed on immediate rerun, with no repeatable 
 `9cf59efc8` was audited independently three times after commit: clean tree, frozen SPEC, empty
 production retirement grep, no generated acceptance outputs, and no residual application/test/Qt
 processes.
+
+### Scan Round 58 — completed 2026-08-08 after `63ae6f10a`
+
+Three fresh explorer-light scans reviewed the clean checkout independently. The strongest
+convergent candidate is `signing-workspace-compatibility-surface-retirement`: the typed
+`SigningWorkspaceTestingPort`/`SigningWorkspaceTestingAdapter` and `SigningWorkspaceBundle` already
+cover the harness/testing boundary, but `SigningWorkspaceLegacyWidgetExports.install()` still
+dynamically attaches approximately 30 widget attributes and methods, while the shell exposes a
+`compat_surface` property and the composition/orchestrator still installs the export facade. The
+remaining tests and the Qt harness are the concrete migration surface; the production workflow is
+AppFrame -> workspace composition -> shell controller -> typed testing/session ports.
+
+The candidate is local-substitutable: fake Qt bindings and existing headless harness adapters are
+available, while the real Qt/PyHanko/Pillow effects remain at their existing adapter edges. The
+stable target boundary is the typed `SigningWorkspaceTestingPort` plus the production
+`SigningWorkspacePort`/`SigningWorkspaceSessionPort`; no new generic workspace manager is allowed.
+Two explorer score records were `(4.5,4.5,4,4.5,4,4.5,3,2)` and
+`(4.5,4.5,4,4.5,5,4.5,3,2)`; the orchestrator record is
+`(4.5,4.5,4,4.5,4.5,4.5,3,2)`. Medians are
+`(4.5,4.5,4,4.5,4.5,4.5,3,2)`, agreement `0.975`, evidence coverage `1.0`, confidence
+`0.9825`, benefit `4.425`, penalty `2.6`, and Candidate Priority `72.512812`. This exceeds the
+continuation threshold and wins the tie-breakers over all other credible clusters.
+
+The internal evidence-core nomenclature child was independently corroborated but scored only
+`56.057812` after high disagreement over migration risk and behavioral uncertainty; it remains a
+bounded follow-up rather than the selected slice. A remaining harness-projection extraction scored
+`53.552969`; the certificate catalog reader scored below `60`; legacy persisted-profile and evidence
+snapshot compatibility removal remain contract-sensitive and require explicit migration policy.
+
+### Problem Frame 58 — typed signing-workspace compatibility retirement
+
+The representative workflow is AppFrame workspace open -> `build_qt_signing_shell()` ->
+`SigningWorkspaceShellController.bootstrap()` -> `SigningWorkspaceCompatibilitySurface` and
+`SigningWorkspaceLegacyWidgetExports.install()`. The dynamic installer makes the concrete widget a
+second, implicit API: tests and the Phase 3 workspace adapter can reach panel/viewer/sidebar internals
+and document commands through aliases even though typed testing/session ports already exist. This
+keeps compatibility state alive, obscures ownership, and makes a widget refactor require updating a
+large alias list rather than one explicit capability.
+
+The migration must preserve production shell behavior, Phase 3 capture and signed-acceptance
+matrices, document search/selection commands, current-page placement, close/dispose lifecycle,
+and all JSON/CLI/artifact contracts. It must migrate every remaining caller/test to the typed
+testing/session boundary before deleting the dynamic export installer and `compat_surface`; no
+compatibility re-export or new service locator may remain. Illustrative target:
+
+    testing = workspace_bundle.testing_adapter
+    snapshot = testing.snapshot()
+    # no widget.current_request / widget.signature_properties_panel aliases
+
+The dependency category is local-substitutable. Expected improvement comes from removing a broad
+implicit interface and concentrating observable testing at the typed port, not from moving the same
+aliases into another file.
+
+### Design Selection 58 — completed 2026-08-08
+
+Three radically different shapes were reviewed for this seam. Design A is the minimal deletion:
+retain the existing typed `SigningWorkspaceTestingPort`, construct its adapter directly in Qt
+composition, replace dynamic aliases with a small set of explicit shell-owned properties, and
+delete the compatibility facade/export installer. Design B introduces nested immutable scenario,
+diagnostics, panel, and optional capture capability records; it handles variation cleanly but adds
+ceremony and speculative public capability surface. Design C is the strict common-caller bundle
+shape: keep the existing `SigningWorkspaceBundle(maintenance, session, testing, view)` as the sole
+AppFrame/harness contract, construct `SigningWorkspaceTestingAdapter` and an explicit navigation
+adapter in composition, and make all callers consume the bundle rather than reading shell/widget
+aliases. It does not introduce a generic manager or new service locator.
+
+Independent reviewer scores for A were
+`(4.5,4.5,4.5,4.5,4.5,2.5,3.0)` and `(3,5,4,3,4,5,4)`; the orchestrator scored
+`(4.5,4.5,4.5,4.5,4.5,3,4)`. Median dimensions produce BaseShapeScore `86.5`, with no penalties
+when the deletion gate is enforced. B reviewer scores were
+`(4.5,3.5,4.5,4.5,4,3,3.5)` and `(4,4,5,4,4,4,5)`; orchestrator `(4,3.5,4.5,4,4,3.5,4.5)`,
+producing `80.0`; it is rejected for unnecessary nested capability ceremony in this known caller
+graph. C reviewer scores were `(4.5,4.5,4.5,4.5,4.5,2.5,4)` and `(5,5,4,5,3,3,4)`;
+orchestrator `(5,5,5,4.5,4.5,3,4.5)`, producing BaseShapeScore `90.5`. No evidence-backed
+penalties apply to the strict ports-and-adapters C shape. C is selected because it removes the
+largest implicit API, preserves the existing bundle contract, proves one bundle identity across
+AppFrame/harness callers, and keeps the implementation bounded without a speculative manager.
+
+The child plan is `docs/ExecPlans/signing_workspace_compatibility_surface_retirement_execplan.md`.
+
+### Implementation 58 — signing-workspace compatibility retirement (completed 2026-08-08)
+
+The selected strict bundle-and-ports shape is implemented. `SigningWorkspaceTestingAdapter` and its
+panel adapter now live in `signing_workspace_testing_adapter.py`; the compatibility surface and
+legacy widget exporter were deleted. `SigningWorkspaceWidget` is the declared shell facade with
+explicit visual properties, `go_to_previous_page()`, `go_to_next_page()`, and `reset_zoom_view()`;
+the session port calls those methods rather than inspecting the navigation-controls dictionary.
+`SigningWorkspaceBundle` is required by the live harness workspace, preview capture, interactive
+session runner, signed-acceptance matrix, and scenario executor. Their raw-shell construction and
+AttributeError fallback branches were removed, and all first-party fakes/tests now construct typed
+bundles.
+
+Focused compatibility/harness/AppFrame/session validation passed `225` tests; the full suite passed
+`1156` tests with `11` skips and one pre-existing Pillow deprecation warning. Ruff, compileall, CLI help, typed
+bundle import isolation, frozen-SPEC, and diff checks passed. The unchanged offscreen evidence
+command passed signed acceptance `10/7`, preview parity `18/18`, and fit rejection `3/3`; generated
+acceptance outputs and the summary were removed, and the process audit was empty. Retirement grep
+is empty across `src` and `tests` for `compat_surface`, the legacy exporter, installer, and deleted
+module; the only remaining `shell: Any` is the intentional opaque lifecycle view.
+
+Conservative measured proxies are navigation `.33`, change amplification `.40`, seam reduction
+`.75`, boundary-test improvement `.40`, interface compression `.50`, cohesion `.45`, and isolation
+`.85`, for weighted Actual Improvement approximately `.53` versus predicted `.65375`; no component
+regressed beyond `-.10`. The child plan records the exact cleanup and acceptance evidence; the
+implementation is committed as `74ff0352d` (`Retire signing workspace compatibility surface`). The next bounded slice is the atomic
+`phase3_nomenclature_retirement_execplan.md` migration, which remains separate so external CLI/DTO/
+fixture/artifact contracts are not renamed piecemeal.
+
+### Naming follow-up 58 — retire historical `phase3` nomenclature
+
+The next bounded slice is `docs/ExecPlans/phase3_nomenclature_retirement_execplan.md`. It owns the
+atomic replacement of internal `phase3` module/symbol/document names with durable acceptance and
+evidence terminology, including import edges, tests, packaging, active plans, and CLI help where
+the external command contract is deliberately migrated together. It must not add compatibility
+aliases, must preserve or explicitly version any persisted JSON/fixture/artifact boundary, and must
+leave `docs/SPEC.md` unchanged. The current compatibility-surface slice intentionally does not mix
+that rename into its implementation; it only records this plan as the next complete naming slice.

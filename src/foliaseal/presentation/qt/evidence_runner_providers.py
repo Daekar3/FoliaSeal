@@ -46,7 +46,6 @@ class SignedAcceptanceEvidenceProviders:
     build_phase3_signing_executor: Callable[..., Any]
     build_dummy_timestamper: Callable[..., Any]
     load_page_count: Callable[..., Any]
-    build_qt_signing_shell: Callable[..., Any]
     build_workspace: Callable[..., Any]
     execute_signed_acceptance_scenario: Callable[..., Any]
     preview_matrix_error_result: Callable[..., Any]
@@ -55,7 +54,7 @@ class SignedAcceptanceEvidenceProviders:
     jsonable_capture: Callable[..., Any]
     render_backend_factory: Callable[..., Any]
     profile_store_factory: Callable[..., Any]
-    create_workspace: Callable[..., Any] | None = None
+    create_workspace: Callable[..., Any]
 
 
 @dataclass(frozen=True)

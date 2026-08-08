@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from foliaseal.presentation.qt.evidence_artifacts import (
     MemoryEvidenceArtifactPort,
@@ -16,6 +17,7 @@ from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
 from foliaseal.presentation.qt.phase3_signed_acceptance_scenario_executor import (
     Phase3SignedAcceptanceScenarioResult,
 )
+from foliaseal.presentation.qt.signing_shell_port import SigningWorkspaceBundle
 
 
 class _FakeApplication:
@@ -102,7 +104,6 @@ def _runner(
             or (lambda **kwargs: {"executor": kwargs}),
             build_dummy_timestamper=build_dummy_timestamper or (lambda: object()),
             load_page_count=lambda **_kwargs: 1,
-            build_qt_signing_shell=lambda **_kwargs: _FakeShell(),
             build_workspace=build_workspace or (lambda **_kwargs: _FakeWorkspace()),
             execute_signed_acceptance_scenario=scenario_executor,
             preview_matrix_error_result=lambda **kwargs: {
@@ -130,6 +131,15 @@ def _runner(
             artifact_port_factory=(lambda: artifact_port)
             if artifact_port is not None
             else None,
+            create_workspace=lambda _bootstrap: SigningWorkspaceBundle(
+                maintenance=SimpleNamespace(),
+                session=SimpleNamespace(refresh_viewer=lambda: None),
+                testing=SimpleNamespace(),
+                view=SimpleNamespace(
+                    mount_target=lambda: _FakeShell(),
+                    dispose=lambda: None,
+                ),
+            ),
         )
     )
 
@@ -183,7 +193,7 @@ def test_signed_acceptance_matrix_runner_writes_summary_and_expectation_fields(
     assert dummy_calls == ["dummy"]
     assert summary["acceptance_expectations_passed"] is False
     assert workspace.refresh_calls == 1
-    assert workspace_calls[0]["shell"] is not None
+    assert workspace_calls[0]["workspace"] is not None
     assert workspace_calls[0]["profile_store"] is not None
 
 

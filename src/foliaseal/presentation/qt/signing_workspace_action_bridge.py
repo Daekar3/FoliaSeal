@@ -120,7 +120,6 @@ class SigningWorkspaceActionBridge:
         self.reload_state()
 
     def _apply_signing_action_state(self, state: SigningActionState) -> None:
-        self._widget.last_signing_result = state.last_signing_result
         self._sidebar.render_signing_action_state(state)
 
     def _default_output_dialog_path(self) -> Path:

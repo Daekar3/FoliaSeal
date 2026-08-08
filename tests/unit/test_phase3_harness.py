@@ -1020,8 +1020,9 @@ def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() ->
     try:
         shell = type("_Shell", (), {"testing_adapter": object()})()
         profile_store = object()
+        bundle = SimpleNamespace(view=SimpleNamespace(mount_target=lambda: shell))
         workspace = phase3_harness_module._build_live_evidence_workspace(
-            shell=shell,
+            workspace=bundle,
             profile_store=profile_store,
         )
     finally:
@@ -1048,28 +1049,28 @@ def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() ->
 def test_qt_phase3_harness_workspace_wrappers_delegate_to_shared_live_builder() -> None:
     calls: list[dict[str, object]] = []
 
-    def _fake_builder(*, shell, profile_store):
-        calls.append({"shell": shell, "profile_store": profile_store})
+    def _fake_builder(*, workspace, profile_store):
+        calls.append({"workspace": workspace, "profile_store": profile_store})
         return object()
 
     original_builder = phase3_harness_module._build_live_evidence_workspace
     phase3_harness_module._build_live_evidence_workspace = _fake_builder
     try:
-        harness_shell = object()
-        preview_shell = object()
+        harness_workspace = object()
+        preview_workspace = object()
         preview_store = object()
-        phase3_harness_module._build_qt_evidence_workspace(harness_shell)
+        phase3_harness_module._build_qt_evidence_workspace(harness_workspace)
         phase3_harness_module._build_preview_matrix_qt_workspace(
-            shell=preview_shell,
+            workspace=preview_workspace,
             profile_store=preview_store,
         )
     finally:
         phase3_harness_module._build_live_evidence_workspace = original_builder
 
     assert len(calls) == 2
-    assert calls[0]["shell"] is harness_shell
+    assert calls[0]["workspace"] is harness_workspace
     assert calls[0]["profile_store"] is not preview_store
-    assert calls[1] == {"shell": preview_shell, "profile_store": preview_store}
+    assert calls[1] == {"workspace": preview_workspace, "profile_store": preview_store}
 
 
 def test_apply_preview_matrix_scenario_uses_preview_matrix_workspace_builder() -> None:
@@ -1079,8 +1080,8 @@ def test_apply_preview_matrix_scenario_uses_preview_matrix_workspace_builder() -
         def apply_scenario(self, command) -> None:
             captured["command"] = command
 
-    def _fake_builder(*, shell, profile_store):
-        captured["shell"] = shell
+    def _fake_builder(*, workspace, profile_store):
+        captured["workspace"] = workspace
         captured["profile_store"] = profile_store
         return _FakeWorkspace()
 
@@ -1092,17 +1093,17 @@ def test_apply_preview_matrix_scenario_uses_preview_matrix_workspace_builder() -
             "profile_name": "Saved Profile",
             "timestamp_required": False,
         }
-        shell = object()
+        workspace = object()
         profile_store = object()
         phase3_harness_module._apply_preview_matrix_scenario(
-            shell=shell,
+            workspace=workspace,
             scenario=scenario,
             profile_store=profile_store,
         )
     finally:
         phase3_harness_module._build_preview_matrix_qt_workspace = original_builder
 
-    assert captured["shell"] is shell
+    assert captured["workspace"] is workspace
     assert captured["profile_store"] is profile_store
     assert captured["command"] == phase3_harness_module.Phase3HarnessScenarioCommand(
         profile_name="Saved Profile",
@@ -1141,7 +1142,7 @@ def test_execute_preview_matrix_scenario_uses_workspace_snapshot_capture(
     phase3_harness_module._build_preview_matrix_qt_workspace = lambda **_kwargs: _FakeWorkspace()
     try:
         result = phase3_harness_module._execute_preview_matrix_scenario(
-            shell=object(),
+            workspace=object(),
             scenario={"name": "Scenario A", "profile_name": "Saved Profile"},
             profile_store=object(),
             artifacts_dir=tmp_path,
@@ -2259,7 +2260,7 @@ def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
     )
 
     summary = phase3_harness_module._execute_signed_acceptance_scenario(
-        shell="shell",
+        workspace="workspace",
         scenario={"name": "Scenario A"},
         profile_store="profiles",
         artifacts_dir=tmp_path,
@@ -2271,7 +2272,7 @@ def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
 
     assert summary == {"name": "Scenario A", "signing_result": {"success": True}}
     assert captured == {
-        "shell": "shell",
+        "workspace": "workspace",
         "scenario": {"name": "Scenario A"},
         "profile_store": "profiles",
         "artifacts_dir": tmp_path,

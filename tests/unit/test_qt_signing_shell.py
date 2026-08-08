@@ -792,7 +792,7 @@ def test_signing_shell_output_dialog_uses_app_settings_default_directory(
     assert workflow.output_pdf_path == str(selected_path)
     assert bindings.q_file_dialog.save_calls == [
         (
-            widget,
+                widget.widget,
             "Save signed PDF",
             str(default_output_dir / "output.pdf"),
             "PDF files (*.pdf)",
@@ -876,7 +876,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     assert widget.sidebar_surface.sign_result_label.text() == original_result_label
     assert bindings.q_message_box.calls[-1:] == [
         (
-            widget,
+                widget.widget,
             "Overwrite signed PDF?",
             f"Replace existing signed PDF at {existing_output_path}?",
         )
@@ -914,7 +914,7 @@ def test_signing_shell_output_path_overwrite_cancel_prompts_for_current_path(
     assert workflow.output_pdf_path == str(current_output_path)
     assert bindings.q_message_box.calls[-1:] == [
         (
-            widget,
+                widget.widget,
             "Overwrite signed PDF?",
             f"Replace existing signed PDF at {current_output_path}?",
         )
@@ -997,7 +997,7 @@ def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
     )
     assert bindings.q_message_box.calls[-1:] == [
         (
-            widget,
+                widget.widget,
             "Overwrite signed PDF?",
             f"Replace existing signed PDF at {existing_output_path}?",
         )
@@ -2971,7 +2971,7 @@ def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
     assert len(bindings.q_input_dialog.calls) == 1
 
 
-def test_signing_shell_installs_named_compatibility_surface(
+def test_signing_shell_exposes_declared_testing_adapter(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2990,8 +2990,6 @@ def test_signing_shell_installs_named_compatibility_surface(
         signing_workflow=_ready_workflow(tmp_path),
     )
 
-    assert widget.compat_surface is not None
-    assert widget.testing_adapter is not widget.compat_surface
     assert widget.testing_adapter.panel is not widget.properties_panel
     assert callable(widget.testing_adapter.signature_appearance)
     assert callable(widget.testing_adapter.set_timestamp_required)
@@ -3005,7 +3003,7 @@ def test_signing_shell_installs_named_compatibility_surface(
     assert callable(widget.testing_adapter.panel.preview_text)
     assert callable(widget.testing_adapter.panel.validation_text)
     assert callable(widget.testing_adapter.panel.capture_preview_render)
-    assert widget.refresh_viewer.__self__ is not widget.compat_surface
+    assert widget.refresh_viewer.__self__ is widget
     assert widget.testing_adapter.current_request() == widget.current_request()
     assert widget.testing_adapter.last_signing_result() == widget.last_signing_result
     snapshot = widget.testing_adapter.snapshot()

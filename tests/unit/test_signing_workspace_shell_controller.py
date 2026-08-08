@@ -26,7 +26,7 @@ def _composition(*, bootstrap):
         "interaction_bridge",
         "orchestrator",
         "runtime",
-        "compatibility_surface",
+        "testing_adapter",
         "shell_surface",
         "main_row",
     )
@@ -51,7 +51,7 @@ def test_controller_builds_installs_and_bootstraps_once() -> None:
 
     assert len(compose_calls) == 1
     assert len(bootstrap_calls) == 1
-    assert shell.properties_panel is composition.properties_panel
+    assert shell._properties_panel is composition.properties_panel
     assert shell._runtime is composition.runtime
     assert shell._interaction_bridge is composition.interaction_bridge
 

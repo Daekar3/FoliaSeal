@@ -14,6 +14,7 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
     Phase3HarnessCaptureCommand,
     Phase3HarnessWorkspaceSnapshot,
 )
+from foliaseal.presentation.qt.signing_shell_port import SigningWorkspaceBundle
 from tests.support.signing_builders import build_signing_request
 
 
@@ -35,6 +36,7 @@ def test_session_runner_returns_raw_session_state(
     shell_holder = {}
     workspace_holder = {}
     window_holder = {}
+    dispose_calls = []
     attempt_indices = []
 
     class _FakeSignal:
@@ -149,6 +151,9 @@ def test_session_runner_returns_raw_session_state(
         def setFocus(self):  # noqa: N802
             return None
 
+        def focus(self):
+            return None
+
         def submit_sign_request(self):
             self._on_sign_request(request)
             self.last_signing_result = SigningResult(
@@ -236,11 +241,26 @@ def test_session_runner_returns_raw_session_state(
         session=ViewerSession(page_count=1),
     )
 
+    def create_workspace(bootstrap):
+        shell = fake_build_qt_signing_shell(
+            on_sign_request=bootstrap.on_sign_request,
+            on_error=bootstrap.on_error,
+            on_status_change=bootstrap.on_status_change,
+        )
+        return SigningWorkspaceBundle(
+            maintenance=SimpleNamespace(),
+            session=shell,
+            testing=shell.testing_adapter,
+            view=SimpleNamespace(
+                mount_target=lambda: shell,
+                dispose=lambda: dispose_calls.append("disposed"),
+            ),
+        )
+
     runner = runner_module.Phase3HarnessSessionRunner(
         deps=Phase3HarnessSessionRunnerDeps(
-            build_qt_signing_shell=fake_build_qt_signing_shell,
-            build_workspace=lambda shell: workspace_holder.setdefault(
-                "workspace", _FakeWorkspace(shell)
+            build_workspace=lambda workspace: workspace_holder.setdefault(
+                "workspace", _FakeWorkspace(workspace.view.mount_target())
             ),
             default_harness_output_pdf_path=lambda **kwargs: (
                 attempt_indices.append(kwargs["sign_attempt_index"])
@@ -249,6 +269,7 @@ def test_session_runner_returns_raw_session_state(
                     / f"{Path(kwargs['pdf_path']).stem}_{kwargs['sign_attempt_index']}.pdf"
                 )
             ),
+            create_workspace=create_workspace,
         ),
     )
 
@@ -266,6 +287,7 @@ def test_session_runner_returns_raw_session_state(
         with pytest.raises(RuntimeError, match="final capture failed"):
             runner.run(**run_kwargs)
         assert window_holder["window"].closed is True
+        assert dispose_calls == ["disposed"]
         return
 
     result = runner.run(**run_kwargs)
@@ -273,6 +295,7 @@ def test_session_runner_returns_raw_session_state(
     assert result.sign_requests == (request,)
     assert attempt_indices == [1]
     assert window_holder["window"].closed is True
+    assert dispose_calls == ["disposed"]
     assert result.errors == ("debug issue",)
     assert result.interaction_counts == {
         "selection_success": 1,
@@ -362,12 +385,17 @@ def test_session_runner_closes_window_when_setup_fails(
         def submit_sign_request(self):
             return None
 
-    def build_shell(**kwargs):
+    def create_workspace(_bootstrap):
         if failure_stage == "shell":
             raise RuntimeError("shell failed")
-        return _Shell()
+        shell = _Shell()
+        return SimpleNamespace(
+            view=SimpleNamespace(mount_target=lambda: shell, dispose=lambda: None),
+            session=shell,
+            testing=SimpleNamespace(),
+        )
 
-    def build_workspace(shell):
+    def build_workspace(workspace):
         if failure_stage == "workspace":
             raise RuntimeError("workspace failed")
         return SimpleNamespace()
@@ -386,9 +414,9 @@ def test_session_runner_closes_window_when_setup_fails(
     )
     runner = runner_module.Phase3HarnessSessionRunner(
         deps=Phase3HarnessSessionRunnerDeps(
-            build_qt_signing_shell=build_shell,
             build_workspace=build_workspace,
             default_harness_output_pdf_path=lambda **kwargs: str(tmp_path / "out.pdf"),
+            create_workspace=create_workspace,
         )
     )
 

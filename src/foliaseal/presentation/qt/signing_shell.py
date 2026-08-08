@@ -277,17 +277,42 @@ class SigningWorkspaceWidget:
     def container(self) -> Any:
         return self.widget
 
+    @property
+    def layout(self) -> Any:
+        return self._layout
+
     def close(self) -> Any:
         """Close the mounted Qt container and release shell-owned resources."""
         return self._shell_controller.close()
+
+    def setFocus(self) -> Any:  # noqa: N802
+        """Focus the mounted Qt container for harness/session interactions."""
+        focus = getattr(self.widget, "setFocus", None)
+        return focus() if callable(focus) else None
 
     @property
     def viewer_widget(self) -> Any:
         return self._viewer_widget
 
     @property
+    def properties_panel(self) -> Any:
+        return self._properties_panel
+
+    @property
     def viewer_navigation_controls(self) -> Any:
         return self._viewer_navigation_controls
+
+    @property
+    def sidebar(self) -> Any:
+        return self._sidebar.container
+
+    @property
+    def sidebar_surface(self) -> Any:
+        return self._sidebar.surface
+
+    @property
+    def properties_scroll(self) -> Any:
+        return self._properties_scroll
 
     @property
     def app_settings(self) -> AppSettings:
@@ -295,16 +320,25 @@ class SigningWorkspaceWidget:
 
     @property
     def testing_adapter(self) -> Any:
-        """Expose the explicit harness adapter without dynamic widget lookup."""
-        return self._compatibility_surface.testing_adapter
-
-    @property
-    def compat_surface(self) -> Any:
-        """Historical compatibility view retained at the Qt edge only."""
-        return self._compatibility_surface
+        """Expose the explicit harness adapter at the typed Qt edge."""
+        return self._testing_adapter
 
     def refresh_viewer(self) -> None:
         self._runtime.refresh_viewer()
+
+    def go_to_previous_page(self) -> None:
+        target = max(self._viewer_workflow.session.current_page - 1, 0)
+        self._runtime.refresh_review_jump_to_page_index(target)
+
+    def go_to_next_page(self) -> None:
+        target = min(
+            self._viewer_workflow.session.current_page + 1,
+            self._viewer_workflow.session.page_count - 1,
+        )
+        self._runtime.refresh_review_jump_to_page_index(target)
+
+    def reset_zoom_view(self) -> None:
+        self._viewer_widget.reset_zoom_view()
 
     def refresh_document_review(self) -> DocumentReviewSummary:
         return self._runtime.refresh_document_review()
@@ -454,7 +488,7 @@ class SigningShellAdapter:
             on_copy_text=copy_text_callback,
             on_error=on_error,
             on_status_change=on_status_change,
-        ).container
+        )
 
     def _load_bindings(self) -> QtSigningWidgetBindings:
         try:
@@ -528,8 +562,8 @@ def build_qt_signing_shell(
     on_copy_text: Callable[[str], Any] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
-) -> Any:
-    """Build a QWidget instance for the FoliaSeal signing shell."""
+) -> SigningWorkspaceWidget:
+    """Build the declared signing-shell facade around its Qt container."""
 
     adapter = SigningShellAdapter()
     return adapter.create(

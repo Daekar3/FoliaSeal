@@ -32,11 +32,9 @@ from foliaseal.presentation.qt.phase3_harness_workspace import (
 from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBootstrap,
     SigningWorkspaceBundle,
-    build_qt_signing_workspace_bundle,
 )
 
-BuildQtSigningShell = Callable[..., Any]
-BuildWorkspace = Callable[[Any], Phase3HarnessWorkspacePort]
+BuildWorkspace = Callable[[SigningWorkspaceBundle], Phase3HarnessWorkspacePort]
 CreateWorkspace = Callable[[SigningWorkspaceBootstrap], SigningWorkspaceBundle]
 DefaultHarnessOutputPdfPath = Callable[..., str]
 
@@ -60,11 +58,10 @@ class Phase3HarnessSessionResult:
 class Phase3HarnessSessionRunnerDeps:
     """Typed collaborator bundle for one interactive harness session."""
 
-    build_qt_signing_shell: BuildQtSigningShell
     build_workspace: BuildWorkspace
     default_harness_output_pdf_path: DefaultHarnessOutputPdfPath
+    create_workspace: CreateWorkspace
     lifecycle_factory: Callable[[Any], HarnessQtLifecyclePort] | None = None
-    create_workspace: CreateWorkspace | None = None
 
 
 @dataclass(frozen=True)
@@ -109,9 +106,12 @@ class Phase3HarnessSessionRunner:
 
         captured_states: list[dict[str, Any]] = []
 
-        shell: Any
-        workspace_bundle: SigningWorkspaceBundle
+        workspace_bundle: SigningWorkspaceBundle | None = None
         workspace: Phase3HarnessWorkspacePort
+
+        def dispose_workspace() -> None:
+            if workspace_bundle is not None:
+                workspace_bundle.view.dispose()
 
         def refocus_shell() -> None:
             workspace_bundle.session.focus()
@@ -166,33 +166,21 @@ class Phase3HarnessSessionRunner:
 
         try:
             reusable_objects = ReusableSigningObjects(profile_store)
-            if self.deps.create_workspace is not None:
-                workspace_bundle = self.deps.create_workspace(
-                    SigningWorkspaceBootstrap(
-                        viewer_workflow=viewer_workflow,
-                        signing_workflow=signing_workflow,
-                        app_settings=AppSettings.default(),
-                        reusable_objects=reusable_objects,
-                        sign_executor=sign_executor,
-                        on_sign_request=on_sign_request,
-                        on_error=on_error,
-                        on_status_change=on_status_change,
-                    )
-                )
-                workspace = self.deps.build_workspace(workspace_bundle)
-            else:
-                shell = self.deps.build_qt_signing_shell(
+            workspace_bundle = self.deps.create_workspace(
+                SigningWorkspaceBootstrap(
                     viewer_workflow=viewer_workflow,
                     signing_workflow=signing_workflow,
+                    app_settings=AppSettings.default(),
                     reusable_objects=reusable_objects,
                     sign_executor=sign_executor,
                     on_sign_request=on_sign_request,
                     on_error=on_error,
                     on_status_change=on_status_change,
                 )
-                workspace = self.deps.build_workspace(shell)
-                workspace_bundle = build_qt_signing_workspace_bundle(shell)
+            )
+            workspace = self.deps.build_workspace(workspace_bundle)
         except Exception:
+            dispose_workspace()
             close_lifecycle()
             raise
         lifecycle.mount(surface, workspace_bundle.view.mount_target())
@@ -275,6 +263,7 @@ class Phase3HarnessSessionRunner:
             workspace_bundle.session.refresh_viewer()
             first_render_ms = viewer_workflow.timing_tracker.snapshot().first_render_ms
         except Exception:
+            dispose_workspace()
             close_lifecycle()
             raise
 
@@ -302,4 +291,5 @@ class Phase3HarnessSessionRunner:
                 last_signing_result=last_signing_result,
             )
         finally:
+            dispose_workspace()
             close_lifecycle()
