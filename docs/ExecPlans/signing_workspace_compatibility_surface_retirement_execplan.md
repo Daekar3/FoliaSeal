@@ -115,7 +115,7 @@ continue to work, while the same behavior is proven through the typed bundle and
 
 ## Outcomes & Retrospective
 
-Implementation completed in commit `74ff0352d` (2026-08-08).
+Implementation completed in commit `34e0e4a8e` (2026-08-08).
 The compatibility module and dynamic alias assignments were deleted rather than left unused. The
 typed `SigningWorkspaceBundle` is now the only first-party harness/session contract; the shell facade
 owns declared visual properties and navigation verbs, while `SigningWorkspaceTestingAdapter` is the

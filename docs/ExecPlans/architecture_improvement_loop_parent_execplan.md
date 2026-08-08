@@ -3017,7 +3017,7 @@ Conservative measured proxies are navigation `.33`, change amplification `.40`, 
 `.75`, boundary-test improvement `.40`, interface compression `.50`, cohesion `.45`, and isolation
 `.85`, for weighted Actual Improvement approximately `.53` versus predicted `.65375`; no component
 regressed beyond `-.10`. The child plan records the exact cleanup and acceptance evidence; the
-implementation is committed as `74ff0352d` (`Retire signing workspace compatibility surface`). The next bounded slice is the atomic
+implementation is committed as `34e0e4a8e` (`Retire signing workspace compatibility surface`). The next bounded slice is the atomic
 `phase3_nomenclature_retirement_execplan.md` migration, which remains separate so external CLI/DTO/
 fixture/artifact contracts are not renamed piecemeal.
 
