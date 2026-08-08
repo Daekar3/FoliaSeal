@@ -17,7 +17,6 @@ from foliaseal.application.signature_properties_coordinator import (
     ApplyCertificateConfiguration,
     ApplySignaturePreset,
     ApplyVisibleSignatureSetup,
-    DefaultSignaturePropertiesCoordinator,
     DeletePreset,
     RefreshCatalogs,
     SaveCurrentAppearanceProfile,
@@ -27,6 +26,9 @@ from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinatorError,
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
+)
+from foliaseal.application.signature_properties_coordinator import (
+    DefaultSignaturePropertiesCoordinator as _DefaultSignaturePropertiesCoordinator,
 )
 from foliaseal.application.signing_material_resolver import (
     RepositoryBackedCertificateSigningMaterialPort,
@@ -44,6 +46,9 @@ from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_preset,
     build_signature_preset_catalog,
+)
+from tests.support.signing_builders import (
+    build_signature_properties_coordinator_fixture as DefaultSignaturePropertiesCoordinator,
 )
 
 
@@ -108,13 +113,29 @@ def test_coordinator_load_reports_catalog_names_and_initial_readiness(tmp_path: 
     assert state.visible_signature_setup_draft.placement.height_pt == 24.0
 
 
-def test_coordinator_rejects_canonical_reusable_service_with_legacy_catalog_inputs(
+def test_production_coordinator_requires_canonical_reusable_objects(tmp_path: Path) -> None:
+    with pytest.raises(TypeError, match="reusable_objects"):
+        _DefaultSignaturePropertiesCoordinator(workflow=_workflow(tmp_path))
+
+
+def test_production_coordinator_preserves_canonical_reusable_object_identity(
+    tmp_path: Path,
+) -> None:
+    service = ReusableSigningObjects(InMemoryCatalogRepository(build_signature_preset_catalog()))
+    coordinator = _DefaultSignaturePropertiesCoordinator(
+        workflow=_workflow(tmp_path),
+        reusable_objects=service,
+    )
+    assert coordinator.reusable_objects is service
+
+
+def test_production_coordinator_rejects_legacy_catalog_inputs(
     tmp_path: Path,
 ) -> None:
     service = ReusableSigningObjects(InMemoryCatalogRepository(build_signature_preset_catalog()))
 
-    with pytest.raises(ValueError, match="cannot be combined"):
-        DefaultSignaturePropertiesCoordinator(
+    with pytest.raises(TypeError, match="unexpected keyword argument 'preset_catalog'"):
+        _DefaultSignaturePropertiesCoordinator(
             workflow=_workflow(tmp_path),
             certificate_catalog=build_certificate_catalog(),
             reusable_objects=service,
@@ -326,9 +347,7 @@ def test_coordinator_reconcile_set_signature_appearance_updates_workflow_and_cle
         show_field_names=False,
     )
 
-    state = coordinator.reconcile(
-        SetSignatureAppearance(signature_appearance=updated_appearance)
-    )
+    state = coordinator.reconcile(SetSignatureAppearance(signature_appearance=updated_appearance))
 
     assert workflow.signature_appearance == updated_appearance
     assert workflow.selected_signature_preset_id is None
@@ -720,9 +739,7 @@ def test_coordinator_applies_preset_without_certificate_and_preserves_active_cer
         workflow=workflow,
         certificate_catalog_store=store,
         preset_catalog=build_signature_preset_catalog(
-            profiles=(
-                build_signature_preset(name="Compact"),
-            )
+            profiles=(build_signature_preset(name="Compact"),)
         ),
     )
     coordinator.reconcile(
@@ -990,9 +1007,7 @@ def test_coordinator_save_current_appearance_profile_persists_without_mutating_w
         preset_catalog_store=store,
     )
 
-    state = coordinator.reconcile(
-        SaveCurrentAppearanceProfile(name="Contract approval")
-    )
+    state = coordinator.reconcile(SaveCurrentAppearanceProfile(name="Contract approval"))
 
     saved = store.load_catalog().appearance_profile_named("Contract approval")
     assert saved.appearance == workflow.current_signature_appearance

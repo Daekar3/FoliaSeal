@@ -16,15 +16,12 @@ from foliaseal.application.certificate_models import (
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
     ResolvedSignaturePreset,
-    SignaturePresetCatalog,
 )
 from foliaseal.application.reusable_signing_models import (
     ReusableObjectValidationError as ConfigValidationError,
 )
 from foliaseal.application.reusable_signing_objects import (
-    CatalogRepository,
     DeleteObject,
-    InMemoryCatalogRepository,
     ReusableObjectKind,
     ReusableObjectRef,
     ReusableSigningObjects,
@@ -248,12 +245,10 @@ class DefaultSignaturePropertiesCoordinator:
     """Default application-layer coordinator for signing-shell properties."""
 
     workflow: SigningDraftWorkflow
+    reusable_objects: ReusableSigningObjects
     certificate_catalog: CertificateCatalog | None = None
     certificate_catalog_store: CertificateCatalogRepository | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
-    preset_catalog: SignaturePresetCatalog | None = None
-    preset_catalog_store: CatalogRepository | None = None
-    reusable_objects: ReusableSigningObjects | None = None
 
     def __post_init__(self) -> None:
         if self.certificate_catalog_store is None:
@@ -264,17 +259,6 @@ class DefaultSignaturePropertiesCoordinator:
             self.certificate_catalog = self.certificate_catalog
         else:
             self.certificate_catalog = self.certificate_catalog_store.load_catalog()
-        if self.reusable_objects is not None and (
-            self.preset_catalog is not None or self.preset_catalog_store is not None
-        ):
-            raise ValueError(
-                "reusable_objects cannot be combined with legacy preset catalog inputs."
-            )
-        if self.reusable_objects is None:
-            repository = self.preset_catalog_store or InMemoryCatalogRepository(
-                self.preset_catalog or SignaturePresetCatalog(schema_version=1)
-            )
-            self.reusable_objects = ReusableSigningObjects(repository)
         self._certificate_material_port = self.certificate_material_port or (
             RepositoryBackedCertificateSigningMaterialPort(
                 repository=self.certificate_catalog_store,

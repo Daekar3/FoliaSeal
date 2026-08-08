@@ -147,7 +147,14 @@ created.
   qualifying architectural candidate at approximately `68.0` priority.
 - [x] Completed Design Selection 56; selected the common-caller policy/probe boundary and created
   `visible_signature_rendered_fit_boundary_execplan.md`.
-- [ ] Execute and close the rendered-preview fit boundary child plan through the complete DevLoop.
+- [x] Executed and closed the rendered-preview fit boundary through the complete DevLoop at
+  `71d69d524`, with cleanup correction and closure-audit documentation at `bdde2f12a`.
+- [x] Completed Scan Round 57 and Design Selection 57; selected the common-caller concrete
+  `ReusableSigningObjects` shape and created
+  `reusable_signing_objects_qt_legacy_kwargs_execplan.md`.
+- [x] Implemented the canonical reusable-object boundary, moved test-only fixture adaptation to
+  shared test support, completed focused/full/offscreen validation, and removed slice-generated
+  acceptance outputs; intentional commit and post-commit closure audits remain.
 
 ## Scan and Candidate Ledger
 
@@ -2760,7 +2767,7 @@ confirmed the same ownership and scored `91.0`. No evidence-backed penalties or 
 apply, and no hybrid is needed. The child plan is
 `docs/ExecPlans/visible_signature_rendered_fit_boundary_execplan.md`.
 
-### Implementation 56 — rendered-preview fit boundary (implementation complete; closure pending)
+### Implementation 56 — rendered-preview fit boundary (completed at `71d69d524`; closure corrected 2026-08-08)
 
 The selected common-caller policy/probe shape is implemented. `visible_signature_fit_policy.py`
 now exposes the third-party-free `VisibleSignatureRenderedFitRequest`,
@@ -2788,3 +2795,118 @@ renamed in this behavior-preserving slice. Implementation commit: `71d69d524`. T
 audits confirm clean Git state, frozen SPEC, zero retired-helper/cache references, `151` focused
 tests, and no residual application/test processes; only targeted generated-output deletion remains
 blocked by the local approval limit.
+
+### Closure Correction 56 — completed 2026-08-08
+
+The targeted generated-output cleanup was retried after the prior local approval-limit rejection and
+completed successfully. `artifacts/signed_acceptance_evidence/` and
+`artifacts/phase3_signed_acceptance_evidence_summary.md` are absent, the worktree is clean, and the
+post-commit process audit is empty. The rendered-fit child is now behaviorally closed at
+`71d69d524` with the plan/documentation correction at `bdde2f12a`; the remaining phase3
+nomenclature plan is intentionally still open.
+
+### Scan Round 57 — completed 2026-08-08 after `bdde2f12a`
+
+Three independent explorer-light agents reviewed the clean checkout against the full architecture
+objective. Two reports converge on `reusable-signing-objects-qt-legacy-kwargs`: the production Qt
+graph already carries one canonical `ReusableSigningObjects` instance from `AppFrame` through
+workspace-open, shell composition, properties panel, and coordinator, but
+`SigningShellAdapter.create()` and `build_qt_signing_shell()` still accept and synthesize from the
+legacy `preset_catalog`/`preset_catalog_store` inputs. The coordinator retains the same legacy
+adapter fields, and `tests/unit/test_qt_signing_shell.py` still exercises the old kwargs extensively.
+The candidate is local-substitutable: existing Qt fakes, `ReusableSigningObjects`, in-memory
+repositories, and shell boundary tests provide safe stand-ins.
+
+The first independent score record is `(4.5,4.0,4.0,4.0,3.5,4.0,2.5,3.0)`. The orchestrator
+verified the production call path, the duplicate source-selection logic, and the test migration
+surface and scored `(4.5,4.5,4.0,4.5,4.0,4.5,2.5,2.5)`. Medians are
+`(4.5,4.25,4.0,4.25,3.75,4.25,2.5,2.75)`, agreement `0.9375`, evidence coverage `1.0`, and
+confidence `0.95625`. Benefit is `4.1875`, penalty `2.6`, and Candidate Priority is approximately
+`67.2/100`, above the continuation threshold. The bounded slice is to remove legacy preset catalog
+inputs from the production shell factory and canonical workspace graph, preserve only the explicit
+test/compatibility adapters required by current callers, and prove one reusable-object identity
+through shell composition without changing persisted schemas, current-page semantics, CLI/JSON/
+artifact contracts, or the separate phase3 nomenclature migration.
+
+The other credible cluster was `signing-workspace-compat-surface-retirement`, with two reports
+placing it below the continuation threshold after migration-risk penalties (approximately `58–61`);
+it remains a follow-up after the canonical kwargs seam. `phase3` nomenclature retirement remains
+contract-heavy and below the deep-module gate. Evidence snapshot read-model consolidation scored
+approximately `62–65` in one report but lacks a second independent record, so it is deferred pending
+corroboration. Stale closeout checkboxes in older completed plans are documentation debt, not a
+selected architecture slice.
+
+### Problem Frame 57 — canonical reusable-object threading and legacy kwargs retirement
+
+The representative workflow is AppFrame construction -> workspace open -> signing-shell factory ->
+properties-panel/coordinator construction. The intended invariant is one canonical
+`ReusableSigningObjects` identity for all reusable appearance, placement, and preset reads/writes.
+The current shell factory still accepts two older catalog-shaped inputs, rejects them only when a
+canonical service is also supplied, and otherwise creates a second service locally. This leaves a
+compatibility source-selection branch in a production-facing factory and keeps dozens of tests and
+callers coupled to the old catalog vocabulary. A future catalog change can therefore still be
+miswired at the shell edge even though the rest of the graph is canonical.
+
+The dependency category is local-substitutable: Qt widget bindings can be faked, the application
+coordinator accepts in-memory repositories/services, and existing shell/workspace tests exercise
+the observable composition contract without a live display. The refactor must preserve all signing,
+preview, refresh, selection, placement `current_page`, persistence, CLI/JSON/artifact, and phase3
+behavior. The expected improvement is removal of duplicate source selection and caller knowledge,
+not a generic workspace manager or a rename-only cleanup. Illustrative target:
+
+    shell = build_qt_signing_shell(
+        viewer_workflow=viewer,
+        signing_workflow=workflow,
+        reusable_objects=app_frame.reusable_objects,
+    )
+    # no preset_catalog/preset_catalog_store branch exists in production composition
+
+The design round must decide whether legacy kwargs are removed atomically or retained only in a
+test-only adapter, and how to prove the canonical object identity across the shell boundary.
+
+### Design Selection 57 — completed 2026-08-08
+
+Three radically different shapes were considered for the canonical reusable-object threading seam.
+Design A, the minimal interface, makes `ReusableSigningObjects` required on the shell/coordinator
+edges and deletes the source-selection fallback while retaining the AppFrame persistence-store
+injection; its author score is `82.0`. Design B adds a broad `ReusableSigningObjectsPort` protocol
+covering snapshot, refresh, resolution, duplicate checks, composition, and commands; its score is
+`81.5`, but its larger public surface is not justified by a current alternate implementation.
+Design C is the common-caller optimized shape: require the concrete `ReusableSigningObjects` at
+the already-existing `SigningWorkspaceBootstrap`, shell factory, composition, panel, and
+coordinator boundaries; keep `preset_catalog_store` only at AppFrame as the persistence composition
+root; remove shell/coordinator catalog-shaped inputs and their fallback construction. Its author
+score is approximately `87.5`.
+
+Two independent reviewers scored Design C as `(4.0,4.75,4.25,4.75,4.75,3.75,4.5)` and
+`(4.5,4.5,4.5,3.5,4.5,4.0,4.5)`. The orchestrator score is
+`(4.5,4.5,4.5,4.0,4.5,3.75,4.75)`. Median dimensions are
+`(4.5,4.5,4.5,4.0,4.5,3.75,4.5)`, yielding BaseShapeScore `87.0`; no evidence-backed penalties
+apply. Design C is selected because it makes the dominant existing caller path trivial, removes a
+second reusable-object construction source, avoids speculative protocol surface, and keeps storage
+and persisted schema ownership at AppFrame. The exact contract is required concrete
+`ReusableSigningObjects`, not an optional value and not a service locator. The child plan is
+`docs/ExecPlans/reusable_signing_objects_qt_legacy_kwargs_execplan.md`.
+
+The separate historical-label cleanup is now decomposed into a bounded first child slice,
+`docs/ExecPlans/evidence_core_nomenclature_retirement_execplan.md`. It renames only the neutral
+application evidence-core/fidelity module paths and tests, deletes old import paths rather than
+adding aliases, and preserves public `phase3` CLI/DTO/JSON/fixture/artifact contracts for a later
+versioned migration.
+
+### Implementation 57 — canonical reusable-object threading (in validation/closure)
+
+The selected common-caller shape is implemented in the child plan. `DefaultSignaturePropertiesCoordinator`,
+`SigningShellAdapter.create()`, and `build_qt_signing_shell()` now require one concrete
+`ReusableSigningObjects` instance and contain no catalog-shaped fallback or source-selection
+branch. AppFrame and top-level persistence adapters retain `preset_catalog_store` only where the
+filesystem-backed repository is composed; the production target grep is empty. The historical
+fixture corpus is isolated behind a test-only helper in `tests/support/signing_builders.py`, with
+direct production identity and fail-fast tests proving the new boundary.
+
+Focused validation passed `216` tests; full validation passed `1,166` tests with the one pre-existing
+Pillow warning. Ruff, compileall, diff checks, and frozen-SPEC checks passed. The offscreen signed
+acceptance evidence command passed `10` scenarios/`7` successful signings, preview parity `18/18`,
+and fit rejection `3/3`; its generated outputs were removed and the process audit is empty. Two
+independent compliance reviews found no production compatibility remnants; one timing-sensitive
+preview assertion failed once and passed on immediate rerun, with no repeatable regression.

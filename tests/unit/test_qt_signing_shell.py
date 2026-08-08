@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 
 import pytest
@@ -19,7 +20,9 @@ from foliaseal.application.document_review import (
 )
 from foliaseal.application.document_text_search import DocumentTextMatch
 from foliaseal.application.document_text_selection import DocumentTextSelection
-from foliaseal.application.reusable_signing_models import PlacementProfileRect
+from foliaseal.application.reusable_signing_models import (
+    PlacementProfileRect,
+)
 from foliaseal.application.signing_material_resolver import (
     RepositoryBackedCertificateSigningMaterialPort,
 )
@@ -41,7 +44,7 @@ from foliaseal.infra.config.profile_storage import (
 )
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPageResult
-from foliaseal.presentation.qt import build_qt_signing_shell
+from foliaseal.presentation.qt import build_qt_signing_shell as _build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
@@ -52,6 +55,7 @@ from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,
+    build_reusable_objects_fixture,
     build_signature_appearance,
     build_signature_field_binding,
     build_signature_preset,
@@ -71,6 +75,23 @@ class _FakeSecretProvider:
 
     def get_secret(self, secret_ref: str) -> str | None:
         return self._secrets.get(secret_ref)
+
+
+def build_qt_signing_shell(**kwargs):
+    """Normalize historical shell fixtures to the required reusable-object input."""
+    preset_catalog = kwargs.pop("preset_catalog", None)
+    preset_catalog_store = kwargs.pop("preset_catalog_store", None)
+    reusable_objects = kwargs.get("reusable_objects")
+    if reusable_objects is not None and (
+        preset_catalog is not None or preset_catalog_store is not None
+    ):
+        raise ValueError("reusable_objects cannot be combined with legacy preset catalog inputs.")
+    if reusable_objects is None:
+        kwargs["reusable_objects"] = build_reusable_objects_fixture(
+            preset_catalog=preset_catalog,
+            preset_catalog_store=preset_catalog_store,
+        )
+    return _build_qt_signing_shell(**kwargs)
 
 
 class _FakeSignal:
@@ -701,6 +722,11 @@ def _viewer_workflow() -> ViewerWorkflow:
         render_backend=_FakeRenderBackend(),
         session=ViewerSession(page_count=3),
     )
+
+
+def test_production_shell_factory_requires_canonical_reusable_objects() -> None:
+    parameter = inspect.signature(_build_qt_signing_shell).parameters["reusable_objects"]
+    assert parameter.default is inspect.Parameter.empty
 
 
 def test_signing_shell_output_dialog_uses_app_settings_default_directory(
@@ -1571,9 +1597,7 @@ def test_signing_shell_shows_document_review_summary_from_injected_inspector(
     )
 
     assert inspector.calls == ["/tmp/sample.pdf"]
-    assert widget.sidebar_surface.document_review_headline_label.text() == (
-        "Signature review"
-    )
+    assert widget.sidebar_surface.document_review_headline_label.text() == ("Signature review")
     assert "Found 1 embedded signature." in (
         widget.sidebar_surface.document_review_detail_label.text()
     )
@@ -1695,8 +1719,7 @@ def test_signing_shell_renders_per_signature_review_items(
     rendered = widget.sidebar_surface.document_review_signature_items_label.text()
     assert "Signature 1: CN=Bob Example: verified locally." in rendered
     assert (
-        "Signature 2 (latest): "
-        "CN=Alice Example: needs local verification attention."
+        "Signature 2 (latest): CN=Alice Example: needs local verification attention."
     ) in rendered
 
 
@@ -1856,8 +1879,7 @@ def test_signing_shell_renders_next_action_guidance_for_not_evaluated_signature(
         DocumentReviewSummary(
             headline="Signature review",
             detail=(
-                "Found 1 embedded signature. "
-                "Latest signature validity was not evaluated locally."
+                "Found 1 embedded signature. Latest signature validity was not evaluated locally."
             ),
             signature_count=1,
             signature_items=(
@@ -1976,8 +1998,7 @@ def test_signing_shell_preserves_selected_signature_on_review_refresh(
                     cryptographic_validation_passed=True,
                     detail="CN=Bob Example: verified locally.",
                     drill_in_detail=(
-                        "Signer: CN=Bob Example.\n"
-                        "Local verification: verified locally."
+                        "Signer: CN=Bob Example.\nLocal verification: verified locally."
                     ),
                 ),
                 DocumentSignatureReviewItem(
@@ -2636,8 +2657,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
     assert (
-        len(widget.properties_panel._visible_text_controls.field_checks_container.layout.items)
-        == 8
+        len(widget.properties_panel._visible_text_controls.field_checks_container.layout.items) == 8
     )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
@@ -2733,17 +2753,14 @@ def test_signing_shell_refinement_dialog_cancel_keeps_current_state(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
     )
-    original_prefix = (
-        widget.properties_panel._appearance_controls.signer_label_prefix.text()
-    )
+    original_prefix = widget.properties_panel._appearance_controls.signer_label_prefix.text()
 
     applied = widget.properties_panel.open_refinement_dialog()
 
     assert applied is False
     assert widget.properties_panel._active_refinement_dialog is None
     assert (
-        widget.properties_panel._appearance_controls.signer_label_prefix.text()
-        == original_prefix
+        widget.properties_panel._appearance_controls.signer_label_prefix.text() == original_prefix
     )
 
 
@@ -2792,8 +2809,7 @@ def test_signing_shell_refinement_dialog_saves_appearance_without_applying_draft
         == "Reviewed by"
     )
     assert (
-        widget.properties_panel._appearance_controls.signer_label_prefix.text()
-        == original_prefix
+        widget.properties_panel._appearance_controls.signer_label_prefix.text() == original_prefix
     )
     assert bindings.q_input_dialog.calls[0][1:3] == (
         "Save appearance profile",
@@ -3263,9 +3279,11 @@ def test_signing_shell_visible_style_edits_preserve_hidden_preset_appearance_val
     assert detail_lines[7] == "Reason: Reason"
     assert len(detail_lines) == 8
     assert preview_controls.footer_label.text() == ""
-    assert widget.properties_panel._appearance_controls.font_family._items[
-        :3
-    ] == ["Sans Serif", "Serif", "Monospace"]
+    assert widget.properties_panel._appearance_controls.font_family._items[:3] == [
+        "Sans Serif",
+        "Serif",
+        "Monospace",
+    ]
     assert "Source Sans 3" in widget.properties_panel._appearance_controls.font_family._items
     assert widget.properties_panel._appearance_controls.font_family.currentText() == "Serif"
     assert "Digitally signed by" in preview_text
@@ -5092,9 +5110,7 @@ def test_signing_shell_signature_preset_overwrite_requires_confirmation(
             profiles=(
                 build_signature_preset(
                     name="Team Standard",
-                    appearance=build_signature_appearance(
-                        signer_label_prefix="Signed by Team"
-                    ),
+                    appearance=build_signature_appearance(signer_label_prefix="Signed by Team"),
                 ),
             )
         )
@@ -5115,9 +5131,7 @@ def test_signing_shell_signature_preset_overwrite_requires_confirmation(
     assert result is None
     assert fake_bindings.q_message_box.calls
     assert (
-        store.load_catalog()
-        .preset_named("Team Standard")
-        .appearance.signer_label_prefix
+        store.load_catalog().preset_named("Team Standard").appearance.signer_label_prefix
         == "Signed by Team"
     )
 

@@ -24,6 +24,11 @@ from foliaseal.application.reusable_signing_models import (
     SignaturePreset,
     SignaturePresetCatalog,
 )
+from foliaseal.application.reusable_signing_objects import (
+    CatalogRepository,
+    InMemoryCatalogRepository,
+    ReusableSigningObjects,
+)
 from foliaseal.domain.models import (
     SignatureAnchor,
     SignatureAppearance,
@@ -40,6 +45,45 @@ from foliaseal.domain.models import (
     SigningRequest,
     TimestampTrustPolicy,
 )
+
+
+def build_reusable_objects_fixture(
+    *,
+    preset_catalog: SignaturePresetCatalog | None = None,
+    preset_catalog_store: CatalogRepository | None = None,
+) -> ReusableSigningObjects:
+    """Adapt historical fixture inputs to the canonical reusable-object service.
+
+    This helper is test-only. Production constructors intentionally do not accept these
+    catalog-shaped inputs.
+    """
+    if preset_catalog is not None and preset_catalog_store is not None:
+        raise ValueError("preset_catalog and preset_catalog_store are mutually exclusive")
+    return ReusableSigningObjects(
+        preset_catalog_store
+        or InMemoryCatalogRepository(preset_catalog or SignaturePresetCatalog(schema_version=1))
+    )
+
+
+def build_signature_properties_coordinator_fixture(**kwargs):
+    """Build the production coordinator from historical test fixture kwargs only."""
+    from foliaseal.application.signature_properties_coordinator import (
+        DefaultSignaturePropertiesCoordinator,
+    )
+
+    preset_catalog = kwargs.pop("preset_catalog", None)
+    preset_catalog_store = kwargs.pop("preset_catalog_store", None)
+    reusable_objects = kwargs.get("reusable_objects")
+    if reusable_objects is not None and (
+        preset_catalog is not None or preset_catalog_store is not None
+    ):
+        raise ValueError("reusable_objects cannot be combined with legacy preset catalog inputs.")
+    if reusable_objects is None:
+        kwargs["reusable_objects"] = build_reusable_objects_fixture(
+            preset_catalog=preset_catalog,
+            preset_catalog_store=preset_catalog_store,
+        )
+    return DefaultSignaturePropertiesCoordinator(**kwargs)
 
 
 def build_signature_rect(

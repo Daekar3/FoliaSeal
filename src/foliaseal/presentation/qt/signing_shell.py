@@ -30,11 +30,7 @@ from foliaseal.application.document_text_selection import (
     DocumentTextSelectionEngine,
     DocumentTextSelectionState,
 )
-from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
-from foliaseal.application.reusable_signing_objects import (
-    InMemoryCatalogRepository,
-    ReusableSigningObjects,
-)
+from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinatorError as _SignaturePropertiesCoordinatorError,
 )
@@ -67,7 +63,6 @@ from foliaseal.domain.models import (
     SignatureTimezoneDisplayMode as _SignatureTimezoneDisplayMode,
 )
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
-from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signature_preview_layout import (
     _preview_stamp_text as _preview_stamp_text_impl,
@@ -423,12 +418,10 @@ class SigningShellAdapter:
         *,
         viewer_workflow: ViewerWorkflow,
         signing_workflow: SigningDraftWorkflow,
+        reusable_objects: ReusableSigningObjects,
         certificate_catalog: CertificateCatalog | None = None,
         certificate_catalog_store: CertificateCatalogRepository | None = None,
         certificate_material_port: CertificateSigningMaterialPort | None = None,
-        reusable_objects: ReusableSigningObjects | None = None,
-        preset_catalog: SignaturePresetCatalog | None = None,
-        preset_catalog_store: SignaturePresetCatalogStore | None = None,
         app_settings: AppSettings | None = None,
         app_settings_store: AppSettingsStore | None = None,
         document_review_inspector: DocumentReviewInspector | None = None,
@@ -441,18 +434,6 @@ class SigningShellAdapter:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
     ) -> Any:
-        if reusable_objects is not None and (
-            preset_catalog is not None or preset_catalog_store is not None
-        ):
-            raise ValueError(
-                "reusable_objects cannot be combined with legacy preset catalog inputs."
-            )
-        if reusable_objects is None:
-            reusable_objects = ReusableSigningObjects(
-                preset_catalog_store or InMemoryCatalogRepository(
-                    preset_catalog or SignaturePresetCatalog(schema_version=1)
-                )
-            )
         copy_text_callback = on_copy_text or self._load_copy_text_callback()
         return SigningWorkspaceWidget(
             bindings=self._bindings,
@@ -532,12 +513,10 @@ def build_qt_signing_shell(
     *,
     viewer_workflow: ViewerWorkflow,
     signing_workflow: SigningDraftWorkflow,
+    reusable_objects: ReusableSigningObjects,
     certificate_catalog: CertificateCatalog | None = None,
     certificate_catalog_store: CertificateCatalogRepository | None = None,
     certificate_material_port: CertificateSigningMaterialPort | None = None,
-    reusable_objects: ReusableSigningObjects | None = None,
-    preset_catalog: SignaturePresetCatalog | None = None,
-    preset_catalog_store: SignaturePresetCatalogStore | None = None,
     app_settings: AppSettings | None = None,
     app_settings_store: AppSettingsStore | None = None,
     document_review_inspector: DocumentReviewInspector | None = None,
@@ -556,12 +535,10 @@ def build_qt_signing_shell(
     return adapter.create(
         viewer_workflow=viewer_workflow,
         signing_workflow=signing_workflow,
+        reusable_objects=reusable_objects,
         certificate_catalog=certificate_catalog,
         certificate_catalog_store=certificate_catalog_store,
         certificate_material_port=certificate_material_port,
-        reusable_objects=reusable_objects,
-        preset_catalog=preset_catalog,
-        preset_catalog_store=preset_catalog_store,
         app_settings=app_settings,
         app_settings_store=app_settings_store,
         document_review_inspector=document_review_inspector,

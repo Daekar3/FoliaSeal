@@ -2,7 +2,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from foliaseal.application.signature_properties_coordinator import (
-    DefaultSignaturePropertiesCoordinator,
     SignaturePropertiesCoordinatorError,
     SignaturePropertiesViewState,
     VisibleSignaturePlacementDraft,
@@ -20,6 +19,9 @@ from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_preset,
     build_signature_preset_catalog,
+)
+from tests.support.signing_builders import (
+    build_signature_properties_coordinator_fixture as DefaultSignaturePropertiesCoordinator,
 )
 from tests.unit.test_signature_properties_coordinator import (
     _FakeSecretProvider,
@@ -373,8 +375,7 @@ def test_signing_setup_session_set_signature_appearance_clears_selected_preset(
     assert coordinator.workflow.signature_appearance == updated_appearance
 
 
-def test_signing_setup_session_set_signature_appearance_delegates_to_coordinator_boundary(
-) -> None:
+def test_signing_setup_session_set_signature_appearance_delegates_to_coordinator_boundary() -> None:
     returned_state = SignaturePropertiesViewState(
         selected_certificate_configuration_name="Corporate Records Signing",
         selected_signature_preset_name=None,
