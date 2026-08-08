@@ -152,9 +152,9 @@ created.
 - [x] Completed Scan Round 57 and Design Selection 57; selected the common-caller concrete
   `ReusableSigningObjects` shape and created
   `reusable_signing_objects_qt_legacy_kwargs_execplan.md`.
-- [x] Implemented the canonical reusable-object boundary, moved test-only fixture adaptation to
-  shared test support, completed focused/full/offscreen validation, and removed slice-generated
-  acceptance outputs; intentional commit and post-commit closure audits remain.
+- [x] Implemented and closed the canonical reusable-object boundary as commit `9cf59efc8`; moved
+  test-only fixture adaptation to shared test support, completed focused/full/offscreen validation,
+  removed slice-generated acceptance outputs, and passed three independent post-commit audits.
 
 ## Scan and Candidate Ledger
 
@@ -2894,7 +2894,7 @@ application evidence-core/fidelity module paths and tests, deletes old import pa
 adding aliases, and preserves public `phase3` CLI/DTO/JSON/fixture/artifact contracts for a later
 versioned migration.
 
-### Implementation 57 — canonical reusable-object threading (in validation/closure)
+### Implementation 57 — canonical reusable-object threading (completed 2026-08-08)
 
 The selected common-caller shape is implemented in the child plan. `DefaultSignaturePropertiesCoordinator`,
 `SigningShellAdapter.create()`, and `build_qt_signing_shell()` now require one concrete
@@ -2909,4 +2909,7 @@ Pillow warning. Ruff, compileall, diff checks, and frozen-SPEC checks passed. Th
 acceptance evidence command passed `10` scenarios/`7` successful signings, preview parity `18/18`,
 and fit rejection `3/3`; its generated outputs were removed and the process audit is empty. Two
 independent compliance reviews found no production compatibility remnants; one timing-sensitive
-preview assertion failed once and passed on immediate rerun, with no repeatable regression.
+preview assertion failed once and passed on immediate rerun, with no repeatable regression. Commit
+`9cf59efc8` was audited independently three times after commit: clean tree, frozen SPEC, empty
+production retirement grep, no generated acceptance outputs, and no residual application/test/Qt
+processes.

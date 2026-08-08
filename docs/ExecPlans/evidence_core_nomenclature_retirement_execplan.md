@@ -29,8 +29,10 @@ until a later contract-migration slice can change them atomically.
 ## Progress
 
 - [x] (2026-08-08) Inventory completed: the two target modules have first-party imports in
-  `evidence_service.py`, `signed_acceptance_evidence.py`, `phase3_harness.py`, and the two target
-  unit-test modules; no package export or entry-point shim is required.
+  `evidence_service.py`, `signed_acceptance_evidence.py`, `phase3_harness.py`,
+  `tests/unit/test_phase3_evidence_core.py`, `tests/unit/test_phase3_fidelity_contract.py`,
+  `tests/unit/test_evidence_service.py`, and `tests/unit/test_qa_signed_acceptance_evidence.py`;
+  no package export or entry-point shim is required.
 - [x] (2026-08-08) Scope constrained to internal module/test paths; no compatibility alias will be
   added and no persisted/CLI/fixture contract will be changed.
 - [ ] Rename modules and tests, update imports and import-isolation assertions, and remove old paths.

@@ -729,6 +729,31 @@ def test_production_shell_factory_requires_canonical_reusable_objects() -> None:
     assert parameter.default is inspect.Parameter.empty
 
 
+def test_shell_factory_preserves_reusable_object_identity(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+    service = build_reusable_objects_fixture()
+
+    widget = _build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        reusable_objects=service,
+    )
+
+    assert widget.properties_panel._coordinator.reusable_objects is service
+
+
 def test_signing_shell_output_dialog_uses_app_settings_default_directory(
     monkeypatch,
     tmp_path: Path,

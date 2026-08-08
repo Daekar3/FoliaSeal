@@ -59,7 +59,10 @@ evidence afterward.
   passed with `10` scenarios/`7` successful signings, preview parity `18/18`, and fit rejection
   `3/3`. The command-generated acceptance directory and summary were removed; unrelated pre-existing
   `artifacts/` evidence is retained.
-- [ ] Reconcile final plan/parent status, commit, and complete three independent closure audits.
+- [x] (2026-08-08) Reconciled final plan/parent status and committed the complete slice as
+  `9cf59efc8` (`Retire Qt signing catalog compatibility inputs`). Three independent post-commit
+  audits confirmed a clean tree, frozen SPEC, empty production legacy-kwarg grep, absent generated
+  acceptance outputs, and no residual FoliaSeal/pytest/Qt processes.
 
 ## Surprises & Discoveries
 
@@ -137,8 +140,9 @@ Validation evidence: focused `216` passed; full `1,166` passed with one pre-exis
 warning; Ruff, compileall, diff, and frozen-SPEC checks passed; offscreen acceptance reported
 `10` scenarios/`7` successful signings, parity `18/18`, and fit rejection `3/3`. The generated
 acceptance directory and summary were removed, unrelated baseline artifacts were left untouched,
-and the process audit is empty. Commit ID and post-commit closure audits are recorded below when
-complete.
+and the process audit is empty. Commit `9cf59efc8` is closed by three independent post-commit
+audits; the only intentional remaining compatibility-shaped inputs are the AppFrame persistence
+store and the test-only fixture adapter, both documented with retirement boundaries.
 
 ## Context and Orientation
 
