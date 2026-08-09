@@ -1,0 +1,139 @@
+# Verification failure recovery, reopen, and later approval
+
+This ExecPlan is a living document and must be maintained in accordance with
+.agents/skills/write-execplan/PLANS.md. It is an AFK (agent can implement and validate without a
+pending human product decision) child of
+docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
+
+## Purpose / Big Picture
+
+After this slice, a user can verified-result guidance, preserved-artifact recovery, reopen, and later approval in the real FoliaSeal GUI. It is mapped to SPEC primary story and UI_SPEC WF05/SUR06/section 16. The
+slice is one vertical path through the relevant model, application workflow,
+Qt surface, focused tests, and observable acceptance.
+
+## Child ExecPlan Dependencies
+
+- [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
+- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md, docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
+
+## Progress
+
+- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
+- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
+- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
+- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+
+## Surprises & Discoveries
+
+- Observation: verification, document review, and workspace reopening are separate seams; this
+  child must preserve the original draft on failure and verify every existing signature before
+  reopening for another approval.
+  Evidence: the live source paths and focused tests listed below are the audit baseline.
+
+## Decision Log
+
+- Decision: obey SPEC.md, SCHEMAS.md, and UI_SPEC.md in that precedence order.
+  Rationale: these are the repository's explicit authority boundaries.
+  Date/Author: 2026-08-09 / Codex
+- Decision: keep the slice limited to one user-visible verification failure recovery, reopen, and later approval outcome.
+  Rationale: narrow changes are independently testable and recoverable.
+  Date/Author: 2026-08-09 / Codex
+
+## Outcomes & Retrospective
+
+Not started. Record demonstrated behavior, evidence, and remaining gaps at completion.
+
+## Context and Orientation
+
+The relevant code is document_review.py; signing_workspace_review_bridge.py; signing_completion.py; app-frame reopen/open flow; verification surfaces. FoliaSeal is a Python/Qt Linux PDF signing application. The
+primary flow is open, review, select reusable setup, place one visible signature, preview
+readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
+workflow, enterprise trust administration, and multiple pending signatures.
+
+A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
+contracts; production backend/evidence imports may be renamed only after a neutral migration proves
+the old name is no longer required.
+
+## Change Slice
+
+Primary change class: behavior change. Allowed changes are the named modules, focused tests, bounded
+ignored local evidence, and the minimum truthful status documentation. Package construction and
+installed-package evidence belong only to ui_product_support_and_release_execplan.md.
+
+## Plan of Work
+
+Render successful local verification as a terminal signed state with clear reopen guidance. On post-write verification failure preserve the artifact and offer Verify again, Return to draft, Open preserved copy, and technical details. Reopening must permit another approval only when permissions allow and must explain invalid/changed/unverifiable signatures plainly. Use typed application contracts and public Qt ports, not private child-widget reach-through.
+Keep persistent objects and secrets within the schemas/storage rules. Retire obsolete compatibility
+paths only after proving their consumers migrated, and record every retirement in the Decision Log.
+
+## Milestones
+
+Milestone 1 adds verification/reopen fixtures including every existing signature and failure modes.
+Milestone 2 wires recovery actions and reopen/add-approval behavior after successful verification.
+Milestone 3 proves failed and successful paths in the GUI and records cleanup.
+
+## Concrete Steps
+
+Run from /home/daekar/FoliaSeal.
+
+    rg -n -e 'verify|reopen|recovery|signature|permission' src/foliaseal/application/document_review.py src/foliaseal/application/signing_completion.py src/foliaseal/presentation/qt/app_frame_workspace_open.py
+    .venv/bin/pytest -q tests/unit/test_signing_completion.py tests/unit/test_document_review.py tests/unit/test_qt_app_frame_workspace_open.py
+    .venv/bin/ruff check src tests
+    git diff --check
+
+Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
+
+    audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
+    timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
+    ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest|build_deb|build_pyinstaller' | rg -v 'rg ' || true
+    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
+    rmdir "$audit_root" 2>/dev/null || true
+
+Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
+walkthrough. Record recovery inputs, observed verification/reopen state, evidence path, and cleanup
+result; the bounded timeout is only a lifecycle check. Package evidence belongs only to the final
+release plan.
+
+## Validation and Acceptance
+
+Acceptance is behavioral: A user can sign, reopen the output, inspect the verification result, and add another approval when allowed; failed verification never presents the artifact as safe or destroys the original. Focused tests and the full suite must pass; the
+final acceptance record must distinguish headless evidence from real Qt interaction and must include
+cleanup evidence.
+
+## Required Acceptance Cases
+
+Post-write verification failure says the artifact must not yet be relied upon and offers Verify again,
+Return to draft, Open preserved copy, and technical details. Successful verified signing is terminal for
+the workspace; reopening the signed output exposes later approval signing only when permissions allow.
+
+## Evidence Record
+
+Before completion, record the exact verification/reopen test command and result, successful and
+failed GUI recovery sequences, every-signature verification observation, evidence path, cleanup,
+and compatibility grep proof.
+
+## Idempotence and Recovery
+
+Use temporary configuration, sibling output, and disposable package-install roots. If a build or GUI
+audit fails, retain source data, update Progress, clean owned processes/artifacts, and retry from
+the recorded state. Never delete unrelated temporary files or private material.
+
+## Artifacts and Notes
+
+Record exact package name/path, launch command, help output, accessibility observations, and concise
+acceptance evidence. Do not commit generated packages, private keys, passwords, or machine-local
+absolute paths unless the repository explicitly requires a fixture.
+
+## Interfaces and Dependencies
+
+Use AppSettings, the public Qt frame/workspace ports, packaged Markdown help, the CLI parser in
+src/foliaseal/__main__.py, and build helpers under src/foliaseal/build/. The final behavior must be
+exercised by tests/unit/test_signing_completion.py, tests/unit/test_document_review.py,
+tests/unit/test_qt_app_frame_workspace_open.py, and tests/integration/test_verification_recovery_reopen.py.
+New help/diagnostic surfaces must not expose secrets, PDF contents, selected
+text, Reason, Location, or private keys.
+
+Revision note: 2026-08-09 / Codex
+Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
