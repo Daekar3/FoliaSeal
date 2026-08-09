@@ -5606,6 +5606,7 @@ def test_signing_shell_disposes_canonical_preview_snapshot_on_widget_close(
     snapshot = widget.properties_panel.preview_controls.card_container._canonical_preview_snapshot
     assert snapshot is None
     assert not snapshot_dir.exists()
+    assert widget._composition_boundary._disposed is True
 
 
 def test_signing_shell_sizes_canonical_render_label_to_scaled_pixmap(

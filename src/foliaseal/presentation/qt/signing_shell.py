@@ -74,13 +74,12 @@ from foliaseal.presentation.qt.signing_action_boundary import (
     SigningActionBoundary as _SigningActionBoundary,
 )
 from foliaseal.presentation.qt.signing_workspace_composition import (
-    build_signing_workspace_composition,
+    QtSigningWorkspaceComposition,
+    QtSigningWorkspaceCompositionRequest,
+    QtSigningWorkspaceHostActions,
 )
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
     SigningWorkspaceSnapshot,
-)
-from foliaseal.presentation.qt.signing_workspace_runtime import (
-    SigningWorkspaceRuntime,
 )
 from foliaseal.presentation.qt.signing_workspace_shell_controller import (
     SigningWorkspaceShellController,
@@ -218,22 +217,15 @@ class SigningWorkspaceWidget:
             self._app_settings = app_settings_store.load_settings()
         else:
             self._app_settings = AppSettings.default()
-        self._runtime = SigningWorkspaceRuntime(
-            draft_workflow=signing_workflow,
-            on_copy_text=on_copy_text,
-            on_error=on_error,
-            on_status_change=on_status_change,
-        )
         self.widget = _build_close_aware_widget(
             bindings.q_widget,
-            on_close=lambda: self.properties_panel.dispose(),
+            on_close=self._dispose_composition,
         )
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
         self._layout.setSpacing(8)
-        self._shell_controller = SigningWorkspaceShellController.build(
-            widget=self.widget,
-            compose=lambda: build_signing_workspace_composition(
+        composition = QtSigningWorkspaceComposition.from_request(
+            QtSigningWorkspaceCompositionRequest(
                 bindings=bindings,
                 widget=self.widget,
                 layout=self._layout,
@@ -255,23 +247,39 @@ class SigningWorkspaceWidget:
                 on_error=on_error,
                 on_status_change=on_status_change,
                 viewer_widget_builder=build_qt_pdf_viewer_widget,
-                runtime=self._runtime,
-                choose_output_pdf_path=self.choose_output_pdf_path,
-                submit_sign_request=self.submit_sign_request,
-                open_signed_output=self.open_signed_output,
-                search_document_text=self.search_document_text,
-                previous_document_text_match=self.previous_document_text_match,
-                next_document_text_match=self.next_document_text_match,
-                copy_current_document_text_match=self.copy_current_document_text_match,
-                set_document_text_selection_mode=self.set_document_text_selection_mode,
-                copy_selected_document_text=self.copy_selected_document_text,
-                clear_selected_document_text=self.clear_selected_document_text,
-                get_app_settings=lambda: self._app_settings,
-                set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
-            ),
+                host_actions=QtSigningWorkspaceHostActions(
+                    choose_output_pdf_path=self.choose_output_pdf_path,
+                    submit_sign_request=self.submit_sign_request,
+                    open_signed_output=self.open_signed_output,
+                    search_document_text=self.search_document_text,
+                    previous_document_text_match=self.previous_document_text_match,
+                    next_document_text_match=self.next_document_text_match,
+                    copy_current_document_text_match=self.copy_current_document_text_match,
+                    set_document_text_selection_mode=self.set_document_text_selection_mode,
+                    copy_selected_document_text=self.copy_selected_document_text,
+                    clear_selected_document_text=self.clear_selected_document_text,
+                    get_app_settings=lambda: self._app_settings,
+                    set_app_settings=lambda settings: setattr(self, "_app_settings", settings),
+                ),
+            )
+        )
+        self._composition_boundary = composition
+        self._shell_controller = SigningWorkspaceShellController.build(
+            widget=self.widget,
+            compose=composition.build,
         )
         self._shell_controller.install_into(self)
         self._shell_controller.bootstrap()
+
+    def _dispose_composition(self) -> None:
+        composition = getattr(self, "_composition_boundary", None)
+        if composition is not None:
+            composition.dispose()
+            return
+        properties_panel = getattr(self, "_properties_panel", None)
+        dispose = getattr(properties_panel, "dispose", None)
+        if callable(dispose):
+            dispose()
 
     @property
     def container(self) -> Any:
@@ -488,6 +496,23 @@ class SigningShellAdapter:
             on_copy_text=copy_text_callback,
             on_error=on_error,
             on_status_change=on_status_change,
+        )
+
+    def create_from_bootstrap(self, bootstrap: Any) -> SigningWorkspaceWidget:
+        """Create from the stable application bootstrap without exposing Qt wiring."""
+        return self.create(
+            viewer_workflow=bootstrap.viewer_workflow,
+            signing_workflow=bootstrap.signing_workflow,
+            certificate_catalog_store=bootstrap.certificate_catalog_store,
+            certificate_material_port=bootstrap.certificate_material_port,
+            reusable_objects=bootstrap.reusable_objects,
+            app_settings=bootstrap.app_settings,
+            app_settings_store=bootstrap.app_settings_store,
+            sign_executor=bootstrap.sign_executor,
+            on_sign_request=bootstrap.on_sign_request,
+            on_open_signed_output=bootstrap.on_open_signed_output,
+            on_error=bootstrap.on_error,
+            on_status_change=bootstrap.on_status_change,
         )
 
     def _load_bindings(self) -> QtSigningWidgetBindings:

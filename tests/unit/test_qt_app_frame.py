@@ -489,20 +489,21 @@ def _settings(tmp_path: Path) -> AppSettings:
     )
 
 
-def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
+def test_qt_signing_workspace_factory_delegates_typed_bootstrap_to_shell_adapter(
     tmp_path: Path, monkeypatch
 ) -> None:
     captured = {}
     shell = _FakeShell()
 
-    def _fake_build_qt_signing_shell(**kwargs):
-        captured.update(kwargs)
-        return shell
+    class _FakeShellAdapter:
+        def create_from_bootstrap(self, bootstrap):
+            captured["bootstrap"] = bootstrap
+            return shell
 
     monkeypatch.setattr(
         signing_shell_port_module,
-        "build_qt_signing_shell",
-        _fake_build_qt_signing_shell,
+        "SigningShellAdapter",
+        _FakeShellAdapter,
     )
     bootstrap = SigningWorkspaceBootstrap(
         viewer_workflow=object(),
@@ -527,20 +528,7 @@ def test_qt_signing_workspace_factory_wraps_build_qt_signing_shell(
 
     assert bundle.view.mount_target() is shell
     assert bundle.testing is shell.testing_adapter
-    assert captured == {
-        "viewer_workflow": bootstrap.viewer_workflow,
-        "signing_workflow": bootstrap.signing_workflow,
-        "certificate_catalog_store": bootstrap.certificate_catalog_store,
-        "certificate_material_port": bootstrap.certificate_material_port,
-        "reusable_objects": bootstrap.reusable_objects,
-        "app_settings": bootstrap.app_settings,
-        "app_settings_store": bootstrap.app_settings_store,
-        "sign_executor": bootstrap.sign_executor,
-        "on_sign_request": bootstrap.on_sign_request,
-        "on_open_signed_output": bootstrap.on_open_signed_output,
-        "on_error": bootstrap.on_error,
-        "on_status_change": bootstrap.on_status_change,
-    }
+    assert captured == {"bootstrap": bootstrap}
 
 
 def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path) -> None:

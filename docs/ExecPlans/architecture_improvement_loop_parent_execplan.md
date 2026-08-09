@@ -49,7 +49,8 @@ created.
 
 - [x] The frozen product contract is available in `docs/SPEC.md`.
 - [x] The current architecture map is available in `docs/ARCHITECTURE.md`.
-- [x] The current checkout baseline is `main` at commit `ca6857ef9` (clean at loop start).
+- [x] The initial loop baseline was `main` at commit `ca6857ef9` (clean at loop start); live
+  continuation baselines are recorded by scan round below.
 - [x] Child plan `signing_workspace_primary_session_hybrid_execplan.md` records the hybrid interface,
   baseline proxies, behavior map, predicted improvement, and acceptance gates.
 - [x] Child plan `reusable_signing_models_application_boundary_execplan.md` records the persisted-
@@ -155,6 +156,13 @@ created.
 - [x] Implemented and closed the canonical reusable-object boundary as commit `9cf59efc8`; moved
   test-only fixture adaptation to shared test support, completed focused/full/offscreen validation,
   removed slice-generated acceptance outputs, and passed three independent post-commit audits.
+- [x] (2026-08-09) Reconciled the live continuation baseline at `f6a3ed3fc`, including the
+  user-approved frozen `docs/UI_SPEC.md`, exploratory UI topology/state artifacts, updated
+  `docs/SPEC.md`/`docs/SCHEMAS.md`, and the clean-slate README rewrite; these documentation changes
+  are current inputs to candidate ranking, not architecture-cycle implementation credit.
+- [x] (2026-08-09) Completed Scan Round 59 with three independent explorers. The highest qualifying
+  bounded candidate is `qt-workspace-composition-boundary`; the reusable Signature Library is the
+  next GUI-focused candidate, while atomic `phase3` nomenclature remains contract-sensitive.
 
 ## Scan and Candidate Ledger
 
@@ -3030,3 +3038,158 @@ the external command contract is deliberately migrated together. It must not add
 aliases, must preserve or explicitly version any persisted JSON/fixture/artifact boundary, and must
 leave `docs/SPEC.md` unchanged. The current compatibility-surface slice intentionally does not mix
 that rename into its implementation; it only records this plan as the next complete naming slice.
+
+### Scan Round 59 — completed 2026-08-09 after `f6a3ed3fc`
+
+The live continuation baseline is clean at `f6a3ed3fc`, which includes the frozen UI/interaction
+contract in `docs/UI_SPEC.md`, exploratory topology/state artifacts under `docs/ui/`, the current
+SPEC/schema reconciliation, and the replacement root README. Three independent explorer-light
+scans reviewed the source, tests, governing documents, and active plans without sharing reports.
+
+The strongest bounded candidate is `qt-workspace-composition-boundary`. The production path is
+`AppFrame -> WorkspaceOpenService -> QtSigningWorkspaceFactory -> SigningWorkspaceWidget ->
+build_signing_workspace_composition`. `SigningWorkspaceWidget.__init__` still accepts about 21
+collaborators and constructs runtime/controller/composition wiring inline in
+`src/foliaseal/presentation/qt/signing_shell.py`; `build_signing_workspace_composition()` accepts
+about 35 parameters and coordinates viewer navigation, review/text sessions, properties panel,
+sidebar, action bridges, and callbacks in
+`src/foliaseal/presentation/qt/signing_workspace_composition.py`; and
+`QtSigningWorkspaceFactory.create()` repackages the bootstrap into a large keyword dictionary in
+`src/foliaseal/presentation/qt/signing_shell_port.py`. The existing typed
+`SigningWorkspaceBootstrap` and `SigningWorkspaceBundle` are stable stand-ins, and fake Qt/workflow
+collaborators plus shell boundary tests make the dependency category local-substitutable.
+
+The orchestrator score record is `(4.5, 4.5, 4.5, 4.5, 4.0, 4.5, 3.0, 2.5)` for
+`(NF, CA, SR, TG, IC, CC, MR, BU)`, independently matching the strongest explorer record. With
+agreement `1.0`, evidence coverage `1.0`, and confidence `1.0`, the medians produce benefit
+`4.425`, penalty `2.8`, and Candidate Priority `71.7`. This exceeds the continuation threshold.
+The candidate advances the new UI contract by concentrating construction and lifecycle ownership
+behind the existing typed workspace boundary; it is not a generic workspace manager and does not
+change the UI contract itself.
+
+The second credible candidate is `signature-library-boundary`: the current
+`ReusableObjectLibraryDialog` is a modal flat combo-box dialog in
+`src/foliaseal/presentation/qt/app_frame_profile_library.py`, while `docs/UI_SPEC.md` requires a
+modeless, preset-first, three-column library with independent editor transactions and no open-PDF
+dependency. The current application catalog service lacks pin/search/sort/editor-transaction
+policy, and `app_frame.py` rejects create/edit when no workspace is open. Explorer and orchestrator
+records are `(4.5, 4.0, 4.0, 4.5, 4.0, 4.5, 3.5, 3.5)` and
+`(4.5, 4.0, 4.0, 4.5, 4.0, 4.5, 3.0, 3.0)`; confidence is approximately `0.974`, benefit is
+`4.3125`, penalty is `3.2`, and Candidate Priority is approximately `66.5`. It is ranked second
+because the composition boundary has higher current seam risk and a smaller one-slice migration.
+
+The third candidate is the atomic `phase3-nomenclature-retirement` plan. It remains a high-payoff
+repository-wide rename, but its occurrences cross public CLI commands, DTOs, JSON fields, fixtures,
+artifact paths, packaging, tests, and documentation. Its independent records disagree materially on
+migration risk and behavioral uncertainty; it is a contract migration rather than a deep-module
+refactor for this round and remains separately tracked by
+`docs/ExecPlans/phase3_nomenclature_retirement_execplan.md`.
+
+Selected candidate: `qt-workspace-composition-boundary`. It wins the fixed ranking by Candidate
+Priority and tie-breakers, has local substitutes, and directly reduces construction knowledge and
+callback seam risk in the production GUI without introducing a speculative service or changing the
+frozen product/UI contracts. The next design review must preserve the existing
+`SigningWorkspaceBundle(maintenance, session, testing, view)` contract and make one typed
+composition boundary own collaborator assembly, lifecycle ordering, and callback wiring.
+
+### Design Selection 59 — completed 2026-08-09
+
+Three radically different shapes were reviewed for `qt-workspace-composition-boundary`.
+
+Design A is the minimal stateful object: `QtSigningWorkspaceComposition.from_bootstrap(...)`,
+`bootstrap()`, `bundle()`, and `dispose()`. It absorbs the current builder, preserves the existing
+bootstrap/bundle records, and exposes only test seams for fake bindings and the viewer builder. Its
+author score was `86.5`; reviewer score records were `(4.5, 4.5, 4.0, 3.5, 4.5, 4.5, 4.5)` and
+`(4.0, 4.0, 3.0, 2.0, 4.0, 4.0, 4.0)`. The second review applied an evidence-backed `-15`
+penalty if the object merely collected the existing large shallow graph; that failure mode is
+forbidden even though the design remains a valid fallback if the builder is truly absorbed.
+
+Design B is the flexible encapsulated shape: a finite variation record for only proven test seams,
+a narrow internal host-actions protocol, a callback record, and a composition object with
+`from_bootstrap()`, `build()`, `bootstrap()`, and `dispose()`. Its author score was `86.5`; reviewer
+score records were `(4.5, 3.5, 4.5, 4.5, 4.0, 3.5, 4.0)` and
+`(4.0, 4.0, 5.0, 5.0, 4.0, 3.0, 4.0)`. It is rejected for introducing several new records and
+variation concepts at the same boundary before a second production variation exists.
+
+Design C is the common-caller optimized shape. `QtSigningWorkspaceCompositionRequest` carries the
+unchanged `SigningWorkspaceBootstrap` plus a Qt-local construction context; one internal
+host-actions adapter absorbs current shell callback choreography; `QtSigningWorkspaceFactory.create`
+is the sole production construction entry and returns the unchanged
+`SigningWorkspaceBundle(maintenance, session, testing, view)` after one bootstrap. The author score
+was `90.5`; reviewer score records were `(4.5, 5.0, 4.5, 4.5, 5.0, 4.5, 5.0)` and
+`(4.0, 5.0, 4.0, 4.0, 5.0, 5.0, 5.0)`. The orchestrator record is
+`(4.5, 4.75, 4.5, 4.25, 4.5, 4.5, 4.75)`. Medians are
+`(4.5, 5.0, 4.5, 4.25, 5.0, 4.5, 5.0)`, yielding BaseShapeScore `92.25`. No penalties apply
+when the old builder is absorbed, the host-actions protocol remains internal and finite, and
+cross-workspace replacement stays in `SigningWorkspaceLifecycle`.
+
+Design C is selected. It makes the existing dominant factory caller trivial, preserves the strongest
+current typed contracts, gives bootstrap/disposal a direct boundary for tests, and does not add a
+generic manager, registry, service locator, or speculative public variation surface. The selected
+contract may not change `SigningWorkspaceBootstrap`, `SigningWorkspaceBundle`, the four bundle ports,
+or cross-workspace lifecycle ownership. The child plan is
+`docs/ExecPlans/qt_workspace_composition_boundary_execplan.md`.
+
+### Problem Frame 59 — typed Qt workspace composition boundary
+
+The representative workflow is opening one PDF, composing the signing workspace, bootstrapping the
+viewer/review/signing state, and returning a typed `SigningWorkspaceBundle` to the app frame and
+headless/interactive harnesses. The current composition boundary is wide in both directions:
+`SigningWorkspaceWidget.__init__` constructs several collaborators inline, while
+`build_signing_workspace_composition()` receives a large parameter list and assembles widgets,
+sessions, bridges, callbacks, and runtime state directly. `QtSigningWorkspaceFactory.create()` then
+repackages the typed bootstrap into a large keyword dictionary. The existing ports make the final
+bundle understandable, but the construction path still requires a maintainer to know the entire
+widget graph and callback choreography.
+
+The bounded refactor must make one typed construction object own collaborator assembly and lifecycle
+ordering while preserving `SigningWorkspaceBundle(maintenance, session, testing, view)`, the
+`SigningWorkspaceBootstrap` inputs, production shell behavior, current-page placement, preview and
+signing state, workspace replacement/close cleanup, and all existing CLI/JSON/artifact contracts.
+The dependency category is local-substitutable: fake bindings, workflows, repositories, and existing
+shell/lifecycle fakes can exercise the new boundary without starting Qt. The improvement must come
+from hiding construction knowledge and callback sequencing behind a deep boundary, not from moving
+the same parameter list into a generic manager or adding a service locator.
+
+Illustrative constraint sketch:
+
+    composition = QtSigningWorkspaceComposition.from_bootstrap(bootstrap)
+    bundle = composition.bundle()
+    composition.bootstrap()
+
+The design review must decide the smallest typed shape that hides the current assembly while keeping
+the public workspace ports narrow and making disposal/bootstrapping observable at one test boundary.
+
+### Implementation 59 — typed Qt workspace composition boundary (completed 2026-08-09)
+
+The selected composition slice is implemented in `docs/ExecPlans/qt_workspace_composition_boundary_execplan.md`.
+`QtSigningWorkspaceCompositionRequest` and `QtSigningWorkspaceHostActions` now form the Qt-local
+typed boundary around the existing `SigningWorkspaceBootstrap`; runtime creation, collaborator/session/
+bridge/widget assembly, callback choreography, and explicit partial-build cleanup live behind
+`QtSigningWorkspaceComposition`. The existing `SigningWorkspaceBootstrap`, four-port
+`SigningWorkspaceBundle`, `SigningWorkspaceShellController`, `QtWorkspaceView`, and
+`SigningWorkspaceLifecycle` contracts remain unchanged. The factory no longer expands bootstrap into
+a keyword dictionary or calls `build_qt_signing_shell`; it delegates one bootstrap to
+`SigningShellAdapter.create_from_bootstrap()`. The old helper remains only for the large direct shell
+test suite and is recorded for retirement after those callers migrate.
+
+An independent compliance review found one lifecycle gap after the first implementation pass:
+composition cleanup was not connected to normal shell close. The fix stores the composition boundary
+on `SigningWorkspaceWidget` and routes the close-aware widget through its idempotent disposal; the
+controller destruction guard remains the fallback. No import cycle, SPEC/UI_SPEC change, bundle-port
+change, production bypass, or behavioral regression was found.
+
+Validation evidence: 1,169 tests collected; focused workspace/composition/AppFrame/shell suites
+`141 passed`; full suite `1,150 passed, 19 skipped, 1 pre-existing Pillow warning`; Ruff and
+compileall passed. A bounded offscreen `phase3-signing-acceptance-evidence` attempt under
+`QT_QPA_PLATFORM=offscreen` timed out after 30 seconds without summary/artifacts; the generated
+temporary directory and all processes were cleaned, so no acceptance counters are claimed from that
+environment. The retirement grep is currently limited to the compatibility adapter, package lazy
+export, and direct tests.
+
+Repeated proxy measurement used the fixed metrics helper: navigation `5 -> 4`, change amplification
+`3 -> 1`, seam count `3 -> 1`, boundary behavior coverage `0.00 -> 0.67`, public surface `3 -> 2`,
+and production bypasses `1 -> 0`. Component values are `(0.20, 0.667, 0.667, 0.67, 0.333, 1.0)`;
+Actual Improvement is `0.574`, above the `0.15` gate with no component regression. The child plan
+is ready for the commit gate; after commit, the loop must rescan and continue with the strongest
+remaining candidate rather than treating this implementation milestone as overall completion.

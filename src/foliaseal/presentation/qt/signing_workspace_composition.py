@@ -117,43 +117,149 @@ class SigningWorkspaceComposition:
         self.orchestrator.bootstrap()
 
 
-def build_signing_workspace_composition(
+@dataclass(frozen=True)
+class QtSigningWorkspaceHostActions:
+    """Semantic shell actions needed while assembling one workspace."""
+
+    choose_output_pdf_path: Callable[[], str | None]
+    submit_sign_request: Callable[[], SigningRequest | None]
+    open_signed_output: Callable[[], str | None]
+    search_document_text: Callable[[], Any]
+    previous_document_text_match: Callable[[], Any]
+    next_document_text_match: Callable[[], Any]
+    copy_current_document_text_match: Callable[[], str | None]
+    set_document_text_selection_mode: Callable[[bool], bool]
+    copy_selected_document_text: Callable[[], str | None]
+    clear_selected_document_text: Callable[[], Any]
+    get_app_settings: Callable[[], AppSettings]
+    set_app_settings: Callable[[AppSettings], None]
+
+
+@dataclass(frozen=True)
+class QtSigningWorkspaceCompositionRequest:
+    """Typed request for the one production Qt workspace composition."""
+
+    bindings: QtSigningWidgetBindings
+    widget: Any
+    layout: Any
+    viewer_workflow: ViewerWorkflow
+    signing_workflow: SigningDraftWorkflow
+    app_settings: AppSettings
+    host_actions: QtSigningWorkspaceHostActions
+    viewer_widget_builder: Callable[..., Any]
+    certificate_catalog: CertificateCatalog | None = None
+    certificate_catalog_store: CertificateCatalogRepository | None = None
+    certificate_material_port: CertificateSigningMaterialPort | None = None
+    reusable_objects: ReusableSigningObjects | None = None
+    app_settings_store: AppSettingsStore | None = None
+    document_review_inspector: DocumentReviewInspector | None = None
+    document_text_selection_engine: DocumentTextSelectionEngine | None = None
+    document_text_search_engine: DocumentTextSearchEngine | None = None
+    sign_executor: SigningRequestExecutor | None = None
+    on_sign_request: Callable[[SigningRequest], None] | None = None
+    on_open_signed_output: Callable[[str], Any] | None = None
+    on_copy_text: Callable[[str], Any] | None = None
+    on_error: Callable[[str], None] | None = None
+    on_status_change: Callable[[str], None] | None = None
+
+
+class QtSigningWorkspaceComposition:
+    """Own assembly and local cleanup for one concrete Qt workspace."""
+
+    def __init__(self, request: QtSigningWorkspaceCompositionRequest) -> None:
+        self.request = request
+        self._runtime: SigningWorkspaceRuntime | None = None
+        self._assembled: SigningWorkspaceComposition | None = None
+        self._owned_resources: list[Any] = []
+        self._bootstrapped = False
+        self._disposed = False
+
+    @classmethod
+    def from_request(
+        cls, request: QtSigningWorkspaceCompositionRequest
+    ) -> QtSigningWorkspaceComposition:
+        return cls(request)
+
+    def build(self) -> SigningWorkspaceComposition:
+        if self._assembled is not None:
+            return self._assembled
+        if self.request.reusable_objects is None:
+            raise ValueError("reusable_objects is required to compose a signing workspace.")
+        self._runtime = SigningWorkspaceRuntime(
+            draft_workflow=self.request.signing_workflow,
+            on_copy_text=self.request.on_copy_text,
+            on_error=self.request.on_error,
+            on_status_change=self.request.on_status_change,
+        )
+        try:
+            self._assembled = _assemble_signing_workspace_composition(
+                request=self.request,
+                runtime=self._runtime,
+                register_disposable=self._owned_resources.append,
+            )
+        except Exception:
+            self.dispose()
+            raise
+        return self._assembled
+
+    def bootstrap(self) -> None:
+        """Bootstrap the assembled workspace exactly once."""
+        if self._bootstrapped:
+            return
+        self.build().bootstrap()
+        self._bootstrapped = True
+
+    def dispose(self) -> None:
+        """Release locally assembled resources; safe for partial or repeated builds."""
+        if self._disposed:
+            return
+        self._disposed = True
+        for resource in reversed(self._owned_resources):
+            dispose = getattr(resource, "dispose", None)
+            if callable(dispose):
+                dispose()
+        self._owned_resources.clear()
+
+
+def _assemble_signing_workspace_composition(
     *,
-    bindings: QtSigningWidgetBindings,
-    widget: Any,
-    layout: Any,
-    viewer_workflow: ViewerWorkflow,
-    signing_workflow: SigningDraftWorkflow,
-    certificate_catalog: CertificateCatalog | None = None,
-    certificate_catalog_store: CertificateCatalogRepository | None = None,
-    certificate_material_port: CertificateSigningMaterialPort | None = None,
-    reusable_objects: ReusableSigningObjects | None = None,
-    app_settings: AppSettings,
-    app_settings_store: AppSettingsStore | None = None,
-    document_review_inspector: DocumentReviewInspector | None = None,
-    document_text_selection_engine: DocumentTextSelectionEngine | None = None,
-    document_text_search_engine: DocumentTextSearchEngine | None = None,
-    sign_executor: SigningRequestExecutor | None = None,
-    on_sign_request: Callable[[SigningRequest], None] | None = None,
-    on_open_signed_output: Callable[[str], Any] | None = None,
-    on_copy_text: Callable[[str], Any] | None = None,
-    on_error: Callable[[str], None] | None = None,
-    on_status_change: Callable[[str], None] | None = None,
-    viewer_widget_builder: Callable[..., Any],
+    request: QtSigningWorkspaceCompositionRequest,
     runtime: SigningWorkspaceRuntime,
-    choose_output_pdf_path: Callable[[], str | None],
-    submit_sign_request: Callable[[], SigningRequest | None],
-    open_signed_output: Callable[[], str | None],
-    search_document_text: Callable[[], Any],
-    previous_document_text_match: Callable[[], Any],
-    next_document_text_match: Callable[[], Any],
-    copy_current_document_text_match: Callable[[], str | None],
-    set_document_text_selection_mode: Callable[[bool], bool],
-    copy_selected_document_text: Callable[[], str | None],
-    clear_selected_document_text: Callable[[], Any],
-    get_app_settings: Callable[[], AppSettings],
-    set_app_settings: Callable[[AppSettings], None],
+    register_disposable: Callable[[Any], None],
 ) -> SigningWorkspaceComposition:
+    bindings = request.bindings
+    widget = request.widget
+    layout = request.layout
+    viewer_workflow = request.viewer_workflow
+    signing_workflow = request.signing_workflow
+    certificate_catalog = request.certificate_catalog
+    certificate_catalog_store = request.certificate_catalog_store
+    certificate_material_port = request.certificate_material_port
+    reusable_objects = request.reusable_objects
+    app_settings = request.app_settings
+    document_review_inspector = request.document_review_inspector
+    document_text_selection_engine = request.document_text_selection_engine
+    document_text_search_engine = request.document_text_search_engine
+    sign_executor = request.sign_executor
+    on_sign_request = request.on_sign_request
+    on_open_signed_output = request.on_open_signed_output
+    on_copy_text = request.on_copy_text
+    on_error = request.on_error
+    on_status_change = request.on_status_change
+    viewer_widget_builder = request.viewer_widget_builder
+    host_actions = request.host_actions
+    choose_output_pdf_path = host_actions.choose_output_pdf_path
+    submit_sign_request = host_actions.submit_sign_request
+    open_signed_output = host_actions.open_signed_output
+    search_document_text = host_actions.search_document_text
+    previous_document_text_match = host_actions.previous_document_text_match
+    next_document_text_match = host_actions.next_document_text_match
+    copy_current_document_text_match = host_actions.copy_current_document_text_match
+    set_document_text_selection_mode = host_actions.set_document_text_selection_mode
+    copy_selected_document_text = host_actions.copy_selected_document_text
+    clear_selected_document_text = host_actions.clear_selected_document_text
+    get_app_settings = host_actions.get_app_settings
+    set_app_settings = host_actions.set_app_settings
     if reusable_objects is None:
         raise ValueError("reusable_objects is required to compose a signing workspace.")
 
@@ -343,6 +449,7 @@ def build_signing_workspace_composition(
         on_page_change=runtime.on_page_change,
         on_error=runtime.emit_error,
     )
+    register_disposable(properties_panel)
     setup_port = PanelSigningWorkspaceSetupAdapter(properties_panel)
     sidebar = SigningWorkspaceSidebar(
         bindings=bindings,

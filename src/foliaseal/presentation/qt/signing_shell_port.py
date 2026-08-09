@@ -20,7 +20,7 @@ from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
-    build_qt_signing_shell,
+    SigningShellAdapter,
 )
 from foliaseal.presentation.qt.signing_workspace_diagnostics import SigningWorkspaceSnapshot
 from foliaseal.presentation.qt.signing_workspace_testing_port import (
@@ -244,22 +244,14 @@ def build_qt_signing_workspace_bundle(shell_widget: Any) -> SigningWorkspaceBund
 class QtSigningWorkspaceFactory:
     """Production factory that wraps the Qt signing shell behind a port."""
 
+    def __init__(
+        self,
+        shell_adapter_factory: Callable[[], SigningShellAdapter] | None = None,
+    ) -> None:
+        self._shell_adapter_factory = shell_adapter_factory or SigningShellAdapter
+
     def create(self, bootstrap: SigningWorkspaceBootstrap) -> SigningWorkspaceBundle:
         if bootstrap.reusable_objects is None:
             raise ValueError("reusable_objects is required to create a signing workspace.")
-        kwargs: dict[str, Any] = dict(
-            viewer_workflow=bootstrap.viewer_workflow,
-            signing_workflow=bootstrap.signing_workflow,
-            certificate_catalog_store=bootstrap.certificate_catalog_store,
-            certificate_material_port=bootstrap.certificate_material_port,
-            reusable_objects=bootstrap.reusable_objects,
-            app_settings=bootstrap.app_settings,
-            app_settings_store=bootstrap.app_settings_store,
-            sign_executor=bootstrap.sign_executor,
-            on_sign_request=bootstrap.on_sign_request,
-            on_open_signed_output=bootstrap.on_open_signed_output,
-            on_error=bootstrap.on_error,
-            on_status_change=bootstrap.on_status_change,
-        )
-        shell_widget = build_qt_signing_shell(**kwargs)
+        shell_widget = self._shell_adapter_factory().create_from_bootstrap(bootstrap)
         return build_qt_signing_workspace_bundle(shell_widget)
