@@ -3,8 +3,9 @@
 This document is the canonical product specification for FoliaSeal.
 
 Use this document for product goals, anti-goals, user-visible workflow, and release criteria.
-Use [`docs/SCHEMAS.md`](/home/daekar/FoliaSeal/docs/SCHEMAS.md) for the canonical persistent object model.
-Use [`docs/ARCHITECTURE.md`](/home/daekar/FoliaSeal/docs/ARCHITECTURE.md) for the codebase as it exists today.
+Use [`SCHEMAS.md`](SCHEMAS.md) for the canonical persistent object model.
+Use [`UI_SPEC.md`](UI_SPEC.md) for the canonical interface and interaction contract.
+Use [`ARCHITECTURE.md`](ARCHITECTURE.md) for the codebase as it exists today.
 
 This specification describes the intended V1 product direction. It is allowed to supersede older
 implementation assumptions and older persisted-object behavior.
@@ -44,14 +45,14 @@ The core V1 story is:
 
 1. Open a PDF in a familiar desktop application.
 2. Review the document comfortably.
-3. Choose or create a signing certificate.
-4. Choose or refine a signing setup.
+3. Choose or create a signature preset through the Signature Library.
+4. Select a certificate and placement per document when the preset intentionally omits them.
 5. Place a visible approval signature.
 6. Preview the signed appearance on the document page.
 7. Confirm readiness.
 8. Save the signed output to a user-chosen path.
-9. Reopen and verify the result.
-10. Add another approval signature later if document permissions allow it.
+9. Review the automatic local verification result.
+10. Reopen the signed output to add another approval signature later if permissions allow it.
 
 ## V1 Goals
 
@@ -86,6 +87,8 @@ That workflow includes:
 - select/copy document text
 - inspect existing signatures
 - place a visible signature with mouse-driven placement
+- place and adjust a visible signature without a mouse
+- target an eligible existing visible unsigned PDF signature field
 - fine-tune placement numerically
 - preview the visible result directly on the document page
 - sign with a local certificate
@@ -129,13 +132,15 @@ V1 should support reusable named signing objects:
 These objects are separate and are composed through `Signature Preset`.
 `Signature Preset` may be partial. It does not need to include a certificate reference.
 
-Reusable-object management should exist both:
+Full reusable-object create/edit/delete management belongs to a dedicated modeless Signature
+Library. The main signing workflow provides quick preset selection, per-document values, contextual
+placement capture, and an authoritative on-document preview; it must not duplicate the Library's
+editors. Synthetic/template preview is the primary Library editing context, while the on-document
+preview is authoritative for the current signing session.
 
-- in the main signing workflow for quick selection and quick reuse
-- in a dedicated library/settings area for full create/edit/delete management
-
-Editing `Appearance Profile` and `Placement Profile` must remain contextual. Live-document editing
-is the primary workflow. Synthetic/template preview contexts are secondary fallback tools.
+Every `Signature Preset` must reference an `Appearance Profile`. Certificate and placement
+references are optional. Users must create and select a preset through the normal Signature Library;
+V1 does not maintain a parallel manual-assembly workflow.
 
 ### 6. Managed certificate workflow
 
@@ -233,13 +238,14 @@ does not partially override component objects.
 
 Loading a partial preset:
 
-- leaves the current certificate selection untouched if one is already active
-- makes clear that the preset did not define a certificate
-- still requires explicit certificate selection before signing if none is active
+- makes clear which optional component must be chosen per document
+- never silently carries a certificate or preset selection from another document
+- still requires explicit certificate selection before signing when the preset omits it
 
 ## Output Behavior
 
-The app should always use an explicit save dialog for signed output.
+The first Save in a signing session uses an explicit save dialog. Save As always chooses a path;
+subsequent Save may use the already confirmed output path for that same unsigned draft.
 
 The default output directory is the user’s home directory unless the user changes that global app
 setting.
@@ -248,12 +254,18 @@ Overwrite confirmation should use the normal OS warning when available. If the p
 not provide that warning, the app must require explicit confirmation before overwriting an existing
 file.
 
+Users may explicitly choose the open source PDF as the destination. FoliaSeal must create and verify
+a temporary sibling first and replace the source atomically only after success. Failures leave the
+original intact and expose safe recovery for any preserved signed artifact. Existing encryption and
+restrictions must be preserved; signing is blocked when FoliaSeal cannot confidently preserve them.
+
 ## UI Principles
 
 The main V1 window should be document-centric.
 
-The product should bias toward a `Signature Preset`-first setup flow, while still allowing manual
-assembly of certificate, appearance, and placement when needed.
+The product requires a `Signature Preset`-first setup flow. A partial preset may request an existing
+certificate or a new per-document placement, but those choices remain part of the selected preset
+workflow rather than a second assembly path.
 
 The app should support a quick-sign path for experienced users once a valid setup and document are
 in place, but quick sign must still stop at an explicit readiness/sign confirmation step.
@@ -274,6 +286,9 @@ The following are explicit V1 anti-goals:
 - opportunistic PDF-editing creep beyond signing and review
 - tabbed or multi-document workflows
 - multi-signature staging in one unsaved draft
+- printers and printing
+- a general PDF Document Properties/metadata inspector
+- user page rotation, addition, movement, deletion, or cropping
 - broad trust-policy configuration in the primary GUI
 - timestamping in the primary GUI path
 - enterprise trust administration
@@ -284,6 +299,8 @@ The following are explicit V1 anti-goals:
 - plugin/extensibility frameworks
 - general-purpose signature-card design tooling
 - arbitrary custom visible-signature fields or rich-text composition
+- ordinary PDF form filling or annotation editing
+- thumbnails, bookmarks/document outline, recent files, or automatic document restoration
 
 ## V2 Direction
 
@@ -292,7 +309,12 @@ The intended V2 direction includes page operations such as:
 - add pages
 - remove pages
 - move/reorder pages
+- rotate pages
 - crop pages
+
+V2 may also add multiple pending signatures, authorized owner-credential removal or weakening of PDF
+restrictions, ordinary form filling, thumbnails/outlines, richer annotation/attachment review, and a
+general Document Properties surface. Printing remains unsupported unless separately reconsidered.
 
 V2 also will include full CLI interface suitable for use by both humans and agents.
 
@@ -307,8 +329,9 @@ V1 is done when a non-expert user can do the following in a packaged Linux deskt
 - manage certificate configurations
 - review a PDF
 - search/select/copy as needed
-- choose or assemble a signing setup
-- place a visible approval signature
+- create and explicitly select a preset with a required appearance
+- select optional certificate/placement inputs per document when needed
+- place a visible approval signature by pointer or keyboard, including an eligible existing field
 - save and reuse appearance, placement, and preset objects
 - sign offline
 - save to a user-chosen output path

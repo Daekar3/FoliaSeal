@@ -4,8 +4,9 @@ This document defines the canonical persistent object model for FoliaSeal V1.
 
 Use this document for the intended names, responsibilities, relationships, and persistence rules of
 user-facing objects.
-Use [`docs/SPEC.md`](/home/daekar/FoliaSeal/docs/SPEC.md) for product goals and anti-goals.
-Use [`docs/ARCHITECTURE.md`](/home/daekar/FoliaSeal/docs/ARCHITECTURE.md) for the current
+Use [`SPEC.md`](SPEC.md) for product goals and anti-goals.
+Use [`UI_SPEC.md`](UI_SPEC.md) for the canonical interface and interaction contract.
+Use [`ARCHITECTURE.md`](ARCHITECTURE.md) for the current
 implementation and its drift from this target model.
 
 This document is intentionally product-facing. It may describe the desired object model even when
@@ -58,6 +59,12 @@ objects.
 Certificate passwords, when persisted, should live in the OS credential store or an explicitly
 supported secure fallback. They must not be stored as plain text in ordinary configuration files.
 
+### 4. Catalog names and pins are stable metadata
+
+Display names are trimmed, required, and case-insensitively unique within their own catalog. Names
+may repeat across different catalogs. Presets, certificate entries, appearances, and placements
+support persistent pin metadata; renaming does not change pin state and duplication starts unpinned.
+
 ## AppSettings
 
 `AppSettings` stores environment-level preferences that are not part of reusable signing behavior.
@@ -81,9 +88,16 @@ choices.
   "schema_version": 1,
   "default_output_directory": "/home/user",
   "default_open_directory": "/home/user",
-  "linux_packaging_channel": "primary",
   "ui": {
-    "last_window_layout": "optional"
+    "appearance_mode": "system",
+    "main_window_geometry": "toolkit-owned-opaque-value-or-null",
+    "main_window_maximized": false,
+    "signing_rail_width": 320,
+    "signing_rail_divider": "toolkit-owned-relative-value",
+    "library_window_geometry": "toolkit-owned-opaque-value-or-null",
+    "library_column_widths": [180, 300, 520],
+    "library_last_catalog": "presets",
+    "library_sort": "name_ascending"
   }
 }
 ```
@@ -92,6 +106,9 @@ choices.
 
 - `default_output_directory` defaults to the user home directory until explicitly changed.
 - Settings should remain distinct from reusable signing objects.
+- UI layout preferences may be persisted, but open documents, unsigned drafts, dialogs, active
+  presets, and Library open state must not be restored across launches.
+- `appearance_mode` is one of `system`, `light`, or `dark`, with `system` as default.
 
 ## ManagedCertificate
 
@@ -114,12 +131,18 @@ Represent a certificate file that the app owns in managed storage, whether it wa
   "storage_filename": "cert_7f4a9b2f.p12",
   "source_kind": "created",
   "created_at": "2026-05-05T12:00:00Z",
+  "pinned": false,
   "subject_summary": {
     "common_name": "Morgan Ellery",
+    "distinguished_name": "CN=Morgan Ellery,O=Northwind Ledger Holdings",
     "email": "morgan@example.com",
     "title": "Board Secretary",
     "company": "Northwind Ledger Holdings"
-  }
+  },
+  "issuer_summary": "Morgan Ellery",
+  "valid_from": "2026-05-05T12:00:00Z",
+  "valid_until": "2031-05-05T12:00:00Z",
+  "fingerprint_sha256": "hex-encoded-fingerprint"
 }
 ```
 
@@ -128,6 +151,8 @@ Represent a certificate file that the app owns in managed storage, whether it wa
 - `storage_filename` is app-assigned and stable.
 - The file lives in a controlled, user-accessible application data directory.
 - The app does not reference arbitrary external certificate paths after import.
+- The managed record stores public inspection metadata only; private-key presence and password
+  validity are checked against the managed PKCS#12 file when needed.
 - Deleting a `ManagedCertificate` is a separate action from deleting a
   `CertificateConfiguration`.
 
@@ -149,7 +174,8 @@ Capture how the app should use a managed certificate for signing.
   "managed_certificate_id": "uuid-or-stable-id",
   "save_password": true,
   "password_secret_ref": "credential-store-key-or-null",
-  "notes": "optional freeform note"
+  "notes": "optional freeform note",
+  "pinned": false
 }
 ```
 
@@ -173,14 +199,17 @@ Persist the bounded, signing-specific appearance model used for preview and fina
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "appearance_profile_id": "uuid-or-stable-id",
   "display_name": "Board Approval",
-  "layout_template": "single_line",
-  "stamp_position": "top",
+  "pinned": false,
+  "text_layout": "compact",
+  "image_position": "left",
+  "image_prominence": "primary",
   "show_field_names": true,
-  "datetime_format": "%Y-%m-%d %H:%M",
-  "timezone_display_mode": "local",
+  "show_signing_statement": true,
+  "datetime_format_preset": "compact_numeric",
+  "timezone_display_mode": "utc",
   "visible_field_order": [
     "common_name",
     "title",
@@ -194,18 +223,26 @@ Persist the bounded, signing-specific appearance model used for preview and fina
   ],
   "text_style": {
     "font_family": "Sans Serif",
-    "font_size_pt": 8.5,
+    "font_size_pt": 10.0,
     "bold": false,
     "italic": false,
     "text_color_hex": "#000000"
   },
   "box_style": {
-    "show_border": true,
+    "show_border": false,
     "border_color_hex": "#000000",
-    "border_width_pt": 1.0,
-    "background_color_hex": "#FFFFFF"
+    "border_thickness": "thin",
+    "background_color_hex": "#FFFFFF",
+    "transparent_background": false
   },
-  "image_stamp_ref": "optional-managed-image-ref-or-null"
+  "image_asset": {
+    "managed_asset_id": "optional-stable-id-or-null",
+    "storage_filename": "image_7f4a9b2f.png",
+    "original_filename": "wet-signature.gif",
+    "width_px": 1400,
+    "height_px": 620,
+    "has_alpha": true
+  }
 }
 ```
 
@@ -213,8 +250,22 @@ Persist the bounded, signing-specific appearance model used for preview and fina
 
 - Appearance remains bounded to the signing domain.
 - Users may choose field visibility and order.
+- The bounded field set is Common Name, Distinguished Name, Email, Title, Company, Signing Time,
+  Reason, and Location.
 - Arbitrary custom field content is not part of the canonical end-user model.
 - Preview/output fidelity takes priority over preserving every possible appearance option.
+- `text_layout` is `compact` or `stacked`; `image_position` is `left`, `right`, `above`, or
+  `below`; `image_prominence` is `supporting`, `balanced`, or `primary`.
+- `datetime_format_preset` is a bounded product enum, not a raw formatting string. UTC is default.
+- Font family is one of the exact bundled Sans Serif, Serif, or Monospace assets; size is 6–48 pt.
+- Managed images are normalized PNG assets. They preserve imported alpha but contain no source-path
+  dependency or retained EXIF/comments/location metadata. Multiple appearances may reference one
+  immutable asset; unreferenced assets may be garbage-collected.
+- `transparent_background` controls compositing only. False flattens transparent image pixels to
+  white; true preserves existing alpha and does not manufacture transparency.
+- The standardized signing statement is fixed/localizable text, not arbitrary user content.
+- An appearance must be capable of resolving meaningful signing text or an image. Styling and the
+  signing statement alone are insufficient.
 
 ## PlacementProfile
 
@@ -228,17 +279,22 @@ Persist a named reusable placement setup without binding it to document identity
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "placement_profile_id": "uuid-or-stable-id",
   "display_name": "Purchase Requisition Bottom Right",
-  "page_selection_mode": "current_page",
+  "pinned": false,
+  "page_number": 3,
+  "source_page": {
+    "visible_width_pt": 612.0,
+    "visible_height_pt": 792.0,
+    "rotation_degrees": 0
+  },
   "rect": {
     "left_pt": 360.0,
-    "bottom_pt": 72.0,
+    "top_pt": 666.0,
     "width_pt": 180.0,
     "height_pt": 54.0
-  },
-  "numeric_fine_tuning_enabled": true
+  }
 }
 ```
 
@@ -248,6 +304,10 @@ Persist a named reusable placement setup without binding it to document identity
 - Users manage them by name.
 - Mouse placement and numeric placement are both first-class product behavior.
 - The UI for numeric placement should be compact and efficient.
+- `page_number` is fixed and one-based. The geometry is relative to the visible, already-rotated
+  page with a top-left origin. PDF-internal bottom-left transforms occur only at the PDF boundary.
+- `source_page` records geometry compatibility but no document identity, path, content, or field ID.
+- Dimension/rotation mismatch never silently scales, clamps, or moves the rectangle.
 
 ## SignaturePreset
 
@@ -261,21 +321,27 @@ Combine references to other reusable objects for faster setup.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "signature_preset_id": "uuid-or-stable-id",
   "display_name": "Board Approval Default",
+  "pinned": false,
   "certificate_configuration_id": "optional-id-or-null",
-  "appearance_profile_id": "optional-id-or-null",
-  "placement_profile_id": "optional-id-or-null"
+  "appearance_profile_id": "required-id",
+  "placement_profile_id": "optional-id-or-null",
+  "reason_default": "optional-string-or-empty",
+  "location_default": "optional-string-or-empty"
 }
 ```
 
 ### Rules
 
-- All three references are optional in V1.
+- `appearance_profile_id` is required. Certificate and placement references are optional.
 - The preset does not override its referenced objects.
-- Loading a preset applies immediately to the current draft.
-- Loading a preset without a certificate reference leaves an existing active certificate in place.
+- Reason and Location defaults are permitted only when the referenced Appearance exposes those
+  fields. Changing the Appearance to exclude a nonblank default requires explicit clearing.
+- A newly opened document has no active preset. Loading a preset never carries an active certificate
+  or placement from a previous document.
+- Missing references are never allowed. Deletion must resolve dependent presets atomically.
 
 ## Per-Signing Session Inputs
 
@@ -285,16 +351,30 @@ These values are part of the current signing session, not long-lived identity ob
 
 ```json
 {
+  "signature_preset_id": "required-id",
+  "certificate_configuration_id": "resolved-id",
+  "placement_profile_id": "optional-source-profile-id-or-null",
   "reason": "Approved for board circulation",
   "location": "Charlottesville, Virginia",
-  "output_path": "/home/user/Documents/signed.pdf"
+  "output_path": "/home/user/Documents/signed.pdf",
+  "placement": {
+    "page_number": 3,
+    "left_pt": 360.0,
+    "top_pt": 666.0,
+    "width_pt": 180.0,
+    "height_pt": 54.0,
+    "existing_signature_field_name": "optional-session-only-name-or-null"
+  }
 }
 ```
 
 ### Rules
 
 - `reason` and `location` are per-signing inputs with optional defaults from reusable objects.
-- `signing_time` is always system-generated at signing time and is never user-editable.
+- `signing_time` is system-generated. Preview time is live; Sign and save freezes the exact displayed
+  value before final confirmation and uses it for both appearance and PDF metadata.
+- Exactly one placement and one pending new signature are permitted in a V1 signing session.
+- The output path is confirmed per draft and is not a reusable-object property.
 
 ## Review and Signing Draft State
 
@@ -311,6 +391,11 @@ Ephemeral draft state may include:
 - currently selected signature preset
 - current per-signing values such as `reason` and `location`
 - current placed signature rectangle
+- frozen signing time during a confirmed signing attempt
+- undo/redo history for placement operations
+
+Draft state is never restored across process restart. During an active signing transaction only,
+FoliaSeal may persist a secret-free recovery journal containing owned paths and operation stage.
 
 ## Storage and File-Ownership Rules
 
@@ -324,6 +409,12 @@ Ephemeral draft state may include:
 
 - Reusable object catalogs should be stored in human-readable local files.
 - It is acceptable for V1 to replace old shapes rather than maintain compatibility shims.
+- Internal references and schema versions must remain stable and human-readable enough for safe
+  folder-level copying. Certificate passwords remain outside these files in the OS credential store.
+- Presets, certificates/configurations, appearances, and placements support persistent `pinned`
+  metadata. Duplicate objects begin unpinned.
+- There is no separate user-facing image catalog; managed immutable image assets are owned through
+  Appearance references.
 
 ## Current Implementation Drift
 
@@ -334,7 +425,14 @@ The current codebase has moved most persisted reusable signing objects toward th
 - certificate identity data is represented through `ManagedCertificate` and `CertificateConfiguration`.
 - `AppSettings` exists as a first-class app-wide preferences object.
 
-Some older implementation vocabulary remains, including:
+Known implementation drift includes older persisted shapes or behavior for:
+
+- optional Appearance references in presets
+- current-page Placement semantics and PDF-internal bottom-origin rectangles
+- raw date/time format strings, older layout names, and incomplete image/transparency fields
+- source/output-path restrictions that may reject the user's explicit source-overwrite intent
+
+Some older implementation vocabulary also remains, including:
 
 - the historical `profile_storage.py` module name
 - the historical user-visible storage path `Signature Profiles/profiles.json`

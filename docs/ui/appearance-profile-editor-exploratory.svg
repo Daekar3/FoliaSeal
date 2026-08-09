@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <title>FoliaSeal Appearance editor exploratory wireframe</title>
+  <desc>Nested Signature Library editor with content-first controls, independent text and image layout, and a sticky sample preview.</desc>
+  <style>
+    .bg{fill:#f4f4f2}.panel{fill:#fff;stroke:#888781;stroke-width:2}.subtle{fill:#efefec;stroke:#aaa9a4;stroke-width:1.5}.selected{fill:#dfeafb;stroke:#4776a8;stroke-width:2}.button{fill:#f8f8f6;stroke:#777772;stroke-width:1.4}.primary{fill:#356ea5;stroke:#28557f;stroke-width:1.5}.disabled{fill:#ececea;stroke:#b8b8b3;stroke-width:1.3}.field{fill:#fff;stroke:#8d8d88;stroke-width:1.3}.rule{stroke:#c1c1bc;stroke-width:1.3}.t{font:18px sans-serif;fill:#262624}.small{font:15px sans-serif;fill:#4d4d49}.tiny{font:13px sans-serif;fill:#60605b}.head{font:bold 24px sans-serif;fill:#20201e}.section{font:bold 17px sans-serif;fill:#292927}.white{font:bold 16px sans-serif;fill:#fff}.muted{font:13px sans-serif;fill:#888883}.check{fill:#356ea5;stroke:#28557f;stroke-width:1}.radio{fill:#fff;stroke:#777;stroke-width:1.5}.dot{fill:#356ea5}
+  </style>
+  <rect class="bg" width="1440" height="900"/>
+  <rect class="panel" x="25" y="25" width="1390" height="850" rx="7"/>
+  <text class="head" x="55" y="67">Signature Library</text>
+  <text class="small" x="55" y="94">Presets › Board Approval › New Appearance</text>
+  <line class="rule" x1="25" y1="115" x2="1415" y2="115"/>
+
+  <rect class="subtle" x="45" y="135" width="190" height="670" rx="5"/>
+  <text class="section" x="65" y="172">Library</text>
+  <rect class="selected" x="57" y="190" width="166" height="46" rx="4"/>
+  <text class="t" x="75" y="219">Presets</text>
+  <text class="t" x="75" y="274">Certificates</text>
+  <text class="t" x="75" y="326">Appearances</text>
+  <text class="t" x="75" y="378">Placements</text>
+
+  <rect class="panel" x="255" y="135" width="260" height="670" rx="5"/>
+  <text class="section" x="277" y="172">Signature Presets</text>
+  <rect class="selected" x="275" y="198" width="220" height="78" rx="4"/>
+  <text class="section" x="291" y="228">Board Approval</text>
+  <text class="tiny" x="291" y="253">Editing new appearance…</text>
+  <text class="tiny" x="277" y="770">Parent preset draft is preserved</text>
+  <text class="tiny" x="277" y="790">while this editor is active.</text>
+
+  <rect class="panel" x="535" y="135" width="860" height="670" rx="5"/>
+  <text class="section" x="560" y="171">New Appearance</text>
+  <text class="small" x="560" y="207">Name</text>
+  <rect class="field" x="560" y="219" width="380" height="36" rx="3"/>
+  <text class="small" x="576" y="243">Formal Approval Block</text>
+
+  <!-- Scrollable controls column -->
+  <text class="section" x="560" y="292">Content</text>
+  <rect class="check" x="560" y="308" width="18" height="18" rx="2"/>
+  <text class="white" x="563" y="323">✓</text>
+  <text class="small" x="588" y="323">Show “Digitally signed by”</text>
+  <rect class="check" x="560" y="344" width="18" height="18" rx="2"/>
+  <text class="white" x="563" y="359">✓</text><text class="small" x="588" y="359">Common name</text>
+  <rect class="check" x="560" y="376" width="18" height="18" rx="2"/>
+  <text class="white" x="563" y="391">✓</text><text class="small" x="588" y="391">Signing time</text>
+  <rect class="check" x="560" y="408" width="18" height="18" rx="2"/>
+  <text class="white" x="563" y="423">✓</text><text class="small" x="588" y="423">Title</text>
+  <rect class="radio" x="790" y="344" width="18" height="18" rx="2"/>
+  <text class="small" x="818" y="359">Email</text>
+  <rect class="radio" x="790" y="376" width="18" height="18" rx="2"/>
+  <text class="small" x="818" y="391">Organization</text>
+  <rect class="radio" x="790" y="408" width="18" height="18" rx="2"/>
+  <text class="small" x="818" y="423">Reason</text>
+  <rect class="button" x="560" y="442" width="118" height="30" rx="3"/>
+  <text class="small" x="580" y="462">Move up</text>
+  <rect class="button" x="687" y="442" width="118" height="30" rx="3"/>
+  <text class="small" x="704" y="462">Move down</text>
+  <rect class="check" x="825" y="448" width="18" height="18" rx="2"/>
+  <text class="white" x="828" y="463">✓</text><text class="small" x="853" y="463">Show field labels</text>
+
+  <text class="section" x="560" y="507">Image</text>
+  <rect class="field" x="560" y="520" width="270" height="36" rx="3"/>
+  <text class="small" x="574" y="544">signature.png</text>
+  <rect class="button" x="838" y="520" width="102" height="36" rx="3"/>
+  <text class="small" x="858" y="544">Replace…</text>
+  <text class="tiny" x="560" y="581">Position</text>
+  <circle class="radio" cx="579" cy="604" r="9"/><circle class="dot" cx="579" cy="604" r="5"/>
+  <text class="small" x="596" y="609">Left</text>
+  <circle class="radio" cx="657" cy="604" r="9"/><text class="small" x="674" y="609">Right</text>
+  <circle class="radio" cx="748" cy="604" r="9"/><text class="small" x="765" y="609">Above</text>
+  <circle class="radio" cx="846" cy="604" r="9"/><text class="small" x="863" y="609">Below</text>
+  <text class="tiny" x="560" y="642">Image prominence</text>
+  <circle class="radio" cx="579" cy="665" r="9"/><text class="small" x="596" y="670">Supporting</text>
+  <circle class="radio" cx="701" cy="665" r="9"/><text class="small" x="718" y="670">Balanced</text>
+  <circle class="radio" cx="812" cy="665" r="9"/><circle class="dot" cx="812" cy="665" r="5"/>
+  <text class="small" x="829" y="670">Primary</text>
+
+  <rect class="subtle" x="560" y="699" width="380" height="42" rx="4"/>
+  <text class="section" x="578" y="725">Layout and typography</text>
+  <text class="small" x="913" y="725">⌄</text>
+  <rect class="subtle" x="560" y="748" width="380" height="42" rx="4"/>
+  <text class="section" x="578" y="774">Style</text>
+  <text class="small" x="913" y="774">⌄</text>
+
+  <!-- Sticky sample preview -->
+  <line class="rule" x1="965" y1="198" x2="965" y2="780"/>
+  <text class="section" x="990" y="225">Sample preview</text>
+  <text class="tiny" x="990" y="248">Representative size • sample values</text>
+  <rect x="990" y="270" width="375" height="210" fill="#d9d9d5" stroke="#999"/>
+  <text class="tiny" x="1005" y="292">Transparency checkerboard</text>
+  <rect x="1018" y="315" width="320" height="125" fill="#fff" fill-opacity="0.72" stroke="#222" stroke-width="1.5"/>
+  <path d="M1040 392 C1080 335,1112 414,1160 352 C1190 320,1215 400,1250 355" fill="none" stroke="#274b80" stroke-width="5"/>
+  <text class="tiny" x="1260" y="344">Digitally signed by</text>
+  <text class="tiny" x="1260" y="363">Morgan Ellery</text>
+  <text class="tiny" x="1260" y="382">Title: Board Secretary</text>
+  <text class="tiny" x="1260" y="401">2026-08-09 18:35 UTC</text>
+  <text class="tiny" x="990" y="507">Text layout</text>
+  <circle class="radio" cx="1000" cy="531" r="9"/><text class="small" x="1017" y="536">Compact</text>
+  <circle class="radio" cx="1102" cy="531" r="9"/><circle class="dot" cx="1102" cy="531" r="5"/>
+  <text class="small" x="1119" y="536">Stacked</text>
+  <text class="tiny" x="990" y="573">Time zone: UTC • Format: 2026-08-09 18:35 UTC</text>
+  <text class="tiny" x="990" y="603">Font: Sans Serif • 10 pt • Regular</text>
+  <text class="tiny" x="990" y="633">Transparent background • Thin border</text>
+  <rect class="subtle" x="990" y="666" width="375" height="74" rx="4"/>
+  <text class="small" x="1008" y="692">Preview fits the representative placement.</text>
+  <text class="tiny" x="1008" y="715">On-document preview remains authoritative.</text>
+
+  <line class="rule" x1="25" y1="825" x2="1415" y2="825"/>
+  <text class="tiny" x="55" y="855">Unsaved appearance changes</text>
+  <rect class="button" x="1160" y="838" width="100" height="34" rx="4"/>
+  <text class="small" x="1187" y="861">Cancel</text>
+  <rect class="primary" x="1272" y="838" width="112" height="34" rx="4"/>
+  <text class="white" x="1307" y="861">Save</text>
+</svg>

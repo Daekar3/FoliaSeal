@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850">
+  <title>FoliaSeal document-open workspace exploratory wireframe</title>
+  <desc>Exploratory low-fidelity wireframe separating the menu, review toolbar, PDF canvas, signing controls, signing status, and bottom application status bar.</desc>
+  <style>
+    .window { fill: #f7f7f7; stroke: #222; stroke-width: 2; }
+    .surface { fill: #fff; stroke: #555; stroke-width: 1.5; }
+    .subtle { fill: #f1f1f1; stroke: #777; stroke-width: 1; }
+    .canvas { fill: #dedede; stroke: #555; stroke-width: 1.5; }
+    .page { fill: #fff; stroke: #777; stroke-width: 1.5; }
+    .control { fill: #fafafa; stroke: #777; stroke-width: 1; rx: 4; }
+    .active-tool { fill: #d5e3f4; stroke: #356ea5; stroke-width: 2; rx: 4; }
+    .primary { fill: #e8e8e8; stroke: #333; stroke-width: 1.5; rx: 4; }
+    .disabled { fill: #f4f4f4; stroke: #aaa; stroke-width: 1; rx: 4; }
+    .divider { stroke: #aaa; stroke-width: 1; }
+    text { font-family: sans-serif; fill: #222; }
+    .title { font-size: 18px; font-weight: 700; }
+    .label { font-size: 15px; font-weight: 700; }
+    .body { font-size: 14px; }
+    .small { font-size: 12px; fill: #555; }
+    .disabled-text { font-size: 14px; fill: #999; }
+    .annotation { font-size: 13px; fill: #555; font-style: italic; }
+  </style>
+
+  <rect class="window" x="20" y="20" width="1360" height="810" rx="8"/>
+
+  <!-- Window title and menu -->
+  <rect class="subtle" x="20" y="20" width="1360" height="42" rx="8"/>
+  <text class="title" x="42" y="47">contract.pdf * — FoliaSeal</text>
+
+  <rect class="surface" x="20" y="62" width="1360" height="38"/>
+  <text class="body" x="42" y="87">File</text>
+  <text class="body" x="92" y="87">Edit</text>
+  <text class="body" x="142" y="87">View</text>
+  <text class="body" x="198" y="87">Signing</text>
+  <text class="body" x="265" y="87">Settings</text>
+  <text class="body" x="337" y="87">Help</text>
+  <text class="annotation" x="1065" y="87">Application commands only</text>
+
+  <!-- Review toolbar: commands only -->
+  <rect class="surface" x="20" y="100" width="1045" height="58"/>
+  <text class="label" x="40" y="123">Document tools</text>
+  <rect class="control" x="40" y="131" width="34" height="20"/>
+  <text class="body" x="52" y="147">‹</text>
+  <rect class="control" x="82" y="131" width="92" height="20"/>
+  <text class="small" x="95" y="146">Page 1 of 12</text>
+  <rect class="control" x="182" y="131" width="34" height="20"/>
+  <text class="body" x="194" y="147">›</text>
+  <line class="divider" x1="235" y1="126" x2="235" y2="153"/>
+  <rect class="control" x="252" y="131" width="30" height="20"/>
+  <text class="body" x="262" y="147">−</text>
+  <rect class="control" x="290" y="131" width="62" height="20"/>
+  <text class="small" x="304" y="146">100%</text>
+  <rect class="control" x="360" y="131" width="30" height="20"/>
+  <text class="body" x="370" y="147">+</text>
+  <rect class="control" x="398" y="131" width="54" height="20"/>
+  <text class="small" x="412" y="146">Fit</text>
+  <line class="divider" x1="470" y1="126" x2="470" y2="153"/>
+  <rect class="control" x="487" y="131" width="185" height="20"/>
+  <text class="small" x="500" y="146">Search document…</text>
+  <rect class="control" x="680" y="131" width="34" height="20"/>
+  <text class="small" x="691" y="146">‹</text>
+  <rect class="control" x="722" y="131" width="34" height="20"/>
+  <text class="small" x="733" y="146">›</text>
+  <line class="divider" x1="775" y1="126" x2="775" y2="153"/>
+  <rect class="active-tool" x="792" y="128" width="52" height="25"/>
+  <text class="small" x="806" y="146">Pan</text>
+  <rect class="control" x="852" y="128" width="84" height="25"/>
+  <text class="small" x="865" y="146">Select text</text>
+  <rect class="control" x="944" y="128" width="104" height="25"/>
+  <text class="small" x="958" y="146">Signatures (2)</text>
+
+  <!-- Right signing controls: actions and selection only -->
+  <rect class="surface" x="1065" y="100" width="315" height="470"/>
+  <text class="label" x="1088" y="130">Signing controls</text>
+  <text class="small" x="1088" y="158">Signature preset</text>
+  <rect class="control" x="1088" y="168" width="269" height="34"/>
+  <text class="body" x="1102" y="190">Board Approval Default ▾</text>
+  <rect class="control" x="1088" y="214" width="269" height="32"/>
+  <text class="body" x="1136" y="235">Manage Signature Library…</text>
+
+  <line class="divider" x1="1088" y1="258" x2="1357" y2="258"/>
+  <text class="small" x="1088" y="279">Certificate</text>
+  <text class="body" x="1088" y="299">Corporate Records Signing</text>
+  <text class="small" x="1088" y="317">Self-signed — ready for local signing</text>
+
+  <text class="small" x="1088" y="342">Signing details</text>
+  <rect class="control" x="1088" y="350" width="269" height="28"/>
+  <text class="small" x="1100" y="369">Reason (optional)</text>
+  <rect class="control" x="1088" y="385" width="269" height="28"/>
+  <text class="small" x="1100" y="404">Signing location (optional)</text>
+
+  <text class="small" x="1088" y="436">Placement</text>
+  <text class="body" x="1088" y="456">Not placed on this document</text>
+  <rect class="control" x="1088" y="465" width="269" height="30"/>
+  <text class="body" x="1141" y="486">Place signature on page</text>
+  <rect class="disabled" x="1088" y="503" width="130" height="25"/>
+  <text class="disabled-text" x="1106" y="521">Adjust…</text>
+  <rect class="disabled" x="1227" y="503" width="130" height="25"/>
+  <text class="disabled-text" x="1248" y="521">Remove</text>
+
+  <rect class="disabled" x="1088" y="536" width="269" height="28"/>
+  <text class="disabled-text" x="1176" y="555">Sign and save</text>
+
+  <!-- PDF canvas -->
+  <rect class="canvas" x="20" y="158" width="1045" height="620"/>
+  <text class="annotation" x="44" y="185">Primary document workspace</text>
+  <rect class="page" x="270" y="193" width="545" height="545" rx="2"/>
+  <text class="small" x="495" y="222">PDF page</text>
+  <line class="divider" x1="320" y1="258" x2="765" y2="258"/>
+  <line class="divider" x1="320" y1="282" x2="720" y2="282"/>
+  <line class="divider" x1="320" y1="306" x2="750" y2="306"/>
+  <line class="divider" x1="320" y1="330" x2="700" y2="330"/>
+  <line class="divider" x1="320" y1="390" x2="765" y2="390"/>
+  <line class="divider" x1="320" y1="414" x2="730" y2="414"/>
+  <line class="divider" x1="320" y1="438" x2="750" y2="438"/>
+  <text class="annotation" x="397" y="690">No signature overlay until placement exists</text>
+
+  <!-- Signing status: separate read-only surface -->
+  <rect class="subtle" x="1065" y="570" width="315" height="208"/>
+  <text class="label" x="1088" y="600">Signing status</text>
+  <text class="body" x="1088" y="630">Setup required</text>
+  <text class="small" x="1088" y="654">Place the signature on the PDF.</text>
+  <text class="small" x="1088" y="675">All other signing requirements are ready.</text>
+  <line class="divider" x1="1088" y1="694" x2="1357" y2="694"/>
+  <text class="small" x="1088" y="719">Next: choose “Place signature on page”</text>
+  <text class="small" x="1088" y="740">and draw the approval box.</text>
+  <text class="annotation" x="1088" y="764">Read-only guidance; details expand here</text>
+
+  <!-- Bottom application status bar: transient status only -->
+  <rect class="surface" x="20" y="778" width="1360" height="52" rx="0"/>
+  <text class="label" x="40" y="801">Application status</text>
+  <text class="small" x="40" y="820">Page rendered · Local/offline mode</text>
+  <text class="annotation" x="1078" y="811">Transient activity only</text>
+</svg>

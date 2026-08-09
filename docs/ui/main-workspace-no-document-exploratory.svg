@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850">
+  <title>FoliaSeal no-document exploratory wireframe</title>
+  <desc>Stable application frame at direct launch with a minimal central empty state and inactive signing rail.</desc>
+  <style>
+    .window{fill:#f7f7f7;stroke:#222;stroke-width:2}.surface{fill:#fff;stroke:#555;stroke-width:1.5}.subtle{fill:#f1f1f1;stroke:#777;stroke-width:1}.canvas{fill:#dedede;stroke:#555;stroke-width:1.5}.control{fill:#fafafa;stroke:#777;stroke-width:1.2}.primary{fill:#356ea5;stroke:#28557f;stroke-width:1.5}.disabled{fill:#f4f4f4;stroke:#aaa;stroke-width:1}.divider{stroke:#aaa;stroke-width:1}text{font-family:sans-serif;fill:#222}.title{font-size:18px;font-weight:700}.hero{font-size:27px;font-weight:700}.label{font-size:15px;font-weight:700}.body{font-size:14px}.small{font-size:12px;fill:#555}.muted{font-size:14px;fill:#92928d}.white{font-size:15px;fill:#fff;font-weight:700}.annotation{font-size:13px;fill:#555;font-style:italic}
+  </style>
+  <rect class="window" x="20" y="20" width="1360" height="810" rx="8"/>
+  <rect class="subtle" x="20" y="20" width="1360" height="42" rx="8"/>
+  <text class="title" x="42" y="47">FoliaSeal</text>
+  <rect class="surface" x="20" y="62" width="1360" height="38"/>
+  <text class="body" x="42" y="87">File</text><text class="body" x="92" y="87">Edit</text><text class="body" x="142" y="87">View</text><text class="body" x="198" y="87">Signing</text><text class="body" x="265" y="87">Settings</text><text class="body" x="337" y="87">Help</text>
+
+  <rect class="surface" x="20" y="100" width="1045" height="58"/>
+  <text class="label" x="40" y="123">Document tools</text>
+  <rect class="disabled" x="40" y="131" width="176" height="20"/><text class="small" x="73" y="146">No document open</text>
+  <rect class="disabled" x="252" y="131" width="200" height="20"/><text class="small" x="319" y="146">Zoom</text>
+  <rect class="disabled" x="487" y="131" width="260" height="20"/><text class="small" x="573" y="146">Search</text>
+  <rect class="disabled" x="792" y="128" width="256" height="25"/><text class="small" x="873" y="146">Viewer modes</text>
+
+  <rect class="canvas" x="20" y="158" width="1045" height="620"/>
+  <text class="hero" x="405" y="333">Open a PDF to begin</text>
+  <text class="body" x="353" y="371">Review a document, choose a signature preset, and place a visible signature.</text>
+  <rect class="primary" x="430" y="407" width="225" height="46" rx="4"/>
+  <text class="white" x="499" y="436">Open a PDF…</text>
+  <rect class="control" x="405" y="468" width="275" height="42" rx="4"/>
+  <text class="body" x="454" y="494">Manage Signature Library…</text>
+  <text class="small" x="413" y="548">You can manage presets and certificates without opening a document.</text>
+  <text class="annotation" x="395" y="705">A PDF may also be dropped anywhere in this document area.</text>
+
+  <rect class="surface" x="1065" y="100" width="315" height="470"/>
+  <text class="label" x="1088" y="130">Signing controls</text>
+  <text class="small" x="1088" y="158">Signature preset</text>
+  <rect class="disabled" x="1088" y="168" width="269" height="34"/><text class="muted" x="1160" y="190">No document open</text>
+  <rect class="control" x="1088" y="214" width="269" height="32"/><text class="body" x="1136" y="235">Manage Signature Library…</text>
+  <line class="divider" x1="1088" y1="265" x2="1357" y2="265"/>
+  <text class="small" x="1088" y="294">Certificate</text><text class="muted" x="1088" y="316">Unavailable without a document</text>
+  <text class="small" x="1088" y="354">Signing details</text>
+  <rect class="disabled" x="1088" y="364" width="269" height="30"/><rect class="disabled" x="1088" y="402" width="269" height="30"/>
+  <text class="small" x="1088" y="466">Placement</text><text class="muted" x="1088" y="488">Unavailable without a document</text>
+  <rect class="disabled" x="1088" y="526" width="269" height="30"/><text class="muted" x="1176" y="547">Sign and save</text>
+
+  <rect class="subtle" x="1065" y="570" width="315" height="208"/>
+  <text class="label" x="1088" y="600">Signing status</text>
+  <text class="body" x="1088" y="630">No document open</text>
+  <text class="small" x="1088" y="655">Open a PDF to begin preparing a signature.</text>
+  <text class="annotation" x="1088" y="754">Read-only guidance</text>
+
+  <rect class="surface" x="20" y="778" width="1360" height="52"/>
+  <text class="label" x="40" y="801">Application status</text><text class="small" x="40" y="820">Ready</text><text class="annotation" x="1078" y="811">Transient activity only</text>
+</svg>

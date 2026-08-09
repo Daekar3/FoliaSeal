@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="860" viewBox="0 0 1500 860">
+  <defs>
+    <style>
+      .bg{fill:#dedede}.panel{fill:#f8f8f8;stroke:#555;stroke-width:2}.title{font:700 21px sans-serif;fill:#222}.head{font:700 16px sans-serif;fill:#222}.body{font:14px sans-serif;fill:#303030}.small{font:12px sans-serif;fill:#626262}.label{font:12px sans-serif;fill:#666}.value{font:14px sans-serif;fill:#222}.line{stroke:#c4c4c4}.button{fill:#fafafa;stroke:#888;stroke-width:1.5}.primary{fill:#3978b5;stroke:#285b89;stroke-width:1.5}.primaryText{font:700 14px sans-serif;fill:white}.buttonText{font:14px sans-serif;fill:#222}.disabled{fill:#ededed;stroke:#c6c6c6}.disabledText{font:14px sans-serif;fill:#999}.info{fill:#edf4fa;stroke:#6b91ad}.warn{fill:#fff5df;stroke:#b98b32}.error{fill:#fbecec;stroke:#b45f5f}.tag{font:700 12px sans-serif;fill:#555;letter-spacing:.5px}.stage{fill:#3978b5}.stageOff{fill:#c8c8c8}
+    </style>
+  </defs>
+  <rect class="bg" width="1500" height="860"/>
+  <text x="40" y="45" class="title">Sign and save — transaction states</text>
+  <text x="40" y="70" class="small">Exploratory state wireframe; ordinary desktop styling and exact copy may be refined.</text>
+
+  <!-- Confirmation -->
+  <text x="40" y="112" class="tag">1 · FINAL CONFIRMATION</text>
+  <rect x="40" y="130" width="450" height="650" rx="5" class="panel"/>
+  <text x="68" y="170" class="title">Sign and save this PDF?</text>
+  <text x="68" y="198" class="body">Review the signature and destination before continuing.</text>
+  <line x1="68" y1="220" x2="462" y2="220" class="line"/>
+  <text x="68" y="252" class="label">SIGNATURE PRESET</text><text x="68" y="276" class="value">Board approval</text>
+  <text x="68" y="315" class="label">CERTIFICATE</text><text x="68" y="339" class="value">Morgan Ellery — Board Secretary</text>
+  <text x="68" y="378" class="label">PLACEMENT</text><text x="68" y="402" class="value">Page 3 · Existing signature field “Approval”</text>
+  <text x="68" y="441" class="label">SIGNING TIME</text><text x="68" y="465" class="value">2026-08-09 19:42 UTC</text>
+  <text x="68" y="504" class="label">SAVE TO</text><text x="68" y="528" class="value">/Documents/Minutes-signed.pdf</text>
+  <rect x="68" y="554" width="394" height="74" rx="3" class="info"/>
+  <text x="86" y="580" class="body">ⓘ Self-signed certificate — ready for local signing</text>
+  <text x="86" y="605" class="small">The signature can be validated; recipient trust may vary.</text>
+  <text x="68" y="658" class="small">The displayed time is now frozen for this attempt.</text>
+  <line x1="40" y1="692" x2="490" y2="692" class="line"/>
+  <rect x="245" y="716" width="92" height="38" rx="3" class="button"/><text x="270" y="740" class="buttonText">Cancel</text>
+  <rect x="347" y="716" width="115" height="38" rx="3" class="primary"/><text x="365" y="740" class="primaryText">Sign and save</text>
+
+  <!-- Active -->
+  <text x="525" y="112" class="tag">2 · ACTIVE TRANSACTION</text>
+  <rect x="525" y="130" width="450" height="650" rx="5" class="panel"/>
+  <text x="553" y="170" class="title">Signing and saving…</text>
+  <text x="553" y="198" class="body">Keep FoliaSeal open while the signed PDF is verified.</text>
+  <rect x="553" y="232" width="394" height="90" rx="3" class="info"/>
+  <text x="575" y="262" class="head">Verifying signed output</text>
+  <text x="575" y="290" class="small">The PDF has been written. FoliaSeal is checking the result.</text>
+  <circle cx="585" cy="362" r="8" class="stage"/><text x="605" y="367" class="body">Preparing</text>
+  <line x1="585" y1="373" x2="585" y2="407" stroke="#3978b5" stroke-width="3"/>
+  <circle cx="585" cy="420" r="8" class="stage"/><text x="605" y="425" class="body">Writing signed PDF</text>
+  <line x1="585" y1="431" x2="585" y2="465" stroke="#3978b5" stroke-width="3"/>
+  <circle cx="585" cy="478" r="8" class="stage"/><text x="605" y="483" class="body">Verifying signatures and document integrity</text>
+  <text x="553" y="540" class="small">This operation cannot be cancelled after signing begins.</text>
+  <text x="553" y="567" class="small">The window remains responsive and may be minimized.</text>
+  <rect x="553" y="604" width="394" height="62" rx="3" class="warn"/>
+  <text x="575" y="631" class="body">This is taking longer than expected.</text>
+  <text x="575" y="653" class="small">Show technical activity ▸</text>
+  <line x1="525" y1="692" x2="975" y2="692" class="line"/>
+  <rect x="840" y="716" width="107" height="38" rx="3" class="disabled"/><text x="872" y="740" class="disabledText">Close</text>
+
+  <!-- Recovery -->
+  <text x="1010" y="112" class="tag">3 · VERIFICATION FAILURE</text>
+  <rect x="1010" y="130" width="450" height="650" rx="5" class="panel"/>
+  <text x="1038" y="170" class="title">Saved, but not verified</text>
+  <text x="1038" y="198" class="body">FoliaSeal could not confirm the signed PDF is valid.</text>
+  <rect x="1038" y="230" width="394" height="110" rx="3" class="error"/>
+  <text x="1060" y="260" class="head">Do not rely on this signed copy yet</text>
+  <text x="1060" y="287" class="small">The artifact has been preserved for recovery.</text>
+  <text x="1060" y="312" class="small">The original PDF remains unchanged.</text>
+  <text x="1038" y="382" class="label">PRESERVED COPY</text>
+  <text x="1038" y="406" class="value">/Documents/.Minutes-signed.recovery.pdf</text>
+  <text x="1038" y="451" class="label">RECOMMENDED NEXT STEP</text>
+  <text x="1038" y="475" class="body">Verify again. If the problem remains, return to the draft</text>
+  <text x="1038" y="497" class="body">or inspect technical details before opening the copy.</text>
+  <rect x="1038" y="526" width="394" height="38" rx="3" class="primary"/><text x="1193" y="550" class="primaryText">Verify again</text>
+  <rect x="1038" y="576" width="190" height="38" rx="3" class="button"/><text x="1085" y="600" class="buttonText">Return to draft</text>
+  <rect x="1242" y="576" width="190" height="38" rx="3" class="button"/><text x="1273" y="600" class="buttonText">Open preserved copy</text>
+  <text x="1038" y="650" class="small">Technical details ▸  ·  Error FS-VERIFY-004  ·  Verification stage</text>
+  <line x1="1010" y1="692" x2="1460" y2="692" class="line"/>
+  <rect x="1325" y="716" width="107" height="38" rx="3" class="button"/><text x="1358" y="740" class="buttonText">Close</text>
+
+  <text x="40" y="824" class="small">State 1 is cancellable and defaults to Sign and save. State 2 disables document-changing commands. State 3 preserves evidence and defaults to the safest recovery action.</text>
+</svg>
