@@ -11,9 +11,9 @@ Break a spec into independently-grabbable execplans using vertical slices (trace
 
 ### 1. Locate SPEC.md
 
-Ask the user for the SPEC.md file path.
+Ask the user for the SPEC.md or UI_SPEC.mdfile path.
 
-If the SPEC.md is not already in your context window, fetch it.
+If the SPEC.md or UI_SPEC.md is not already in your context window, fetch it.
 
 ### 2. Explore the codebase (optional)
 
