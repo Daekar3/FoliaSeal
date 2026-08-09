@@ -65,6 +65,8 @@ Read the highest-authority project documents before interviewing. Typical source
 - brand/design-system documents, if one exists
 - existing UI specification, if updating one
 
+Before interviewing, record each governing document’s responsibility and authority. Do not assume a universal precedence order. If the project does not define one, default to product scope first, canonical domain/object semantics second, UI/UX realization third, followed by platform and toolkit conventions.
+
 Extract already-decided UI constraints and label them as inherited decisions. Do not ask the user to decide them again unless a genuine conflict or ambiguity exists.
 
 ### 2. Explore the current interface and code

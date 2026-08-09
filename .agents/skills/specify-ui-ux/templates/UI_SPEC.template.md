@@ -20,17 +20,19 @@ Supporting visual artifacts referenced by this document are part of the approved
 
 ## 1. Source Precedence
 
-When sources conflict, use this precedence unless the project explicitly establishes another order:
+Each governing document is canonical within its assigned responsibility. Complete this hierarchy from project governance rather than assuming that UI decisions supersede upstream requirements.
 
-1. explicitly approved decisions in this document
-2. governing product specification and anti-goals
-3. canonical object/domain semantics
-4. project-specific accessibility or brand requirements
-5. active platform conventions and Human Interface Guidelines
-6. toolkit/framework conventions
-7. current implementation behavior
+Default precedence when the project defines no alternative:
 
-Current implementation is evidence, not authority over intended design.
+1. governing product specification for scope, capabilities, goals, anti-goals, and release criteria
+2. canonical domain/schema specification for objects, relationships, and persistence semantics
+3. this UI/UX specification for interface and interaction realization within those boundaries
+4. project-specific accessibility and other governing requirements
+5. platform conventions
+6. toolkit conventions
+7. current implementation
+
+An approved UI interview decision does not override an upstream frozen requirement. Surface the conflict and obtain authorization to reconcile the affected governing documents.
 
 ## 2. Decision Language
 
