@@ -14,7 +14,8 @@ Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md (the complete readiness state machine remains a prerequisite; this slice consumes its existing preview projection only)
+- [x] docs/ExecPlans/ui_readiness_caveats_status_execplan.md — typed readiness projection and
+  document-source safety inputs are implemented; the parent ledger remains separately reconciled.
 
 ## Progress
 
@@ -31,7 +32,8 @@ Qt surface, focused tests, and observable acceptance.
   explicitly documented compatibility boundary rather than dead product surface. No phase3 product
   terminology was introduced or removed in this slice.
 - [x] (2026-08-10) Run focused, regression, and GUI validation; clean processes and artifacts:
-  focused `158 passed`; full `1285 passed, 20 skipped, 1 warning`; Ruff and diff checks clean; the
+  current focused confirmation/bridge/shell command is `136 passed`; the current full suite is
+  `1440 passed, 20 skipped, 1 warning`; Ruff and diff checks clean; the
   bounded offscreen launch exits at `SingleInstanceUnavailable`, leaves no matching processes, and
   removes its temporary configuration root.
 - [x] (2026-08-10) Update this plan and relevant docs and obtain independent compliance review. The
@@ -82,8 +84,8 @@ Cancel-lossless output selection, explicit source-overwrite authorization, conse
 confirmation controls, and verified staged same-source replacement. The summary is derived from
 the synchronized draft, frozen preview time, and warning issues; the authorization is session-local
 and resets when the output path changes. Implementation and compliance-review gates are complete;
-the remaining work is the commit and future display-backed acceptance once the environment can claim
-the single-instance endpoint.
+the remaining work is the closeout commit and future display-backed acceptance once the environment
+can claim the single-instance endpoint.
 
 ## Context and Orientation
 
@@ -125,7 +127,7 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e 'confirm|output|Save As|Sign and save' src/foliaseal/presentation/qt/signing_workspace_action_bridge.py src/foliaseal/application/output_path_policy.py src/foliaseal/presentation/qt/signing_action_coordinator.py
-    .venv/bin/pytest -q tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_output_path_policy.py tests/unit/test_qt_signing_shell.py
+    .venv/bin/pytest -q tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_output_path_policy.py tests/unit/test_qt_signing_workspace_action_bridge.py tests/unit/test_qt_signing_shell.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -193,5 +195,5 @@ text, Reason, Location, or private keys.
 Revision note: 2026-08-10 / Codex
 Implemented and reviewed the confirmation/output-policy vertical slice after the live audit and
 red/green tests; updated the acceptance contract, compatibility note, and evidence requirements.
-Full regression and cleanup are recorded; display-backed acceptance is explicitly environment
-blocked, and commit is the remaining gate for this slice.
+Current focused evidence is `136 passed`; full regression and cleanup are recorded; display-backed
+acceptance is explicitly environment-blocked, and commit is the remaining gate for this slice.

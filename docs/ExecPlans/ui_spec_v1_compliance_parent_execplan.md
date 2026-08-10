@@ -137,7 +137,10 @@ Placement, preview, and signing tranche:
   projection and action vocabulary landed in the current slice; document-safety source gating is
   now implemented by the readiness-caveats child, while the remaining full rail state machine
   remains with its owning children.
-- [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
+- [x] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md — typed confirmation summary,
+  collision-safe output naming, Cancel-lossless selection, explicit source-overwrite authorization,
+  and verified staged replacement are implemented; display-backed dialog acceptance remains
+  environment-limited.
 - [x] docs/ExecPlans/ui_signing_transaction_progress_execplan.md — owned non-blocking worker,
   Qt-thread completion polling, truthful delayed stage/calm copy, and non-cancellable cleanup are
   implemented; crash journals/autosave remain out of scope.
@@ -312,6 +315,10 @@ Release tranche:
   1 warning`, and architecture/plan claims now record the distinct untrusted workspace, strict
   verification requirements, permission gate, and cleanup ownership. The bounded GUI launch remains
   limited by `SingleInstanceUnavailable` with cleanup confirmed.
+- [x] (2026-08-10) Closed the sign-confirmation/output-policy child: current focused
+  coordinator/output-policy/bridge/shell coverage is `136 passed`, current full suite is `1440
+  passed, 20 skipped, 1 warning`, and the typed summary/authorization/staging boundaries are
+  documented. The bounded dialog audit remains limited by `SingleInstanceUnavailable`.
 - [x] (2026-08-10) Added the bounded pointer-placement cancellation contract: existing pointer drags
   already cross the typed viewer/session/workspace bridge into a page-local `SignatureRect`; Escape
   now cancels unfinished placement or handle drags without emitting a new rectangle. Focused viewer/
