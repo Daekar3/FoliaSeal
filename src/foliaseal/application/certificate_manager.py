@@ -188,6 +188,7 @@ class CertificateManager:
             organization=self._optional_value(request.organization),
             created_at=created_at,
         )
+        metadata = self._certificate_metadata(certificate)
         payload = pkcs12.serialize_key_and_certificates(
             name=name.encode("utf-8"),
             key=key,
@@ -205,6 +206,7 @@ class CertificateManager:
             source_kind="created",
             created_at=self._now_iso(created_at),
             subject_summary=self._subject_summary(certificate),
+            **metadata,
         )
         configuration = CertificateConfiguration(
             schema_version=1,
@@ -234,6 +236,7 @@ class CertificateManager:
         self._ensure_unique_name(catalog, name)
         key, certificate = self._load_pkcs12(source, request.passphrase)
         del key
+        metadata = self._certificate_metadata(certificate)
         managed_id, configuration_id = self._new_id(), self._new_id()
         managed = ManagedCertificate(
             schema_version=1,
@@ -243,6 +246,7 @@ class CertificateManager:
             source_kind="imported",
             created_at=self._now_iso(self._now()),
             subject_summary=self._subject_summary(certificate),
+            **metadata,
         )
         configuration = CertificateConfiguration(
             schema_version=1,
@@ -672,7 +676,19 @@ class CertificateManager:
 
         return ManagedCertificateSubjectSummary(
             common_name=first(NameOID.COMMON_NAME),
+            distinguished_name=certificate.subject.rfc4514_string() or None,
             email=first(NameOID.EMAIL_ADDRESS),
             title=first(NameOID.TITLE) or first(NameOID.ORGANIZATIONAL_UNIT_NAME),
             company=first(NameOID.ORGANIZATION_NAME),
         )
+
+    @classmethod
+    def _certificate_metadata(cls, certificate: object) -> dict[str, str]:
+        """Return public, secret-free identity and validity facts for persistence."""
+
+        return {
+            "issuer_summary": certificate.issuer.rfc4514_string() or "Unknown issuer",
+            "valid_from": cls._now_iso(cls._certificate_datetime(certificate, "not_valid_before")),
+            "valid_until": cls._now_iso(cls._certificate_datetime(certificate, "not_valid_after")),
+            "fingerprint_sha256": certificate.fingerprint(hashes.SHA256()).hex(),
+        }

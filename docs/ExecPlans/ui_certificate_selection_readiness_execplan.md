@@ -69,6 +69,10 @@ This is a bounded readiness increment, not completion of the certificate corpus.
 unconfigured-file rows, import inspection/configuration, create/export/password-management, and
 the full signing-rail stage machine remain in their owning ExecPlans. The direct-material fallback
 exists only for headless/evidence callers and is not used by the catalog-backed app-frame path.
+Public certificate validity metadata and Library expiration ordering are owned by the separate
+`ui_certificate_validity_expiration_sort_execplan.md` child; readiness still re-reads managed
+PKCS#12 material at signing time, so persisted metadata never replaces password/private-key
+validation.
 
 ## Context and Orientation
 

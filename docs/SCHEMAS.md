@@ -153,6 +153,9 @@ Represent a certificate file that the app owns in managed storage, whether it wa
 - The app does not reference arbitrary external certificate paths after import.
 - The managed record stores public inspection metadata only; private-key presence and password
   validity are checked against the managed PKCS#12 file when needed.
+- New records populate `subject_summary`, `issuer_summary`, `valid_from`, `valid_until`, and
+  `fingerprint_sha256` from the inspected certificate. Older local records may omit these public
+  fields; the Library presents their expiration as unknown and never invents a date.
 - Deleting a `ManagedCertificate` is a separate action from deleting a
   `CertificateConfiguration`.
 
@@ -429,7 +432,7 @@ Known implementation drift includes older persisted shapes or behavior for:
 
 - optional Appearance references in presets
 - current-page Placement semantics and PDF-internal bottom-origin rectangles
-- raw date/time format strings, older layout names, and incomplete image/transparency fields
+- older layout names and incomplete image/transparency fields
 - source/output-path restrictions that may reject the user's explicit source-overwrite intent
 
 Some older implementation vocabulary also remains, including:

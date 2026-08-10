@@ -250,3 +250,20 @@ def test_library_exposes_configure_action_for_retained_certificate() -> None:
     dialog.controls.edit_button.click()
 
     assert configured == [CertificateLibraryRef("managed-cert-default")]
+
+
+def test_library_exposes_expiration_sort_choice() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+
+    assert dialog.controls.sort_selector._items == [
+        "Name A–Z",
+        "Name Z–A",
+        "Expiration soonest",
+    ]

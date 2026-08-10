@@ -78,6 +78,9 @@ Reusable-object and certificate tranche:
   password-confirmed identity fields, password-validated encrypted backup, secure remember/
   preserve/disable, and deletion/reference behavior are implemented and validated in the current
   slice; expiration sorting and password change remain open.
+- [x] docs/ExecPlans/ui_certificate_validity_expiration_sort_execplan.md — persist public issuer,
+  validity, subject-DN, and fingerprint metadata and expose the already-declared expiration sort;
+  focused/full validation and cleanup are recorded in the child.
 - [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
 
 Placement, preview, and signing tranche:
@@ -175,6 +178,11 @@ Release tranche:
   export validates the existing encrypted PKCS#12 password, and management Save preserves,
   enables, or explicitly disables remembered passwords through the secure-secret boundary. Full
   suite and bounded GUI evidence remain at the child commit gate.
+- [x] (2026-08-10) Implemented the certificate validity-metadata and expiration-sort child: new
+  managed records persist public subject-DN, issuer, validity, and SHA-256 facts; old records read
+  as unknown; Library sorting honors expiration within the existing configured/pinned partitions;
+  the Qt choice uses the existing `expiration_soonest` AppSettings value. Focused `74 passed`, full
+  `1269 passed, 20 skipped`, Ruff/diff clean, and bounded launch cleanup are recorded in the child.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

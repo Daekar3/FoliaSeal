@@ -23,8 +23,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] (2026-08-10) Audited the governing catalog rules and live models. Only placements had pin
   metadata; names compared case-sensitively; no duplicate command, sort state, or Library preference
-  bridge existed. Certificate expiration metadata is absent and remains owned by the certificate
-  readiness child.
+  bridge existed. Certificate validity metadata and expiration ordering are owned by the dedicated
+  certificate-validity child.
 - [x] (2026-08-10) Added failing coverage for case-insensitive names, duplicate identity/pin reset,
   pin ordering, certificate pin round-trip, and AppSettings Library preferences.
 - [x] (2026-08-10) Implemented persistent pins for appearances, placements, presets, managed
@@ -36,6 +36,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Ran focused, regression, offscreen GUI, static, diff, and process-cleanup
   validation; no owned FoliaSeal/PySide6/pytest process remains.
 - [x] (2026-08-10) Updated architecture/parent documentation; commit is the remaining handoff gate.
+- [x] (2026-08-10) Reconciled the former expiration deferral with
+  `ui_certificate_validity_expiration_sort_execplan.md`: this child owns row identity ordering while
+  the certificate child owns public validity metadata and the expiration-specific control.
 
 ## Surprises & Discoveries
 
@@ -58,7 +61,7 @@ The application/storage boundary now owns stable pin metadata and duplicate sema
 persisted catalog records. The Library session keeps pinned rows first, configured certificate rows
 before retained unconfigured files, and applies Name A-Z or Z-A ordering while persisting last
 catalog/sort choices without restoring an open window or draft.
-Certificate expiration sorting, certificate import/create/configure UI, nested editors, and
+Certificate import/create/configure UI, nested editors, and
 dirty-detail prompts remain explicit follow-on work owned by certificate/editor children; the
 Library now routes certificate pin, rename, and delete operations through typed AppFrame callbacks.
 
@@ -141,8 +144,9 @@ Pins persist by stable object reference across restart; last catalog and Name so
 search exists only while the Library is open. Names are trimmed and case-insensitively unique.
 Referenced deletion is blocked or resolved without dangling references, duplicate objects receive a
 new stable identity and start unpinned, and pinned entries remain first after rename or merged search
-results. Certificate expiration sorting and certificate create/import/configure actions remain
-deferred; certificate pin/rename/delete are routed through the existing certificate authority.
+results. Certificate validity metadata and expiration sorting are owned by
+`ui_certificate_validity_expiration_sort_execplan.md`; certificate pin/rename/delete are routed
+through the existing certificate authority.
 
 ## Evidence Record
 
@@ -150,8 +154,8 @@ Evidence recorded: the focused catalog/session/Qt/AppSettings command passed `58
 regression passed `1241 passed, 20 skipped, 1 warning`; Ruff and `git diff --check` are clean; the
 offscreen Library/no-document integration passed `2 tests`; process audit was empty. The GUI surface
 now exposes search, Name A-Z/Z-A sort, pin, duplicate, rename, and delete controls, with configured
-certificate rows before retained unconfigured files. Certificate expiration sorting and create/import/
-configure remain deferred to the certificate child.
+certificate rows before retained unconfigured files. The certificate validity child adds the
+expiration choice without changing this catalog's identity ordering.
 
 Before completion, record the exact catalog/AppSettings test command and result, the GUI search,
 sort, pin, duplicate, rename, and delete sequence with observed rows, the evidence path and restart result,
@@ -188,3 +192,7 @@ Revised during implementation to record persistent pin metadata across reusable 
 catalogs, typed duplicate/pin commands, case-insensitive uniqueness, pinned-first Name sorting,
 AppSettings Library preferences, focused evidence, and the explicit certificate-expiration/editor
 deferrals.
+
+Revision note: 2026-08-10 / Codex
+Updated after the validity-metadata audit so the catalog child owns merged-row ordering while the
+certificate child owns public certificate metadata and the expiration-specific UI choice.

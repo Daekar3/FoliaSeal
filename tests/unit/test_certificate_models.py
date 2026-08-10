@@ -54,7 +54,25 @@ def test_certificate_codec_preserves_catalog_shape_and_round_trip() -> None:
         "created_at",
         "subject_summary",
         "pinned",
+        "issuer_summary",
+        "valid_from",
+        "valid_until",
+        "fingerprint_sha256",
     }
+
+
+def test_legacy_managed_certificate_payload_decodes_without_validity_metadata() -> None:
+    original = build_certificate_catalog()
+    payload = encode_certificate_catalog(original)
+    for field in ("issuer_summary", "valid_from", "valid_until", "fingerprint_sha256"):
+        payload["managed_certificates"][0].pop(field)
+
+    restored = decode_certificate_catalog(payload).managed_certificates[0]
+
+    assert restored.issuer_summary is None
+    assert restored.valid_from is None
+    assert restored.valid_until is None
+    assert restored.fingerprint_sha256 is None
 
 
 @pytest.mark.parametrize(

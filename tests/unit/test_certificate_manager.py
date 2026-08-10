@@ -147,6 +147,7 @@ def test_manager_create_and_import_return_typed_operations(tmp_path: Path) -> No
     assert created.certificate_configuration is not None
     assert created.certificate_configuration.display_name == "Alice Signing"
     assert created.managed_file_path is not None and created.managed_file_path.exists()
+    assert created.managed_certificate is not None
 
     source = tmp_path / "source.p12"
     _write_pkcs12(source, passphrase="secret", common_name="Alice Imported")
@@ -158,6 +159,10 @@ def test_manager_create_and_import_return_typed_operations(tmp_path: Path) -> No
     assert imported.operation == "imported"
     assert imported.managed_certificate is not None
     assert imported.managed_certificate.subject_summary.common_name == "Alice Imported"
+    assert imported.managed_certificate.issuer_summary
+    assert imported.managed_certificate.valid_from
+    assert imported.managed_certificate.valid_until
+    assert imported.managed_certificate.fingerprint_sha256
 
 
 def test_manager_create_uses_five_year_identity_fields_and_confirmation(
@@ -197,6 +202,17 @@ def test_manager_create_uses_five_year_identity_fields_and_confirmation(
         "Example Org"
     )
     assert certificate.not_valid_after_utc.year == 2031
+    managed = result.managed_certificate
+    assert managed is not None
+    assert managed.issuer_summary == certificate.issuer.rfc4514_string()
+    assert managed.subject_summary.distinguished_name == certificate.subject.rfc4514_string()
+    assert managed.valid_from == certificate.not_valid_before_utc.isoformat().replace(
+        "+00:00", "Z"
+    )
+    assert managed.valid_until == certificate.not_valid_after_utc.isoformat().replace(
+        "+00:00", "Z"
+    )
+    assert managed.fingerprint_sha256 == certificate.fingerprint(hashes.SHA256()).hex()
 
 
 def test_manager_create_rejects_mismatched_confirmation(tmp_path: Path) -> None:

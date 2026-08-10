@@ -287,12 +287,17 @@ class ReusableObjectLibraryDialog:
         for label, value in (
             ("Name A–Z", LibrarySort.NAME_ASCENDING.value),
             ("Name Z–A", LibrarySort.NAME_DESCENDING.value),
+            ("Expiration soonest", LibrarySort.EXPIRATION_SOONEST.value),
         ):
             try:
                 sort_selector.addItem(label, value)
             except TypeError:
                 sort_selector.addItem(label)
-        available_sorts = (LibrarySort.NAME_ASCENDING, LibrarySort.NAME_DESCENDING)
+        available_sorts = (
+            LibrarySort.NAME_ASCENDING,
+            LibrarySort.NAME_DESCENDING,
+            LibrarySort.EXPIRATION_SOONEST,
+        )
         available_sort_index = {
             value: index for index, value in enumerate(available_sorts)
         }.get(self._session.sort, 0)
@@ -577,8 +582,12 @@ class ReusableObjectLibraryDialog:
         value = (
             data_getter(index)
             if callable(data_getter)
-            else (LibrarySort.NAME_ASCENDING, LibrarySort.NAME_DESCENDING)[index].value
-            if 0 <= index < 2
+            else (
+                LibrarySort.NAME_ASCENDING,
+                LibrarySort.NAME_DESCENDING,
+                LibrarySort.EXPIRATION_SOONEST,
+            )[index].value
+            if 0 <= index < 3
             else LibrarySort.NAME_ASCENDING.value
         )
         self._rows = self._session.set_sort(str(value))

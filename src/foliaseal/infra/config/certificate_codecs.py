@@ -67,6 +67,7 @@ def _optional_str(payload: Mapping[str, Any], field: str) -> str | None:
 def _decode_subject(payload: Mapping[str, Any]) -> ManagedCertificateSubjectSummary:
     return ManagedCertificateSubjectSummary(
         common_name=_optional_str(payload, "common_name"),
+        distinguished_name=_optional_str(payload, "distinguished_name"),
         email=_optional_str(payload, "email"),
         title=_optional_str(payload, "title"),
         company=_optional_str(payload, "company"),
@@ -83,6 +84,10 @@ def _decode_managed_certificate(payload: Mapping[str, Any]) -> ManagedCertificat
         created_at=_require_non_empty_str(payload, "created_at"),
         subject_summary=_decode_subject(_require_mapping(payload, "subject_summary")),
         pinned=_require_bool(payload, "pinned") if "pinned" in payload else False,
+        issuer_summary=_optional_str(payload, "issuer_summary"),
+        valid_from=_optional_str(payload, "valid_from"),
+        valid_until=_optional_str(payload, "valid_until"),
+        fingerprint_sha256=_optional_str(payload, "fingerprint_sha256"),
     )
 
 
@@ -135,6 +140,7 @@ def decode_certificate_catalog(payload: Mapping[str, Any]) -> CertificateCatalog
 def _encode_subject(subject: ManagedCertificateSubjectSummary) -> dict[str, Any]:
     return {
         "common_name": subject.common_name,
+        "distinguished_name": subject.distinguished_name,
         "email": subject.email,
         "title": subject.title,
         "company": subject.company,
@@ -151,6 +157,10 @@ def _encode_managed_certificate(certificate: ManagedCertificate) -> dict[str, An
         "created_at": certificate.created_at,
         "subject_summary": _encode_subject(certificate.subject_summary),
         "pinned": certificate.pinned,
+        "issuer_summary": certificate.issuer_summary,
+        "valid_from": certificate.valid_from,
+        "valid_until": certificate.valid_until,
+        "fingerprint_sha256": certificate.fingerprint_sha256,
     }
 
 

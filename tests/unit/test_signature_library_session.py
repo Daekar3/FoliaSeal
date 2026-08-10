@@ -162,3 +162,49 @@ def test_certificate_catalog_projects_one_combined_entry_and_unconfigured_files(
     assert unconfigured.display_name == "Alpha unconfigured"
     assert "Not configured" in unconfigured.details
     assert rows[0].ref.object_id == "managed-configured"
+
+
+def test_certificate_catalog_expiration_sort_puts_known_dates_first_and_unknown_last() -> None:
+    session = SignatureLibrarySession(
+        _session()._library,  # noqa: SLF001 - test keeps one service boundary
+        CertificateCatalog(
+            schema_version=1,
+            managed_certificates=(
+                ManagedCertificate(
+                    schema_version=1,
+                    managed_certificate_id="managed-later",
+                    display_name="Later",
+                    storage_filename="later.p12",
+                    source_kind="imported",
+                    created_at="2026-01-01T00:00:00Z",
+                    subject_summary=ManagedCertificateSubjectSummary(common_name="Later"),
+                    valid_until="2027-06-01T00:00:00Z",
+                ),
+                ManagedCertificate(
+                    schema_version=1,
+                    managed_certificate_id="managed-sooner",
+                    display_name="Sooner",
+                    storage_filename="sooner.p12",
+                    source_kind="imported",
+                    created_at="2026-01-01T00:00:00Z",
+                    subject_summary=ManagedCertificateSubjectSummary(common_name="Sooner"),
+                    valid_until="2026-09-01T00:00:00Z",
+                ),
+                ManagedCertificate(
+                    schema_version=1,
+                    managed_certificate_id="managed-legacy",
+                    display_name="Legacy",
+                    storage_filename="legacy.p12",
+                    source_kind="imported",
+                    created_at="2026-01-01T00:00:00Z",
+                    subject_summary=ManagedCertificateSubjectSummary(common_name="Legacy"),
+                    valid_until="not-a-date",
+                ),
+            ),
+        ),
+        initial_catalog=LibraryCatalog.CERTIFICATES,
+        sort=LibrarySort.EXPIRATION_SOONEST,
+    )
+
+    assert [row.display_name for row in session.rows()] == ["Sooner", "Later", "Legacy"]
+    assert session.rows()[-1].expiration == "not-a-date"

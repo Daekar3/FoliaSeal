@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from foliaseal.application.certificate_models import CertificateCatalog
@@ -40,6 +41,7 @@ class SignatureLibraryRow:
     details: str
     pinned: bool = False
     configured: bool = False
+    expiration: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,14 +141,21 @@ class SignatureLibrarySession:
                 details=summary.details,
                 pinned=summary.pinned,
                 configured=getattr(summary, "configured", False),
+                expiration=getattr(summary, "expiration", None),
             )
             for summary in summaries
             if not query
             or query in summary.display_name.casefold()
             or query in summary.details.casefold()
         )
-        reverse = self._sort is LibrarySort.NAME_DESCENDING
-        name_sorted = sorted(rows, key=lambda row: row.display_name.casefold(), reverse=reverse)
+        if self._sort is LibrarySort.EXPIRATION_SOONEST:
+            name_sorted = sorted(
+                rows,
+                key=lambda row: (_expiration_key(row.expiration), row.display_name.casefold()),
+            )
+        else:
+            reverse = self._sort is LibrarySort.NAME_DESCENDING
+            name_sorted = sorted(rows, key=lambda row: row.display_name.casefold(), reverse=reverse)
         configured_sorted = sorted(name_sorted, key=lambda row: not row.configured)
         return tuple(sorted(configured_sorted, key=lambda row: not row.pinned))
 
@@ -229,6 +238,7 @@ class SignatureLibrarySession:
                     else False
                 ),
                 configured=item.managed_certificate_id in configurations,
+                expiration=item.valid_until,
             )
             for item in self._certificate_catalog.managed_certificates
         ]
@@ -242,6 +252,7 @@ class SignatureLibrarySession:
                 details="Managed certificate file is unavailable; configure or remove this entry.",
                 pinned=item.pinned,
                 configured=False,
+                expiration=None,
             )
             for item in self._certificate_catalog.certificate_configurations
             if item.managed_certificate_id not in managed_ids
@@ -266,6 +277,20 @@ def _sort_from_value(value: str | LibrarySort) -> LibrarySort:
         return LibrarySort(str(value).strip().lower())
     except ValueError:
         return LibrarySort.NAME_ASCENDING
+
+
+def _expiration_key(value: str | None) -> tuple[int, datetime]:
+    """Sort known UTC dates first and legacy/invalid values last."""
+
+    if not value:
+        return (1, datetime.max.replace(tzinfo=UTC))
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return (0, parsed.astimezone(UTC))
+    except (TypeError, ValueError):
+        return (1, datetime.max.replace(tzinfo=UTC))
 
 
 __all__ = [

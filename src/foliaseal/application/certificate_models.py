@@ -40,12 +40,19 @@ class ManagedCertificateSubjectSummary:
     """Non-secret certificate subject fields shown in certificate lists."""
 
     common_name: str | None = None
+    distinguished_name: str | None = None
     email: str | None = None
     title: str | None = None
     company: str | None = None
 
     def __post_init__(self) -> None:
-        for field_name in ("common_name", "email", "title", "company"):
+        for field_name in (
+            "common_name",
+            "distinguished_name",
+            "email",
+            "title",
+            "company",
+        ):
             object.__setattr__(
                 self,
                 field_name,
@@ -64,6 +71,10 @@ class ManagedCertificate:
     created_at: str
     subject_summary: ManagedCertificateSubjectSummary
     pinned: bool = False
+    issuer_summary: str | None = None
+    valid_from: str | None = None
+    valid_until: str | None = None
+    fingerprint_sha256: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -110,6 +121,17 @@ class ManagedCertificate:
                 "Field 'subject_summary' must be a ManagedCertificateSubjectSummary."
             )
         object.__setattr__(self, "pinned", _require_bool(self.pinned, "pinned"))
+        for field_name in (
+            "issuer_summary",
+            "valid_from",
+            "valid_until",
+            "fingerprint_sha256",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _require_optional_non_empty_str_value(getattr(self, field_name), field_name),
+            )
 
 @dataclass(frozen=True)
 class CertificateConfiguration:
