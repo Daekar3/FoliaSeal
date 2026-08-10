@@ -14,9 +14,10 @@ from foliaseal.presentation.qt.signing_action_coordinator import SigningActionSt
 
 @dataclass(frozen=True)
 class SigningActionControls:
-    """Widgets used for the primary signing action/status panel."""
+    """Widgets used for the interactive action group and read-only status group."""
 
     container: Any
+    status_container: Any
     journey_label: Any
     stage_label: Any
     detail_label: Any
@@ -159,13 +160,10 @@ class SigningWorkspaceSidebar:
             on_copy_selected_text=on_copy_selected_text,
             on_clear_selected_text=on_clear_selected_text,
         )
-        self.status_region = bindings.q_widget()
+        self.status_region = self.signing_action_controls.status_container
         set_minimum_height = getattr(self.status_region, "setMinimumHeight", None)
         if callable(set_minimum_height):
             set_minimum_height(self.STATUS_REGION_MINIMUM_HEIGHT)
-        status_layout = bindings.q_vbox_layout(self.status_region)
-        status_layout.setContentsMargins(0, 0, 0, 0)
-        status_layout.addWidget(self.signing_action_controls.container)
         index_changed = getattr(
             self.document_review_controls.signature_selector,
             "currentIndexChanged",
@@ -228,6 +226,7 @@ class SigningWorkspaceSidebar:
         self._layout.addWidget(self.properties_scroll, 1)
         self._layout.addWidget(self.document_review_controls.container)
         self._layout.addWidget(self.document_text_controls.container)
+        self._layout.addWidget(self.signing_action_controls.container)
         self._layout.addWidget(self.status_region)
 
     def render_signing_action_state(self, state: SigningActionState) -> None:
@@ -259,9 +258,28 @@ class SigningWorkspaceSidebar:
             "open_signed_output": self.open_signed_output_button,
         }
         for name, button in buttons.items():
+            is_primary = name == action_name
             set_property = getattr(button, "setProperty", None)
             if callable(set_property):
-                set_property("foliasealPrimaryAction", name == action_name)
+                set_property("foliasealPrimaryAction", is_primary)
+            set_style = getattr(button, "setStyleSheet", None)
+            if callable(set_style):
+                set_style(
+                    "font-weight: 700; border: 2px solid #2563eb;"
+                    if is_primary
+                    else "font-weight: 400;"
+                )
+            set_accessible_name = getattr(button, "setAccessibleName", None)
+            if callable(set_accessible_name):
+                set_accessible_name(
+                    "Recommended next action: "
+                    + ("Confirm and sign" if name == "sign" else "Open signed PDF")
+                    if is_primary
+                    else ""
+                )
+            set_tool_tip = getattr(button, "setToolTip", None)
+            if callable(set_tool_tip):
+                set_tool_tip("Recommended next action" if is_primary else "")
 
     def apply_signing_action_state(self, state: SigningActionState) -> None:
         self.render_signing_action_state(state)
@@ -347,6 +365,11 @@ class SigningWorkspaceSidebar:
         layout = self._bindings.q_vbox_layout(container)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
+        status_container = self._bindings.q_group_box("Signing status")
+        _style_panel(status_container)
+        status_layout = self._bindings.q_vbox_layout(status_container)
+        status_layout.setContentsMargins(6, 6, 6, 6)
+        status_layout.setSpacing(4)
         stage_label = self._bindings.q_label("")
         journey_label = self._bindings.q_label(
             "Workflow: 1 Review → 2 Setup → 3 Place → 4 Ready → 5 Sign → 6 Verify"
@@ -373,15 +396,16 @@ class SigningWorkspaceSidebar:
         choose_output_button.clicked.connect(on_choose_output)  # type: ignore[attr-defined]
         sign_button.clicked.connect(on_sign)  # type: ignore[attr-defined]
         open_signed_output_button.clicked.connect(on_open_signed_output)  # type: ignore[attr-defined]
-        layout.addWidget(journey_label)
-        layout.addWidget(stage_label)
-        layout.addWidget(detail_label)
         layout.addWidget(choose_output_button)
         layout.addWidget(sign_button)
         layout.addWidget(open_signed_output_button)
-        layout.addWidget(result_label)
+        status_layout.addWidget(journey_label)
+        status_layout.addWidget(stage_label)
+        status_layout.addWidget(detail_label)
+        status_layout.addWidget(result_label)
         return SigningActionControls(
             container=container,
+            status_container=status_container,
             journey_label=journey_label,
             stage_label=stage_label,
             detail_label=detail_label,

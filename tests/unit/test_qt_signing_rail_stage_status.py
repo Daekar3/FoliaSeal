@@ -27,7 +27,9 @@ def test_sidebar_uses_fixed_rail_and_protected_status_region() -> None:
         sidebar.status_region.minimum_height
         == SigningWorkspaceSidebar.STATUS_REGION_MINIMUM_HEIGHT
     )
-    assert sidebar.signing_action_controls.container.parent is sidebar.status_region
+    assert sidebar.signing_action_controls.container.parent is sidebar.container
+    assert sidebar.signing_action_controls.status_container is sidebar.status_region
+    assert sidebar.status_region.parent is sidebar.container
 
 
 def test_sidebar_marks_at_most_one_recommended_primary_action() -> None:
@@ -36,13 +38,24 @@ def test_sidebar_marks_at_most_one_recommended_primary_action() -> None:
     sidebar.render_signing_action_state(_state(can_sign=True, recommended_action="sign"))
     assert sidebar.sign_button.property("foliasealPrimaryAction") is True
     assert sidebar.open_signed_output_button.property("foliasealPrimaryAction") is False
+    assert "border: 2px solid #2563eb" in sidebar.sign_button.style
+    assert sidebar.sign_button.accessible_name == "Recommended next action: Confirm and sign"
+    assert sidebar.sign_button.tooltip == "Recommended next action"
 
     sidebar.render_signing_action_state(
         _state(can_open=True, recommended_action="open_signed_output")
     )
     assert sidebar.sign_button.property("foliasealPrimaryAction") is False
     assert sidebar.open_signed_output_button.property("foliasealPrimaryAction") is True
+    assert "border: 2px solid #2563eb" in sidebar.open_signed_output_button.style
+    assert (
+        sidebar.open_signed_output_button.accessible_name
+        == "Recommended next action: Open signed PDF"
+    )
+    assert sidebar.open_signed_output_button.tooltip == "Recommended next action"
 
     sidebar.render_signing_action_state(_state())
     assert sidebar.sign_button.property("foliasealPrimaryAction") is False
     assert sidebar.open_signed_output_button.property("foliasealPrimaryAction") is False
+    assert "border: 2px solid #2563eb" not in sidebar.sign_button.style
+    assert "border: 2px solid #2563eb" not in sidebar.open_signed_output_button.style

@@ -7,10 +7,14 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can use a fixed right rail that shows truthful readiness/result stages and one next action in the real FoliaSeal GUI. It is mapped to UI_SPEC SUR02, SUR07, section 11, and acceptance scenarios 2 and 5. The
-slice is intentionally one vertical path through the relevant persistent
-model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
-generic refactor.
+After this slice, a user can use a fixed right rail whose interactive signing controls remain in
+the upper controls area while a protected lower region shows only read-only readiness/result
+status and visibly identifies at most one recommended action. This is the bounded portion of UI_SPEC
+SUR02, SUR07, section 11, and acceptance scenarios 2 and 5 that the current coordinator can
+truthfully support. It does not claim the full asynchronous signing, verification, dirty-draft, or
+remembered-divider state machine; those remain explicit follow-up work. The slice is one vertical
+path through the relevant application workflow, Qt surface, focused tests, and observable
+acceptance, not a generic refactor.
 
 ## Child ExecPlan Dependencies
 
@@ -23,9 +27,11 @@ generic refactor.
 
 - [x] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
 - [x] (2026-08-09) Implement the bounded fixed-rail, protected-status, and typed recommended-action path.
-- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
-- [x] (2026-08-09) Run focused, regression, and offscreen Qt validation; record evidence and clean up.
-- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
+- [x] (2026-08-09) Re-audit commit 8cec447d0 and identify that its status region incorrectly contained interactive controls and that its recommended action was not visibly rendered.
+- [x] (2026-08-09) Move interactive signing controls above a read-only status region, add visible and accessible recommended-action treatment, and prove the real Qt geometry.
+- [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the named sidebar/coordinator modules was met, so no unrelated removal was mixed into this slice.
+- [x] (2026-08-09) Run focused, regression, and real offscreen Qt validation; record evidence and clean up.
+- [x] (2026-08-09) Update this plan and relevant architecture/status documentation; commit remains the final handoff gate.
 
 ## Surprises & Discoveries
 
@@ -37,6 +43,21 @@ generic refactor.
   typed primary-action identity even though it already exposes `can_sign` and result capability.
   Evidence: `signing_workspace_composition.py` and `SigningWorkspaceSidebar.__init__` inspected on
   2026-08-09.
+- Observation: commit 8cec447d0 placed the entire action-controls group, including Choose output,
+  Confirm and sign, and Open signed PDF, inside `status_region`. UI_SPEC SUR02/SUR07 require that
+  lower region to be read-only.
+  Evidence: explorer review of `signing_workspace_sidebar.py` and the current unit assertion that
+  `signing_action_controls.container.parent is status_region`.
+- Observation: the dynamic `foliasealPrimaryAction` property had no visible Qt styling or
+  accessibility treatment, so a user could not identify the recommended action.
+  Evidence: focused tests only inspected the property and no stylesheet or accessible name consumed
+  it.
+- Observation: the real Qt acceptance test can prove the sidebar's production widget tree and
+  fixed geometry, but constructing the entire application bootstrap would pull unrelated signing
+  backend dependencies into this narrow contract test.
+  Evidence: `tests/integration/test_signing_rail_layout.py` constructs `SigningWorkspaceSidebar`
+  with production `QtSigningWidgetBindings` and embeds it in a real `QMainWindow`; the full shell
+  composition remains covered by its existing unit/integration tests.
 
 ## Decision Log
 
@@ -53,14 +74,25 @@ generic refactor.
   Rationale: these changes make the existing truthful states stable and actionable without inventing
   verification results or fake progress.
   Date/Author: 2026-08-09 / Codex
+- Decision: keep the interactive signing action group outside `status_region`; the lower region will
+  contain only journey, stage, detail, and result labels. Apply a visible border/weight treatment,
+  tooltip, and accessible name to the one recommended button while retaining the typed property for
+  styling and tests.
+  Rationale: UI_SPEC defines the status region as read-only and requires one clear next action using
+  text, icon, or color. This corrects the prior foundation without inventing unsupported workflow
+  states.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-The bounded Loop 6 outcome is implemented: the signing rail is fixed at 320 logical pixels, the
-status/action region has a protected minimum and is placed after the upper controls, and the typed
-coordinator state identifies at most one recommended action (`sign` or `open_signed_output`) for
-supported states. Existing stage/result wording remains unchanged. Full asynchronous Signing,
-Saved-but-not-verified, verification, and dirty-draft policy remain deferred to their owning plans.
+The first Loop 6 commit established the fixed width and typed coordinator projection, but its
+compliance review found that the lower region was not read-only and that the recommended action was
+not visible. The correction now leaves a 320-pixel rail with interactive signing controls above a
+read-only status region, visible and accessible recommended-action styling, coordinator transition
+coverage, and real offscreen Qt geometry evidence. The coordinator still supports only its existing
+setup, placement, readiness, signing-result, and failure states; full asynchronous Signing,
+Saved-but-not-verified, verification, dirty-draft policy, independently scrollable split regions,
+and remembered divider width remain deferred to their owning plans.
 
 ## Context and Orientation
 
@@ -84,16 +116,26 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Reshape the mounted workspace into a stable right signing rail with upper controls, a protected lower readiness/result region, and one plain-language next action. Keep the canvas primary, prevent status from moving into the toolbar, and map all specified states without a wizard. Add typed seams where the current code passes raw widget internals or compatibility
-kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
-old path once focused tests prove no callers remain. Keep user-facing terminology from UI_SPEC.md,
-not schema/backend names.
+Reshape the mounted workspace into a stable right signing rail with an upper interactive controls
+group and a protected lower status group. In `signing_workspace_sidebar.py`, split the existing
+`SigningActionControls` widget tree so its buttons remain in the upper action group while its
+journey, stage, detail, and result labels are owned by a read-only `status_container`. Keep the
+existing `SigningWorkspaceSidebarSurface` fields and callback paths stable. Render
+`recommended_action` with the existing dynamic property plus a visible style and accessibility
+text, and add coordinator transition assertions for the supported setup, ready, success,
+unavailable-output, and failure cases. Add a real offscreen Qt test that constructs the sidebar and
+checks the fixed width, protected status height, read-only status children, and visible primary
+action. Update architecture and plan documentation to state supported states and explicit
+deferrals. Do not claim the full UI_SPEC state machine, remembered divider, or asynchronous progress
+until their dedicated plans implement them.
 
 ## Milestones
 
 Milestone 1 defines one readiness/action state and adds coordinator/sidebar tests. Milestone 2 wires
-the fixed-width rail and plain-language stages through public ports. Milestone 3 proves tab order,
-disabled actions, and status transitions in a recorded GUI audit.
+the fixed-width rail with an upper action group and read-only lower status through public ports.
+Milestone 3 proves the real Qt geometry, visible primary-action treatment, disabled actions, and
+supported status transitions in an offscreen audit. Full UI_SPEC state coverage remains a separate
+set of child plans.
 
 ## Concrete Steps
 
@@ -105,7 +147,7 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e 'class SigningWorkspaceSidebar|class SigningActionCoordinator' src/foliaseal/presentation/qt/signing_workspace_sidebar.py src/foliaseal/presentation/qt/signing_action_coordinator.py
-    .venv/bin/pytest -q tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_qt_signing_shell.py tests/unit/test_signing_workspace_sidebar.py
+    .venv/bin/pytest -q tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_qt_signing_shell.py tests/unit/test_signing_workspace_sidebar.py tests/unit/test_qt_signing_rail_stage_status.py tests/integration/test_signing_rail_layout.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -118,26 +160,46 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     rm -rf "$audit_root"
     test ! -e "$audit_root"
 
-Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+Expected evidence is the stated user-visible behavior plus a mandatory real Qt test or display-backed
+walkthrough. The real test records a 320px sidebar, a label-only status region, and accessible/visible
+recommended action. Record the exact input sequence, widget state, expected observation, evidence
+path, and cleanup result; the bounded timeout is only a lifecycle check.
+
+The bounded launch audit was attempted with an isolated configuration root on 2026-08-09. The
+application exited with `GUI_RC=1` and `SingleInstanceUnavailable: Unable to claim or reach the
+FoliaSeal instance endpoint`; this environment cannot bind the local Qt single-instance endpoint.
+No FoliaSeal/PySide6 process remained, and the temporary audit root was removed (`AUDIT_ROOT_CLEAN=1`).
+The real offscreen widget test is therefore the authoritative geometry/accessibility evidence for
+this slice, while the launch limitation remains recorded rather than hidden.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: At minimum, no-document, setup-required, placement, ready, signing, signed-verified, and failed states render in the rail with one clear next action and no needless reflow. The focused regression suite must pass, the full
-suite must remain green when shared code changed, and the GUI audit must record the visible result
-and cleanup. A passing import or unit test without the stated user-visible behavior is insufficient.
+Acceptance is behavioral for the currently supported coordinator states: the real Qt sidebar is
+320 logical pixels wide, interactive signing buttons are outside the lower status group, the status
+group contains only read-only labels and retains its 200-pixel minimum, and exactly one enabled
+recommended action receives visible styling when the state supplies one. Setup-required,
+placement, ready, successful-output, unavailable-output, and failure transitions must be covered by
+coordinator tests. The focused regression suite, full suite, and offscreen Qt geometry test must
+pass, and the bounded GUI audit must record the visible result and cleanup. The full UI_SPEC states
+No document open, Signing progress, Signed and verified locally, Saved but not verified, dirty-draft
+prompts, independently scrollable regions, and remembered divider remain explicit acceptance items
+for later child plans, not claims of this slice.
 
 ## Evidence Record
 
 Before checking this child in the parent, record the governing UI_SPEC requirement and
-`docs/ui/sign-and-save-states-exploratory.svg`, exact focused test command/result, rail keyboard sequence and observed status/action,
-evidence path and cleanup result, and compatibility grep proof.
+`docs/ui/sign-and-save-states-exploratory.svg`, exact focused test command/result, real Qt rail
+geometry and read-only status observation, recommended-action styling observation, evidence path
+and cleanup result, and compatibility grep proof. Record deferred full-state requirements rather
+than implying that this bounded test proves them.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
-Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
-contract, record that the test was red before implementation and green afterward.
+Also record the exact focused test node and expected result (`124 passed` in the correction pass;
+the full suite then completed with `1177 passed, 20 skipped, 1 warning`);
+when the slice adds a new contract, record that the test was red before implementation and green
+afterward. The focused correction command completed with `124 passed in 8.67s`; Ruff and
+`git diff --check` both passed.
 
 ## Idempotence and Recovery
 
@@ -155,11 +217,16 @@ absolute paths.
 ## Interfaces and Dependencies
 
 Use existing typed application workflows and public Qt ports rather than private child-widget
-reach-through. Create `tests/unit/test_qt_signing_rail_stage_status.py` for offscreen rail state;
-the final interface must be exercised by tests/unit/test_qt_signing_action_coordinator.py,
-tests/unit/test_qt_signing_shell.py, and that new test file.
-workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
-retirement condition recorded in this plan.
+reach-through. `SigningActionControls` exposes both its interactive `container` and read-only
+`status_container`; `SigningWorkspaceSidebarSurface.status_region` refers to the latter. Create
+`tests/unit/test_qt_signing_rail_stage_status.py` for fake-binding state and
+`tests/integration/test_signing_rail_layout.py` for real offscreen geometry. The final interface
+must be exercised by those files plus `tests/unit/test_qt_signing_action_coordinator.py` and
+`tests/unit/test_qt_signing_shell.py`. Any compatibility adapter retained temporarily must have a
+named consumer and a retirement condition recorded in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as child ui_signing_rail_stage_status_execplan.md of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-09 / Codex
+Narrowed the claim and added a correction milestone after review found interactive controls in the
+read-only status region, invisible recommended-action metadata, and missing real-Qt evidence.

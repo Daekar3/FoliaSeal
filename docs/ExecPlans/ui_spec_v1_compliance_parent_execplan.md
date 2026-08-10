@@ -108,6 +108,11 @@ Release tranche:
   Page and Next Page actions through the public workspace session port, with boundary-aware
   enablement and viewer-owned navigation synchronization; Fit/zoom/search behavior remains deferred
   to dependent viewer/document seams.
+- [x] (2026-08-09) Loop 6 completed its bounded signing-rail correction: the fixed 320px rail now
+  separates interactive signing controls from a read-only protected status region, exposes typed
+  recommended-action styling/accessibility, and has coordinator plus real offscreen sidebar evidence.
+  The full UI_SPEC state machine, asynchronous progress, verification/recovery, independently
+  scrollable regions, and remembered divider remain open in this child and their owning children.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -135,6 +140,11 @@ Release tranche:
   policy slices for truthful enablement and complete menu coverage.
   Evidence: `ui_command_model_shortcuts_execplan.md` records the bounded File acceptance and its
   deferred Edit/View/Signing/Settings/Help owners.
+- Observation: the bounded signing rail can be made truthful before the full state machine exists,
+  but only if interactive action controls stay out of the read-only status region and the remaining
+  UI_SPEC states are named as deferrals.
+  Evidence: Loop 6 compliance review and `ui_signing_rail_stage_status_execplan.md` revision note
+  dated 2026-08-09.
 
 ## Decision Log
 

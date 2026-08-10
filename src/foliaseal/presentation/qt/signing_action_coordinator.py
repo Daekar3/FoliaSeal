@@ -166,9 +166,7 @@ class SigningActionCoordinator:
             and self._last_signing_result.success
             and self._last_successful_output_path is not None
         )
-        if (
-            has_successful_output
-        ):
+        if has_successful_output:
             stage_text = "Step 6 of 6 — Verify signed PDF"
             detail_text = (
                 "Open the signed PDF, review its local verification status, and keep any "
@@ -218,6 +216,10 @@ class SigningActionCoordinator:
                 if has_successful_output and self._can_open_signed_output
                 else "sign"
                 if can_sign
+                and (
+                    self._last_signing_result is None
+                    or not self._last_signing_result.success
+                )
                 else None
             ),
         )

@@ -121,6 +121,8 @@ class _FakeWidget:
         self.minimum_width = None
         self.minimum_height = None
         self.properties = {}
+        self.accessible_name = None
+        self.tool_tip = None
         self._width_value = 480
         self.word_wrap = None
         self.destroyed = _FakeSignal()
@@ -161,6 +163,12 @@ class _FakeWidget:
 
     def property(self, name):
         return self.properties.get(name)
+
+    def setAccessibleName(self, name):  # noqa: N802
+        self.accessible_name = name
+
+    def setToolTip(self, text):  # noqa: N802
+        self.tool_tip = text
 
     def width(self):
         if self.fixed_width is not None:
@@ -2673,7 +2681,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         widget.sidebar_surface.sign_result_label.parent
-        is widget.sidebar_surface.signing_action_panel
+        is widget.sidebar_surface.status_region
     )
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
