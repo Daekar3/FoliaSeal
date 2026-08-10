@@ -14,16 +14,28 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md (bounded launch landed in `d203e8605`; the
+  parent checkbox was stale and is reconciled below).
+- [x] docs/ExecPlans/ui_window_theme_responsive_execplan.md (main-frame geometry/theme baseline
+  landed before this slice; rail/Library/DPI persistence remains deferred).
+- [x] docs/ExecPlans/ui_document_signatures_review_execplan.md (review surface landed in
+  `9a064669b`; this slice consumes only its AppFrame lifecycle boundary).
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audit SCHEMAS v2, the live legacy placement model, refinement dialog, profile
+  store, and Library dependency; the mismatch and migration boundary are recorded below.
+- [ ] (2026-08-10) Add red model/storage tests for v2 fields, top-left geometry, pinned/source-page
+  validation, and deliberate rejection of legacy payloads without migration context.
+- [ ] (2026-08-10) Implement the v2 placement model/codec, migrate SavePlacement and all new profile
+  writes, and add an isolated transactional fixed-page editor with Save/Cancel and blank-page input.
+- [ ] (2026-08-10) Retire `page_selection_mode`, PDF-space `bottom_pt`, and
+  `numeric_fine_tuning_enabled` from placement-profile output after all callers migrate; do not
+  rename unrelated evidence/backend modules.
+- [ ] (2026-08-10) Run focused, regression, and real offscreen Qt validation; clean processes and
+  artifacts.
+- [ ] (2026-08-10) Update this plan, parent status, architecture/schema notes, complete compliance
+  review, and commit the whole slice.
 
 ## Surprises & Discoveries
 
@@ -31,6 +43,16 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   SCHEMAS.md also describes source-page semantics; this child must resolve that contract before
   wiring Save/Cancel.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: legacy profiles do not contain page dimensions, so converting `bottom_pt` to the v2
+  top-left `top_pt` coordinate is impossible without migration context.
+  Evidence: the v1 payload has only `page_selection_mode` and four rectangle values; it has no visible
+  page width/height or rotation. Context-free legacy payloads must therefore be rejected rather than
+  silently guessed.
+- Observation: the existing refinement dialog isolates a draft and uses the public
+  `SigningSetupSession.save_placement_profile()` callback, but it edits a document-local PDF-space
+  form rather than a reusable fixed-page model.
+  Evidence: `signing_workspace_refinement_dialog.py` and `visible_signature_setup_form.py` inspected
+  on 2026-08-10.
 
 ## Decision Log
 
@@ -40,10 +62,28 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible placement editor transaction and profile capture outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: make `PlacementProfile` schema version 2 the only serialized placement output, with a
+  one-based fixed `page_number`, immutable visible `source_page`, and top-left `PlacementProfileRect`.
+  Rationale: SCHEMAS.md and UI_SPEC section 10 define reusable geometry in visible-page coordinates;
+  retaining v1 fields in new output would keep the GUI contract ambiguous.
+  Date/Author: 2026-08-10 / Codex
+- Decision: reject context-free v1 placement payloads with a clear migration error instead of
+  inventing page dimensions or treating bottom-left values as top-left values. Provide an explicit
+  migration helper that accepts source-page context for callers that can supply it.
+  Rationale: preserving geometry is more important than pretending an unconvertible legacy value is
+  safe, and the plan explicitly allows a deliberate-rejection path.
+  Date/Author: 2026-08-10 / Codex
+- Decision: keep the active PDF-space `VisibleSignaturePlacementDraft` contract and convert to/from
+  v2 profile geometry only at the profile/editor boundary using visible page dimensions and rotation.
+  Rationale: reusable profiles are document-independent, while the signing draft remains a PDF-boundary
+  value.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+Audit/setup completed. The live model remains v1-shaped and no implementation or acceptance evidence
+is claimed yet. The next milestones must prove v2 round-trip/migration behavior before the editor is
+mounted, then prove Save/Cancel isolation and restart persistence in a real offscreen Qt surface.
 
 ## Context and Orientation
 
@@ -66,18 +106,22 @@ rebaselines, V2 features, or packaging work.
 ## Plan of Work
 
 Begin by adopting the frozen SCHEMAS.md v2 contract: serialize `page_number`, `source_page`,
-`top_pt`, `left_pt`, `width_pt`, `height_pt`, and `pinned`; migrate live `bottom_pt` by converting
-from the current page coordinate system. Treat legacy `page_selection_mode="current_page"` as
-input-only migration data and map it to a concrete serialized `page_number`; never add
-`page_selection_mode` to the v2 output. Reject unknown legacy shapes with a clear migration error. The migration
-must explicitly cover/removal-review `page_selection_mode`, `left_pt`, `bottom_pt`, `width_pt`,
-`height_pt`, and `numeric_fine_tuning_enabled`; record a before/after fixture and backward-read test
-before deleting old fields. Then provide a fixed-page Placement editor from a current PDF or blank page with direct
-Page/Left/Top/Width/Height point fields and handles. Store only schema-approved reusable geometry
-and compatibility metadata, never PDF identity or content; Save/Cancel must not mutate the active
-document placement or preset. Add or preserve typed application and public Qt-port boundaries rather
-than reaching through private widgets. When a legacy path is replaced, prove its callers are
-migrated before deleting it.
+`top_pt`, `left_pt`, `width_pt`, `height_pt`, and `pinned`; never add `page_selection_mode`,
+`bottom_pt`, or `numeric_fine_tuning_enabled` to v2 output. Add a pure migration helper that accepts
+the legacy mapping plus an explicit `PlacementProfileSourcePage` and one-based page number, converts
+bottom-left to top-left using `top_pt = visible_height_pt - bottom_pt - height_pt`, and rejects a
+legacy mapping when that context is absent. Reject unknown schema shapes with a clear validation
+error. Update `PlacementProfile`, `PlacementProfileRect`, `SavePlacement`, catalog codecs, storage,
+and all profile builders to use v2 values. Keep active document drafts in PDF-space and convert only
+at the profile boundary.
+
+Then provide a fixed-page Placement editor from a current PDF or blank-page context with direct
+Page/Left/Top/Width/Height point fields, a visible source-page summary, and Save/Cancel. The editor
+must own an immutable draft until Save; Cancel closes without changing the active signing draft or
+preset. Store only schema-approved reusable geometry and compatibility metadata, never PDF identity
+or content. Add or preserve typed application and public Qt-port boundaries rather than reaching
+through private widgets. When a legacy path is replaced, prove its callers are migrated before
+deleting it.
 
 Milestone 1 is the foundation gate and may proceed after launch and typed settings: implement the
 v2 codec, migration fixture, backward-read or deliberate-rejection test, and update every persistence
