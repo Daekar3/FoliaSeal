@@ -374,6 +374,13 @@ Release tranche:
   1 warning`, and architecture/plan claims now record the distinct untrusted workspace, strict
   verification requirements, permission gate, and cleanup ownership. The bounded GUI launch remains
   limited by `SingleInstanceUnavailable` with cleanup confirmed.
+- [x] (2026-08-10) Added the explicit UI_SPEC §11 `Saved but not verified` rail state: preserved
+  `POST_VERIFY_FAILED` results disable Sign and save, retain Verify again/Return to draft/Open
+  preserved copy, and remain distinct from ordinary pre-write failure. Coordinator and real
+  offscreen sidebar coverage are `135 passed`; typed `SigningActionState.status` now carries
+  `saved_but_not_verified` versus `signing_failed`. The full suite remains green at `1482 passed,
+  20 skipped, 1 warning`; the readiness/rail children remain open for broader state-machine and
+  release gates.
 - [x] (2026-08-10) Closed the sign-confirmation/output-policy child: current focused
   coordinator/output-policy/bridge/shell coverage is `136 passed`, current full suite is `1440
   passed, 20 skipped, 1 warning`, and the typed summary/authorization/staging boundaries are

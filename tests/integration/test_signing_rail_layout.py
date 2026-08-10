@@ -106,6 +106,34 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
             "Recommended next action: Open signed PDF"
         )
         assert sidebar.open_signed_output_button.toolTip() == "Recommended next action"
+        sidebar.render_signing_action_state(
+            SigningActionState(
+                can_sign=False,
+                stage_text="Saved but not verified",
+                detail_text=(
+                    "The signed PDF was saved, but local verification did not complete. "
+                    "It must not yet be relied upon; verify again, return to the draft, or "
+                    "open the preserved copy."
+                ),
+                result_text="Post-sign verification failed.",
+                result_kind="error",
+                last_signing_result=None,
+                last_successful_output_path=None,
+                can_open_signed_output=False,
+                can_verify_again=True,
+                can_return_to_draft=True,
+                can_open_preserved_copy=True,
+                recommended_action="verify_again",
+                status="saved_but_not_verified",
+            )
+        )
+        assert sidebar.signing_action_controls.stage_label.text() == "Saved but not verified"
+        assert "must not yet be relied upon" in sidebar.signing_action_controls.detail_label.text()
+        assert sidebar.sign_button.isEnabled() is False
+        assert sidebar.verify_again_button.isEnabled() is True
+        assert sidebar.verify_again_button.accessibleName() == (
+            "Recommended next action: Verify again"
+        )
         assert viewer.width() > sidebar.container.width()
         query_input = sidebar.document_text_controls.query_input
         query_input.setFocus()

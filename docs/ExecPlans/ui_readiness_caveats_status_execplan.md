@@ -41,6 +41,19 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   blocker without claiming Reload/Locate behavior that belongs to the safe-links/lifecycle child.
 - [x] (2026-08-10) Enforce the same source-safety decision at direct workflow request
   construction, so headless callers cannot sign a changed, missing, or unverifiable source.
+- [x] (2026-08-10) Add the missing post-write state projection required by UI_SPEC §11:
+  a preserved `POST_VERIFY_FAILED` result renders as `Saved but not verified`, disables a new
+  signing attempt until recovery is resolved, and retains Verify again, Return to draft, and Open
+  preserved copy as the truthful recovery actions. The typed `SigningActionState.status` keeps
+  this distinct from ordinary `signing_failed` results.
+- [x] (2026-08-10) Focused action-coordinator/sidebar/rail validation passed (`135 passed` before
+  the final full-suite run); the coordinator test proves the preserved-artifact discriminator and
+  the real offscreen rail test proves the heading, warning, disabled Sign button, and Verify again
+  recommendation. The synthetic rail state is intentionally a rendering-boundary test, not a
+  replacement for coordinator transition coverage.
+- [x] (2026-08-10) Final validation passed: focused action-coordinator/sidebar/rail coverage is
+  `135 passed`, full regression is `1482 passed, 20 skipped, 1 warning`, Ruff, `pip check`, and
+  `git diff --check` are clean, and no owned Qt/test process or temporary FoliaSeal root remains.
 
 ## Surprises & Discoveries
 
@@ -63,11 +76,19 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   Rationale: UI_SPEC WF04 requires document safety to precede setup, while the current viewer has no
   safe reload seam. This adds truthful blocking without silently discarding or replacing a draft.
   Date/Author: 2026-08-10 / Codex
+- Decision: project a preserved `FailureCode.POST_VERIFY_FAILED` result as `Saved but not verified`
+  before ordinary readiness text; keep the requested output untrusted and disable Sign and save
+  until Verify again succeeds or the user returns to the draft.
+  Rationale: UI_SPEC §11 and WF05 require a distinct state for bytes written without successful
+  local verification. A generic signing failure or ready-to-sign state would either hide recovery
+  actions or imply that the unverified artifact is safe to use.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
 The typed readiness child supplies one ordered state and recommended action to the rail while
-preserving signed/recovery/no-document precedence. The composition now captures source identity,
+preserving signed/recovery/no-document precedence. The coordinator now adds the typed
+`saved_but_not_verified`/`signing_failed` distinction for terminal signing results. The composition now captures source identity,
 the panel prioritizes changed/missing/unknown safety before setup, and direct workflow request
 construction rejects unresolved source safety. Reload/locate/ignore, condition-only banners,
 full appearance/fit readiness vocabulary, asynchronous signing progress, and the remaining rail
@@ -146,8 +167,9 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
-Current evidence: the focused source/readiness/action set is `49 passed`; the full suite is
-`1398 passed, 20 skipped, 1 warning`; Ruff, `pip check`, and `git diff --check` pass. The offscreen
+Historical evidence from the source-safety increment: the focused source/readiness/action set was
+`49 passed`; the full suite was `1398 passed, 20 skipped, 1 warning`; Ruff, `pip check`, and
+`git diff --check` passed. The offscreen
 properties-panel integration test observes a changed source and asserts the `document_safety` /
 `review_document_safety` state before setup. The bounded CLI walkthrough exits at the known
 isolated `SingleInstanceUnavailable` endpoint before window creation; its exact temporary root is

@@ -14,10 +14,18 @@ from foliaseal.application.signing_readiness import (
     SigningReadinessAction,
     SigningReadinessStage,
 )
+from foliaseal.domain.errors import FailureCode
 from foliaseal.domain.models import SigningRequest, SigningResult
 
 SigningRequestExecutor = object
 ResultKind = Literal["neutral", "success", "error"]
+SigningActionStatus = Literal[
+    "readiness",
+    "signing",
+    "signed_and_verified",
+    "saved_but_not_verified",
+    "signing_failed",
+]
 RecommendedAction = Literal[
     "sign",
     "open_signed_output",
@@ -45,6 +53,7 @@ class SigningActionState:
     can_verify_again: bool = False
     can_return_to_draft: bool = False
     can_open_preserved_copy: bool = False
+    status: SigningActionStatus = "readiness"
 
 
 @dataclass(frozen=True)
@@ -356,10 +365,6 @@ class SigningActionCoordinator:
             if self._transaction_active and self._transaction_started_at is not None
             else 0.0
         )
-        can_sign = readiness.can_sign and (
-            not self._untrusted_recovery
-            or (self._preserved_artifact_verified and self._recovery_permission_allows)
-        )
         has_successful_output = (
             self._last_signing_result is not None
             and self._last_signing_result.success
@@ -367,7 +372,20 @@ class SigningActionCoordinator:
         )
         preserved_artifact_path = self._preserved_artifact_path()
         has_recovery_artifact = preserved_artifact_path is not None
+        saved_but_not_verified = (
+            self._last_signing_result is not None
+            and not self._last_signing_result.success
+            and self._last_signing_result.failure_code == FailureCode.POST_VERIFY_FAILED
+            and has_recovery_artifact
+            and not self._preserved_artifact_verified
+        )
+        can_sign = readiness.can_sign and (
+            not self._untrusted_recovery
+            or (self._preserved_artifact_verified and self._recovery_permission_allows)
+        ) and not saved_but_not_verified
+        status: SigningActionStatus = "readiness"
         if self._transaction_active:
+            status = "signing"
             can_sign = False
             if transaction_elapsed < 1.0:
                 stage_text = "Step 5 of 6 — Confirm and sign"
@@ -381,11 +399,26 @@ class SigningActionCoordinator:
                     "Signing is taking longer than expected; FoliaSeal is still working."
                 )
         elif has_successful_output:
+            status = "signed_and_verified"
             stage_text = "Step 6 of 6 — Verify signed PDF"
             detail_text = (
                 "Open the signed PDF, review its local verification status, and keep any "
                 "trust caveats in mind. Add another approval signature only if document "
                 "permissions permit it."
+            )
+        elif saved_but_not_verified:
+            status = "saved_but_not_verified"
+            stage_text = "Saved but not verified"
+            detail_text = (
+                "The signed PDF was saved, but local verification did not complete. It must not "
+                "yet be relied upon; verify again, return to the draft, or open the preserved copy."
+            )
+        elif self._last_signing_result is not None and not self._last_signing_result.success:
+            status = "signing_failed"
+            stage_text = "Signing failed"
+            detail_text = (
+                "The signing attempt did not produce a trusted output. Correct the reported "
+                "problem and try again."
             )
         elif has_recovery_artifact and not can_sign:
             stage_text = "Step 6 of 6 — Recover verification result"
@@ -422,6 +455,7 @@ class SigningActionCoordinator:
             ),
             can_return_to_draft=has_recovery_artifact,
             can_open_preserved_copy=(has_recovery_artifact and self._can_open_preserved_copy),
+            status=status,
             recommended_action=_recommended_action(
                 readiness=readiness,
                 can_sign=can_sign,

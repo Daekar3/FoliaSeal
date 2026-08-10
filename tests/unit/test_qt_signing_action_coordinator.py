@@ -333,8 +333,8 @@ def test_signing_action_coordinator_failure_tracks_error_state(tmp_path: Path) -
     executor = _FakeSigningExecutor(
         SigningResult(
             success=False,
-            failure_code=FailureCode.POST_VERIFY_FAILED,
-            message="Post-sign verification failed.",
+            failure_code=FailureCode.PDF_SIGNING_FAILED,
+            message="Signing failed before an output was preserved.",
         )
     )
     coordinator = SigningActionCoordinator(
@@ -349,11 +349,13 @@ def test_signing_action_coordinator_failure_tracks_error_state(tmp_path: Path) -
 
     assert transition.request is not None
     assert transition.status_event == "sign_failure"
-    assert transition.error_message == "Post-sign verification failed."
+    assert transition.error_message == "Signing failed before an output was preserved."
     assert transition.error_via_emit is False
     assert transition.state.last_signing_result is not None
     assert transition.state.last_signing_result.success is False
-    assert transition.state.result_text == "Post-sign verification failed."
+    assert transition.state.status == "signing_failed"
+    assert transition.state.stage_text == "Signing failed"
+    assert transition.state.result_text == "Signing failed before an output was preserved."
     assert transition.state.can_open_signed_output is False
     assert transition.state.recommended_action == "sign"
     assert coordinator.open_signed_output() is None
@@ -385,6 +387,10 @@ def test_signing_action_coordinator_exposes_preserved_artifact_recovery_actions(
 
     transition = coordinator.submit()
 
+    assert transition.state.stage_text == "Saved but not verified"
+    assert "must not yet be relied upon" in transition.state.detail_text
+    assert transition.state.can_sign is False
+    assert transition.state.status == "saved_but_not_verified"
     assert transition.state.can_verify_again is True
     assert transition.state.can_return_to_draft is True
     assert transition.state.can_open_preserved_copy is True

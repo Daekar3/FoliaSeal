@@ -34,6 +34,10 @@ acceptance, not a generic refactor.
 - [x] (2026-08-09) Updated this plan and relevant architecture/status documentation; the bounded
   implementation and correction are committed in `8d67d1652`, with remaining async/state-machine
   scope explicitly deferred to its owning children.
+- [x] (2026-08-10) Closed the previously deferred `Saved but not verified` rail state through the
+  readiness/recovery follow-up; this plan remains the owning rail geometry/status boundary while
+  `ui_readiness_caveats_status_execplan.md` owns the result discriminator. Coordinator and real
+  offscreen sidebar coverage prove the warning, disabled Sign button, and Verify again action.
 
 ## Surprises & Discoveries
 
@@ -71,10 +75,11 @@ acceptance, not a generic refactor.
   Date/Author: 2026-08-09 / Codex
 - Decision: implement a 320 logical-pixel rail, a protected 200-pixel minimum status region pinned
   after the upper controls, and a typed `recommended_action` projection for the currently supported
-  coordinator states. Preserve secondary output/reopen controls and defer true asynchronous Signing,
-  Saved-but-not-verified, and verification state machines to their named children.
-  Rationale: these changes make the existing truthful states stable and actionable without inventing
-  verification results or fake progress.
+  coordinator states. Preserve secondary output/reopen controls and defer true asynchronous Signing
+  and broader verification state machines to their named children; the Saved-but-not-verified state
+  is now closed by the readiness/recovery follow-up.
+  Rationale: these changes make truthful states stable and actionable without inventing verification
+  results or fake progress.
   Date/Author: 2026-08-09 / Codex
 - Decision: keep the interactive signing action group outside `status_region`; the lower region will
   contain only journey, stage, detail, and result labels. Apply a visible border/weight treatment,
@@ -91,10 +96,12 @@ The first Loop 6 commit established the fixed width and typed coordinator projec
 compliance review found that the lower region was not read-only and that the recommended action was
 not visible. The correction now leaves a 320-pixel rail with interactive signing controls above a
 read-only status region, visible and accessible recommended-action styling, coordinator transition
-coverage, and real offscreen Qt geometry evidence. The coordinator still supports only its existing
-setup, placement, readiness, signing-result, and failure states; full asynchronous Signing,
-Saved-but-not-verified, verification, dirty-draft policy, independently scrollable split regions,
-and remembered divider width remain deferred to their owning plans.
+coverage, and real offscreen Qt geometry evidence. The coordinator now also projects a typed
+`saved_but_not_verified` status for `POST_VERIFY_FAILED` with a preserved artifact, retaining
+recovery actions and disabling Sign and save until recovery resolves; ordinary pre-write failures
+use `signing_failed`. Full asynchronous Signing, dirty-draft
+policy, independently scrollable split regions, and remembered divider width remain deferred to
+their owning plans.
 This bounded child is complete in `8d67d1652`.
 
 ## Context and Orientation
@@ -183,10 +190,11 @@ group contains only read-only labels and retains its 200-pixel minimum, and exac
 recommended action receives visible styling when the state supplies one. Setup-required,
 placement, ready, successful-output, unavailable-output, and failure transitions must be covered by
 coordinator tests. The focused regression suite, full suite, and offscreen Qt geometry test must
-pass, and the bounded GUI audit must record the visible result and cleanup. The full UI_SPEC states
-No document open, Signing progress, Signed and verified locally, Saved but not verified, dirty-draft
-prompts, independently scrollable regions, and remembered divider remain explicit acceptance items
-for later child plans, not claims of this slice.
+pass, and the bounded GUI audit must record the visible result and cleanup. The `Saved but not
+verified` state is now implemented by the readiness/recovery follow-up and is covered at both the
+coordinator and sidebar-rendering boundaries. The remaining full UI_SPEC items are No document open,
+Signing progress, dirty-draft prompts, independently scrollable regions, and remembered divider;
+those remain explicit acceptance items for later child plans, not claims of this slice.
 
 ## Evidence Record
 
@@ -198,10 +206,10 @@ than implying that this bounded test proves them.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
-Also record the exact focused test node and expected result (`124 passed` in the correction pass;
-the full suite then completed with `1177 passed, 20 skipped, 1 warning`);
+Also record the exact focused test node and expected result (`135 passed` in the current recovery/
+rail pass; the full suite is `1482 passed, 20 skipped, 1 warning`);
 when the slice adds a new contract, record that the test was red before implementation and green
-afterward. The focused correction command completed with `124 passed in 8.67s`; Ruff and
+afterward. The focused recovery/rail command completed with `135 passed`; Ruff and
 `git diff --check` both passed.
 
 ## Idempotence and Recovery

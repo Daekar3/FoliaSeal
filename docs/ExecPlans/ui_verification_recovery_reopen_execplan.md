@@ -38,9 +38,10 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No safe retirement condition
   was met; historical evidence names remain external contracts and no new product-facing phase3
   nomenclature was introduced.
-- [x] (2026-08-10) Ran focused, regression, and GUI validation; clean processes and artifacts:
-  the current recovery/app-frame/sidebar/document-review command is `52 passed`; the current full
-  suite is `1440 passed, 20 skipped, 1 warning`; backend/recovery coverage remains green; Ruff and
+- [x] (2026-08-10) Ran focused, regression, and GUI validation; clean processes and artifacts
+  (historical closeout at that revision): the recovery/app-frame/sidebar/document-review command
+  was `52 passed`; the full suite was `1440 passed, 20 skipped, 1 warning`; backend/recovery
+  coverage remained green; Ruff and
   diff checks clean. The
   bounded offscreen app launch exits at `SingleInstanceUnavailable`, leaves no matching processes,
   and removes its temporary configuration root. Lifecycle disposal now also removes an app-owned
@@ -52,6 +53,9 @@ Qt surface, focused tests, and observable acceptance.
   Display-backed recovery acceptance remains environment-blocked by `SingleInstanceUnavailable`.
 - [x] (2026-08-10) Committed the completed recovery closeout and recorded the remaining
   dependency-ordered blockers as `6370e3f0b`.
+- [x] (2026-08-10) Reconciled the rail-facing recovery vocabulary with UI_SPEC §11: a preserved
+  `POST_VERIFY_FAILED` result is rendered as `Saved but not verified`, while the artifact remains
+  untrusted and the recovery actions remain the only truthful next steps until verification succeeds.
 
 ## Surprises & Discoveries
 
@@ -98,8 +102,8 @@ Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-The bounded recovery path now preserves post-write verification failures and projects typed retry,
-return, and preserved-copy actions into the signing rail. Verification retry interprets structured
+The bounded recovery path now preserves post-write verification failures and projects the normative
+`Saved but not verified` rail state with typed retry, return, and preserved-copy actions. Verification retry interprets structured
 cryptographic validity, every-signature coverage, required timestamp, and required timestamp trust;
 it remains read-only and never promotes the preserved artifact to `last_successful_output_path`.
 Explicit Return to draft removes only the app-owned preserved file. The bounded later-approval
@@ -218,8 +222,8 @@ audit and red tests; updated dependencies and the architecture boundary. The iso
 still stops before frame creation at `SingleInstanceUnavailable`; no process or temporary-config
 debris remains. Independent review and commit completed in the closeout below.
 Revision note: 2026-08-10 / Codex
-Closed the recovery child after reconciling the parent and architecture docs. Current focused
-recovery/app-frame/sidebar/document-review evidence is `52 passed`; the full suite is `1440 passed,
-20 skipped, 1 warning`; the bounded GUI launch remains environment-limited by
+Closed the recovery child after reconciling the parent and architecture docs. Historical focused
+recovery/app-frame/sidebar/document-review evidence is `52 passed`; the full suite at that revision
+was `1440 passed, 20 skipped, 1 warning`; the bounded GUI launch remains environment-limited by
 `SingleInstanceUnavailable`, with owned processes and temporary roots cleaned up. The closeout is
 committed as `6370e3f0b`.
