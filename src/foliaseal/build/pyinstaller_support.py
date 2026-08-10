@@ -3,6 +3,7 @@
 from pathlib import Path
 
 _FONT_DESTINATION = "foliaseal/resources/fonts"
+_HELP_DESTINATION = "foliaseal/resources/help"
 
 
 def collect_runtime_assets(project_root: Path | None = None) -> list[tuple[str, str]]:
@@ -10,4 +11,15 @@ def collect_runtime_assets(project_root: Path | None = None) -> list[tuple[str, 
 
     root = Path(project_root) if project_root is not None else Path(__file__).resolve().parents[3]
     font_root = root / "src" / "foliaseal" / "resources" / "fonts"
-    return [(str(font_path), _FONT_DESTINATION) for font_path in sorted(font_root.glob("*.ttf"))]
+    help_root = root / "src" / "foliaseal" / "resources" / "help"
+    assets = [
+        (str(font_path), _FONT_DESTINATION) for font_path in sorted(font_root.glob("*.ttf"))
+    ]
+    assets.extend(
+        (str(help_path), _HELP_DESTINATION)
+        for help_path in sorted(help_root.glob("*.md"))
+    )
+    index_path = help_root / "index.json"
+    if index_path.is_file():
+        assets.append((str(index_path), _HELP_DESTINATION))
+    return assets

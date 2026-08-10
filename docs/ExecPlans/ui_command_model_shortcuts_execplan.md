@@ -12,7 +12,7 @@ currently focused `QLineEdit` or `QTextEdit`, using Ctrl+X, Ctrl+C, Ctrl+V, and 
 focus-sensitive Undo/Redo boundary remains unchanged: native editors own their local text history,
 while viewer or placement focus routes Undo/Redo to the public placement-history boundary. The same
 Select All action now delegates to the completed document-selection child when no native text editor
-owns focus; Help remains a separate owning slice because it needs a support-content seam. This is a
+owns focus; Help is implemented by its separate packaged-support child. This is a
 bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
 
 ## Child ExecPlan Dependencies
@@ -38,7 +38,7 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   open for the deferred menus and signed-state policy.
 - [x] (2026-08-09) Loop 8: migrated the existing Settings actions to the shared typed command
   registry with unique mnemonics, stable IDs/object names, Qt descriptions, and callback-routing
-  coverage. Edit, Signing, Help, and the remaining View commands remain deferred until truthful
+  coverage. Edit, Signing, and remaining View commands remain deferred until truthful
   behavior seams exist.
 - [x] (2026-08-09) Loop 8 focused validation passed (`44 passed`), full validation passed
   (`1185 passed, 20 skipped, 1 warning`), and the bounded launch audit cleaned its isolated root
@@ -102,7 +102,8 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   no matching processes or temporary audit root remaining. Commit and remaining command-family
   status remain the parent handoff gates.
 - [x] (2026-08-10) Fresh-scan selected native-editor Cut, Copy, Paste, and Select All as the next truthful
-  Edit increment; viewer Select All and Help remain separate because their public seams are not ready.
+  Edit increment; viewer Select All remains integrated here, while packaged Help is owned by its
+  completed support child.
 - [x] (2026-08-10) Added typed native Edit definitions, focus-sensitive state projection, native
   editor callbacks, selection/clipboard signal synchronization, and fake/real offscreen coverage.
 - [x] (2026-08-10) Reconciled architecture/status documentation; focused validation passed (`65 passed`),
@@ -111,7 +112,8 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   error and requires no lingering process or temporary audit root.
 - [x] (2026-08-10) Reconciled the completed viewer Select All child into the shared Edit command
   contract; native editor precedence remains at AppFrame, and the no-native-editor path now uses
-  the public workspace session port for current-page document text. Help remains deferred.
+  the public workspace session port for current-page document text. Packaged Help is owned by its
+  completed support child.
 
 ## Surprises & Discoveries
 
@@ -341,7 +343,7 @@ transitions, and runs the real offscreen Signing-menu test. Milestone 7 adds Edi
 focus-sensitive native-text versus placement-history routing and capability transitions, and runs a
 real offscreen menu/action test that creates, mutates, undoes, and redoes a placement.
 Milestone 8 adds native-editor Cut, Paste, and Select All, proves focus-sensitive enablement and
-shortcut dispatch against a real `QLineEdit`, and records viewer Select All and Help as separate
+  shortcut dispatch against a real `QLineEdit`, and records packaged Help as a separate completed
 remaining dependency gaps.
 
 ## Concrete Steps
@@ -508,4 +510,5 @@ Paste, and Select All over the existing `_focused_text_editor()` seam with Ctrl+
 Selection and clipboard signals now keep action state current; the real offscreen test validates menu
 dispatch and observable native keyboard behavior. Viewer Select All was subsequently implemented in
 `ui_document_select_all_execplan.md` over the public document-selection contract, preserving native
-editor precedence; Help and final release scenario evidence remain explicitly deferred.
+editor precedence; final release scenario evidence remains explicitly deferred, while packaged Help
+is implemented and validated by `ui_help_support_execplan.md`.

@@ -43,10 +43,17 @@ Qt surface, focused tests, and observable acceptance.
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [ ] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
 - [ ] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
+- [x] docs/ExecPlans/ui_help_support_execplan.md — completed first Help milestone for canonical
+  packaged Markdown, CLI discovery, modeless viewer/F1, and offline resource parity.
 
 ## Progress
 
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
+- [x] (2026-08-10) Reconciled the release corpus by delegating the first Help milestone to
+  `ui_help_support_execplan.md`; the broader settings/diagnostics/packaging acceptance remains open.
+- [x] (2026-08-10) Help child completed with `72` focused passes and full-suite evidence of
+  `1465 passed, 20 skipped, 1 warning`; this plan retains ownership of diagnostics, accessibility,
+  installed-package, and final release acceptance.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
 - [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.

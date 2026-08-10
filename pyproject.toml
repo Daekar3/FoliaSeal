@@ -33,7 +33,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-foliaseal = ["resources/fonts/*.ttf"]
+foliaseal = ["resources/fonts/*.ttf", "resources/help/*.md", "resources/help/index.json"]
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

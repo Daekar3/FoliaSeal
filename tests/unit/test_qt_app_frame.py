@@ -23,6 +23,7 @@ from foliaseal.presentation.qt.app_frame import (
 from foliaseal.presentation.qt.app_frame_command_model import (
     EDIT_COMMAND_DEFINITIONS,
     FILE_COMMAND_DEFINITIONS,
+    HELP_COMMAND_DEFINITIONS,
     SETTINGS_COMMAND_DEFINITIONS,
     SIGNING_COMMAND_DEFINITIONS,
     VIEW_COMMAND_DEFINITIONS,
@@ -116,6 +117,18 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         "Ctrl+-",
         None,
     ]
+
+
+def test_help_command_is_typed_and_uses_f1() -> None:
+    from foliaseal.presentation.qt.app_frame_command_model import HELP_COMMAND_DEFINITIONS
+
+    assert len(HELP_COMMAND_DEFINITIONS) == 1
+    definition = HELP_COMMAND_DEFINITIONS[0]
+    assert definition.command_id is AppFrameCommandId.HELP
+    assert definition.menu == "Help"
+    assert definition.text == "Help"
+    assert definition.shortcut == "F1"
+    assert definition.accessible_name == "Open FoliaSeal Help"
 
 
 def test_signing_commands_are_typed_and_keep_placement_actions_truthful() -> None:
@@ -1708,6 +1721,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "View",
         "Signing",
         "Settings",
+        "Help",
     ]
     assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
         "&Open",
@@ -1834,6 +1848,13 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert settings_mnemonics == [
         definition.mnemonic_text.replace("&", "").lower()
         for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.text for action in frame.window.menu_bar.menus[5].actions] == [
+        definition.mnemonic_text for definition in HELP_COMMAND_DEFINITIONS
+    ]
+    assert [action.shortcut for action in frame.window.menu_bar.menus[5].actions] == ["F1"]
+    assert [action.tool_tip for action in frame.window.menu_bar.menus[5].actions] == [
+        definition.accessible_name for definition in HELP_COMMAND_DEFINITIONS
     ]
     assert not hasattr(frame.window, "_foliaseal_app_frame")
     assert not hasattr(frame.window, "app_settings")

@@ -81,6 +81,7 @@ from foliaseal.presentation.qt.external_link_confirmation import (
     ExternalLinkOutcome,
     ExternalLinkRequestResult,
 )
+from foliaseal.presentation.qt.help_viewer import HelpViewerDialog
 from foliaseal.presentation.qt.pending_open_request_surface import (
     PendingOpenRequestSurface,
 )
@@ -146,6 +147,7 @@ class QtAppFrameBindings:
     q_list_widget: type[Any] | None = None
     q_splitter: type[Any] | None = None
     q_text_edit: type[Any] | None = None
+    q_text_browser: type[Any] | None = None
     q_double_spin_box: type[Any] | None = None
     q_spin_box: type[Any] | None = None
     q_desktop_services: Any | None = None
@@ -426,6 +428,7 @@ class FoliaSealAppFrame:
         self._placeholder_library_button: Any | None = None
         self._reusable_object_library: Any | None = None
         self._document_signatures_dialog: DocumentSignaturesDialog | None = None
+        self._help_viewer: HelpViewerDialog | None = None
         self._closing_document_signatures = False
         self._connected_native_editor_ids: set[int] = set()
         self._native_clipboard_connected = False
@@ -564,6 +567,29 @@ class FoliaSealAppFrame:
     @property
     def document_signatures_dialog(self) -> DocumentSignaturesDialog | None:
         return self._document_signatures_dialog
+
+    @property
+    def help_viewer(self) -> HelpViewerDialog | None:
+        """Expose the currently reused modeless Help surface for acceptance tests."""
+
+        return self._help_viewer
+
+    def show_help(self, topic_id: str | None = None) -> HelpViewerDialog:
+        """Open or focus the modeless offline Help viewer."""
+
+        if self._help_viewer is None:
+            self._help_viewer = HelpViewerDialog(
+                bindings=self._bindings,
+                parent=self.window,
+                on_closed=self._clear_help_viewer,
+            )
+        if topic_id is not None:
+            self._help_viewer.show_topic(topic_id)
+        self._help_viewer.show()
+        return self._help_viewer
+
+    def _clear_help_viewer(self) -> None:
+        self._help_viewer = None
 
     def choose_open_pdf(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
@@ -1790,6 +1816,12 @@ class FoliaSealAppFrame:
             AppFrameCommandId.MANAGE_CERTIFICATE_CONFIGURATIONS,
             self.show_certificate_management,
         )
+        help_menu = menu_bar.addMenu("Help")
+        self._command_action(
+            help_menu,
+            AppFrameCommandId.HELP,
+            lambda: self.show_help(),
+        )
 
     def _action(
         self,
@@ -2627,6 +2659,7 @@ class QtAppFrameAdapter:
             q_list_widget=getattr(qt_widgets, "QListWidget"),
             q_splitter=getattr(qt_widgets, "QSplitter"),
             q_text_edit=getattr(qt_widgets, "QTextEdit"),
+            q_text_browser=getattr(qt_widgets, "QTextBrowser"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
             q_spin_box=getattr(qt_widgets, "QSpinBox"),
             q_desktop_services=getattr(qt_gui, "QDesktopServices", None),

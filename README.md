@@ -87,6 +87,19 @@ Use `foliaseal --help` for the current command-line surface. The GUI and accepta
 developer tools while the product workflow is still being refined; they are not separate end-user
 applications.
 
+### Offline Help
+
+Help is available from the packaged, offline topic catalog:
+
+```bash
+foliaseal help --list
+foliaseal help signing-basics --format markdown
+foliaseal help signing-basics --path
+```
+
+The same topics are available from the GUI Help menu or F1. `--path` prints the installed Markdown
+file location when the resource loader provides a filesystem path.
+
 ## Evidence and QA commands
 
 Generated evidence belongs under the ignored `artifacts/` directory or another explicit temporary

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "getting-started",
+    "title": "Getting started",
+    "keywords": ["open", "pdf", "first use", "overview"],
+    "related": ["signing-basics", "troubleshooting"],
+    "filename": "getting-started.md"
+  },
+  {
+    "id": "signing-basics",
+    "title": "Signing basics",
+    "keywords": ["sign", "signature", "placement", "save"],
+    "related": ["certificates", "troubleshooting"],
+    "filename": "signing-basics.md"
+  },
+  {
+    "id": "certificates",
+    "title": "Certificates",
+    "keywords": ["certificate", "p12", "pfx", "password", "identity"],
+    "related": ["signing-basics", "privacy"],
+    "filename": "certificates.md"
+  },
+  {
+    "id": "privacy",
+    "title": "Privacy and local data",
+    "keywords": ["privacy", "offline", "logs", "credentials", "secrets"],
+    "related": ["certificates", "troubleshooting"],
+    "filename": "privacy.md"
+  },
+  {
+    "id": "troubleshooting",
+    "title": "Troubleshooting",
+    "keywords": ["error", "recovery", "help", "diagnostics", "problem"],
+    "related": ["getting-started", "privacy"],
+    "filename": "troubleshooting.md"
+  }
+]

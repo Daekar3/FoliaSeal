@@ -21,7 +21,23 @@ def test_collect_runtime_assets_preserves_package_font_destination() -> None:
     assets = collect_runtime_assets()
 
     assert assets
-    assert {destination for _source, destination in assets} == {"foliaseal/resources/fonts"}
+    assert {destination for _source, destination in assets} == {
+        "foliaseal/resources/fonts",
+        "foliaseal/resources/help",
+    }
+
+
+def test_collect_runtime_assets_includes_packaged_help_topics() -> None:
+    help_root = Path(__file__).resolve().parents[2] / "src/foliaseal/resources/help"
+    expected_help = {path.name for path in help_root.glob("*.md")} | {"index.json"}
+
+    collected_help = {
+        Path(source).name
+        for source, destination in collect_runtime_assets()
+        if destination == "foliaseal/resources/help"
+    }
+
+    assert collected_help == expected_help
 
 
 def test_pyinstaller_spec_uses_runtime_assets_helper_for_analysis_datas() -> None:

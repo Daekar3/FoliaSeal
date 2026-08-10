@@ -29,7 +29,7 @@ does not silently revise them. The persistent model remains governed by docs/SCH
 compatibility paths, manual-assembly paths, and product-facing phase3 labels may be removed when a
 child migrates their consumers, provided the child records the retirement evidence.
 
-This parent and its 30 `ui_*` children are the active UI implementation corpus. Older `gui_*`,
+This parent and its 31 `ui_*` children are the active UI implementation corpus. Older `gui_*`,
 `phase3_*`, and completed migration plans elsewhere in `docs/ExecPlans/` are historical records or
 superseded slices unless this parent names them as a prerequisite. Their retrospective dependency
 notes are not additional execution edges; do not select one as active work without first marking its
@@ -47,8 +47,8 @@ Foundation tranche:
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed File/View/Signing and Edit
   commands now route through public seams or focused-editor behavior with capability-driven enablement;
-  viewer Select All now uses the public document-text fallback, while Help and final parent scenario
-  evidence remain open.
+  viewer Select All now uses the public document-text fallback, while final parent scenario evidence
+  remains open; packaged Help is complete in its release child.
 - [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
   route through the public workspace session port; broader View Back/Forward and remaining command
   families remain open with their owning children.
@@ -74,7 +74,7 @@ Document-flow tranche:
   reconciled here.
 - [x] docs/ExecPlans/ui_document_select_all_execplan.md — current-page viewer Select All over the
   existing text-selection/overlay boundary; native-editor precedence remains with the command-model
-  child and Help remains with the release tranche. Focused/full validation and bounded cleanup are
+  child and packaged Help is complete in its release child. Focused/full validation and bounded cleanup are
   recorded in the child.
 - [x] docs/ExecPlans/ui_document_signatures_review_execplan.md — bounded signature projection and
   modeless review surface are committed; the bounded later-approval permission gate is now covered
@@ -162,14 +162,25 @@ Placement, preview, and signing tranche:
 
 Release tranche:
 
-- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md
+- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — broader Settings, diagnostics,
+  offline/release acceptance, and package-install gates remain open.
+- [x] docs/ExecPlans/ui_help_support_execplan.md — packaged
+  canonical Markdown, CLI discovery, modeless searchable viewer, F1 routing, and offline/resource
+  parity are implemented and validated; diagnostics and final release acceptance remain with the
+  parent release plan.
 
 ## Progress
 
 - [ ] (2026-08-09) Confirm the frozen SPEC/UI_SPEC baseline and current implementation map.
-- [x] (2026-08-09) Created and structurally reviewed all 29 child ExecPlans in dependency order.
+- [x] (2026-08-09) Created and structurally reviewed the original 29 child ExecPlans in dependency order.
+- [x] (2026-08-10) Added the focused Help child after a fresh audit found the broad release plan too
+  coarse for one restartable implementation slice.
+- [x] (2026-08-10) Completed the Help child: focused Help/AppFrame/resource validation is `72 passed`,
+  full validation is `1465 passed, 20 skipped, 1 warning`, and architecture/plan reconciliation is
+  recorded; broader diagnostics and final release acceptance remain open.
 - [x] (2026-08-10) Added the current-page viewer Select All child after a fresh dependency audit; the
-  existing search/selection seams are ready, while Help remains a separate release-tranche corpus.
+  existing search/selection seams are ready, while packaged Help is complete in its separate
+  release-tranche child.
 - [x] (2026-08-10) Implemented and validated the current-page viewer Select All slice through the
   typed selection/session/runtime/AppFrame boundary; focused acceptance is `100 passed`, full
   validation is `1456 passed, 20 skipped, 1 warning`, and the bounded GUI cleanup is reconciled.
@@ -343,7 +354,7 @@ Release tranche:
 - [x] (2026-08-10) Added native focused-editor Edit Cut/Copy/Paste/Select All with Ctrl+X/Ctrl+C/
   Ctrl+V/Ctrl+A, signal-driven selection/clipboard enablement, and fake plus real offscreen coverage.
   Full validation is `1449 passed, 20 skipped, 1 warning`; viewer Select All was completed by the
-  current-page document-selection child, while Help remains explicitly incomplete pending its
+  current-page document-selection child, while packaged Help is complete in its
   support-content seam.
 - [x] (2026-08-10) Completed the current-page viewer Select All child: native-editor precedence and
   no-document disablement remain intact, while the public session/runtime port performs Qt PDF

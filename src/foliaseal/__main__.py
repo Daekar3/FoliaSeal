@@ -17,6 +17,7 @@ from foliaseal.application.evidence_service import (
     EvidenceMatrixRequest,
     SignedAcceptanceEvidenceRequest,
 )
+from foliaseal.application.help_catalog import HelpCatalog, HelpTopicError
 from foliaseal.application.performance_timing import ViewerPerformanceTracker
 from foliaseal.application.phase2_evidence import (
     QtRuntimeReadinessSnapshot,
@@ -276,6 +277,32 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional PDF to open immediately after the main window launches.",
     )
 
+    help_command = subparsers.add_parser(
+        "help",
+        help="Read the offline packaged FoliaSeal Help topics.",
+    )
+    help_command.add_argument(
+        "topic",
+        nargs="?",
+        help="Stable Help topic id. Omit it with --list to discover topics.",
+    )
+    help_command.add_argument(
+        "--list",
+        action="store_true",
+        help="List the available Help topic ids and titles.",
+    )
+    help_command.add_argument(
+        "--format",
+        choices=("markdown",),
+        default="markdown",
+        help="Output format for a topic (currently only canonical Markdown).",
+    )
+    help_command.add_argument(
+        "--path",
+        action="store_true",
+        help="Print the packaged Markdown file path instead of its contents.",
+    )
+
     phase3_matrix = subparsers.add_parser(
         "phase3-signing-preview-matrix",
         help="Run a repeatable Phase 3 preview scenario sweep and capture per-scenario artifacts.",
@@ -527,6 +554,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "phase3-signing-harness":
         _build_evidence_program().capture(_build_evidence_capture_request(args))
         return 0
+    if args.command == "help":
+        try:
+            catalog = HelpCatalog.default()
+            if args.list:
+                if args.topic is not None or args.path:
+                    parser.error("help --list cannot be combined with a topic or --path")
+                for topic in catalog.list_topics():
+                    print(f"{topic.topic_id}\t{topic.title}")
+                return 0
+            if args.topic is None:
+                parser.error("help requires a topic or --list")
+            topic = catalog.topic(args.topic)
+            if args.path:
+                if topic.path is None:
+                    parser.error(
+                        f"Help topic has no filesystem path in this installation: {args.topic}"
+                    )
+                print(topic.path)
+                return 0
+            if args.format == "markdown":
+                print(topic.markdown, end="")
+                return 0
+        except HelpTopicError as exc:
+            parser.error(str(exc))
+        return 2
     if args.command == "gui":
         return launch_qt_app_frame(
             argv=argv if argv is not None else sys.argv,

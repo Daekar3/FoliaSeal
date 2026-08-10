@@ -37,6 +37,7 @@ class AppFrameCommandId(StrEnum):
     CREATE_CERTIFICATE = "settings.create_certificate"
     IMPORT_CERTIFICATE = "settings.import_certificate"
     MANAGE_CERTIFICATE_CONFIGURATIONS = "settings.manage_certificate_configurations"
+    HELP = "help.open"
     SIGNATURE_LIBRARY = "signing.signature_library"
     SIGN_AND_SAVE = "signing.sign_and_save"
     PLACE_SIGNATURE = "signing.place_signature"
@@ -296,6 +297,18 @@ SETTINGS_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 )
 
 
+HELP_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.HELP,
+        menu="Help",
+        text="Help",
+        shortcut="F1",
+        accessible_name="Open FoliaSeal Help",
+        mnemonic_text="&Help",
+    ),
+)
+
+
 SIGNING_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.SIGNATURE_LIBRARY,
@@ -346,6 +359,7 @@ ALL_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     *VIEW_COMMAND_DEFINITIONS,
     *SIGNING_COMMAND_DEFINITIONS,
     *SETTINGS_COMMAND_DEFINITIONS,
+    *HELP_COMMAND_DEFINITIONS,
 )
 
 
