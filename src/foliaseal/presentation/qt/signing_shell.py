@@ -345,6 +345,12 @@ class SigningWorkspaceWidget:
         )
         self._runtime.refresh_review_jump_to_page_index(target)
 
+    def can_go_previous_page(self) -> bool:
+        return self._viewer_workflow.session.can_go_previous()
+
+    def can_go_next_page(self) -> bool:
+        return self._viewer_workflow.session.can_go_next()
+
     def reset_zoom_view(self) -> None:
         self._viewer_widget.reset_zoom_view()
 

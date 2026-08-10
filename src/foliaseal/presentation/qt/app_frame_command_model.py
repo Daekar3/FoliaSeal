@@ -14,6 +14,8 @@ class AppFrameCommandId(StrEnum):
     SAVE_AS = "file.save_as"
     CLOSE = "file.close"
     EXIT = "file.exit"
+    PREVIOUS_PAGE = "view.previous_page"
+    NEXT_PAGE = "view.next_page"
 
 
 @dataclass(frozen=True)
@@ -72,10 +74,36 @@ FILE_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 )
 
 
-def file_command_definition(command_id: AppFrameCommandId) -> AppFrameCommandDefinition:
-    """Return the registered File definition for ``command_id``."""
+VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.PREVIOUS_PAGE,
+        menu="View",
+        text="Previous Page",
+        shortcut="Page Up",
+        accessible_name="Go to previous PDF page",
+        mnemonic_text="Previous &Page",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.NEXT_PAGE,
+        menu="View",
+        text="Next Page",
+        shortcut="Page Down",
+        accessible_name="Go to next PDF page",
+        mnemonic_text="Next P&age",
+    ),
+)
 
-    for definition in FILE_COMMAND_DEFINITIONS:
+
+ALL_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    *FILE_COMMAND_DEFINITIONS,
+    *VIEW_COMMAND_DEFINITIONS,
+)
+
+
+def command_definition(command_id: AppFrameCommandId) -> AppFrameCommandDefinition:
+    """Return one definition from the single frame command registry."""
+
+    for definition in ALL_COMMAND_DEFINITIONS:
         if definition.command_id is command_id:
             return definition
     raise KeyError(command_id)

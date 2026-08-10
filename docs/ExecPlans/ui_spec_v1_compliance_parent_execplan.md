@@ -104,6 +104,10 @@ Release tranche:
   Save, Save As, Close, and Exit with shortcuts, mnemonics, Qt-supported descriptions, and an
   explicit first-Save output-path seam; the command-model child remains open for its remaining
   menus and signed-state policy.
+- [x] (2026-08-09) Loop 5 completed: the typed command registry now includes truthful View Previous
+  Page and Next Page actions through the public workspace session port, with boundary-aware
+  enablement and viewer-owned navigation synchronization; Fit/zoom/search behavior remains deferred
+  to dependent viewer/document seams.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

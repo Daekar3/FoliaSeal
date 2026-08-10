@@ -97,6 +97,8 @@ class SigningWorkspaceSessionPort(Protocol):
     def open_signed_output(self) -> str | None: ...
     def go_to_previous_page(self) -> None: ...
     def go_to_next_page(self) -> None: ...
+    def can_go_previous_page(self) -> bool: ...
+    def can_go_next_page(self) -> bool: ...
     def reset_zoom_view(self) -> None: ...
     def focus(self) -> None: ...
 
@@ -228,6 +230,14 @@ class QtSigningWorkspaceSessionPort:
 
     def go_to_next_page(self) -> None:
         self.shell_widget.go_to_next_page()
+
+    def can_go_previous_page(self) -> bool:
+        capability = getattr(self.shell_widget, "can_go_previous_page", None)
+        return bool(capability()) if callable(capability) else False
+
+    def can_go_next_page(self) -> bool:
+        capability = getattr(self.shell_widget, "can_go_next_page", None)
+        return bool(capability()) if callable(capability) else False
 
     def reset_zoom_view(self) -> None:
         self.shell_widget.reset_zoom_view()

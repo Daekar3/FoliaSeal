@@ -20,6 +20,7 @@ from foliaseal.presentation.qt.app_frame import (
 )
 from foliaseal.presentation.qt.app_frame_command_model import (
     FILE_COMMAND_DEFINITIONS,
+    VIEW_COMMAND_DEFINITIONS,
     AppFrameCommandId,
 )
 from foliaseal.presentation.qt.signing_shell_port import (
@@ -421,6 +422,11 @@ class _FakeShell:
         self.testing_adapter = object()
         self.close_calls = 0
         self.delete_later_calls = 0
+        self.go_to_previous_page_calls = 0
+        self.go_to_next_page_calls = 0
+        self.current_page = 0
+        self.page_count = 1
+        self.status_callback = None
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -453,6 +459,27 @@ class _FakeShell:
     def copy_selected_document_text(self) -> str | None:
         self.copy_selected_document_text_calls += 1
         return "Alice Example"
+
+    def go_to_previous_page(self) -> None:
+        self.go_to_previous_page_calls += 1
+        self.current_page = max(self.current_page - 1, 0)
+        if callable(self.status_callback):
+            self.status_callback("navigation_changed")
+
+    def go_to_next_page(self) -> None:
+        self.go_to_next_page_calls += 1
+        self.current_page = min(self.current_page + 1, self.page_count - 1)
+        if callable(self.status_callback):
+            self.status_callback("navigation_changed")
+
+    def can_go_previous_page(self) -> bool:
+        return self.current_page > 0
+
+    def can_go_next_page(self) -> bool:
+        return self.current_page < self.page_count - 1
+
+    def reset_zoom_view(self) -> None:
+        return None
 
     def close(self) -> None:
         self.close_calls += 1
@@ -497,6 +524,7 @@ class _FakeShellFactory:
 
     def create(self, bootstrap: SigningWorkspaceBootstrap):
         self.bootstrap_calls.append(bootstrap)
+        self.shell_widget.status_callback = bootstrap.on_status_change
         return SigningWorkspaceBundle(
             maintenance=_FakeShellPort(self.shell_widget),
             session=QtSigningWorkspaceSessionPort(self.shell_widget),
@@ -929,7 +957,12 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         render_backend_factory=lambda: object(),
     )
 
-    assert [menu.title for menu in frame.window.menu_bar.menus] == ["File", "Edit", "Settings"]
+    assert [menu.title for menu in frame.window.menu_bar.menus] == [
+        "File",
+        "Edit",
+        "View",
+        "Settings",
+    ]
     assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
         "&Open",
         "&Save",
@@ -953,7 +986,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         True,
     ]
     assert [action.object_name for action in frame.window.menu_bar.menus[0].actions] == [
-        command_id.value for command_id in AppFrameCommandId
+        definition.command_id.value for definition in FILE_COMMAND_DEFINITIONS
     ]
     assert [action.tool_tip for action in frame.window.menu_bar.menus[0].actions] == [
         definition.accessible_name for definition in FILE_COMMAND_DEFINITIONS
@@ -971,6 +1004,15 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert frame.window.menu_bar.menus[1].actions[0].icon.path.endswith("text-select.svg")
     assert frame.window.menu_bar.menus[1].actions[1].icon.path.endswith("copy.svg")
     assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
+        "Previous &Page",
+        "Next P&age",
+    ]
+    assert [action.shortcut for action in frame.window.menu_bar.menus[2].actions] == [
+        "Page Up",
+        "Page Down",
+    ]
+    assert [action.enabled for action in frame.window.menu_bar.menus[2].actions] == [False, False]
+    assert [action.text for action in frame.window.menu_bar.menus[3].actions] == [
         "Application settings",
         "Manage reusable signing objects...",
         "Create certificate...",
@@ -986,7 +1028,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert not hasattr(frame.window, "show_certificate_import")
     assert not hasattr(frame.window, "show_certificate_management")
 
-    frame.window.menu_bar.menus[2].actions[0].trigger()
+    frame.window.menu_bar.menus[3].actions[0].trigger()
 
     assert frame.settings_dialog.controls.dialog.title == "Application settings"
     assert (
@@ -1072,7 +1114,13 @@ def test_app_frame_file_lifecycle_routes_save_close_and_exit(tmp_path: Path) -> 
 
 def test_file_command_registry_is_typed_and_normative() -> None:
     assert [definition.command_id for definition in FILE_COMMAND_DEFINITIONS] == list(
-        AppFrameCommandId
+        (
+            AppFrameCommandId.OPEN,
+            AppFrameCommandId.SAVE,
+            AppFrameCommandId.SAVE_AS,
+            AppFrameCommandId.CLOSE,
+            AppFrameCommandId.EXIT,
+        )
     )
     assert [definition.text for definition in FILE_COMMAND_DEFINITIONS] == [
         "Open",
@@ -1088,6 +1136,58 @@ def test_file_command_registry_is_typed_and_normative() -> None:
         "&Close",
         "E&xit",
     ]
+
+
+def test_view_command_registry_is_typed_and_normative() -> None:
+    assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
+        AppFrameCommandId.PREVIOUS_PAGE,
+        AppFrameCommandId.NEXT_PAGE,
+    ]
+    assert [definition.text for definition in VIEW_COMMAND_DEFINITIONS] == [
+        "Previous Page",
+        "Next Page",
+    ]
+    assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS] == [
+        "Page Up",
+        "Page Down",
+    ]
+
+
+def test_view_page_commands_route_through_the_session_port(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    shell.page_count = 3
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+
+    view_actions = frame.window.menu_bar.menus[2].actions
+    assert [action.enabled for action in view_actions] == [False, False]
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    assert [action.enabled for action in view_actions] == [False, True]
+
+    view_actions[1].trigger()
+    assert [action.enabled for action in view_actions] == [True, True]
+    view_actions[1].trigger()
+    assert [action.enabled for action in view_actions] == [True, False]
+    view_actions[0].trigger()
+    assert [action.enabled for action in view_actions] == [True, True]
+    view_actions[0].trigger()
+    assert [action.enabled for action in view_actions] == [False, True]
+
+    shell.go_to_next_page()
+    assert [action.enabled for action in view_actions] == [True, True]
+    shell.go_to_next_page()
+    assert [action.enabled for action in view_actions] == [True, False]
+    shell.go_to_previous_page()
+    assert [action.enabled for action in view_actions] == [True, True]
+
+    assert shell.go_to_previous_page_calls == 3
+    assert shell.go_to_next_page_calls == 4
 
 
 def test_app_frame_certificate_creation_routes_to_dialog_port(

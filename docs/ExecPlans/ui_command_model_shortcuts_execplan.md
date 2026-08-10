@@ -24,6 +24,14 @@ generic refactor.
 - [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
 - [x] (2026-08-09) Run focused, regression, and real-Qt validation; record evidence and clean up.
 - [ ] (2026-08-09) Update relevant architecture/status documentation, complete the remaining command menus, then commit the whole child outcome.
+- [x] (2026-08-09) Loop 5: add typed View Previous Page and Next Page commands through the public
+  session port; keep Fit/zoom/search/history commands deferred until their truthful seams exist.
+- [x] (2026-08-09) Loop 5 compliance fixes: synchronize boundary capability after viewer-owned
+  navigation, use explicit registry lookup, and prove Page Up/Page Down single-dispatch behavior.
+- [x] (2026-08-09) Removed the unused per-menu definition lookup helpers after confirming there
+  were no remaining repository callers; `command_definition()` is now the sole frame lookup.
+- [x] (2026-08-09) Loop 5 architecture/status documentation updated; the command-model child remains
+  open for the deferred menus and signed-state policy.
 
 ## Surprises & Discoveries
 
@@ -38,6 +46,12 @@ generic refactor.
 - Observation: PySide6 `QAction` has no portable `setAccessibleName()` API. File actions therefore
   use normative mnemonic text plus Qt-supported tooltip/status-tip descriptions and stable object
   names; real-Qt integration coverage verifies those properties.
+- Observation: the existing session port exposes previous/next page navigation, and Loop 5 adds the
+  frame's typed View menu. The viewer's reset zoom is not equivalent to UI_SPEC's Fit Page, so this
+  loop does not register a misleading fit command.
+  Evidence: `SigningWorkspaceSessionPort.go_to_previous_page()` and
+  `go_to_next_page()` route through `SigningShellAdapter`; the typed View definitions now live in
+  `VIEW_COMMAND_DEFINITIONS` and are mapped by `command_definition()`.
 
 ## Decision Log
 
@@ -57,15 +71,24 @@ generic refactor.
   Rationale: this preserves UI_SPEC's first-Save-as rule without duplicating signing policy in the
   frame.
   Date/Author: 2026-08-09 / Codex
+- Decision: implement View Previous Page and Next Page as the next command-model increment, using
+  Page Up/Page Down and the public session port; defer Fit Page, Fit Width, exact zoom, Find,
+  Document Signatures, and Back/Forward until their public behavior seams are available.
+  Rationale: these two commands already have real application behavior and can be proven without
+  inventing disabled or misleading actions for unfinished viewer features.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
 The File command foundation is implemented but this child is not complete: a novice can open a PDF,
 choose an explicit output path on first Save, invoke signing through subsequent Save, choose Save As,
 close the workspace, or exit the application. Focused and real-Qt checks are green (`35 passed` for
-the app-frame/state/integration slice; `142 passed` including shell regressions). The remaining gap is
-the rest of the UI_SPEC command registry and its parent scenario evidence; those are deliberately
-deferred to the viewer, signing, support, and later command-model slices.
+the app-frame/state/integration slice; `142 passed` including shell regressions). Loop 5 adds a
+typed View menu with Previous Page and Next Page, Page Up/Page Down shortcuts, boundary-aware
+enablement, public session-port routing, and callback synchronization after viewer-owned navigation.
+The offscreen Qt shortcut test proves exactly one transition per key. The remaining gap is the rest
+of the UI_SPEC command registry and its parent scenario evidence; Fit/zoom/search/signature/history
+commands remain deferred to their owning viewer/document children.
 
 ## Context and Orientation
 
@@ -142,7 +165,12 @@ Before checking this child in the parent, record the governing UI_SPEC requireme
 test command/result, keyboard/menu input sequence and observed File action state, evidence path and
 cleanup result, and compatibility grep proof. Loop 2 evidence is the offscreen real-Qt integration
 assertion for File labels, shortcuts, tooltip/status descriptions, mnemonic text, and no-document
-enablement; display-backed audit remains pending the unavailable xcb display.
+enablement; Loop 5 adds `tests/integration/test_view_navigation_shortcuts.py`, whose offscreen
+QTest Page Down/Page Up sequence produced exactly one page transition and one render per key. The
+full validation result for this loop is `1173 passed, 20 skipped, 1 warning`; Ruff passes. The
+bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
+isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
+FoliaSeal/PySide6 processes after cleanup.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.

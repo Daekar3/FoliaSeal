@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +37,7 @@ from foliaseal.presentation.qt.app_frame_certificate_management import (
 )
 from foliaseal.presentation.qt.app_frame_command_model import (
     AppFrameCommandId,
-    file_command_definition,
+    command_definition,
 )
 from foliaseal.presentation.qt.app_frame_profile_library import (
     ReusableObjectLibraryDialog,
@@ -345,6 +345,8 @@ class FoliaSealAppFrame:
         self._save_as_action: Any | None = None
         self._close_action: Any | None = None
         self._exit_action: Any | None = None
+        self._previous_page_action: Any | None = None
+        self._next_page_action: Any | None = None
         self._command_actions: dict[AppFrameCommandId, Any] = {}
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
@@ -368,7 +370,7 @@ class FoliaSealAppFrame:
                 on_sign_request=self._on_sign_request,
                 reopen_target=self.open_pdf_path,
                 on_error=self._emit_error,
-                on_status_change=self._on_status_change,
+                on_status_change=self._handle_status_change,
             ),
             workspace_open_port=self._workspace_open_port,
             mount_port=self._workspace_mount,
@@ -472,6 +474,7 @@ class FoliaSealAppFrame:
             return None
 
         self._apply_workspace_action_state(workspace_action_state_open())
+        self._sync_page_navigation_actions()
         return handle.view.mount_target()
 
     def close_workspace(self) -> None:
@@ -479,6 +482,14 @@ class FoliaSealAppFrame:
 
         self._workspace_host.close()
         self._set_placeholder()
+
+    def _go_to_previous_page(self) -> None:
+        self._with_current_session_port(lambda session: session.go_to_previous_page())
+        self._sync_page_navigation_actions()
+
+    def _go_to_next_page(self) -> None:
+        self._with_current_session_port(lambda session: session.go_to_next_page())
+        self._sync_page_navigation_actions()
 
     def command_actions(self) -> dict[AppFrameCommandId, Any]:
         """Return a snapshot of frame-owned actions keyed by stable command ID."""
@@ -598,6 +609,19 @@ class FoliaSealAppFrame:
             icon_name="copy.svg",
         )
         edit_menu.addAction(self._copy_selected_text_action)
+        view_menu = menu_bar.addMenu("View")
+        self._previous_page_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.PREVIOUS_PAGE,
+            self._go_to_previous_page,
+            enabled=False,
+        )
+        self._next_page_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.NEXT_PAGE,
+            self._go_to_next_page,
+            enabled=False,
+        )
         settings_menu = menu_bar.addMenu("Settings")
         settings_menu.addAction(self._action("Application settings", self.show_app_settings))
         settings_menu.addAction(
@@ -665,7 +689,7 @@ class FoliaSealAppFrame:
         *,
         enabled: bool = True,
     ) -> Any:
-        definition = file_command_definition(command_id)
+        definition = command_definition(command_id)
         action = self._action(
             definition.mnemonic_text,
             callback,
@@ -710,6 +734,8 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._save_action, state.save_enabled)
         self._set_action_enabled(self._save_as_action, state.save_as_enabled)
         self._set_action_enabled(self._close_action, state.close_enabled)
+        self._set_action_enabled(self._previous_page_action, state.previous_page_enabled)
+        self._set_action_enabled(self._next_page_action, state.next_page_enabled)
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
         self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
@@ -729,6 +755,20 @@ class FoliaSealAppFrame:
         set_checked = getattr(action, "setChecked", None)
         if callable(set_checked):
             set_checked(checked)
+
+    def _sync_page_navigation_actions(self) -> None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            self._apply_workspace_action_state(workspace_action_state_closed())
+            return
+        session = workspace.session
+        self._apply_workspace_action_state(
+            replace(
+                self._workspace_action_state,
+                previous_page_enabled=session.can_go_previous_page(),
+                next_page_enabled=session.can_go_next_page(),
+            )
+        )
 
     def _toggle_text_selection_mode_from_action(self) -> bool | None:
         action = self._text_selection_mode_action
@@ -802,6 +842,12 @@ class FoliaSealAppFrame:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.window, "FoliaSeal", message)
+
+    def _handle_status_change(self, status: str) -> None:
+        if status == "navigation_changed":
+            self._sync_page_navigation_actions()
+        if self._on_status_change is not None:
+            self._on_status_change(status)
 
     def _apply_window_baseline(self) -> None:
         set_minimum_size = getattr(self.window, "setMinimumSize", None)
