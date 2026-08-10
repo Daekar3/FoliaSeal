@@ -68,6 +68,7 @@ class CertificateConfigurationControls:
 
     container: Any
     configuration_combo: Any
+    helper_label: Any
 
 
 @dataclass(frozen=True)
@@ -797,6 +798,7 @@ class SignaturePropertiesPanel:
         return CertificateConfigurationControls(
             container=container,
             configuration_combo=configuration_combo,
+            helper_label=helper_label,
         )
 
     def _build_signature_preset_controls(self) -> SignaturePresetControls:
@@ -1006,6 +1008,11 @@ class SignaturePropertiesPanel:
             self._suspend_updates = False
         preview = state.preview
         self._update_preview_controls(preview)
+        if state.certificate_readiness is not None:
+            _set_widget_text(
+                self._certificate_controls.helper_label,
+                state.certificate_readiness.detail,
+            )
         self._validation_text = state.validation_text
         return preview
 

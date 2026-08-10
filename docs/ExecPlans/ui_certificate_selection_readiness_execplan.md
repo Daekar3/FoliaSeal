@@ -21,11 +21,26 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the live catalog-backed rail, resolver, workflow preview, and Qt
+  controls. Added focused contracts for ready/self-signed, expiry warning, expired/not-yet-valid,
+  missing-file, missing-private-key, password-promptable, and no-selection outcomes. A separate
+  pre-implementation red run was not captured; the contract tests are recorded as green below.
+- [x] (2026-08-10) Implemented `certificate_readiness.py` as a typed application projection and
+  connected it through `SignaturePropertiesViewState` to the certificate helper label and signing
+  readiness gate. The catalog-backed GUI now evaluates the selected PKCS#12 file, private key,
+  validity window, and self-signed caveat without exposing secrets; direct headless callers with
+  explicit material retain their existing boundary.
+- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. This slice adds no phase3
+  nomenclature or compatibility wrapper; existing evidence names remain because their external
+  CLI/fixture contracts still have consumers. No safe retirement condition was met here.
+- [x] (2026-08-10) Ran focused application/Qt tests, Ruff, the full suite, and a bounded offscreen
+  launch attempt. The final focused readiness/coordinator/session/shell command reports 162 passed;
+  Ruff and `git diff --check` are clean; the full suite reports 1256 passed, 20 skipped, and one
+  existing Pillow deprecation warning. The offscreen CLI still exits before frame creation with the
+  known isolated `SingleInstanceUnavailable` transport limit. Temporary configuration roots and
+  processes were cleaned.
+- [x] (2026-08-10) Updated this plan, the parent progress record, and `docs/ARCHITECTURE.md`; the
+  implementation is ready for the commit gate and the remaining dependency gaps are recorded below.
 
 ## Surprises & Discoveries
 
@@ -44,7 +59,16 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The catalog-backed signing rail now has one typed readiness projection. Empty selection explains
+the next action, selected valid material reports identity/validity and the exact neutral
+self-signed caveat, expiry within 30 days warns without disabling signing, and expired,
+not-yet-valid, missing-file, invalid, or missing-private-key material blocks with a corrective
+action. Password entry remains promptable and is not treated as a durable readiness failure.
+
+This is a bounded readiness increment, not completion of the certificate corpus. Retained
+unconfigured-file rows, import inspection/configuration, create/export/password-management, and
+the full signing-rail stage machine remain in their owning ExecPlans. The direct-material fallback
+exists only for headless/evidence callers and is not used by the catalog-backed app-frame path.
 
 ## Context and Orientation
 
@@ -86,7 +110,7 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e 'certificate|ready|expired|password' src/foliaseal/presentation/qt/signing_workspace_properties_panel.py src/foliaseal/application/signing_setup_session.py src/foliaseal/application/signing_material_resolver.py
-    .venv/bin/pytest -q tests/unit/test_signing_setup_session.py tests/unit/test_signing_material_resolver.py tests/unit/test_qt_signing_shell.py
+    .venv/bin/pytest -q tests/unit/test_certificate_readiness.py tests/unit/test_signature_properties_coordinator.py tests/unit/test_signing_setup_session.py tests/unit/test_qt_signing_shell.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -101,7 +125,9 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+cleanup result; the bounded timeout is only a lifecycle check. In this slice the display-backed
+walkthrough was unavailable, so the real Qt fake-binding acceptance test is the authoritative
+visible-state evidence and the offscreen launch limitation is recorded rather than overstated.
 
 ## Validation and Acceptance
 
@@ -114,7 +140,7 @@ Readiness warns but permits expiry within 30 days, blocks expired/not-yet-valid/
 states, prompts for a missing password, and uses the exact local/self-signed caveat from UI_SPEC.md.
 Selecting a partial preset never carries a certificate from another document.
 
-## Evidence Record
+## Evidence Record Requirements
 
 Before completion, record the exact resolver/coordinator test command and result, the GUI selection
 sequence and ready/warning/blocked observations, evidence path, cleanup, and compatibility grep proof.
@@ -140,6 +166,30 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
 or workspace ports. The final behavior must be exercised by tests/unit/test_signing_setup_session.py tests/unit/test_signing_material_resolver.py tests/unit/test_qt_signing_shell.py. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
+
+## Evidence Record
+
+- Focused contract/coordinator/Qt command: `.venv/bin/pytest -q
+  tests/unit/test_certificate_readiness.py tests/unit/test_signature_properties_coordinator.py
+  tests/unit/test_signing_setup_session.py tests/unit/test_qt_signing_shell.py` — 162 passed in
+  9.22s after the final visible-state test was added.
+- Repository validation: `.venv/bin/ruff check src tests`, `git diff --check`, and `.venv/bin/pytest
+  -q` — Ruff/diff clean; 1256 passed, 20 skipped, one existing Pillow deprecation warning in
+  48.12s.
+- Visible sequence: open a catalog-backed workspace with no selected certificate (helper reads
+  `Select a certificate configuration before signing.`); choose `Corporate Records Signing`, enter
+  the password, and observe `Self-signed certificate — ready for local signing` plus the neutral
+  local-trust caveat in the certificate helper. Expiry and blocking states are covered by the
+  application reader contract tests.
+- GUI evidence path: `tests/unit/test_qt_signing_shell.py::test_signing_shell_renders_certificate_readiness_detail`;
+  no screenshot/SVG was added because this is an existing certificate-group surface, not a new
+  topology. The bounded command exited `1` with `SingleInstanceUnavailable` before frame creation;
+  its isolated root was removed and no FoliaSeal/PySide6/pytest processes remained after validation.
+- Compatibility proof: no new `phase3` imports or product-facing labels were introduced; existing
+  phase3 evidence modules remain outside this product readiness boundary.
+
+Revision note: 2026-08-10 / Codex
+Implemented the typed catalog-backed readiness projection and Qt helper-state slice.
 
 Revision note: 2026-08-09 / Codex
 Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.

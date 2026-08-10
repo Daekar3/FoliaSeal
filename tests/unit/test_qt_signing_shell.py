@@ -63,6 +63,7 @@ from tests.support.signing_builders import (
     build_signature_preset,
     build_signature_preset_catalog,
     build_signature_rect,
+    write_test_pkcs12,
 )
 from tests.unit.test_signature_properties_coordinator import _ready_workflow
 
@@ -1151,6 +1152,48 @@ def test_signing_shell_applies_selected_certificate_configuration(
     assert workflow.passphrase == "typed-secret"
     assert not hasattr(panel._certificate_controls, "password_input")
     assert fake_bindings.q_input_dialog.calls
+
+
+def test_signing_shell_renders_certificate_readiness_detail(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed = catalog.managed_certificates[0]
+    certificate_path = store.managed_certificate_dir / managed.storage_filename
+    write_test_pkcs12(certificate_path, passphrase="secret")
+    workflow = _ready_workflow(tmp_path)
+    workflow.certificate_path = ""
+    workflow.passphrase = ""
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog_store=store,
+    )
+
+    helper = widget.properties_panel._certificate_controls.helper_label
+    assert "Select a certificate configuration" in helper.text()
+
+    fake_bindings.q_input_dialog.next_text = "secret"
+    widget.properties_panel._certificate_controls.configuration_combo.setCurrentText(
+        "Corporate Records Signing"
+    )
+
+    assert "Self-signed certificate — ready for local signing" in helper.text()
+    assert "other systems may not independently recognize" in helper.text()
 
 
 def test_signing_shell_certificate_selection_uses_explicit_coordinator_entrypoint(

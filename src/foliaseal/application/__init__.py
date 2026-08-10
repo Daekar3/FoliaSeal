@@ -31,6 +31,15 @@ _EXPORT_MODULES = {
     "ManagedCertificateCommit": "certificate_catalog_repository",
     **dict.fromkeys(
         (
+            "CertificateReadiness",
+            "CertificateReadinessReader",
+            "CertificateReadinessStatus",
+            "Pkcs12CertificateReadinessReader",
+        ),
+        "certificate_readiness",
+    ),
+    **dict.fromkeys(
+        (
             "DocumentReviewCardState",
             "DocumentReviewWorkspaceSession",
             "DocumentReviewWorkspaceState",
@@ -290,6 +299,10 @@ __all__ = [
     "CertificateConfiguration",
     "ManagedCertificate",
     "ManagedCertificateSubjectSummary",
+    "CertificateReadiness",
+    "CertificateReadinessReader",
+    "CertificateReadinessStatus",
+    "Pkcs12CertificateReadinessReader",
     "CertificateManager",
     "CertificateManagerError",
     "CertificateSecretStore",

@@ -13,6 +13,12 @@ from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
 )
+from foliaseal.application.certificate_readiness import (
+    CertificateReadiness,
+    CertificateReadinessReader,
+    CertificateReadinessStatus,
+    Pkcs12CertificateReadinessReader,
+)
 from foliaseal.application.coordinate_transform import (
     PdfRect,
     pdf_rect_to_visible_page_rect,
@@ -94,6 +100,7 @@ class SignaturePropertiesViewState:
     validation_text: str
     ready_to_sign: bool
     preview: SigningDraftPreview
+    certificate_readiness: CertificateReadiness | None = None
 
 
 @dataclass(frozen=True)
@@ -256,8 +263,12 @@ class DefaultSignaturePropertiesCoordinator:
     certificate_catalog: CertificateCatalog | None = None
     certificate_catalog_store: CertificateCatalogRepository | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
+    certificate_readiness_reader: CertificateReadinessReader | None = None
 
     def __post_init__(self) -> None:
+        explicit_certificate_catalog = (
+            self.certificate_catalog is not None or self.certificate_catalog_store is not None
+        )
         if self.certificate_catalog_store is None:
             self.certificate_catalog_store = InMemoryCertificateCatalogRepository.for_catalog(
                 self.certificate_catalog or CertificateCatalog(schema_version=1)
@@ -270,6 +281,10 @@ class DefaultSignaturePropertiesCoordinator:
             RepositoryBackedCertificateSigningMaterialPort(
                 repository=self.certificate_catalog_store,
             )
+        )
+        self._certificate_catalog_is_explicit = explicit_certificate_catalog
+        self._certificate_readiness_reader = (
+            self.certificate_readiness_reader or Pkcs12CertificateReadinessReader()
         )
         self._selected_certificate_configuration_name: str | None = None
         self._selected_signature_preset_name: str | None = None
@@ -284,9 +299,11 @@ class DefaultSignaturePropertiesCoordinator:
         )
         self._selected_signature_preset_name = self._resolve_selected_signature_preset_name()
         preview = self.workflow.preview()
+        certificate_readiness = self._certificate_readiness()
         validation_text = _format_validation_text(
             preview,
             control_issue=control_issue,
+            certificate_readiness=certificate_readiness,
         )
         partial_preset_notice = self._partial_preset_notice()
         if partial_preset_notice is not None:
@@ -304,8 +321,13 @@ class DefaultSignaturePropertiesCoordinator:
             placement_profile_names=reusable_snapshot.placement_names,
             visible_signature_setup_draft=self._current_visible_signature_setup_draft(),
             validation_text=validation_text,
-            ready_to_sign=_ready_to_sign(preview, control_issue=control_issue),
+            ready_to_sign=_ready_to_sign(
+                preview,
+                control_issue=control_issue,
+                certificate_readiness=certificate_readiness,
+            ),
             preview=preview,
+            certificate_readiness=certificate_readiness,
         )
 
     def reconcile(
@@ -713,6 +735,35 @@ class DefaultSignaturePropertiesCoordinator:
             return None
         return configuration.display_name
 
+    def _certificate_readiness(self) -> CertificateReadiness:
+        """Project the selected certificate into a non-secret rail status."""
+        if not self._certificate_catalog_is_explicit:
+            # Headless callers may intentionally provide direct signing material without
+            # a catalog. Preserve that application boundary while the real GUI remains
+            # catalog-backed and selection-first.
+            if self.workflow.certificate_path:
+                return CertificateReadiness(
+                    status=CertificateReadinessStatus.READY,
+                    detail="Ready to sign.",
+                    blocking=False,
+                )
+            return self._certificate_readiness_reader.read(
+                self.workflow.certificate_path,
+                self.workflow.passphrase,
+            )
+        if self._selected_certificate_configuration_name is None:
+            if self.workflow.certificate_path:
+                return CertificateReadiness(
+                    status=CertificateReadinessStatus.READY,
+                    detail="Ready to sign.",
+                    blocking=False,
+                )
+            return self._certificate_readiness_reader.read("", "")
+        return self._certificate_readiness_reader.read(
+            self.workflow.certificate_path,
+            self.workflow.passphrase,
+        )
+
     def _resolve_selected_signature_preset_name(self) -> str | None:
         snapshot = self.reusable_objects.snapshot()
         preset_names = set(snapshot.preset_names)
@@ -760,18 +811,23 @@ def _ready_to_sign(
     preview: SigningDraftPreview,
     *,
     control_issue: SigningDraftValidationIssue | None,
+    certificate_readiness: CertificateReadiness | None = None,
 ) -> bool:
     if not preview.can_submit:
         return False
     if control_issue is None:
-        return True
-    return control_issue.severity != SigningDraftValidationSeverity.ERROR
+        return not (certificate_readiness is not None and certificate_readiness.blocking)
+    return (
+        control_issue.severity != SigningDraftValidationSeverity.ERROR
+        and not (certificate_readiness is not None and certificate_readiness.blocking)
+    )
 
 
 def _format_validation_text(
     preview: SigningDraftPreview,
     *,
     control_issue: SigningDraftValidationIssue | None,
+    certificate_readiness: CertificateReadiness | None = None,
 ) -> str:
     issues = preview.issues if control_issue is None else preview.issues + (control_issue,)
     blocking_issues = [
@@ -790,9 +846,18 @@ def _format_validation_text(
         and blocking_issues[0].code == "visible_signature_layout_unavailable"
     ):
         return f"Will fail to sign: {blocking_issues[0].message}"
-    return "\n".join(
+    formatted = "\n".join(
         f"{issue.severity.value.upper()} {issue.code}: {issue.message}" for issue in blocking_issues
     )
+    if certificate_readiness is not None and certificate_readiness.blocking:
+        return (
+            f"{formatted}\n{certificate_readiness.detail}"
+            if formatted
+            else certificate_readiness.detail
+        )
+    if not formatted and certificate_readiness is not None and certificate_readiness.warning:
+        return f"Ready to sign.\n{certificate_readiness.detail}"
+    return formatted
 
 
 def _require_name(value: str, message: str) -> str:

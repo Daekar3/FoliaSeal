@@ -155,6 +155,11 @@ Release tranche:
   through typed workspace composition to the existing modeless Presets-first Library. Opening the
   Library does not mutate the active draft; nested editor suspension/return and per-document input
   prompts remain open in the first-use/certificate children.
+- [x] (2026-08-10) Added the bounded certificate-readiness increment: the catalog-backed signing
+  rail now projects selected PKCS#12 identity, private-key presence, validity, expiry warnings,
+  blocking states, password-promptability, and the exact neutral self-signed caveat through a typed
+  application contract. Import/configuration, create/export/password management, retained
+  unconfigured rows, and the complete signing-rail stage machine remain open in their children.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

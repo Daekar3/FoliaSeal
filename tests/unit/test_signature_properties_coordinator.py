@@ -8,6 +8,10 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.certificate_readiness import (
+    CertificateReadinessStatus,
+    Pkcs12CertificateReadinessReader,
+)
 from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
@@ -48,6 +52,7 @@ from tests.support.signing_builders import (
     build_signature_appearance,
     build_signature_preset,
     build_signature_preset_catalog,
+    write_test_pkcs12,
 )
 from tests.support.signing_builders import (
     build_signature_properties_coordinator_fixture as DefaultSignaturePropertiesCoordinator,
@@ -120,6 +125,39 @@ def test_coordinator_load_reports_catalog_names_and_initial_readiness(tmp_path: 
     assert state.visible_signature_setup_draft.placement.enabled is False
     assert state.visible_signature_setup_draft.placement.width_pt == 72.0
     assert state.visible_signature_setup_draft.placement.height_pt == 24.0
+
+
+def test_coordinator_projects_selected_certificate_readiness(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    catalog = build_certificate_catalog()
+    store.save_catalog(catalog)
+    managed = catalog.managed_certificates[0]
+    certificate_path = store.managed_certificate_dir / managed.storage_filename
+    certificate_path.parent.mkdir(parents=True, exist_ok=True)
+    write_test_pkcs12(certificate_path, passphrase="secret")
+    workflow = _ready_workflow(tmp_path)
+    workflow.certificate_path = ""
+    workflow.passphrase = ""
+    workflow.update_signature_rect(width_pt=300.0, height_pt=120.0)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog_store=store,
+        certificate_readiness_reader=Pkcs12CertificateReadinessReader(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    before = coordinator.load()
+    selected = coordinator.apply_certificate_configuration(
+        "Corporate Records Signing",
+        passphrase="secret",
+    )
+
+    assert before.certificate_readiness is not None
+    assert before.certificate_readiness.status is CertificateReadinessStatus.NO_CERTIFICATE_SELECTED
+    assert selected.certificate_readiness is not None
+    assert selected.certificate_readiness.status is CertificateReadinessStatus.READY
+    assert selected.ready_to_sign is True
+    assert "ready for local signing" in selected.certificate_readiness.detail
 
 
 def test_production_coordinator_requires_canonical_reusable_objects(tmp_path: Path) -> None:
