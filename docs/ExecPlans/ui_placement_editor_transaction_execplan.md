@@ -97,6 +97,11 @@ Cancel, restart, and no-PDF editing with focused and GUI evidence.
 
 Run from /home/daekar/FoliaSeal.
 
+The commands below assume the repository virtual environment exists. If it does not, create it
+before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install -e '.[gui]'`. If
+dependency installation is unavailable, stop and report that environment blocker; do not silently
+fall back to a system Python or system Qt installation.
+
     rg -n -e 'Placement|page|left|top|width|height|Save|Cancel' src/foliaseal/presentation/qt/signing_workspace_refinement_dialog.py src/foliaseal/application/reusable_signing_models.py
     .venv/bin/pytest -q tests/unit/test_reusable_signing_models.py tests/unit/test_qt_visible_signature_setup_form.py
     .venv/bin/ruff check src tests
@@ -129,6 +134,8 @@ path and cleanup result, serialized migration result, and compatibility grep pro
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
+Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
+contract, record that the test was red before implementation and green afterward.
 
 ## Idempotence and Recovery
 

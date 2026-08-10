@@ -83,6 +83,11 @@ Milestone 2 wires the Library controls and refresh behavior through the catalog 
 
 Run from /home/daekar/FoliaSeal.
 
+The commands below assume the repository virtual environment exists. If it does not, create it
+before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install -e '.[gui]'`. If
+dependency installation is unavailable, stop and report that environment blocker; do not silently
+fall back to a system Python or system Qt installation.
+
     rg -n -e 'pin|sort|search|duplicate|delete|display_name' src/foliaseal/application/reusable_signing_models.py src/foliaseal/application/reusable_signing_objects.py src/foliaseal/infra/config/profile_storage.py
     .venv/bin/pytest -q tests/unit/test_reusable_signing_models.py tests/unit/test_reusable_signing_objects.py tests/unit/test_signature_preset_storage.py
     .venv/bin/ruff check src tests
@@ -121,6 +126,8 @@ serialized fixture compatibility result, cleanup, and compatibility grep proof.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
+Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
+contract, record that the test was red before implementation and green afterward.
 
 ## Idempotence and Recovery
 

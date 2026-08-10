@@ -80,6 +80,11 @@ records plain-language GUI observations, focused results, and cleanup.
 
 Run from /home/daekar/FoliaSeal.
 
+The commands below assume the repository virtual environment exists. If it does not, create it
+before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install -e '.[gui]'`. If
+dependency installation is unavailable, stop and report that environment blocker; do not silently
+fall back to a system Python or system Qt installation.
+
     rg -n -e 'certificate|ready|expired|password' src/foliaseal/presentation/qt/signing_workspace_properties_panel.py src/foliaseal/application/signing_setup_session.py src/foliaseal/application/signing_material_resolver.py
     .venv/bin/pytest -q tests/unit/test_signing_setup_session.py tests/unit/test_signing_material_resolver.py tests/unit/test_qt_signing_shell.py
     .venv/bin/ruff check src tests
@@ -116,6 +121,8 @@ sequence and ready/warning/blocked observations, evidence path, cleanup, and com
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
+Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
+contract, record that the test was red before implementation and green afterward.
 
 ## Idempotence and Recovery
 

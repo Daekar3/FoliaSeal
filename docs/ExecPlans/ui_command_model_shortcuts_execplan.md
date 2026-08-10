@@ -81,6 +81,11 @@ action labels, shortcuts, enablement, and keyboard equivalents through the frame
 
 Run from /home/daekar/FoliaSeal.
 
+The commands below assume the repository virtual environment exists. If it does not, create it
+before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install -e '.[gui]'`. If
+dependency installation is unavailable, stop and report that environment blocker; do not silently
+fall back to a system Python or system Qt installation.
+
     rg -n -e '_install_menus|_action' src/foliaseal/presentation/qt/app_frame.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py
     .venv/bin/ruff check src tests
@@ -113,6 +118,8 @@ cleanup result, and compatibility grep proof.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
+Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
+contract, record that the test was red before implementation and green afterward.
 
 ## Idempotence and Recovery
 

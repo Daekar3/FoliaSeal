@@ -29,6 +29,12 @@ does not silently revise them. The persistent model remains governed by docs/SCH
 compatibility paths, manual-assembly paths, and product-facing phase3 labels may be removed when a
 child migrates their consumers, provided the child records the retirement evidence.
 
+This parent and its 29 `ui_*` children are the active UI implementation corpus. Older `gui_*`,
+`phase3_*`, and completed migration plans elsewhere in `docs/ExecPlans/` are historical records or
+superseded slices unless this parent names them as a prerequisite. Their retrospective dependency
+notes are not additional execution edges; do not select one as active work without first marking its
+status and reconciling it with this parent.
+
 ## Child ExecPlan Dependencies
 
 The following children are grouped into dependency tranches. A child may begin only when its listed
@@ -147,6 +153,10 @@ Release tranche:
   UI can safely write data; separating the schema milestone avoids a circular dependency between the
   placement editor and the Library that hosts it.
   Date/Author: 2026-08-09 / Codex
+- Decision: use the normalized ten-scenario matrix as the sole acceptance-owner map.
+  Rationale: several scenarios intentionally span multiple children, but a single primary owner is
+  needed to prevent duplicate or missing acceptance decisions at the final gate.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
@@ -213,6 +223,24 @@ placement, Library/editor accessibility, and product support; scenario 9 owns wi
 product support; scenario 10 owns product support/release. Each row must cite one focused test,
 one GUI evidence artifact, and its owning SVG or explicit “no SVG” decision.
 
+Use this normalized matrix when those cross-links overlap. “Primary owner” is the one child that
+checks the scenario evidence row in the parent; “supporting children” may contribute tests or
+screenshots but must not create a second acceptance decision. The SVG column is mandatory evidence
+when a normative artifact exists and is explicitly “no SVG” for scenarios without one.
+
+| Scenario | Primary owner | Supporting children | SVG or decision |
+|---|---|---|---|
+| 1 open and review | `ui_launch_no_document_execplan.md` | lifecycle, navigation, search | main-workspace SVGs |
+| 2 reusable setup | `ui_signing_rail_stage_status_execplan.md` | first-use, preset transactions, certificate readiness, Library | sign-and-save and Library SVGs |
+| 3 placement undo | `ui_pointer_signature_placement_execplan.md` | keyboard placement, placement editor | placement-profile SVG |
+| 4 field targeting | `ui_signature_field_targeting_profiles_execplan.md` | placement, document-signatures review | placement-profile SVG |
+| 5 preview and verification state | `ui_appearance_content_layout_execplan.md` | preview, review, readiness, confirmation, verification | appearance-profile and sign-and-save SVGs |
+| 6 source replacement safety | `ui_sign_confirmation_output_policy_execplan.md` | atomic write, lifecycle | sign-and-save SVG |
+| 7 restricted/verified output | `ui_atomic_sign_write_safety_execplan.md` | verification/reopen | sign-and-save SVG |
+| 8 accessibility and keyboard paths | `ui_product_support_and_release_execplan.md` | command model, keyboard placement, Library/editor | no SVG |
+| 9 minimum size, theme, DPI | `ui_window_theme_responsive_execplan.md` | product support/release | no SVG |
+| 10 offline Help and package | `ui_product_support_and_release_execplan.md` | none | no SVG |
+
 The final acceptance record must also cover password-protected PDF prompts and password clearing on
 Close/replacement/success/Exit; certification and ordinary-signature preflight; final verification
 of every existing signature; page-local render recovery; exact source-overwrite warnings;
@@ -266,6 +294,11 @@ parent box.
 
 All commands run from /home/daekar/FoliaSeal.
 
+The checkout must use its virtual environment. If `.venv/bin/python` is absent, create it with
+`python3 -m venv .venv && .venv/bin/python -m pip install -e '.[gui]'`; if dependency installation
+is unavailable, stop with that exact environment blocker rather than falling back to system Python
+or system Qt.
+
     git status --short
     sed -n '1,360p' docs/SPEC.md
     sed -n '1,530p' docs/UI_SPEC.md
@@ -302,6 +335,17 @@ processes, dialogs, or generated artifacts behind. Child cleanup must terminate 
 owns, remove the exact temporary root with `rm -rf`, and assert that the root is gone; do not hide
 cleanup failures behind `rmdir ... || true` or broad `find` deletions.
 
+Use one of these executable evidence paths. For a behavior-specific Qt test, name the exact test
+node in the child plan and record the expected `N passed` result; the test must drive widgets and
+assert the visible state rather than merely importing a class. For the shared primary workflow, run
+the repository audit runner from a display-backed session:
+
+    DISPLAY=:0 timeout --foreground 180s .venv/bin/python scripts/live_gui_parent_audit.py --artifacts-dir "$audit_root/live-gui"
+
+Review its screenshots and JSON report, record the checkpoint relevant to the child, and remove the
+audit directory afterward. If no display is available, the child must use a real Qt test or remain
+incomplete; an offscreen launch may establish lifecycle health but cannot close the acceptance gate.
+
 ## Validation and Acceptance
 
 The parent succeeds only when all children are checked and a novice can complete the primary
@@ -309,6 +353,9 @@ SPEC.md story in the packaged application without developer explanation. Accepta
 ten observable UI_SPEC scenarios, the SPEC.md release bar, keyboard and accessibility paths, offline
 verification, safe source overwrite, restriction preservation, and installed Debian-family startup.
 Passing unit tests alone is insufficient; record live GUI observations and cleanup evidence.
+Every child must identify its new or changed focused test by node id, record red-before/green-after
+behavior when adding a new contract, and record the full-suite result (`.venv/bin/pytest -q`) whenever
+shared application or Qt code changes.
 
 ## Evidence Record
 
@@ -348,3 +395,5 @@ Updated after the second review wave to add schema/SVG ownership, executable pac
 evidence, milestone gates, and explicit GUI-observation requirements.
 Updated after blocker review to add explicit implementation tranches and make placement/AppSettings
 contracts prerequisites for reusable-object and signing UI work.
+Updated after the next review wave to add normalized scenario ownership, executable GUI-evidence
+paths, environment preflight, active-versus-historical corpus guidance, and full-suite expectations.

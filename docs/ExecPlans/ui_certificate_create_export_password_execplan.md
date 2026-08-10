@@ -84,6 +84,11 @@ secret material and records recovery evidence.
 
 Run from /home/daekar/FoliaSeal.
 
+The commands below assume the repository virtual environment exists. If it does not, create it
+before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install -e '.[gui]'`. If
+dependency installation is unavailable, stop and report that environment blocker; do not silently
+fall back to a system Python or system Qt installation.
+
     rg -n -e 'create|export|password|delete' src/foliaseal/application/certificate_manager.py src/foliaseal/application/certificate_secret_store.py src/foliaseal/presentation/qt/app_frame_certificate_management.py
     .venv/bin/pytest -q tests/unit/test_certificate_manager.py tests/unit/test_secret_storage.py tests/unit/test_certificate_storage.py tests/unit/test_qt_app_frame_certificate_management.py
     .venv/bin/ruff check src tests
@@ -122,6 +127,8 @@ serialized catalog compatibility result, and compatibility grep proof.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
+Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
+contract, record that the test was red before implementation and green afterward.
 
 ## Idempotence and Recovery
 

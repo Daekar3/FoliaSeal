@@ -10,7 +10,7 @@ After the Slice 4E compliance review, two issues need a narrow follow-up: stale 
 
 ## Child ExecPlan Dependencies
 
-- [x] Depends on `docs/ExecPlans/schema_model_alignment_slice4e_remove_shell_settings_controls_execplan.md`.
+- [x] Depends on `docs/ExecPlans/schema_model_alignment_slice4e_remove_shell_settings_execplan.md`.
 
 ## Progress
 

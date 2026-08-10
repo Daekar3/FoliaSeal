@@ -48,10 +48,10 @@ not a permanent alias; any retained reader must have a dated retirement criterio
    describe the durable acceptance/evidence capabilities without phase language. Do not rewrite
    immutable historical evidence; annotate archival references only where needed for provenance.
 
-## Current inventory and replacement mapping (2026-08-06)
+## Current inventory and replacement mapping (2026-08-09)
 
-The live checkout inventory on 2026-08-06 contains `phase3` in `106` tracked path names and in
-`256` active files when content is searched case-insensitively (about `5,963` broad occurrences,
+The live checkout inventory on 2026-08-09 contains `phase3` in `106` tracked path names and in
+`290` active files when content is searched case-insensitively (about `6,078` broad occurrences,
 excluding this plan itself). The count includes historical ExecPlans and archival evidence; it is
 intentionally recorded before any rename:
 
@@ -64,9 +64,13 @@ intentionally recorded before any rename:
 | Active docs | architecture, README, current ExecPlans | Rewrite to durable acceptance/evidence terminology during the atomic rename; keep provenance notes for historical records |
 | Historical evidence/handoffs | dated artifacts and completed plans | Do not rewrite; annotate only when a current document links to them |
 
-The next rename slice must begin by regenerating this inventory, then perform the full mapping
+The next rename slice must begin by regenerating this inventory with the commands below, then perform the full mapping
 atomically. A piecemeal rename is explicitly rejected because it would leave mixed imports,
 packaging paths, CLI help, fixture names, or persisted contract labels.
+
+    git ls-files | rg -i 'phase3|phase 3|Phase3' | wc -l
+    rg -l -i 'phase3|phase 3|Phase3' src tests scripts README.md docs --glob '!docs/ExecPlans/phase3_nomenclature_retirement_execplan.md' | wc -l
+    rg -o -i 'phase3|phase 3|Phase3' src tests scripts README.md docs --glob '!docs/ExecPlans/phase3_nomenclature_retirement_execplan.md' | wc -l
 
 ## Acceptance contract
 
