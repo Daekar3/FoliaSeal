@@ -51,6 +51,8 @@ class PdfViewerWidgetAdapter:
         on_selection: Callable[[object], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_interaction: Callable[[str], None] | None = None,
+        on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
+        on_keyboard_move: Callable[[float, float], SignatureRect | None] | None = None,
     ) -> Any:
         bindings = self._bindings
 
@@ -61,6 +63,8 @@ class PdfViewerWidgetAdapter:
                 self._on_selection = on_selection
                 self._on_error = on_error
                 self._on_interaction = on_interaction
+                self._on_keyboard_create = on_keyboard_create
+                self._on_keyboard_move = on_keyboard_move
                 self._pixmap: Any | None = None
                 self._scroll_container: Any | None = None
                 self._drag_origin: Any | None = None
@@ -200,6 +204,49 @@ class PdfViewerWidgetAdapter:
                         event.accept()
                         return
                     super().keyPressEvent(event)
+                    return
+
+                enter_keys = tuple(
+                    key_value
+                    for key_value in (
+                        getattr(bindings.qt, "Key_Return", None),
+                        getattr(bindings.qt, "Key_Enter", None),
+                    )
+                    if key_value is not None
+                )
+                if key in enter_keys and self._interaction_mode == "signature":
+                    if (
+                        self._overlay_signature_rect is None
+                        and self._on_keyboard_create is not None
+                    ):
+                        rect = self._on_keyboard_create()
+                        if rect is not None:
+                            self._overlay_signature_rect = rect
+                            self.update()
+                    event.accept()
+                    return
+
+                arrow_deltas = {
+                    getattr(bindings.qt, "Key_Left", None): (-1.0, 0.0),
+                    getattr(bindings.qt, "Key_Right", None): (1.0, 0.0),
+                    getattr(bindings.qt, "Key_Up", None): (0.0, 1.0),
+                    getattr(bindings.qt, "Key_Down", None): (0.0, -1.0),
+                }
+                if (
+                    self._interaction_mode == "signature"
+                    and self._overlay_signature_rect is not None
+                    and key in arrow_deltas
+                    and self._on_keyboard_move is not None
+                ):
+                    delta_x, delta_y = arrow_deltas[key]
+                    if self._has_shift_modifier(event):
+                        delta_x *= 10.0
+                        delta_y *= 10.0
+                    rect = self._on_keyboard_move(delta_x, delta_y)
+                    if rect is not None:
+                        self._overlay_signature_rect = rect
+                        self.update()
+                    event.accept()
                     return
 
                 if key in (
@@ -999,6 +1046,8 @@ def build_qt_pdf_viewer_widget(
     on_selection: Callable[[object], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_interaction: Callable[[str], None] | None = None,
+    on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
+    on_keyboard_move: Callable[[float, float], SignatureRect | None] | None = None,
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
 
@@ -1008,6 +1057,8 @@ def build_qt_pdf_viewer_widget(
         on_selection=on_selection,
         on_error=on_error,
         on_interaction=on_interaction,
+        on_keyboard_create=on_keyboard_create,
+        on_keyboard_move=on_keyboard_move,
     )
 
     class ScrollablePdfViewer(adapter._bindings.q_scroll_area):  # type: ignore[misc,valid-type]

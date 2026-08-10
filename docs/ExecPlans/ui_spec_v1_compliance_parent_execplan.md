@@ -234,6 +234,12 @@ Release tranche:
   shell/viewer/composition/integration validation is `156 passed`; full-suite validation is `1297
   passed, 20 skipped, 1 warning`, and final commit gates remain. Keyboard placement, snap/guides,
   undo history, and off-page recovery remain open.
+- [x] (2026-08-10) Added the first keyboard-placement tracer bullet: Place-mode Enter creates a
+  centered 3×1-inch placement with proportional small-page fitting, while Arrow/Shift+Arrow move
+  it by exact 1/10-point deltas through the typed ViewerInteractionSession/runtime seam. Focused
+  viewer/session/shell/composition/integration validation is `165 passed`; current full suite is
+  `1301 passed, 20 skipped, 1 warning`. Resize, Delete/history, snap/guides, and off-page recovery
+  remain open in the keyboard-placement child.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

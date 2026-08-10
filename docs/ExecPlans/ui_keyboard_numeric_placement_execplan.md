@@ -7,22 +7,32 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can keyboard-only exact movement, resizing, snap, and undo/redo in the real FoliaSeal GUI. It is mapped to UI_SPEC section 8 and acceptance scenarios 3 and 8. The
-slice is one vertical path through the relevant persistent model,
-application workflow, Qt surface, focused tests, and observable acceptance.
+The first tracer bullet of this child gives a keyboard-only user centered placement creation and
+exact movement in the real FoliaSeal GUI. It is mapped to UI_SPEC section 8 and acceptance scenarios
+3 and 8. Resize, Delete/history, snapping, and off-page recovery remain subsequent increments of
+this child because they require additional typed state and history seams.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
+- [x] docs/ExecPlans/ui_pointer_signature_placement_execplan.md (pointer drag, Escape cancellation,
+  and explicit Pan/Place topology are implemented; keyboard/history work remains here)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the keyboard-placement requirements and split the broad child at the
+  next truthful seam: centered Enter creation plus exact Arrow/Shift+Arrow movement. No existing
+  application history seam supports claiming resize, Delete, snap, or undo/redo yet.
+- [x] (2026-08-10) Implemented typed application placement creation/movement and routed keyboard
+  callbacks through the runtime/composition boundary; Enter and exact movement are consumed only in
+  Place mode and do not alter Pan/Text behavior.
+- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft; no migrated consumer retirement
+  condition was proven in this viewer/application seam.
+- [x] (2026-08-10) Focused viewer/session/shell/composition/offscreen validation passed (`165 passed`)
+  and the full suite passed (`1301 passed, 20 skipped, 1 warning`); bounded GUI launch cleanup is
+  confirmed, with the known isolated `SingleInstanceUnavailable` endpoint limitation.
+- [ ] (2026-08-10) Add Ctrl-arrow resize, Delete/history, snap/guides, and off-page recovery in
+  subsequent increments; then perform final documentation/commit closeout for the whole child.
 
 ## Surprises & Discoveries
 
@@ -35,13 +45,17 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - Decision: obey SPEC.md, SCHEMAS.md, and UI_SPEC.md in that precedence order.
   Rationale: these are the repository's explicit authority boundaries.
   Date/Author: 2026-08-09 / Codex
-- Decision: keep the slice limited to one user-visible keyboard, numeric geometry, snap, and undo/redo outcome.
+- Decision: keep this increment limited to one user-visible keyboard creation and exact movement outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The first keyboard tracer bullet is complete: Place-mode Enter creates a centered 3×1-inch placement
+scaled proportionally to a smaller page, and Arrow/Shift+Arrow move it by exact 1/10-point deltas
+without clamping or snapping. The remaining child scope—Ctrl-arrow resize, Delete, numeric-field
+traversal, snap/guides, off-page recovery, and undo/redo history—requires additional typed state and
+history increments and remains open.
 
 ## Context and Orientation
 
@@ -133,5 +147,6 @@ Use the existing typed application workflows, schema models, persistence stores,
 or workspace ports. The final behavior must be exercised by tests/unit/test_workspace_interaction_session.py tests/unit/test_qt_viewer_widget.py and the relevant signing-shell Qt tests. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
-Revision note: 2026-08-09 / Codex
-Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Implemented the first keyboard placement tracer bullet after the Pan/Place topology landed. The
+plan is intentionally still open for resize, Delete/history, snap/guides, and off-page recovery.

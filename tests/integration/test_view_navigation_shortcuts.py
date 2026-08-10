@@ -8,6 +8,7 @@ import pytest
 
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
+from foliaseal.domain.models import SignatureRect
 from foliaseal.infra.render import PdfPageGeometry, RenderPageResult
 from foliaseal.presentation.qt.viewer_widget import (
     PdfViewerWidgetAdapter,
@@ -292,6 +293,80 @@ def test_pan_and_place_tools_are_explicit_and_mutually_exclusive() -> None:
         QTest.mouseMove(viewer.widget(), pos=QPoint(100, 100))
         QTest.mouseRelease(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(100, 100))
         assert len(selected) == 1
+    finally:
+        window.close()
+        app.processEvents()
+        if created_app:
+            app.quit()
+
+
+def test_keyboard_place_enter_and_shift_arrow_update_the_overlay() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QMainWindow
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal-keyboard-placement-test"])
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/keyboard-placement-test.pdf",
+        render_backend=_RenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    current: list[SignatureRect | None] = [None]
+
+    def create() -> SignatureRect:
+        current[0] = SignatureRect(
+            page_index=0,
+            left_pt=0.0,
+            bottom_pt=24.0,
+            width_pt=72.0,
+            height_pt=24.0,
+        )
+        return current[0]
+
+    def move(delta_x: float, delta_y: float) -> SignatureRect:
+        rect = current[0]
+        assert rect is not None
+        current[0] = SignatureRect(
+            page_index=rect.page_index,
+            left_pt=rect.left_pt + delta_x,
+            bottom_pt=rect.bottom_pt + delta_y,
+            width_pt=rect.width_pt,
+            height_pt=rect.height_pt,
+        )
+        return current[0]
+
+    viewer = build_qt_pdf_viewer_widget(
+        workflow=workflow,
+        on_keyboard_create=create,
+        on_keyboard_move=move,
+    )
+    window = QMainWindow()
+    window.resize(240, 240)
+    window.setCentralWidget(viewer)
+    viewer.refresh()
+    viewer.set_interaction_mode("signature")
+    window.show()
+    viewer.widget().setFocus()
+    app.processEvents()
+
+    try:
+        QTest.keyClick(viewer.widget(), Qt.Key_Return)
+        app.processEvents()
+        assert current[0] is not None
+        assert viewer.widget()._overlay_signature_rect == current[0]
+
+        QTest.keyClick(viewer.widget(), Qt.Key_Right, Qt.KeyboardModifier.ShiftModifier)
+        app.processEvents()
+        assert current[0] is not None
+        assert current[0].left_pt == 10.0
+        assert viewer.widget()._overlay_signature_rect == current[0]
     finally:
         window.close()
         app.processEvents()

@@ -416,11 +416,11 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/application/viewer_interaction_session.py`
 - Responsibility: Own the application-layer translation from viewer state and viewer drags into signing-placement updates so the shell does not reconstruct placement logic from raw viewer outputs.
-- Owns: `ViewerInteractionSession`, `ViewerPlacementContextResult`, `ViewerSelectionPlacementResult`, placement-context derivation from the active viewer snapshot, `PdfRect` to `SignatureRect` translation for signing placement, and logical page-index updates for shell-driven navigation.
+- Owns: `ViewerInteractionSession`, `ViewerPlacementContextResult`, `ViewerSelectionPlacementResult`, `ViewerKeyboardPlacementResult`, placement-context derivation from the active viewer snapshot, centered keyboard placement sizing, exact keyboard movement, `PdfRect` to `SignatureRect` translation for signing placement, and logical page-index updates for shell-driven navigation.
 - Does not own: Qt mouse handling, text-selection routing, sidebar widget mutation, canonical preview refresh, or signature overlay painting.
 - Key collaborators: `ViewerWorkflow`, `SignaturePlacementContext`, `SignatureRect`, `presentation/qt/signing_shell.py`.
-- Main entry points: `ViewerInteractionSession.current_placement_context()`, `select_signature_rect()`, `set_logical_page_index()`, `set_page_number()`.
-- Known constraints: The boundary is intentionally Qt-free and leaves widget refresh/application of overlays to the shell. It composes with `document_review_workspace.py`: the review/text workspace gets first chance to consume a viewer drag, and only then does the viewer-interaction session translate that drag into a signing placement.
+- Main entry points: `ViewerInteractionSession.current_placement_context()`, `select_signature_rect()`, `create_centered_signature_rect()`, `move_signature_rect()`, `set_logical_page_index()`, `set_page_number()`.
+- Known constraints: The boundary is intentionally Qt-free and leaves widget refresh/application of overlays to the shell. Centered keyboard placement defaults to 216×72 points and proportionally fits smaller visible pages; movement preserves exact deltas and deliberately does not clamp or snap. Resize, Delete/history, snap/guides, and off-page recovery remain follow-up contracts. It composes with `document_review_workspace.py`: the review/text workspace gets first chance to consume a viewer drag, and only then does the viewer-interaction session translate that drag into a signing placement.
 - Status: Implemented and confirmed by code and tests.
 
 ### Workspace interaction session

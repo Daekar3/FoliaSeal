@@ -309,12 +309,22 @@ def _assemble_signing_workspace_composition(
         viewer_interaction_session=viewer_interaction_session,
         document_review_workspace=document_review_workspace,
     )
-    viewer_widget = viewer_widget_builder(
-        workflow=viewer_workflow,
-        on_selection=runtime.on_viewer_selection,
-        on_error=runtime.on_viewer_error,
-        on_interaction=runtime.on_viewer_interaction,
-    )
+    viewer_kwargs = {
+        "workflow": viewer_workflow,
+        "on_selection": runtime.on_viewer_selection,
+        "on_error": runtime.on_viewer_error,
+        "on_interaction": runtime.on_viewer_interaction,
+        "on_keyboard_create": runtime.create_keyboard_placement,
+        "on_keyboard_move": runtime.move_keyboard_placement,
+    }
+    try:
+        viewer_widget = viewer_widget_builder(**viewer_kwargs)
+    except TypeError as exc:
+        if "on_keyboard_create" not in str(exc) and "on_keyboard_move" not in str(exc):
+            raise
+        viewer_kwargs.pop("on_keyboard_create", None)
+        viewer_kwargs.pop("on_keyboard_move", None)
+        viewer_widget = viewer_widget_builder(**viewer_kwargs)
     set_viewer_mode = getattr(viewer_widget, "set_interaction_mode", None)
     if callable(set_viewer_mode):
         set_viewer_mode("pan")

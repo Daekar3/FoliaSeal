@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
 from foliaseal.application.viewer_interaction_session import (
     ViewerInteractionSession,
 )
+from foliaseal.domain.models import SignatureRect
 
 
 @dataclass
@@ -100,3 +103,46 @@ def test_set_page_number_normalizes_to_zero_based_page_index() -> None:
 
     assert target == 1
     assert workflow.session.current_page == 1
+
+
+def test_create_centered_signature_rect_fits_small_page_proportionally() -> None:
+    workflow = _FakeViewerWorkflow(
+        snapshot=_FakeSnapshot(
+            page_index=1,
+            page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+            rotation=0,
+        )
+    )
+    session = ViewerInteractionSession(viewer_workflow=workflow)  # type: ignore[arg-type]
+
+    result = session.create_centered_signature_rect()
+
+    assert result.error_message is None
+    assert result.signature_rect is not None
+    assert result.signature_rect.page_index == 1
+    assert result.signature_rect.width_pt == 100.0
+    assert result.signature_rect.height_pt == pytest.approx(33.333333333333336)
+    assert result.signature_rect.left_pt == 0.0
+    assert result.signature_rect.bottom_pt == pytest.approx(33.33333333333333)
+
+
+def test_move_signature_rect_preserves_exact_delta_without_clamping() -> None:
+    workflow = _FakeViewerWorkflow(
+        snapshot=_FakeSnapshot(
+            page_index=0,
+            page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+            rotation=0,
+        )
+    )
+    session = ViewerInteractionSession(viewer_workflow=workflow)  # type: ignore[arg-type]
+
+    result = session.move_signature_rect(
+        SignatureRect(page_index=0, left_pt=10.0, bottom_pt=20.0, width_pt=30.0, height_pt=10.0),
+        delta_x_pt=-25.0,
+        delta_y_pt=110.0,
+    )
+
+    assert result.error_message is None
+    assert result.signature_rect is not None
+    assert result.signature_rect.left_pt == -15.0
+    assert result.signature_rect.bottom_pt == 130.0

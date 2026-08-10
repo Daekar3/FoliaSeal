@@ -72,6 +72,8 @@ class _FakeQt:
     Key_Home = 21
     Key_End = 22
     Key_Escape = 23
+    Key_Return = 24
+    Key_Enter = 25
     ControlModifier = 1 << 1
 
     class KeyboardModifier:
@@ -798,6 +800,37 @@ def test_set_interaction_mode_changes_cursor(monkeypatch):
     preview.set_interaction_mode("pan")
 
     assert preview.cursor == _FakeQt.OpenHandCursor
+
+
+def test_keyboard_place_enter_and_shift_arrow_are_only_active_in_place_mode(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    created = []
+    moved = []
+    rect = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_create=lambda: (created.append(rect) or rect),
+        on_keyboard_move=lambda dx, dy: (moved.append((dx, dy)) or rect),
+    )
+    preview.set_interaction_mode("pan")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Return))
+    assert created == []
+
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Return))
+    preview.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Right, modifiers=_FakeQt.KeyboardModifier.ShiftModifier)
+    )
+
+    assert created == [rect]
+    assert moved == [(10.0, 0.0)]
 
 
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):

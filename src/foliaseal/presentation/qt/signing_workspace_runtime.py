@@ -136,6 +136,31 @@ class SigningWorkspaceRuntime:
     def on_viewer_error(self, message: str) -> None:
         self.emit_error(message)
 
+    def create_keyboard_placement(self) -> SignatureRect | None:
+        result = self._viewer_interaction_session_required().create_centered_signature_rect()
+        if result.error_message is not None:
+            self.emit_error(result.error_message)
+            return None
+        if result.signature_rect is not None:
+            self.apply_signature_rect_placement(result.signature_rect)
+        return result.signature_rect
+
+    def move_keyboard_placement(self, delta_x_pt: float, delta_y_pt: float) -> SignatureRect | None:
+        current = self._draft_workflow.signature_rect
+        if current is None:
+            return None
+        result = self._viewer_interaction_session_required().move_signature_rect(
+            current,
+            delta_x_pt=delta_x_pt,
+            delta_y_pt=delta_y_pt,
+        )
+        if result.error_message is not None:
+            self.emit_error(result.error_message)
+            return None
+        if result.signature_rect is not None:
+            self.apply_signature_rect_placement(result.signature_rect)
+        return result.signature_rect
+
     def on_viewer_interaction(self, name: str) -> None:
         if name == "navigation_changed":
             self.clear_selected_document_text()
