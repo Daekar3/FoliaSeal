@@ -7,10 +7,12 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can use the documented File, Edit, View, Signing, Settings, and Help command model in the real FoliaSeal GUI. It is mapped to UI_SPEC section 7 and acceptance scenarios 1 and 8. The
-slice is intentionally one vertical path through the relevant persistent
-model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
-generic refactor.
+After this slice, the two already-supported text commands use the same typed command registry as
+File, View, and Settings: View contains a checkable Select Text action, and Edit contains Copy. The
+commands retain their existing public workspace callbacks and state synchronization, so keyboard
+and menu users see the correct topology without inventing unsupported editing features. This is a
+bounded increment toward UI_SPEC section 7 and acceptance scenarios 1 and 8; the broader command
+corpus remains open for its owning viewer, signing, and support plans.
 
 ## Child ExecPlan Dependencies
 
@@ -42,6 +44,16 @@ generic refactor.
   `SingleInstanceUnavailable` endpoint error.
 - [x] (2026-08-09) Architecture and parent-plan status documentation were reconciled; the bounded
   Settings outcome is ready for commit while the broader child remains open.
+- [x] (2026-08-09) Re-audited the remaining raw actions against UI_SPEC: Select Text is currently
+  under Edit but belongs under View, and Copy is currently raw but belongs under Edit.
+- [x] (2026-08-09) Add red registry/menu-topology tests for typed Select Text and Copy.
+- [x] (2026-08-09) Implement the two typed definitions and preserve existing enablement/check state
+  and public maintenance-port callback routing; Copy is selection-sensitive and owns Ctrl+C.
+- [x] (2026-08-09) Focused validation passed (`165 passed`), full validation passed (`1193 passed,
+  20 skipped, 1 warning`), Ruff and diff checks passed, and the real-Qt no-document menu test
+  passed; the bounded launch remains limited by the known local QLocalServer endpoint error.
+- [ ] (2026-08-09) Commit this bounded increment; keep unsupported Undo/Redo/Cut/Paste/Help/Signing/
+  fit/search commands out.
 
 ## Surprises & Discoveries
 
@@ -66,6 +78,9 @@ generic refactor.
   migrated without inventing behavior; Help, Signing, and the full Edit menu do not yet have
   complete truthful seams.
   Evidence: Loop 8 explorer review and the resulting `SETTINGS_COMMAND_DEFINITIONS` registry.
+- Observation: Select Text and Copy are concrete, tested frame callbacks but bypass the typed
+  registry and are mounted under the wrong menus relative to UI_SPEC §7.
+  Evidence: `FoliaSealAppFrame._install_menus()` and explorer review dated 2026-08-09.
 
 ## Decision Log
 
@@ -95,6 +110,12 @@ generic refactor.
   command-model increment, while leaving unsupported Edit/Signing/Help placeholders out of the UI.
   Rationale: each migrated Settings action has a concrete frame boundary and can expose stable
   keyboard metadata; adding commands without behavior would violate UI_SPEC's truthful-action rule.
+  Date/Author: 2026-08-09 / Codex
+- Decision: register only Select Text and Copy in this increment, moving Select Text to View and
+  keeping Copy in Edit; do not add unsupported editing or signing placeholders.
+  Rationale: both actions already have real maintenance-port behavior and state projection, while
+  Undo/Redo/Cut/Paste/Select All, Help, Signing, and advanced View commands lack complete truthful
+  seams. A typed correction improves UI_SPEC compliance without overstating capability.
   Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
@@ -134,14 +155,20 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Build the File, Edit, View, Signing, Settings, and Help menus and visible shortcut labels from one typed command registry. Loop 2 establishes the File registry and lifecycle seam; subsequent command slices must extend the same registry rather than introduce parallel raw `_action()` definitions. Give every action a Qt-supported accessible description, disabled state, mnemonic, and focus-safe routing; Save aliases Sign and save while Save As always chooses a path. Add typed seams where the current code passes raw widget internals or compatibility kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the old path once focused tests prove no callers remain. Keep user-facing terminology from UI_SPEC.md, not schema/backend names.
+Extend the existing typed registry rather than introducing parallel raw `_action()` definitions. Add
+`VIEW_SELECT_TEXT` and `EDIT_COPY` definitions with stable IDs, truthful Qt descriptions, and
+unique menu mnemonics. In `FoliaSealAppFrame._install_menus()`, route Select Text through the
+existing `_toggle_text_selection_mode_from_action()` callback under View and Copy through
+`_copy_selected_text_from_action()` under Edit. Keep action enablement/check state projected by
+`WorkspaceActionState` and preserve the public maintenance port. Do not add commands whose behavior
+is not implemented.
 
 ## Milestones
 
 Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
-action labels, shortcuts, enablement, and keyboard equivalents through the frame boundary. Milestone
-3 verifies menu/shortcut parity in a bounded GUI audit and records evidence. Loop 2's bounded
-acceptance is File-only; the parent command-model acceptance remains open until all named menus have
+Select Text and Copy metadata and menu routing through the frame boundary. Milestone 3 verifies
+menu/enablement parity in focused and real-Qt tests and records the remaining unsupported command
+families as deferred. The parent command-model acceptance remains open until all named menus have
 their owning slices and scenario evidence.
 
 ## Concrete Steps
@@ -153,7 +180,7 @@ before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install
 dependency installation is unavailable, stop and report that environment blocker; do not silently
 fall back to a system Python or system Qt installation.
 
-    rg -n -e '_install_menus|_command_action|FILE_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
+    rg -n -e '_install_menus|_command_action|text_selection|copy_selected|VIEW_COMMAND_DEFINITIONS|EDIT_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py tests/integration/test_gui_launch_no_document.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
@@ -173,14 +200,16 @@ cleanup result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance for the completed bounded increments is behavioral: File and View Previous/Next Page
-commands remain defined by one typed registry, and all five existing Settings actions now use the
-same registry with unique menu mnemonics, stable object names, Qt-supported descriptions, and
-callbacks that reach their existing frame surfaces. First Save must choose a path before
-submitting. The full child acceptance remains open for focus-sensitive Edit, Signing, Help,
+Acceptance for this increment is behavioral: View Select Text and Edit Copy are defined by the one
+typed registry, appear in the normative menus, retain correct document-dependent enablement/check
+state, and reach their existing public maintenance-port callbacks exactly once. File, View
+Previous/Next Page, and the five Settings actions remain green under their prior contracts. First
+Save must choose a path before submitting. The full child acceptance remains open for focus-sensitive
+Edit, Signing, Help,
 remaining View, signed-state policy, and parent scenario requirements. The focused regression suite
-must pass, shared-code changes must keep the full suite green, and real-Qt evidence must record the
-visible command state and cleanup.
+passed (`165 passed`), shared-code changes keep the full suite green (`1193 passed, 20 skipped,
+1 warning`), and real-Qt no-document evidence records the visible command state and cleanup. A
+display-backed audit remains environment-limited by the known xcb/QLocalServer failures.
 
 ## Evidence Record
 
@@ -190,8 +219,9 @@ cleanup result, and compatibility grep proof. Loop 2 evidence is the offscreen r
 assertion for File labels, shortcuts, tooltip/status descriptions, mnemonic text, and no-document
 enablement; Loop 5 adds `tests/integration/test_view_navigation_shortcuts.py`, whose offscreen
 QTest Page Down/Page Up sequence produced exactly one page transition and one render per key. The
-Loop 8 Settings focused pass is `44 passed`; its updated full-suite result must be recorded below;
-Ruff passes. The
+Loop 8 Settings focused pass is `44 passed`; this increment's focused pass is `165 passed` and the
+registry test was red before implementation and green afterward. The full suite is `1193 passed,
+20 skipped, 1 warning`; Ruff and diff checks pass. The
 bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
 isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
 FoliaSeal/PySide6 processes after cleanup.
@@ -228,3 +258,6 @@ Created as child ui_command_model_shortcuts_execplan.md of the approved SPEC/UI_
 Revision note: 2026-08-09 / Codex
 Recorded the Loop 8 Settings-registry migration and narrowed remaining command-model work to
 existing truthful Edit/Signing/Help/View seams rather than placeholder actions.
+Revision note: 2026-08-09 / Codex
+Selected the next bounded correction: typed View Select Text and Edit Copy registration with
+existing callback/state behavior; unsupported command families remain deferred.

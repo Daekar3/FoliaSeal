@@ -384,6 +384,12 @@ class SigningWorkspaceWidget:
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self._runtime.set_document_text_selection_mode(enabled)
 
+    def document_text_selection_mode_enabled(self) -> bool:
+        return self._runtime.document_text_selection_mode_enabled()
+
+    def can_copy_selected_document_text(self) -> bool:
+        return self._runtime.can_copy_selected_document_text()
+
     def copy_selected_document_text(self) -> str | None:
         return self._runtime.copy_selected_document_text()
 

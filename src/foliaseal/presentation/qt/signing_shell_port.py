@@ -79,6 +79,12 @@ class SigningWorkspacePort(Protocol):
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         """Toggle document text-selection mode for the live shell."""
 
+    def document_text_selection_mode_enabled(self) -> bool:
+        """Return whether document text-selection mode is active."""
+
+    def can_copy_selected_document_text(self) -> bool:
+        """Return whether the current document selection can be copied."""
+
     def copy_selected_document_text(self) -> str | None:
         """Copy the current arbitrary text selection, if any."""
 
@@ -194,6 +200,12 @@ class QtSigningWorkspacePort:
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self.shell_widget.set_document_text_selection_mode(enabled)
+
+    def document_text_selection_mode_enabled(self) -> bool:
+        return bool(self.shell_widget.document_text_selection_mode_enabled())
+
+    def can_copy_selected_document_text(self) -> bool:
+        return bool(self.shell_widget.can_copy_selected_document_text())
 
     def copy_selected_document_text(self) -> str | None:
         return self.shell_widget.copy_selected_document_text()

@@ -19,6 +19,7 @@ from foliaseal.presentation.qt.app_frame import (
     QtAppFrameBindings,
 )
 from foliaseal.presentation.qt.app_frame_command_model import (
+    EDIT_COMMAND_DEFINITIONS,
     FILE_COMMAND_DEFINITIONS,
     SETTINGS_COMMAND_DEFINITIONS,
     VIEW_COMMAND_DEFINITIONS,
@@ -38,6 +39,20 @@ def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
     defaults = FoliaSealAppFrame.__init__.__kwdefaults__
     assert defaults is not None
     assert defaults["render_backend_factory"] is PopplerPdfRenderBackend
+
+
+def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
+    assert [definition.command_id for definition in EDIT_COMMAND_DEFINITIONS] == [
+        AppFrameCommandId.COPY
+    ]
+    assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
+        AppFrameCommandId.PREVIOUS_PAGE,
+        AppFrameCommandId.NEXT_PAGE,
+        AppFrameCommandId.SELECT_TEXT,
+    ]
+    assert EDIT_COMMAND_DEFINITIONS[0].menu == "Edit"
+    assert EDIT_COMMAND_DEFINITIONS[0].shortcut == "Ctrl+C"
+    assert VIEW_COMMAND_DEFINITIONS[-1].menu == "View"
 
 
 def test_app_frame_applies_window_baseline_and_normalizes_appearance_mode(tmp_path: Path) -> None:
@@ -480,6 +495,8 @@ class _FakeShell:
         self.submit_sign_request_calls = 0
         self.explicit_output_pdf_path = False
         self.set_document_text_selection_mode_calls = []
+        self.document_text_selection_mode = False
+        self.can_copy_selected_text = False
         self.copy_selected_document_text_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
         self.testing_adapter = object()
@@ -531,7 +548,14 @@ class _FakeShell:
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         self.set_document_text_selection_mode_calls.append(bool(enabled))
+        self.document_text_selection_mode = bool(enabled)
         return bool(enabled)
+
+    def document_text_selection_mode_enabled(self) -> bool:
+        return self.document_text_selection_mode
+
+    def can_copy_selected_document_text(self) -> bool:
+        return self.can_copy_selected_text
 
     def copy_selected_document_text(self) -> str | None:
         self.copy_selected_document_text_calls += 1
@@ -598,6 +622,12 @@ class _FakeShellPort:
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self.shell_widget.set_document_text_selection_mode(enabled)
+
+    def document_text_selection_mode_enabled(self) -> bool:
+        return self.shell_widget.document_text_selection_mode_enabled()
+
+    def can_copy_selected_document_text(self) -> bool:
+        return self.shell_widget.can_copy_selected_document_text()
 
     def copy_selected_document_text(self) -> str | None:
         return self.shell_widget.copy_selected_document_text()
@@ -995,7 +1025,7 @@ def test_app_frame_close_workspace_is_idempotent_and_restores_placeholder(
     assert bindings.q_message_box.warning_calls == []
     assert frame.window.menu_bar.menus[0].actions[1].enabled is False
     assert frame.window.menu_bar.menus[1].actions[0].enabled is False
-    assert frame.window.menu_bar.menus[1].actions[1].enabled is False
+    assert frame.window.menu_bar.menus[2].actions[2].enabled is False
 
 
 def test_app_frame_no_document_placeholder_exposes_open_and_library_actions(
@@ -1088,24 +1118,27 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.status_tip for action in frame.window.menu_bar.menus[0].actions] == [
         definition.accessible_name for definition in FILE_COMMAND_DEFINITIONS
     ]
-    assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
-        "Text selection mode",
-        "Copy selected text",
-    ]
-    assert frame.window.menu_bar.menus[1].actions[0].checkable is True
+    assert [action.text for action in frame.window.menu_bar.menus[1].actions] == ["&Copy"]
+    assert frame.window.menu_bar.menus[1].actions[0].checkable is False
     assert frame.window.menu_bar.menus[1].actions[0].enabled is False
-    assert frame.window.menu_bar.menus[1].actions[1].enabled is False
-    assert frame.window.menu_bar.menus[1].actions[0].icon.path.endswith("text-select.svg")
-    assert frame.window.menu_bar.menus[1].actions[1].icon.path.endswith("copy.svg")
+    assert frame.window.menu_bar.menus[1].actions[0].icon.path.endswith("copy.svg")
     assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
         "Previous &Page",
         "Next P&age",
+        "&Select Text",
     ]
     assert [action.shortcut for action in frame.window.menu_bar.menus[2].actions] == [
         "Page Up",
         "Page Down",
+        None,
     ]
-    assert [action.enabled for action in frame.window.menu_bar.menus[2].actions] == [False, False]
+    assert [action.enabled for action in frame.window.menu_bar.menus[2].actions] == [
+        False,
+        False,
+        False,
+    ]
+    assert frame.window.menu_bar.menus[2].actions[2].checkable is True
+    assert frame.window.menu_bar.menus[2].actions[2].icon.path.endswith("text-select.svg")
     assert [action.text for action in frame.window.menu_bar.menus[3].actions] == [
         definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
     ]
@@ -1178,8 +1211,8 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     save_action = frame.window.menu_bar.menus[0].actions[1]
     save_as_action = frame.window.menu_bar.menus[0].actions[2]
     close_action = frame.window.menu_bar.menus[0].actions[3]
-    text_selection_action = frame.window.menu_bar.menus[1].actions[0]
-    copy_selection_action = frame.window.menu_bar.menus[1].actions[1]
+    copy_selection_action = frame.window.menu_bar.menus[1].actions[0]
+    text_selection_action = frame.window.menu_bar.menus[2].actions[2]
 
     assert save_action.enabled is False
     assert save_as_action.enabled is False
@@ -1196,11 +1229,13 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert close_action.enabled is True
     assert text_selection_action.enabled is True
     assert text_selection_action.checked is False
-    assert copy_selection_action.enabled is True
+    assert copy_selection_action.enabled is False
     assert frame.workspace_action_state.workspace_open is True
 
     save_as_action.trigger()
     text_selection_action.trigger()
+    shell.can_copy_selected_text = True
+    frame._handle_status_change("document_text_selection_changed")
     copy_selection_action.trigger()
 
     assert shell.choose_output_pdf_path_calls == 1
@@ -1208,6 +1243,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert shell.copy_selected_document_text_calls == 1
     assert text_selection_action.checked is True
     assert frame.workspace_action_state.text_selection_checked is True
+    assert frame.workspace_action_state.copy_selected_text_enabled is True
 
 
 def test_app_frame_file_lifecycle_routes_save_close_and_exit(tmp_path: Path) -> None:
@@ -1371,14 +1407,17 @@ def test_view_command_registry_is_typed_and_normative() -> None:
     assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
+        AppFrameCommandId.SELECT_TEXT,
     ]
     assert [definition.text for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Previous Page",
         "Next Page",
+        "Select Text",
     ]
     assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Page Up",
         "Page Down",
+        None,
     ]
 
 
@@ -1395,25 +1434,25 @@ def test_view_page_commands_route_through_the_session_port(tmp_path: Path) -> No
     )
 
     view_actions = frame.window.menu_bar.menus[2].actions
-    assert [action.enabled for action in view_actions] == [False, False]
+    assert [action.enabled for action in view_actions] == [False, False, False]
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
-    assert [action.enabled for action in view_actions] == [False, True]
+    assert [action.enabled for action in view_actions] == [False, True, True]
 
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True]
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, False]
+    assert [action.enabled for action in view_actions] == [True, False, True]
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True]
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [False, True]
+    assert [action.enabled for action in view_actions] == [False, True, True]
 
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True]
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, False]
+    assert [action.enabled for action in view_actions] == [True, False, True]
     shell.go_to_previous_page()
-    assert [action.enabled for action in view_actions] == [True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True]
 
     assert shell.go_to_previous_page_calls == 3
     assert shell.go_to_next_page_calls == 4

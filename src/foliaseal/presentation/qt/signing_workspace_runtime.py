@@ -130,6 +130,8 @@ class SigningWorkspaceRuntime:
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().select_in_viewer(pdf_rect),
         )
+        if self._on_status_change is not None:
+            self._on_status_change("document_text_selection_changed")
 
     def on_viewer_error(self, message: str) -> None:
         self.emit_error(message)
@@ -194,7 +196,17 @@ class SigningWorkspaceRuntime:
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         transition = self._document_review_workspace_required().set_text_selection_mode(enabled)
         self._review_bridge_required().apply_transition(transition)
+        if self._on_status_change is not None:
+            self._on_status_change("document_text_mode_changed")
         return transition.state.document_text.selection_mode_enabled
+
+    def document_text_selection_mode_enabled(self) -> bool:
+        state = self._document_review_workspace_required().current_state()
+        return state.document_text.selection_mode_enabled
+
+    def can_copy_selected_document_text(self) -> bool:
+        state = self._document_review_workspace_required().current_state()
+        return state.document_text.selection_state.can_copy
 
     def copy_selected_document_text(self) -> str | None:
         copy_text = self._document_review_workspace_required().copy_selected_text()
@@ -206,6 +218,8 @@ class SigningWorkspaceRuntime:
     def clear_selected_document_text(self) -> DocumentTextSelectionState:
         transition = self._document_review_workspace_required().clear_selected_text()
         self._review_bridge_required().apply_transition(transition)
+        if self._on_status_change is not None:
+            self._on_status_change("document_text_selection_changed")
         return transition.state.document_text.selection_state
 
     def set_logical_page_index(self, page_index: int) -> None:

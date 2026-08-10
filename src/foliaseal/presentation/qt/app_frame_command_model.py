@@ -14,8 +14,10 @@ class AppFrameCommandId(StrEnum):
     SAVE_AS = "file.save_as"
     CLOSE = "file.close"
     EXIT = "file.exit"
+    COPY = "edit.copy"
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
+    SELECT_TEXT = "view.select_text"
     APPLICATION_SETTINGS = "settings.application"
     MANAGE_REUSABLE_OBJECTS = "settings.manage_reusable_objects"
     CREATE_CERTIFICATE = "settings.create_certificate"
@@ -79,6 +81,18 @@ FILE_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 )
 
 
+EDIT_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.COPY,
+        menu="Edit",
+        text="Copy",
+        shortcut="Ctrl+C",
+        accessible_name="Copy selected document text",
+        mnemonic_text="&Copy",
+    ),
+)
+
+
 VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.PREVIOUS_PAGE,
@@ -95,6 +109,14 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="Page Down",
         accessible_name="Go to next PDF page",
         mnemonic_text="Next P&age",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.SELECT_TEXT,
+        menu="View",
+        text="Select Text",
+        shortcut=None,
+        accessible_name="Select document text",
+        mnemonic_text="&Select Text",
     ),
 )
 
@@ -145,6 +167,7 @@ SETTINGS_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 
 ALL_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     *FILE_COMMAND_DEFINITIONS,
+    *EDIT_COMMAND_DEFINITIONS,
     *VIEW_COMMAND_DEFINITIONS,
     *SETTINGS_COMMAND_DEFINITIONS,
 )

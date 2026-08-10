@@ -112,6 +112,11 @@ class DocumentReviewWorkspaceSession:
         self._review_summary = self._document_review_inspector.inspect(self._input_pdf_path)
         return self._build_state()
 
+    def current_state(self) -> DocumentReviewWorkspaceState:
+        """Return the current immutable review/text projection without changing state."""
+
+        return self._build_state()
+
     def select_review_signature(self, index: int) -> DocumentReviewWorkspaceState:
         signature_items = self._review_summary.signature_items
         if index < 0 or index >= len(signature_items):

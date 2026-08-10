@@ -54,7 +54,7 @@ def workspace_action_state_open(
         save_as_enabled=True,
         text_selection_enabled=True,
         text_selection_checked=False,
-        copy_selected_text_enabled=True,
+        copy_selected_text_enabled=False,
         previous_page_enabled=previous_page_enabled,
         next_page_enabled=next_page_enabled,
     )
@@ -67,3 +67,17 @@ def workspace_action_state_with_selection_result(
     """Return ``state`` with only the selection checked flag replaced."""
 
     return replace(state, text_selection_checked=bool(checked))
+
+
+def workspace_action_state_with_document_text_result(
+    state: WorkspaceActionState,
+    *,
+    selection_mode_enabled: bool,
+    can_copy_selected_text: bool,
+) -> WorkspaceActionState:
+    """Project current document-text mode and selection capability onto frame actions."""
+    return replace(
+        state,
+        text_selection_checked=bool(selection_mode_enabled),
+        copy_selected_text_enabled=bool(can_copy_selected_text),
+    )

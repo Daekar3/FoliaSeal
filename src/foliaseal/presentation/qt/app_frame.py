@@ -51,6 +51,7 @@ from foliaseal.presentation.qt.app_frame_workspace_action_state import (
     WorkspaceActionState,
     workspace_action_state_closed,
     workspace_action_state_open,
+    workspace_action_state_with_document_text_result,
     workspace_action_state_with_selection_result,
 )
 from foliaseal.presentation.qt.app_frame_workspace_open import (
@@ -798,21 +799,13 @@ class FoliaSealAppFrame:
             self._exit_application,
         )
         edit_menu = menu_bar.addMenu("Edit")
-        self._text_selection_mode_action = self._action(
-            "Text selection mode",
-            self._toggle_text_selection_mode_from_action,
-            enabled=False,
-            checkable=True,
-            icon_name="text-select.svg",
-        )
-        edit_menu.addAction(self._text_selection_mode_action)
-        self._copy_selected_text_action = self._action(
-            "Copy selected text",
+        self._copy_selected_text_action = self._command_action(
+            edit_menu,
+            AppFrameCommandId.COPY,
             self._copy_selected_text_from_action,
             enabled=False,
             icon_name="copy.svg",
         )
-        edit_menu.addAction(self._copy_selected_text_action)
         view_menu = menu_bar.addMenu("View")
         self._previous_page_action = self._command_action(
             view_menu,
@@ -825,6 +818,14 @@ class FoliaSealAppFrame:
             AppFrameCommandId.NEXT_PAGE,
             self._go_to_next_page,
             enabled=False,
+        )
+        self._text_selection_mode_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.SELECT_TEXT,
+            self._toggle_text_selection_mode_from_action,
+            enabled=False,
+            checkable=True,
+            icon_name="text-select.svg",
         )
         settings_menu = menu_bar.addMenu("Settings")
         self._command_action(
@@ -900,6 +901,8 @@ class FoliaSealAppFrame:
         callback: Callable[[], Any],
         *,
         enabled: bool = True,
+        checkable: bool = False,
+        icon_name: str | None = None,
     ) -> Any:
         definition = command_definition(command_id)
         action = self._action(
@@ -907,6 +910,8 @@ class FoliaSealAppFrame:
             callback,
             shortcut=definition.shortcut,
             enabled=enabled,
+            checkable=checkable,
+            icon_name=icon_name,
             object_name=definition.command_id.value,
             accessible_name=definition.accessible_name,
         )
@@ -984,6 +989,32 @@ class FoliaSealAppFrame:
                 next_page_enabled=session.can_go_next_page(),
             )
         )
+        self._sync_document_text_actions()
+
+    def _sync_document_text_actions(self) -> None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return
+        maintenance = workspace.maintenance
+        mode_getter = getattr(maintenance, "document_text_selection_mode_enabled", None)
+        copy_getter = getattr(maintenance, "can_copy_selected_document_text", None)
+        mode_enabled = (
+            bool(mode_getter())
+            if callable(mode_getter)
+            else self._workspace_action_state.text_selection_checked
+        )
+        can_copy = (
+            bool(copy_getter())
+            if callable(copy_getter)
+            else self._workspace_action_state.copy_selected_text_enabled
+        )
+        self._apply_workspace_action_state(
+            workspace_action_state_with_document_text_result(
+                self._workspace_action_state,
+                selection_mode_enabled=mode_enabled,
+                can_copy_selected_text=can_copy,
+            )
+        )
 
     def _toggle_text_selection_mode_from_action(self) -> bool | None:
         action = self._text_selection_mode_action
@@ -1001,6 +1032,7 @@ class FoliaSealAppFrame:
                     result,
                 )
             )
+            self._sync_document_text_actions()
         return result
 
     def _copy_selected_text_from_action(self) -> str | None:
@@ -1061,6 +1093,8 @@ class FoliaSealAppFrame:
     def _handle_status_change(self, status: str) -> None:
         if status == "navigation_changed":
             self._sync_page_navigation_actions()
+        elif status in {"document_text_selection_changed", "document_text_mode_changed"}:
+            self._sync_document_text_actions()
         if self._on_status_change is not None:
             self._on_status_change(status)
 
