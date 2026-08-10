@@ -47,6 +47,11 @@ increments because they require additional geometry and focus seams.
   seam and gave Page/Left/Bottom/Width/Height controls accessible names plus deterministic tab order.
   Focused viewer/form/runtime coverage is `50 passed`; the full suite is `1308 passed, 20 skipped,
   1 warning`. Numeric traversal remains a follow-up only for richer field-level commands.
+- [x] (2026-08-10) Added the pointer-only page-guide snap seam: edges and centers snap within an
+  8-point threshold, Alt bypasses the policy, and the viewer paints the resulting guide lines.
+  Keyboard and numeric operations never call the snap helper. Focused coordinate/viewer coverage is
+  green (`63 passed`); the full suite is `1311 passed, 20 skipped, 1 warning`; off-page recovery
+  remains open.
 - [ ] (2026-08-10) Add numeric-field traversal, snap/guides, and off-page recovery in subsequent
   increments; then perform final documentation/commit closeout for the whole child.
 

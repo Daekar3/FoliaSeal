@@ -12,7 +12,9 @@ from foliaseal.application.coordinate_transform import (
     PdfRect,
     ViewRect,
     ViewTransform,
+    pdf_point_to_view,
     pdf_rect_to_view_rect,
+    snap_pdf_rect_to_page_guides,
 )
 from foliaseal.application.placement_history import PlacementHistory
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -79,6 +81,7 @@ class PdfViewerWidgetAdapter:
                 self._pan_start_y = 0
                 self._overlay_signature_rect: SignatureRect | None = None
                 self._placement_history = PlacementHistory()
+                self._placement_snap_guides: tuple[str, ...] = ()
                 self._overlay_drag_handle: str | None = None
                 self._overlay_drag_view_rect: ViewRect | None = None
                 self._overlay_drag_start_view_rect: ViewRect | None = None
@@ -165,6 +168,15 @@ class PdfViewerWidgetAdapter:
                         else:
                             painter.setPen(bindings.q_pen(bindings.q_color(0, 153, 255), 2))
                         painter.drawRect(self._selection_rect.normalized())
+
+                    draw_line = getattr(painter, "drawLine", None)
+                    if callable(draw_line):
+                        painter.setPen(bindings.q_pen(bindings.q_color(245, 158, 11), 1))
+                        for start, end in self._current_snap_guide_lines():
+                            draw_line(
+                                bindings.q_point(int(start[0]), int(start[1])),
+                                bindings.q_point(int(end[0]), int(end[1])),
+                            )
 
                     overlay_rect = self._current_overlay_qrect()
                     if overlay_rect is not None:
@@ -527,6 +539,7 @@ class PdfViewerWidgetAdapter:
                     event.accept()
                     return
                 rect = bindings.q_rect(self._drag_origin, current).normalized()
+                self._placement_snap_guides = ()
                 self._selection_rect = None
                 self._drag_origin = None
 
@@ -536,6 +549,18 @@ class PdfViewerWidgetAdapter:
                     pdf_rect = self._workflow.selection_to_pdf_rect(
                         selection=selection
                     )
+                    if not self._has_alt_modifier(event):
+                        snapshot = getattr(self._workflow, "snapshot", None)
+                        page_box = getattr(snapshot, "page_box", None)
+                        if page_box is not None:
+                            snap_result = snap_pdf_rect_to_page_guides(
+                                pdf_rect,
+                                page_box=page_box,
+                            )
+                            pdf_rect = snap_result.rect
+                            self._placement_snap_guides = snap_result.guides
+                            if snap_result.guides:
+                                self._emit_interaction("placement_snap_applied")
                 except (RuntimeError, ValueError) as exc:
                     self._emit_interaction("selection_error")
                     self._emit_error(
@@ -554,6 +579,78 @@ class PdfViewerWidgetAdapter:
                 self._placement_history.synchronize(signature_rect)
                 self._overlay_signature_rect = signature_rect
                 self.update()
+
+            def _current_snap_guide_lines(
+                self,
+            ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None or not self._placement_snap_guides:
+                    return ()
+                box = snapshot.page_box
+                lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
+                for guide in self._placement_snap_guides:
+                    if guide in {"left-edge", "right-edge", "vertical-center"}:
+                        x = (
+                            box.left
+                            if guide == "left-edge"
+                            else box.right
+                            if guide == "right-edge"
+                            else (box.left + box.right) / 2.0
+                        )
+                        start = pdf_point_to_view(
+                            pdf_x=x,
+                            pdf_y=box.bottom,
+                            transform=ViewTransform(
+                                zoom=snapshot.zoom,
+                                pan_x=snapshot.pan_x,
+                                pan_y=snapshot.pan_y,
+                            ),
+                            page_box=box,
+                            rotation=snapshot.rotation,
+                        )
+                        end = pdf_point_to_view(
+                            pdf_x=x,
+                            pdf_y=box.top,
+                            transform=ViewTransform(
+                                zoom=snapshot.zoom,
+                                pan_x=snapshot.pan_x,
+                                pan_y=snapshot.pan_y,
+                            ),
+                            page_box=box,
+                            rotation=snapshot.rotation,
+                        )
+                    else:
+                        y = (
+                            box.bottom
+                            if guide == "bottom-edge"
+                            else box.top
+                            if guide == "top-edge"
+                            else (box.bottom + box.top) / 2.0
+                        )
+                        start = pdf_point_to_view(
+                            pdf_x=box.left,
+                            pdf_y=y,
+                            transform=ViewTransform(
+                                zoom=snapshot.zoom,
+                                pan_x=snapshot.pan_x,
+                                pan_y=snapshot.pan_y,
+                            ),
+                            page_box=box,
+                            rotation=snapshot.rotation,
+                        )
+                        end = pdf_point_to_view(
+                            pdf_x=box.right,
+                            pdf_y=y,
+                            transform=ViewTransform(
+                                zoom=snapshot.zoom,
+                                pan_x=snapshot.pan_x,
+                                pan_y=snapshot.pan_y,
+                            ),
+                            page_box=box,
+                            rotation=snapshot.rotation,
+                        )
+                    lines.append((start, end))
+                return tuple(lines)
 
             def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
                 """Record a placement edit originating outside viewer keyboard input."""
@@ -770,6 +867,16 @@ class PdfViewerWidgetAdapter:
                 modifiers = event.modifiers()
                 shift_mask = bindings.qt.KeyboardModifier.ShiftModifier
                 return bool(modifiers & shift_mask)
+
+            def _has_alt_modifier(self, event: Any) -> bool:
+                modifiers = event.modifiers()
+                keyboard_modifier = getattr(bindings.qt, "KeyboardModifier", bindings.qt)
+                alt_mask = getattr(
+                    keyboard_modifier,
+                    "AltModifier",
+                    getattr(bindings.qt, "AltModifier", 0),
+                )
+                return bool(modifiers & alt_mask)
 
             def _has_control_modifier(self, event: Any) -> bool:
                 modifiers = event.modifiers()

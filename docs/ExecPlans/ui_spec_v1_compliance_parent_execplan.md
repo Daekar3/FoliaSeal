@@ -255,6 +255,9 @@ Release tranche:
   deterministic Page/Left/Bottom/Width/Height tab order in the setup form. Focused viewer/form/runtime
   validation is green; the full suite is `1308 passed, 20 skipped, 1 warning`. Richer numeric
   traversal commands, snap/guides, and off-page recovery remain open.
+- [x] (2026-08-10) Added pointer-only visible-page edge/center snapping with an 8-point threshold,
+  Alt bypass, and rendered guide lines; keyboard/numeric edits remain exact and unsnapped. Focused
+  coordinate/viewer validation is green; off-page recovery remains open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

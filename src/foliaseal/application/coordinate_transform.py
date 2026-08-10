@@ -63,6 +63,70 @@ class PageBox:
             raise ValueError("Page box must have positive width and height.")
 
 
+@dataclass(frozen=True)
+class PdfRectSnap:
+    """A pointer-placement snap result and the guides that caused it."""
+
+    rect: PdfRect
+    guides: tuple[str, ...] = ()
+
+
+def snap_pdf_rect_to_page_guides(
+    pdf_rect: PdfRect,
+    *,
+    page_box: PageBox,
+    threshold_pt: float = 8.0,
+) -> PdfRectSnap:
+    """Snap a pointer rectangle to nearby page edges or centers.
+
+    Keyboard and numeric callers intentionally do not use this helper. The page box is the
+    only authority for guides; no document or neighboring-object snapping is introduced.
+    """
+    page_box.validate()
+    if threshold_pt < 0:
+        raise ValueError("Snap threshold must not be negative.")
+    normalized = pdf_rect.normalized()
+    width = normalized.x2 - normalized.x1
+    height = normalized.y2 - normalized.y1
+
+    x_candidates = (
+        (abs(normalized.x1 - page_box.left), page_box.left, "left-edge"),
+        (abs(normalized.x2 - page_box.right), page_box.right - width, "right-edge"),
+        (
+            abs((normalized.x1 + normalized.x2) / 2.0 - (page_box.left + page_box.right) / 2.0),
+            (page_box.left + page_box.right - width) / 2.0,
+            "vertical-center",
+        ),
+    )
+    y_candidates = (
+        (abs(normalized.y1 - page_box.bottom), page_box.bottom, "bottom-edge"),
+        (abs(normalized.y2 - page_box.top), page_box.top - height, "top-edge"),
+        (
+            abs((normalized.y1 + normalized.y2) / 2.0 - (page_box.bottom + page_box.top) / 2.0),
+            (page_box.bottom + page_box.top - height) / 2.0,
+            "horizontal-center",
+        ),
+    )
+    x_snap = min(x_candidates, key=lambda candidate: candidate[0])
+    y_snap = min(y_candidates, key=lambda candidate: candidate[0])
+    left = x_snap[1] if x_snap[0] <= threshold_pt else normalized.x1
+    bottom = y_snap[1] if y_snap[0] <= threshold_pt else normalized.y1
+    guides = tuple(
+        guide
+        for distance, _coordinate, guide in (x_snap, y_snap)
+        if distance <= threshold_pt
+    )
+    return PdfRectSnap(
+        rect=PdfRect(
+            x1=left,
+            y1=bottom,
+            x2=left + width,
+            y2=bottom + height,
+        ),
+        guides=guides,
+    )
+
+
 def _normalize_rotation(rotation: int) -> int:
     if rotation % 90 != 0:
         raise ValueError("Rotation must be a multiple of 90 degrees.")

@@ -8,6 +8,7 @@ from foliaseal.application.coordinate_transform import (
     pdf_point_to_view,
     pdf_rect_to_view_rect,
     pdf_rect_to_visible_page_rect,
+    snap_pdf_rect_to_page_guides,
     validate_pdf_rect_within_page,
     view_point_to_pdf,
     view_rect_to_pdf_rect,
@@ -127,6 +128,31 @@ def test_validate_pdf_rect_within_page_rejects_invalid_page_box() -> None:
             PdfRect(0, 0, 10, 10),
             page_box=PageBox(left=0, bottom=5, right=10, top=5),
         )
+
+
+def test_pointer_snap_targets_page_edges_and_centers_only() -> None:
+    page_box = PageBox(left=0, bottom=0, right=100, top=100)
+
+    result = snap_pdf_rect_to_page_guides(
+        PdfRect(x1=3, y1=42, x2=23, y2=62),
+        page_box=page_box,
+    )
+
+    assert result.rect == PdfRect(x1=0, y1=40, x2=20, y2=60)
+    assert result.guides == ("left-edge", "horizontal-center")
+
+
+def test_pointer_snap_can_be_disabled_by_caller_without_changing_geometry() -> None:
+    page_box = PageBox(left=0, bottom=0, right=100, top=100)
+
+    result = snap_pdf_rect_to_page_guides(
+        PdfRect(x1=3, y1=42, x2=23, y2=62),
+        page_box=page_box,
+        threshold_pt=0,
+    )
+
+    assert result.rect == PdfRect(x1=3, y1=42, x2=23, y2=62)
+    assert result.guides == ()
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])

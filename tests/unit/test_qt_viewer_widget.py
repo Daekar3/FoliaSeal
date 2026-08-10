@@ -76,6 +76,7 @@ class _FakeQt:
     Key_Enter = 25
     Key_Delete = 26
     Key_Z = 27
+    AltModifier = 1 << 2
     ControlModifier = 1 << 1
 
     class KeyboardModifier:
@@ -603,6 +604,50 @@ def test_escape_cancels_unfinished_signature_drag_without_emitting_selection(mon
     assert selected == []
     assert widget._drag_origin is None
     assert widget._selection_rect is None
+
+
+def test_pointer_placement_snaps_to_page_guides_and_alt_bypasses(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    interactions = []
+    widget = PdfViewerWidgetAdapter().create(
+        workflow=workflow,
+        on_selection=selected.append,
+        on_interaction=interactions.append,
+    )
+    widget.refresh()
+
+    widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=3, y=38))
+    widget.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=23, y=58))
+    widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=23, y=58))
+
+    widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=3, y=38))
+    widget.mouseMoveEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=23,
+            y=58,
+            modifiers=_FakeQt.AltModifier,
+        )
+    )
+    widget.mouseReleaseEvent(
+        _FakeMouseEvent(
+            button=_FakeQt.LeftButton,
+            x=23,
+            y=58,
+            modifiers=_FakeQt.AltModifier,
+        )
+    )
+
+    assert selected[0] == PdfRect(x1=0.0, y1=40.0, x2=20.0, y2=60.0)
+    assert selected[1] == PdfRect(x1=3.0, y1=42.0, x2=23.0, y2=62.0)
+    assert "placement_snap_applied" in interactions
 
 
 def test_overlay_corner_handle_resizes_persistent_signature_overlay(monkeypatch):
@@ -1578,9 +1623,9 @@ def test_plain_left_drag_with_real_workflow_remains_in_bounds_after_scroll(monke
     assert errors == []
     assert len(selected) == 1
     normalized = selected[0].normalized()
-    assert normalized.x1 == 30.0
+    assert normalized.x1 == 35.0
     assert normalized.y1 == 20.0
-    assert normalized.x2 == 60.0
+    assert normalized.x2 == 65.0
     assert normalized.y2 == 40.0
 
 
