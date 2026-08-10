@@ -346,7 +346,10 @@ class FoliaSealAppFrame:
             )
         )
         self._preset_catalog_store = preset_catalog_store or SignaturePresetCatalogStore.default()
-        self._reusable_objects = ReusableSigningObjects(self._preset_catalog_store)
+        self._reusable_objects = ReusableSigningObjects(
+            self._preset_catalog_store,
+            certificate_configuration_exists=self._certificate_configuration_exists,
+        )
         self._sign_executor = sign_executor
         self._shell_factory = shell_factory or QtSigningWorkspaceFactory()
         self._render_backend_factory = render_backend_factory
@@ -445,6 +448,15 @@ class FoliaSealAppFrame:
     def current_viewer_workflow(self) -> ViewerWorkflow | None:
         workspace = self._workspace_host.active()
         return None if workspace is None else workspace.viewer_workflow
+
+    def _certificate_configuration_exists(self, configuration_id: str) -> bool:
+        """Return whether a preset certificate reference resolves in the live catalog."""
+
+        try:
+            self._certificate_catalog_store.load_catalog().configuration_by_id(configuration_id)
+        except KeyError:
+            return False
+        return True
 
     @property
     def current_signing_workflow(self) -> SigningDraftWorkflow | None:

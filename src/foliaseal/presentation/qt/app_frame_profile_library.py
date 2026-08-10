@@ -233,6 +233,11 @@ class ReusableObjectLibraryDialog:
         self._render_selection()
         return True
 
+    def save_detail(self) -> bool:
+        """Commit the current detail transaction through the typed rename boundary."""
+
+        return self.rename_selected()
+
     def delete_selected(self) -> bool:
         selected = self._selected_object()
         if selected is None:
@@ -367,7 +372,7 @@ class ReusableObjectLibraryDialog:
         duplicate.clicked.connect(self.duplicate_selected)
         pin.clicked.connect(self.toggle_pin_selected)
         delete.clicked.connect(self.delete_selected)
-        save.clicked.connect(self.rename_selected)
+        save.clicked.connect(self.save_detail)
         cancel.clicked.connect(self.cancel_detail)
         if self._on_create is not None:
             create.clicked.connect(self._on_create)

@@ -69,3 +69,22 @@ def test_library_pin_and_duplicate_controls_use_typed_catalog_commands() -> None
     assert rows[0].pinned is True
     assert len(rows) == 2
     assert rows[1].pinned is False
+
+
+def test_library_save_button_commits_explicit_detail_transaction() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.refresh()
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.name_input.setText("Approved")
+
+    assert dialog.controls.save_button.click() is None
+    assert service.view().appearance_names == ("Approved",)

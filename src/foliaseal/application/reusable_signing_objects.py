@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from enum import Enum
 from types import MappingProxyType
@@ -257,8 +257,14 @@ class InMemoryCatalogRepository:
 class ReusableSigningObjects:
     """Own reusable-object policy while hiding catalog persistence details."""
 
-    def __init__(self, repository: CatalogRepository) -> None:
+    def __init__(
+        self,
+        repository: CatalogRepository,
+        *,
+        certificate_configuration_exists: Callable[[str], bool] | None = None,
+    ) -> None:
         self._repository = repository
+        self._certificate_configuration_exists = certificate_configuration_exists
         self._snapshot: ReusableCatalogSnapshot | None = None
 
     def snapshot(self) -> ReusableCatalogSnapshot:
@@ -422,6 +428,14 @@ class ReusableSigningObjects:
             return catalog.upsert_placement_profile(profile)
         if isinstance(command, SavePreset):
             name = _require_name(command.name, "Signature preset name is required.")
+            if (
+                command.certificate_configuration_id is not None
+                and self._certificate_configuration_exists is not None
+                and not self._certificate_configuration_exists(command.certificate_configuration_id)
+            ):
+                raise ConfigValidationError(
+                    "Signature preset references a missing certificate configuration."
+                )
             self._check_duplicate(
                 catalog.signature_presets,
                 name,

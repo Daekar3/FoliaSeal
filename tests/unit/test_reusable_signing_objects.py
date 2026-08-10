@@ -146,6 +146,32 @@ def test_names_are_case_insensitively_unique_and_duplicate_starts_unpinned(tmp_p
     assert rows[0].ref.object_id != rows[1].ref.object_id
 
 
+def test_production_boundary_rejects_missing_certificate_references(tmp_path: Path) -> None:
+    service = ReusableSigningObjects(
+        SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+        certificate_configuration_exists=lambda value: value == "known-config",
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    appearance_ref = service.view().appearances[0].ref
+
+    with pytest.raises(ConfigValidationError, match="missing certificate configuration"):
+        service.execute(
+            SavePreset(
+                "Missing certificate",
+                appearance_profile_id=appearance_ref.object_id,
+                certificate_configuration_id="missing-config",
+            )
+        )
+
+    service.execute(
+        SavePreset(
+            "Known certificate",
+            appearance_profile_id=appearance_ref.object_id,
+            certificate_configuration_id="known-config",
+        )
+    )
+
+
 def test_inline_preset_overwrite_preserves_component_ids(tmp_path: Path) -> None:
     service = ReusableSigningObjects(SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"))
     service.execute(

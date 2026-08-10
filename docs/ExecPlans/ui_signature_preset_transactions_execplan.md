@@ -14,22 +14,32 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
-- [ ] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
+- [x] docs/ExecPlans/ui_signature_library_topology_execplan.md (completed in `a4e97edab`)
+- [x] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md (completed in `ecf4f73ab`)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-10) Audit current behavior and add a failing focused test.
+- [x] (2026-08-10) Implement the bounded model/application/Qt reference-validation and Save-boundary path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Run focused, regression, and offscreen GUI validation; clean processes and artifacts.
+- [x] (2026-08-10) Update this plan and relevant architecture docs.
+- [ ] Commit the slice after compliance review.
 
 ## Surprises & Discoveries
 
 - Observation: preset mutation is already represented by reusable-object model/store boundaries;
   this child must make nested Save/Cancel transactional and keep stable identifiers on rename.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the production reusable-object service did not previously validate certificate
+  configuration references because certificates live in a separate catalog. The AppFrame now injects
+  an existence resolver, while direct test fixtures remain intentionally decoupled.
+  Evidence: `ReusableSigningObjects(... certificate_configuration_exists=...)` and
+  `tests/unit/test_reusable_signing_objects.py::test_production_boundary_rejects_missing_certificate_references`.
+- Observation: the Library Save button was wired directly to the rename implementation. It now
+  crosses an explicit `save_detail()` transaction boundary, but the full document-independent
+  nested preset editor and dirty-switch/close prompts remain unimplemented.
+  Evidence: `ReusableObjectLibraryDialog.save_detail()` and the compliance review boundary.
 
 ## Decision Log
 
@@ -42,7 +52,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+This slice closes the production certificate-reference validation seam and makes the Library detail
+Save action an explicit application-facing transaction boundary. It does not complete the full
+UI_SPEC WF06 editor: preset component editing remains routed through the contextual signing
+workflow, reason/location defaults are not yet modeled, and dirty-switch/close or active-placement
+invalidation prompts remain open follow-on work.
 
 ## Context and Orientation
 
@@ -119,6 +133,18 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 "no SVG" decision alongside the evidence row.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
+
+Current evidence (2026-08-10):
+
+- Focused reusable-object, Library, and session tests: `20 passed`.
+- Offscreen AppFrame/shell/Library/integration tests: `153 passed`.
+- Updated focused set after the Save-boundary test: `21 passed`.
+- Full regression: `1243 passed, 20 skipped, 1 warning`.
+- Offscreen Library/no-document integration: `2 passed`.
+- Ruff and `git diff --check`: clean.
+- Process audit: no FoliaSeal, PySide6, or pytest processes remained.
+- No new SVG: this bounded seam changes application validation and the existing Save/Cancel name
+  boundary, not the Library topology.
 
 ## Idempotence and Recovery
 
