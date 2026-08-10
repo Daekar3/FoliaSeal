@@ -72,7 +72,7 @@ Document-flow tranche:
   workspace integration remain open in the safe-links and lifecycle children.
 - [x] docs/ExecPlans/ui_safe_links_contract_hardening_execplan.md — conservative unknown-source,
   mode-gating, malformed-destination, and bounded-display corrections implemented and validated
-  (24 focused; 1342 full-suite; commit follows).
+  (24 focused; 1342 full-suite; committed in `45e5187d2`).
 
 Reusable-object and certificate tranche:
 

@@ -29,7 +29,8 @@ fully tested policy contract that cannot silently authorize an unknown source.
   recorded the corrected living-plan handoff; full-suite validation remains the final gate.
 - [x] (2026-08-10) Full validation reports 1342 passed, 20 skipped, 1 warning; the bounded GUI
   lifecycle reaches the known isolated endpoint limitation and cleans its root/processes. The
-  correction is ready for commit and hands renderer/workspace integration to the parent plans.
+  correction is committed in `45e5187d2` and hands renderer/workspace integration to the parent
+  plans.
 
 ## Surprises & Discoveries
 
