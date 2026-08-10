@@ -98,6 +98,17 @@ reviews found only documentation drift; the documentation worker fixed it and a
 post-fix review passed. The implementation commit is `0163efc36`; this plan
 revision records the final closure.
 
+Follow-on reference guard (2026-08-10): the production AppFrame now injects a
+resolver of signature-preset certificate-configuration ids into
+`CertificateManager.delete_configuration()`, and the AppFrame deletion route
+rechecks that guard even when a custom manager is supplied. This prevents the
+ordinary UI path from deleting a configuration still referenced by a saved
+preset. It is a preflight across separate certificate and preset stores, not a
+shared cross-store transaction; concurrent writers can still create a
+time-of-check/time-of-use window. A versioned or locked cross-catalog commit
+and a real temporary-store interleaving test remain future work owned by the
+preset/reference compliance plan.
+
 ## Context and Orientation
 
 `src/foliaseal/application/certificate_manager.py` is the current caller

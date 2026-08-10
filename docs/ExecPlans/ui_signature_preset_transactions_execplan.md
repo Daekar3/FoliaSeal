@@ -40,6 +40,15 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   crosses an explicit `save_detail()` transaction boundary, but the full document-independent
   nested preset editor and dirty-switch/close prompts remain unimplemented.
   Evidence: `ReusableObjectLibraryDialog.save_detail()` and the compliance review boundary.
+- Observation: certificate-configuration deletion must be guarded from the certificate side as well
+  as at preset save time. `CertificateManager.delete_configuration()` now accepts the AppFrame's
+  referenced-preset id resolver and rejects deletion while a saved preset still points at it.
+  Evidence: `tests/unit/test_certificate_manager.py::test_manager_blocks_deleting_configuration_referenced_by_preset`.
+- Compliance limitation: the guard is a production preflight across two independent stores, not a
+  shared cross-catalog transaction. A concurrent writer could create a preset after the resolver
+  check and before certificate deletion. AppFrame now performs the guard even when a custom manager
+  is injected, but a real temporary-store wiring/interleaving test and versioned/locked transaction
+  remain follow-on work.
 
 ## Decision Log
 
@@ -56,7 +65,9 @@ This slice closes the production certificate-reference validation seam and makes
 Save action an explicit application-facing transaction boundary. It does not complete the full
 UI_SPEC WF06 editor: preset component editing remains routed through the contextual signing
 workflow, reason/location defaults are not yet modeled, and dirty-switch/close or active-placement
-invalidation prompts remain open follow-on work.
+invalidation prompts remain open follow-on work. Certificate deletion now refuses known preset
+references at the AppFrame/CertificateManager composition boundary; a single cross-store commit
+transaction remains a future hardening item for external concurrent writers.
 
 ## Context and Orientation
 
@@ -140,11 +151,14 @@ Current evidence (2026-08-10):
 - Offscreen AppFrame/shell/Library/integration tests: `153 passed`.
 - Updated focused set after the Save-boundary test: `21 passed`.
 - Full regression: `1243 passed, 20 skipped, 1 warning`.
+- Full regression after the deletion guard: `1244 passed, 20 skipped, 1 warning`.
 - Offscreen Library/no-document integration: `2 passed`.
 - Ruff and `git diff --check`: clean.
 - Process audit: no FoliaSeal, PySide6, or pytest processes remained.
 - No new SVG: this bounded seam changes application validation and the existing Save/Cancel name
   boundary, not the Library topology.
+- Deletion guard evidence: manager-level static resolver test is green; real AppFrame temporary-store
+  wiring and concurrent interleaving remain open acceptance items.
 
 ## Idempotence and Recovery
 

@@ -339,13 +339,14 @@ class FoliaSealAppFrame:
                 secret_provider=self._certificate_secret_provider,
             )
         )
+        self._preset_catalog_store = preset_catalog_store or SignaturePresetCatalogStore.default()
         self._certificate_manager = certificate_manager or (
             CertificateManager(
                 store=self._certificate_catalog_store,
                 secret_store=self._certificate_secret_provider,
+                referenced_configuration_ids=self._referenced_preset_configuration_ids,
             )
         )
-        self._preset_catalog_store = preset_catalog_store or SignaturePresetCatalogStore.default()
         self._reusable_objects = ReusableSigningObjects(
             self._preset_catalog_store,
             certificate_configuration_exists=self._certificate_configuration_exists,
@@ -457,6 +458,16 @@ class FoliaSealAppFrame:
         except KeyError:
             return False
         return True
+
+    def _referenced_preset_configuration_ids(self) -> set[str]:
+        """Return certificate configuration ids retained by saved signature presets."""
+
+        catalog = self._preset_catalog_store.load_catalog()
+        return {
+            preset.certificate_configuration_id
+            for preset in catalog.signature_presets
+            if preset.certificate_configuration_id is not None
+        }
 
     @property
     def current_signing_workflow(self) -> SigningDraftWorkflow | None:
@@ -899,6 +910,15 @@ class FoliaSealAppFrame:
 
     def _delete_certificate(self, ref: CertificateLibraryRef) -> bool:
         try:
+            if (
+                ref.configuration_id is not None
+                and ref.configuration_id in self._referenced_preset_configuration_ids()
+            ):
+                self._emit_error(
+                    "Certificate configuration is referenced by a signature preset "
+                    "and cannot be deleted."
+                )
+                return False
             if ref.configuration_id is not None:
                 self._certificate_manager.delete_configuration(ref.configuration_id)
             else:

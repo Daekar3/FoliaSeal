@@ -90,6 +90,7 @@ class CertificateManager:
     secret_store: CertificateSecretStore | None = None
     id_factory: Callable[[], str] | None = None
     clock: Callable[[], datetime] | None = None
+    referenced_configuration_ids: Callable[[], set[str]] | None = None
 
     def snapshot(self) -> CertificateCatalog:
         return self.store.load_catalog()
@@ -199,6 +200,14 @@ class CertificateManager:
     def delete_configuration(self, configuration_id: str) -> CertificateOperationResult:
         catalog = self.snapshot()
         configuration = catalog.configuration_by_id(configuration_id)
+        if (
+            self.referenced_configuration_ids is not None
+            and configuration_id in self.referenced_configuration_ids()
+        ):
+            raise ConfigValidationError(
+                "Certificate configuration is referenced by a signature preset "
+                "and cannot be deleted."
+            )
         secret_ref = configuration.password_secret_ref
         saved_secret: str | None = None
         if secret_ref is not None:

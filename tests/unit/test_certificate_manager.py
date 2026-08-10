@@ -21,6 +21,7 @@ from foliaseal.application import (
     SaveConfigurationRequest,
 )
 from foliaseal.application.certificate_catalog_repository import ManagedCertificateCommit
+from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from tests.support.signing_builders import (
     build_certificate_catalog,
@@ -59,6 +60,7 @@ def _manager(
     *,
     secret_store: FakeSecretStore | None = None,
     ids: tuple[str, ...] = ("managed-cert-one", "cert-config-one"),
+    referenced_configuration_ids=None,
 ) -> CertificateManager:
     id_values = iter(ids)
     return CertificateManager(
@@ -66,6 +68,7 @@ def _manager(
         secret_store=secret_store,
         id_factory=lambda: next(id_values),
         clock=lambda: datetime(2026, 5, 13, 12, 0, tzinfo=UTC),
+        referenced_configuration_ids=referenced_configuration_ids,
     )
 
 
@@ -236,6 +239,20 @@ def test_manager_save_and_delete_configuration_preserves_managed_certificate(
     catalog = manager.snapshot()
     assert catalog.certificate_configurations == ()
     assert catalog.managed_certificates
+
+
+def test_manager_blocks_deleting_configuration_referenced_by_preset(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(build_certificate_catalog())
+    manager = _manager(
+        store,
+        referenced_configuration_ids=lambda: {"cert-config-default"},
+    )
+
+    with pytest.raises(ConfigValidationError, match="referenced by a signature preset"):
+        manager.delete_configuration("cert-config-default")
+
+    assert manager.snapshot().configuration_by_id("cert-config-default")
 
 
 def test_manager_delete_managed_certificate_restores_state_when_unlink_fails(
