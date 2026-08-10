@@ -156,6 +156,7 @@ class ReusableCatalogSnapshot:
 class SaveAppearance:
     name: str
     appearance: SignatureAppearance
+    appearance_profile_id: str | None = None
     overwrite: bool = False
 
 
@@ -377,7 +378,21 @@ class ReusableSigningObjects:
     ) -> SignaturePresetCatalog:
         if isinstance(command, SaveAppearance):
             name = _require_name(command.name, "Appearance profile name is required.")
-            existing = next(
+            existing_by_id = (
+                next(
+                    (
+                        item
+                        for item in catalog.appearance_profiles
+                        if item.appearance_profile_id == command.appearance_profile_id
+                    ),
+                    None,
+                )
+                if command.appearance_profile_id is not None
+                else None
+            )
+            if command.appearance_profile_id is not None and existing_by_id is None:
+                raise ConfigValidationError("The appearance profile being edited no longer exists.")
+            existing_by_name = next(
                 (
                     item
                     for item in catalog.appearance_profiles
@@ -385,10 +400,18 @@ class ReusableSigningObjects:
                 ),
                 None,
             )
+            if (
+                existing_by_name is not None
+                and existing_by_id is not None
+                and existing_by_name.appearance_profile_id != existing_by_id.appearance_profile_id
+            ):
+                raise ConfigValidationError(f"Appearance '{name}' already exists.")
+            existing = existing_by_id or existing_by_name
             profile = AppearanceProfile(
                 schema_version=1,
                 appearance_profile_id=(
-                    existing.appearance_profile_id
+                    command.appearance_profile_id
+                    or (existing.appearance_profile_id if existing is not None else None)
                     if existing is not None
                     else _stable_id("appearance", name)
                 ),

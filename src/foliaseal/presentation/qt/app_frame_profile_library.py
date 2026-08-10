@@ -100,6 +100,8 @@ class ReusableObjectLibraryDialog:
         on_toggle_certificate_pin: Callable[[CertificateLibraryRef, bool], bool] | None = None,
         on_rename_certificate: Callable[[CertificateLibraryRef, str], bool] | None = None,
         on_delete_certificate: Callable[[CertificateLibraryRef], bool] | None = None,
+        on_create_appearance: Callable[[], bool] | None = None,
+        on_edit_appearance: Callable[[ReusableObjectRef], bool] | None = None,
         on_create: Callable[[], bool] | None = None,
         on_edit: Callable[[ReusableObjectRef], bool] | None = None,
         on_create_placement: Callable[[], bool] | None = None,
@@ -109,6 +111,8 @@ class ReusableObjectLibraryDialog:
         self._library = library
         self._on_create = on_create
         self._on_edit = on_edit
+        self._on_create_appearance = on_create_appearance
+        self._on_edit_appearance = on_edit_appearance
         self._on_create_placement = on_create_placement
         self._on_edit_placement = on_edit_placement
         self._certificate_catalog_provider = certificate_catalog_provider
@@ -301,8 +305,8 @@ class ReusableObjectLibraryDialog:
         delete = self._bindings.q_push_button("Delete")
         duplicate = self._bindings.q_push_button("Duplicate")
         pin = self._bindings.q_push_button("Pin")
-        create = self._bindings.q_push_button("Create preset")
-        edit = self._bindings.q_push_button("Edit preset")
+        create = self._bindings.q_push_button("Create")
+        edit = self._bindings.q_push_button("Edit")
         create_placement = self._bindings.q_push_button("Create placement")
         edit_placement = self._bindings.q_push_button("Edit selected placement")
         save = self._bindings.q_push_button("Save")
@@ -374,10 +378,8 @@ class ReusableObjectLibraryDialog:
         delete.clicked.connect(self.delete_selected)
         save.clicked.connect(self.save_detail)
         cancel.clicked.connect(self.cancel_detail)
-        if self._on_create is not None:
-            create.clicked.connect(self._on_create)
-        if self._on_edit is not None:
-            edit.clicked.connect(self._edit_selected_preset)
+        create.clicked.connect(self._create_selected_object)
+        edit.clicked.connect(self._edit_selected_object)
         if self._on_create_placement is not None:
             create_placement.clicked.connect(self._on_create_placement)
         else:
@@ -442,6 +444,38 @@ class ReusableObjectLibraryDialog:
             return False
         assert self._on_edit is not None
         return self._on_edit(ref)
+
+    def _create_selected_object(self) -> bool:
+        callback = (
+            self._on_create_appearance
+            if self._session.catalog is LibraryCatalog.APPEARANCES
+            else self._on_create
+            if self._session.catalog is LibraryCatalog.PRESETS
+            else None
+        )
+        if callback is None:
+            self._show_error("Create is not available for this catalog.")
+            return False
+        return callback()
+
+    def _edit_selected_object(self) -> bool:
+        selected = self._selected_object()
+        if selected is None or not isinstance(selected[0], ReusableObjectRef):
+            self._show_error("Select a reusable object before editing it.")
+            return False
+        ref, _name = selected
+        if ref.kind is ReusableObjectKind.APPEARANCE:
+            if self._on_edit_appearance is None:
+                self._show_error("Appearance editing is not available.")
+                return False
+            return self._on_edit_appearance(ref)
+        if ref.kind is ReusableObjectKind.PRESET:
+            if self._on_edit is None:
+                self._show_error("Preset editing is not available.")
+                return False
+            return self._on_edit(ref)
+        self._show_error("Select an appearance or preset to edit it.")
+        return False
 
     def _has_list_widget(self) -> bool:
         return callable(getattr(self._bindings, "q_list_widget", None))
@@ -541,7 +575,23 @@ class ReusableObjectLibraryDialog:
         self._render_selection()
 
     def _render_selection(self) -> None:
-        _set_enabled(self.controls.create_button, self._session.catalog is LibraryCatalog.PRESETS)
+        if self._session.catalog is LibraryCatalog.APPEARANCES:
+            _set_text(self.controls.create_button, "Create appearance")
+        elif self._session.catalog is LibraryCatalog.PRESETS:
+            _set_text(self.controls.create_button, "Create preset")
+        else:
+            _set_text(self.controls.create_button, "Create")
+        _set_enabled(
+            self.controls.create_button,
+            (
+                self._session.catalog is LibraryCatalog.APPEARANCES
+                and self._on_create_appearance is not None
+            )
+            or (
+                self._session.catalog is LibraryCatalog.PRESETS
+                and self._on_create is not None
+            ),
+        )
         selected = self._session.selected_row()
         if selected is None:
             if self._session.catalog is LibraryCatalog.CERTIFICATES:
@@ -572,8 +622,19 @@ class ReusableObjectLibraryDialog:
         )
         _set_enabled(
             self.controls.edit_button,
-            is_reusable and selected.ref.kind is ReusableObjectKind.PRESET,
+            is_reusable
+            and (
+                (selected.ref.kind is ReusableObjectKind.PRESET and self._on_edit is not None)
+                or (
+                    selected.ref.kind is ReusableObjectKind.APPEARANCE
+                    and self._on_edit_appearance is not None
+                )
+            ),
         )
+        if selected.ref.kind is ReusableObjectKind.APPEARANCE:
+            _set_text(self.controls.edit_button, "Edit appearance")
+        elif selected.ref.kind is ReusableObjectKind.PRESET:
+            _set_text(self.controls.edit_button, "Edit preset")
 
     def _selected_object(
         self,

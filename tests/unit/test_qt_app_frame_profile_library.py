@@ -12,6 +12,7 @@ from foliaseal.application.reusable_signing_objects import (
     SavePreset,
 )
 from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
+from foliaseal.presentation.qt.appearance_profile_editor_dialog import AppearanceProfileEditorDialog
 from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePresetEditorDialog
 from tests.support.signing_builders import build_signature_appearance
 from tests.unit.test_qt_signing_shell import _fake_bindings
@@ -141,3 +142,85 @@ def test_document_independent_preset_editor_edit_preserves_preset_identity() -> 
 
     assert service.view().presets[0].ref == original_ref
     assert service.view().preset_names == ("Board approval v2",)
+
+
+def test_document_independent_appearance_editor_saves_without_active_document() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    errors: list[str] = []
+    editor = AppearanceProfileEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        on_error=errors.append,
+    )
+    editor.controls.name_input.setText("Board appearance")
+    editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Signed by Board")
+    editor.controls.save_button.click()
+
+    assert errors == []
+    assert service.view().appearance_names == ("Board appearance",)
+    profile = service.resolve(service.view().appearances[0].ref)
+    assert profile.appearance.signer_label_prefix == "Signed by Board"
+
+
+def test_document_independent_appearance_editor_edit_preserves_identity_and_cancel_isolation(
+) -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    original = service.view().appearances[0]
+    editor = AppearanceProfileEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        initial_ref=original.ref,
+    )
+    editor.controls.name_input.setText("Approved")
+    editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Changed")
+    editor.controls.cancel_button.click()
+
+    assert service.view().appearances[0] == original
+
+    editor = AppearanceProfileEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        initial_ref=original.ref,
+    )
+    editor.controls.name_input.setText("Approved")
+    editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Changed")
+    editor.controls.save_button.click()
+
+    updated = service.view().appearances[0]
+    profile = service.resolve(updated.ref)
+    assert updated.ref == original.ref
+    assert updated.display_name == "Approved"
+    assert profile.appearance.signer_label_prefix == "Changed"
+
+
+def test_library_exposes_appearance_create_and_edit_actions() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    created: list[str] = []
+    edited: list[str] = []
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        on_create_appearance=lambda: created.append("create") or True,
+        on_edit_appearance=lambda ref: edited.append(ref.object_id) or True,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.create_button.click()
+    assert created == ["create"]
+
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog.refresh()
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.edit_button.click()
+    assert edited == [service.view().appearances[0].ref.object_id]

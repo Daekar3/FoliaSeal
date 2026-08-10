@@ -14,22 +14,28 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
-- [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
+- [x] docs/ExecPlans/ui_signature_library_topology_execplan.md (bounded modeless Library and catalog callbacks are live)
+- [x] docs/ExecPlans/ui_signature_preset_transactions_execplan.md (bounded document-independent preset editor is live)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audit current behavior and add focused Save/Cancel and stable-id tests.
+- [x] (2026-08-10) Implement the document-independent Appearance create/edit model/application/Qt path.
+- [x] (2026-08-10) Confirm no phase3 product-facing compatibility path was introduced; evidence-only phase3 modules remain outside this product slice.
+- [x] (2026-08-10) Run focused, regression, and offscreen Qt validation; clean processes and artifacts.
+- [ ] (2026-08-10) Complete the full UI_SPEC nested Library detail-pane experience and commit that follow-up slice.
 
 ## Surprises & Discoveries
 
 - Observation: appearance refinement is nested inside signing setup; this child must keep unsaved
   appearance edits isolated until an explicit Save intent and preserve Cancel as a no-op.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the local collaboration runtime refused a fresh explorer after prior completed
+  threads remained counted against its thread limit. The required pre-implementation and post-pass
+  review was therefore completed as a checkout-grounded self-audit; no implementation blocker was
+  inferred from the tooling limitation.
+  Evidence: `collaboration.spawn_agent` returned `agent thread limit reached` after completed agents
+  were interrupted; focused, regression, full-suite, Ruff, and process-cleanup checks were run here.
 
 ## Decision Log
 
@@ -42,7 +48,13 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The bounded slice is implemented. `AppearanceProfileEditorDialog` reuses the existing
+`QtVisibleSignatureSetupForm` appearance controls, opens from Library Create/Edit without an
+active document, and persists through `SaveAppearance.appearance_profile_id` so renaming an edited
+profile preserves its stable reference. Cancel leaves the catalog unchanged. The implementation is
+intentionally modal; UI_SPEC's nested breadcrumb/detail-pane navigation, labeled sample preview,
+reason/location defaults, dirty-detail prompts, and active-placement invalidation prompts remain
+open follow-up work.
 
 ## Context and Orientation
 
@@ -64,16 +76,22 @@ rebaselines, V2 features, or packaging work.
 
 ## Plan of Work
 
-Move reusable Appearance editing into the Library detail pane with content-first controls, synthetic sample preview labeled as sample, breadcrumb navigation, and suspended parent preset draft. Save/Cancel must be transactional and never silently apply or close the parent document draft. Add or preserve typed application and public Qt-port boundaries rather than reaching
-through private widgets. Keep schema and terminology aligned with the frozen documents. When a
-legacy path is replaced, prove its callers are migrated before deleting it.
+Move reusable Appearance editing into the Library detail pane with content-first controls, synthetic
+sample preview labeled as sample, breadcrumb navigation, and suspended parent preset draft. The
+bounded prerequisite now exists as a document-independent modal editor: it provides the typed
+Save/Cancel transaction and stable-id persistence seam without silently applying or closing a parent
+document draft. The remaining nested detail-pane and preview behavior must be implemented as a
+separate follow-up rather than hidden behind the modal adapter. Add or preserve typed application
+and public Qt-port boundaries rather than reaching through private widgets. Keep schema and
+terminology aligned with the frozen documents. When a legacy path is replaced, prove its callers
+are migrated before deleting it.
 
 ## Milestones
 
-Milestone 1 audits the named editor/session seams and adds a red Save/Cancel transaction test.
-Milestone 2 implements isolated draft editing and explicit commit wiring through the public Qt
-port. Milestone 3 proves Save and Cancel in the GUI, records cleanup evidence, and updates the
-plan before handoff.
+Milestone 1 audited the named editor/session seams and added focused Save/Cancel and stable-id
+coverage. Milestone 2 implemented isolated draft editing and explicit commit wiring through the
+typed reusable-object boundary. Milestone 3 validated the modal editor offscreen and recorded the
+remaining nested-pane/preview gaps for the next slice.
 
 ## Concrete Steps
 
@@ -99,13 +117,21 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+walkthrough. The bounded slice evidence is `tests/unit/test_qt_app_frame_profile_library.py` and
+the offscreen Qt regression suite; the exact input sequence is create/edit from the Library's
+Appearances catalog, change signer-label/name, Save or Cancel, and verify catalog identity/state.
+Record the exact input sequence, widget state, expected observation, evidence path, and cleanup
+result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: Creating an Appearance from a new preset returns to the suspended preset editor with the reference attached only after Save; Cancel at either level preserves the previous persisted state. Focused tests must pass, shared-code changes must
-leave the full suite green, and the GUI audit must record the visible result and cleanup.
+Acceptance for this bounded slice is behavioral: creating or editing an Appearance from the
+document-independent Library surface writes only after Save, preserves stable identity on edit,
+and leaves the previous persisted state unchanged on Cancel. The full nested behavior remains open:
+creating an Appearance from a suspended preset must return to that editor with the reference attached
+only after Save, and Cancel at either level must preserve the previous persisted state. Focused tests
+must pass, shared-code changes must leave the full suite green, and the GUI audit must record the
+visible result and cleanup.
 
 ## Evidence Record
 
@@ -117,6 +143,18 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 "no SVG" decision alongside the evidence row.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
+
+Bounded evidence (2026-08-10):
+
+- `.venv/bin/pytest -q tests/unit/test_qt_app_frame_profile_library.py tests/unit/test_reusable_signing_objects.py` — 20 passed.
+- `.venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_qt_signing_shell.py tests/unit/test_qt_visible_signature_setup_form.py` — 157 passed.
+- The Appearances catalog exposes Create appearance and Edit appearance; the modal editor works
+  without an active document; Save creates/renames the profile and preserves its stable ref; Cancel
+  leaves the previous catalog entry unchanged.
+- Process audit after Qt tests showed no FoliaSeal/PySide6/pytest processes or owned temporary
+  dialogs. Display-backed xcb acceptance remains unavailable and is not claimed here.
+- Remaining gaps: nested breadcrumb navigation, labeled sample preview, suspended preset return,
+  reason/location defaults, dirty prompts, and active-placement invalidation.
 
 ## Idempotence and Recovery
 
