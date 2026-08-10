@@ -203,7 +203,21 @@ Release tranche:
 
 ## Outcomes & Retrospective
 
-Not started. Update this section after each major dependency tranche and at final acceptance.
+The first eight bounded implementation loops established and committed a usable foundation rather
+than full SPEC/UI_SPEC compliance. Proven slices include no-document launch, typed File lifecycle
+commands, single-instance open routing, app-frame appearance/minimum sizing, View Previous/Next
+Page navigation, a fixed signing rail with a read-only status region and typed recommended action,
+main-window geometry/maximized persistence, and typed Settings command metadata/callback routing.
+Focused and full validation remained green through the final loop (`1185 passed, 20 skipped,
+1 warning`), with bounded CLI audits cleaning up their isolated roots and recording the environment's
+`SingleInstanceUnavailable` local-endpoint limitation.
+
+The parent is not complete. All 29 child checkboxes remain open because the remaining requirements
+include full document lifecycle/recovery, Library topology and transactions, certificate flows,
+pointer/keyboard placement, preview fidelity, atomic sign/write/verification/recovery, complete
+Edit/View/Signing/Help command surfaces, rail divider/Library/monitor/DPI persistence, accessibility
+and packaged-release acceptance. The bounded slices deliberately recorded these gaps instead of
+claiming compliance from narrow tests.
 
 ## Context and Orientation
 
