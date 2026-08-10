@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
@@ -26,6 +27,9 @@ from foliaseal.application.signature_library_session import (
 from foliaseal.infra.config.schemas import ConfigValidationError
 from foliaseal.presentation.qt.appearance_profile_editor_widget import (
     AppearanceProfileEditorWidget,
+)
+from foliaseal.presentation.qt.signature_preset_editor_widget import (
+    SignaturePresetEditorWidget,
 )
 
 
@@ -83,6 +87,7 @@ class ReusableObjectLibraryControls:
     cancel_button: Any
     close_button: Any
     appearance_editor: AppearanceProfileEditorWidget | None = None
+    preset_editor: SignaturePresetEditorWidget | None = None
 
 
 class ReusableObjectLibraryDialog:
@@ -118,6 +123,7 @@ class ReusableObjectLibraryDialog:
     ) -> None:
         self._bindings = bindings
         self._library = library
+        self._certificate_catalog = certificate_catalog or CertificateCatalog(schema_version=1)
         self._on_create = on_create
         self._on_edit = on_edit
         self._on_create_appearance = on_create_appearance
@@ -138,6 +144,7 @@ class ReusableObjectLibraryDialog:
         )
         self._rows: tuple[SignatureLibraryRow, ...] = ()
         self._appearance_editor: AppearanceProfileEditorWidget | None = None
+        self._preset_editor: SignaturePresetEditorWidget | None = None
         self._appearance_parent_ref: ReusableObjectRef | None = None
         self._appearance_parent_catalog: LibraryCatalog | None = None
         self._appearance_parent_draft_name: str | None = None
@@ -162,11 +169,12 @@ class ReusableObjectLibraryDialog:
 
     def refresh(self) -> None:
         if self._certificate_catalog_provider is not None:
-            self._session.set_certificate_catalog(self._certificate_catalog_provider())
+            self._certificate_catalog = self._certificate_catalog_provider()
+            self._session.set_certificate_catalog(self._certificate_catalog)
         self._rows = self._session.refresh()
         self._render_catalog_navigation()
         self._render_master_list()
-        if self._appearance_editor is None:
+        if self._appearance_editor is None and self._preset_editor is None:
             self._render_selection()
 
     def rename_selected(self) -> bool:
@@ -516,6 +524,134 @@ class ReusableObjectLibraryDialog:
             return "Appearance"
         return getattr(resolved, "display_name", "Appearance")
 
+    def _open_nested_preset_editor(
+        self,
+        initial_ref: ReusableObjectRef | None = None,
+    ) -> bool:
+        """Replace the detail column with a Preset editor and one Appearance child path."""
+
+        if self._appearance_editor is not None or self._preset_editor is not None:
+            return False
+        self._appearance_parent_catalog = self._session.catalog
+        self._appearance_parent_ref = self._session.selected_ref
+        self._appearance_parent_draft_name = self._session.draft_name
+        editor = SignaturePresetEditorWidget(
+            bindings=self._bindings,
+            parent=self.controls.appearance_editor_host,
+            library=self._library,
+            certificate_catalog=self._certificate_catalog,
+            initial_ref=initial_ref,
+            breadcrumb=(
+                "Signature Library / Presets / "
+                + ("New preset" if initial_ref is None else self._display_name_for_ref(initial_ref))
+            ),
+            on_saved=self._preset_editor_saved,
+            on_cancel_requested=self._preset_editor_cancel_requested,
+            on_error=self._show_error,
+        )
+        self._preset_editor = editor
+        object.__setattr__(self.controls, "preset_editor", editor)
+        self.controls.detail_view.setVisible(False)
+        self.controls.appearance_editor_host.setVisible(True)
+        self._appearance_editor_host_layout.addWidget(editor.controls.container)
+        return True
+
+    def _preset_editor_saved(self) -> None:
+        editor = self._preset_editor
+        saved_ref = None if editor is None else editor.saved_ref
+        self._leave_nested_preset_editor(saved_ref=saved_ref)
+
+    def _preset_editor_cancel_requested(self) -> bool:
+        return self._resolve_nested_preset_editor()
+
+    def _leave_nested_preset_editor(
+        self,
+        *,
+        saved_ref: ReusableObjectRef | None = None,
+    ) -> None:
+        parent_ref = self._appearance_parent_ref
+        parent_catalog = self._appearance_parent_catalog
+        parent_draft_name = self._appearance_parent_draft_name
+        editor = self._preset_editor
+        if editor is not None:
+            editor_container = editor.controls.container
+            remove_widget = getattr(self._appearance_editor_host_layout, "removeWidget", None)
+            if callable(remove_widget):
+                remove_widget(editor_container)
+            set_visible = getattr(editor_container, "setVisible", None)
+            if callable(set_visible):
+                set_visible(False)
+            delete_later = getattr(editor_container, "deleteLater", None)
+            if callable(delete_later):
+                delete_later()
+        self._preset_editor = None
+        object.__setattr__(self.controls, "preset_editor", None)
+        self.controls.appearance_editor_host.setVisible(False)
+        self.controls.detail_view.setVisible(True)
+        if parent_catalog is not None and self._session.catalog is not parent_catalog:
+            self._session.select_catalog(parent_catalog)
+        self.refresh()
+        if saved_ref is not None:
+            self._session.select(saved_ref)
+        elif parent_ref is not None:
+            self._session.select(parent_ref)
+            if parent_draft_name is not None:
+                self._session.set_draft_name(parent_draft_name)
+        self._render_master_list()
+        self._render_selection()
+        self._appearance_parent_ref = None
+        self._appearance_parent_catalog = None
+        self._appearance_parent_draft_name = None
+
+    def _resolve_nested_preset_editor(self) -> bool:
+        """Resolve the nested Appearance child before the parent Preset draft."""
+
+        editor = self._preset_editor
+        if editor is None:
+            return True
+        if editor.child_active and not editor.resolve_child():
+            return False
+        if not editor.dirty:
+            self._leave_nested_preset_editor()
+            return True
+        message_box = getattr(self._bindings, "q_message_box", None)
+        question = getattr(message_box, "question", None)
+        save = getattr(message_box, "Save", None)
+        discard = getattr(message_box, "Discard", None)
+        continue_editing = getattr(message_box, "Cancel", None)
+        standard_button = getattr(message_box, "StandardButton", None)
+        if standard_button is not None:
+            save = save if save is not None else getattr(standard_button, "Save", None)
+            discard = discard if discard is not None else getattr(standard_button, "Discard", None)
+            continue_editing = (
+                continue_editing
+                if continue_editing is not None
+                else getattr(standard_button, "Cancel", None)
+            )
+        if not callable(question) or save is None or discard is None or continue_editing is None:
+            self._show_error("Unable to resolve unsaved Preset changes; continue editing.")
+            return False
+        try:
+            result = question(
+                self.controls.dialog,
+                "Unsaved preset changes",
+                "Save changes, discard them, or continue editing?",
+                save | discard | continue_editing,
+                continue_editing,
+            )
+        except TypeError:
+            result = question(
+                self.controls.dialog,
+                "Unsaved preset changes",
+                "Save changes, discard them, or continue editing?",
+            )
+        if result == save:
+            return editor.save()
+        if result == discard:
+            self._leave_nested_preset_editor()
+            return True
+        return False
+
     def _appearance_editor_saved(self) -> None:
         editor = self._appearance_editor
         saved_ref = None if editor is None else editor.saved_ref
@@ -615,8 +751,18 @@ class ReusableObjectLibraryDialog:
             return True
         return False
 
+    def _nested_editor_active(self) -> bool:
+        return self._appearance_editor is not None or self._preset_editor is not None
+
+    def _resolve_active_nested_editor(self) -> bool:
+        if self._appearance_editor is not None:
+            return self._resolve_nested_appearance_editor()
+        if self._preset_editor is not None:
+            return self._resolve_nested_preset_editor()
+        return True
+
     def _close_requested(self, reject: Callable[[], Any]) -> None:
-        if self._appearance_editor is not None and not self._resolve_nested_appearance_editor():
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
             return
         reject()
 
@@ -637,7 +783,11 @@ class ReusableObjectLibraryDialog:
             if self._on_create_appearance is not None:
                 return self._on_create_appearance()
             return self._open_nested_appearance_editor()
-        callback = self._on_create if self._session.catalog is LibraryCatalog.PRESETS else None
+        if self._session.catalog is LibraryCatalog.PRESETS:
+            if self._on_create is not None:
+                return self._on_create()
+            return self._open_nested_preset_editor()
+        callback = None
         if callback is None:
             self._show_error("Create is not available for this catalog.")
             return False
@@ -683,10 +833,9 @@ class ReusableObjectLibraryDialog:
                 return self._on_edit_appearance(ref)
             return self._open_nested_appearance_editor(ref)
         if ref.kind is ReusableObjectKind.PRESET:
-            if self._on_edit is None:
-                self._show_error("Preset editing is not available.")
-                return False
-            return self._on_edit(ref)
+            if self._on_edit is not None:
+                return self._on_edit(ref)
+            return self._open_nested_preset_editor(ref)
         self._show_error("Select an appearance or preset to edit it.")
         return False
 
@@ -754,7 +903,7 @@ class ReusableObjectLibraryDialog:
     def _handle_catalog_row_changed(self, index: int) -> None:
         if self._rendering_master_list or self._rendering_catalog_navigation:
             return
-        if self._appearance_editor is not None and not self._resolve_nested_appearance_editor():
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
             self._render_catalog_navigation()
             return
         catalogs = list(LibraryCatalog)
@@ -771,7 +920,7 @@ class ReusableObjectLibraryDialog:
     def _handle_catalog_text_changed(self, value: str) -> None:
         if self._rendering_master_list or self._rendering_catalog_navigation:
             return
-        if self._appearance_editor is not None and not self._resolve_nested_appearance_editor():
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
             self._render_catalog_navigation()
             return
         try:
@@ -786,14 +935,14 @@ class ReusableObjectLibraryDialog:
         self._render_selection()
 
     def _handle_search_changed(self, value: str) -> None:
-        if self._appearance_editor is not None and not self._resolve_nested_appearance_editor():
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
             return
         self._rows = self._session.set_search(value)
         self._render_master_list()
         self._render_selection()
 
     def _handle_sort_changed(self, index: int | None = None) -> None:
-        if self._appearance_editor is not None and not self._resolve_nested_appearance_editor():
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
             return
         if not hasattr(self, "controls"):
             return
@@ -821,7 +970,7 @@ class ReusableObjectLibraryDialog:
     def _handle_master_row_changed(self) -> None:
         if self._rendering_master_list:
             return
-        if self._appearance_editor is not None and not self._resolve_nested_appearance_editor():
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
             self._render_master_list()
             return
         selected = self._selected_object()
@@ -829,7 +978,7 @@ class ReusableObjectLibraryDialog:
         self._render_selection()
 
     def _render_selection(self) -> None:
-        if self._appearance_editor is not None:
+        if self._nested_editor_active():
             return
         if self._session.catalog is LibraryCatalog.APPEARANCES:
             _set_text(self.controls.create_button, "Create appearance")
@@ -848,7 +997,7 @@ class ReusableObjectLibraryDialog:
             )
             or (
                 self._session.catalog is LibraryCatalog.PRESETS
-                and self._on_create is not None
+                and (self._on_create is not None or self._preset_editor is None)
             ),
         )
         selected = self._session.selected_row()
@@ -884,7 +1033,10 @@ class ReusableObjectLibraryDialog:
             (
                 is_reusable
                 and (
-                (selected.ref.kind is ReusableObjectKind.PRESET and self._on_edit is not None)
+                (
+                    selected.ref.kind is ReusableObjectKind.PRESET
+                    and (self._on_edit is not None or self._preset_editor is None)
+                )
                 or (
                     selected.ref.kind is ReusableObjectKind.APPEARANCE
                     and (

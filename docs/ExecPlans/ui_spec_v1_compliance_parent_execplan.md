@@ -87,7 +87,9 @@ Reusable-object and certificate tranche:
   semantics, normalized names, configured-first certificate projection, Name sorting, certificate
   pin/rename/delete routing, confirmation-safe mutation lifecycle, expiration preference propagation,
   and Library preferences validated in the current follow-up slice.
-- [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
+- [x] docs/ExecPlans/ui_signature_preset_transactions_execplan.md — production Preset Create/Edit
+  now uses the Library-owned nested Preset → Appearance editor path with child-first resolution,
+  stable-reference return, and full focused/offscreen regression evidence.
 - [x] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
 - [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
 - [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — typed inspection,
@@ -209,6 +211,14 @@ Release tranche:
   invalidation, and final preview fidelity remain open in their owning children. Full validation is
   1357 passed and 20 skipped; the bounded launch audit's isolated single-instance error is recorded
   as an environment limitation with cleanup confirmed.
+- [x] (2026-08-10) Completed the production nested Signature Preset transaction increment:
+  `SignaturePresetEditorWidget` now replaces the modal production path, mounts one nested
+  `AppearanceProfileEditorWidget`, returns a stable appearance reference to the suspended preset
+  draft, and resolves child before parent Save/Discard/Continue on Back, close, and catalog switch.
+  The dialog is a compatibility/test wrapper only; focused validation is `72 passed`, full
+  regression is `1363 passed, 20 skipped, 1 warning`, and the bounded launch audit left no process
+  or temporary-config debris. Reason/location, placement/certificate creation, active-placement
+  invalidation, and final preview-fidelity work stays in owning children.
 - [x] (2026-08-10) Added the bounded first-use preset entry increment: an empty preset catalog now
   gives explicit no-preset guidance in the signing rail and routes `Create or manage presets…`
   through typed workspace composition to the existing modeless Presets-first Library. Opening the

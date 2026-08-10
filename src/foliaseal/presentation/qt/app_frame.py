@@ -18,7 +18,7 @@ from foliaseal.application import (
     build_default_signing_executor,
 )
 from foliaseal.application.reusable_signing_models import PlacementProfile
-from foliaseal.application.reusable_signing_objects import ReusableObjectRef, SavePlacement
+from foliaseal.application.reusable_signing_objects import SavePlacement
 from foliaseal.application.signature_library_session import (
     CertificateLibraryRef,
 )
@@ -72,9 +72,6 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
 from foliaseal.presentation.qt.document_signatures_dialog import DocumentSignaturesDialog
 from foliaseal.presentation.qt.placement_profile_editor_dialog import (
     PlacementProfileEditorDialog,
-)
-from foliaseal.presentation.qt.signature_preset_editor_dialog import (
-    SignaturePresetEditorDialog,
 )
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
@@ -833,8 +830,6 @@ class FoliaSealAppFrame:
             on_rename_certificate=self._rename_certificate,
             on_delete_certificate=self._delete_certificate,
             on_configure_certificate=self._configure_certificate,
-            on_create=self._open_signature_preset_editor,
-            on_edit=self._edit_signature_preset,
             on_create_placement=self._open_placement_profile_editor,
             on_edit_placement=self._edit_placement_profile,
         )
@@ -1097,37 +1092,6 @@ class FoliaSealAppFrame:
                     close()
         finally:
             self._closing_document_signatures = False
-
-    def _open_signature_preset_editor(self) -> bool:
-        return self._run_signature_preset_editor()
-
-    def _edit_signature_preset(self, ref: ReusableObjectRef) -> bool:
-        return self._run_signature_preset_editor(initial_ref=ref)
-
-    def _run_signature_preset_editor(
-        self,
-        *,
-        initial_ref: ReusableObjectRef | None = None,
-    ) -> bool:
-        saved = False
-
-        def on_saved() -> None:
-            nonlocal saved
-            saved = True
-            if self._reusable_object_library is not None:
-                self._reusable_object_library.refresh()
-
-        editor = SignaturePresetEditorDialog(
-            bindings=self._bindings,
-            parent=self.window,
-            library=self._reusable_objects,
-            certificate_catalog=self._certificate_catalog_store.load_catalog(),
-            initial_ref=initial_ref,
-            on_saved=on_saved,
-            on_error=self._emit_error,
-        )
-        editor.open()
-        return saved
 
     def _open_placement_profile_editor(self) -> bool:
         """Open a document-independent placement editor from the Library."""
