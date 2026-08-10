@@ -29,6 +29,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   renders only non-secret identity, issuer, validity, private-key, and warning facts before the
   existing atomic import/configuration commit. Import re-inspects the current path/password so a
   changed field cannot bypass validation.
+- [x] (2026-08-10) Added the retained-file Configure action: a certificate row without a
+  configuration now exposes `Configure certificate` in the Library, prompts for a display name,
+  creates a typed configuration without copying or changing the managed file, and refreshes the
+  signing rail. Orphan configuration rows remain non-configurable and actionable only through
+  their existing repair/delete surfaces.
 - [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No new phase3 names or
   compatibility wrappers were introduced; existing evidence contracts remain because their
   external consumers still exist. No safe retirement condition was met in this slice.
@@ -38,8 +43,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   launch remains subject to the known isolated single-instance transport limitation; owned
   temporary roots/processes are cleaned at the validation gate below.
 - [x] (2026-08-10) Updated this plan and the architecture/status records; the implementation is
-  ready for the commit gate. Retained-unconfigured Configure action, richer catalog management,
-  and create/export/password lifecycle remain explicitly open in their owning children.
+  ready for the commit gate. Richer catalog management and create/export/password lifecycle remain
+  explicitly open in their owning children.
 
 ## Surprises & Discoveries
 
@@ -66,9 +71,9 @@ operation revalidates the current inputs and retains the existing atomic managed
 commit, so rejected or canceled input leaves no managed residue.
 
 This bounded increment does not complete the certificate catalog. A retained managed file is
-already preserved when its configuration is deleted and projected as unconfigured by the Library,
-but an explicit Configure action, expiration sorting, create five-year/password-confirmation flow,
-and export/password lifecycle remain deferred to their owning plans.
+preserved when its configuration is deleted, projected as unconfigured by the Library, and can now
+be explicitly configured without changing its file. Expiration sorting, create five-year/password-
+confirmation flow, and export/password lifecycle remain deferred to their owning plans.
 
 ## Context and Orientation
 
@@ -187,8 +192,9 @@ name its remaining consumer and retirement condition in this plan.
   self-signed warning. Import then re-inspects and creates one configured catalog entry. The
   visible-state node is `test_certificate_import_dialog_renders_non_secret_inspection`.
 - Retained-file evidence: existing manager deletion tests prove deleting a configuration preserves
-  the managed file; Library session tests project that row as `Not configured for signing`. An
-  explicit Configure action is recorded as the next child slice rather than implied complete here.
+  the managed file; Library session tests project that row as `Not configured for signing`, and
+  `test_library_exposes_configure_action_for_retained_certificate` proves the typed Configure
+  callback is reachable from the row.
 - No SVG was added: this increment deepens the existing Settings import dialog and does not change
   the normative Library topology. No private keys/passwords or generated files were committed.
 - Bounded GUI launch: the isolated offscreen command exited `1` before frame creation with

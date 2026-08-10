@@ -48,6 +48,8 @@ def _set_text(widget: Any, value: str) -> None:
     setter = getattr(widget, "setText", None)
     if callable(setter):
         setter(value)
+    elif hasattr(widget, "_text"):
+        widget._text = value
     elif hasattr(widget, "text"):
         widget.text = value
 
@@ -100,6 +102,7 @@ class ReusableObjectLibraryDialog:
         on_toggle_certificate_pin: Callable[[CertificateLibraryRef, bool], bool] | None = None,
         on_rename_certificate: Callable[[CertificateLibraryRef, str], bool] | None = None,
         on_delete_certificate: Callable[[CertificateLibraryRef], bool] | None = None,
+        on_configure_certificate: Callable[[CertificateLibraryRef], bool] | None = None,
         on_create_appearance: Callable[[], bool] | None = None,
         on_edit_appearance: Callable[[ReusableObjectRef], bool] | None = None,
         on_create: Callable[[], bool] | None = None,
@@ -120,6 +123,7 @@ class ReusableObjectLibraryDialog:
         self._on_toggle_certificate_pin = on_toggle_certificate_pin
         self._on_rename_certificate = on_rename_certificate
         self._on_delete_certificate = on_delete_certificate
+        self._on_configure_certificate = on_configure_certificate
         self._session = SignatureLibrarySession(
             library,
             certificate_catalog,
@@ -460,10 +464,24 @@ class ReusableObjectLibraryDialog:
 
     def _edit_selected_object(self) -> bool:
         selected = self._selected_object()
-        if selected is None or not isinstance(selected[0], ReusableObjectRef):
+        if selected is None:
             self._show_error("Select a reusable object before editing it.")
             return False
         ref, _name = selected
+        if isinstance(ref, CertificateLibraryRef):
+            row = self._session.selected_row()
+            if (
+                row is not None
+                and not row.configured
+                and ref.configuration_id is None
+                and self._on_configure_certificate is not None
+            ):
+                return self._on_configure_certificate(ref)
+            self._show_error("Select a retained certificate file to configure it.")
+            return False
+        if not isinstance(ref, ReusableObjectRef):
+            self._show_error("Select a reusable object before editing it.")
+            return False
         if ref.kind is ReusableObjectKind.APPEARANCE:
             if self._on_edit_appearance is None:
                 self._show_error("Appearance editing is not available.")
@@ -622,19 +640,32 @@ class ReusableObjectLibraryDialog:
         )
         _set_enabled(
             self.controls.edit_button,
-            is_reusable
-            and (
+            (
+                is_reusable
+                and (
                 (selected.ref.kind is ReusableObjectKind.PRESET and self._on_edit is not None)
                 or (
                     selected.ref.kind is ReusableObjectKind.APPEARANCE
                     and self._on_edit_appearance is not None
                 )
+                )
             ),
         )
-        if selected.ref.kind is ReusableObjectKind.APPEARANCE:
-            _set_text(self.controls.edit_button, "Edit appearance")
-        elif selected.ref.kind is ReusableObjectKind.PRESET:
-            _set_text(self.controls.edit_button, "Edit preset")
+        if isinstance(selected.ref, ReusableObjectRef):
+            if selected.ref.kind is ReusableObjectKind.APPEARANCE:
+                _set_text(self.controls.edit_button, "Edit appearance")
+            elif selected.ref.kind is ReusableObjectKind.PRESET:
+                _set_text(self.controls.edit_button, "Edit preset")
+        elif (
+            isinstance(selected.ref, CertificateLibraryRef)
+            and not selected.configured
+            and selected.ref.configuration_id is None
+        ):
+            _set_text(self.controls.edit_button, "Configure certificate")
+            _set_enabled(
+                self.controls.edit_button,
+                self._on_configure_certificate is not None,
+            )
 
     def _selected_object(
         self,

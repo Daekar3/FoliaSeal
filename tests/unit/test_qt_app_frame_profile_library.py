@@ -11,10 +11,11 @@ from foliaseal.application.reusable_signing_objects import (
     SavePlacement,
     SavePreset,
 )
+from foliaseal.application.signature_library_session import CertificateLibraryRef
 from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
 from foliaseal.presentation.qt.appearance_profile_editor_dialog import AppearanceProfileEditorDialog
 from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePresetEditorDialog
-from tests.support.signing_builders import build_signature_appearance
+from tests.support.signing_builders import build_certificate_catalog, build_signature_appearance
 from tests.unit.test_qt_signing_shell import _fake_bindings
 
 
@@ -224,3 +225,28 @@ def test_library_exposes_appearance_create_and_edit_actions() -> None:
     dialog.controls.object_selector.setCurrentIndex(0)
     dialog.controls.edit_button.click()
     assert edited == [service.view().appearances[0].ref.object_id]
+
+
+def test_library_exposes_configure_action_for_retained_certificate() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    configured: list[CertificateLibraryRef] = []
+    catalog = build_certificate_catalog(certificate_configurations=())
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=catalog,
+        on_configure_certificate=lambda ref: configured.append(ref) or True,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Certificates")
+    dialog.refresh()
+    dialog.controls.object_selector.setCurrentIndex(0)
+
+    assert dialog.controls.edit_button._text == "Configure certificate"
+    assert dialog.controls.edit_button._enabled is True
+    dialog.controls.edit_button.click()
+
+    assert configured == [CertificateLibraryRef("managed-cert-default")]

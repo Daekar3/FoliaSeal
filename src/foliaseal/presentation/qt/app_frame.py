@@ -11,6 +11,7 @@ from typing import Any
 
 from foliaseal.application import (
     CertificateManager,
+    ConfigureCertificateRequest,
     PlacementEditorState,
     ReusableSigningObjects,
     SigningDraftWorkflow,
@@ -806,6 +807,7 @@ class FoliaSealAppFrame:
             on_toggle_certificate_pin=self._toggle_certificate_pin,
             on_rename_certificate=self._rename_certificate,
             on_delete_certificate=self._delete_certificate,
+            on_configure_certificate=self._configure_certificate,
             on_create_appearance=self._open_appearance_profile_editor,
             on_edit_appearance=self._edit_appearance_profile,
             on_create=self._open_signature_preset_editor,
@@ -936,6 +938,51 @@ class FoliaSealAppFrame:
         except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
             self._emit_error(f"Unable to delete certificate: {exc}")
             return False
+
+    def _configure_certificate(self, ref: CertificateLibraryRef) -> bool:
+        """Create a signing configuration for a retained managed certificate file."""
+        if ref.configuration_id is not None:
+            self._emit_error("Certificate is already configured for signing.")
+            return False
+        catalog = self._certificate_catalog_store.load_catalog()
+        try:
+            certificate = catalog.managed_certificate_by_id(ref.object_id)
+        except KeyError:
+            self._emit_error("The retained certificate file is no longer available.")
+            return False
+        input_dialog = getattr(self._bindings, "q_input_dialog", None)
+        get_text = getattr(input_dialog, "getText", None)
+        if not callable(get_text):
+            self._emit_error("Certificate configuration naming is unavailable.")
+            return False
+        selected = get_text(
+            self.window,
+            "Configure certificate",
+            "Display name",
+        )
+        if isinstance(selected, tuple):
+            name, accepted = selected
+        else:
+            name, accepted = selected, True
+        if not accepted:
+            return False
+        try:
+            result = self._certificate_manager.configure_managed_certificate(
+                ConfigureCertificateRequest(
+                    managed_certificate_id=certificate.managed_certificate_id,
+                    display_name=str(name),
+                )
+            )
+        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            self._emit_error(f"Unable to configure certificate: {exc}")
+            return False
+        self._refresh_shell_certificate_configurations()
+        self._show_information(
+            f"Certificate configuration '{result.certificate_configuration.display_name}' created."
+            if result.certificate_configuration is not None
+            else "Certificate configured for signing."
+        )
+        return True
 
     def show_document_signatures(self) -> Any | None:
         """Open or refresh the one modeless Document Signatures surface."""
@@ -1452,6 +1499,11 @@ class FoliaSealAppFrame:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.window, "FoliaSeal", message)
+
+    def _show_information(self, message: str) -> None:
+        information = getattr(self._bindings.q_message_box, "information", None)
+        if callable(information):
+            information(self.window, "FoliaSeal", message)
 
     def _handle_status_change(self, status: str) -> None:
         if status == "navigation_changed":

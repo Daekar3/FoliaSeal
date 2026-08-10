@@ -55,6 +55,15 @@ class SaveConfigurationRequest:
 
 
 @dataclass(frozen=True)
+class ConfigureCertificateRequest:
+    """Create a signing configuration for an existing managed certificate file."""
+
+    managed_certificate_id: str
+    display_name: str
+    notes: str = ""
+
+
+@dataclass(frozen=True)
 class ExportCertificateRequest:
     certificate_id: str
     destination_path: str | Path
@@ -77,6 +86,7 @@ CertificateOperation = Literal[
     "created",
     "imported",
     "configuration_saved",
+    "configuration_created",
     "configuration_deleted",
     "managed_certificate_deleted",
     "exported",
@@ -246,6 +256,36 @@ class CertificateManager:
             catalog=self.store.save_configuration(updated),
             operation="configuration_saved",
             certificate_configuration=updated,
+        )
+
+    def configure_managed_certificate(
+        self,
+        request: ConfigureCertificateRequest,
+    ) -> CertificateOperationResult:
+        """Create a configuration for a retained managed certificate file."""
+        catalog = self.snapshot()
+        managed = catalog.managed_certificate_by_id(request.managed_certificate_id)
+        if any(
+            configuration.managed_certificate_id == managed.managed_certificate_id
+            for configuration in catalog.certificate_configurations
+        ):
+            raise ConfigValidationError("Managed certificate is already configured for signing.")
+        name = self._normalized_name(request.display_name)
+        self._ensure_unique_name(catalog, name)
+        configuration = CertificateConfiguration(
+            schema_version=1,
+            certificate_configuration_id=self._new_id(),
+            display_name=name,
+            managed_certificate_id=managed.managed_certificate_id,
+            save_password=False,
+            password_secret_ref=None,
+            notes=request.notes.strip() or None,
+        )
+        updated = self.store.save_configuration(configuration)
+        return CertificateOperationResult(
+            catalog=updated,
+            operation="configuration_created",
+            certificate_configuration=configuration,
         )
 
     def delete_configuration(self, configuration_id: str) -> CertificateOperationResult:

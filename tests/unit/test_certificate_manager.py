@@ -15,6 +15,7 @@ from foliaseal.application import (
     CertificateCatalog,
     CertificateManager,
     CertificateManagerError,
+    ConfigureCertificateRequest,
     CreateCertificateRequest,
     ExportCertificateRequest,
     ImportCertificateRequest,
@@ -174,6 +175,24 @@ def test_manager_inspects_import_without_mutating_catalog(tmp_path: Path) -> Non
     assert any("created locally" in warning for warning in inspection.warnings)
     assert store.load_catalog().managed_certificates == ()
     assert not store.managed_certificate_dir.exists()
+
+
+def test_manager_configures_retained_managed_certificate(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    store.save_catalog(build_certificate_catalog(certificate_configurations=()))
+    manager = _manager(store, ids=("config-retained",))
+
+    result = manager.configure_managed_certificate(
+        ConfigureCertificateRequest(
+            managed_certificate_id="managed-cert-default",
+            display_name="Retained signing",
+        )
+    )
+
+    assert result.operation == "configuration_created"
+    assert result.certificate_configuration is not None
+    assert result.certificate_configuration.managed_certificate_id == "managed-cert-default"
+    assert store.load_catalog().configuration_named("Retained signing")
 
 
 def test_manager_uses_atomic_repository_verb_without_path_properties() -> None:
