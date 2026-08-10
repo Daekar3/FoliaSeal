@@ -317,6 +317,7 @@ def _assemble_signing_workspace_composition(
         "on_keyboard_create": runtime.create_keyboard_placement,
         "on_keyboard_move": runtime.move_keyboard_placement,
         "on_keyboard_resize": runtime.resize_keyboard_placement,
+        "on_keyboard_recover": runtime.recover_keyboard_placement,
         "on_keyboard_apply": runtime.apply_keyboard_placement,
     }
     try:
@@ -328,6 +329,7 @@ def _assemble_signing_workspace_composition(
                 "on_keyboard_create",
                 "on_keyboard_move",
                 "on_keyboard_resize",
+                "on_keyboard_recover",
                 "on_keyboard_apply",
             )
         ):
@@ -335,6 +337,7 @@ def _assemble_signing_workspace_composition(
         viewer_kwargs.pop("on_keyboard_create", None)
         viewer_kwargs.pop("on_keyboard_move", None)
         viewer_kwargs.pop("on_keyboard_resize", None)
+        viewer_kwargs.pop("on_keyboard_recover", None)
         viewer_kwargs.pop("on_keyboard_apply", None)
         viewer_widget = viewer_widget_builder(**viewer_kwargs)
     set_viewer_mode = getattr(viewer_widget, "set_interaction_mode", None)
@@ -386,7 +389,10 @@ def _assemble_signing_workspace_composition(
             set_checkable(True)
     for button, tooltip in (
         (pan_button, "Pan the document viewer"),
-        (place_button, "Place or resize a visible signature"),
+        (
+            place_button,
+            "Place or resize a visible signature (Enter, Arrow, Ctrl+Arrow, Delete, M to recover)",
+        ),
     ):
         set_tooltip = getattr(button, "setToolTip", None)
         if callable(set_tooltip):

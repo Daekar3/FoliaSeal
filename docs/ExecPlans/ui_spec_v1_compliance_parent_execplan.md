@@ -258,6 +258,11 @@ Release tranche:
 - [x] (2026-08-10) Added pointer-only visible-page edge/center snapping with an 8-point threshold,
   Alt bypass, and rendered guide lines; keyboard/numeric edits remain exact and unsnapped. Focused
   coordinate/viewer validation is green; off-page recovery remains open.
+- [x] (2026-08-10) Added explicit off-page recovery through the typed application/runtime seam:
+  Place-mode `M` moves a non-oversized placement fully onto the visible page without scaling,
+  oversized rectangles report an actionable resize requirement, and red page-edge indicators make
+  crossing visible. Focused viewer/application/integration validation is green; the full suite is
+  `1314 passed, 20 skipped, 1 warning`. Numeric traversal remains open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

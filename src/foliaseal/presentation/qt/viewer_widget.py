@@ -57,6 +57,7 @@ class PdfViewerWidgetAdapter:
         on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
         on_keyboard_move: Callable[[float, float], SignatureRect | None] | None = None,
         on_keyboard_resize: Callable[[float, float], SignatureRect | None] | None = None,
+        on_keyboard_recover: Callable[[], SignatureRect | None] | None = None,
         on_keyboard_apply: Callable[[SignatureRect | None], SignatureRect | None] | None = None,
     ) -> Any:
         bindings = self._bindings
@@ -71,6 +72,7 @@ class PdfViewerWidgetAdapter:
                 self._on_keyboard_create = on_keyboard_create
                 self._on_keyboard_move = on_keyboard_move
                 self._on_keyboard_resize = on_keyboard_resize
+                self._on_keyboard_recover = on_keyboard_recover
                 self._on_keyboard_apply = on_keyboard_apply
                 self._pixmap: Any | None = None
                 self._scroll_container: Any | None = None
@@ -177,6 +179,12 @@ class PdfViewerWidgetAdapter:
                                 bindings.q_point(int(start[0]), int(start[1])),
                                 bindings.q_point(int(end[0]), int(end[1])),
                             )
+                        painter.setPen(bindings.q_pen(bindings.q_color(220, 38, 38), 3))
+                        for start, end in self._current_off_page_indicator_lines():
+                            draw_line(
+                                bindings.q_point(int(start[0]), int(start[1])),
+                                bindings.q_point(int(end[0]), int(end[1])),
+                            )
 
                     overlay_rect = self._current_overlay_qrect()
                     if overlay_rect is not None:
@@ -250,6 +258,22 @@ class PdfViewerWidgetAdapter:
                             self._placement_history.commit(rect)
                             self._overlay_signature_rect = rect
                             self.update()
+                    event.accept()
+                    return
+
+                recover_key = getattr(bindings.qt, "Key_M", None)
+                if (
+                    recover_key is not None
+                    and key == recover_key
+                    and self._interaction_mode == "signature"
+                    and self._overlay_signature_rect is not None
+                    and self._on_keyboard_recover is not None
+                ):
+                    rect = self._on_keyboard_recover()
+                    if rect is not None:
+                        self._placement_history.commit(rect)
+                        self._overlay_signature_rect = rect
+                        self.update()
                     event.accept()
                     return
 
@@ -650,6 +674,61 @@ class PdfViewerWidgetAdapter:
                             rotation=snapshot.rotation,
                         )
                     lines.append((start, end))
+                return tuple(lines)
+
+            def _current_off_page_indicator_lines(
+                self,
+            ) -> tuple[tuple[tuple[float, float], tuple[float, float]], ...]:
+                overlay = self._overlay_signature_rect
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if overlay is None or snapshot is None or overlay.page_index != snapshot.page_index:
+                    return ()
+                box = snapshot.page_box
+                edges: list[str] = []
+                if overlay.left_pt < box.left:
+                    edges.append("left-edge")
+                if overlay.left_pt + overlay.width_pt > box.right:
+                    edges.append("right-edge")
+                if overlay.bottom_pt < box.bottom:
+                    edges.append("bottom-edge")
+                if overlay.bottom_pt + overlay.height_pt > box.top:
+                    edges.append("top-edge")
+                lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
+                for edge in edges:
+                    if edge in {"left-edge", "right-edge"}:
+                        x = box.left if edge == "left-edge" else box.right
+                        start = (x, box.bottom)
+                        end = (x, box.top)
+                    else:
+                        y = box.bottom if edge == "bottom-edge" else box.top
+                        start = (box.left, y)
+                        end = (box.right, y)
+                    lines.append(
+                        (
+                            pdf_point_to_view(
+                                pdf_x=start[0],
+                                pdf_y=start[1],
+                                transform=ViewTransform(
+                                    zoom=snapshot.zoom,
+                                    pan_x=snapshot.pan_x,
+                                    pan_y=snapshot.pan_y,
+                                ),
+                                page_box=box,
+                                rotation=snapshot.rotation,
+                            ),
+                            pdf_point_to_view(
+                                pdf_x=end[0],
+                                pdf_y=end[1],
+                                transform=ViewTransform(
+                                    zoom=snapshot.zoom,
+                                    pan_x=snapshot.pan_x,
+                                    pan_y=snapshot.pan_y,
+                                ),
+                                page_box=box,
+                                rotation=snapshot.rotation,
+                            ),
+                        )
+                    )
                 return tuple(lines)
 
             def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
@@ -1229,6 +1308,7 @@ def build_qt_pdf_viewer_widget(
     on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
     on_keyboard_move: Callable[[float, float], SignatureRect | None] | None = None,
     on_keyboard_resize: Callable[[float, float], SignatureRect | None] | None = None,
+    on_keyboard_recover: Callable[[], SignatureRect | None] | None = None,
     on_keyboard_apply: Callable[[SignatureRect | None], SignatureRect | None] | None = None,
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
@@ -1242,6 +1322,7 @@ def build_qt_pdf_viewer_widget(
         on_keyboard_create=on_keyboard_create,
         on_keyboard_move=on_keyboard_move,
         on_keyboard_resize=on_keyboard_resize,
+        on_keyboard_recover=on_keyboard_recover,
         on_keyboard_apply=on_keyboard_apply,
     )
 

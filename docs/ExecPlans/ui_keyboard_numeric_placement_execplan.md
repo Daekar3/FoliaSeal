@@ -52,6 +52,11 @@ increments because they require additional geometry and focus seams.
   Keyboard and numeric operations never call the snap helper. Focused coordinate/viewer coverage is
   green (`63 passed`); the full suite is `1311 passed, 20 skipped, 1 warning`; off-page recovery
   remains open.
+- [x] (2026-08-10) Added off-page recovery: Place-mode `M` moves a non-oversized placement fully
+  onto the visible page without scaling, oversized placements explain that resize is required, and
+  red page-edge indicators remain visible while a placement crosses a page boundary. The focused
+  viewer/application/integration set is `54 passed`; the full suite is `1314 passed, 20 skipped,
+  1 warning`.
 - [ ] (2026-08-10) Add numeric-field traversal, snap/guides, and off-page recovery in subsequent
   increments; then perform final documentation/commit closeout for the whole child.
 

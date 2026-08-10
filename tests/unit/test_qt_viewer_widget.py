@@ -76,6 +76,7 @@ class _FakeQt:
     Key_Enter = 25
     Key_Delete = 26
     Key_Z = 27
+    Key_M = 28
     AltModifier = 1 << 2
     ControlModifier = 1 << 1
 
@@ -1018,6 +1019,36 @@ def test_external_numeric_edit_enters_placement_history(monkeypatch):
 
     assert preview._overlay_signature_rect == first
     assert applied == [first]
+
+
+def test_keyboard_recovery_moves_off_page_overlay_without_scaling(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    off_page = SignatureRect(
+        page_index=0,
+        left_pt=-30.0,
+        bottom_pt=90.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+    recovered = SignatureRect(
+        page_index=0,
+        left_pt=0.0,
+        bottom_pt=80.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+    applied = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_recover=lambda: (applied.append(recovered) or recovered),
+    )
+    preview.set_signature_overlay(off_page)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_M))
+
+    assert applied == [recovered]
+    assert preview._overlay_signature_rect == recovered
 
 
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):

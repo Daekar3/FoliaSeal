@@ -186,3 +186,47 @@ def test_resize_signature_rect_rejects_non_positive_dimensions_without_clamping(
 
     assert result.signature_rect is None
     assert result.error_message == "width_pt must be a positive finite number."
+
+
+def test_move_signature_rect_fully_onto_page_preserves_size_without_scaling() -> None:
+    workflow = _FakeViewerWorkflow(
+        snapshot=_FakeSnapshot(
+            page_index=0,
+            page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+            rotation=0,
+        )
+    )
+    session = ViewerInteractionSession(viewer_workflow=workflow)  # type: ignore[arg-type]
+
+    result = session.move_signature_rect_fully_onto_page(
+        SignatureRect(page_index=0, left_pt=-30.0, bottom_pt=90.0, width_pt=40.0, height_pt=20.0)
+    )
+
+    assert result.error_message is None
+    assert result.signature_rect == SignatureRect(
+        page_index=0,
+        left_pt=0.0,
+        bottom_pt=80.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+
+
+def test_move_signature_rect_fully_onto_page_rejects_oversized_without_scaling() -> None:
+    workflow = _FakeViewerWorkflow(
+        snapshot=_FakeSnapshot(
+            page_index=0,
+            page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+            rotation=0,
+        )
+    )
+    session = ViewerInteractionSession(viewer_workflow=workflow)  # type: ignore[arg-type]
+
+    result = session.move_signature_rect_fully_onto_page(
+        SignatureRect(page_index=0, left_pt=-30.0, bottom_pt=0.0, width_pt=140.0, height_pt=20.0)
+    )
+
+    assert result.signature_rect is None
+    assert result.error_message == (
+        "Placement is larger than the visible page; resize it before moving it onto the page."
+    )

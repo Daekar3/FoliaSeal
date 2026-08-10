@@ -179,6 +179,20 @@ class SigningWorkspaceRuntime:
             self.apply_signature_rect_placement(result.signature_rect)
         return result.signature_rect
 
+    def recover_keyboard_placement(self) -> SignatureRect | None:
+        current = self._draft_workflow.signature_rect
+        if current is None:
+            return None
+        result = self._viewer_interaction_session_required().move_signature_rect_fully_onto_page(
+            current
+        )
+        if result.error_message is not None:
+            self.emit_error(result.error_message)
+            return None
+        if result.signature_rect is not None:
+            self.apply_signature_rect_placement(result.signature_rect)
+        return result.signature_rect
+
     def apply_keyboard_placement(
         self, signature_rect: SignatureRect | None
     ) -> SignatureRect | None:

@@ -358,11 +358,24 @@ def test_keyboard_place_enter_and_shift_arrow_update_the_overlay() -> None:
         )
         return current[0]
 
+    def recover() -> SignatureRect:
+        rect = current[0]
+        assert rect is not None
+        current[0] = SignatureRect(
+            page_index=rect.page_index,
+            left_pt=0.0,
+            bottom_pt=rect.bottom_pt,
+            width_pt=rect.width_pt,
+            height_pt=rect.height_pt,
+        )
+        return current[0]
+
     viewer = build_qt_pdf_viewer_widget(
         workflow=workflow,
         on_keyboard_create=create,
         on_keyboard_move=move,
         on_keyboard_resize=resize,
+        on_keyboard_recover=recover,
         on_keyboard_apply=apply,
     )
     window = QMainWindow()
@@ -379,6 +392,16 @@ def test_keyboard_place_enter_and_shift_arrow_update_the_overlay() -> None:
         app.processEvents()
         assert current[0] is not None
         assert viewer.widget()._overlay_signature_rect == current[0]
+
+        QTest.keyClick(viewer.widget(), Qt.Key_Left, Qt.KeyboardModifier.ShiftModifier)
+        app.processEvents()
+        assert current[0] is not None
+        assert current[0].left_pt == -10.0
+
+        QTest.keyClick(viewer.widget(), Qt.Key_M)
+        app.processEvents()
+        assert current[0] is not None
+        assert current[0].left_pt == 0.0
 
         QTest.keyClick(viewer.widget(), Qt.Key_Right, Qt.KeyboardModifier.ShiftModifier)
         app.processEvents()

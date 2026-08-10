@@ -33,6 +33,7 @@ class ViewerKeyboardPlacementResult:
 
     signature_rect: SignatureRect | None
     error_message: str | None = None
+    recovery_edges: tuple[str, ...] = ()
 
 
 class ViewerInteractionSession:
@@ -153,6 +154,47 @@ class ViewerInteractionSession:
                     bottom_pt=signature_rect.bottom_pt,
                     width_pt=signature_rect.width_pt + delta_width_pt,
                     height_pt=signature_rect.height_pt + delta_height_pt,
+                )
+            )
+        except ValueError as exc:
+            return ViewerKeyboardPlacementResult(signature_rect=None, error_message=str(exc))
+
+    def move_signature_rect_fully_onto_page(
+        self,
+        signature_rect: SignatureRect,
+    ) -> ViewerKeyboardPlacementResult:
+        """Move an off-page placement onto the visible page without scaling it."""
+        context = self.current_placement_context().placement_context
+        if context is None:
+            return ViewerKeyboardPlacementResult(
+                signature_rect=None,
+                error_message="Unable to recover placement without visible page context.",
+            )
+        page_box = context.page_box
+        if signature_rect.width_pt > page_box.width or signature_rect.height_pt > page_box.height:
+            return ViewerKeyboardPlacementResult(
+                signature_rect=None,
+                error_message=(
+                    "Placement is larger than the visible page; resize it before moving it onto "
+                    "the page."
+                ),
+            )
+        left = min(
+            max(signature_rect.left_pt, page_box.left),
+            page_box.right - signature_rect.width_pt,
+        )
+        bottom = min(
+            max(signature_rect.bottom_pt, page_box.bottom),
+            page_box.top - signature_rect.height_pt,
+        )
+        try:
+            return ViewerKeyboardPlacementResult(
+                signature_rect=SignatureRect(
+                    page_index=context.page_index,
+                    left_pt=left,
+                    bottom_pt=bottom,
+                    width_pt=signature_rect.width_pt,
+                    height_pt=signature_rect.height_pt,
                 )
             )
         except ValueError as exc:
