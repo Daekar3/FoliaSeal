@@ -70,6 +70,7 @@ class _FakeQt:
     Key_Left = 20
     Key_Home = 21
     Key_End = 22
+    Key_Escape = 23
     ControlModifier = 1 << 1
 
     class KeyboardModifier:
@@ -574,6 +575,29 @@ def test_plain_click_does_not_emit_selection(monkeypatch):
     widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=30))
 
     assert selected == []
+
+
+def test_escape_cancels_unfinished_signature_drag_without_emitting_selection(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    class _WorkflowWithSelection:
+        def selection_to_pdf_rect(self, *, selection):
+            return selection
+
+    selected = []
+    widget = PdfViewerWidgetAdapter().create(
+        workflow=_WorkflowWithSelection(),
+        on_selection=selected.append,
+    )
+
+    widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=30))
+    widget.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=60, y=70))
+    widget.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Escape))
+    widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=60, y=70))
+
+    assert selected == []
+    assert widget._drag_origin is None
+    assert widget._selection_rect is None
 
 
 def test_overlay_corner_handle_resizes_persistent_signature_overlay(monkeypatch):

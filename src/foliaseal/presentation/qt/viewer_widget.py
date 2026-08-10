@@ -186,6 +186,22 @@ class PdfViewerWidgetAdapter:
             def keyPressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 key = event.key()
 
+                if key == bindings.qt.Key_Escape:
+                    if self._overlay_drag_handle is not None:
+                        self._reset_overlay_drag_state()
+                        self.update()
+                        event.accept()
+                        return
+                    if self._drag_origin is not None:
+                        self._drag_origin = None
+                        self._selection_rect = None
+                        self._emit_interaction("placement_drag_cancelled")
+                        self.update()
+                        event.accept()
+                        return
+                    super().keyPressEvent(event)
+                    return
+
                 if key in (
                     bindings.qt.Key_Plus,
                     bindings.qt.Key_Equal,

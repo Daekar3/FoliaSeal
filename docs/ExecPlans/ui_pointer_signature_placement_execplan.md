@@ -14,17 +14,22 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
-- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+- [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md (implemented; display-backed acceptance remains environment-limited)
+- [x] docs/ExecPlans/ui_first_use_preset_setup_execplan.md (bounded setup path implemented)
+- [x] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md (bounded readiness path implemented)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the existing pointer path and added a failing focused Escape-cancellation
+  contract; drag already crossed the typed viewer/session/workspace bridge.
+- [x] (2026-08-10) Implemented cancellation for unfinished placement and overlay-resize drags without
+  mutating the completed draft overlay; a completed pointer drag remains persistent across refreshes
+  and mode changes.
+- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft; no migrated consumer retirement
+  condition was proven in this narrow viewer edge, and no new phase3 nomenclature was introduced.
+- [x] (2026-08-10) Focused viewer/interaction and offscreen pointer integration validation passed
+  (`39 passed`); the full suite passed (`1295 passed, 20 skipped, 1 warning`), with GUI audit,
+  docs, and commit gates remaining.
 
 ## Surprises & Discoveries
 
@@ -43,7 +48,10 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The bounded pointer path was already present in the current viewer/session/bridge seams; this slice
+adds the missing Escape cancellation contract. Broader UI_SPEC mode-group topology (explicit Pan/
+Place buttons, keyboard placement, snap/guides, undo history, and off-page recovery) remains owned by
+the navigation/placement follow-up work and is not claimed here.
 
 ## Context and Orientation
 
@@ -137,5 +145,8 @@ walkthrough. The final behavior must be exercised by tests/unit/test_qt_viewer_w
 tests/unit/test_viewer_interaction_session.py, and that integration test. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
-Revision note: 2026-08-09 / Codex
-Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Completed the bounded pointer-placement cancellation increment after auditing the existing drag →
+page-local rectangle → typed workspace bridge. Broader mode-group and keyboard-placement behavior
+remains explicitly open; full validation, GUI audit, documentation reconciliation, and commit are
+the remaining gates.

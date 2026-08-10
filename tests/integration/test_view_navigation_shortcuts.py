@@ -195,3 +195,58 @@ def test_find_shortcut_focuses_and_selects_the_search_query() -> None:
         app.processEvents()
         if created_app:
             app.quit()
+
+
+def test_pointer_drag_creates_one_page_local_signature_rectangle_and_escape_cancels() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QMainWindow
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal-pointer-placement-test"])
+
+    backend = _RenderBackend()
+    workflow = ViewerWorkflow(
+        document_path="/tmp/pointer-placement-test.pdf",
+        render_backend=backend,
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    viewer = build_qt_pdf_viewer_widget(workflow=workflow, on_selection=selected.append)
+    window = QMainWindow()
+    window.resize(240, 240)
+    window.setCentralWidget(viewer)
+    viewer.refresh()
+    window.show()
+    viewer.widget().setFocus()
+    app.processEvents()
+
+    try:
+        QTest.mousePress(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(20, 20))
+        QTest.mouseMove(viewer.widget(), pos=QPoint(100, 100))
+        QTest.mouseRelease(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(100, 100))
+        app.processEvents()
+
+        assert len(selected) == 1
+        rect = selected[0].normalized()
+        assert rect.x1 >= 0.0
+        assert rect.y1 >= 0.0
+        assert rect.x2 <= 72.0
+        assert rect.y2 <= 72.0
+
+        QTest.mousePress(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(30, 30))
+        QTest.mouseMove(viewer.widget(), pos=QPoint(40, 40))
+        QTest.keyClick(viewer.widget(), Qt.Key_Escape)
+        QTest.mouseRelease(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(40, 40))
+        app.processEvents()
+        assert len(selected) == 1
+    finally:
+        window.close()
+        app.processEvents()
+        if created_app:
+            app.quit()
