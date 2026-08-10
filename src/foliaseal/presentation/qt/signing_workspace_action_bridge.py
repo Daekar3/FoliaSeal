@@ -63,6 +63,10 @@ class SigningWorkspaceActionBridge:
     def submit_sign_request(self) -> SigningRequest | None:
         if not self._confirm_signing_request():
             return None
+        if getattr(self._signing_action_boundary, "supports_async_transaction", False):
+            result = self._signing_action_boundary.begin_transaction()
+            self._apply_signing_action_state(result.state)
+            return result.request
         result = self._signing_action_boundary.submit()
         self._apply_signing_action_state(result.state)
         if (
@@ -71,6 +75,21 @@ class SigningWorkspaceActionBridge:
         ):
             self._clear_signature_history()
         return result.request
+
+    def poll_signing_transaction(self) -> Any | None:
+        """Deliver a completed worker result and refresh the rail on the Qt thread."""
+        result = self._signing_action_boundary.poll_transaction()
+        if result is None:
+            if getattr(self._signing_action_boundary, "supports_async_transaction", False):
+                self.reload_state()
+            return None
+        self._apply_signing_action_state(result.state)
+        if (
+            self._clear_signature_history is not None
+            and getattr(result.state.last_signing_result, "success", False)
+        ):
+            self._clear_signature_history()
+        return result
 
     def _confirm_signing_request(self) -> bool:
         apply_changes = getattr(self._setup_port, "apply_changes", None)

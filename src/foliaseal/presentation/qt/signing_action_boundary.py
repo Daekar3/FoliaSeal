@@ -10,7 +10,9 @@ from foliaseal.domain.models import SigningRequest
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
     SigningActionState,
+    SigningActionTransition,
 )
+from foliaseal.presentation.qt.signing_transaction_runner import SigningTransactionRunner
 
 
 class ErrorEmitter(Protocol):
@@ -40,12 +42,19 @@ class SigningActionBoundary:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
         on_open_signed_output: Callable[[str], None] | None = None,
+        transaction_runner: SigningTransactionRunner | None = None,
     ) -> None:
         self._coordinator = coordinator
         self._emit_error = emit_error
         self._on_error = on_error
         self._on_status_change = on_status_change
         self._on_open_signed_output = on_open_signed_output
+        self._transaction_runner = transaction_runner
+
+    @property
+    def supports_async_transaction(self) -> bool:
+        """Whether the boundary has an owned worker for the production Qt path."""
+        return self._transaction_runner is not None
 
     def load(self) -> SigningActionState:
         return self._coordinator.load()
@@ -75,12 +84,7 @@ class SigningActionBoundary:
         transition = self._coordinator.submit()
         if transition.status_event is not None and self._on_status_change is not None:
             self._on_status_change(transition.status_event)
-        if transition.error_message is not None:
-            if transition.error_via_emit:
-                if self._emit_error is not None:
-                    self._emit_error(transition.error_message)
-            elif self._on_error is not None:
-                self._on_error(transition.error_message)
+        self._emit_transition_error(transition)
         return SigningActionBoundaryResult(
             state=transition.state,
             request=transition.request,
@@ -88,6 +92,66 @@ class SigningActionBoundary:
             error_message=transition.error_message,
             error_via_emit=transition.error_via_emit,
         )
+
+    def begin_transaction(self) -> SigningActionBoundaryResult:
+        """Begin the production non-blocking signing transaction."""
+        transition = self._coordinator.begin()
+        worker_started = False
+        if transition.request is not None and self._transaction_runner is not None:
+            try:
+                self._transaction_runner.start(transition.request)
+                worker_started = True
+            except Exception as exc:
+                transition = self._coordinator.complete(error=exc)
+        if self._on_status_change is not None and worker_started:
+            self._on_status_change("sign_started")
+        if transition.status_event is not None and self._on_status_change is not None:
+            self._on_status_change(transition.status_event)
+        if transition.error_message is not None:
+            self._emit_transition_error(transition)
+        return SigningActionBoundaryResult(
+            state=transition.state,
+            request=transition.request,
+            error_message=transition.error_message,
+            error_via_emit=transition.error_via_emit,
+        )
+
+    def poll_transaction(self) -> SigningActionBoundaryResult | None:
+        """Deliver one worker terminal result on the caller's thread."""
+        runner = self._transaction_runner
+        if runner is None:
+            return None
+        completion = runner.poll_completion()
+        if completion is None:
+            return None
+        if isinstance(completion, BaseException):
+            transition = self._coordinator.complete(error=completion)
+        else:
+            transition = self._coordinator.complete(result=completion)
+        if transition.status_event is not None and self._on_status_change is not None:
+            self._on_status_change(transition.status_event)
+        self._emit_transition_error(transition)
+        return SigningActionBoundaryResult(
+            state=transition.state,
+            request=transition.request,
+            status_event=transition.status_event,
+            error_message=transition.error_message,
+            error_via_emit=transition.error_via_emit,
+        )
+
+    def close_transaction(self) -> None:
+        """Join and release the owned worker, if any."""
+        if self._transaction_runner is not None:
+            self._transaction_runner.close()
+
+    def _emit_transition_error(self, transition: SigningActionTransition) -> None:
+        if transition.error_message is None:
+            return
+        if transition.error_via_emit:
+            if self._emit_error is not None:
+                self._emit_error(transition.error_message)
+        elif self._on_error is not None:
+            self._on_error(transition.error_message)
 
     def open_signed_output(self) -> SigningActionBoundaryResult:
         output_path = self._coordinator.open_signed_output()

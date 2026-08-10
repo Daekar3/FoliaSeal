@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from time import monotonic
 from typing import Literal
 
 from foliaseal.application import format_signing_completion_message
@@ -38,6 +39,8 @@ class SigningActionState:
     last_signing_result: SigningResult | None
     last_successful_output_path: str | None
     can_open_signed_output: bool
+    transaction_active: bool = False
+    transaction_elapsed_seconds: float = 0.0
     recommended_action: RecommendedAction | None = None
     can_verify_again: bool = False
     can_return_to_draft: bool = False
@@ -91,6 +94,9 @@ class SigningActionCoordinator:
         self._result_kind: ResultKind = "neutral"
         self._recovery_timestamp_required = False
         self._recovery_trust_required = False
+        self._transaction_active = False
+        self._transaction_request: SigningRequest | None = None
+        self._transaction_started_at: float | None = None
 
     @property
     def last_signing_result(self) -> SigningResult | None:
@@ -118,7 +124,15 @@ class SigningActionCoordinator:
         self._clear_previous_signing_result()
         return self._build_state()
 
-    def submit(self) -> SigningActionTransition:
+    def begin(self) -> SigningActionTransition:
+        """Prepare one confirmed request and mark its non-cancellable transaction active."""
+        if self._transaction_active:
+            return SigningActionTransition(
+                request=self._transaction_request,
+                state=self._build_state(),
+                error_message="Signing is already in progress.",
+                error_via_emit=True,
+            )
         self._apply_changes()
         readiness = self._readiness()
         if not readiness.can_sign:
@@ -133,16 +147,30 @@ class SigningActionCoordinator:
         request = self._workflow.build_signing_request()
         if self._on_sign_request is not None:
             self._on_sign_request(request)
-
         if self._sign_executor is None:
             self._clear_previous_signing_result()
             return SigningActionTransition(request=request, state=self._build_state())
+        self._transaction_active = True
+        self._transaction_request = request
+        self._transaction_started_at = monotonic()
+        self._result_text = ""
+        self._result_kind = "neutral"
+        return SigningActionTransition(request=request, state=self._build_state())
 
-        try:
-            execute = getattr(self._sign_executor, "execute")
-            result = execute(request)
-        except Exception as exc:  # pragma: no cover - defensive integration guard
-            failure_message = f"Signing failed: {exc}"
+    def complete(
+        self,
+        result: SigningResult | None = None,
+        error: BaseException | None = None,
+    ) -> SigningActionTransition:
+        """Apply one worker terminal result on the caller's (Qt) thread."""
+        request = self._transaction_request
+        if not self._transaction_active or request is None:
+            raise RuntimeError("No signing transaction is active.")
+        self._transaction_active = False
+        self._transaction_request = None
+        self._transaction_started_at = None
+        if error is not None:
+            failure_message = f"Signing failed: {error}"
             self._last_signing_result = SigningResult(
                 success=False,
                 failure_code=None,
@@ -156,8 +184,29 @@ class SigningActionCoordinator:
                 state=self._build_state(),
                 error_message=failure_message,
                 error_via_emit=True,
+                status_event="sign_failure",
             )
+        if result is None:
+            raise ValueError("A signing result or error is required.")
+        return self._apply_result(request, result)
 
+    def submit(self) -> SigningActionTransition:
+        transition = self.begin()
+        request = transition.request
+        if request is None or not self._transaction_active:
+            return transition
+        try:
+            execute = getattr(self._sign_executor, "execute")
+            result = execute(request)
+        except Exception as exc:  # pragma: no cover - defensive integration guard
+            return self.complete(error=exc)
+        return self.complete(result=result)
+
+    def _apply_result(
+        self,
+        request: SigningRequest,
+        result: SigningResult,
+    ) -> SigningActionTransition:
         self._last_signing_result = result
         if result.success:
             self._workflow.mark_clean()
@@ -302,6 +351,11 @@ class SigningActionCoordinator:
 
     def _build_state(self) -> SigningActionState:
         readiness = self._readiness()
+        transaction_elapsed = (
+            max(0.0, monotonic() - self._transaction_started_at)
+            if self._transaction_active and self._transaction_started_at is not None
+            else 0.0
+        )
         can_sign = readiness.can_sign and (
             not self._untrusted_recovery
             or (self._preserved_artifact_verified and self._recovery_permission_allows)
@@ -313,7 +367,20 @@ class SigningActionCoordinator:
         )
         preserved_artifact_path = self._preserved_artifact_path()
         has_recovery_artifact = preserved_artifact_path is not None
-        if has_successful_output:
+        if self._transaction_active:
+            can_sign = False
+            if transaction_elapsed < 1.0:
+                stage_text = "Step 5 of 6 — Confirm and sign"
+                detail_text = readiness.detail
+            elif transaction_elapsed < 10.0:
+                stage_text = "Signing — preparing, writing, and verifying"
+                detail_text = "FoliaSeal is signing and verifying the PDF."
+            else:
+                stage_text = "Signing — still working"
+                detail_text = (
+                    "Signing is taking longer than expected; FoliaSeal is still working."
+                )
+        elif has_successful_output:
             stage_text = "Step 6 of 6 — Verify signed PDF"
             detail_text = (
                 "Open the signed PDF, review its local verification status, and keep any "
@@ -348,6 +415,8 @@ class SigningActionCoordinator:
                 self._last_successful_output_path is not None
                 and self._can_open_signed_output
             ),
+            transaction_active=self._transaction_active,
+            transaction_elapsed_seconds=transaction_elapsed,
             can_verify_again=(
                 has_recovery_artifact and self._verify_preserved_artifact is not None
             ),

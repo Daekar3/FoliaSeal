@@ -289,6 +289,7 @@ class SigningWorkspaceWidget:
         self._shell_controller.install_into(self)
         self._shell_controller.bootstrap()
         self._source_monitor_timer = None
+        self._transaction_timer = None
         if bindings.q_timer is not None:
             self._source_monitor_timer = bindings.q_timer(self.widget)
             timeout = getattr(self._source_monitor_timer, "timeout", None)
@@ -298,10 +299,23 @@ class SigningWorkspaceWidget:
             start = getattr(self._source_monitor_timer, "start", None)
             if callable(start):
                 start(1000)
+            if getattr(self._signing_action_boundary, "supports_async_transaction", False):
+                self._transaction_timer = bindings.q_timer(self.widget)
+                timeout = getattr(self._transaction_timer, "timeout", None)
+                connect = getattr(timeout, "connect", None)
+                if callable(connect):
+                    connect(self.poll_signing_transaction)
+                start = getattr(self._transaction_timer, "start", None)
+                if callable(start):
+                    start(100)
 
     def _dispose_composition(self) -> None:
         timer = getattr(self, "_source_monitor_timer", None)
         stop = getattr(timer, "stop", None)
+        if callable(stop):
+            stop()
+        transaction_timer = getattr(self, "_transaction_timer", None)
+        stop = getattr(transaction_timer, "stop", None)
         if callable(stop):
             stop()
         composition = getattr(self, "_composition_boundary", None)
@@ -358,6 +372,11 @@ class SigningWorkspaceWidget:
         if callable(reload_state):
             reload_state()
         self.refresh_source_safety()
+
+    def poll_signing_transaction(self) -> Any:
+        """Deliver a completed worker result through the Qt-owned action bridge."""
+        poll = getattr(getattr(self, "_action_bridge", None), "poll_signing_transaction", None)
+        return poll() if callable(poll) else None
 
     def setFocus(self) -> Any:  # noqa: N802
         """Focus the mounted Qt container for harness/session interactions."""

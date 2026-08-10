@@ -269,6 +269,40 @@ def test_signing_action_coordinator_success_tracks_signed_state(tmp_path: Path) 
     assert coordinator.open_signed_output() == workflow.output_pdf_path
 
 
+def test_signing_action_coordinator_begin_and_complete_preserve_non_cancellable_state(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    executor = _FakeSigningExecutor()
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        readiness=_readiness(workflow, ready=True, text=""),
+        sign_executor=executor,
+    )
+
+    started = coordinator.begin()
+
+    assert started.request is not None
+    assert started.state.transaction_active is True
+    assert started.state.can_sign is False
+    assert started.state.stage_text == "Step 5 of 6 — Confirm and sign"
+    assert "Signing is starting" not in started.state.detail_text
+    duplicate = coordinator.begin()
+    assert duplicate.error_message == "Signing is already in progress."
+
+    result = SigningResult(
+        success=True,
+        failure_code=None,
+        message="Signing completed successfully.",
+    )
+    completed = coordinator.complete(result=result)
+
+    assert completed.status_event == "sign_success"
+    assert completed.state.transaction_active is False
+    assert completed.state.last_signing_result == result
+
+
 def test_signing_action_coordinator_success_without_reopen_capability_has_no_recommended_action(
     tmp_path: Path,
 ) -> None:

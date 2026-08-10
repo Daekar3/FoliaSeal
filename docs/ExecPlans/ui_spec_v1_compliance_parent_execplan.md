@@ -136,6 +136,9 @@ Placement, preview, and signing tranche:
   now implemented by the readiness-caveats child, while the remaining full rail state machine
   remains with its owning children.
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
+- [x] docs/ExecPlans/ui_signing_transaction_progress_execplan.md — owned non-blocking worker,
+  Qt-thread completion polling, truthful delayed stage/calm copy, and non-cancellable cleanup are
+  implemented; crash journals/autosave remain out of scope.
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
   are committed; confirmation/source policy is now bounded in its follow-on child, while async
   recovery and package acceptance remain open.
@@ -391,6 +394,12 @@ Release tranche:
   Focused tests, real offscreen integration, and the full suite (`1428 passed, 20 skipped, 1 warning`)
   are green; display-backed acceptance remains environment-blocked by unavailable xcb `DISPLAY=:0`,
   and crash recovery remains a separate plan.
+- [x] (2026-08-10) Added the signing transaction-progress increment: the real Qt composition now
+  runs the injected executor on an owned worker, polls terminal completion on the Qt thread, shows
+  truthful delayed stage/long-running copy without percentages or cancellation, and joins workers
+  during disposal. Focused coverage, production-composition fake-Qt timer cleanup, and the real
+  offscreen timing test are green; full regression is `1435 passed, 20 skipped, 1 warning`.
+  Durable transaction journals/autosave remain open.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

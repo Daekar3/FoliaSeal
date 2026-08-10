@@ -49,6 +49,9 @@ from foliaseal.presentation.qt.signing_action_boundary import (
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
 )
+from foliaseal.presentation.qt.signing_transaction_runner import (
+    ThreadSigningTransactionRunner,
+)
 from foliaseal.presentation.qt.signing_workspace_action_bridge import (
     SigningWorkspaceActionBridge,
 )
@@ -637,6 +640,12 @@ def _assemble_signing_workspace_composition(
         can_copy_text=on_copy_text is not None,
         on_document_text_state_changed=refresh_text_selection_toolbar_state,
     )
+    transaction_runner = None
+    if sign_executor is not None and request.bindings.q_timer is not None:
+        execute = getattr(sign_executor, "execute", None)
+        if callable(execute):
+            transaction_runner = ThreadSigningTransactionRunner(execute)
+            register_disposable(transaction_runner)
     signing_action_coordinator = SigningActionCoordinator(
         workflow=signing_workflow,
         apply_changes=properties_panel.apply_changes,
@@ -655,6 +664,7 @@ def _assemble_signing_workspace_composition(
         on_error=on_error,
         on_status_change=on_status_change,
         on_open_signed_output=on_open_signed_output,
+        transaction_runner=transaction_runner,
     )
     action_bridge = SigningWorkspaceActionBridge(
         widget=widget,

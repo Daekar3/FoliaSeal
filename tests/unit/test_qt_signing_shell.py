@@ -1,4 +1,5 @@
 import inspect
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -117,6 +118,22 @@ class _FakeSignal:
     def emit(self, *args):
         for callback in list(self._callbacks):
             callback(*args)
+
+
+class _FakeTimer:
+    instances = []
+
+    def __init__(self, _parent=None) -> None:
+        self.timeout = _FakeSignal()
+        self.started = []
+        self.stop_calls = 0
+        type(self).instances.append(self)
+
+    def start(self, interval):
+        self.started.append(interval)
+
+    def stop(self):
+        self.stop_calls += 1
 
 
 class _FakeWidget:
@@ -1755,6 +1772,52 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     assert widget.sidebar_surface.flow_stage_label.text() == "Step 6 of 6 — Verify signed PDF"
     assert "review its local verification status" in widget.sidebar_surface.flow_detail_label.text()
     assert widget.sidebar_surface.open_signed_output_button._enabled is False
+
+
+def test_signing_shell_owns_async_transaction_timer_and_worker_cleanup(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = replace(_fake_bindings(), q_timer=_FakeTimer)
+    _FakeTimer.instances.clear()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    executor = _FakeSigningExecutor(
+        SigningResult(
+            success=True,
+            failure_code=None,
+            message="Signing completed successfully.",
+        )
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        sign_executor=executor,
+    )
+    widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    request = widget.submit_sign_request()
+
+    assert request is not None
+    assert widget._signing_action_boundary.load().transaction_active is True  # noqa: SLF001
+    for _ in range(100):
+        widget.poll_signing_transaction()
+        if widget.last_signing_result is not None:
+            break
+        __import__("time").sleep(0.01)
+    assert widget.last_signing_result is not None
+    assert any(timer.started == [1000] for timer in _FakeTimer.instances)
+    assert any(timer.started == [100] for timer in _FakeTimer.instances)
+
+    widget.close()
+    assert all(timer.stop_calls >= 1 for timer in _FakeTimer.instances)
 
 
 def test_signing_shell_shows_document_review_summary_from_injected_inspector(
