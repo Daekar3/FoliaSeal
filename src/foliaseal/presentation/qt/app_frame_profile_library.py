@@ -17,6 +17,7 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableSigningObjects,
     SetPinned,
 )
+from foliaseal.application.signature_image_import import ManagedSignatureImageStore
 from foliaseal.application.signature_library_session import (
     CertificateLibraryRef,
     LibraryCatalog,
@@ -121,6 +122,7 @@ class ReusableObjectLibraryDialog:
         on_edit: Callable[[ReusableObjectRef], bool] | None = None,
         on_create_placement: Callable[[], bool] | None = None,
         on_edit_placement: Callable[[PlacementProfile], bool] | None = None,
+        image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._bindings = bindings
         self._library = library
@@ -138,6 +140,7 @@ class ReusableObjectLibraryDialog:
         self._on_rename_certificate = on_rename_certificate
         self._on_delete_certificate = on_delete_certificate
         self._on_configure_certificate = on_configure_certificate
+        self._image_store = image_store
         self._session = SignatureLibrarySession(
             library,
             certificate_catalog,
@@ -545,6 +548,7 @@ class ReusableObjectLibraryDialog:
             on_saved=self._appearance_editor_saved,
             on_cancel_requested=self._appearance_editor_cancel_requested,
             on_error=self._show_error,
+            image_store=self._image_store,
         )
         self._appearance_editor = editor
         object.__setattr__(self.controls, "appearance_editor", editor)
@@ -585,6 +589,7 @@ class ReusableObjectLibraryDialog:
             on_reusable_objects_changed=self._notify_reusable_objects_changed,
             on_cancel_requested=self._preset_editor_cancel_requested,
             on_error=self._show_error,
+            image_store=self._image_store,
         )
         self._preset_editor = editor
         object.__setattr__(self.controls, "preset_editor", editor)
@@ -709,6 +714,8 @@ class ReusableObjectLibraryDialog:
         parent_draft_name = self._appearance_parent_draft_name
         editor = self._appearance_editor
         if editor is not None:
+            if saved_ref is None:
+                editor.discard_staged_images()
             editor_container = editor.controls.container
             remove_widget = getattr(self._appearance_editor_host_layout, "removeWidget", None)
             if callable(remove_widget):

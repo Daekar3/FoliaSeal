@@ -10,6 +10,7 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableObjectRef,
     ReusableSigningObjects,
 )
+from foliaseal.application.signature_image_import import ManagedSignatureImageStore
 from foliaseal.presentation.qt.appearance_profile_editor_widget import (
     AppearanceProfileEditorWidget,
 )
@@ -37,12 +38,14 @@ class AppearanceProfileEditorDialog:
         initial_ref: ReusableObjectRef | None = None,
         on_saved: Callable[[], None] | None = None,
         on_error: Callable[[str], None] | None = None,
+        image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._bindings = bindings
         self._library = library
         self._initial_ref = initial_ref
         self._on_saved = on_saved or (lambda: None)
         self._on_error = on_error or (lambda _message: None)
+        self._image_store = image_store
         self.controls = self._build_controls(parent)
 
     def open(self) -> bool:
@@ -75,8 +78,12 @@ class AppearanceProfileEditorDialog:
             library=self._library,
             initial_ref=self._initial_ref,
             on_saved=on_saved,
-            on_cancel_requested=lambda: getattr(dialog, "reject", lambda: None)(),
+            on_cancel_requested=lambda: (
+                widget.discard_staged_images(),
+                getattr(dialog, "reject", lambda: None)(),
+            ),
             on_error=self._on_error,
+            image_store=self._image_store,
         )
         layout.addWidget(widget.controls.container)
         return AppearanceProfileEditorControls(

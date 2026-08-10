@@ -13,6 +13,11 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableSigningObjects,
     SaveAppearance,
 )
+from foliaseal.application.signature_image_import import (
+    ManagedSignatureImageStore,
+    SignatureImageImportError,
+    SignatureImageOptimizationRequired,
+)
 from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
@@ -64,6 +69,7 @@ class AppearanceProfileEditorWidget:
         on_saved: Callable[[], None] | None = None,
         on_cancel_requested: Callable[[], None] | None = None,
         on_error: Callable[[str], None] | None = None,
+        image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._bindings = bindings
         self._library = library
@@ -72,11 +78,13 @@ class AppearanceProfileEditorWidget:
         self._on_saved = on_saved or (lambda: None)
         self._on_cancel_requested = on_cancel_requested or (lambda: None)
         self._on_error = on_error or (lambda _message: None)
+        self._image_store = image_store
         self._suspend_updates = True
         self._dirty = False
         self._saved_ref: ReusableObjectRef | None = None
         self._original_name = ""
         self._original_appearance = self._initial_appearance()
+        self._staged_image_paths: set[str] = set()
         self.controls = self._build_controls(parent)
         self._suspend_updates = False
         self._refresh_preview()
@@ -150,6 +158,7 @@ class AppearanceProfileEditorWidget:
             self._on_error(str(exc))
             return False
         self._saved_ref = self._library.resolve_name(ReusableObjectKind.APPEARANCE, name)
+        self._staged_image_paths.clear()
         self._dirty = False
         self._on_saved()
         return True
@@ -158,6 +167,19 @@ class AppearanceProfileEditorWidget:
         """Ask the owner to resolve Back/Cancel, preserving the draft until it decides."""
 
         self._on_cancel_requested()
+
+    def discard_staged_images(self) -> None:
+        """Delete normalized images created by this draft and not yet saved."""
+
+        if self._image_store is None:
+            self._staged_image_paths.clear()
+            return
+        for image_path in tuple(self._staged_image_paths):
+            try:
+                self._image_store.delete_managed_image(image_path)
+            except SignatureImageImportError as exc:
+                self._on_error(str(exc))
+        self._staged_image_paths.clear()
 
     def _initial_appearance(self) -> SignatureAppearance:
         if self._initial_ref is None:
@@ -201,6 +223,8 @@ class AppearanceProfileEditorWidget:
         setup_form = QtVisibleSignatureSetupForm(
             bindings=bindings,
             on_change=self._mark_dirty,
+            on_image_import=self._import_image,
+            on_image_remove=self._remove_image,
         )
         setup_form.load(
             VisibleSignatureSetupDraft(
@@ -249,6 +273,79 @@ class AppearanceProfileEditorWidget:
 
     def _on_name_changed(self, *_args: object) -> None:
         self._mark_dirty()
+
+    def _import_image(self) -> None:
+        if self._image_store is None:
+            self._on_error("Managed image storage is unavailable.")
+            return
+        file_dialog = getattr(self._bindings, "q_file_dialog", None)
+        chooser = getattr(file_dialog, "getOpenFileName", None)
+        if not callable(chooser):
+            self._on_error("Image selection is unavailable in this environment.")
+            return
+        selected = chooser(
+            self.controls.container,
+            "Choose signature image",
+            "",
+            "Signature images (*.png *.jpg *.jpeg *.gif)",
+        )
+        source = selected[0] if isinstance(selected, tuple) else selected
+        source_text = str(source).strip()
+        if not source_text:
+            return
+        preserve_alpha = self.controls.setup_form.build_draft().appearance.preserve_image_alpha
+        try:
+            try:
+                managed_path = self._image_store.import_image(
+                    source_text,
+                    preserve_alpha=preserve_alpha,
+                )
+            except SignatureImageOptimizationRequired as exc:
+                if not self._confirm_image_optimization(exc):
+                    return
+                managed_path = self._image_store.import_image(
+                    source_text,
+                    preserve_alpha=preserve_alpha,
+                    allow_optimization=True,
+                )
+        except SignatureImageImportError as exc:
+            self._on_error(str(exc))
+            return
+        current_path = self.controls.setup_form.build_draft().appearance.image_stamp_path
+        if current_path is not None and current_path in self._staged_image_paths:
+            try:
+                self._image_store.delete_managed_image(current_path)
+            except SignatureImageImportError as exc:
+                self._on_error(str(exc))
+                return
+            self._staged_image_paths.discard(current_path)
+        self.controls.setup_form.set_image_stamp_path(str(managed_path))
+        self._staged_image_paths.add(str(managed_path))
+
+    def _confirm_image_optimization(self, error: SignatureImageOptimizationRequired) -> bool:
+        message_box = getattr(self._bindings, "q_message_box", None)
+        question = getattr(message_box, "question", None)
+        yes = getattr(message_box, "Yes", None)
+        if not callable(question):
+            self._on_error(str(error))
+            return False
+        result = question(
+            self.controls.container,
+            "Optimize signature image?",
+            "This image is larger than 2048 pixels on one edge. Optimize a managed copy?",
+        )
+        return result == yes
+
+    def _remove_image(self) -> None:
+        current_path = self.controls.setup_form.build_draft().appearance.image_stamp_path
+        if current_path is not None and current_path in self._staged_image_paths:
+            if self._image_store is not None:
+                try:
+                    self._image_store.delete_managed_image(current_path)
+                except SignatureImageImportError as exc:
+                    self._on_error(str(exc))
+            self._staged_image_paths.discard(current_path)
+        self.controls.setup_form.set_image_stamp_path(None)
 
     def _mark_dirty(self) -> None:
         if self._suspend_updates:

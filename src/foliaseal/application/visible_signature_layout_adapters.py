@@ -136,6 +136,7 @@ class PyHankoSignatureAppearanceAdapter:
             stamp_aspect_ratio=(
                 None if layout_plan.stamp_image is None else layout_plan.stamp_image.aspect_ratio
             ),
+            image_prominence=appearance.image_prominence,
         )
 
 

@@ -22,6 +22,7 @@ from foliaseal.domain.models import (
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
     SignatureStampPosition,
@@ -173,6 +174,8 @@ def _serialize_appearance(value: SignatureAppearance) -> dict[str, Any]:
         "signer_label_prefix": value.signer_label_prefix,
         "layout_template": value.layout_template.value,
         "stamp_position": value.stamp_position.value,
+        "image_prominence": value.image_prominence.value,
+        "preserve_image_alpha": value.preserve_image_alpha,
         "timezone_display_mode": value.timezone_display_mode.value,
         "show_field_names": value.show_field_names,
         "datetime_format": value.datetime_format,
@@ -202,6 +205,13 @@ def _deserialize_appearance(payload: dict[str, Any]) -> SignatureAppearance:
         layout_template=_require_enum(payload, "layout_template", SignatureLayoutTemplate),  # type: ignore[arg-type]
         stamp_position=_optional_enum(payload, "stamp_position", SignatureStampPosition)
         or SignatureStampPosition.TOP,
+        image_prominence=_optional_enum(payload, "image_prominence", SignatureImageProminence)
+        or SignatureImageProminence.PRIMARY,
+        preserve_image_alpha=(
+            _require_bool(payload, "preserve_image_alpha")
+            if "preserve_image_alpha" in payload
+            else True
+        ),
         timezone_display_mode=_require_enum(
             payload, "timezone_display_mode", SignatureTimezoneDisplayMode
         ),  # type: ignore[arg-type]

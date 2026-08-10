@@ -37,6 +37,7 @@ from foliaseal.application.visible_signature_semantics import (
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldKey,
+    SignatureImageProminence,
     SignaturePlacementDefaults,
     SignatureRect,
     SignatureTimezoneDisplayMode,
@@ -518,6 +519,14 @@ class SigningDraftWorkflow:
             text_style=appearance.text_style if appearance else None,
             box_style=appearance.box_style if appearance else None,
             image_stamp_path=appearance.image_stamp_path if appearance else None,
+            image_prominence=(
+                appearance.image_prominence
+                if appearance is not None
+                else SignatureImageProminence.PRIMARY
+            ),
+            preserve_image_alpha=(
+                appearance.preserve_image_alpha if appearance is not None else True
+            ),
             fields=fields,
             detail_text=detail_text,
             issues=issues,

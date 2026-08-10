@@ -66,6 +66,14 @@ class SignatureStampPosition(str, Enum):  # noqa: UP042
     RIGHT = "right"
 
 
+class SignatureImageProminence(str, Enum):  # noqa: UP042
+    """How much of the primary content axis the stamp image reserves."""
+
+    SUPPORTING = "supporting"
+    BALANCED = "balanced"
+    PRIMARY = "primary"
+
+
 class SignatureTimezoneDisplayMode(str, Enum):  # noqa: UP042
     """How signing-time timestamps should be displayed."""
 
@@ -349,6 +357,8 @@ class SignatureAppearance:
     signer_label_prefix: str = "Digitally signed by"
     layout_template: SignatureLayoutTemplate = SignatureLayoutTemplate.SINGLE_LINE
     stamp_position: SignatureStampPosition = SignatureStampPosition.TOP
+    image_prominence: SignatureImageProminence = SignatureImageProminence.PRIMARY
+    preserve_image_alpha: bool = True
     timezone_display_mode: SignatureTimezoneDisplayMode = SignatureTimezoneDisplayMode.UTC
     show_field_names: bool = False
     datetime_format: str = "%Y-%m-%d %H:%M:%S %Z"
@@ -384,6 +394,13 @@ class SignatureAppearance:
             raise ValueError("layout_template must be a SignatureLayoutTemplate value.")
         if not isinstance(self.stamp_position, SignatureStampPosition):
             raise ValueError("stamp_position must be a SignatureStampPosition value.")
+        if not isinstance(self.image_prominence, SignatureImageProminence):
+            raise ValueError("image_prominence must be a SignatureImageProminence value.")
+        object.__setattr__(
+            self,
+            "preserve_image_alpha",
+            _require_bool(self.preserve_image_alpha, "preserve_image_alpha"),
+        )
         if not isinstance(self.timezone_display_mode, SignatureTimezoneDisplayMode):
             raise ValueError(
                 "timezone_display_mode must be a SignatureTimezoneDisplayMode value."

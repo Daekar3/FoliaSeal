@@ -444,7 +444,13 @@ class _FakeInputDialog:
 class _FakeFileDialog:
     def __init__(self) -> None:
         self.save_calls = []
+        self.open_calls = []
+        self.next_open_file_name = ""
         self.next_save_file_name = ""
+
+    def getOpenFileName(self, parent, title, directory, file_filter):  # noqa: N802
+        self.open_calls.append((parent, title, directory, file_filter))
+        return (self.next_open_file_name, file_filter)
 
     def getSaveFileName(self, parent, title, directory, file_filter):  # noqa: N802
         self.save_calls.append((parent, title, directory, file_filter))
@@ -2849,7 +2855,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
-        == 8
+        == 10
     )
     assert widget.properties_panel._placement_controls.container.parent is None
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"

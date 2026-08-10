@@ -30,6 +30,7 @@ from foliaseal.application.visible_signature_layout_adapters import (
 )
 from foliaseal.domain.models import (
     SignatureBoxStyle,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -226,6 +227,69 @@ def test_plan_reserves_text_and_stamp_areas_for_horizontal_image_stamp() -> None
     assert plan.fit_issues == ()
     assert plan.text_layout.x_align == "ALIGN_MAX"
     assert plan.stamp_layout.x_align == "ALIGN_MIN"
+
+
+@pytest.mark.parametrize(
+    ("prominence", "expected_fraction"),
+    [
+        (SignatureImageProminence.SUPPORTING, 0.35),
+        (SignatureImageProminence.BALANCED, 0.55),
+        (SignatureImageProminence.PRIMARY, 0.75),
+    ],
+)
+def test_layout_request_allocates_explicit_image_prominence(
+    prominence: SignatureImageProminence,
+    expected_fraction: float,
+) -> None:
+    plan = _engine(text_width=40, text_height=12).plan(
+        LayoutRequest(
+            signature_rect=SignatureRect(
+                page_index=0,
+                left_pt=0,
+                bottom_pt=0,
+                width_pt=300,
+                height_pt=100,
+            ),
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.LEFT,
+            text_style=SignatureTextStyle(font_family="Serif", font_size_pt=8.5),
+            box_style=_box_style(),
+            stamp_text="Signed by Ada",
+            image_stamp_path="stamp.png",
+            image_prominence=prominence,
+        )
+    )
+
+    available = plan.text_area_width_pt + plan.stamp_area_width_pt
+    actual_fraction = plan.stamp_area_width_pt / available
+    assert actual_fraction == pytest.approx(expected_fraction, abs=0.03)
+
+
+def test_layout_request_image_only_uses_the_available_content_area() -> None:
+    plan = _engine().plan(
+        LayoutRequest(
+            signature_rect=SignatureRect(
+                page_index=0,
+                left_pt=0,
+                bottom_pt=0,
+                width_pt=300,
+                height_pt=100,
+            ),
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            text_style=SignatureTextStyle(font_family="Serif", font_size_pt=8.5),
+            box_style=_box_style(),
+            stamp_text=" ",
+            image_stamp_path="stamp.png",
+            image_prominence=SignatureImageProminence.PRIMARY,
+        )
+    )
+
+    assert plan.text_box == TextMetrics(width_pt=0, height_pt=0, line_count=0)
+    assert plan.text_area_width_pt == 292
+    assert plan.text_area_height_pt == 0
+    assert plan.stamp_area_height_pt == 92
+    assert plan.fit_issues == ()
 
 
 def test_single_line_no_stamp_gives_usable_area_to_text_and_zero_stamp_area() -> None:

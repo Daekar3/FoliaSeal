@@ -10,6 +10,7 @@ from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -93,6 +94,8 @@ class SigningDraftPreview:
     issues: tuple[SigningDraftValidationIssue, ...]
     can_submit: bool
     stamp_text: str | None = None
+    image_prominence: SignatureImageProminence | None = None
+    preserve_image_alpha: bool = True
 
 
 __all__ = [

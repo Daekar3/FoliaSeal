@@ -5,6 +5,7 @@ from foliaseal.application.signature_properties_coordinator import (
 from foliaseal.domain.models import (
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureTextStyle,
 )
 from foliaseal.presentation.qt import visible_signature_setup_form as form_module
@@ -56,6 +57,9 @@ def test_setup_form_loads_visible_signature_draft_into_controls() -> None:
     assert form.appearance_controls.border_show.isChecked() is True
     assert form.appearance_controls.border_color.text() == "#333333"
     assert form.appearance_controls.background_color.text() == "#FFFFFF"
+    assert form.appearance_controls.image_path_label.text() == "/tmp/stamp.png"
+    assert form.appearance_controls.image_prominence.currentText() == "Primary"
+    assert form.appearance_controls.preserve_image_alpha.isChecked() is True
     assert not hasattr(form.appearance_controls, "image_stamp_path")
 
 
@@ -156,6 +160,35 @@ def test_setup_form_preserves_hidden_loaded_appearance_values_on_rebuild() -> No
     assert draft.appearance.datetime_format == "custom-format"
     assert draft.appearance.image_stamp_path == "/tmp/stamp.png"
     assert draft.appearance.box_style == appearance.box_style
+
+
+def test_setup_form_round_trips_changed_image_and_text_controls() -> None:
+    form = QtVisibleSignatureSetupForm(bindings=_fake_bindings())
+    form.load(
+        VisibleSignatureSetupDraft(
+            appearance=build_signature_appearance(image_stamp_path=None),
+            placement=VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=48.0,
+                enabled=False,
+            ),
+        )
+    )
+
+    form.appearance_controls.text_color.setText("#AABBCC")
+    form.appearance_controls.image_prominence.setCurrentText("Balanced")
+    form.appearance_controls.preserve_image_alpha.setChecked(False)
+    form.set_image_stamp_path("/managed/signature.png")
+
+    appearance = form.build_draft().appearance
+
+    assert appearance.text_style.text_color_hex == "#AABBCC"
+    assert appearance.image_stamp_path == "/managed/signature.png"
+    assert appearance.image_prominence is SignatureImageProminence.BALANCED
+    assert appearance.preserve_image_alpha is False
 
 
 def test_setup_form_disables_unsupported_font_styles() -> None:

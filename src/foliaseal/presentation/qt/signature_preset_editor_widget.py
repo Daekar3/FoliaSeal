@@ -14,6 +14,7 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableSigningObjects,
     SavePreset,
 )
+from foliaseal.application.signature_image_import import ManagedSignatureImageStore
 from foliaseal.infra.config.schemas import ConfigValidationError
 from foliaseal.presentation.qt.appearance_profile_editor_widget import (
     AppearanceProfileEditorWidget,
@@ -63,6 +64,7 @@ class SignaturePresetEditorWidget:
         on_reusable_objects_changed: Callable[[], None] | None = None,
         on_cancel_requested: Callable[[], bool] | None = None,
         on_error: Callable[[str], None] | None = None,
+        image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._bindings = bindings
         self._library = library
@@ -73,6 +75,7 @@ class SignaturePresetEditorWidget:
         self._on_reusable_objects_changed = on_reusable_objects_changed or (lambda: None)
         self._on_cancel_requested = on_cancel_requested or (lambda: True)
         self._on_error = on_error or (lambda _message: None)
+        self._image_store = image_store
         self._suspend_updates = True
         self._dirty = False
         self._saved_ref: ReusableObjectRef | None = None
@@ -348,6 +351,7 @@ class SignaturePresetEditorWidget:
             on_saved=self._appearance_child_saved,
             on_cancel_requested=self._appearance_child_cancel_requested,
             on_error=self._on_error,
+            image_store=self._image_store,
         )
         self._appearance_child = child
         self.controls.child_host.setVisible(True)
@@ -371,6 +375,7 @@ class SignaturePresetEditorWidget:
     def _leave_appearance_child(self) -> None:
         child = self._appearance_child
         if child is not None:
+            child.discard_staged_images()
             remove_widget = getattr(self.controls.child_host.layout, "removeWidget", None)
             if callable(remove_widget):
                 remove_widget(child.controls.container)

@@ -19,6 +19,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import SavePlacement
+from foliaseal.application.signature_image_import import ManagedSignatureImageStore
 from foliaseal.application.signature_library_session import (
     CertificateLibraryRef,
 )
@@ -345,6 +346,9 @@ class FoliaSealAppFrame:
             )
         )
         self._preset_catalog_store = preset_catalog_store or SignaturePresetCatalogStore.default()
+        self._signature_image_store = ManagedSignatureImageStore(
+            self._preset_catalog_store.storage_dir
+        )
         self._certificate_manager = certificate_manager or (
             CertificateManager(
                 store=self._certificate_catalog_store,
@@ -837,6 +841,7 @@ class FoliaSealAppFrame:
             on_configure_certificate=self._configure_certificate,
             on_create_placement=self._open_placement_profile_editor,
             on_edit_placement=self._edit_placement_profile,
+            image_store=self._signature_image_store,
         )
         self._dialog_compatibility = AppFrameDialogCompatibilityState(
             settings_dialog=self.settings_dialog,

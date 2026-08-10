@@ -28,6 +28,7 @@ from foliaseal.domain.models import (
     SignatureBoxStyle,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -111,6 +112,8 @@ class SigningBackendAppearance:
     text_style: SignatureTextStyle
     box_style: SignatureBoxStyle
     image_stamp_path: str | None = None
+    image_prominence: SignatureImageProminence | None = None
+    preserve_image_alpha: bool = True
 
     @classmethod
     def from_signature_appearance(
@@ -138,6 +141,12 @@ class SigningBackendAppearance:
             text_style=appearance.text_style,
             box_style=appearance.box_style,
             image_stamp_path=appearance.image_stamp_path,
+            image_prominence=(
+                None
+                if appearance.image_prominence is SignatureImageProminence.PRIMARY
+                else appearance.image_prominence
+            ),
+            preserve_image_alpha=appearance.preserve_image_alpha,
         )
 
 

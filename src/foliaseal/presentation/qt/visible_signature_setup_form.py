@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from foliaseal.application.signature_font_registry import validate_signature_font_request
@@ -17,6 +17,7 @@ from foliaseal.domain.models import (
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureStampPosition,
     SignatureTextStyle,
@@ -64,6 +65,11 @@ class AppearanceControls:
     bold: Any
     italic: Any
     show_field_names: Any
+    image_path_label: Any
+    browse_image_button: Any
+    remove_image_button: Any
+    image_prominence: Any
+    preserve_image_alpha: Any
     datetime_format: Any
     field_order: Any
     move_field_up: Any
@@ -107,12 +113,15 @@ def _compose_row(bindings: Any, *widgets: Any) -> Any:
 def _enum_display_text(
     value: SignatureLayoutTemplate
     | SignatureStampPosition
+    | SignatureImageProminence
     | SignatureTimezoneDisplayMode
     | str,
 ) -> str:
     if isinstance(value, SignatureTimezoneDisplayMode):
         return "UTC" if value == SignatureTimezoneDisplayMode.UTC else "Local"
     if isinstance(value, SignatureStampPosition):
+        return value.value.replace("_", " ").title()
+    if isinstance(value, SignatureImageProminence):
         return value.value.replace("_", " ").title()
     if isinstance(value, SignatureLayoutTemplate):
         return value.value.replace("_", " ").title()
@@ -137,6 +146,7 @@ def _enum_combo_items(
     enum_cls: type[
         SignatureLayoutTemplate
         | SignatureStampPosition
+        | SignatureImageProminence
         | SignatureTimezoneDisplayMode
     ],
 ) -> tuple[str, ...]:
@@ -272,10 +282,14 @@ class QtVisibleSignatureSetupForm:
         bindings: Any,
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
+        on_image_import: Callable[[], None] | None = None,
+        on_image_remove: Callable[[], None] | None = None,
     ) -> None:
         self._bindings = bindings
         self._on_change = on_change
         self._on_page_change = on_page_change
+        self._on_image_import = on_image_import
+        self._on_image_remove = on_image_remove
         self._suspend_updates = False
         self._placement_enabled = False
         self._field_order = SIGNATURE_FIELD_DISPLAY_ORDER
@@ -342,6 +356,16 @@ class QtVisibleSignatureSetupForm:
             setter = getattr(widget, "setEnabled", None)
             if callable(setter):
                 setter(bool(editable))
+
+    def set_image_stamp_path(self, image_path: str | None) -> None:
+        """Update only the isolated draft's managed image path."""
+
+        self._appearance_template = replace(
+            self._appearance_template,
+            image_stamp_path=image_path,
+        )
+        self._set_image_path_label(image_path)
+        self._on_any_control_changed()
 
     def _build_placement_controls(self) -> PlacementControls:
         bindings = self._bindings
@@ -488,6 +512,14 @@ class QtVisibleSignatureSetupForm:
         bold = bindings.q_check_box("Bold")
         italic = bindings.q_check_box("Italic")
         show_field_names = bindings.q_check_box("Show field names")
+        image_path_label = bindings.q_label("No image selected")
+        if hasattr(image_path_label, "setWordWrap"):
+            image_path_label.setWordWrap(True)
+        browse_image_button = bindings.q_push_button("Browse…")
+        remove_image_button = bindings.q_push_button("Remove")
+        image_prominence = bindings.q_combo_box()
+        image_prominence.addItems(_enum_combo_items(SignatureImageProminence))
+        preserve_image_alpha = bindings.q_check_box("Preserve transparency")
         field_order = bindings.q_combo_box()
         field_order.addItems(
             tuple(_field_order_label(key) for key in SIGNATURE_FIELD_DISPLAY_ORDER)
@@ -523,6 +555,14 @@ class QtVisibleSignatureSetupForm:
             _compose_row(bindings, bold, italic, show_field_names),
         )
         text_layout.addRow(
+            "Image",
+            _compose_row(bindings, image_path_label, browse_image_button, remove_image_button),
+        )
+        text_layout.addRow(
+            "Image prominence",
+            _compose_row(bindings, image_prominence, preserve_image_alpha),
+        )
+        text_layout.addRow(
             "Field order",
             _compose_row(bindings, field_order, move_field_up, move_field_down),
         )
@@ -546,6 +586,8 @@ class QtVisibleSignatureSetupForm:
             bold,
             italic,
             show_field_names,
+            image_prominence,
+            preserve_image_alpha,
             datetime_format,
             field_order,
             text_color,
@@ -557,6 +599,8 @@ class QtVisibleSignatureSetupForm:
             self._connect_change_signal(control)
         move_field_up.clicked.connect(self._move_field_up)  # type: ignore[attr-defined]
         move_field_down.clicked.connect(self._move_field_down)  # type: ignore[attr-defined]
+        browse_image_button.clicked.connect(self._request_image_import)  # type: ignore[attr-defined]
+        remove_image_button.clicked.connect(self._request_image_remove)  # type: ignore[attr-defined]
 
         return AppearanceControls(
             container=container,
@@ -570,6 +614,11 @@ class QtVisibleSignatureSetupForm:
             bold=bold,
             italic=italic,
             show_field_names=show_field_names,
+            image_path_label=image_path_label,
+            browse_image_button=browse_image_button,
+            remove_image_button=remove_image_button,
+            image_prominence=image_prominence,
+            preserve_image_alpha=preserve_image_alpha,
             datetime_format=datetime_format,
             field_order=field_order,
             move_field_up=move_field_up,
@@ -678,6 +727,15 @@ class QtVisibleSignatureSetupForm:
         )
         _set_combo_text(self._appearance_controls.datetime_format, format_label, allow_custom=True)
         _set_checked(self._appearance_controls.show_field_names, appearance.show_field_names)
+        self._set_image_path_label(appearance.image_stamp_path)
+        _set_combo_text(
+            self._appearance_controls.image_prominence,
+            _enum_display_text(appearance.image_prominence),
+        )
+        _set_checked(
+            self._appearance_controls.preserve_image_alpha,
+            appearance.preserve_image_alpha,
+        )
         _set_combo_text(
             self._appearance_controls.field_order,
             _field_order_label(appearance.field_order[0]),
@@ -710,7 +768,7 @@ class QtVisibleSignatureSetupForm:
             font_size_pt=_spin_value(self._appearance_controls.font_size),
             bold=_is_checked(self._appearance_controls.bold),
             italic=_is_checked(self._appearance_controls.italic),
-            text_color_hex=preserved.text_style.text_color_hex,
+            text_color_hex=_text(self._appearance_controls.text_color),
         )
         box_style = SignatureBoxStyle(
             show_border=_is_checked(self._appearance_controls.border_show),
@@ -733,6 +791,11 @@ class QtVisibleSignatureSetupForm:
                 _combo_text(self._appearance_controls.stamp_position),
                 SignatureStampPosition,
             ),
+            image_prominence=_selected_enum(
+                _combo_text(self._appearance_controls.image_prominence),
+                SignatureImageProminence,
+            ),
+            preserve_image_alpha=_is_checked(self._appearance_controls.preserve_image_alpha),
             timezone_display_mode=_selected_enum(
                 _combo_text(self._appearance_controls.timezone_display_mode),
                 SignatureTimezoneDisplayMode,
@@ -752,6 +815,22 @@ class QtVisibleSignatureSetupForm:
             box_style=box_style,
             image_stamp_path=preserved.image_stamp_path,
         )
+
+    def _set_image_path_label(self, image_path: str | None) -> None:
+        _set_text(
+            self._appearance_controls.image_path_label,
+            "No image selected" if image_path is None else str(image_path),
+        )
+
+    def _request_image_import(self) -> None:
+        if self._on_image_import is not None:
+            self._on_image_import()
+
+    def _request_image_remove(self) -> None:
+        if self._on_image_remove is not None:
+            self._on_image_remove()
+        else:
+            self.set_image_stamp_path(None)
 
     def _datetime_format_value(self) -> str:
         selected = _combo_text(self._appearance_controls.datetime_format)

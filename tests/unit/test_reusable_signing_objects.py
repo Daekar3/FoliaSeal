@@ -6,6 +6,7 @@ import pytest
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
     PlacementProfileSourcePage,
+    _deserialize_appearance,
     _serialize_appearance,
 )
 from foliaseal.application.reusable_signing_objects import (
@@ -19,6 +20,7 @@ from foliaseal.application.reusable_signing_objects import (
     SavePreset,
     SetPinned,
 )
+from foliaseal.domain.models import SignatureImageProminence
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import ConfigValidationError
 from tests.support.signing_builders import build_signature_appearance
@@ -258,6 +260,25 @@ def test_legacy_profile_payload_drops_unconvertible_placement_without_page_conte
     assert catalog.preset_names() == ("Legacy",)
     assert catalog.appearance_profile_named("Legacy").display_name == "Legacy"
     assert catalog.placement_profiles == ()
+
+
+def test_appearance_image_fields_round_trip_and_old_payload_defaults() -> None:
+    appearance = build_signature_appearance()
+    payload = _serialize_appearance(appearance)
+    payload["image_prominence"] = SignatureImageProminence.BALANCED.value
+    payload["preserve_image_alpha"] = False
+
+    reconstructed = _deserialize_appearance(payload)
+
+    assert reconstructed.image_prominence is SignatureImageProminence.BALANCED
+    assert reconstructed.preserve_image_alpha is False
+
+    old_payload = dict(payload)
+    old_payload.pop("image_prominence")
+    old_payload.pop("preserve_image_alpha")
+    legacy = _deserialize_appearance(old_payload)
+    assert legacy.image_prominence is SignatureImageProminence.PRIMARY
+    assert legacy.preserve_image_alpha is True
 
 
 def test_catalog_load_rejects_dangling_preset_reference(tmp_path: Path) -> None:

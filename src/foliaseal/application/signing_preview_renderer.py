@@ -45,6 +45,7 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureRect,
     SignatureTextStyle,
     SignatureTimezoneDisplayMode,
@@ -845,6 +846,12 @@ def _canonical_preview_layout(
         text_style=preview.text_style,
         box_style=preview.box_style,
         image_stamp_path=preview.image_stamp_path if include_stamp else None,
+        image_prominence=(
+            None
+            if preview.image_prominence is SignatureImageProminence.PRIMARY
+            else preview.image_prominence
+        ),
+        preserve_image_alpha=preview.preserve_image_alpha,
     )
     stamp_text = _semantic_preview_stamp_text(preview) if include_text else " "
     stamp_background = stamp_background_for_path(appearance.image_stamp_path)

@@ -19,6 +19,7 @@ from foliaseal.application.horizontal_signature_reservation import (
 from foliaseal.application.signing_draft_contracts import SigningDraftValidationSeverity
 from foliaseal.domain.models import (
     SignatureBoxStyle,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -132,6 +133,7 @@ class VisibleSignatureAppearancePort(Protocol):
     text_style: SignatureTextStyle
     box_style: SignatureBoxStyle
     image_stamp_path: str | None
+    image_prominence: SignatureImageProminence
 
 
 def _layout_rule_spec_from_parts(
@@ -360,6 +362,14 @@ def _effective_horizontal_text_reservation_width(
     )
 
 
+def _image_prominence_fraction(prominence: SignatureImageProminence) -> float:
+    return {
+        SignatureImageProminence.SUPPORTING: 0.35,
+        SignatureImageProminence.BALANCED: 0.55,
+        SignatureImageProminence.PRIMARY: 0.75,
+    }[prominence]
+
+
 def _layout_reservation_for_template(
     layout_template: SignatureLayoutTemplate,
     *,
@@ -370,6 +380,7 @@ def _layout_reservation_for_template(
     box_style: SignatureBoxStyle | None = None,
     has_visible_stamp_image: bool = True,
     stamp_aspect_ratio: float | None = None,
+    image_prominence: SignatureImageProminence | None = None,
 ) -> SignatureLayoutReservation:
     box_width = max(1, int(round(signature_rect.width_pt)))
     box_height = max(1, int(round(signature_rect.height_pt)))
@@ -431,16 +442,29 @@ def _layout_reservation_for_template(
         )
 
     if stamp_position in {SignatureStampPosition.LEFT, SignatureStampPosition.RIGHT}:
-        text_area_width = min(
-            _effective_horizontal_text_reservation_width(
-                layout_template=layout_template,
-                stamp_position=stamp_position,
-                text_box_width=text_box_width,
-            ),
-            available_width,
+        text_width = _effective_horizontal_text_reservation_width(
+            layout_template=layout_template,
+            stamp_position=stamp_position,
+            text_box_width=text_box_width,
         )
+        separator_width = min(gap, available_width)
+        effective_prominence = image_prominence if has_visible_stamp_image else None
+        if effective_prominence is None:
+            text_area_width = min(text_width, available_width)
+        else:
+            target_stamp_width = int(
+                round(
+                    max(0, available_width - separator_width)
+                    * _image_prominence_fraction(effective_prominence)
+                )
+            )
+            text_area_width = max(
+                text_width,
+                max(0, available_width - separator_width - target_stamp_width),
+            )
+            text_area_width = min(text_area_width, available_width)
         remaining_width = max(available_width - text_area_width, 0)
-        separator_width = min(gap, remaining_width)
+        separator_width = min(separator_width, remaining_width)
         stamp_area_width = max(remaining_width - separator_width, 0)
         reserved_primary_extent = stamp_area_width
         stamp_area_height = available_height
@@ -513,9 +537,25 @@ def _layout_reservation_for_template(
         vertical_bottom_margin = vertical_top_margin
         available_width = max(box_width - edge_margin * 2, 0)
         available_height = max(box_height - vertical_top_margin - vertical_bottom_margin, 0)
-    text_area_height = min(text_box_height, available_height)
+    effective_prominence = image_prominence if has_visible_stamp_image else None
+    if not text_box_height:
+        text_area_height = 0
+    elif effective_prominence is None:
+        text_area_height = min(text_box_height, available_height)
+    else:
+        target_stamp_height = int(
+            round(
+                max(0, available_height - gap)
+                * _image_prominence_fraction(effective_prominence)
+            )
+        )
+        text_area_height = max(
+            text_box_height,
+            max(0, available_height - gap - target_stamp_height),
+        )
+        text_area_height = min(text_area_height, available_height)
     remaining_height = max(available_height - text_area_height, 0)
-    separator_height = min(gap, remaining_height)
+    separator_height = min(gap if text_box_height else 0, remaining_height)
     text_area_width = available_width
     stamp_area_width = available_width
     stamp_area_height = max(remaining_height - separator_height, 0)
@@ -621,6 +661,7 @@ class VisibleSignatureLayoutInput:
     stamp_text: str
     image_stamp_path: str | None
     use_horizontal_ink_reservation: bool = True
+    image_prominence: SignatureImageProminence | None = None
 
 
 @dataclass(frozen=True)
@@ -935,7 +976,11 @@ class VisibleSignatureLayoutEngine:
 
         text_measurer = _text_measurer_or_default(self.text_measurer)
         image_probe = _image_probe_or_default(self.image_probe)
-        text_box = text_measurer.measure(request.stamp_text, request.text_style)
+        text_box = (
+            TextMetrics(width_pt=0, height_pt=0, line_count=0)
+            if not request.stamp_text.strip()
+            else text_measurer.measure(request.stamp_text, request.text_style)
+        )
         stamp_image = image_probe.inspect(request.image_stamp_path)
         has_visible_stamp_image = stamp_image is not None
 
@@ -948,6 +993,7 @@ class VisibleSignatureLayoutEngine:
             box_style=request.box_style,
             has_visible_stamp_image=has_visible_stamp_image,
             stamp_aspect_ratio=None if stamp_image is None else stamp_image.aspect_ratio,
+            image_prominence=request.image_prominence,
         )
         ink_reservation = self._horizontal_ink_reservation(
             request=request,
@@ -966,6 +1012,7 @@ class VisibleSignatureLayoutEngine:
             box_style=request.box_style,
             has_visible_stamp_image=has_visible_stamp_image,
             stamp_aspect_ratio=None if stamp_image is None else stamp_image.aspect_ratio,
+            image_prominence=request.image_prominence,
         )
         placement_reservation = _apply_horizontal_single_line_ink_text_alignment(
             placement_reservation,
@@ -1121,6 +1168,7 @@ def _horizontal_single_line_ink_validation_reservation(
     box_style: SignatureBoxStyle | None,
     has_visible_stamp_image: bool,
     stamp_aspect_ratio: float | None,
+    image_prominence: SignatureImageProminence | None = None,
 ) -> SignatureLayoutReservation:
     """Return an ink-informed reservation for validation without changing placement."""
 
@@ -1144,6 +1192,7 @@ def _horizontal_single_line_ink_validation_reservation(
         box_style=box_style,
         has_visible_stamp_image=has_visible_stamp_image,
         stamp_aspect_ratio=stamp_aspect_ratio,
+        image_prominence=image_prominence,
     )
 
 
@@ -1266,6 +1315,7 @@ class _LayoutAppearance:
     text_style: SignatureTextStyle
     box_style: SignatureBoxStyle
     image_stamp_path: str | None
+    image_prominence: SignatureImageProminence | None = None
 
 
 @dataclass
@@ -1324,6 +1374,7 @@ class VisibleSignatureLayoutService:
             text_style=request.text_style,
             box_style=request.box_style,
             image_stamp_path=request.image_stamp_path,
+            image_prominence=request.image_prominence,
         )
         return self._plan_for_appearance(
             appearance=appearance,
@@ -1358,6 +1409,7 @@ class VisibleSignatureLayoutService:
                 stamp_text=stamp_text,
                 image_stamp_path=appearance.image_stamp_path if include_stamp else None,
                 use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+                image_prominence=appearance.image_prominence,
             )
         )
 
@@ -1393,6 +1445,7 @@ def _background_layout_spec_for_stamp(
     text_box_height: int,
     box_style: SignatureBoxStyle | None = None,
     stamp_aspect_ratio: float | None = None,
+    image_prominence: SignatureImageProminence | None = None,
 ) -> LayoutRuleSpec:
     if stamp_aspect_ratio is None:
         image = getattr(stamp_background, "image", None)
@@ -1408,6 +1461,7 @@ def _background_layout_spec_for_stamp(
         box_style=box_style,
         has_visible_stamp_image=stamp_background is not None,
         stamp_aspect_ratio=stamp_aspect_ratio,
+        image_prominence=image_prominence,
     )
     if stamp_background is None:
         return reservation.background_layout
