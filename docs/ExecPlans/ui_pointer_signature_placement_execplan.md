@@ -28,7 +28,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Reviewed compatibility and phase3 product cruft; no migrated consumer retirement
   condition was proven in this narrow viewer edge, and no new phase3 nomenclature was introduced.
 - [x] (2026-08-10) Focused viewer/interaction and offscreen pointer integration validation passed
-  (`39 passed`); the full suite passed (`1295 passed, 20 skipped, 1 warning`), with GUI audit,
+  (`40 passed`); the full suite passed (`1296 passed, 20 skipped, 1 warning`), with GUI audit,
   docs, and commit gates remaining.
 
 ## Surprises & Discoveries

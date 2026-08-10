@@ -225,7 +225,7 @@ Release tranche:
 - [x] (2026-08-10) Added the bounded pointer-placement cancellation contract: existing pointer drags
   already cross the typed viewer/session/workspace bridge into a page-local `SignatureRect`; Escape
   now cancels unfinished placement or handle drags without emitting a new rectangle. Focused viewer/
-  interaction and offscreen integration coverage is `39 passed`; current full suite is `1295 passed,
+  interaction and offscreen integration coverage is `40 passed`; current full suite is `1296 passed,
   20 skipped, 1 warning`. Broader explicit Pan/Place tool topology, keyboard placement, snap/guides,
   undo history, and off-page recovery remain open in later placement work.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
