@@ -114,6 +114,11 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   contract; native editor precedence remains at AppFrame, and the no-native-editor path now uses
   the public workspace session port for current-page document text. Packaged Help is owned by its
   completed support child.
+- [x] (2026-08-10) Reconciled the viewer keyboard contract with UI_SPEC §8: Page Up/Page Down
+  remain page-relative commands, while only `Ctrl+Home`/`Ctrl+End` jump to the first/last page and
+  bare Home/End pass through to the focused widget hierarchy. The navigation child owns the
+  implementation and its fake/real Qt evidence; this parent remains open for unrelated deferred
+  command families and release gates.
 
 ## Surprises & Discoveries
 

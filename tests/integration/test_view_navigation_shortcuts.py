@@ -87,6 +87,26 @@ def test_page_shortcut_navigates_once_with_viewer_focus() -> None:
         app.processEvents()
         assert workflow.session.current_page == 0
         assert backend.render_calls == 2
+
+        QTest.keyClick(viewer, Qt.Key_End)
+        app.processEvents()
+        assert workflow.session.current_page == 0
+        assert backend.render_calls == 2
+
+        QTest.keyClick(viewer, Qt.Key_End, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+        assert workflow.session.current_page == 2
+        assert backend.render_calls == 3
+
+        QTest.keyClick(viewer, Qt.Key_Home)
+        app.processEvents()
+        assert workflow.session.current_page == 2
+        assert backend.render_calls == 3
+
+        QTest.keyClick(viewer, Qt.Key_Home, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+        assert workflow.session.current_page == 0
+        assert backend.render_calls == 4
     finally:
         window.close()
         app.processEvents()

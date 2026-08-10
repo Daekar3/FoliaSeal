@@ -399,6 +399,7 @@ class _FakeWidget:
         self.minimum_size = None
         self.size = None
         self.cursor = None
+        self.base_key_events = []
 
     def update(self):
         self.update_calls += 1
@@ -428,7 +429,7 @@ class _FakeWidget:
         return None
 
     def keyPressEvent(self, event):  # noqa: N802
-        return None
+        self.base_key_events.append(event)
 
 
 class _FakeScrollArea(_FakeWidget):
@@ -1464,16 +1465,32 @@ def test_key_press_event_wires_keyboard_affordances(monkeypatch):
     workflow = _WorkflowWithKeyboardActions()
     widget = PdfViewerWidgetAdapter().create(workflow=workflow)
 
+    bare_home = _FakeKeyEvent(key=_FakeQt.Key_Home)
+    bare_end = _FakeKeyEvent(key=_FakeQt.Key_End)
+    widget.keyPressEvent(bare_home)
+    widget.keyPressEvent(bare_end)
+    assert not bare_home.accepted
+    assert not bare_end.accepted
+    assert widget.base_key_events == [bare_home, bare_end]
+    assert not any(
+        action in workflow.actions
+        for action in (("jump_to_page", 0), ("jump_to_page", 3))
+    )
+
     for key in (
         _FakeQt.Key_Plus,
         _FakeQt.Key_Minus,
         _FakeQt.Key_0,
         _FakeQt.Key_PageDown,
         _FakeQt.Key_PageUp,
-        _FakeQt.Key_Home,
-        _FakeQt.Key_End,
     ):
         widget.keyPressEvent(_FakeKeyEvent(key=key))
+    widget.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Home, modifiers=_FakeQt.ControlModifier)
+    )
+    widget.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_End, modifiers=_FakeQt.ControlModifier)
+    )
 
     assert "zoom_in" in workflow.actions
     assert "zoom_out" in workflow.actions

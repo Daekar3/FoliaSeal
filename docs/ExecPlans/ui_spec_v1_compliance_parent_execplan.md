@@ -68,7 +68,8 @@ Document-flow tranche:
   display-backed two-process acceptance remain environment-limited.
 - [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
 - [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md — typed fit, zoom, pan, and navigation
-  behavior is implemented and validated; final handoff status is reconciled here.
+  behavior is implemented and validated; UI_SPEC §8 navigation now consumes only Ctrl+Home/End,
+  with bare Home/End forwarded to the focused widget hierarchy.
 - [x] docs/ExecPlans/ui_document_search_selection_execplan.md — bounded text search, selection,
   highlighting, copy, and keyboard traversal are implemented and validated; final handoff status is
   reconciled here.
@@ -521,6 +522,10 @@ Release tranche:
   1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`; the real offscreen pending-open
   widget test passes. QLocalServer remains unable to bind in this sandbox (`Unknown error 1`), so
   display-backed two-process smoke acceptance and compatibility retirement remain open.
+- [x] (2026-08-10) Closed the viewer keyboard-contract correction: fake and real offscreen Qt
+  evidence proves bare Home/End are not consumed or rendered as page jumps, while Ctrl+Home/End
+  perform exactly one first/last-page transition. The combined viewer/navigation validation is
+  `47 passed`; unrelated display-backed, package-install, and phase3 nomenclature gates remain open.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

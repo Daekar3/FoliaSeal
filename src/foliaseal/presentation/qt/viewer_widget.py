@@ -421,7 +421,7 @@ class PdfViewerWidgetAdapter:
                     event.accept()
                     return
 
-                if key == bindings.qt.Key_Home:
+                if key == bindings.qt.Key_Home and self._has_control_modifier(event):
                     self._emit_interaction("key_jump_home")
                     self._navigate(
                         action=lambda: self._workflow.jump_to_page(0),
@@ -433,7 +433,7 @@ class PdfViewerWidgetAdapter:
                     event.accept()
                     return
 
-                if key == bindings.qt.Key_End:
+                if key == bindings.qt.Key_End and self._has_control_modifier(event):
                     self._emit_interaction("key_jump_end")
                     self._navigate(
                         action=lambda: self._workflow.jump_to_page(

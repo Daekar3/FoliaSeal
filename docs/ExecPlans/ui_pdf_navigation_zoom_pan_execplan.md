@@ -36,6 +36,14 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   20 skipped, 1 warning`), Ruff and diff checks passed, and owned Qt resources were cleaned.
 - [x] (2026-08-09) Updated this plan and relevant architecture documentation with the typed fit,
   zoom/pan ownership and recorded evidence; implementation and validation are complete.
+- [x] (2026-08-10) Closed the remaining keyboard-contract gap found in a fresh compliance scan:
+  UI_SPEC §8 requires `Ctrl+Home`/`Ctrl+End`, while the current viewer consumes bare `Home`/`End`
+  as page jumps. The modifier guard now preserves unmodified Home/End for the focused widget
+  hierarchy; fake-Qt and real offscreen dispatch prove both paths without changing page invariants.
+- [x] (2026-08-10) Final validation after the correction passed: the focused viewer/navigation set is
+  `47 passed`, the targeted keyboard subset is `7 passed, 33 deselected`, and the full suite is
+  `1482 passed, 20 skipped, 1 warning`. Ruff, `pip check`, and `git diff --check` are clean; no
+  FoliaSeal/test processes remain and all owned `/tmp/foliaseal-*` roots were removed.
 
 ## Surprises & Discoveries
 
@@ -93,12 +101,19 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   the least surprising adjacent desktop convention for the paired width-fit action, and its visible
   label makes the choice discoverable rather than hiding an invented shortcut.
   Date/Author: 2026-08-09 / Codex
+- Decision: consume Home/End for first/last-page navigation only when the Control modifier is
+  present; pass bare Home/End through to Qt's ordinary focused-widget behavior.
+  Rationale: UI_SPEC §7/§8 reserves `Ctrl+Home`/`Ctrl+End` for document navigation, while bare
+  Home/End are conventional text/scroll positioning keys and must not be stolen by the viewer.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Implementation and validation are complete; the final commit and parent-plan status update remain.
-The slice proves the viewer fit/zoom/pan path without claiming unfinished Find, Document Signatures,
-Back, Forward, or full mode-group/placement behavior owned by later children.
+The fit/zoom/pan implementation and validation are complete. The fresh keyboard compliance
+correction is now complete: only Ctrl+Home/End are consumed for first/last-page navigation, and
+bare Home/End reach the base focused-widget handler. The slice still does not claim unfinished
+Find, Document Signatures, Back, Forward, or full mode-group/placement behavior owned by later
+children.
 
 ## Context and Orientation
 
@@ -148,6 +163,7 @@ fall back to a system Python or system Qt installation.
     rg -n -e 'zoom|fit|page|wheel|render' src/foliaseal/application/viewer_session.py src/foliaseal/application/viewer_workflow.py src/foliaseal/presentation/qt/viewer_widget.py src/foliaseal/presentation/qt/signing_workspace_composition.py src/foliaseal/presentation/qt/app_frame_command_model.py
     .venv/bin/pytest -q tests/unit/test_viewer_session.py tests/unit/test_viewer_workflow.py tests/unit/test_qt_viewer_widget.py
     .venv/bin/pytest -q tests/integration/test_view_navigation_shortcuts.py
+    .venv/bin/pytest -q tests/unit/test_qt_viewer_widget.py -k 'key_press_event or home or end'
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q   # 1201 passed, 20 skipped, 1 warning at this revision
     git diff --check
@@ -196,6 +212,13 @@ warning. The no-document real-Qt menu integration remains green, and process ins
 run found no FoliaSeal/PySide6/pytest processes. No SVG is assigned to this viewer-only command
 increment; the normative UI_SPEC §8 text and main-workspace SVGs remain the parent/open-review
 owners.
+
+The 2026-08-10 correction adds red/green evidence in
+`tests/unit/test_qt_viewer_widget.py::test_key_press_event_wires_keyboard_affordances` and
+`tests/integration/test_view_navigation_shortcuts.py::test_page_shortcut_navigates_once_with_viewer_focus`:
+bare Home/End are forwarded without acceptance or render, while Ctrl+Home/End perform exactly one
+page jump/render. The combined viewer/integration command passes `47 passed`; the targeted keyboard
+subset passes `7 passed, 33 deselected`.
 
 ## Idempotence and Recovery
 
