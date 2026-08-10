@@ -1288,7 +1288,19 @@ boundary fakeable while preserving native Qt shortcuts.
 - Owns: the `foliaseal` console script; bundled font assets, Python runtime, and Qt runtime; deterministic `.deb` naming and staging; `/usr/bin/foliaseal` relocation-aware launcher; desktop entry and icon; `Depends: poppler-utils`; and package-owned extraction/startup/signed-acceptance auditing.
 - Does not own: system-wide package installation, distribution repositories, or copying arbitrary host libraries into the bundle.
 - Known constraints: Runtime dependencies in `pyproject.toml` are `fonttools`, `pyHanko[opentype]`, and Pillow; FontTools is required at runtime because exact bundled-font cmap validation is part of visible-signature readiness. The optional `gui` extra installs `PySide6`, while the Debian package bundles PySide6 and the Python runtime. Interactive pixels still late-resolve the host `pdftoppm` supplied by `poppler-utils`; canonical preview and evidence rendering remain QtPdf-scoped. The first supported distribution mode is Debian-family `amd64` (architecture is read from `dpkg --print-architecture`).
-- Status: Confirmed by code and tests. The built `dist/foliaseal_0.1.0_amd64.deb` passed package inspection, extracted wrapper/help and offscreen Qt startup, and the package-owned signing audit (10 scenarios/7 successful signings, 18/18 parity, 3/3 fit rejection). SHA-256: `14403f944861636ca8729893eb4be721668f197e07ae733154e493b70b6a8d95`.
+- Status: Confirmed by code, focused audit tests, and one fresh temporary package audit. The audit
+  script executable bit is restored; helper tests passed (`12 passed`), including offline-environment
+  and complete-font-set checks. The extracted package report ended with `status=passed` and recorded
+  `offline_environment.proxy_environment_removed=true`, `network_requests_required=false`, and
+  `dependency.help_output_present=true` for the wrapper, executable, desktop entry/icon,
+  `Depends: poppler-utils`, five offline Help topics, the complete canonical 18-font set, the
+  PyInstaller 6 `_internal/foliaseal/resources` root, and a successful `pdftoppm` fixture conversion.
+  The packaged GUI probe is `limited` (return code `1`) with the
+  exact isolated-environment reason `SingleInstanceUnavailable: Unable to claim or reach the
+  FoliaSeal instance endpoint:`. Build warnings included missing `pycparser.lextab` and
+  `pycparser.yacctab` hidden imports plus optional `libtiff.so.5`. Temporary extraction/process
+  cleanup succeeded; no generated package or signing-audit/hash claim is retained here. Display-
+  backed GUI/accessibility and real package-manager installation remain open gates.
 
 ## 5. Object model / domain model
 
@@ -1882,6 +1894,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-08-10 | Reconciled the packaged-release boundary with fresh temporary audit evidence. | Focused audit helpers passed (`12 passed`), including offline-environment and complete-font-set checks, and the audit script executable bit was restored. A fresh extracted Debian package reported `status=passed`, with `offline_environment.proxy_environment_removed=true`, `network_requests_required=false`, and `dependency.help_output_present=true`; wrapper/executable, desktop entry/icon, `Depends: poppler-utils`, five offline Help topics, the complete canonical 18-font set, the PyInstaller 6 `_internal/foliaseal/resources` root, and a true `pdftoppm` fixture conversion passed. The isolated/offscreen GUI probe remains explicitly limited (return code `1`, `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:`); build warnings and cleanup are recorded in the owning ExecPlan, no generated artifact was committed, and display-backed/package-manager gates remain open. |
 | 2026-08-10 | Added the offline packaged Help boundary. | `HelpCatalog` owns validated Markdown/index resources shared by `foliaseal help` and the modeless `HelpViewerDialog`; typed Help/F1 routing, local `help:` navigation, and setuptools/PyInstaller resource parity are implemented and covered by focused tests. Diagnostics, final packaging acceptance, and broader release gates remain open in their owning plans. |
 | 2026-08-10 | Added the bounded real-Qt accessibility acceptance boundary. | `tests/integration/test_accessibility_acceptance.py` now covers offscreen minimum geometry, no-document Open/Library accessible names, typed menu metadata and unique top-level/action mnemonics, shortcuts, disabled state, F1 Help, modeless support surfaces, Settings Restore defaults, diagnostic-folder routing, and Unicode XDG paths; the follow-up focused acceptance plus AppFrame regression tests pass (`64 passed`). Offscreen evidence does not claim screen-reader, high-contrast, physical DPI/monitor, or package-install behavior; those display-backed/release gates remain open. |
 | 2026-08-10 | Added single-instance open routing and AppFrame pending-open safety surface. | `QtAppFrameAdapter.launch()` now claims a per-user local owner endpoint and forwards secondary absolute-path requests into the existing frame. `FoliaSealAppFrame` retains only the newest request during active signing; `PendingOpenRequestSurface` exposes the queued basename and keyboard-accessible Cancel pending open action, and terminal/cancel/close paths clear it. Focused validation is `62 passed, 1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`; real offscreen widget evidence passes. QLocalServer bind failure (`Unknown error 1`) remains an environment limitation for two-process acceptance. |

@@ -37,12 +37,14 @@ success when the environment cannot provide it.
   legacy `phase3-signing-acceptance-evidence` command.
 - [x] (2026-08-10) Created this bounded neutral package-audit plan; generated bundles/packages remain
   temporary and must never be committed.
-- [ ] Replace the legacy audit command path with offline Help/resource/desktop/dependency checks and
+- [x] Replace the legacy audit command path with offline Help/resource/desktop/dependency checks and
   explicit classification of the isolated GUI endpoint.
-- [ ] Add focused tests for audit report parsing and package metadata/resource assertions without
-  forcing a full PyInstaller build in ordinary unit runs.
-- [ ] Build a fresh bundle and `.deb`, run the audit, clean all owned roots/processes, reconcile
-  release/architecture status, and commit the complete slice.
+- [x] Add focused tests for audit report parsing and package metadata/resource assertions without
+  forcing a full PyInstaller build in ordinary unit runs (`12 passed`), including offline-environment
+  and complete-font-set assertions.
+- [x] Build a fresh bundle and `.deb`, run the audit, clean all owned roots/processes, and reconcile
+  release/architecture status. The child implementation/evidence is complete; display-backed GUI,
+  real package-manager installation, and the parent release gates remain open.
 
 ## Surprises & Discoveries
 
@@ -83,9 +85,29 @@ success when the environment cannot provide it.
 
 ## Outcomes & Retrospective
 
-Not started. At completion, record the fresh package path (without committing it), package metadata,
-offline Help outputs, resource/dependency checks, GUI classification, warnings, cleanup, and the
-remaining display-backed/manual installation gates.
+The focused audit helper tests passed (`12 passed`). The audit script executable bit was restored. A
+fresh temporary PyInstaller-backed Debian package was extracted and the audit report ended with
+`status=passed`; its offline-environment report recorded
+`offline_environment.proxy_environment_removed=true` and
+`network_requests_required=false`, and the dependency probe recorded
+`dependency.help_output_present=true`.
+The payload contained the
+executable wrapper `/usr/bin/foliaseal`, bundle executable `/usr/lib/foliaseal/foliaseal`, desktop
+entry, and SVG icon; the desktop control declared `Depends: poppler-utils`. Installed Help reported
+five topics with IDs `getting-started`, `signing-basics`, `certificates`, `privacy`, and
+`troubleshooting`; the topic path was inside the extracted package and Markdown passed the safety
+checks. The extracted bundle contained the complete canonical 18-font set and used the PyInstaller 6 resource root
+`_internal/foliaseal/resources`. `/usr/bin/pdftoppm` performed the fixture conversion successfully.
+
+The packaged GUI probe is intentionally limited: return code `1`, status `limited`, and exact reason
+`SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:` because the
+isolated/offscreen environment cannot claim or reach the local endpoint. Build warnings recorded
+missing `pycparser.lextab`/`pycparser.yacctab` hidden imports and optional `libtiff.so.5`; these did
+not invalidate the audited payload, Help, or Poppler checks. Temporary extraction and the child
+process were cleaned. The package and extracted evidence were temporary and no generated artifact
+was committed. Display-backed accessibility/GUI and real package-manager installation remain
+external gates; this evidence does not claim screen-reader, high-contrast, physical DPI/monitor, or
+installed-package acceptance.
 
 ## Context and Orientation
 

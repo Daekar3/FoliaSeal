@@ -64,6 +64,17 @@ Qt surface, focused tests, and observable acceptance.
   passes, including explicit no-document accessible names and corrected typed View mnemonics;
   display-backed accessibility, installed-package, diagnostics, and final release acceptance remain
   open under this plan.
+- [x] (2026-08-10) Packaged-release child completed its bounded audit: focused audit helper tests
+  passed (`12 passed`), including offline-environment and complete-font-set assertions; the audit
+  script executable bit was restored. A fresh temporary package audit passed (`status=passed`) for wrapper,
+  executable, desktop entry/icon, `Depends: poppler-utils`, five-topic offline Help, 18 bundled
+  fonts (the complete canonical set), PyInstaller 6 `_internal/foliaseal/resources`, and a true
+  `pdftoppm` fixture conversion. Its report recorded `offline_environment.proxy_environment_removed=true`,
+  `network_requests_required=false`, and `dependency.help_output_present=true`.
+  The GUI probe was classified `limited` with return code `1` and the exact isolated endpoint
+  reason `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:`;
+  temporary extraction/process cleanup succeeded and no generated artifact was committed. The
+  display-backed accessibility/GUI and real package-manager installation gates remain open.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
 - [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
@@ -96,7 +107,11 @@ Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record demonstrated behavior, evidence, and remaining gaps at completion.
+The packaged-release acceptance child is implementation/evidence-complete, but this parent release
+plan remains open for cross-surface diagnostics, display-backed accessibility/GUI evidence, and a
+real package-manager installation. Its fresh package audit passed the structural/offline contract
+and recorded the isolated GUI limitation; it does not claim screen-reader, high-contrast,
+physical-DPI/monitor, or installed-package acceptance.
 
 ## Context and Orientation
 

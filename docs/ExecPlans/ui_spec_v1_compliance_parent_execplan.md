@@ -162,8 +162,9 @@ Placement, preview, and signing tranche:
 
 Release tranche:
 
-- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — broader Settings, diagnostics,
-  offline/release acceptance, and package-install gates remain open.
+- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — bounded package audit evidence is
+  complete, while broader Settings/diagnostics, display-backed accessibility/GUI, and package-install
+  gates remain open.
 - [x] docs/ExecPlans/ui_help_support_execplan.md — packaged
   canonical Markdown, CLI discovery, modeless searchable viewer, F1 routing, and offline/resource
   parity are implemented and validated; diagnostics and final release acceptance remain with the
@@ -190,6 +191,16 @@ Release tranche:
 - [x] (2026-08-10) Implemented and validated the current-page viewer Select All slice through the
   typed selection/session/runtime/AppFrame boundary; focused acceptance is `100 passed`, full
   validation is `1456 passed, 20 skipped, 1 warning`, and the bounded GUI cleanup is reconciled.
+- [x] (2026-08-10) Completed the packaged-release audit child: focused helper tests are `12 passed`,
+  including offline-environment and complete-font-set checks; the audit script executable bit was
+  restored. A fresh temporary Debian package audit reports `status=passed` for payload/desktop/icon,
+  `Depends: poppler-utils`, five offline Help topics, the complete canonical 18-font set, PyInstaller
+  6 resource discovery, and successful `pdftoppm` fixture conversion. The report records
+  `offline_environment.proxy_environment_removed=true`, `network_requests_required=false`, and
+  `dependency.help_output_present=true`. The GUI probe is explicitly `limited`
+  (return code `1`, exact `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal
+  instance endpoint:` reason); build warnings and cleanup were recorded in the child plan, and no
+  generated artifact was committed. Display-backed and real package-manager gates remain open.
 - [x] (2026-08-09) Added requirement traceability, exact live paths, executable validation commands,
   schema/SVG ownership, and milestone/evidence requirements before implementation.
 - [x] (2026-08-09) Reordered the corpus into foundation, document-flow, reusable-object/certificate,
