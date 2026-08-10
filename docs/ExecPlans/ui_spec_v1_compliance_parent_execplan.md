@@ -144,7 +144,10 @@ Placement, preview, and signing tranche:
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
   are committed; confirmation/source policy is now bounded in its follow-on child, while async
   recovery and package acceptance remain open.
-- [ ] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
+- [x] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md — preserved-artifact recovery,
+  distinct untrusted reopen, every-signature/timestamp/trust verification, allowed-DocMDP
+  later-approval gating, and cleanup are implemented; display-backed acceptance remains
+  environment-limited.
 
 Release tranche:
 
@@ -304,6 +307,11 @@ Release tranche:
   signature verifies and DocMDP permissions are known to allow approval changes; lifecycle disposal
   cleans the app-owned recovery artifact. Focused app-frame/action/sidebar coverage is `64 passed`;
   current full suite is `1292 passed, 20 skipped, 1 warning`.
+- [x] (2026-08-10) Closed the verification-recovery child: current focused recovery/app-frame/
+  sidebar/document-review coverage is `52 passed`, current full suite is `1440 passed, 20 skipped,
+  1 warning`, and architecture/plan claims now record the distinct untrusted workspace, strict
+  verification requirements, permission gate, and cleanup ownership. The bounded GUI launch remains
+  limited by `SingleInstanceUnavailable` with cleanup confirmed.
 - [x] (2026-08-10) Added the bounded pointer-placement cancellation contract: existing pointer drags
   already cross the typed viewer/session/workspace bridge into a page-local `SignatureRect`; Escape
   now cancels unfinished placement or handle drags without emitting a new rectangle. Focused viewer/

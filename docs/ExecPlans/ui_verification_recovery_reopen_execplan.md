@@ -39,18 +39,19 @@ Qt surface, focused tests, and observable acceptance.
   was met; historical evidence names remain external contracts and no new product-facing phase3
   nomenclature was introduced.
 - [x] (2026-08-10) Ran focused, regression, and GUI validation; clean processes and artifacts:
-  focused app-frame/action/sidebar/composition command `64 passed`; full suite `1292 passed,
-  20 skipped, 1 warning`; backend/recovery subset remains green; Ruff and diff checks clean. The
+  the current recovery/app-frame/sidebar/document-review command is `52 passed`; the current full
+  suite is `1440 passed, 20 skipped, 1 warning`; backend/recovery coverage remains green; Ruff and
+  diff checks clean. The
   bounded offscreen app launch exits at `SingleInstanceUnavailable`, leaves no matching processes,
   and removes its temporary configuration root. Lifecycle disposal now also removes an app-owned
   preserved artifact when the recovery workspace is discarded or replaced, and a `try/finally`
   guard releases the view even if cleanup itself raises.
-- [ ] (2026-08-10) Update this plan, the parent plan, and `docs/ARCHITECTURE.md`; independent
+- [x] (2026-08-10) Updated this plan, the parent plan, and `docs/ARCHITECTURE.md`; independent
   review findings were addressed for strict validity, required timestamp/trust, every-signature
   verification, explicit artifact cleanup, and the distinct untrusted reopen/permission gate.
-  Display-backed recovery acceptance remains environment-blocked; final review and commit are
-  the remaining gates for this increment.
-- [ ] (2026-08-10) Commit the completed slice and record the next dependency-ordered blocker.
+  Display-backed recovery acceptance remains environment-blocked by `SingleInstanceUnavailable`.
+- [ ] (2026-08-10) Commit the completed recovery closeout and record the remaining
+  dependency-ordered blockers.
 
 ## Surprises & Discoveries
 
@@ -102,8 +103,8 @@ return, and preserved-copy actions into the signing rail. Verification retry int
 cryptographic validity, every-signature coverage, required timestamp, and required timestamp trust;
 it remains read-only and never promotes the preserved artifact to `last_successful_output_path`.
 Explicit Return to draft removes only the app-owned preserved file. The bounded later-approval
-permission gate is implemented; broader document-reopen policy and display-backed acceptance remain
-explicit follow-up work.
+permission gate is implemented and this child is closed; broader document-reopen policy and
+display-backed acceptance remain explicit follow-up/environment gates.
 
 ## Context and Orientation
 
@@ -145,7 +146,7 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e 'verify|reopen|recovery|signature|permission' src/foliaseal/application/document_review.py src/foliaseal/application/signing_completion.py src/foliaseal/presentation/qt/app_frame_workspace_open.py
-    .venv/bin/pytest -q tests/unit/test_signing_completion.py tests/unit/test_document_review.py tests/unit/test_qt_app_frame_workspace_open.py
+    .venv/bin/pytest -q tests/unit/test_signing_completion.py tests/unit/test_document_review.py tests/unit/test_document_review_workspace.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_signing_workspace_sidebar.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -204,8 +205,10 @@ Use AppSettings, the public Qt frame/workspace ports, packaged Markdown help, th
 src/foliaseal/__main__.py, and build helpers under src/foliaseal/build/. The final behavior must be
 exercised by tests/unit/test_sign_pdf_use_case.py, tests/unit/test_qt_signing_action_coordinator.py,
 tests/unit/test_signing_workspace_sidebar.py, tests/unit/test_signing_completion.py,
-tests/unit/test_document_review.py, tests/unit/test_qt_app_frame_workspace_open.py, and
-tests/integration/test_verification_recovery_reopen.py.
+tests/unit/test_document_review.py, tests/unit/test_document_review_workspace.py, and
+tests/unit/test_qt_app_frame_workspace_open.py. A dedicated integration test node is not present in
+this checkout; the offscreen launch audit remains a bounded lifecycle check and is recorded as
+environment-limited.
 New help/diagnostic surfaces must not expose secrets, PDF contents, selected
 text, Reason, Location, or private keys.
 
@@ -213,4 +216,10 @@ Revision note: 2026-08-10 / Codex
 Implemented and validated the bounded preserved-artifact recovery vertical slice after the live
 audit and red tests; updated dependencies and the architecture boundary. The isolated GUI launch
 still stops before frame creation at `SingleInstanceUnavailable`; no process or temporary-config
-debris remains. Independent review and commit are the remaining gates for this slice.
+debris remains. Independent review and commit completed in the closeout below.
+Revision note: 2026-08-10 / Codex
+Closed the recovery child after reconciling the parent and architecture docs. Current focused
+recovery/app-frame/sidebar/document-review evidence is `52 passed`; the full suite is `1440 passed,
+20 skipped, 1 warning`; the bounded GUI launch remains environment-limited by
+`SingleInstanceUnavailable`, with owned processes and temporary roots cleaned up. The closeout is
+prepared for commit in the current working tree.
