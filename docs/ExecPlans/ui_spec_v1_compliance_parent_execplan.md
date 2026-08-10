@@ -90,8 +90,11 @@ Reusable-object and certificate tranche:
 
 Placement, preview, and signing tranche:
 
-- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
-- [ ] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md
+- [x] docs/ExecPlans/ui_pointer_signature_placement_execplan.md — pointer placement, Pan/Place
+  topology, page-guide snapping, Alt bypass, and off-page indication are implemented and reconciled.
+- [x] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md — keyboard creation/movement/resize,
+  numeric-field history, Delete/undo/redo, snap bypass, off-page recovery, and lifecycle clearing
+  are implemented and reconciled.
 - [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
@@ -267,6 +270,10 @@ Release tranche:
   successful signing invalidate local placement history, while placement-field edits remain
   undoable and external overlay synchronization drops stale branches. The keyboard-placement child
   now has no remaining behavior tranche; final audit/closeout remains.
+- [x] (2026-08-10) Closed the pointer and keyboard placement child corpus after the full interaction
+  tranche landed. Current validation is `1314 passed, 20 skipped, 1 warning`; bounded GUI launch
+  exits at the known isolated single-instance endpoint and leaves no process or temporary audit-root
+  debris.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

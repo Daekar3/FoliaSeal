@@ -36,6 +36,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   Focused shell/viewer/composition/integration validation is `156 passed`; full-suite validation is
   `1297 passed, 20 skipped, 1 warning`; final GUI audit, documentation reconciliation, and commit
   remain.
+- [x] (2026-08-10) Reconciled the completed pointer contract with the later placement increments:
+  pointer-only page-guide snapping, Alt bypass, rendered guides, and explicit off-page indicators
+  now live in the coordinate/viewer seams. Current full-suite evidence is `1314 passed, 20 skipped,
+  1 warning`; the bounded GUI launch remains limited only by the isolated single-instance endpoint,
+  with cleanup confirmed.
 
 ## Surprises & Discoveries
 
@@ -55,8 +60,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Outcomes & Retrospective
 
 The bounded pointer path and explicit Pan/Place mode topology are implemented through the current
-viewer/session/composition seams. Keyboard placement, snap/guides, undo history, and off-page
-recovery remain explicit follow-up work and are not claimed here.
+viewer/session/composition seams. Pointer snap/guides and off-page indicators are implemented by
+the later placement child; keyboard/numeric history remains owned by that child rather than this
+pointer-specific contract.
 
 ## Context and Orientation
 
