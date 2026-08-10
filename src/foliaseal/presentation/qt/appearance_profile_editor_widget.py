@@ -17,7 +17,7 @@ from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
-from foliaseal.domain.models import SignatureAppearance
+from foliaseal.domain.models import SignatureAppearance, SignatureFieldSource
 from foliaseal.infra.config.schemas import ConfigValidationError
 from foliaseal.presentation.qt.visible_signature_setup_form import QtVisibleSignatureSetupForm
 
@@ -125,10 +125,21 @@ class AppearanceProfileEditorWidget:
                     self._on_error(f"Appearance '{name}' already exists.")
                     return False
         try:
+            appearance = self.controls.setup_form.build_draft().appearance
+            has_visible_content = any(
+                binding.show_in_visible_appearance
+                and binding.source is not SignatureFieldSource.HIDDEN
+                for _field_key, binding in appearance.iter_field_bindings()
+            )
+            if not has_visible_content and appearance.image_stamp_path is None:
+                self._on_error(
+                    "An Appearance must contain visible signing text or an image."
+                )
+                return False
             self._library.execute(
                 SaveAppearance(
                     name=name,
-                    appearance=self.controls.setup_form.build_draft().appearance,
+                    appearance=appearance,
                     appearance_profile_id=(
                         None if self._initial_ref is None else self._initial_ref.object_id
                     ),

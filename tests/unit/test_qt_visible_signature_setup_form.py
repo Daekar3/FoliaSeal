@@ -50,11 +50,13 @@ def test_setup_form_loads_visible_signature_draft_into_controls() -> None:
     assert not hasattr(form, "field_controls")
     assert not hasattr(form.visible_text_controls, "advanced_toggle")
     assert not hasattr(form.visible_text_controls, "advanced_container")
-    assert not hasattr(form.appearance_controls, "datetime_format")
+    assert form.appearance_controls.datetime_format.currentText() == "%Y-%m-%d %H:%M"
+    assert form.appearance_controls.field_order.count() == 8
+    assert form.appearance_controls.text_color.text() == "#123456"
+    assert form.appearance_controls.border_show.isChecked() is True
+    assert form.appearance_controls.border_color.text() == "#333333"
+    assert form.appearance_controls.background_color.text() == "#FFFFFF"
     assert not hasattr(form.appearance_controls, "image_stamp_path")
-    assert not hasattr(form.appearance_controls, "text_color")
-    assert not hasattr(form.appearance_controls, "background_color")
-    assert not hasattr(form.appearance_controls, "border_show")
 
 
 def test_setup_form_builds_draft_and_normalizes_legacy_field_customizations() -> None:
@@ -264,3 +266,42 @@ def test_setup_form_preserves_loaded_field_order_when_rebuilding_draft() -> None
     draft = form.build_draft()
 
     assert draft.appearance.field_order == custom_field_order
+
+
+def test_setup_form_edits_bounded_time_color_border_and_field_order_controls() -> None:
+    form = QtVisibleSignatureSetupForm(bindings=_fake_bindings())
+    form.load(
+        VisibleSignatureSetupDraft(
+            appearance=build_signature_appearance(),
+            placement=VisibleSignaturePlacementDraft(
+                page_number=1,
+                left_pt=24.0,
+                bottom_pt=18.0,
+                width_pt=180.0,
+                height_pt=48.0,
+                enabled=False,
+            ),
+        )
+    )
+
+    controls = form.appearance_controls
+    controls.datetime_format.setCurrentText("Aug 8, 2026, 2:35 PM UTC")
+    controls.text_color.setText("#123456")
+    controls.border_show.setChecked(False)
+    controls.border_color.setText("#654321")
+    controls.border_width.setValue(2.5)
+    controls.background_color.setText("#F0F0F0")
+    controls.move_field_down.click()
+
+    draft = form.build_draft().appearance
+
+    assert draft.datetime_format == "%b %-d, %Y, %-I:%M %p %Z"
+    assert draft.text_style.text_color_hex == "#123456"
+    assert draft.box_style.show_border is False
+    assert draft.box_style.border_color_hex == "#654321"
+    assert draft.box_style.border_width_pt == 2.5
+    assert draft.box_style.background_color_hex == "#F0F0F0"
+    assert draft.field_order[:2] == (
+        SignatureFieldKey.COMMON_NAME,
+        SignatureFieldKey.DISTINGUISHED_NAME,
+    )

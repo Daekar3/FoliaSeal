@@ -13,6 +13,7 @@ from foliaseal.application.signature_properties_coordinator import (
 )
 from foliaseal.domain.models import (
     SignatureAppearance,
+    SignatureBoxStyle,
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
@@ -63,6 +64,15 @@ class AppearanceControls:
     bold: Any
     italic: Any
     show_field_names: Any
+    datetime_format: Any
+    field_order: Any
+    move_field_up: Any
+    move_field_down: Any
+    text_color: Any
+    border_show: Any
+    border_color: Any
+    border_width: Any
+    background_color: Any
 
 
 @dataclass(frozen=True)
@@ -131,6 +141,17 @@ def _enum_combo_items(
     ],
 ) -> tuple[str, ...]:
     return tuple(_enum_display_text(member) for member in enum_cls)
+
+
+_BOUNDED_DATETIME_FORMATS = (
+    ("2026-08-08 14:35 UTC", "%Y-%m-%d %H:%M %Z"),
+    ("Aug 8, 2026, 2:35 PM UTC", "%b %-d, %Y, %-I:%M %p %Z"),
+    ("2026-08-08T18:35:00Z", "%Y-%m-%dT%H:%M:%SZ"),
+)
+
+
+def _field_order_label(field_key: SignatureFieldKey) -> str:
+    return _field_label(field_key)
 
 
 def _standard_field_binding() -> SignatureFieldBinding:
@@ -448,6 +469,9 @@ class QtVisibleSignatureSetupForm:
         timezone_display_mode = bindings.q_combo_box()
         timezone_display_mode.addItems(_enum_combo_items(SignatureTimezoneDisplayMode))
 
+        datetime_format = bindings.q_combo_box()
+        datetime_format.addItems(tuple(label for label, _value in _BOUNDED_DATETIME_FORMATS))
+
         font_family = bindings.q_combo_box()
         font_family.addItems(
             _choice_combo_items(
@@ -464,6 +488,23 @@ class QtVisibleSignatureSetupForm:
         bold = bindings.q_check_box("Bold")
         italic = bindings.q_check_box("Italic")
         show_field_names = bindings.q_check_box("Show field names")
+        field_order = bindings.q_combo_box()
+        field_order.addItems(
+            tuple(_field_order_label(key) for key in SIGNATURE_FIELD_DISPLAY_ORDER)
+        )
+        move_field_up = bindings.q_push_button("Move field up")
+        move_field_down = bindings.q_push_button("Move field down")
+        text_color = bindings.q_line_edit()
+        text_color.setPlaceholderText("#RRGGBB")
+        border_show = bindings.q_check_box("Border")
+        border_color = bindings.q_line_edit()
+        border_color.setPlaceholderText("#RRGGBB")
+        border_width = bindings.q_double_spin_box()
+        border_width.setRange(0.1, 12.0)
+        border_width.setDecimals(1)
+        border_width.setSingleStep(0.5)
+        background_color = bindings.q_line_edit()
+        background_color.setPlaceholderText("#RRGGBB")
 
         text_layout.addRow(
             "Signer label / Stamp Position",
@@ -471,7 +512,7 @@ class QtVisibleSignatureSetupForm:
         )
         text_layout.addRow(
             "Layout / Timezone",
-            _compose_row(bindings, layout_template, timezone_display_mode),
+            _compose_row(bindings, layout_template, timezone_display_mode, datetime_format),
         )
         text_layout.addRow(
             "Font / Size",
@@ -481,6 +522,16 @@ class QtVisibleSignatureSetupForm:
             "Weight / Labels",
             _compose_row(bindings, bold, italic, show_field_names),
         )
+        text_layout.addRow(
+            "Field order",
+            _compose_row(bindings, field_order, move_field_up, move_field_down),
+        )
+        text_layout.addRow("Text color", text_color)
+        text_layout.addRow(
+            "Border",
+            _compose_row(bindings, border_show, border_color, border_width),
+        )
+        text_layout.addRow("Background color", background_color)
 
         layout.addWidget(summary_label)
         layout.addWidget(text_group)
@@ -495,8 +546,17 @@ class QtVisibleSignatureSetupForm:
             bold,
             italic,
             show_field_names,
+            datetime_format,
+            field_order,
+            text_color,
+            border_show,
+            border_color,
+            border_width,
+            background_color,
         ):
             self._connect_change_signal(control)
+        move_field_up.clicked.connect(self._move_field_up)  # type: ignore[attr-defined]
+        move_field_down.clicked.connect(self._move_field_down)  # type: ignore[attr-defined]
 
         return AppearanceControls(
             container=container,
@@ -510,6 +570,15 @@ class QtVisibleSignatureSetupForm:
             bold=bold,
             italic=italic,
             show_field_names=show_field_names,
+            datetime_format=datetime_format,
+            field_order=field_order,
+            move_field_up=move_field_up,
+            move_field_down=move_field_down,
+            text_color=text_color,
+            border_show=border_show,
+            border_color=border_color,
+            border_width=border_width,
+            background_color=background_color,
         )
 
     def _build_visible_text_controls(self) -> VisibleTextControls:
@@ -599,7 +668,21 @@ class QtVisibleSignatureSetupForm:
             self._appearance_controls.timezone_display_mode,
             _enum_display_text(appearance.timezone_display_mode),
         )
+        format_label = next(
+            (
+                label
+                for label, value in _BOUNDED_DATETIME_FORMATS
+                if value == appearance.datetime_format
+            ),
+            appearance.datetime_format,
+        )
+        _set_combo_text(self._appearance_controls.datetime_format, format_label, allow_custom=True)
         _set_checked(self._appearance_controls.show_field_names, appearance.show_field_names)
+        _set_combo_text(
+            self._appearance_controls.field_order,
+            _field_order_label(appearance.field_order[0]),
+        )
+        self._set_field_order_items(appearance.field_order)
         _set_combo_text(
             self._appearance_controls.font_family,
             appearance.text_style.font_family,
@@ -608,6 +691,17 @@ class QtVisibleSignatureSetupForm:
         _set_spin_value(self._appearance_controls.font_size, appearance.text_style.font_size_pt)
         _set_checked(self._appearance_controls.bold, appearance.text_style.bold)
         _set_checked(self._appearance_controls.italic, appearance.text_style.italic)
+        _set_text(self._appearance_controls.text_color, appearance.text_style.text_color_hex)
+        _set_checked(self._appearance_controls.border_show, appearance.box_style.show_border)
+        _set_text(self._appearance_controls.border_color, appearance.box_style.border_color_hex)
+        _set_spin_value(
+            self._appearance_controls.border_width,
+            appearance.box_style.border_width_pt,
+        )
+        _set_text(
+            self._appearance_controls.background_color,
+            appearance.box_style.background_color_hex,
+        )
 
     def _build_appearance_from_controls(self) -> SignatureAppearance:
         preserved = self._appearance_template
@@ -618,7 +712,12 @@ class QtVisibleSignatureSetupForm:
             italic=_is_checked(self._appearance_controls.italic),
             text_color_hex=preserved.text_style.text_color_hex,
         )
-        box_style = preserved.box_style
+        box_style = SignatureBoxStyle(
+            show_border=_is_checked(self._appearance_controls.border_show),
+            border_color_hex=_text(self._appearance_controls.border_color),
+            border_width_pt=_spin_value(self._appearance_controls.border_width),
+            background_color_hex=_text(self._appearance_controls.background_color),
+        )
 
         field_bindings = {
             field_key: self._build_field_binding(field_key)
@@ -639,8 +738,8 @@ class QtVisibleSignatureSetupForm:
                 SignatureTimezoneDisplayMode,
             ),
             show_field_names=_is_checked(self._appearance_controls.show_field_names),
-            datetime_format=preserved.datetime_format,
-            field_order=self._field_order,
+            datetime_format=self._datetime_format_value(),
+            field_order=self._field_order_from_controls(),
             distinguished_name=field_bindings[SignatureFieldKey.DISTINGUISHED_NAME],
             common_name=field_bindings[SignatureFieldKey.COMMON_NAME],
             email=field_bindings[SignatureFieldKey.EMAIL],
@@ -653,6 +752,55 @@ class QtVisibleSignatureSetupForm:
             box_style=box_style,
             image_stamp_path=preserved.image_stamp_path,
         )
+
+    def _datetime_format_value(self) -> str:
+        selected = _combo_text(self._appearance_controls.datetime_format)
+        for label, value in _BOUNDED_DATETIME_FORMATS:
+            if selected == label:
+                return value
+        return selected
+
+    def _field_order_from_controls(self) -> tuple[SignatureFieldKey, ...]:
+        labels = _combo_items(self._appearance_controls.field_order)
+        by_label = {_field_order_label(key): key for key in SIGNATURE_FIELD_DISPLAY_ORDER}
+        return tuple(by_label[label] for label in labels if label in by_label)
+
+    def _set_field_order_items(self, field_order: tuple[SignatureFieldKey, ...]) -> None:
+        combo = self._appearance_controls.field_order
+        clear = getattr(combo, "clear", None)
+        if callable(clear):
+            clear()
+        labels = tuple(_field_order_label(key) for key in field_order)
+        add_items = getattr(combo, "addItems", None)
+        if callable(add_items):
+            add_items(labels)
+
+    def _move_field_up(self) -> None:
+        self._move_field(-1)
+
+    def _move_field_down(self) -> None:
+        self._move_field(1)
+
+    def _move_field(self, offset: int) -> None:
+        combo = self._appearance_controls.field_order
+        index_getter = getattr(combo, "currentIndex", None)
+        setter = getattr(combo, "setCurrentIndex", None)
+        if not callable(index_getter) or not callable(setter):
+            return
+        current = int(index_getter())
+        labels = list(_combo_items(combo))
+        target = current + offset
+        if current < 0 or target < 0 or target >= len(labels):
+            return
+        labels[current], labels[target] = labels[target], labels[current]
+        clear = getattr(combo, "clear", None)
+        add_items = getattr(combo, "addItems", None)
+        if callable(clear) and callable(add_items):
+            clear()
+            add_items(tuple(labels))
+            setter(target)
+            self._field_order = self._field_order_from_controls()
+            self._on_any_control_changed()
 
     def _load_field_visibility_controls(self, appearance: SignatureAppearance) -> None:
         for field_key, binding in appearance.iter_field_bindings():

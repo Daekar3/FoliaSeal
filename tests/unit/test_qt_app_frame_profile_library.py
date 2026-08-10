@@ -220,6 +220,27 @@ def test_document_independent_appearance_editor_saves_without_active_document() 
     assert profile.appearance.signer_label_prefix == "Signed by Board"
 
 
+def test_appearance_editor_rejects_empty_semantic_content() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    errors: list[str] = []
+    editor = AppearanceProfileEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        on_error=errors.append,
+    )
+    for check_box in editor.controls.setup_form._field_visibility_checks.values():  # noqa: SLF001
+        check_box.setChecked(False)
+
+    editor.controls.name_input.setText("Empty appearance")
+    editor.controls.save_button.click()
+
+    assert errors == ["An Appearance must contain visible signing text or an image."]
+    assert service.view().appearance_names == ()
+
+
 def test_document_independent_appearance_editor_edit_preserves_identity_and_cancel_isolation(
 ) -> None:
     service = ReusableSigningObjects(

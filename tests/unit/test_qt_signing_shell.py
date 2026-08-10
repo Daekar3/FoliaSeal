@@ -389,6 +389,9 @@ class _FakeComboBox(_FakeWidget):
     def currentText(self):
         return self._current
 
+    def currentIndex(self):  # noqa: N802
+        return self.findText(self._current)
+
     def findText(self, text):  # noqa: N802
         try:
             return self._items.index(text)
@@ -2846,7 +2849,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
-        == 4
+        == 8
     )
     assert widget.properties_panel._placement_controls.container.parent is None
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
@@ -3064,11 +3067,13 @@ def test_signing_shell_refinement_dialog_saves_placement_profile_without_applyin
     assert not hasattr(widget, "document_text_find_button")
     assert not hasattr(widget, "sign_result_label")
     assert not hasattr(widget.properties_panel, "field_controls")
-    assert not hasattr(widget.properties_panel._appearance_controls, "datetime_format")
+    assert widget.properties_panel._appearance_controls.datetime_format.currentText() == (
+        "%Y-%m-%d %H:%M:%S %Z"
+    )
     assert not hasattr(widget.properties_panel._appearance_controls, "image_stamp_path")
-    assert not hasattr(widget.properties_panel._appearance_controls, "text_color")
-    assert not hasattr(widget.properties_panel._appearance_controls, "background_color")
-    assert not hasattr(widget.properties_panel._appearance_controls, "border_show")
+    assert widget.properties_panel._appearance_controls.text_color.text() == "#000000"
+    assert widget.properties_panel._appearance_controls.background_color.text() == "#FFFFFF"
+    assert widget.properties_panel._appearance_controls.border_show.isChecked() is True
     assert not hasattr(widget.properties_panel._certificate_controls, "password_input")
 
 
