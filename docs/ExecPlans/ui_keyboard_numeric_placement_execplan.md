@@ -80,6 +80,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'Arrow|resize|Delete|Undo|Redo|snap' src/foliaseal/presentation/qt/signing_workspace_properties_panel.py src/foliaseal/application/workspace_interaction_session.py src/foliaseal/presentation/qt/viewer_widget.py
     .venv/bin/pytest -q tests/unit/test_workspace_interaction_session.py tests/unit/test_qt_viewer_widget.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -87,8 +88,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -104,6 +105,9 @@ leave the full suite green, and the GUI audit must record the visible result and
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
 test command/result, keyboard input sequence and observed rectangle/undo state, evidence path and
 cleanup result, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

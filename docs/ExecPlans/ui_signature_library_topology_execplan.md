@@ -7,14 +7,17 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can a modeless, document-independent, preset-first three-column Signature Library in the real FoliaSeal GUI. It is mapped to UI_SPEC SUR03, LAY04, WF06, and normative Library topology SVG. The
+After this slice, a user can open a modeless, document-independent, preset-first three-column Signature Library in the real FoliaSeal GUI. It is mapped to UI_SPEC SUR03, LAY04, WF06, and normative Library topology SVG. The
 slice is one vertical path through the relevant persistent model,
 application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md and docs/ExecPlans/ui_command_model_shortcuts_execplan.md
+- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
+- [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
+- [ ] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 
 ## Progress
 
@@ -90,6 +93,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'ReusableObjectLibraryDialog|show_reusable_object_library' src/foliaseal/presentation/qt/app_frame_profile_library.py src/foliaseal/presentation/qt/app_frame.py
     .venv/bin/pytest -q tests/unit/test_reusable_signing_objects.py tests/unit/test_qt_app_frame.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -97,8 +101,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -115,6 +119,9 @@ Before checking this child in the parent, record the governing UI_SPEC requireme
 `docs/ui/signature-library-presets-exploratory.svg`, exact focused test command/result, GUI input
 sequence and observed three-column/session state, evidence path and cleanup result, serialized
 refresh result, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

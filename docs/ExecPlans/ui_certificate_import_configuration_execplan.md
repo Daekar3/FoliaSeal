@@ -7,14 +7,15 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can content-validated Certificate import and configuration catalog behavior in the real FoliaSeal GUI. It is mapped to SPEC managed certificate workflow and UI_SPEC section 15. The
+After this slice, a user can import a validated Certificate, inspect it, configure it for signing, and recover cleanly from rejection in the real FoliaSeal GUI. It is mapped to SPEC managed certificate workflow and UI_SPEC section 15. The
 slice is one vertical path through the relevant persistent model,
 application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md and docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
+- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
+- [ ] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
 
 ## Progress
 
@@ -85,6 +86,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'import_|configuration|private|issuer|validity' src/foliaseal/application/certificate_manager.py src/foliaseal/application/certificate_catalog_repository.py src/foliaseal/presentation/qt/app_frame_certificate_management.py
     .venv/bin/pytest -q tests/unit/test_certificate_manager.py tests/unit/test_certificate_catalog_repository.py tests/unit/test_qt_app_frame_certificate_management.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -92,8 +94,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -118,6 +120,9 @@ missing-private-key inputs leave no residue.
 Before completion, record the exact import/catalog/Qt test command and result, the GUI import and
 configuration sequence, retained-but-unconfigured observation, evidence path, serialized fixture
 compatibility result, cleanup, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

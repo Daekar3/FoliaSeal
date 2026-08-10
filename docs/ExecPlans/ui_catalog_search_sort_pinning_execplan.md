@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can persistent catalog search, sort, pinning, naming, and deletion semantics in the real FoliaSeal GUI. It is mapped to UI_SPEC sections 6 and 14; SCHEMAS storage rules. The
+After this slice, a user can search, sort, pin, rename, duplicate, and delete catalog entries safely across restarts in the real FoliaSeal GUI. It is mapped to UI_SPEC sections 6 and 14; SCHEMAS storage rules. The
 slice is one vertical path through the relevant persistent model,
 application workflow, Qt surface, focused tests, and observable acceptance.
 
@@ -15,6 +15,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
 - [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
+- [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
 
 ## Progress
 
@@ -67,11 +68,10 @@ Implement case-insensitive live search, Name A-Z/Z-A sorting, expiration sort fo
 through private widgets. Keep schema and terminology aligned with the frozen documents. When a
 legacy path is replaced, prove its callers are migrated before deleting it.
 
-Own the `library_last_catalog` and `library_sort` settings in the AppSettings schema/store (or
-record a governing-document decision if those keys are intentionally renamed); do not leave this
-restart behavior as an implicit widget concern. Add a before/after AppSettings serialized fixture,
-prove old settings are read or deliberately rejected with a clear fallback, and keep Library open
-state/session drafts non-restorable.
+Consume the canonical AppSettings keys owned by
+`docs/ExecPlans/ui_window_theme_responsive_execplan.md` for `library_last_catalog` and
+`library_sort`; do not create a second settings schema. Add catalog fixtures proving those keys are
+preserved while Library open state/session drafts remain non-restorable.
 
 ## Milestones
 
@@ -86,6 +86,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'pin|sort|search|duplicate|delete|display_name' src/foliaseal/application/reusable_signing_models.py src/foliaseal/application/reusable_signing_objects.py src/foliaseal/infra/config/profile_storage.py
     .venv/bin/pytest -q tests/unit/test_reusable_signing_models.py tests/unit/test_reusable_signing_objects.py tests/unit/test_signature_preset_storage.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -93,8 +94,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -117,6 +118,9 @@ after rename or merged search results.
 Before completion, record the exact catalog/AppSettings test command and result, the GUI search,
 sort, pin, rename, and delete sequence with observed rows, the evidence path and restart result,
 serialized fixture compatibility result, cleanup, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

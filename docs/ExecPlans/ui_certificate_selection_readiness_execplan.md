@@ -7,14 +7,17 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can per-document Certificate selection and readiness states in the real FoliaSeal GUI. It is mapped to SPEC goals 6–7 and UI_SPEC sections 3, 11, and 15. The
+After this slice, a user can select a Certificate for the current document and understand whether signing is ready, blocked, or caveated in the real FoliaSeal GUI. It is mapped to SPEC goals 6–7 and UI_SPEC sections 3, 11, and 15. The
 slice is one vertical path through the relevant persistent model,
 application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md, docs/ExecPlans/ui_first_use_preset_setup_execplan.md, docs/ExecPlans/ui_certificate_import_configuration_execplan.md, and docs/ExecPlans/ui_certificate_create_export_password_execplan.md
+- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
+- [ ] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
+- [ ] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
 
 ## Progress
 
@@ -80,6 +83,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'certificate|ready|expired|password' src/foliaseal/presentation/qt/signing_workspace_properties_panel.py src/foliaseal/application/signing_setup_session.py src/foliaseal/application/signing_material_resolver.py
     .venv/bin/pytest -q tests/unit/test_signing_setup_session.py tests/unit/test_signing_material_resolver.py tests/unit/test_qt_signing_shell.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -87,8 +91,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -109,6 +113,9 @@ Selecting a partial preset never carries a certificate from another document.
 
 Before completion, record the exact resolver/coordinator test command and result, the GUI selection
 sequence and ready/warning/blocked observations, evidence path, cleanup, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

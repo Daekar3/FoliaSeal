@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can atomic sign/write safety, password flow, restriction checks, and source replacement in the real FoliaSeal GUI. It is mapped to SPEC Output Behavior and UI_SPEC WF04/WF05/section 16. The
+After this slice, a user can sign and save safely with password prompts, restriction checks, and explicit source replacement in the real FoliaSeal GUI. It is mapped to SPEC Output Behavior and UI_SPEC WF04/WF05/section 16. The
 slice is one vertical path through the relevant model, application workflow,
 Qt surface, focused tests, and observable acceptance.
 
@@ -90,6 +90,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'overwrite|temporary|verify|password|restriction' src/foliaseal/application/sign_pdf_use_case.py src/foliaseal/application/signing_completion.py src/foliaseal/application/output_path_policy.py src/foliaseal/application/pdf_compatibility.py
     .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_signing_completion.py tests/unit/test_output_path_policy.py tests/unit/test_pdf_compatibility.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -97,8 +98,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest|build_deb|build_pyinstaller' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the staged-output byte comparison, password/restriction results, and mandatory
 Qt/integration observation of confirmation and recovery; the bounded timeout is only a lifecycle
@@ -126,6 +127,9 @@ artifact with recovery actions.
 Before completion, record the exact password/overwrite/recovery test command and result, the GUI
 input sequence and observed confirmation/error state, the evidence path, byte-preservation and
 cleanup results, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

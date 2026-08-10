@@ -7,14 +7,16 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can authoritative on-document preview, frozen time, image normalization, and fit/glyph blocking in the real FoliaSeal GUI. It is mapped to SPEC goal 4 and UI_SPEC section 9 and acceptance scenario 5. The
+After this slice, a user can preview the authoritative signed appearance with frozen time, normalized images, and clear fit/glyph blocking in the real FoliaSeal GUI. It is mapped to SPEC goal 4 and UI_SPEC section 9 and acceptance scenario 5. The
 slice is one vertical path through the relevant persistent model,
 application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md, docs/ExecPlans/ui_appearance_content_layout_execplan.md, and docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
+- [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
+- [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
 
 ## Progress
 
@@ -81,6 +83,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'render|fit|glyph|time|image' src/foliaseal/application/signing_preview_renderer.py src/foliaseal/presentation/qt/signature_preview_layout.py src/foliaseal/application/visible_signature_fit_validator.py
     .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py tests/unit/test_signature_preview_layout.py tests/unit/test_visible_signature_fit_validator.py tests/unit/test_visible_signature_rendered_fit_adapters.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -88,8 +91,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -111,6 +114,9 @@ font, geometry, image prominence, and frozen time are equal in preview and signe
 Before completion, record the exact render/layout/fit test command and result, the GUI preview input
 sequence and parity observation, owned `docs/ui/appearance-profile-editor-exploratory.svg` agreement,
 evidence path, cleanup, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

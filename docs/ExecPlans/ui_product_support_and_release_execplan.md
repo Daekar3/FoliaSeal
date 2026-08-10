@@ -101,7 +101,9 @@ packaging files, and truthful documentation. Do not add V2 features or broad unr
 
 ## Plan of Work
 
-Complete this final integration slice in four explicit milestones: Settings/geometry persistence;
+Complete this final integration slice in four explicit milestones: integrate the Settings/geometry
+contract owned by `ui_window_theme_responsive_execplan.md` (this plan does not own its schema or
+storage);
 accessibility and input-independent behavior; local Markdown Help/diagnostics/privacy; then
 PyInstaller/.deb packaging and the complete acceptance matrix. Each milestone owns its tests and
 evidence, while this plan owns only the final cross-milestone wiring and negative anti-goal audit.
@@ -117,7 +119,9 @@ earlier behavior children must not add package files or package smoke evidence.
 
 ## Milestones
 
-Milestone 1 owns typed Settings/geometry persistence and accessibility/input-independent behavior.
+Milestone 1 owns accessibility/input-independent behavior and acceptance of the typed Settings/
+geometry persistence implemented by `ui_window_theme_responsive_execplan.md`; it does not redefine
+those keys or storage.
 Milestone 2 owns local Markdown Help, diagnostics, privacy, and parity tests. Milestone 3 builds and
 extracts the Debian package, runs the installed wrapper and `pdftoppm` checks, then records the full
 offline/accessibility/UI-scenario matrix and cleanup.
@@ -129,6 +133,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'help|settings|theme|packag|diagnostic|privacy' src/foliaseal/infra/config/app_settings_storage.py src/foliaseal/presentation/qt/app_frame.py src/foliaseal/__main__.py src/foliaseal/build
     .venv/bin/pytest -q tests/unit/test_app_settings_storage.py tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_certificate_management.py tests/unit/test_certificate_manager.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
     .venv/bin/python -m foliaseal --help
     .venv/bin/pytest -q tests/unit/test_app_settings_storage.py tests/unit/test_qt_app_frame.py
@@ -158,8 +163,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest|build_deb|build_pyinstaller' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the installed-package, offline, accessibility, and Help observations plus
 their exact procedures and evidence paths; the bounded timeout is only a lifecycle check. Record
@@ -185,6 +190,9 @@ then run the global anti-goal audit and all ten UI_SPEC scenarios.
 Before completion, record the exact Settings/accessibility/Help/package commands and results, the
 offline and accessibility procedure with observed output, extracted-package launcher evidence,
 evidence paths, cleanup, anti-goal audit, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

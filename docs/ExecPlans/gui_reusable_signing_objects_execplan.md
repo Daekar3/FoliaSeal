@@ -4,6 +4,11 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
+> **Superseded by the UI_SPEC v1 compliance corpus.** Its refinement-dialog management model is
+> historical. New implementation work must use the modeless, document-independent Library
+> topology and editor children in `docs/ExecPlans/ui_signature_library_topology_execplan.md`,
+> `ui_signature_preset_transactions_execplan.md`, and the related appearance/placement plans.
+
 ## Purpose / Big Picture
 
 After this change, a user will be able to refine a signing setup in document context and then save that work as reusable named objects instead of losing it as one-off current-document state. A novice will be able to create an appearance profile, create a placement profile, create a signature preset that composes them, and later re-select those saved objects from the main shell. This is the core missing product behavior blocking the audited GUI from matching `docs/SPEC.md`.

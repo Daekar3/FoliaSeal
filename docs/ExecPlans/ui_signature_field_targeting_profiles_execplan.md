@@ -7,14 +7,16 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can explicit unsigned-field targeting and exact Placement profile mismatch handling in the real FoliaSeal GUI. It is mapped to UI_SPEC WF02, section 10, SUR06, and acceptance scenario 4. The
+After this slice, a user can target an unsigned field and understand exact Placement-profile mismatches in the real FoliaSeal GUI. It is mapped to UI_SPEC WF02, section 10, SUR06, and acceptance scenario 4. The
 slice is one vertical path through the relevant persistent model,
 application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md, docs/ExecPlans/ui_first_use_preset_setup_execplan.md, and docs/ExecPlans/ui_pointer_signature_placement_execplan.md
+- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md
+- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
+- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
 
 ## Progress
 
@@ -80,6 +82,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'field|placement|mismatch|current_page' src/foliaseal/application/document_review.py src/foliaseal/application/signing_setup_session.py src/foliaseal/application/reusable_signing_models.py
     .venv/bin/pytest -q tests/unit/test_document_review.py tests/unit/test_signing_setup_session.py tests/unit/test_reusable_signing_models.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -87,8 +90,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record field/profile inputs, observed mismatch action, evidence path, and cleanup
@@ -104,6 +107,9 @@ leave the full suite green, and the GUI audit must record the visible result and
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
 test command/result, field/profile input sequence and observed mismatch action, evidence path and
 cleanup result, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

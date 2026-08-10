@@ -2,6 +2,11 @@
 
 This ExecPlan is a living document maintained under `.agents/skills/write-execplan/PLANS.md`.
 
+> **Superseded by the UI_SPEC v1 compliance corpus.** This historical plan documents the former
+> `current_page`/`page_selection_mode` storage shape. Do not use it as an implementation contract;
+> `docs/ExecPlans/ui_placement_editor_transaction_execplan.md` owns the frozen SCHEMAS.md v2
+> migration and must reconcile the already-landed behavior before deleting legacy fields.
+
 ## Purpose / Big Picture
 
 Users can save the currently edited visible-signature rectangle as a named reusable Placement Profile without applying it to the PDF or closing the refinement dialog. The saved profile means “use this rectangle on the current page,” not “use page N of this document,” so it remains reusable across PDFs.

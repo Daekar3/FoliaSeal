@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can minimum-size, theme, DPI, monitor, and persisted window behavior in the real FoliaSeal GUI. It is mapped to UI_SPEC section 12 and acceptance scenario 9. The
+After this slice, a user can use the application at minimum size, across themes/DPI/monitors, with safe persisted window behavior in the real FoliaSeal GUI. It is mapped to UI_SPEC section 12 and acceptance scenario 9. The
 slice is intentionally one vertical path through the relevant persistent
 model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
 generic refactor.
@@ -66,12 +66,17 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Enforce the 1100x700 main and 1000x650 Library minimums, remembered geometry/rail width, System/Light/Dark palette selection, high-DPI scaling, monitor clamping, and non-wrapping toolbar behavior. Do not let PDF or appearance colors follow the app palette. Add typed seams where the current code passes raw widget internals or compatibility
+Own the canonical AppSettings UI keys and migration: appearance mode, main-window geometry and
+maximized state, signing-rail divider, Library geometry, Library columns, last catalog, and sort.
+Enforce the 1100x700 main and 1000x650 Library
+minimums, remembered geometry/rail width, System/Light/Dark palette selection, high-DPI scaling,
+monitor clamping, and non-wrapping toolbar behavior. Do not let PDF or appearance colors follow the app palette. Add typed seams where the current code passes raw widget internals or compatibility
 kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
 old path once focused tests prove no callers remain. Keep user-facing terminology from UI_SPEC.md,
 not schema/backend names. Add typed AppSettings keys for geometry and Library preferences, write a
 before/after serialized fixture, and prove old settings are read or deliberately rejected with a
-clear fallback before wiring the widgets.
+clear fallback before wiring the widgets. Reconcile `linux_packaging_channel` with SCHEMAS.md as
+either implementation metadata or an explicit removal/rejection; do not create a second persistence schema.
 
 ## Milestones
 
@@ -86,6 +91,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'setMinimumSize|AppSettings|geometry|theme' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/infra/config/app_settings_storage.py
     .venv/bin/pytest -q tests/unit/test_app_settings_storage.py tests/unit/test_qt_app_frame.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -93,8 +99,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record resize/theme/restart inputs, observed geometry/palette, evidence path, and
@@ -111,6 +117,9 @@ and cleanup. A passing import or unit test without the stated user-visible behav
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
 test command/result, resize/theme/restart input sequence and observed geometry, evidence path and
 cleanup result, serialized settings result, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

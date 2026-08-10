@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can safe document close/replacement and secret-free recovery handling in the real FoliaSeal GUI. It is mapped to UI_SPEC WF01, WF05, section 16, and acceptance scenarios 6 and 7. The
+After this slice, a user can close or replace a document safely and recover without retaining passwords or destroying a draft in the real FoliaSeal GUI. It is mapped to UI_SPEC WF01, WF05, section 16, and acceptance scenarios 6 and 7. The
 slice is intentionally one vertical path through the relevant persistent
 model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
 generic refactor.
@@ -15,7 +15,9 @@ generic refactor.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are the frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md, docs/ExecPlans/ui_single_instance_open_routing_execplan.md, and docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
+- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
 
 ## Progress
 
@@ -84,6 +86,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'close|discard|recovery|password' src/foliaseal/presentation/qt/app_frame_workspace_open.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_workspace_lifecycle.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_workspace_lifecycle.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -91,8 +94,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
@@ -117,6 +120,9 @@ Before completion, record agreement with `docs/ui/main-workspace-document-open-e
 the exact lifecycle/recovery test command and result, each close/replace/
 success/exit password-clearing observation, GUI input sequence, evidence path, cleanup, and
 compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

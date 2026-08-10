@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can verified-result guidance, preserved-artifact recovery, reopen, and later approval in the real FoliaSeal GUI. It is mapped to SPEC primary story and UI_SPEC WF05/SUR06/section 16. The
+After this slice, a user can understand verification results, recover preserved artifacts, reopen the document, and add a later approval in the real FoliaSeal GUI. It is mapped to SPEC primary story and UI_SPEC WF05/SUR06/section 16. The
 slice is one vertical path through the relevant model, application workflow,
 Qt surface, focused tests, and observable acceptance.
 
@@ -81,6 +81,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'verify|reopen|recovery|signature|permission' src/foliaseal/application/document_review.py src/foliaseal/application/signing_completion.py src/foliaseal/presentation/qt/app_frame_workspace_open.py
     .venv/bin/pytest -q tests/unit/test_signing_completion.py tests/unit/test_document_review.py tests/unit/test_qt_app_frame_workspace_open.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -88,8 +89,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest|build_deb|build_pyinstaller' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record recovery inputs, observed verification/reopen state, evidence path, and cleanup
@@ -113,6 +114,9 @@ the workspace; reopening the signed output exposes later approval signing only w
 Before completion, record the exact verification/reopen test command and result, successful and
 failed GUI recovery sequences, every-signature verification observation, evidence path, cleanup,
 and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

@@ -95,6 +95,7 @@ Run from /home/daekar/FoliaSeal.
     .venv/bin/pytest -q tests/unit/test_qt_app_frame_workspace_open.py
     .venv/bin/pytest -q tests/integration/test_single_instance_open_routing.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -103,7 +104,11 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     primary_log="$audit_root/primary.log"
     secondary_log="$audit_root/secondary.log"
     QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui >"$primary_log" 2>&1 & primary_pid=$!
+    set +e
     timeout --foreground 10s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf >"$secondary_log" 2>&1
+    secondary_rc=$?
+    set -e
+    test "$secondary_rc" -eq 0 || test "$secondary_rc" -eq 124
     kill -TERM "$primary_pid" 2>/dev/null || true; wait "$primary_pid" 2>/dev/null || true
     rg -n 'forwarded|already running|open request' "$primary_log" "$secondary_log"
     ! ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg '
@@ -131,6 +136,9 @@ explicit cancel action; no second window or tab is created.
 Before completion, record the exact two-process test and smoke command results, primary/secondary
 input sequence and forwarding logs, evidence path, cleanup of both owned processes and temp roots,
 and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

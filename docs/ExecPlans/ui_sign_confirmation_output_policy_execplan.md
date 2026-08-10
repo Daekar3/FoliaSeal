@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can explicit confirmation and destination policy before signing in the real FoliaSeal GUI. It is mapped to SPEC output behavior and UI_SPEC WF04 section 11. The
+After this slice, a user can confirm the signing objects and destination before signing in the real FoliaSeal GUI. It is mapped to SPEC output behavior and UI_SPEC WF04 section 11. The
 slice is one vertical path through the relevant model, application workflow,
 Qt surface, focused tests, and observable acceptance.
 
@@ -80,6 +80,7 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'confirm|output|Save As|Sign and save' src/foliaseal/presentation/qt/signing_workspace_action_bridge.py src/foliaseal/application/output_path_policy.py src/foliaseal/presentation/qt/signing_action_coordinator.py
     .venv/bin/pytest -q tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_output_path_policy.py tests/unit/test_qt_signing_shell.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
@@ -87,8 +88,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf || test "$?" -eq 124
     ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest|build_deb|build_pyinstaller' | rg -v 'rg ' || true
-    find "$audit_root" -mindepth 1 -maxdepth 2 -type f -delete
-    rmdir "$audit_root" 2>/dev/null || true
+    rm -rf "$audit_root"
+    test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record Save/Sign/Replace inputs, observed wording, evidence path, and cleanup result;
@@ -113,6 +114,9 @@ Before completion, record agreement with `docs/ui/sign-and-save-states-explorato
 confirmation/output-policy test command and result, the GUI
 Save/Sign/Replace sequence and observed wording, owned sign-and-save SVG agreement, evidence path,
 cleanup, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

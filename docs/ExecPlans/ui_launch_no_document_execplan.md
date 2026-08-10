@@ -83,12 +83,17 @@ Run from /home/daekar/FoliaSeal.
     rg -n -e 'FoliaSealAppFrame|launch_qt_app_frame' src/foliaseal/presentation/qt/app_frame.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py
     .venv/bin/ruff check src tests
+    .venv/bin/pytest -q
     git diff --check
 
 Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated configuration root:
 
     audit_root=$(mktemp -d /tmp/foliaseal-plan-audit-XXXXXX)
+    set +e
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui
+    gui_rc=$?
+    set -e
+    test "$gui_rc" -eq 0 || test "$gui_rc" -eq 124
     ! ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg '
     rm -rf "$audit_root"
 
@@ -110,6 +115,9 @@ Before checking this child in the parent, record the governing UI_SPEC requireme
 `docs/ui/main-workspace-document-open-exploratory.svg`, exact focused test command/result,
 no-document launch and tab-order input sequence, observed frame state, evidence path and cleanup
 result, and compatibility grep proof.
+
+Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+"no SVG" decision alongside the evidence row.
 
 ## Idempotence and Recovery
 

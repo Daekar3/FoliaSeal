@@ -121,6 +121,11 @@ The JSON shape may be replaced because V1 does not require compatibility with ol
 
 ## Artifacts and Notes
 
+> **Superseded by the UI_SPEC v1 compliance corpus.** The persisted shape below records the former
+> `page_selection_mode` contract for historical context only. Use
+> `docs/ExecPlans/ui_placement_editor_transaction_execplan.md` and frozen `docs/SCHEMAS.md` v2 for
+> all new work and migration decisions.
+
 Expected new persisted shape is a single catalog with lists similar to:
 
     appearance_profiles: [{ appearance_profile_id, display_name, appearance }]

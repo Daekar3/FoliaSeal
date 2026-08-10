@@ -7,7 +7,13 @@ implement the frozen product contract in docs/SPEC.md and docs/UI_SPEC.md.
 In this document, AFK means “agent can implement and validate without a pending human product
 decision.” A Qt port is a small typed interface between application behavior and Qt widgets. A
 compatibility surface is an adapter retained only for old callers. “phase3” is legacy evidence or
-harness nomenclature, not a product feature name.
+harness nomenclature, not a product feature name. A vertical slice is one complete path from stored
+data through application logic and the GUI to a user-observable result. A red test is a focused test
+that fails before the behavior exists; green means it passes after implementation. CRUD means create,
+read, update, and delete. PKCS#12 is the password-protected certificate bundle format used by
+`.p12`/`.pfx` files. A glyph is one rendered character shape; DPI is display pixel density;
+headless means without a display; and display-backed means running with a real display for human
+interaction or screenshots.
 
 ## Purpose / Big Picture
 
@@ -25,28 +31,41 @@ child migrates their consumers, provided the child records the retirement eviden
 
 ## Child ExecPlan Dependencies
 
-The following children are created in dependency order. A child may begin only when its listed
-predecessors are checked off in this parent and in the child plan itself.
+The following children are grouped into dependency tranches. A child may begin only when its listed
+predecessors are checked off in this parent and in the child plan itself. The foundation tranche is
+deliberately small: it settles application startup, typed restart settings, and placement storage
+before any reusable-object or signing UI is allowed to persist data.
+
+Foundation tranche:
 
 - [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
 - [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
 - [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
+- [ ] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
+
+Document-flow tranche:
+
+- [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
 - [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
 - [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
 - [ ] docs/ExecPlans/ui_document_search_selection_execplan.md
 - [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md
 - [ ] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
+
+Reusable-object and certificate tranche:
+
 - [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
 - [ ] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
 - [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
-- [ ] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 - [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
 - [ ] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
 - [ ] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
 - [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+
+Placement, preview, and signing tranche:
+
 - [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
 - [ ] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md
 - [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
@@ -56,6 +75,9 @@ predecessors are checked off in this parent and in the child plan itself.
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [ ] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
 - [ ] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
+
+Release tranche:
+
 - [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md
 
 ## Progress
@@ -64,6 +86,9 @@ predecessors are checked off in this parent and in the child plan itself.
 - [x] (2026-08-09) Created and structurally reviewed all 29 child ExecPlans in dependency order.
 - [x] (2026-08-09) Added requirement traceability, exact live paths, executable validation commands,
   schema/SVG ownership, and milestone/evidence requirements before implementation.
+- [x] (2026-08-09) Reordered the corpus into foundation, document-flow, reusable-object/certificate,
+  placement/preview/signing, and release tranches; placement storage and typed settings now precede
+  any child that persists reusable objects.
 - [ ] (2026-08-09) Resolve the live contract blockers identified during review: default GUI signing
   execution, placement-schema alignment, Library/AppSettings restart state, and a real
   single-instance process boundary.
@@ -110,6 +135,17 @@ predecessors are checked off in this parent and in the child plan itself.
   prerequisites, not assumptions hidden inside later GUI work.
   Rationale: the default signing executor, placement schema fields, restart settings, and process
   routing determine whether the UI contract can be exercised end to end.
+  Date/Author: 2026-08-09 / Codex
+- Decision: make the placement v2 schema and AppSettings key ownership explicit before dependent
+  children persist data.
+  Rationale: the live placement model and untyped `ui` mapping otherwise allow parallel children to
+  invent incompatible serialized contracts.
+  Date/Author: 2026-08-09 / Codex
+- Decision: treat placement schema migration and typed AppSettings as foundation work, while keeping
+  the placement editor’s Library mounting in the reusable-object tranche.
+  Rationale: persistence contracts must be settled before Library, preset, certificate, or signing
+  UI can safely write data; separating the schema milestone avoids a circular dependency between the
+  placement editor and the Library that hosts it.
   Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
@@ -215,10 +251,12 @@ labels after that audit; they may not rename the backend opportunistically.
 
 ## Milestones
 
-Milestone 1 is the contract gate: confirm the frozen SPEC/UI_SPEC/SCHEMAS requirements, resolve
-the placement serialization decision, and make every child’s focused red test and exact live paths
-available. Milestone 2 is the dependency-ordered vertical implementation: foundation and document
-flow first, reusable objects and certificates next, then placement, preview, signing, and recovery;
+Milestone 1 is the contract and foundation gate: confirm the frozen SPEC/UI_SPEC/SCHEMAS requirements,
+make startup and typed restart settings work, migrate placement persistence to v2, and make every
+child’s focused red test and exact live paths available. At the end of this gate, no later child may
+invent a settings or placement shape. Milestone 2 is the dependency-ordered vertical implementation: startup, typed settings,
+and placement persistence first; document flow next; reusable objects and certificates next; then
+placement interactions, preview, signing, and recovery;
 each completed child must leave focused tests and a recorded GUI observation. Milestone 3 is the
 release gate: run the two-process routing check, offline/accessibility/help matrix, extracted
 package launcher check, all ten UI scenarios, anti-goal audit, and cleanup before checking every
@@ -233,6 +271,12 @@ All commands run from /home/daekar/FoliaSeal.
     sed -n '1,530p' docs/UI_SPEC.md
     rg -n "phase3|compat|manual assembly|Signature Library|Sign and save" src tests docs
 
+Do not begin the document-flow or reusable-object tranches until the foundation gate is green. Its
+observable proof is: `foliaseal gui` starts without a document; a restart preserves only the typed
+window/settings keys; a before/after fixture reads or clearly rejects the old settings shape; and a
+legacy placement fixture is converted to SCHEMAS.md v2 with a concrete `page_number` and no
+serialized `page_selection_mode`.
+
 For each child, follow its exact commands. The common validation baseline is:
 
     .venv/bin/pytest -q
@@ -241,15 +285,22 @@ For each child, follow its exact commands. The common validation baseline is:
 
     audit_root=$(mktemp -d /tmp/foliaseal-ui-audit-XXXXXX)
     trap 'pkill -TERM -f "foliaseal|FoliaSeal" 2>/dev/null || true; rm -rf "$audit_root"' EXIT
+    set +e
     timeout --foreground 30s env QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME="$audit_root/config" XDG_CACHE_HOME="$audit_root/cache" .venv/bin/python -m foliaseal gui --pdf-path artifacts/preview_sweep_assets/sweep_fixture.pdf
+    gui_rc=$?
+    set -e
+    test "$gui_rc" -eq 0 || test "$gui_rc" -eq 124
     ! ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg '
+    rm -rf "$audit_root"
     test ! -e "$audit_root"
 
 The common command is only a lifecycle/cleanup smoke check. Each child that claims a visual or
 interactive result must add a bounded display-backed or Qt-test walkthrough that records widget
 state, input sequence, expected observation, and an evidence file under ignored `artifacts/`; an
 offscreen timeout alone is never accepted as proof of a GUI behavior. Never leave FoliaSeal
-processes, dialogs, or generated artifacts behind.
+processes, dialogs, or generated artifacts behind. Child cleanup must terminate only processes it
+owns, remove the exact temporary root with `rm -rf`, and assert that the root is gone; do not hide
+cleanup failures behind `rmdir ... || true` or broad `find` deletions.
 
 ## Validation and Acceptance
 
@@ -295,3 +346,5 @@ Revision note: 2026-08-09 / Codex
 Created after approval of the 29-slice SPEC/UI_SPEC breakdown.
 Updated after the second review wave to add schema/SVG ownership, executable package/process
 evidence, milestone gates, and explicit GUI-observation requirements.
+Updated after blocker review to add explicit implementation tranches and make placement/AppSettings
+contracts prerequisites for reusable-object and signing UI work.
