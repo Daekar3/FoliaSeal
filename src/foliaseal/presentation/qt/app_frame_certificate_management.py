@@ -37,7 +37,9 @@ class CertificateImportDialogControls:
     display_name: Any
     passphrase: Any
     save_password: Any
+    inspection_label: Any
     choose_button: Any
+    inspect_button: Any
     import_button: Any
     cancel_button: Any
 
@@ -115,6 +117,7 @@ class CertificateImportDialog:
         self._certificate_manager = certificate_manager
         self._on_import = on_import
         self.import_result = None
+        self._inspection = None
         self.controls = self._build_controls(parent=parent)
 
     def exec(self) -> Any | None:
@@ -141,6 +144,8 @@ class CertificateImportDialog:
         return selected_path
 
     def import_certificate(self) -> Any | None:
+        if self.inspect_certificate() is None:
+            return None
         source_path = self.controls.certificate_path.text().strip()
         display_name = self.controls.display_name.text().strip() or Path(source_path).stem
         passphrase = self.controls.passphrase.text()
@@ -173,6 +178,33 @@ class CertificateImportDialog:
             accept()
         return result
 
+    def inspect_certificate(self) -> Any | None:
+        """Validate the selected source and render non-secret inspection facts."""
+        source_path = self.controls.certificate_path.text().strip()
+        passphrase = self.controls.passphrase.text()
+        try:
+            inspection = self._certificate_manager.inspect_import(source_path, passphrase)
+        except Exception as exc:
+            self._inspection = None
+            self.controls.inspection_label.setText("Inspection failed. " + str(exc))
+            self._show_error(str(exc))
+            return None
+        self._inspection = inspection
+        warning_text = (
+            "\nWarnings: " + " ".join(inspection.warnings)
+            if inspection.warnings
+            else "\nWarnings: none."
+        )
+        self.controls.inspection_label.setText(
+            f"Identity: {inspection.subject}\n"
+            f"Issuer: {inspection.issuer}\n"
+            f"Validity: {inspection.valid_from.date().isoformat()} to "
+            f"{inspection.valid_until.date().isoformat()}\n"
+            f"Private key: {'present' if inspection.private_key_present else 'missing'}"
+            f"{warning_text}"
+        )
+        return inspection
+
     def cancel(self) -> None:
         reject = getattr(self.controls.dialog, "reject", None)
         if callable(reject):
@@ -194,12 +226,19 @@ class CertificateImportDialog:
         passphrase = self._bindings.q_line_edit("")
         save_password = self._bindings.q_check_box("Save password securely")
         choose_button = self._bindings.q_push_button("Choose...")
+        inspect_button = self._bindings.q_push_button("Inspect")
+        inspection_label = self._bindings.q_label(
+            "Choose a certificate file and inspect it before importing."
+        )
+        inspection_label.setWordWrap(True)
         import_button = self._bindings.q_push_button("Import")
         cancel_button = self._bindings.q_push_button("Cancel")
 
         layout.addRow("", introduction_label)
         layout.addRow("PKCS#12 file", certificate_path)
         layout.addRow("", choose_button)
+        layout.addRow("", inspect_button)
+        layout.addRow("", inspection_label)
         layout.addRow("Display name", display_name)
         layout.addRow("Password", passphrase)
         layout.addRow("", save_password)
@@ -207,6 +246,7 @@ class CertificateImportDialog:
         layout.addRow("", cancel_button)
 
         choose_button.clicked.connect(self.choose_certificate_file)  # type: ignore[attr-defined]
+        inspect_button.clicked.connect(self.inspect_certificate)  # type: ignore[attr-defined]
         import_button.clicked.connect(self.import_certificate)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
 
@@ -216,7 +256,9 @@ class CertificateImportDialog:
             display_name=display_name,
             passphrase=passphrase,
             save_password=save_password,
+            inspection_label=inspection_label,
             choose_button=choose_button,
+            inspect_button=inspect_button,
             import_button=import_button,
             cancel_button=cancel_button,
         )

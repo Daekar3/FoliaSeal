@@ -19,11 +19,27 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the manager, repository transaction, Settings dialog, and Library
+  projections. Confirmed managed-file/configuration commits are atomic and that deleting a
+  configuration intentionally retains the managed file; identified the missing pre-import
+  identity/issuer/validity/private-key inspection surface. Focused tests were added after the
+  audit; a separate pre-implementation red run was not captured.
+- [x] (2026-08-10) Added `CertificateManager.inspect_import()` and the typed
+  `CertificateImportInspection` result. The Qt import dialog now has an explicit Inspect action and
+  renders only non-secret identity, issuer, validity, private-key, and warning facts before the
+  existing atomic import/configuration commit. Import re-inspects the current path/password so a
+  changed field cannot bypass validation.
+- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No new phase3 names or
+  compatibility wrappers were introduced; existing evidence contracts remain because their
+  external consumers still exist. No safe retirement condition was met in this slice.
+- [x] (2026-08-10) Ran focused manager/dialog validation and repository hygiene checks. The final
+  focused command reports 29 passed; Ruff and `git diff --check` are clean, and the full suite
+  reports 1258 passed, 20 skipped, and one existing Pillow deprecation warning. The bounded GUI
+  launch remains subject to the known isolated single-instance transport limitation; owned
+  temporary roots/processes are cleaned at the validation gate below.
+- [x] (2026-08-10) Updated this plan and the architecture/status records; the implementation is
+  ready for the commit gate. Retained-unconfigured Configure action, richer catalog management,
+  and create/export/password lifecycle remain explicitly open in their owning children.
 
 ## Surprises & Discoveries
 
@@ -43,7 +59,16 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+Import is now a two-step user-visible path: choose a source and password, inspect the certificate,
+then import it. Inspection never writes catalog or managed storage and reports the subject/issuer,
+validity range, private-key presence, self-signed caveat, and expiry/validity warnings. The import
+operation revalidates the current inputs and retains the existing atomic managed-file plus catalog
+commit, so rejected or canceled input leaves no managed residue.
+
+This bounded increment does not complete the certificate catalog. A retained managed file is
+already preserved when its configuration is deleted and projected as unconfigured by the Library,
+but an explicit Configure action, expiration sorting, create five-year/password-confirmation flow,
+and export/password lifecycle remain deferred to their owning plans.
 
 ## Context and Orientation
 
@@ -104,7 +129,8 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+cleanup result; the bounded timeout is only a lifecycle check. The fake-binding Qt test is the
+authoritative visible-state evidence when the environment cannot claim the local QLocalServer.
 
 ## Validation and Acceptance
 
@@ -120,7 +146,7 @@ file without a configuration remains visible as “Not configured for signing”
 backup, and Delete actions; it is not preset-selectable. Cancelled, duplicate, unsupported, and
 missing-private-key inputs leave no residue.
 
-## Evidence Record
+## Evidence Record Requirements
 
 Before completion, record the exact import/catalog/Qt test command and result, the GUI import and
 configuration sequence, retained-but-unconfigured observation, evidence path, serialized fixture
@@ -147,6 +173,30 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
 or workspace ports. The final behavior must be exercised by tests/unit/test_certificate_manager.py tests/unit/test_certificate_catalog_repository.py tests/unit/test_qt_app_frame_certificate_management.py. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
+
+## Evidence Record
+
+- Focused command: `.venv/bin/pytest -q tests/unit/test_certificate_manager.py
+  tests/unit/test_certificate_catalog_repository.py tests/unit/test_qt_app_frame_certificate_management.py`
+  — 29 passed. Ruff is clean for the changed source/tests and the import inspection test confirms
+  the non-mutating boundary leaves an empty catalog and no managed directory.
+- Full suite: `.venv/bin/pytest -q` — 1258 passed, 20 skipped, one existing Pillow deprecation
+  warning in 48.37s; no process residue remained.
+- Visible sequence: open Settings → Import certificate, choose a `.p12`, enter its password,
+  choose Inspect, and observe Identity, Issuer, Validity, `Private key: present`, and the local
+  self-signed warning. Import then re-inspects and creates one configured catalog entry. The
+  visible-state node is `test_certificate_import_dialog_renders_non_secret_inspection`.
+- Retained-file evidence: existing manager deletion tests prove deleting a configuration preserves
+  the managed file; Library session tests project that row as `Not configured for signing`. An
+  explicit Configure action is recorded as the next child slice rather than implied complete here.
+- No SVG was added: this increment deepens the existing Settings import dialog and does not change
+  the normative Library topology. No private keys/passwords or generated files were committed.
+- Bounded GUI launch: the isolated offscreen command exited `1` before frame creation with
+  `SingleInstanceUnavailable` for its temporary socket; the temporary root was removed and the
+  process audit was empty. This is recorded as an environment limitation, not GUI success.
+
+Revision note: 2026-08-10 / Codex
+Added typed pre-import inspection and explicit Qt Inspect flow.
 
 Revision note: 2026-08-09 / Codex
 Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.

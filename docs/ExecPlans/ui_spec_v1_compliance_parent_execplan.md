@@ -160,6 +160,10 @@ Release tranche:
   blocking states, password-promptability, and the exact neutral self-signed caveat through a typed
   application contract. Import/configuration, create/export/password management, retained
   unconfigured rows, and the complete signing-rail stage machine remain open in their children.
+- [x] (2026-08-10) Added the bounded certificate-import inspection increment: Settings Import now
+  has a typed, non-mutating Inspect step for identity, issuer, validity, private-key presence, and
+  warnings, then revalidates before the existing atomic configured-entry commit. Retained-file
+  Configure action, expiration sorting, and create/export/password lifecycle remain open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

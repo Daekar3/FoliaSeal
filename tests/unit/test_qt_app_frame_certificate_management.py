@@ -142,6 +142,24 @@ def test_certificate_import_dialog_imports_and_refreshes(tmp_path: Path) -> None
     assert bindings.q_message_box.information_calls[-1][1] == "Certificate imported"
 
 
+def test_certificate_import_dialog_renders_non_secret_inspection(tmp_path: Path) -> None:
+    source = tmp_path / "alice.p12"
+    passphrase = "correct horse"
+    write_test_pkcs12(source, passphrase=passphrase, common_name="Alice Example")
+    bindings, _, _, _, service = _build_service(tmp_path)
+
+    dialog = service.show_import_dialog().compatibility.import_dialog
+    dialog.controls.certificate_path.setText(str(source))
+    dialog.controls.passphrase.setText(passphrase)
+    inspection = dialog.inspect_certificate()
+
+    assert inspection is not None
+    assert "Identity: CN=Alice Example" in dialog.controls.inspection_label.text
+    assert "Issuer: CN=Alice Example" in dialog.controls.inspection_label.text
+    assert "Private key: present" in dialog.controls.inspection_label.text
+    assert "created locally" in dialog.controls.inspection_label.text
+
+
 def test_certificate_import_dialog_saves_password_outside_catalog(
     tmp_path: Path,
 ) -> None:

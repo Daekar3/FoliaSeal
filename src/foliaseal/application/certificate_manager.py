@@ -60,6 +60,19 @@ class ExportCertificateRequest:
     destination_path: str | Path
 
 
+@dataclass(frozen=True)
+class CertificateImportInspection:
+    """Non-secret inspection facts shown before a PKCS#12 import."""
+
+    subject: str
+    issuer: str
+    valid_from: datetime
+    valid_until: datetime
+    private_key_present: bool
+    self_signed: bool
+    warnings: tuple[str, ...] = ()
+
+
 CertificateOperation = Literal[
     "created",
     "imported",
@@ -94,6 +107,44 @@ class CertificateManager:
 
     def snapshot(self) -> CertificateCatalog:
         return self.store.load_catalog()
+
+    def inspect_import(
+        self,
+        source_path: str | Path,
+        passphrase: str,
+    ) -> CertificateImportInspection:
+        """Validate and inspect a PKCS#12 source without changing managed state."""
+        source = Path(source_path)
+        if not source.exists() or not source.is_file():
+            raise ValueError(f"Certificate file does not exist: {source}")
+        key, certificate = self._load_pkcs12(source, passphrase)
+        valid_from = self._certificate_datetime(certificate, "not_valid_before")
+        valid_until = self._certificate_datetime(certificate, "not_valid_after")
+        now = self._now()
+        warnings: list[str] = []
+        if now < valid_from:
+            warnings.append(f"Certificate is not valid until {valid_from.date().isoformat()}.")
+        elif now > valid_until:
+            warnings.append(f"Certificate expired on {valid_until.date().isoformat()}.")
+        elif valid_until - now <= timedelta(days=30):
+            warnings.append(
+                f"Certificate expires on {valid_until.date().isoformat()} within 30 days."
+            )
+        self_signed = certificate.subject == certificate.issuer
+        if self_signed:
+            warnings.append(
+                "This certificate was created locally and may not be independently recognized "
+                "unless other systems trust it."
+            )
+        return CertificateImportInspection(
+            subject=certificate.subject.rfc4514_string(),
+            issuer=certificate.issuer.rfc4514_string(),
+            valid_from=valid_from,
+            valid_until=valid_until,
+            private_key_present=key is not None,
+            self_signed=self_signed,
+            warnings=tuple(warnings),
+        )
 
     def create(self, request: CreateCertificateRequest) -> CertificateOperationResult:
         name = self._normalized_name(request.display_name)
@@ -387,6 +438,14 @@ class CertificateManager:
         if key is None or certificate is None:
             raise ValueError("PKCS#12 file must contain both a private key and a certificate.")
         return key, certificate
+
+    @staticmethod
+    def _certificate_datetime(certificate: object, name: str) -> datetime:
+        utc_value = getattr(certificate, f"{name}_utc", None)
+        value = utc_value if utc_value is not None else getattr(certificate, name)
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     @staticmethod
     def _subject_summary(certificate: object) -> ManagedCertificateSubjectSummary:

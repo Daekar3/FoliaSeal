@@ -159,6 +159,23 @@ def test_manager_create_and_import_return_typed_operations(tmp_path: Path) -> No
     assert imported.managed_certificate.subject_summary.common_name == "Alice Imported"
 
 
+def test_manager_inspects_import_without_mutating_catalog(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    source = tmp_path / "alice.p12"
+    _write_pkcs12(source, passphrase="secret", common_name="Alice Imported")
+    manager = _manager(store)
+
+    inspection = manager.inspect_import(source, "secret")
+
+    assert inspection.subject == "CN=Alice Imported"
+    assert inspection.issuer == "CN=Alice Imported"
+    assert inspection.private_key_present is True
+    assert inspection.self_signed is True
+    assert any("created locally" in warning for warning in inspection.warnings)
+    assert store.load_catalog().managed_certificates == ()
+    assert not store.managed_certificate_dir.exists()
+
+
 def test_manager_uses_atomic_repository_verb_without_path_properties() -> None:
     repository = _NoPathRepository(CertificateCatalog(schema_version=1))
     manager = CertificateManager(
