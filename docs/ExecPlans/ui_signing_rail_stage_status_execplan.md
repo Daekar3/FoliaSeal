@@ -15,15 +15,16 @@ generic refactor.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are the frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [x] docs/ExecPlans/ui_command_model_shortcuts_execplan.md (File/View foundation slices complete;
+  remaining menu groups remain open in the command-model child)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
+- [x] (2026-08-09) Implement the bounded fixed-rail, protected-status, and typed recommended-action path.
 - [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; record evidence and clean up.
+- [x] (2026-08-09) Run focused, regression, and offscreen Qt validation; record evidence and clean up.
 - [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
 
 ## Surprises & Discoveries
@@ -31,6 +32,11 @@ generic refactor.
 - Observation: the signing rail is coordinated through sidebar and action-coordinator seams; the
   child must keep readiness state plain-language and derive action enablement from one state model.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the existing sidebar uses a 3:2 stretch split and appends the action panel before
+  review/text cards, so its width and status position vary with content. The coordinator has no
+  typed primary-action identity even though it already exposes `can_sign` and result capability.
+  Evidence: `signing_workspace_composition.py` and `SigningWorkspaceSidebar.__init__` inspected on
+  2026-08-09.
 
 ## Decision Log
 
@@ -40,10 +46,21 @@ generic refactor.
 - Decision: keep this change limited to one observable fixed signing rail, status regions, and stage model outcome.
   Rationale: narrow commits make GUI regressions and recovery auditable.
   Date/Author: 2026-08-09 / Codex
+- Decision: implement a 320 logical-pixel rail, a protected 200-pixel minimum status region pinned
+  after the upper controls, and a typed `recommended_action` projection for the currently supported
+  coordinator states. Preserve secondary output/reopen controls and defer true asynchronous Signing,
+  Saved-but-not-verified, and verification state machines to their named children.
+  Rationale: these changes make the existing truthful states stable and actionable without inventing
+  verification results or fake progress.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. At completion, state what a novice can now do, which tests and live evidence prove it, and any remaining gap.
+The bounded Loop 6 outcome is implemented: the signing rail is fixed at 320 logical pixels, the
+status/action region has a protected minimum and is placed after the upper controls, and the typed
+coordinator state identifies at most one recommended action (`sign` or `open_signed_output`) for
+supported states. Existing stage/result wording remains unchanged. Full asynchronous Signing,
+Saved-but-not-verified, verification, and dirty-draft policy remain deferred to their owning plans.
 
 ## Context and Orientation
 

@@ -12,6 +12,7 @@ from foliaseal.domain.models import SigningRequest, SigningResult
 
 SigningRequestExecutor = object
 ResultKind = Literal["neutral", "success", "error"]
+RecommendedAction = Literal["sign", "open_signed_output"]
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class SigningActionState:
     last_signing_result: SigningResult | None
     last_successful_output_path: str | None
     can_open_signed_output: bool
+    recommended_action: RecommendedAction | None = None
 
 
 @dataclass(frozen=True)
@@ -159,10 +161,13 @@ class SigningActionCoordinator:
 
     def _build_state(self) -> SigningActionState:
         can_sign = self._is_ready_to_sign()
-        if (
+        has_successful_output = (
             self._last_signing_result is not None
             and self._last_signing_result.success
             and self._last_successful_output_path is not None
+        )
+        if (
+            has_successful_output
         ):
             stage_text = "Step 6 of 6 — Verify signed PDF"
             detail_text = (
@@ -207,6 +212,13 @@ class SigningActionCoordinator:
             can_open_signed_output=(
                 self._last_successful_output_path is not None
                 and self._can_open_signed_output
+            ),
+            recommended_action=(
+                "open_signed_output"
+                if has_successful_output and self._can_open_signed_output
+                else "sign"
+                if can_sign
+                else None
             ),
         )
 

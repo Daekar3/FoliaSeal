@@ -62,6 +62,7 @@ class SigningWorkspaceSidebarSurface:
     container: Any
     properties_scroll: Any
     signing_action_panel: Any
+    status_region: Any
     choose_output_button: Any
     sign_button: Any
     open_signed_output_button: Any
@@ -97,6 +98,9 @@ def format_document_signature_items(signature_items: tuple[Any, ...]) -> str:
 class SigningWorkspaceSidebar:
     """Build the production sidebar used by the signing workspace."""
 
+    RAIL_WIDTH = 320
+    STATUS_REGION_MINIMUM_HEIGHT = 200
+
     def __init__(
         self,
         *,
@@ -118,6 +122,16 @@ class SigningWorkspaceSidebar:
         self._updating_document_review_selector = False
         self._updating_text_selection_mode_checkbox = False
         self.container = bindings.q_widget()
+        set_fixed_width = getattr(self.container, "setFixedWidth", None)
+        if callable(set_fixed_width):
+            set_fixed_width(self.RAIL_WIDTH)
+        else:
+            set_minimum_width = getattr(self.container, "setMinimumWidth", None)
+            set_maximum_width = getattr(self.container, "setMaximumWidth", None)
+            if callable(set_minimum_width):
+                set_minimum_width(self.RAIL_WIDTH)
+            if callable(set_maximum_width):
+                set_maximum_width(self.RAIL_WIDTH)
         self._layout = bindings.q_vbox_layout(self.container)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(8)
@@ -145,6 +159,13 @@ class SigningWorkspaceSidebar:
             on_copy_selected_text=on_copy_selected_text,
             on_clear_selected_text=on_clear_selected_text,
         )
+        self.status_region = bindings.q_widget()
+        set_minimum_height = getattr(self.status_region, "setMinimumHeight", None)
+        if callable(set_minimum_height):
+            set_minimum_height(self.STATUS_REGION_MINIMUM_HEIGHT)
+        status_layout = bindings.q_vbox_layout(self.status_region)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.addWidget(self.signing_action_controls.container)
         index_changed = getattr(
             self.document_review_controls.signature_selector,
             "currentIndexChanged",
@@ -167,6 +188,7 @@ class SigningWorkspaceSidebar:
             container=self.container,
             properties_scroll=self.properties_scroll,
             signing_action_panel=self.signing_action_controls.container,
+            status_region=self.status_region,
             choose_output_button=self.choose_output_button,
             sign_button=self.sign_button,
             open_signed_output_button=self.open_signed_output_button,
@@ -203,10 +225,10 @@ class SigningWorkspaceSidebar:
             document_text_detail_label=self.document_text_controls.detail_label,
         )
 
-        self._layout.addWidget(self.properties_scroll)
-        self._layout.addWidget(self.signing_action_controls.container)
+        self._layout.addWidget(self.properties_scroll, 1)
         self._layout.addWidget(self.document_review_controls.container)
         self._layout.addWidget(self.document_text_controls.container)
+        self._layout.addWidget(self.status_region)
 
     def render_signing_action_state(self, state: SigningActionState) -> None:
         self.sign_button.setEnabled(state.can_sign)
@@ -218,6 +240,7 @@ class SigningWorkspaceSidebar:
             _panel_available_width(self.container),
         )
         self.result_label.setText(state.result_text)
+        self._mark_recommended_action(state.recommended_action)
         if hasattr(self.result_label, "setStyleSheet"):
             if state.result_kind == "success":
                 self.result_label.setStyleSheet(
@@ -229,6 +252,16 @@ class SigningWorkspaceSidebar:
                 )
             else:
                 self.result_label.setStyleSheet("color: #444;")
+
+    def _mark_recommended_action(self, action_name: str | None) -> None:
+        buttons = {
+            "sign": self.sign_button,
+            "open_signed_output": self.open_signed_output_button,
+        }
+        for name, button in buttons.items():
+            set_property = getattr(button, "setProperty", None)
+            if callable(set_property):
+                set_property("foliasealPrimaryAction", name == action_name)
 
     def apply_signing_action_state(self, state: SigningActionState) -> None:
         self.render_signing_action_state(state)

@@ -51,6 +51,7 @@ from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
 from foliaseal.presentation.qt.signing_workspace_properties_panel import (
     SIGNATURE_PRESET_PLACEHOLDER,
 )
+from foliaseal.presentation.qt.signing_workspace_sidebar import SigningWorkspaceSidebar
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
@@ -118,6 +119,8 @@ class _FakeWidget:
         self.fixed_width = None
         self.maximum_width = None
         self.minimum_width = None
+        self.minimum_height = None
+        self.properties = {}
         self._width_value = 480
         self.word_wrap = None
         self.destroyed = _FakeSignal()
@@ -148,6 +151,16 @@ class _FakeWidget:
 
     def setMinimumWidth(self, width):  # noqa: N802
         self.minimum_width = width
+
+    def setMinimumHeight(self, height):  # noqa: N802
+        self.minimum_height = height
+
+    def setProperty(self, name, value):  # noqa: N802
+        self.properties[name] = value
+        return True
+
+    def property(self, name):
+        return self.properties.get(name)
 
     def width(self):
         if self.fixed_width is not None:
@@ -3421,7 +3434,9 @@ def test_signing_shell_readiness_detail_is_width_limited_to_action_panel(
     widget.refresh_viewer()
 
     assert not hasattr(panel, "_validation_label")
-    assert widget.sidebar_surface.flow_detail_label.fixed_width == 464
+    assert widget.sidebar_surface.flow_detail_label.fixed_width == (
+        SigningWorkspaceSidebar.RAIL_WIDTH - 16
+    )
     assert widget.sidebar_surface.flow_stage_label.text() == "Step 4 of 6 — Review readiness"
     assert widget.sidebar_surface.flow_detail_label.text().startswith("Will fail to sign:")
     assert panel.validation_text().startswith("Will fail to sign:")

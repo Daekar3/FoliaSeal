@@ -566,8 +566,8 @@ def _assemble_signing_workspace_composition(
     main_row = bindings.q_hbox_layout()
     main_row.setContentsMargins(0, 0, 0, 0)
     main_row.setSpacing(8)
-    main_row.addWidget(viewer_column_container, 3)
-    main_row.addWidget(sidebar.container, 2)
+    main_row.addWidget(viewer_column_container, 1)
+    main_row.addWidget(sidebar.container)
     layout.addLayout(main_row)
     return SigningWorkspaceComposition(
         document_review_inspector=inspector,
