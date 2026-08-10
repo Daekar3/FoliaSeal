@@ -43,10 +43,12 @@ phase3 evidence nomenclature retirement.
   instance per support surface and clean references on close.
 - [x] (2026-08-10) Added Settings Restore defaults with explicit cancel-safe behavior.
 - [x] (2026-08-10) Added focused XDG/privacy/rotation contract tests; `tests/unit/test_support_diagnostics.py`
-  passes (2 tests). Existing legacy Help assertion still expects one command and requires parent-plan
-  test reconciliation for the now-required five-entry Help surface.
-- [ ] Run focused/offscreen/full validation, package/source audits, bounded GUI cleanup, reconcile
-  architecture and parent/release plans, and commit the complete slice.
+  passes (2 tests), and the reconciled AppFrame/support set passes. The five-entry Help surface is
+  now reflected in the typed command and real-Qt acceptance tests.
+- [x] (2026-08-10) Committed the support slice as `4aad84ad8`; the full suite at that point was
+  `1468 passed, 20 skipped, 1 warning`, with Ruff, pip check, and diff checks clean.
+- [ ] Final installed-package, display-backed accessibility, and release-matrix evidence remain in
+  the owning product-support/release plan.
 
 ## Surprises & Discoveries
 
@@ -82,9 +84,12 @@ phase3 evidence nomenclature retirement.
 
 ## Outcomes & Retrospective
 
-Not started. At completion, record the exact support command list, privacy/rotation evidence,
-offscreen dialog observations, full-suite result, package/path behavior, and any environment-limited
-display evidence. Remaining final-release and screen-reader certification must stay explicitly open.
+The local support behavior is implemented and committed. The Help menu exposes all five required
+commands; modeless support dialogs show keyboard shortcuts, data locations, and About; the
+diagnostic writer is Qt-free, privacy-filtered, bounded, and rotated; Settings Restore defaults is
+cancel-safe. Focused support/AppFrame tests and the full suite are green. Installed-package,
+display-backed screen-reader/high-contrast/DPI, and final release-matrix evidence remain open and
+must not be inferred from headless success.
 
 ## Context and Orientation
 
@@ -235,3 +240,7 @@ import the Phase 3 harness or read private document/signing values.
 Revision note: 2026-08-10 / Codex
 Created after a fresh repository audit found the required Help-menu support commands and product-level
 diagnostics/log contract missing while the offline Help viewer and package path were already complete.
+
+Revision note: 2026-08-10 / Codex
+Updated after implementation and commit `4aad84ad8` to record the complete local support behavior,
+focused/full validation, and the remaining installed-package/display-backed release gates.

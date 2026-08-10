@@ -456,6 +456,7 @@ class FoliaSealAppFrame:
         self._closing_document_signatures = False
         self._connected_native_editor_ids: set[int] = set()
         self._native_clipboard_connected = False
+        self._window_is_closing = False
         self._workspace_action_state = workspace_action_state_closed()
 
         self.window = bindings.q_main_window()
@@ -1066,6 +1067,7 @@ class FoliaSealAppFrame:
     def _handle_window_close_event(self, event: Any) -> None:
         """Route native main-window close through the same draft policy as File > Close."""
         if self._confirm_discard_if_dirty(action="close"):
+            self._window_is_closing = True
             self._close_document_signatures()
             self._workspace_host.close()
             accept = getattr(event, "accept", None)
@@ -1135,6 +1137,8 @@ class FoliaSealAppFrame:
         self._connect_native_edit_signals()
 
     def _handle_focus_change(self) -> None:
+        if self._window_is_closing:
+            return
         self._connect_native_edit_signals()
         self._sync_edit_history_actions()
 
@@ -1168,6 +1172,8 @@ class FoliaSealAppFrame:
     def _sync_edit_history_actions(self) -> None:
         """Project native-text or placement-history state onto Edit actions."""
 
+        if self._window_is_closing:
+            return
         self._connect_native_edit_signals()
         workspace = self._workspace_host.active()
         editor = self._focused_text_editor()
@@ -2208,6 +2214,12 @@ class FoliaSealAppFrame:
             message.setWordWrap(True)
         open_button = self._bindings.q_push_button("Open a PDF…")
         library_button = self._bindings.q_push_button("Manage Signature Library…")
+        set_accessible_name = getattr(open_button, "setAccessibleName", None)
+        if callable(set_accessible_name):
+            set_accessible_name("Open a PDF")
+        set_accessible_name = getattr(library_button, "setAccessibleName", None)
+        if callable(set_accessible_name):
+            set_accessible_name("Manage Signature Library")
         open_button.clicked.connect(self.choose_open_pdf)
         library_button.clicked.connect(self.show_reusable_object_library)
         layout.addRow(message)

@@ -1775,10 +1775,10 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Zoom &In",
         "Zoom &Out",
         "Reset &Zoom",
-        "Fit &Page",
+        "Fit Pa&ge",
         "Fit &Width",
-        "&Find",
-        "Document &Signatures",
+        "Fin&d",
+        "Document Signatur&es",
     ]
     assert [action.shortcut for action in frame.window.menu_bar.menus[2].actions] == [
         "Page Up",

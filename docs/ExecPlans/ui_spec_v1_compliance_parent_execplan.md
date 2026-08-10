@@ -168,6 +168,12 @@ Release tranche:
   canonical Markdown, CLI discovery, modeless searchable viewer, F1 routing, and offline/resource
   parity are implemented and validated; diagnostics and final release acceptance remain with the
   parent release plan.
+- [x] docs/ExecPlans/ui_support_surfaces_execplan.md — required Help support commands, privacy-safe
+  bounded diagnostics, and Settings Restore defaults are implemented and committed; installed-
+  package and final release evidence remain with the release child.
+- [x] docs/ExecPlans/ui_accessibility_acceptance_execplan.md — focused real-Qt/offscreen
+  accessibility acceptance is implemented and validated; display-backed screen-reader,
+  high-contrast, DPI/monitor, package-install, and final release gates remain open.
 
 ## Progress
 
@@ -222,6 +228,11 @@ Release tranche:
   activation, Back, Forward, unavailable outcomes, branching, replacement, and close. Focused and
   real offscreen Qt coverage are green; the command-model child remains open for unsupported command
   families and final scenario evidence.
+- [x] (2026-08-10) Added the bounded real-Qt accessibility acceptance child: offscreen evidence now
+  covers no-document accessible names, unique typed View mnemonics, menu metadata/disabled state,
+  F1 Help, modeless support dialogs, Settings Restore defaults, minimum geometry, and Unicode XDG
+  paths (`60 passed` with focused AppFrame regressions). Screen-reader, high-contrast, physical
+  DPI/monitor, package-install, and final release evidence remain display/environment gates.
 - [x] (2026-08-10) Completed the supported Signing command increment: Signature Library is available
   from a no-document frame, while Sign and save is routed through public session readiness and
   transaction state; readiness/status changes keep the action truthful. Placement commands were

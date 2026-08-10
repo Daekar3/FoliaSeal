@@ -228,7 +228,7 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         text="Fit Page",
         shortcut="Ctrl+0",
         accessible_name="Fit PDF page in viewer",
-        mnemonic_text="Fit &Page",
+        mnemonic_text="Fit Pa&ge",
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.FIT_WIDTH,
@@ -244,7 +244,7 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         text="Find",
         shortcut="Ctrl+F",
         accessible_name="Find text in the current PDF",
-        mnemonic_text="&Find",
+        mnemonic_text="Fin&d",
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.DOCUMENT_SIGNATURES,
@@ -252,7 +252,7 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         text="Document Signatures",
         shortcut=None,
         accessible_name="Review document signatures",
-        mnemonic_text="Document &Signatures",
+        mnemonic_text="Document Signatur&es",
     ),
 )
 

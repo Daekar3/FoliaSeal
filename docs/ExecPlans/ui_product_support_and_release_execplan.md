@@ -45,6 +45,12 @@ Qt surface, focused tests, and observable acceptance.
 - [ ] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
 - [x] docs/ExecPlans/ui_help_support_execplan.md — completed first Help milestone for canonical
   packaged Markdown, CLI discovery, modeless viewer/F1, and offline resource parity.
+- [x] docs/ExecPlans/ui_support_surfaces_execplan.md — product Help support commands, privacy-safe
+  bounded diagnostics, and Settings Restore defaults are implemented; final package/release evidence
+  remains here.
+- [x] docs/ExecPlans/ui_accessibility_acceptance_execplan.md — focused real-Qt/offscreen keyboard,
+  names/roles, menu-mnemonic, support-dialog, Settings, minimum-size, and Unicode-path acceptance
+  passes; display-backed screen-reader/high-contrast/DPI and package-install gates remain open.
 
 ## Progress
 
@@ -54,6 +60,10 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Help child completed with `72` focused passes and full-suite evidence of
   `1465 passed, 20 skipped, 1 warning`; this plan retains ownership of diagnostics, accessibility,
   installed-package, and final release acceptance.
+- [x] (2026-08-10) Accessibility child completed its focused real-Qt/offscreen contract with `60`
+  passes, including explicit no-document accessible names and corrected typed View mnemonics;
+  display-backed accessibility, installed-package, diagnostics, and final release acceptance remain
+  open under this plan.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
 - [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
