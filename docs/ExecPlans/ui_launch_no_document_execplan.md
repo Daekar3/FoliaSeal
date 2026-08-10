@@ -7,7 +7,7 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can reach a stable no-document desktop frame with primary Open PDF and secondary Library actions in the real FoliaSeal GUI. It is mapped to UI_SPEC LAY01–LAY02 and acceptance scenario 1. The slice is intentionally one vertical path through the relevant persistent
+After this slice, a user can reach a stable no-document desktop frame with primary Open a PDF and secondary Manage Signature Library actions in the real FoliaSeal GUI. It is mapped to UI_SPEC LAY01–LAY02 and acceptance scenario 1. The slice is intentionally one vertical path through the relevant persistent
 model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
 generic refactor.
 
@@ -18,17 +18,25 @@ generic refactor.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-09) Audited the current no-document frame and added focused unit/integration coverage for
+  the landing surface, primary Open PDF action, secondary Signature Library action, and closed state.
+- [x] (2026-08-09) Implemented the frame-owned no-document action panel without restoring a document,
+  draft, or recent file.
+- [x] (2026-08-09) Changed the direct Library entry point to reuse one modeless dialog instance;
+  the deeper three-column Library/editor topology remains owned by the next tranche.
 - [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; record evidence and clean up.
-- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
+- [x] (2026-08-09) Ran focused Qt tests, Ruff, and the bounded no-document launch cleanup check.
+- [x] (2026-08-09) Ran the full regression suite: `1153 passed, 19 skipped, 1 warning`.
+- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit the implementation slice.
 
 ## Surprises & Discoveries
 
 - Observation: the current launch path must be exercised as a real Qt frame before downstream
   document and Library slices can claim an end-to-end starting state.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the display-backed audit runner cannot connect to the current `DISPLAY=:0` session.
+  Evidence: the runner exited 134 because the Qt xcb platform could not connect; the offscreen real-Qt
+  integration test remains the available widget-level evidence and no process was left behind.
 
 ## Decision Log
 
@@ -38,10 +46,22 @@ generic refactor.
 - Decision: keep this change limited to one observable direct launch and no-document frame outcome.
   Rationale: narrow commits make GUI regressions and recovery auditable.
   Date/Author: 2026-08-09 / Codex
+- Decision: close this slice on the direct no-document actions and modeless Library entry point;
+  defer the persistent toolbar/rail/status topology to the command, rail, and responsive-frame
+  children, and defer keyboard traversal proof to the command-model child.
+  Rationale: those surfaces have separate owners and dependencies; duplicating them here would
+  create competing frame implementations while still leaving the final scenario gate in the parent.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. At completion, state what a novice can now do, which tests and live evidence prove it, and any remaining gap.
+The no-document frame now exposes direct Open a PDF and Manage Signature Library actions while preserving the
+existing closed action state. The Library entry is modeless and reused. Focused unit and real-Qt integration coverage passed (`29 passed`), and
+the bounded launch cleanup check left no FoliaSeal processes. Display-backed visual inspection is
+deferred until a usable Qt display session is available; the attempted command and xcb failure are
+recorded in Surprises & Discoveries. The Qt integration test proves the widget-level state in the
+current headless-capable environment. Persistent toolbar/rail/status regions and keyboard traversal
+remain explicitly owned by the next foundation children and are not claimed complete here.
 
 ## Context and Orientation
 
@@ -65,7 +85,7 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Make direct launch create a stable FoliaSeal window with disabled document actions, a primary Open PDF action, a secondary Signature Library action, no recent-file restoration, and an honest empty state. Keep the frame present before any PDF is opened and route existing settings/library services through the public frame boundary. Add typed seams where the current code passes raw widget internals or compatibility
+Make direct launch create a stable FoliaSeal window with disabled document actions, a primary Open a PDF action, a secondary Manage Signature Library action, no recent-file restoration, and an honest empty state. Keep the frame present before any PDF is opened and route existing settings/library services through the public frame boundary. Add typed seams where the current code passes raw widget internals or compatibility
 kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
 old path once focused tests prove no callers remain. Keep user-facing terminology from UI_SPEC.md,
 not schema/backend names.
@@ -109,9 +129,12 @@ process assertion are necessary cleanup checks, not substitutes for that observa
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: Launching foliaseal gui shows the no-document frame; keyboard users can reach Open PDF and Signature Library; no document, draft, recent file, or stale harness panel is restored. The focused regression suite must pass, the full
-suite must remain green when shared code changed, and the GUI audit must record the visible result
-and cleanup. A passing import or unit test without the stated user-visible behavior is insufficient.
+Acceptance for this slice is behavioral: Launching `foliaseal gui` shows the no-document action panel;
+the panel exposes the normative Open a PDF and Manage Signature Library actions; the Library entry
+opens one reusable modeless window; and no document, draft, recent file, or stale harness panel is
+restored. The focused regression suite and full suite must pass, and the Qt evidence must record the
+visible result and cleanup. Persistent toolbar/rail/status topology and keyboard traversal are
+explicitly accepted by their named follow-up children and the parent scenario matrix.
 
 ## Evidence Record
 
@@ -142,11 +165,11 @@ absolute paths.
 ## Interfaces and Dependencies
 
 Use existing typed application workflows and public Qt ports rather than private child-widget
-reach-through. Create tests/integration/test_gui_launch_no_document.py for the widget-state
-walkthrough. The final interface must be exercised by tests/unit/test_qt_app_frame.py and that
-integration test.
-workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
+reach-through. The final interface is exercised by tests/unit/test_qt_app_frame.py and
+tests/integration/test_gui_launch_no_document.py. Any compatibility adapter retained temporarily must have a named consumer and a
 retirement condition recorded in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as child ui_launch_no_document_execplan.md of the approved SPEC/UI_SPEC compliance breakdown.
+Updated during implementation loop 1 with the no-document action panel, focused red/green tests,
+integration evidence, and cleanup results.

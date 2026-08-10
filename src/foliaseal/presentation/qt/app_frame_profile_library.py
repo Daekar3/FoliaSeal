@@ -56,9 +56,18 @@ class ReusableObjectLibraryDialog:
         self.controls = self._build_controls(parent)
         self.refresh()
 
-    def exec(self) -> Any:
-        execute = getattr(self.controls.dialog, "exec", None)
-        return execute() if callable(execute) else None
+    def show(self) -> Any:
+        """Show the modeless Library window without blocking the main frame."""
+        show = getattr(self.controls.dialog, "show", None)
+        if callable(show):
+            show()
+        raise_window = getattr(self.controls.dialog, "raise_", None)
+        if callable(raise_window):
+            raise_window()
+        activate = getattr(self.controls.dialog, "activateWindow", None)
+        if callable(activate):
+            activate()
+        return self
 
     def refresh(self) -> None:
         items = self._library.view().all_items

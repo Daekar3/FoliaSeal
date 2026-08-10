@@ -123,12 +123,16 @@ class _FakeLabel:
     def __init__(self, text="") -> None:
         self.text = text
         self.word_wrap = False
+        self.layout = None
 
     def setText(self, text):  # noqa: N802
         self.text = text
 
     def setWordWrap(self, value):  # noqa: N802
         self.word_wrap = bool(value)
+
+    def setLayout(self, layout):  # noqa: N802
+        self.layout = layout
 
 
 class _FakeDialog:
@@ -140,6 +144,8 @@ class _FakeDialog:
         self.title = ""
         self.result = self.Rejected
         self.layout = None
+        self.visible = False
+        self.show_calls = 0
 
     def setWindowTitle(self, title):  # noqa: N802
         self.title = title
@@ -149,6 +155,16 @@ class _FakeDialog:
 
     def exec(self):
         return self.result
+
+    def show(self) -> None:
+        self.show_calls += 1
+        self.visible = True
+
+    def raise_(self) -> None:
+        return None
+
+    def activateWindow(self) -> None:  # noqa: N802
+        return None
 
     def accept(self) -> None:
         self.result = self.Accepted
@@ -178,6 +194,9 @@ class _FakeLineEdit:
     def text(self):
         return self._text
 
+    def setPlaceholderText(self, text):  # noqa: N802
+        self.placeholder_text = text
+
 
 class _FakeCheckBox:
     def __init__(self, text="") -> None:
@@ -196,11 +215,16 @@ class _FakeComboBox:
         self.items = []
         self.current_index = -1
         self.currentIndexChanged = _FakeSignal()
+        self.currentTextChanged = _FakeSignal()
 
     def addItem(self, text, user_data=None):  # noqa: N802
         self.items.append((text, user_data))
         if self.current_index < 0:
             self.current_index = 0
+
+    def addItems(self, items):  # noqa: N802
+        for item in items:
+            self.addItem(item)
 
     def clear(self) -> None:
         self.items = []
@@ -220,6 +244,15 @@ class _FakeComboBox:
 
     def itemData(self, index):  # noqa: N802
         return self.items[index][1]
+
+    def setItemData(self, index, value):  # noqa: N802
+        text, _ = self.items[index]
+        self.items[index] = (text, value)
+
+    def currentText(self):  # noqa: N802
+        if self.current_index < 0:
+            return ""
+        return self.items[self.current_index][0]
 
     def count(self):
         return len(self.items)
@@ -751,6 +784,49 @@ def test_app_frame_close_workspace_is_idempotent_and_restores_placeholder(
     assert frame.window.menu_bar.menus[0].actions[1].enabled is False
     assert frame.window.menu_bar.menus[1].actions[0].enabled is False
     assert frame.window.menu_bar.menus[1].actions[1].enabled is False
+
+
+def test_app_frame_no_document_placeholder_exposes_open_and_library_actions(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    placeholder = frame.window.central_widget
+
+    assert placeholder.layout is not None
+    assert [row[0].text for row in placeholder.layout.rows] == [
+        "No document open. Open a PDF to begin signing, or manage reusable signing objects.",
+        "Open a PDF…",
+        "Manage Signature Library…",
+    ]
+    assert frame._placeholder_open_button.text == "Open a PDF…"
+    assert frame._placeholder_library_button.text == "Manage Signature Library…"
+    assert frame.workspace_action_state.workspace_open is False
+
+
+def test_app_frame_library_action_is_modeless_and_reused(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    first = frame.show_reusable_object_library()
+    second = frame.show_reusable_object_library()
+
+    assert second is first
+    assert first.controls.dialog.show_calls == 2
+    assert first.controls.dialog.visible is True
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:

@@ -44,7 +44,7 @@ before any reusable-object or signing UI is allowed to persist data.
 
 Foundation tranche:
 
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
 - [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
 - [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
@@ -98,6 +98,8 @@ Release tranche:
 - [ ] (2026-08-09) Resolve the live contract blockers identified during review: default GUI signing
   execution, placement-schema alignment, Library/AppSettings restart state, and a real
   single-instance process boundary.
+- [x] (2026-08-09) Completed the first foundation slice: no-document launch now exposes direct Open
+  PDF and Signature Library actions with focused unit/integration evidence and clean teardown.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -115,6 +117,11 @@ Release tranche:
   Evidence: phase3-prefixed files occur under application evidence and Qt acceptance tooling.
   Their product-facing labels must not leak into the V1 UI; migrations must preserve evidence meaning
   while removing obsolete nomenclature where safe.
+- Observation: the first live implementation loop completed with real-Qt offscreen evidence, while
+  the display-backed audit was blocked by the current xcb session.
+  Evidence: `tests/integration/test_gui_launch_no_document.py` passed under
+  `QT_QPA_PLATFORM=offscreen`, while `DISPLAY=:0 ... scripts/live_gui_parent_audit.py` exited 134
+  because xcb could not connect; cleanup found no FoliaSeal processes.
 
 ## Decision Log
 

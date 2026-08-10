@@ -304,6 +304,9 @@ class FoliaSealAppFrame:
         self._save_as_action: Any | None = None
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
+        self._placeholder_open_button: Any | None = None
+        self._placeholder_library_button: Any | None = None
+        self._reusable_object_library: Any | None = None
         self._workspace_action_state = workspace_action_state_closed()
 
         self.window = bindings.q_main_window()
@@ -463,6 +466,10 @@ class FoliaSealAppFrame:
 
     def show_reusable_object_library(self) -> Any:
         """Open Settings management for reusable signing profiles and presets."""
+        if self._reusable_object_library is not None:
+            self._reusable_object_library.refresh()
+            self._reusable_object_library.show()
+            return self._reusable_object_library
         dialog = ReusableObjectLibraryDialog(
             bindings=self._bindings,
             parent=self.window,
@@ -477,8 +484,8 @@ class FoliaSealAppFrame:
             certificate_management_dialog=self.certificate_management_dialog,
             reusable_object_library_dialog=dialog,
         )
-        dialog.exec()
-        self._refresh_shell_signature_profiles()
+        self._reusable_object_library = dialog
+        dialog.show()
         return dialog
 
     def _open_reusable_object_editor(self) -> bool:
@@ -641,10 +648,23 @@ class FoliaSealAppFrame:
         )
 
     def _set_placeholder(self) -> None:
-        label = self._bindings.q_label("Open a PDF to begin signing.")
-        if hasattr(label, "setWordWrap"):
-            label.setWordWrap(True)
-        self._workspace_mount.mount(label)
+        container = self._bindings.q_label()
+        layout = self._bindings.q_form_layout(container)
+        message = self._bindings.q_label(
+            "No document open. Open a PDF to begin signing, or manage reusable signing objects."
+        )
+        if hasattr(message, "setWordWrap"):
+            message.setWordWrap(True)
+        open_button = self._bindings.q_push_button("Open a PDF…")
+        library_button = self._bindings.q_push_button("Manage Signature Library…")
+        open_button.clicked.connect(self.choose_open_pdf)
+        library_button.clicked.connect(self.show_reusable_object_library)
+        layout.addRow(message)
+        layout.addRow(open_button)
+        layout.addRow(library_button)
+        self._placeholder_open_button = open_button
+        self._placeholder_library_button = library_button
+        self._workspace_mount.mount(container)
         self._apply_workspace_action_state(workspace_action_state_closed())
 
     def _emit_error(self, message: str) -> None:
