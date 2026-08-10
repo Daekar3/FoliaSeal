@@ -34,6 +34,9 @@ class AppFrameCommandId(StrEnum):
     MANAGE_CERTIFICATE_CONFIGURATIONS = "settings.manage_certificate_configurations"
     SIGNATURE_LIBRARY = "signing.signature_library"
     SIGN_AND_SAVE = "signing.sign_and_save"
+    PLACE_SIGNATURE = "signing.place_signature"
+    ADJUST_PLACEMENT = "signing.adjust_placement"
+    REMOVE_PLACEMENT = "signing.remove_placement"
 
 
 @dataclass(frozen=True)
@@ -256,6 +259,30 @@ SIGNING_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut=None,
         accessible_name="Open Signature Library",
         mnemonic_text="&Signature Library",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.PLACE_SIGNATURE,
+        menu="Signing",
+        text="Place Signature",
+        shortcut=None,
+        accessible_name="Enter signature placement mode",
+        mnemonic_text="&Place Signature",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.ADJUST_PLACEMENT,
+        menu="Signing",
+        text="Adjust Placement",
+        shortcut=None,
+        accessible_name="Adjust visible signature placement",
+        mnemonic_text="Ad&just Placement",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.REMOVE_PLACEMENT,
+        menu="Signing",
+        text="Remove Placement",
+        shortcut=None,
+        accessible_name="Remove visible signature placement",
+        mnemonic_text="&Remove Placement",
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.SIGN_AND_SAVE,

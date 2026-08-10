@@ -45,9 +45,9 @@ before any reusable-object or signing UI is allowed to persist data.
 Foundation tranche:
 
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed View Back/Forward and the
-  supported Signing commands now route through public seams with capability-driven enablement; the
-  child remains open for the remaining truthful command families and final parent scenario evidence.
+- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed View Back/Forward and all five
+  Signing commands now route through public seams with capability-driven enablement; the child
+  remains open for the remaining truthful command families and final parent scenario evidence.
 - [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
   route through the public workspace session port; broader View Back/Forward and remaining command
   families remain open with their owning children.
@@ -194,8 +194,12 @@ Release tranche:
   families and final scenario evidence.
 - [x] (2026-08-10) Completed the supported Signing command increment: Signature Library is available
   from a no-document frame, while Sign and save is routed through public session readiness and
-  transaction state; readiness/status changes keep the action truthful, and placement-command
-  placeholders remain absent. Commit: `64bef66b2`.
+  transaction state; readiness/status changes keep the action truthful. Placement commands were
+  added by the following increment. Commit: `64bef66b2`.
+- [x] (2026-08-10) Completed the Signing placement-command increment: Place Signature, Adjust
+  Placement, and Remove Placement follow UI_SPEC order, route through public session capabilities,
+  protect fixed unsigned fields, and have focused plus real offscreen QAction evidence. Full suite:
+  `1440 passed, 20 skipped, 1 warning`.
 - [x] (2026-08-10) Completed the bounded placement foundation slice: PlacementProfile v2 now stores
   explicit source-page metadata, fixed page number, pinned state, and visible top-left geometry;
   PDF↔visible conversion is centralized; SavePlacement/workflow capture require explicit context;

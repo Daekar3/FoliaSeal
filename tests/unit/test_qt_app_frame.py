@@ -106,16 +106,28 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
     ]
 
 
-def test_signing_commands_are_typed_and_keep_unsupported_placement_actions_absent() -> None:
+def test_signing_commands_are_typed_and_keep_placement_actions_truthful() -> None:
     assert [definition.command_id for definition in SIGNING_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.SIGNATURE_LIBRARY,
+        AppFrameCommandId.PLACE_SIGNATURE,
+        AppFrameCommandId.ADJUST_PLACEMENT,
+        AppFrameCommandId.REMOVE_PLACEMENT,
         AppFrameCommandId.SIGN_AND_SAVE,
     ]
     assert [definition.text for definition in SIGNING_COMMAND_DEFINITIONS] == [
         "Signature Library",
+        "Place Signature",
+        "Adjust Placement",
+        "Remove Placement",
         "Sign and save",
     ]
-    assert [definition.shortcut for definition in SIGNING_COMMAND_DEFINITIONS] == [None, None]
+    assert [definition.shortcut for definition in SIGNING_COMMAND_DEFINITIONS] == [
+        None,
+        None,
+        None,
+        None,
+        None,
+    ]
     assert all(definition.menu == "Signing" for definition in SIGNING_COMMAND_DEFINITIONS)
 
 
@@ -579,6 +591,11 @@ class _FakeShell:
         self.choose_output_pdf_path_calls = 0
         self.submit_sign_request_calls = 0
         self.can_submit_sign_request_value = False
+        self.can_place_signature_placement_value = True
+        self.can_adjust_signature_placement_value = False
+        self.can_remove_signature_placement_value = False
+        self.set_viewer_interaction_mode_calls = []
+        self.remove_signature_placement_calls = 0
         self.explicit_output_pdf_path = False
         self.set_document_text_selection_mode_calls = []
         self.document_text_selection_mode = False
@@ -642,6 +659,23 @@ class _FakeShell:
 
     def can_submit_sign_request(self) -> bool:
         return self.can_submit_sign_request_value
+
+    def can_place_signature_placement(self) -> bool:
+        return self.can_place_signature_placement_value
+
+    def can_adjust_signature_placement(self) -> bool:
+        return self.can_adjust_signature_placement_value
+
+    def can_remove_signature_placement(self) -> bool:
+        return self.can_remove_signature_placement_value
+
+    def set_viewer_interaction_mode(self, mode: str) -> str:
+        self.set_viewer_interaction_mode_calls.append(mode)
+        return mode
+
+    def remove_signature_placement(self) -> bool:
+        self.remove_signature_placement_calls += 1
+        return True
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         self.set_document_text_selection_mode_calls.append(bool(enabled))
@@ -1310,14 +1344,41 @@ def test_signing_menu_routes_library_and_sign_save_through_existing_boundaries(
     actions = frame.command_actions()
     library_action = actions[AppFrameCommandId.SIGNATURE_LIBRARY]
     sign_action = actions[AppFrameCommandId.SIGN_AND_SAVE]
+    place_action = actions[AppFrameCommandId.PLACE_SIGNATURE]
+    adjust_action = actions[AppFrameCommandId.ADJUST_PLACEMENT]
+    remove_action = actions[AppFrameCommandId.REMOVE_PLACEMENT]
     assert library_action.enabled is True
     assert sign_action.enabled is False
+    assert place_action.enabled is False
+    assert adjust_action.enabled is False
+    assert remove_action.enabled is False
 
     library_action.trigger()
     assert frame.reusable_object_library_dialog is not None
 
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
     assert sign_action.enabled is False
+    assert place_action.enabled is True
+    assert adjust_action.enabled is False
+    assert remove_action.enabled is False
+    place_action.trigger()
+    assert shell.set_viewer_interaction_mode_calls == ["signature"]
+    shell.can_adjust_signature_placement_value = True
+    shell.can_remove_signature_placement_value = True
+    shell.status_callback("placement_changed")
+    assert adjust_action.enabled is True
+    assert remove_action.enabled is True
+    adjust_action.trigger()
+    remove_action.trigger()
+    assert shell.set_viewer_interaction_mode_calls == ["signature", "signature"]
+    assert shell.remove_signature_placement_calls == 1
+    shell.can_place_signature_placement_value = False
+    shell.can_adjust_signature_placement_value = False
+    shell.can_remove_signature_placement_value = False
+    shell.status_callback("placement_fixed")
+    assert place_action.enabled is False
+    assert adjust_action.enabled is False
+    assert remove_action.enabled is False
     frame.command_actions()[AppFrameCommandId.SELECT_TEXT].trigger()
     frame._handle_status_change("document_text_mode_changed")
     assert sign_action.enabled is False
@@ -1493,7 +1554,13 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.tool_tip for action in frame.window.menu_bar.menus[3].actions] == [
         definition.accessible_name for definition in SIGNING_COMMAND_DEFINITIONS
     ]
-    assert [action.enabled for action in frame.window.menu_bar.menus[3].actions] == [True, False]
+    assert [action.enabled for action in frame.window.menu_bar.menus[3].actions] == [
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
     assert [action.text for action in frame.window.menu_bar.menus[4].actions] == [
         definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
     ]

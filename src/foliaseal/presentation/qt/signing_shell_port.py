@@ -110,6 +110,10 @@ class SigningWorkspaceSessionPort(Protocol):
     def select_document_review_item(self, signature_id: str) -> DocumentReviewWorkspaceState: ...
     def clear_document_review_highlight(self) -> None: ...
     def set_viewer_interaction_mode(self, mode: str) -> str: ...
+    def can_place_signature_placement(self) -> bool: ...
+    def can_adjust_signature_placement(self) -> bool: ...
+    def can_remove_signature_placement(self) -> bool: ...
+    def remove_signature_placement(self) -> bool: ...
 
     def set_signature_rect(
         self,
@@ -273,6 +277,22 @@ class QtSigningWorkspaceSessionPort:
 
     def set_viewer_interaction_mode(self, mode: str) -> str:
         return self.shell_widget.set_viewer_interaction_mode(mode)
+
+    def can_place_signature_placement(self) -> bool:
+        capability = getattr(self.shell_widget, "can_place_signature_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def can_adjust_signature_placement(self) -> bool:
+        capability = getattr(self.shell_widget, "can_adjust_signature_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def can_remove_signature_placement(self) -> bool:
+        capability = getattr(self.shell_widget, "can_remove_signature_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def remove_signature_placement(self) -> bool:
+        remove = getattr(self.shell_widget, "remove_signature_placement", None)
+        return bool(remove()) if callable(remove) else False
 
     def set_signature_rect(
         self,

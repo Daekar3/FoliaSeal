@@ -403,6 +403,9 @@ class FoliaSealAppFrame:
         self._forward_link_action: Any | None = None
         self._signature_library_action: Any | None = None
         self._sign_and_save_action: Any | None = None
+        self._place_signature_action: Any | None = None
+        self._adjust_placement_action: Any | None = None
+        self._remove_placement_action: Any | None = None
         self._command_actions: dict[AppFrameCommandId, Any] = {}
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
@@ -874,6 +877,22 @@ class FoliaSealAppFrame:
     def _go_forward_link(self) -> None:
         self._with_current_session_port(lambda session: session.go_forward_link())
         self._sync_page_navigation_actions()
+
+    def _place_signature(self) -> None:
+        self._with_current_session_port(
+            lambda session: session.set_viewer_interaction_mode("signature")
+        )
+        self._sync_signing_placement_actions()
+
+    def _adjust_placement(self) -> None:
+        self._with_current_session_port(
+            lambda session: session.set_viewer_interaction_mode("signature")
+        )
+        self._sync_signing_placement_actions()
+
+    def _remove_placement(self) -> None:
+        self._with_current_session_port(lambda session: session.remove_signature_placement())
+        self._sync_signing_placement_actions()
 
     def command_actions(self) -> dict[AppFrameCommandId, Any]:
         """Return a snapshot of frame-owned actions keyed by stable command ID."""
@@ -1372,6 +1391,24 @@ class FoliaSealAppFrame:
             AppFrameCommandId.SIGNATURE_LIBRARY,
             self.show_reusable_object_library,
         )
+        self._place_signature_action = self._command_action(
+            signing_menu,
+            AppFrameCommandId.PLACE_SIGNATURE,
+            self._place_signature,
+            enabled=False,
+        )
+        self._adjust_placement_action = self._command_action(
+            signing_menu,
+            AppFrameCommandId.ADJUST_PLACEMENT,
+            self._adjust_placement,
+            enabled=False,
+        )
+        self._remove_placement_action = self._command_action(
+            signing_menu,
+            AppFrameCommandId.REMOVE_PLACEMENT,
+            self._remove_placement,
+            enabled=False,
+        )
         self._sign_and_save_action = self._command_action(
             signing_menu,
             AppFrameCommandId.SIGN_AND_SAVE,
@@ -1521,6 +1558,7 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._find_action, state.workspace_open)
         self._set_action_enabled(self._document_signatures_action, state.workspace_open)
         self._sync_signing_command_action()
+        self._sync_signing_placement_actions()
 
     @staticmethod
     def _set_action_enabled(action: Any | None, enabled: bool) -> None:
@@ -1564,6 +1602,32 @@ class FoliaSealAppFrame:
             and self._workspace_ready_to_sign(workspace)
         )
         self._set_action_enabled(self._sign_and_save_action, enabled)
+
+    def _sync_signing_placement_actions(self) -> None:
+        workspace = self._workspace_host.active()
+        session = workspace.session if workspace is not None else None
+        active = bool(workspace is not None and not self._signing_transaction_active)
+        def capability(name: str) -> bool:
+            method = getattr(session, name, None)
+            if not callable(method):
+                return False
+            try:
+                return bool(method())
+            except Exception:
+                return False
+
+        self._set_action_enabled(
+            self._place_signature_action,
+            bool(active and capability("can_place_signature_placement")),
+        )
+        self._set_action_enabled(
+            self._adjust_placement_action,
+            bool(active and capability("can_adjust_signature_placement")),
+        )
+        self._set_action_enabled(
+            self._remove_placement_action,
+            bool(active and capability("can_remove_signature_placement")),
+        )
 
     def _sync_document_text_actions(self) -> None:
         workspace = self._workspace_host.active()
@@ -1835,6 +1899,7 @@ class FoliaSealAppFrame:
             self._signing_transaction_active = False
             self._offer_pending_external_link()
         self._sync_signing_command_action()
+        self._sync_signing_placement_actions()
         if self._on_status_change is not None:
             self._on_status_change(status)
 

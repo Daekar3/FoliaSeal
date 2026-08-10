@@ -151,7 +151,13 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     assert [action.toolTip() for action in signing_menu.actions()] == [
         definition.accessible_name for definition in SIGNING_COMMAND_DEFINITIONS
     ]
-    assert [action.isEnabled() for action in signing_menu.actions()] == [True, False]
+    assert [action.isEnabled() for action in signing_menu.actions()] == [
+        True,
+        False,
+        False,
+        False,
+        False,
+    ]
 
     settings_menu = next(
         menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Settings"
@@ -216,6 +222,11 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
             self.forward_available = False
             self.back_calls = 0
             self.forward_calls = 0
+            self.placement_mode_calls: list[str] = []
+            self.remove_placement_calls = 0
+            self.place_available = True
+            self.adjust_available = False
+            self.remove_available = False
             self.container = self
 
         def has_unsaved_changes(self) -> bool:
@@ -259,6 +270,23 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
 
         def copy_selected_document_text(self) -> None:
             return None
+
+        def set_viewer_interaction_mode(self, mode: str) -> str:
+            self.placement_mode_calls.append(mode)
+            return mode
+
+        def can_place_signature_placement(self) -> bool:
+            return self.place_available
+
+        def can_adjust_signature_placement(self) -> bool:
+            return self.adjust_available
+
+        def can_remove_signature_placement(self) -> bool:
+            return self.remove_available
+
+        def remove_signature_placement(self) -> bool:
+            self.remove_placement_calls += 1
+            return True
 
         def go_to_previous_page(self) -> None:
             return None
@@ -357,8 +385,27 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     actions = frame.command_actions()
     back_action = actions[AppFrameCommandId.BACK]
     forward_action = actions[AppFrameCommandId.FORWARD]
+    place_action = actions[AppFrameCommandId.PLACE_SIGNATURE]
+    adjust_action = actions[AppFrameCommandId.ADJUST_PLACEMENT]
+    remove_action = actions[AppFrameCommandId.REMOVE_PLACEMENT]
     assert back_action.isEnabled() is False
     assert forward_action.isEnabled() is False
+    assert place_action.isEnabled() is True
+    assert adjust_action.isEnabled() is False
+    assert remove_action.isEnabled() is False
+
+    place_action.trigger()
+    assert shell.placement_mode_calls == ["signature"]
+    shell.adjust_available = True
+    shell.remove_available = True
+    shell.status_callback("placement_changed")
+    app.processEvents()
+    assert adjust_action.isEnabled() is True
+    assert remove_action.isEnabled() is True
+    adjust_action.trigger()
+    remove_action.trigger()
+    assert shell.placement_mode_calls == ["signature", "signature"]
+    assert shell.remove_placement_calls == 1
 
     shell.back_available = True
     shell.status_callback("link_internal_navigation")

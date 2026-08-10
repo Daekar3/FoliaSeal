@@ -426,6 +426,29 @@ class SigningWorkspaceRuntime:
             self._on_status_change(f"viewer_mode_{mode}")
         return mode
 
+    def can_place_signature_placement(self) -> bool:
+        return (
+            self._draft_workflow.signature_field_name is None
+            and self._draft_workflow.signature_rect is None
+        )
+
+    def can_adjust_signature_placement(self) -> bool:
+        return (
+            self._draft_workflow.signature_field_name is None
+            and self._draft_workflow.signature_rect is not None
+        )
+
+    def can_remove_signature_placement(self) -> bool:
+        return self.can_adjust_signature_placement()
+
+    def remove_signature_placement(self) -> bool:
+        if not self.can_remove_signature_placement():
+            return False
+        self.apply_keyboard_placement(None)
+        if self._on_status_change is not None:
+            self._on_status_change("placement_removed")
+        return True
+
     def document_text_selection_mode_enabled(self) -> bool:
         state = self._document_review_workspace_required().current_state()
         return state.document_text.selection_mode_enabled

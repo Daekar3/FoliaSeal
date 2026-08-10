@@ -39,6 +39,26 @@ class _Shell:
         self.calls.append("submit_sign_request")
         return "request"
 
+    def set_viewer_interaction_mode(self, mode):
+        self.calls.append(("set_viewer_interaction_mode", mode))
+        return mode
+
+    def can_place_signature_placement(self):
+        self.calls.append("can_place")
+        return True
+
+    def can_adjust_signature_placement(self):
+        self.calls.append("can_adjust")
+        return True
+
+    def can_remove_signature_placement(self):
+        self.calls.append("can_remove")
+        return True
+
+    def remove_signature_placement(self):
+        self.calls.append("remove_placement")
+        return True
+
     def open_signed_output(self):
         self.calls.append("open_signed_output")
         return "output.pdf"
@@ -85,6 +105,11 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
     assert session.preview() is shell.preview_value
     assert session.snapshot() is shell.snapshot_value
     assert session.submit_sign_request() == "request"
+    assert session.set_viewer_interaction_mode("signature") == "signature"
+    assert session.can_place_signature_placement() is True
+    assert session.can_adjust_signature_placement() is True
+    assert session.can_remove_signature_placement() is True
+    assert session.remove_signature_placement() is True
     assert session.open_signed_output() == "output.pdf"
     session.go_to_previous_page()
     session.go_to_next_page()
@@ -102,6 +127,11 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
         "preview",
         "snapshot",
         "submit_sign_request",
+        "set_viewer_interaction_mode",
+        "can_place",
+        "can_adjust",
+        "can_remove",
+        "remove_placement",
         "open_signed_output",
         "previous",
         "next",

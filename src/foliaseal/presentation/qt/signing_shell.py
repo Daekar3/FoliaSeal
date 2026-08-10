@@ -496,6 +496,18 @@ class SigningWorkspaceWidget:
     def set_viewer_interaction_mode(self, mode: str) -> str:
         return self._runtime.set_viewer_interaction_mode(mode)
 
+    def can_place_signature_placement(self) -> bool:
+        return self._runtime.can_place_signature_placement()
+
+    def can_adjust_signature_placement(self) -> bool:
+        return self._runtime.can_adjust_signature_placement()
+
+    def can_remove_signature_placement(self) -> bool:
+        return self._runtime.can_remove_signature_placement()
+
+    def remove_signature_placement(self) -> bool:
+        return self._runtime.remove_signature_placement()
+
     def document_text_selection_mode_enabled(self) -> bool:
         return self._runtime.document_text_selection_mode_enabled()
 

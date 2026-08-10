@@ -136,6 +136,7 @@ class _FakeSignButton:
 class _FakeDraftWorkflow:
     def __init__(self, order=None) -> None:
         self.signature_rect = object()
+        self.signature_field_name = None
         self.current_signature_rect = None
         self.signature_appearance = None
         self.current_signature_appearance = None
@@ -493,6 +494,30 @@ def test_signing_workspace_runtime_owns_page_rect_and_current_request_helpers() 
         ("set_signature_rect", False),
         ("apply_plan", bound.interaction_session.panel_plan),
     ]
+
+
+def test_signing_workspace_runtime_placement_commands_protect_fixed_fields() -> None:
+    statuses = []
+    bound = _bind_runtime(on_status_change=statuses.append)
+    bound.draft_workflow.signature_rect = None
+    assert bound.runtime.can_place_signature_placement() is True
+    assert bound.runtime.can_adjust_signature_placement() is False
+    assert bound.runtime.can_remove_signature_placement() is False
+
+    bound.draft_workflow.signature_rect = object()
+    assert bound.runtime.can_place_signature_placement() is False
+    assert bound.runtime.can_adjust_signature_placement() is True
+    assert bound.runtime.can_remove_signature_placement() is True
+
+    assert bound.runtime.remove_signature_placement() is True
+    assert bound.properties_panel.set_signature_rect_calls[-1] == (None, True)
+    assert statuses[-1] == "placement_removed"
+
+    bound.draft_workflow.signature_field_name = "ExistingField"
+    assert bound.runtime.can_place_signature_placement() is False
+    assert bound.runtime.can_adjust_signature_placement() is False
+    assert bound.runtime.can_remove_signature_placement() is False
+    assert bound.runtime.remove_signature_placement() is False
 
 
 def test_signing_workspace_runtime_snapshot_is_complete_and_immutable() -> None:
