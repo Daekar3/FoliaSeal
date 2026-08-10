@@ -74,8 +74,15 @@ class SigningActionCoordinator:
     def load(self) -> SigningActionState:
         return self._build_state()
 
-    def accept_output_path(self, selected_path: str) -> SigningActionState:
+    def accept_output_path(
+        self,
+        selected_path: str,
+        *,
+        allow_source_overwrite: bool = False,
+    ) -> SigningActionState:
         self._workflow.confirm_output_pdf_path(selected_path)
+        if allow_source_overwrite:
+            self._workflow.authorize_source_overwrite()
         self._clear_previous_signing_result()
         self._result_text = f"Output will be saved to: {selected_path}"
         self._result_kind = "neutral"

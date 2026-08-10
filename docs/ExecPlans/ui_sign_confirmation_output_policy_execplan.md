@@ -14,15 +14,32 @@ Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
+- [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md (the complete readiness state machine remains a prerequisite; this slice consumes its existing preview projection only)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the live action bridge, coordinator, draft workflow, output-path policy,
+  and staged signing use case. The current confirmation omits exact page/field, frozen time, and
+  caveats; same-source output is always rejected; and the new verified sibling staging path has no
+  typed authorization for deliberate source replacement.
+- [x] (2026-08-10) Add failing focused tests for the typed final summary, collision-safe suggestions,
+  Cancel-lossless source-overwrite authorization, and staged same-source replacement; the tests were
+  red before implementation and green after the slice.
+- [x] (2026-08-10) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-10) Retain the `_paths_conflict` static wrapper because an existing test seam monkeypatches
+  it; the wrapper delegates to the new neutral `paths_refer_to_same_file()` policy and is now an
+  explicitly documented compatibility boundary rather than dead product surface. No phase3 product
+  terminology was introduced or removed in this slice.
+- [x] (2026-08-10) Run focused, regression, and GUI validation; clean processes and artifacts:
+  focused `158 passed`; full `1285 passed, 20 skipped, 1 warning`; Ruff and diff checks clean; the
+  bounded offscreen launch exits at `SingleInstanceUnavailable`, leaves no matching processes, and
+  removes its temporary configuration root.
+- [x] (2026-08-10) Update this plan and relevant docs and obtain independent compliance review. The
+  review led to consequence-labeled buttons, explicit setup synchronization coverage, and removal
+  of the broad exception-swallowing fallback. Real display-backed dialog acceptance remains
+  environment-blocked at the isolated single-instance endpoint; exact existing-field identity is
+  deferred to `ui_signature_field_targeting_profiles_execplan.md`.
+- [ ] (2026-08-10) Commit the completed slice and record the next dependency-ordered blocker.
 
 ## Surprises & Discoveries
 
@@ -38,10 +55,35 @@ Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible sign confirmation and output-path policy outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: represent deliberate source replacement as an explicit, non-persisted authorization on
+  the in-memory signing draft and public `SigningRequest`; ordinary equal input/output paths remain
+  rejected by the use case.
+  Rationale: the UI must ask a Cancel-default question, while the verified sibling staging/replace
+  algorithm can safely support the authorized case without weakening headless callers or persisted
+  schemas.
+  Date/Author: 2026-08-10 / Codex
+- Decision: build the final confirmation text from one typed, Qt-free summary over the existing
+  `SigningDraftPreview` and frozen workflow signing time, with page/field and warning-caveat lines.
+  Rationale: the preview already owns authoritative visible-signature semantics and warning issues;
+  a small application contract prevents Qt from re-deriving signing facts or taking another clock
+  reading.
+  Date/Author: 2026-08-10 / Codex
+- Decision: synchronize visible setup controls before taking the confirmation preview, then present
+  consequence-labeled `Sign and save` / `Cancel` buttons with Cancel as the default; retain a Yes/No
+  fallback only for legacy test and harness message-box doubles.
+  Rationale: the confirmation must describe the same authored draft that the coordinator submits,
+  while real users need an unambiguous irreversible-action control and an escape-safe default.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. Record demonstrated behavior, evidence, and remaining gaps at completion.
+The slice now provides a typed final confirmation summary, collision-safe default output naming,
+Cancel-lossless output selection, explicit source-overwrite authorization, consequence-labeled
+confirmation controls, and verified staged same-source replacement. The summary is derived from
+the synchronized draft, frozen preview time, and warning issues; the authorization is session-local
+and resets when the output path changes. Implementation and compliance-review gates are complete;
+the remaining work is the commit and future display-backed acceptance once the environment can claim
+the single-instance endpoint.
 
 ## Context and Orientation
 
@@ -97,14 +139,18 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record Save/Sign/Replace inputs, observed wording, evidence path, and cleanup result;
+walkthrough. The current bounded launch may stop at the isolated single-instance endpoint; record
+that exact limitation rather than treating it as a signing-flow success. Record Save/Sign/Replace inputs, observed wording, evidence path, and cleanup result;
 the bounded timeout is only a lifecycle check. Package evidence belongs only to the final release plan.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: A ready user must confirm before signing; the dialog shows the active objects and exact destination; first Save opens a standard save dialog; cancelling changes neither draft nor output. Focused tests and the full suite must pass; the
-final acceptance record must distinguish headless evidence from real Qt interaction and must include
-cleanup evidence.
+Acceptance is behavioral: A ready user must confirm before signing; the dialog shows the active
+objects, exact destination, page/field, frozen time, and caveats; first Save opens a standard save
+dialog; cancelling changes neither draft nor output; source replacement uses a distinct
+Cancel-default warning; and signed bytes are verified before any replacement. Focused tests and the
+full suite must pass; the final acceptance record must distinguish headless evidence from real Qt
+interaction and must include cleanup evidence.
 
 ## Required Acceptance Cases
 
@@ -120,7 +166,7 @@ confirmation/output-policy test command and result, the GUI
 Save/Sign/Replace sequence and observed wording, owned sign-and-save SVG agreement, evidence path,
 cleanup, and compatibility grep proof.
 
-Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
+Record the contributing UI_SPEC scenario ID(s) (WF04 §11) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
@@ -141,8 +187,11 @@ absolute paths unless the repository explicitly requires a fixture.
 
 Use AppSettings, the public Qt frame/workspace ports, packaged Markdown help, the CLI parser in
 src/foliaseal/__main__.py, and build helpers under src/foliaseal/build/. The final behavior must be
-exercised by tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_output_path_policy.py tests/unit/test_qt_signing_shell.py. New help/diagnostic surfaces must not expose secrets, PDF contents, selected
+exercised by tests/unit/test_qt_signing_action_coordinator.py tests/unit/test_output_path_policy.py tests/unit/test_qt_signing_workspace_action_bridge.py tests/unit/test_qt_signing_shell.py. New help/diagnostic surfaces must not expose secrets, PDF contents, selected
 text, Reason, Location, or private keys.
 
-Revision note: 2026-08-09 / Codex
-Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Implemented and reviewed the confirmation/output-policy vertical slice after the live audit and
+red/green tests; updated the acceptance contract, compatibility note, and evidence requirements.
+Full regression and cleanup are recorded; display-backed acceptance is explicitly environment
+blocked, and commit is the remaining gate for this slice.

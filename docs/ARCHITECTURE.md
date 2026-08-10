@@ -158,7 +158,7 @@ The canonical repository document split is:
 - Key collaborators: `PdfInspector`, `CertificateLoader`, `PdfSigner`, `SignatureVerifier`, `CertificationInspector` protocols; `phase3_signing_backend.py`; `preview_render_boundary.py`; `infra.certification`.
 - Main entry points: `SignPdfUseCase.execute()`, `SigningBackendRequest.from_signing_request()`.
 - Important types/classes/functions: `SigningBackendAppearance`, `SigningBackendRequest`, `PdfInspector`, `PdfSigner`, `SignatureVerifier`.
-- Known constraints: Visible signature requests must include both `signature_rect` and `signature_appearance`; output path must not resolve to input path until the explicit source-overwrite policy is implemented; signed bytes are verified at a sibling temporary path before atomic replacement, and failed verification removes only that app-owned temporary path. `execute()` normalizes to `SigningBackendRequest` and copies the use case's optional `preview_render_port` into its `render_port`; when absent, the backend retains its lazy compatibility renderer fallback.
+- Known constraints: Visible signature requests must include both `signature_rect` and `signature_appearance`; input/output collisions are rejected unless the request carries the non-persisted explicit source-overwrite authorization; signed bytes are always verified at a sibling temporary path before atomic replacement, and failed verification removes only that app-owned temporary path. `execute()` normalizes to `SigningBackendRequest` and copies the use case's optional `preview_render_port` into its `render_port`; when absent, the backend retains its lazy compatibility renderer fallback.
 - Status: Confirmed by code and tests.
 
 ### pyHanko signing backend
@@ -260,8 +260,19 @@ The canonical repository document split is:
 - Does not own: immutable validation/placement/preview DTO definitions, visible-signature text/metadata semantics, Qt controls, PyHanko signing execution, persisted profile or certificate stores.
 - Key collaborators: `signing_draft_contracts.py`, domain models, coordinate transforms, visible signature semantics service, visible signature layout engine, signing backend for canonical PyHanko style.
 - Main entry points: `SigningDraftWorkflow.preview()`, `SigningDraftWorkflow.build_signing_request()`, `suggest_signed_output_path()`, `render_signing_preview()`, `render_canonical_signature_preview()`, `compare_preview_to_request()`.
-- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService`; fit checks use the typed `VisibleSignatureFitValidator` injection, defaulting to `BackendVisibleSignatureFitValidator`, while the backend retains authoritative rendered-ink/layout fallback behavior. Direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read through an injected application-layer reader, with `Pkcs12CertificatePreviewReader` as the default implementation. Signed-output path suggestions are computed by application-layer path policy so the app frame and signing shell share the same default filename behavior. The workflow applies the canonical application-owned `CertificateConfiguration`; persistence codecs and stores remain infra adapters, while concrete store injection is a separate follow-up seam.
+- Known constraints: `SigningDraftWorkflow.preview()` populates `SigningDraftPreview.stamp_text` from `VisibleSignatureSemanticsService` and freezes the preview signing time for the subsequent confirmation/request pair; fit checks use the typed `VisibleSignatureFitValidator` injection, defaulting to `BackendVisibleSignatureFitValidator`, while the backend retains authoritative rendered-ink/layout fallback behavior. Direct preview construction still has renderer/presentation compatibility fallbacks. Certificate preview values are read through an injected application-layer reader, with `Pkcs12CertificatePreviewReader` as the default implementation. Signed-output path suggestions are computed by application-layer path policy, which reuses an explicit path and otherwise chooses a collision-safe `<stem>-signed[-N].pdf` candidate. Source replacement authorization is session-local, resets whenever the output path changes, and is never persisted in reusable profiles. The workflow applies the canonical application-owned `CertificateConfiguration`; persistence codecs and stores remain infra adapters, while concrete store injection is a separate follow-up seam.
 - Status: Confirmed by code; certificate model ownership is resolved, with concrete certificate-store coupling tracked as the next candidate.
+
+### Signing confirmation summary
+
+- Location: `src/foliaseal/application/signing_confirmation.py`
+- Responsibility: Project the frozen, Qt-free final signing preview into the concise summary shown immediately before signing.
+- Owns: `SigningConfirmationSummary`, truthful preset/certificate/output/page/field/time/caveat labels, and the consequence text that distinguishes Sign and save from Cancel.
+- Does not own: dialog construction, readiness state, output-path selection, signing execution, or persistence.
+- Key collaborators: `SigningDraftPreview`, `SigningDraftWorkflow.preview_signing_time()`, `SigningWorkspaceActionBridge`.
+- Main entry points: `SigningConfirmationSummary.from_preview()`, `SigningConfirmationSummary.as_message()`.
+- Known constraints: The summary is derived after the setup port synchronizes visible controls and uses the same preview snapshot and frozen signing time used to build the request; it deliberately reports the current flow's visible/new-field semantics rather than inventing a field identity. Qt remains at the presentation edge. The bridge presents consequence-labeled `Sign and save`/`Cancel` buttons with Cancel as the default, while a Yes/No fallback exists only for legacy test/harness message-box doubles.
+- Status: Confirmed by code and tests.
 
 ### Neutral preview raster and rendered-ink boundary
 
@@ -457,7 +468,7 @@ The canonical repository document split is:
 - Does not own: signing-action policy, result/state-machine rules, Qt widget construction, or signing backend execution.
 - Key collaborators: `SigningActionBoundary`, `SigningWorkspaceWidget`, `SigningWorkspaceSidebar`, shell-provided dialog/callback/open-output helpers.
 - Main entry points: `SigningWorkspaceActionBridge.choose_output_pdf_path()`, `SigningWorkspaceActionBridge.submit_sign_request()`, `SigningWorkspaceActionBridge.open_signed_output()`, `SigningWorkspaceActionBridge.refresh_certificate_configurations()`.
-- Known constraints: The bridge must keep explicit output-path presence, overwrite confirmation, and state application explicit so the shell can remain thin while `SigningActionBoundary` stays the narrower policy layer beneath it.
+- Known constraints: The bridge must keep explicit output-path presence, collision-safe default selection, overwrite confirmation, frozen final-summary confirmation, source-overwrite authorization, and state application explicit so the shell can remain thin while `SigningActionBoundary` stays the narrower policy layer beneath it. Source replacement is confirmed separately with a Cancel-default warning and is authorized only for the current request; the use case still verifies a staged sibling before replacing the source.
 - Status: Confirmed by code and tests.
 
 ### Qt signing action boundary

@@ -478,6 +478,7 @@ class SigningRequest:
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
     signing_time: datetime | None = None
+    allow_source_overwrite: bool = False
 
     def __post_init__(self) -> None:
         input_pdf_path = _require_non_empty_str(self.input_pdf_path, "input_pdf_path")
@@ -511,6 +512,8 @@ class SigningRequest:
         if self.signing_time is not None:
             if not isinstance(self.signing_time, datetime) or self.signing_time.tzinfo is None:
                 raise ValueError("signing_time must be a timezone-aware datetime value.")
+        if not isinstance(self.allow_source_overwrite, bool):
+            raise ValueError("allow_source_overwrite must be a boolean value.")
 
     def has_visible_signature_settings(self) -> bool:
         """Return whether the request includes visible signature instructions."""

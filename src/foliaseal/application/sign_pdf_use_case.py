@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Protocol
 
+from foliaseal.application.output_path_policy import paths_refer_to_same_file
 from foliaseal.application.pdf_compatibility import (
     PdfCompatibilityError,
     PdfCompatibilityProfile,
@@ -207,11 +208,16 @@ class SignPdfUseCase:
         """Execute the headless signing pipeline."""
         staged_output_path: Path | None = None
         try:
-            if self._paths_conflict(request.input_pdf_path, request.output_pdf_path):
+            if self._paths_conflict(request.input_pdf_path, request.output_pdf_path) and not (
+                request.allow_source_overwrite
+            ):
                 return SigningResult(
                     success=False,
                     failure_code=FailureCode.OUTPUT_PATH_INVALID,
-                    message="Output path must differ from input path.",
+                    message=(
+                        "Output path must differ from input path unless source overwrite "
+                        "was explicitly authorized."
+                    ),
                 )
 
             backend_request = SigningBackendRequest.from_signing_request(request)
@@ -407,9 +413,8 @@ class SignPdfUseCase:
     @staticmethod
     def _paths_conflict(input_pdf_path: str, output_pdf_path: str) -> bool:
         """Return whether two paths refer to the same intended file."""
-        input_path = Path(input_pdf_path).expanduser().resolve(strict=False)
-        output_path = Path(output_pdf_path).expanduser().resolve(strict=False)
-        return input_path == output_path
+
+        return paths_refer_to_same_file(input_pdf_path, output_pdf_path)
 
     def _inspect_certification(self, input_pdf_path: str) -> CertificationPolicyResult:
         return self.certification_inspector.inspect(input_pdf_path)

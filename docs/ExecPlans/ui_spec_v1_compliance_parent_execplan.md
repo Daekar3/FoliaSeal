@@ -197,9 +197,15 @@ Release tranche:
   `1269 passed, 20 skipped`, Ruff/diff clean, and bounded launch cleanup are recorded in the child.
 - [x] (2026-08-10) Added the first safe-signing increment: the production GUI now receives a
   neutral lazy executor instead of silently returning an unexecuted request, and the signing use
-  case verifies sibling staged output before replacement. Richer confirmation summary, explicit
-  source overwrite, asynchronous progress/recovery, and package acceptance remain open in the
-  signing children.
+  case verifies sibling staged output before replacement. Asynchronous progress/recovery and
+  package acceptance remain open in the signing children.
+- [x] (2026-08-10) Added the bounded confirmation/output-policy increment: final signing now
+  synchronizes the authored setup, summarizes preset/certificate/output/page/field/frozen time and
+  caveats, uses consequence-labeled `Sign and save`/`Cancel` controls with a Cancel default, offers
+  collision-safe signed-output suggestions, and permits source replacement only after explicit
+  session-local authorization and staged verification. Focused `158 passed`, full `1285 passed,
+  20 skipped, 1 warning`, Ruff/diff clean; display-backed acceptance remains blocked by the isolated
+  single-instance endpoint and exact existing-field identity remains with the field-targeting child.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

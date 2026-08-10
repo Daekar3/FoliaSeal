@@ -60,7 +60,10 @@ _EXPORT_MODULES = {
         ),
         "horizontal_signature_reservation",
     ),
-    "suggest_signed_output_path": "output_path_policy",
+    **dict.fromkeys(
+        ("paths_refer_to_same_file", "suggest_signed_output_path"),
+        "output_path_policy",
+    ),
     **dict.fromkeys(("PlacementEditorSession", "PlacementEditorState"), "placement_editor"),
     **dict.fromkeys(("ViewerPerformanceTracker", "ViewerTimingSnapshot"), "performance_timing"),
     **dict.fromkeys(
@@ -110,6 +113,7 @@ _EXPORT_MODULES = {
         ("LazySigningRequestExecutor", "build_default_signing_executor"),
         "signing_executor",
     ),
+    "SigningConfirmationSummary": "signing_confirmation",
     **dict.fromkeys(
         (
             "SignaturePlacementContext",
@@ -427,4 +431,6 @@ __all__ = [
     "render_canonical_signature_preview",
     "render_signing_preview",
     "suggest_signed_output_path",
+    "paths_refer_to_same_file",
+    "SigningConfirmationSummary",
 ]

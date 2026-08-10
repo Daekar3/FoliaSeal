@@ -451,6 +451,40 @@ def test_sign_use_case_rejects_equal_input_and_output_paths(tmp_path: Path) -> N
     assert result.failure_code == FailureCode.OUTPUT_PATH_INVALID
 
 
+def test_sign_use_case_allows_explicitly_authorized_source_replacement(tmp_path: Path) -> None:
+    request = replace(
+        build_signing_request(
+            tmp_path,
+            input_name="same.pdf",
+            output_name="same.pdf",
+        ),
+        allow_source_overwrite=True,
+    )
+    source = Path(request.input_pdf_path)
+    _write_test_pdf(source)
+    verifier = StubVerifier(summary=VerificationSummary(signature_count=1, timestamp_present=True))
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"verified-replacement",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=verifier,
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert source.read_bytes() == b"verified-replacement"
+    assert len(verifier.verified_paths) == 1
+    assert Path(verifier.verified_paths[0]).name.startswith(".same.pdf.")
+
+
 def test_sign_use_case_rejects_paths_pointing_to_same_file_via_relative_path(
     tmp_path: Path,
 ) -> None:

@@ -50,9 +50,23 @@ class SigningActionBoundary:
     def load(self) -> SigningActionState:
         return self._coordinator.load()
 
-    def accept_output_path(self, selected_path: str) -> SigningActionBoundaryResult:
+    def accept_output_path(
+        self,
+        selected_path: str,
+        *,
+        allow_source_overwrite: bool = False,
+    ) -> SigningActionBoundaryResult:
+        if allow_source_overwrite:
+            state = self._coordinator.accept_output_path(
+                selected_path,
+                allow_source_overwrite=True,
+            )
+        else:
+            # Keep the narrow pre-authorization call shape for existing test and
+            # harness coordinators; ordinary output selection remains unchanged.
+            state = self._coordinator.accept_output_path(selected_path)
         return SigningActionBoundaryResult(
-            state=self._coordinator.accept_output_path(selected_path)
+            state=state
         )
 
     def submit(self) -> SigningActionBoundaryResult:

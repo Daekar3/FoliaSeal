@@ -71,6 +71,7 @@ class SigningDraftWorkflow:
     passphrase: str
     tsa_url: str
     output_path_confirmed: bool = False
+    source_overwrite_authorized: bool = False
     timestamp_required: bool = True
     trust_policy: TimestampTrustPolicy | None = None
     certificate_alias: str | None = None
@@ -120,7 +121,12 @@ class SigningDraftWorkflow:
         """Record a user-confirmed output path and protect it as draft state."""
         self.output_pdf_path = output_pdf_path
         self.output_path_confirmed = True
+        self.source_overwrite_authorized = False
         self._invalidate_preview_snapshot()
+
+    def authorize_source_overwrite(self) -> None:
+        """Authorize replacing the input only after the UI's explicit warning."""
+        self.source_overwrite_authorized = True
 
     def clear_session_secrets(self) -> None:
         """Clear credentials held only for the current in-memory signing session."""
@@ -134,6 +140,7 @@ class SigningDraftWorkflow:
         self.signature_placement_defaults = None
         self.placement_context = None
         self.output_path_confirmed = False
+        self.source_overwrite_authorized = False
         self.selected_appearance_profile_id = None
         self.selected_placement_profile_id = None
         self.selected_signature_preset_id = None
@@ -145,6 +152,7 @@ class SigningDraftWorkflow:
             self.signature_rect,
             self.signature_appearance,
             self.output_path_confirmed,
+            self.source_overwrite_authorized,
         )
 
     @classmethod
@@ -161,6 +169,7 @@ class SigningDraftWorkflow:
             certificate_path=request.certificate_path,
             passphrase=request.passphrase,
             tsa_url=request.tsa_url,
+            source_overwrite_authorized=request.allow_source_overwrite,
             timestamp_required=request.timestamp_required,
             trust_policy=request.trust_policy,
             certificate_alias=request.certificate_alias,
@@ -177,6 +186,13 @@ class SigningDraftWorkflow:
     def current_signature_rect(self) -> SignatureRect | None:
         """Return the current signed-rectangle draft value."""
         return self.signature_rect
+
+    @property
+    def preview_signing_time(self) -> datetime | None:
+        """Return the frozen preview time while the draft inputs remain unchanged."""
+        if self._preview_fingerprint != self._current_preview_fingerprint():
+            return None
+        return self._preview_signing_time
 
     @property
     def current_signature_appearance(self) -> SignatureAppearance | None:
@@ -485,6 +501,7 @@ class SigningDraftWorkflow:
                 if self._preview_fingerprint == self._current_preview_fingerprint()
                 else None
             ),
+            allow_source_overwrite=self.source_overwrite_authorized,
         )
 
     def _current_preview_fingerprint(self) -> tuple[object, ...]:
