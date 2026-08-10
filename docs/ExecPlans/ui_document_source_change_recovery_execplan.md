@@ -36,7 +36,7 @@ workspace. Cancelled or failed actions leave the current document, draft, and se
   draft preservation, candidate replacement, and failed/cancelled-safe recovery boundaries.
 - [x] (2026-08-10) Reconcile architecture, lifecycle/parent plans, and acceptance evidence.
 - [x] (2026-08-10) Full validation, bounded GUI audit, and owned process/temp cleanup are complete;
-  commit is being created for this slice.
+  implementation commit `0d5116084` contains the complete slice.
 
 ## Surprises & Discoveries
 
@@ -80,7 +80,7 @@ session secret before atomic mount. Focused app-frame/workflow coverage and the 
 readiness/banner integration are green; the full suite is `1428 passed, 20 skipped, 1 warning`.
 The bounded GUI launch remains display/single-instance limited (`SingleInstanceUnavailable` before
 window creation); crash journal, autosave, and interrupted-session restoration remain explicit
-follow-on work.
+follow-on work. Implementation commit: `0d5116084`.
 
 ## Context and Orientation
 

@@ -36,7 +36,7 @@ temporary/final paths.
 - [x] (2026-08-10) Run focused, regression, and real offscreen Qt validation; display-backed GUI acceptance
   remains environment-blocked (`xcb`/`:0`) and stays explicitly open.
 - [x] (2026-08-10) Update this plan and relevant architecture/status documentation; the source-change
-  recovery child is now ready for its complete slice commit.
+  recovery child was committed in `0d5116084`.
 
 ## Surprises & Discoveries
 

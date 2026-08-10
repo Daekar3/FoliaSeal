@@ -70,7 +70,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-09) Implement the smallest complete model/application/Qt path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
 - [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean processes and artifacts.
-- [x] (2026-08-10) Update this plan and relevant docs; the complete source-recovery slice is being committed.
+- [x] (2026-08-10) Update this plan and relevant docs; the complete source-recovery slice is committed
+  in `0d5116084`.
 
 ## Surprises & Discoveries
 
