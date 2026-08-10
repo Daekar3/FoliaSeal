@@ -607,6 +607,7 @@ def _assemble_signing_workspace_composition(
         on_source_ignore=on_source_ignore,
         on_source_locate=on_source_locate,
         on_source_close=on_source_close,
+        source_safety_overlay_parent=viewer_widget,
     )
     register_disposable(properties_panel)
     setup_port = PanelSigningWorkspaceSetupAdapter(properties_panel)
@@ -742,6 +743,9 @@ def _assemble_signing_workspace_composition(
     main_row.addWidget(viewer_column_container, 1)
     main_row.addWidget(sidebar.container)
     layout.addLayout(main_row)
+    # The source notice is a condition-only canvas overlay, so position it only
+    # after the viewer has been mounted and the workspace layout has a parent.
+    properties_panel.refresh_source_safety()
     return SigningWorkspaceComposition(
         document_review_inspector=inspector,
         viewer_interaction_session=viewer_interaction_session,

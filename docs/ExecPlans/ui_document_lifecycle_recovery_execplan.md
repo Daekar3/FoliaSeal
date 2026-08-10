@@ -89,11 +89,11 @@ temporary/final paths.
 ## Outcomes & Retrospective
 
 Implementation and focused validation are complete. The lifecycle-focused unit suite remains green,
-the source-change child adds draft-preserving Reload/Locate/Ignore coverage, and the full suite is
-green (`1428 passed, 20 skipped, 1 warning`); the bounded display-backed audit and final commit
-remain. The slice does not
-provide a crash-recovery journal, autosave, or interrupted-session restoration; those remain an
-explicit follow-on requirement.
+the source-change child adds draft-preserving Reload/Locate/Ignore coverage, and the current full
+suite is green (`1465 passed, 20 skipped, 1 warning`); the bounded launch remains limited by the
+isolated `SingleInstanceUnavailable` endpoint before window creation, with owned cleanup verified.
+The slice does not provide a crash-recovery journal, autosave, or interrupted-session restoration;
+those remain an explicit follow-on requirement.
 
 ## Context and Orientation
 

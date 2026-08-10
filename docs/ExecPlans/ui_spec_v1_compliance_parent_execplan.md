@@ -464,9 +464,15 @@ Release tranche:
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
   close use consequence-verb policy with conditional Sign and save; changed/missing source states
   now expose explicit Reload/Ignore or Locate/Close recovery while preserving authored draft state.
-  Focused tests, real offscreen integration, and the full suite (`1428 passed, 20 skipped, 1 warning`)
-  are green; display-backed acceptance remains environment-blocked by unavailable xcb `DISPLAY=:0`,
-  and crash recovery remains a separate plan.
+  Focused tests, real offscreen integration, and the current full suite (`1465 passed, 20 skipped,
+  1 warning`) are green; source-recovery closeout also records `89 passed`, Ruff/pip/diff checks,
+  and clean bounded-audit teardown. Display-backed acceptance remains limited by the isolated
+  `SingleInstanceUnavailable` endpoint before window creation, and crash recovery remains a
+  separate plan.
+- [x] (2026-08-10) Current source-recovery closeout reconciles the downstream safe-links/lifecycle
+  records: Reload/Ignore and Locate/Close are implemented, authored state and session secrets survive
+  validated replacement, and the remaining safe-links parent work is limited to explicit compatibility
+  cleanup and final release acceptance rather than missing recovery behavior.
 - [x] (2026-08-10) Added the signing transaction-progress increment: the real Qt composition now
   runs the injected executor on an owned worker, polls terminal completion on the Qt thread, shows
   truthful delayed stage/long-running copy without percentages or cancellation, and joins workers

@@ -344,6 +344,7 @@ class SignaturePropertiesPanel:
         on_source_ignore: Callable[[], Any] | None = None,
         on_source_locate: Callable[[], Any] | None = None,
         on_source_close: Callable[[], Any] | None = None,
+        source_safety_overlay_parent: Any | None = None,
     ) -> None:
         if reusable_objects is None:
             raise ValueError("reusable_objects is required for the signature properties panel.")
@@ -391,7 +392,28 @@ class SignaturePropertiesPanel:
             destroy_connect(lambda *_args: self.dispose())
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
+        self._source_safety_overlay_parent = source_safety_overlay_parent
+        self._source_safety_resize_filter: Any | None = None
         self._source_safety_container = bindings.q_widget()
+        if source_safety_overlay_parent is not None:
+            set_parent = getattr(self._source_safety_container, "setParent", None)
+            if callable(set_parent):
+                set_parent(source_safety_overlay_parent)
+            elif hasattr(self._source_safety_container, "parent"):
+                # Keep lightweight fake bindings parent-aware without requiring
+                # a Qt-only API surface.
+                self._source_safety_container.parent = source_safety_overlay_parent
+            install_filter = getattr(source_safety_overlay_parent, "installEventFilter", None)
+            if callable(install_filter):
+                panel = self
+
+                class _SourceSafetyResizeFilter(bindings.q_widget):  # type: ignore[misc,valid-type]
+                    def eventFilter(self, watched: Any, event: Any) -> bool:  # noqa: N802, ARG002
+                        panel._position_source_safety_overlay()
+                        return False
+
+                self._source_safety_resize_filter = _SourceSafetyResizeFilter()
+                install_filter(self._source_safety_resize_filter)
         source_safety_layout = bindings.q_vbox_layout(self._source_safety_container)
         source_safety_layout.setContentsMargins(8, 8, 8, 8)
         source_safety_layout.setSpacing(4)
@@ -416,7 +438,8 @@ class SignaturePropertiesPanel:
             self._source_close_button,
         ):
             source_safety_buttons.addWidget(button)
-        self._layout.addWidget(self._source_safety_container)
+        if source_safety_overlay_parent is None:
+            self._layout.addWidget(self._source_safety_container)
 
         self._certificate_controls = self._build_certificate_configuration_controls()
         self._signature_preset_controls = self._build_signature_preset_controls()
@@ -512,6 +535,12 @@ class SignaturePropertiesPanel:
         )
 
     def dispose(self) -> None:
+        parent = self._source_safety_overlay_parent
+        resize_filter = self._source_safety_resize_filter
+        remove_filter = getattr(parent, "removeEventFilter", None)
+        if resize_filter is not None and callable(remove_filter):
+            remove_filter(resize_filter)
+        self._source_safety_resize_filter = None
         self._canonical_preview_lifecycle.dispose()
         self._preview_controls.card_container._canonical_preview_snapshot = None
 
@@ -531,6 +560,7 @@ class SignaturePropertiesPanel:
         set_visible = getattr(self._source_safety_container, "setVisible", None)
         if callable(set_visible):
             set_visible(visible)
+        self._position_source_safety_overlay()
         if not visible:
             return decision
         message = (
@@ -551,6 +581,32 @@ class SignaturePropertiesPanel:
             if callable(set_button_visible):
                 set_button_visible(button_visible)
         return decision
+
+    def _position_source_safety_overlay(self) -> None:
+        """Keep the source notice over the document canvas, outside the rail layout."""
+        parent = self._source_safety_overlay_parent
+        if parent is None:
+            return
+        parent_width = getattr(parent, "width", lambda: 0)()
+        parent_height = getattr(parent, "height", lambda: 0)()
+        size_hint = getattr(self._source_safety_container, "sizeHint", None)
+        hint = size_hint() if callable(size_hint) else None
+        hint_height = getattr(hint, "height", lambda: 0)()
+        width = max(0, int(parent_width) - 24)
+        height = min(max(0, int(hint_height)), max(0, int(parent_height) - 24))
+        set_geometry = getattr(self._source_safety_container, "setGeometry", None)
+        if callable(set_geometry):
+            set_geometry(12, 12, width, height)
+        elif hasattr(self._source_safety_container, "properties"):
+            self._source_safety_container.properties["overlay_geometry"] = (
+                12,
+                12,
+                width,
+                height,
+            )
+        raise_widget = getattr(self._source_safety_container, "raise", None)
+        if callable(raise_widget):
+            raise_widget()
 
     def load_from_workflow(self) -> None:
         self._render_setup_state()

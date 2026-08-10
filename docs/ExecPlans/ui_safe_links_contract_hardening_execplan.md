@@ -57,8 +57,10 @@ fully tested policy contract that cannot silently authorize an unknown source.
 The corrected matrix now treats unavailable source identity as `UNKNOWN/REVIEW_REQUIRED`, blocks
 link activation outside Pan mode, rejects malformed/network-relative/empty internal destinations,
 and bounds confirmation display text while retaining no launcher or I/O behavior. The architecture
-document now names `document_safety.py` and its explicit non-responsibilities. Renderer extraction,
-source monitoring, draft-preserving reload, and condition-only banner integration remain open.
+document now names `document_safety.py` and its explicit non-responsibilities. At this plan's
+completion renderer extraction, source monitoring, draft-preserving reload, and condition-only
+banner integration were downstream work; those seams are now implemented and validated by the
+subsequent safe-links and source-recovery children.
 
 ## Context and Orientation
 

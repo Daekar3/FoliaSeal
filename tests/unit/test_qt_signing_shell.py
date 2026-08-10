@@ -2904,17 +2904,18 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.sidebar_surface.sign_result_label.parent is widget.sidebar_surface.status_region
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
-    assert len(widget.properties_panel.container.layout.items) == 5
+    assert len(widget.properties_panel.container.layout.items) == 4
+    assert widget.properties_panel._source_safety_container.parent is widget.viewer_widget  # noqa: SLF001
     assert (
-        widget.properties_panel.container.layout.items[1][0]
+        widget.properties_panel.container.layout.items[0][0]
         is widget.properties_panel._signature_preset_controls.container
     )
     assert (
-        widget.properties_panel.container.layout.items[2][0]
+        widget.properties_panel.container.layout.items[1][0]
         is widget.properties_panel._certificate_controls.container
     )
     assert (
-        widget.properties_panel.container.layout.items[4][0]
+        widget.properties_panel.container.layout.items[3][0]
         is widget.properties_panel._refinement_controls.container
     )
     assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 2

@@ -64,7 +64,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Draft-preserving source-change recovery is implemented in
   `ui_document_source_change_recovery_execplan.md`: changed sources expose Reload/Ignore, missing
   sources expose Locate/Close, candidate replacement is atomic, and authored state/secrets survive
-  transfer. Focused and offscreen coverage is green; final commit and broader parent cleanup remain.
+  transfer. Focused/offscreen coverage, full regression, bounded launch cleanup, and the recovery
+  child evidence record are complete; the remaining open item in this parent is compatibility/phase3
+  cleanup, not source-recovery behavior.
 
 - [x] (2026-08-09) Audit current behavior and add a failing focused test.
 - [x] (2026-08-09) Implement the smallest complete model/application/Qt path.
@@ -90,7 +92,13 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The safe-links behavior is complete through internal Pan-only navigation/history, blocked-link
+classification, cancel-default external confirmation/launch, and draft-preserving source-change
+recovery. The source-recovery child records `89` focused passes and the current full-suite result of
+`1465 passed, 20 skipped, 1 warning`, with a bounded GUI launch limited by the isolated
+`SingleInstanceUnavailable` endpoint and clean process/temp teardown. This parent remains open only
+for its explicit migrated compatibility/phase3 cleanup requirement and final parent-level release
+reconciliation; no source-recovery behavior is deferred.
 
 ## Context and Orientation
 

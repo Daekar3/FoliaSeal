@@ -561,8 +561,9 @@ The canonical repository document split is:
   `src/foliaseal/presentation/qt/signing_shell.py`, and `src/foliaseal/presentation/qt/app_frame.py`
 - Responsibility: Preserve authored signing state while the AppFrame replaces a mounted source
   only after a candidate workspace has been prepared and validated.
-- Owns: Qt-free `SigningDraftSnapshot` capture/restore, the condition-only source-safety banner,
-  one-second source-identity polling, and AppFrame actions for Reload, Ignore, Locate, and Close.
+- Owns: Qt-free `SigningDraftSnapshot` capture/restore, the condition-only source-safety canvas
+  overlay, one-second source-identity polling, and AppFrame actions for Reload, Ignore, Locate, and
+  Close.
 - Does not own: crash journals, autosave, restart restoration, or background draft persistence.
 - Key collaborators: `DocumentSourceMonitor`, `SigningWorkspaceHost.prepare()`,
   `SigningWorkspaceHost.replace_prepared()`, and `SigningWorkspaceLifecycle`.
@@ -570,7 +571,7 @@ The canonical repository document split is:
   `restore_source_transfer()`, `FoliaSealAppFrame._replace_source_preserving_draft()`,
   `_ignore_source_change()`, `_locate_missing_source()`, and `close_workspace()`.
 - Known constraints: The shell timer only refreshes the condition and visibility of the source
-  banner; it does not reload or mutate the draft. Reload and Locate capture a
+  canvas overlay; it does not reload or mutate the draft. Reload and Locate capture a
   `SigningDraftSnapshot`, prepare a candidate, restore the snapshot into that candidate, and
   atomically publish it through `replace_prepared()`; a failed prepare/mount disposes the
   candidate and leaves the prior workspace active. Ignore acknowledges the observed identity

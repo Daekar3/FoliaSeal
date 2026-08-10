@@ -37,6 +37,15 @@ workspace. Cancelled or failed actions leave the current document, draft, and se
 - [x] (2026-08-10) Reconcile architecture, lifecycle/parent plans, and acceptance evidence.
 - [x] (2026-08-10) Full validation, bounded GUI audit, and owned process/temp cleanup are complete;
   implementation commit `0d5116084` contains the complete slice.
+- [x] (2026-08-10) Closeout re-ran the source-recovery focused suite (`89 passed`), the full suite
+  (`1465 passed, 20 skipped, 1 warning`), Ruff, pip checks, and the bounded launch audit. The
+  display-backed audit still stops at the isolated `SingleInstanceUnavailable` endpoint before
+  window creation; no FoliaSeal/PySide6/pytest process or temporary audit root remained.
+- [x] (2026-08-10) Compliance review corrected the notice topology and resize behavior: the
+  condition-only notice is a viewer-canvas child outside the rail layout, and an event-filter hook
+  repositions it when the canvas resizes; offscreen geometry coverage proves both properties.
+- [x] (2026-08-10) The overlay correction, resize-aware acceptance evidence, architecture update,
+  and downstream plan reconciliation were committed as the source-recovery closeout.
 
 ## Surprises & Discoveries
 
@@ -74,13 +83,30 @@ workspace. Cancelled or failed actions leave the current document, draft, and se
 
 ## Outcomes & Retrospective
 
-Implementation is complete. Changed sources render a condition-only Reload/Ignore banner, missing
-sources render Locate/Close, and AppFrame candidate replacement transfers the authored draft and
-session secret before atomic mount. Focused app-frame/workflow coverage and the real offscreen
-readiness/banner integration are green; the full suite is `1428 passed, 20 skipped, 1 warning`.
-The bounded GUI launch remains display/single-instance limited (`SingleInstanceUnavailable` before
-window creation); crash journal, autosave, and interrupted-session restoration remain explicit
-follow-on work. Implementation commit: `0d5116084`.
+Implementation is complete. Changed sources render a condition-only Reload/Ignore canvas overlay,
+missing sources render Locate/Close, and AppFrame candidate replacement transfers the authored draft
+and session secret before atomic mount. Focused source-monitor/workflow/AppFrame/offscreen coverage is
+green (`89 passed`); the full suite is `1465 passed, 20 skipped, 1 warning`; Ruff, pip checks, and
+diff checks are clean. The bounded GUI launch remains display/single-instance limited
+(`SingleInstanceUnavailable` before window creation); crash journal, autosave, and interrupted-
+session restoration remain explicit follow-on work. Implementation commit: `0d5116084`.
+
+## Evidence Record
+
+The focused command was `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
+tests/unit/test_document_source_monitor.py tests/unit/test_signing_draft_workflow.py
+tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py
+tests/integration/test_readiness_caveats_status.py` (`89 passed`). It covers source fingerprint
+decisions, direct signing refusal, snapshot/restore of authored placement/appearance/field/output
+state and session passphrase, candidate validation before replacement, failed/cancelled recovery,
+Ignore without remount, and the real offscreen condition-only canvas overlay. The full suite passed with
+`1465 passed, 20 skipped, 1 warning`; `.venv/bin/ruff check src tests`, `.venv/bin/python -m pip
+check`, and `git diff --check` passed. A bounded `foliaseal gui --pdf-path
+artifacts/preview_sweep_assets/sweep_fixture.pdf` launch returned `gui_rc=1` at the isolated
+  `SingleInstanceUnavailable` endpoint; the owned configuration root was removed and no matching
+process remained. The overlay test also proves its viewer-canvas parent, unchanged canvas/rail/
+properties-panel geometry while visible, and updated bounds after resizing the workspace. This text
+surface has no SVG requirement.
 
 ## Context and Orientation
 
@@ -187,7 +213,8 @@ the existing readiness state, and does nothing until the user chooses an action.
 mount a validated candidate with identical authored draft values and passphrase, then clear the
 notice; Ignore clears the notice without changing the mounted widget; missing-source Locate/Close
 behaves explicitly; Cancel and failed candidate loading preserve the old workspace. The real
-offscreen Qt panel test proves the condition-only banner and explicit Ignore action; fake-Qt
+offscreen Qt overlay test proves the canvas parent, unchanged rail geometry, condition-only notice,
+and explicit Ignore action; fake-Qt
 AppFrame tests prove candidate Reload/Locate transfer and failure preservation. No action may
 auto-reload or silently discard a draft. Focused and full tests, Ruff, pip check, diff check, and
 cleanup must pass. Crash journals/autosave are not acceptance claims.
