@@ -10,10 +10,35 @@ from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
     RenameObject,
+    ReusableObjectKind,
     ReusableObjectRef,
     ReusableSigningObjects,
 )
+from foliaseal.application.signature_library_session import (
+    CertificateLibraryRef,
+    LibraryCatalog,
+    SignatureLibraryRow,
+    SignatureLibrarySession,
+)
 from foliaseal.infra.config.schemas import ConfigValidationError
+
+
+def _compose_row(bindings: Any, *widgets: Any) -> Any:
+    container = bindings.q_widget()
+    layout = bindings.q_hbox_layout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(4)
+    for widget in widgets:
+        layout.addWidget(widget)
+    return container
+
+
+def _set_enabled(widget: Any, enabled: bool) -> None:
+    setter = getattr(widget, "setEnabled", None)
+    if callable(setter):
+        setter(enabled)
+    elif hasattr(widget, "_enabled"):
+        widget._enabled = bool(enabled)
 
 
 @dataclass(frozen=True)
@@ -21,7 +46,10 @@ class ReusableObjectLibraryControls:
     """Widgets exposed by the reusable-signing-object library dialog."""
 
     dialog: Any
+    catalog_selector: Any
+    search_input: Any
     object_selector: Any
+    detail_container: Any
     details_label: Any
     name_input: Any
     rename_button: Any
@@ -30,6 +58,8 @@ class ReusableObjectLibraryControls:
     edit_button: Any
     create_placement_button: Any
     edit_placement_button: Any
+    save_button: Any
+    cancel_button: Any
     close_button: Any
 
 
@@ -48,6 +78,8 @@ class ReusableObjectLibraryDialog:
         bindings: Any,
         parent: Any,
         library: ReusableSigningObjects,
+        certificate_catalog: Any | None = None,
+        certificate_catalog_provider: Callable[[], Any] | None = None,
         on_create: Callable[[], bool] | None = None,
         on_edit: Callable[[], bool] | None = None,
         on_create_placement: Callable[[], bool] | None = None,
@@ -59,7 +91,9 @@ class ReusableObjectLibraryDialog:
         self._on_edit = on_edit
         self._on_create_placement = on_create_placement
         self._on_edit_placement = on_edit_placement
-        self._refs: list[ReusableObjectRef] = []
+        self._certificate_catalog_provider = certificate_catalog_provider
+        self._session = SignatureLibrarySession(library, certificate_catalog)
+        self._rows: tuple[SignatureLibraryRow, ...] = ()
         self.controls = self._build_controls(parent)
         self.refresh()
 
@@ -77,26 +111,23 @@ class ReusableObjectLibraryDialog:
         return self
 
     def refresh(self) -> None:
-        items = self._library.view().all_items
-        self._refs = [item.ref for item in items]
-        selector = self.controls.object_selector
-        clear = getattr(selector, "clear", None)
-        if callable(clear):
-            clear()
-        selector.addItems([item.display_name for item in items])
-        set_item_data = getattr(selector, "setItemData", None)
-        if callable(set_item_data):
-            for index, ref in enumerate(self._refs):
-                set_item_data(index, ref)
+        if self._certificate_catalog_provider is not None:
+            self._session.set_certificate_catalog(self._certificate_catalog_provider())
+        self._rows = self._session.refresh()
+        self._render_catalog_navigation()
+        self._render_master_list()
         self._render_selection()
 
     def rename_selected(self) -> bool:
         selected = self._selected_object()
-        new_name = self.controls.name_input.text().strip()
+        new_name = self._session.draft_name or self.controls.name_input.text().strip()
         if selected is None or not new_name:
             self._show_error("Select a saved object and enter a new name.")
             return False
-        ref, name = selected
+        ref, _name = selected
+        if not isinstance(ref, ReusableObjectRef):
+            self._show_error("Certificate changes are managed from Settings.")
+            return False
         try:
             self._library.execute(RenameObject(ref=ref, new_name=new_name))
         except (ConfigValidationError, KeyError) as exc:
@@ -104,6 +135,15 @@ class ReusableObjectLibraryDialog:
             return False
         self.refresh()
         self._set_selector_text(new_name)
+        self._session.commit_detail()
+        return True
+
+    def cancel_detail(self) -> bool:
+        """Discard the current detail selection without changing the catalog."""
+
+        self._session.cancel_detail()
+        self._render_master_list()
+        self._render_selection()
         return True
 
     def delete_selected(self) -> bool:
@@ -112,6 +152,9 @@ class ReusableObjectLibraryDialog:
             self._show_error("Select a saved object before deleting it.")
             return False
         ref, _name = selected
+        if not isinstance(ref, ReusableObjectRef):
+            self._show_error("Certificate changes are managed from Settings.")
+            return False
         try:
             self._library.execute(DeleteObject(ref=ref))
         except (ConfigValidationError, KeyError) as exc:
@@ -125,8 +168,24 @@ class ReusableObjectLibraryDialog:
         set_title = getattr(dialog, "setWindowTitle", None)
         if callable(set_title):
             set_title("Manage reusable signing objects")
-        layout = self._bindings.q_form_layout(dialog)
-        selector = self._bindings.q_combo_box()
+        layout = self._bindings.q_hbox_layout(dialog)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        navigation = (
+            self._bindings.q_list_widget()
+            if self._has_list_widget()
+            else self._bindings.q_combo_box()
+        )
+        if hasattr(navigation, "setMinimumWidth"):
+            navigation.setMinimumWidth(130)
+        search = self._bindings.q_line_edit()
+        search.setPlaceholderText("Search saved objects")
+        selector = (
+            self._bindings.q_list_widget()
+            if self._has_list_widget()
+            else self._bindings.q_combo_box()
+        )
         details = self._bindings.q_label("")
         name_input = self._bindings.q_line_edit()
         name_input.setPlaceholderText("New name")
@@ -136,17 +195,71 @@ class ReusableObjectLibraryDialog:
         edit = self._bindings.q_push_button("Edit in signing workflow")
         create_placement = self._bindings.q_push_button("Create placement")
         edit_placement = self._bindings.q_push_button("Edit selected placement")
+        save = self._bindings.q_push_button("Save")
+        cancel = self._bindings.q_push_button("Cancel")
         close = self._bindings.q_push_button("Close")
-        layout.addRow("Saved signing object", selector)
-        layout.addRow("References", details)
-        layout.addRow("Rename selected object", name_input)
-        layout.addRow(rename, delete)
-        layout.addRow(create, edit)
-        layout.addRow(create_placement, edit_placement)
-        layout.addRow(close)
-        selector.currentTextChanged.connect(lambda _value: self._render_selection())
+
+        navigation.addItems([catalog.value for catalog in LibraryCatalog])
+        navigation_column = self._bindings.q_widget()
+        navigation_layout = self._bindings.q_vbox_layout(navigation_column)
+        navigation_layout.setContentsMargins(0, 0, 0, 0)
+        navigation_layout.addWidget(self._bindings.q_label("Catalog"))
+        navigation_layout.addWidget(navigation)
+
+        master_column = self._bindings.q_widget()
+        master_layout = self._bindings.q_vbox_layout(master_column)
+        master_layout.setContentsMargins(0, 0, 0, 0)
+        master_layout.addWidget(self._bindings.q_label("Saved objects"))
+        master_layout.addWidget(search)
+        master_layout.addWidget(selector)
+
+        detail = self._bindings.q_widget()
+        detail_layout = self._bindings.q_vbox_layout(detail)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        detail_layout.addWidget(self._bindings.q_label("Details"))
+        detail_layout.addWidget(details)
+        detail_layout.addWidget(self._bindings.q_label("Name"))
+        detail_layout.addWidget(name_input)
+        detail_layout.addWidget(_compose_row(self._bindings, rename, delete))
+        detail_layout.addWidget(_compose_row(self._bindings, create, edit))
+        detail_layout.addWidget(_compose_row(self._bindings, create_placement, edit_placement))
+        add_stretch = getattr(detail_layout, "addStretch", None)
+        if callable(add_stretch):
+            add_stretch()
+        detail_layout.addWidget(_compose_row(self._bindings, save, cancel))
+        detail_layout.addWidget(close)
+
+        splitter_cls = getattr(self._bindings, "q_splitter", None)
+        if splitter_cls is not None:
+            splitter = splitter_cls()
+            orientation = getattr(getattr(self._bindings, "qt", None), "Horizontal", None)
+            if orientation is not None and hasattr(splitter, "setOrientation"):
+                splitter.setOrientation(orientation)
+            splitter.addWidget(navigation_column)
+            splitter.addWidget(master_column)
+            splitter.addWidget(detail)
+            if hasattr(splitter, "setStretchFactor"):
+                splitter.setStretchFactor(2, 1)
+            layout.addWidget(splitter)
+        else:
+            layout.addWidget(navigation_column)
+            layout.addWidget(master_column)
+            layout.addWidget(detail)
+
+        if hasattr(navigation, "currentRowChanged"):
+            navigation.currentRowChanged.connect(self._handle_catalog_row_changed)
+        else:
+            navigation.currentTextChanged.connect(self._handle_catalog_text_changed)
+        search.textChanged.connect(lambda value: self._handle_search_changed(str(value)))
+        name_input.textChanged.connect(lambda value: self._session.set_draft_name(str(value)))
+        if hasattr(selector, "currentRowChanged"):
+            selector.currentRowChanged.connect(lambda _row: self._handle_master_row_changed())
+        else:
+            selector.currentTextChanged.connect(lambda _value: self._handle_master_row_changed())
         rename.clicked.connect(self.rename_selected)
         delete.clicked.connect(self.delete_selected)
+        save.clicked.connect(self.rename_selected)
+        cancel.clicked.connect(self.cancel_detail)
         if self._on_create is not None:
             create.clicked.connect(self._on_create)
         if self._on_edit is not None:
@@ -164,7 +277,10 @@ class ReusableObjectLibraryDialog:
             close.clicked.connect(reject)
         return ReusableObjectLibraryControls(
             dialog=dialog,
+            catalog_selector=navigation,
+            search_input=search,
             object_selector=selector,
+            detail_container=detail,
             details_label=details,
             name_input=name_input,
             rename_button=rename,
@@ -173,6 +289,8 @@ class ReusableObjectLibraryDialog:
             edit_button=edit,
             create_placement_button=create_placement,
             edit_placement_button=edit_placement,
+            save_button=save,
+            cancel_button=cancel,
             close_button=close,
         )
 
@@ -182,6 +300,9 @@ class ReusableObjectLibraryDialog:
             self._show_error("Select a saved placement before editing it.")
             return False
         ref, _name = selected
+        if not isinstance(ref, ReusableObjectRef):
+            self._show_error("Select a placement to open the placement editor.")
+            return False
         try:
             profile = self._library.resolve(ref)
         except ConfigValidationError as exc:
@@ -193,37 +314,130 @@ class ReusableObjectLibraryDialog:
         assert self._on_edit_placement is not None
         return self._on_edit_placement(profile)
 
-    def _render_selection(self) -> None:
-        selected = self._selected_object()
-        if selected is None:
-            self.controls.details_label.setText("Select an object to inspect its saved references.")
-            return
-        ref, name = selected
-        item = next(
-            (item for item in self._library.view().all_items if item.ref == ref),
-            None,
-        )
-        self.controls.details_label.setText(
-            item.details if item is not None else "Saved object is no longer available."
-        )
-        self.controls.name_input.setText(name)
+    def _has_list_widget(self) -> bool:
+        return callable(getattr(self._bindings, "q_list_widget", None))
 
-    def _selected_object(self) -> tuple[ReusableObjectRef, str] | None:
+    def _render_catalog_navigation(self) -> None:
+        navigation = self.controls.catalog_selector
+        if hasattr(navigation, "setCurrentRow"):
+            navigation.setCurrentRow(list(LibraryCatalog).index(self._session.catalog))
+        else:
+            setter = getattr(navigation, "setCurrentText", None)
+            if callable(setter):
+                setter(self._session.catalog.value)
+            else:
+                index = getattr(navigation, "findText", lambda _value: -1)(
+                    self._session.catalog.value
+                )
+                if index >= 0 and hasattr(navigation, "setCurrentIndex"):
+                    navigation.setCurrentIndex(index)
+
+    def _render_master_list(self) -> None:
         selector = self.controls.object_selector
-        index = getattr(selector, "currentIndex", lambda: -1)()
-        if isinstance(index, int) and 0 <= index < len(self._refs):
-            return self._refs[index], selector.currentText().strip()
-        value = selector.currentText().strip()
-        for ref in self._refs:
-            item = next((item for item in self._library.view().all_items if item.ref == ref), None)
-            if item is not None and item.display_name == value:
-                return ref, value
-        return None
+        clear = getattr(selector, "clear", None)
+        if callable(clear):
+            clear()
+        names = [row.display_name for row in self._rows]
+        if hasattr(selector, "addItems"):
+            selector.addItems(names)
+        else:
+            for name in names:
+                selector.addItem(name)
+        if hasattr(selector, "setItemData"):
+            for index, row in enumerate(self._rows):
+                selector.setItemData(index, row.ref)
+        selected = self._session.selected_ref
+        if selected is not None:
+            selected_index = next(
+                (index for index, row in enumerate(self._rows) if row.ref == selected),
+                -1,
+            )
+            if hasattr(selector, "setCurrentRow"):
+                selector.setCurrentRow(selected_index)
+            elif selected_index >= 0:
+                selector.setCurrentIndex(selected_index)
+
+    def _handle_catalog_row_changed(self, index: int) -> None:
+        catalogs = list(LibraryCatalog)
+        if 0 <= int(index) < len(catalogs):
+            self._session.select_catalog(catalogs[int(index)])
+            self._rows = self._session.rows()
+            self._render_master_list()
+            self._render_selection()
+
+    def _handle_catalog_text_changed(self, value: str) -> None:
+        try:
+            catalog = next(item for item in LibraryCatalog if item.value == value)
+        except StopIteration:
+            return
+        self._session.select_catalog(catalog)
+        self._rows = self._session.rows()
+        self._render_master_list()
+        self._render_selection()
+
+    def _handle_search_changed(self, value: str) -> None:
+        self._rows = self._session.set_search(value)
+        self._render_master_list()
+        self._render_selection()
+
+    def _handle_master_row_changed(self) -> None:
+        selected = self._selected_object()
+        self._session.select(None if selected is None else selected[0])
+        self._render_selection()
+
+    def _render_selection(self) -> None:
+        selected = self._session.selected_row()
+        if selected is None:
+            if self._session.catalog is LibraryCatalog.CERTIFICATES:
+                message = "Certificate management is available from Settings."
+            elif self._rows:
+                message = "Select an object to inspect its saved references."
+            else:
+                message = "No saved objects match this catalog or search."
+            self.controls.details_label.setText(message)
+            _set_enabled(self.controls.edit_placement_button, False)
+            return
+        self.controls.details_label.setText(selected.details)
+        self.controls.name_input.setText(self._session.draft_name or selected.display_name)
+        _set_enabled(
+            self.controls.edit_placement_button,
+            isinstance(selected.ref, ReusableObjectRef)
+            and selected.ref.kind is ReusableObjectKind.PLACEMENT,
+        )
+
+    def _selected_object(
+        self,
+    ) -> tuple[ReusableObjectRef | CertificateLibraryRef, str] | None:
+        selector = self.controls.object_selector
+        if hasattr(selector, "currentRow"):
+            index = selector.currentRow()
+        else:
+            index_getter = getattr(selector, "currentIndex", None)
+            if callable(index_getter):
+                index = index_getter()
+            else:
+                value = str(getattr(selector, "currentText", lambda: "")()).strip()
+                index = next(
+                    (index for index, row in enumerate(self._rows) if row.display_name == value),
+                    -1,
+                )
+        if not isinstance(index, int) or not 0 <= index < len(self._rows):
+            return None
+        row = self._rows[index]
+        return row.ref, row.display_name
 
     def _set_selector_text(self, value: str) -> None:
-        setter = getattr(self.controls.object_selector, "setCurrentText", None)
-        if callable(setter):
-            setter(value)
+        selector = self.controls.object_selector
+        index = next(
+            (index for index, row in enumerate(self._rows) if row.display_name == value),
+            -1,
+        )
+        if hasattr(selector, "setCurrentRow"):
+            selector.setCurrentRow(index)
+        else:
+            setter = getattr(selector, "setCurrentText", None)
+            if callable(setter):
+                setter(value)
 
     def _show_error(self, message: str) -> None:
         warning = getattr(self._bindings.q_message_box, "warning", None)

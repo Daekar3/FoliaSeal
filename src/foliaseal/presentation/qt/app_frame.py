@@ -122,6 +122,7 @@ class QtAppFrameBindings:
     q_hbox_layout: type[Any] | None = None
     q_vbox_layout: type[Any] | None = None
     q_list_widget: type[Any] | None = None
+    q_splitter: type[Any] | None = None
     q_text_edit: type[Any] | None = None
     q_double_spin_box: type[Any] | None = None
     q_spin_box: type[Any] | None = None
@@ -764,6 +765,8 @@ class FoliaSealAppFrame:
             bindings=self._bindings,
             parent=self.window,
             library=self._reusable_objects,
+            certificate_catalog=self._certificate_catalog_store.load_catalog(),
+            certificate_catalog_provider=self._certificate_catalog_store.load_catalog,
             on_create=self._open_reusable_object_editor,
             on_edit=self._open_reusable_object_editor,
             on_create_placement=self._open_placement_profile_editor,
@@ -1597,6 +1600,7 @@ class QtAppFrameAdapter:
             q_hbox_layout=getattr(qt_widgets, "QHBoxLayout"),
             q_vbox_layout=getattr(qt_widgets, "QVBoxLayout"),
             q_list_widget=getattr(qt_widgets, "QListWidget"),
+            q_splitter=getattr(qt_widgets, "QSplitter"),
             q_text_edit=getattr(qt_widgets, "QTextEdit"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
             q_spin_box=getattr(qt_widgets, "QSpinBox"),

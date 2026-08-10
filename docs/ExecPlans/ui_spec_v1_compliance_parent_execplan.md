@@ -61,7 +61,9 @@ Document-flow tranche:
 
 Reusable-object and certificate tranche:
 
-- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
+- [x] docs/ExecPlans/ui_signature_library_topology_execplan.md — bounded modeless topology, catalog
+  navigation/search, certificate projection, and transactional name draft landed; nested editors,
+  certificate mutations, Duplicate/Pin, dirty prompts, and Library preferences remain open.
 - [ ] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
 - [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
@@ -125,8 +127,12 @@ Release tranche:
   explicit source-page metadata, fixed page number, pinned state, and visible top-left geometry;
   PDF↔visible conversion is centralized; SavePlacement/workflow capture require explicit context;
   transactional numeric editing is reachable from Library create/edit actions and survives reload.
-  Pointer handles, keyboard placement, snapping/undo, and the final three-column Library remain open
-  in their owning children.
+  Pointer handles, keyboard placement, and snapping/undo remain open in their owning children; the
+  bounded three-column Library topology now lands in its own completed child below.
+- [x] (2026-08-10) Completed the bounded Signature Library topology slice: the AppFrame now owns one
+  modeless Presets-first three-column surface with searchable typed rows, injected certificate
+  projections, and an isolated Save/Cancel name draft. Nested editors, certificate mutations,
+  Duplicate/Pin, dirty prompts, and Library-specific preferences remain open in their owning plans.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

@@ -321,13 +321,27 @@ class _FakeFormLayout:
     def addRow(self, *args):  # noqa: N802
         self.rows.append(args)
 
+    def addWidget(self, widget, *args):  # noqa: N802
+        self.rows.append((widget, *args))
+
+    def addStretch(self, *args):  # noqa: N802
+        self.rows.append(("stretch", *args))
+
+    def setContentsMargins(self, *args):  # noqa: N802
+        return None
+
+    def setSpacing(self, *args):  # noqa: N802
+        return None
+
 
 class _FakeLineEdit:
     def __init__(self, text="") -> None:
         self._text = text
+        self.textChanged = _FakeSignal()
 
     def setText(self, text):  # noqa: N802
         self._text = text
+        self.textChanged.emit(text)
 
     def text(self):
         return self._text
@@ -774,6 +788,9 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_icon=_FakeIcon,
         q_application=_FakeQApplication,
         qpdf_document=_FakeQPdfDocument,
+        q_widget=_FakeLabel,
+        q_hbox_layout=_FakeFormLayout,
+        q_vbox_layout=_FakeFormLayout,
     )
 
 

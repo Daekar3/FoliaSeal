@@ -28,7 +28,7 @@ def test_library_exposes_reachable_create_and_edit_placement_actions() -> None:
 
     dialog.controls.create_placement_button.click()
     assert created == ["create"]
-    assert dialog.controls.edit_placement_button._enabled is True
+    assert dialog.controls.edit_placement_button._enabled is False
 
     service.execute(
         SavePlacement(
@@ -38,6 +38,7 @@ def test_library_exposes_reachable_create_and_edit_placement_actions() -> None:
             page_number=3,
         )
     )
+    dialog.controls.catalog_selector.setCurrentText("Placements")
     dialog.refresh()
     dialog.controls.object_selector.setCurrentIndex(0)
     dialog.controls.edit_placement_button.click()
