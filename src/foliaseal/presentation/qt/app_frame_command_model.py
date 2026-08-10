@@ -16,6 +16,11 @@ class AppFrameCommandId(StrEnum):
     EXIT = "file.exit"
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
+    APPLICATION_SETTINGS = "settings.application"
+    MANAGE_REUSABLE_OBJECTS = "settings.manage_reusable_objects"
+    CREATE_CERTIFICATE = "settings.create_certificate"
+    IMPORT_CERTIFICATE = "settings.import_certificate"
+    MANAGE_CERTIFICATE_CONFIGURATIONS = "settings.manage_certificate_configurations"
 
 
 @dataclass(frozen=True)
@@ -94,9 +99,54 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 )
 
 
+SETTINGS_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.APPLICATION_SETTINGS,
+        menu="Settings",
+        text="Application settings",
+        shortcut=None,
+        accessible_name="Open application settings",
+        mnemonic_text="&Application settings",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.MANAGE_REUSABLE_OBJECTS,
+        menu="Settings",
+        text="Manage reusable signing objects...",
+        shortcut=None,
+        accessible_name="Manage reusable signing objects",
+        mnemonic_text="&Manage reusable signing objects...",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.CREATE_CERTIFICATE,
+        menu="Settings",
+        text="Create certificate...",
+        shortcut=None,
+        accessible_name="Create certificate",
+        mnemonic_text="Create certi&ficate...",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.IMPORT_CERTIFICATE,
+        menu="Settings",
+        text="Import certificate...",
+        shortcut=None,
+        accessible_name="Import certificate",
+        mnemonic_text="&Import certificate...",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.MANAGE_CERTIFICATE_CONFIGURATIONS,
+        menu="Settings",
+        text="Manage certificate configurations...",
+        shortcut=None,
+        accessible_name="Manage certificate configurations",
+        mnemonic_text="Manage certificate &configurations...",
+    ),
+)
+
+
 ALL_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     *FILE_COMMAND_DEFINITIONS,
     *VIEW_COMMAND_DEFINITIONS,
+    *SETTINGS_COMMAND_DEFINITIONS,
 )
 
 

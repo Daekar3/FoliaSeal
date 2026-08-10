@@ -117,6 +117,10 @@ Release tranche:
   `MainWindowGeometry` survives settings round-trip, restores before display, captures after the
   event loop (including controlled cleanup), and preserves unknown UI keys. Rail-divider, Library,
   full monitor/DPI, and toolbar persistence remain open in the window child.
+- [x] (2026-08-09) Loop 8 completed the bounded Settings command-model increment: the five existing
+  Settings callbacks now use the shared typed registry with unique mnemonics, stable IDs/object
+  names, Qt descriptions, and callback-routing tests. Edit, Signing, Help, and remaining View
+  commands remain open until their truthful behavior seams exist.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

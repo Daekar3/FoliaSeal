@@ -21,7 +21,7 @@ generic refactor.
 
 - [x] (2026-08-09) Audit the current implementation and write failing focused tests for the File command foundation.
 - [x] (2026-08-09) Implement the typed File command registry and lifecycle application/Qt path.
-- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
+- [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the command-model seams was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and real-Qt validation; record evidence and clean up.
 - [ ] (2026-08-09) Update relevant architecture/status documentation, complete the remaining command menus, then commit the whole child outcome.
 - [x] (2026-08-09) Loop 5: add typed View Previous Page and Next Page commands through the public
@@ -32,6 +32,16 @@ generic refactor.
   were no remaining repository callers; `command_definition()` is now the sole frame lookup.
 - [x] (2026-08-09) Loop 5 architecture/status documentation updated; the command-model child remains
   open for the deferred menus and signed-state policy.
+- [x] (2026-08-09) Loop 8: migrated the existing Settings actions to the shared typed command
+  registry with unique mnemonics, stable IDs/object names, Qt descriptions, and callback-routing
+  coverage. Edit, Signing, Help, and the remaining View commands remain deferred until truthful
+  behavior seams exist.
+- [x] (2026-08-09) Loop 8 focused validation passed (`44 passed`), full validation passed
+  (`1185 passed, 20 skipped, 1 warning`), and the bounded launch audit cleaned its isolated root
+  with no lingering FoliaSeal/PySide6 process; the launch remains limited by the local
+  `SingleInstanceUnavailable` endpoint error.
+- [x] (2026-08-09) Architecture and parent-plan status documentation were reconciled; the bounded
+  Settings outcome is ready for commit while the broader child remains open.
 
 ## Surprises & Discoveries
 
@@ -52,6 +62,10 @@ generic refactor.
   Evidence: `SigningWorkspaceSessionPort.go_to_previous_page()` and
   `go_to_next_page()` route through `SigningShellAdapter`; the typed View definitions now live in
   `VIEW_COMMAND_DEFINITIONS` and are mapped by `command_definition()`.
+- Observation: Settings already had five concrete frame callbacks, so those actions could be
+  migrated without inventing behavior; Help, Signing, and the full Edit menu do not yet have
+  complete truthful seams.
+  Evidence: Loop 8 explorer review and the resulting `SETTINGS_COMMAND_DEFINITIONS` registry.
 
 ## Decision Log
 
@@ -77,6 +91,11 @@ generic refactor.
   Rationale: these two commands already have real application behavior and can be proven without
   inventing disabled or misleading actions for unfinished viewer features.
   Date/Author: 2026-08-09 / Codex
+- Decision: migrate the existing Settings callbacks into the typed registry as the final bounded
+  command-model increment, while leaving unsupported Edit/Signing/Help placeholders out of the UI.
+  Rationale: each migrated Settings action has a concrete frame boundary and can expose stable
+  keyboard metadata; adding commands without behavior would violate UI_SPEC's truthful-action rule.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
@@ -86,9 +105,12 @@ close the workspace, or exit the application. Focused and real-Qt checks are gre
 the app-frame/state/integration slice; `142 passed` including shell regressions). Loop 5 adds a
 typed View menu with Previous Page and Next Page, Page Up/Page Down shortcuts, boundary-aware
 enablement, public session-port routing, and callback synchronization after viewer-owned navigation.
-The offscreen Qt shortcut test proves exactly one transition per key. The remaining gap is the rest
-of the UI_SPEC command registry and its parent scenario evidence; Fit/zoom/search/signature/history
-commands remain deferred to their owning viewer/document children.
+The offscreen Qt shortcut test proves exactly one transition per key. Loop 8 also migrates the five
+existing Settings callbacks into `SETTINGS_COMMAND_DEFINITIONS`, including unique mnemonics, stable
+object names, Qt descriptions, and trigger-routing tests. The remaining gap is the rest of the
+UI_SPEC command registry and its parent scenario evidence: focus-sensitive Edit actions,
+Signing-menu topology, Help content/actions, and Fit/zoom/search/signature/history commands remain
+deferred to their owning viewer/document/support children.
 
 ## Context and Orientation
 
@@ -132,7 +154,7 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e '_install_menus|_command_action|FILE_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
-    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py tests/integration/test_gui_launch_no_document.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -151,13 +173,14 @@ cleanup result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance for Loop 2 is behavioral for File: Open, Save, Save As, Close, and Exit are defined by one
-typed registry, expose normative shortcuts/mnemonics and Qt-supported descriptions, stay disabled
-when no workspace is open where appropriate, and route through public workspace seams. First Save
-must choose a path before submitting. The full child acceptance remains open for the later Edit,
-View, Signing, Settings, Help, signed-state policy, and parent scenario requirements. The focused
-regression suite must pass, shared-code changes must keep the full suite green, and real-Qt evidence
-must record the visible command state and cleanup.
+Acceptance for the completed bounded increments is behavioral: File and View Previous/Next Page
+commands remain defined by one typed registry, and all five existing Settings actions now use the
+same registry with unique menu mnemonics, stable object names, Qt-supported descriptions, and
+callbacks that reach their existing frame surfaces. First Save must choose a path before
+submitting. The full child acceptance remains open for focus-sensitive Edit, Signing, Help,
+remaining View, signed-state policy, and parent scenario requirements. The focused regression suite
+must pass, shared-code changes must keep the full suite green, and real-Qt evidence must record the
+visible command state and cleanup.
 
 ## Evidence Record
 
@@ -167,7 +190,8 @@ cleanup result, and compatibility grep proof. Loop 2 evidence is the offscreen r
 assertion for File labels, shortcuts, tooltip/status descriptions, mnemonic text, and no-document
 enablement; Loop 5 adds `tests/integration/test_view_navigation_shortcuts.py`, whose offscreen
 QTest Page Down/Page Up sequence produced exactly one page transition and one render per key. The
-full validation result for this loop is `1173 passed, 20 skipped, 1 warning`; Ruff passes. The
+Loop 8 Settings focused pass is `44 passed`; its updated full-suite result must be recorded below;
+Ruff passes. The
 bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
 isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
 FoliaSeal/PySide6 processes after cleanup.
@@ -194,10 +218,13 @@ absolute paths.
 
 Use existing typed application workflows and public Qt ports rather than private child-widget
 reach-through. The final interface must be exercised by tests/unit/test_qt_app_frame.py,
-tests/unit/test_app_frame_workspace_action_state.py, and the command-state assertions added to
-those files.
+tests/unit/test_app_frame_workspace_action_state.py, tests/integration/test_gui_launch_no_document.py,
+and the command-state assertions added for Settings.
 workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
 retirement condition recorded in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as child ui_command_model_shortcuts_execplan.md of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-09 / Codex
+Recorded the Loop 8 Settings-registry migration and narrowed remaining command-model work to
+existing truthful Edit/Signing/Help/View seams rather than placeholder actions.

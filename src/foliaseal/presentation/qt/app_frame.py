@@ -627,22 +627,30 @@ class FoliaSealAppFrame:
             enabled=False,
         )
         settings_menu = menu_bar.addMenu("Settings")
-        settings_menu.addAction(self._action("Application settings", self.show_app_settings))
-        settings_menu.addAction(
-            self._action(
-                "Manage reusable signing objects...",
-                self.show_reusable_object_library,
-            )
+        self._command_action(
+            settings_menu,
+            AppFrameCommandId.APPLICATION_SETTINGS,
+            self.show_app_settings,
         )
-        settings_menu.addAction(
-            self._action("Create certificate...", self.show_certificate_creation)
+        self._command_action(
+            settings_menu,
+            AppFrameCommandId.MANAGE_REUSABLE_OBJECTS,
+            self.show_reusable_object_library,
         )
-        settings_menu.addAction(self._action("Import certificate...", self.show_certificate_import))
-        settings_menu.addAction(
-            self._action(
-                "Manage certificate configurations...",
-                self.show_certificate_management,
-            )
+        self._command_action(
+            settings_menu,
+            AppFrameCommandId.CREATE_CERTIFICATE,
+            self.show_certificate_creation,
+        )
+        self._command_action(
+            settings_menu,
+            AppFrameCommandId.IMPORT_CERTIFICATE,
+            self.show_certificate_import,
+        )
+        self._command_action(
+            settings_menu,
+            AppFrameCommandId.MANAGE_CERTIFICATE_CONFIGURATIONS,
+            self.show_certificate_management,
         )
 
     def _action(

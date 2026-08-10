@@ -20,6 +20,7 @@ from foliaseal.presentation.qt.app_frame import (
 )
 from foliaseal.presentation.qt.app_frame_command_model import (
     FILE_COMMAND_DEFINITIONS,
+    SETTINGS_COMMAND_DEFINITIONS,
     VIEW_COMMAND_DEFINITIONS,
     AppFrameCommandId,
 )
@@ -1051,11 +1052,33 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     ]
     assert [action.enabled for action in frame.window.menu_bar.menus[2].actions] == [False, False]
     assert [action.text for action in frame.window.menu_bar.menus[3].actions] == [
-        "Application settings",
-        "Manage reusable signing objects...",
-        "Create certificate...",
-        "Import certificate...",
-        "Manage certificate configurations...",
+        definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.shortcut for action in frame.window.menu_bar.menus[3].actions] == [
+        definition.shortcut for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.object_name for action in frame.window.menu_bar.menus[3].actions] == [
+        definition.command_id.value for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.tool_tip for action in frame.window.menu_bar.menus[3].actions] == [
+        definition.accessible_name for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.status_tip for action in frame.window.menu_bar.menus[3].actions] == [
+        definition.accessible_name for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    settings_mnemonics = [
+        action.text.replace("&", "").lower()
+        for action in frame.window.menu_bar.menus[3].actions
+    ]
+    mnemonic_letters = [
+        action.text[action.text.index("&") + 1].lower()
+        for action in frame.window.menu_bar.menus[3].actions
+        if "&" in action.text
+    ]
+    assert len(mnemonic_letters) == len(set(mnemonic_letters))
+    assert settings_mnemonics == [
+        definition.mnemonic_text.replace("&", "").lower()
+        for definition in SETTINGS_COMMAND_DEFINITIONS
     ]
     assert not hasattr(frame.window, "_foliaseal_app_frame")
     assert not hasattr(frame.window, "app_settings")
@@ -1073,6 +1096,15 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         frame.settings_dialog.controls.default_open_directory.text()
         == str(tmp_path / "source")
     )
+
+    frame.window.menu_bar.menus[3].actions[1].trigger()
+    assert frame.reusable_object_library_dialog is not None
+    frame.window.menu_bar.menus[3].actions[2].trigger()
+    assert frame.certificate_creation_dialog is not None
+    frame.window.menu_bar.menus[3].actions[3].trigger()
+    assert frame.certificate_import_dialog is not None
+    frame.window.menu_bar.menus[3].actions[4].trigger()
+    assert frame.certificate_management_dialog is not None
 
 
 def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell(

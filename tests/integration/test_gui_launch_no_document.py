@@ -20,6 +20,7 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
     from foliaseal.infra.config.schemas import AppSettings
     from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+    from foliaseal.presentation.qt.app_frame_command_model import SETTINGS_COMMAND_DEFINITIONS
 
     app = QApplication.instance()
     created_app = app is None
@@ -80,6 +81,19 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         "Exit FoliaSeal",
     ]
     assert [action.isEnabled() for action in file_actions] == [True, False, False, False, True]
+
+    settings_menu = next(
+        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Settings"
+    )
+    assert [action.text() for action in settings_menu.actions()] == [
+        definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.objectName() for action in settings_menu.actions()] == [
+        definition.command_id.value for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.toolTip() for action in settings_menu.actions()] == [
+        definition.accessible_name for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
 
     library_button = next(
         button
