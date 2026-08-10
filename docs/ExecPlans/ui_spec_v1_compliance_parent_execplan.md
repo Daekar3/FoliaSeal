@@ -45,7 +45,9 @@ before any reusable-object or signing UI is allowed to persist data.
 Foundation tranche:
 
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
+- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed View Back/Forward now route
+  through the public internal-link history seam with capability-driven enablement; the child remains
+  open for the remaining truthful command families and final parent scenario evidence.
 - [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
   route through the public workspace session port; broader View Back/Forward and remaining command
   families remain open with their owning children.
@@ -185,6 +187,11 @@ Release tranche:
   Settings callbacks now use the shared typed registry with unique mnemonics, stable IDs/object
   names, Qt descriptions, and callback-routing tests. Edit, Signing, Help, and remaining View
   commands remain open until their truthful behavior seams exist.
+- [x] (2026-08-10) Added the typed View Back/Forward command increment: `Alt+Left`/`Alt+Right`
+  route through `SigningWorkspaceSessionPort`, and AppFrame action state follows internal-link
+  activation, Back, Forward, unavailable outcomes, branching, replacement, and close. Focused and
+  real offscreen Qt coverage are green; the command-model child remains open for unsupported command
+  families and final scenario evidence.
 - [x] (2026-08-10) Completed the bounded placement foundation slice: PlacementProfile v2 now stores
   explicit source-page metadata, fixed page number, pinned state, and visible top-left geometry;
   PDF↔visible conversion is centralized; SavePlacement/workflow capture require explicit context;

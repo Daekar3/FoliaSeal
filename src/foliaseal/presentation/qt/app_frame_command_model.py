@@ -17,6 +17,8 @@ class AppFrameCommandId(StrEnum):
     COPY = "edit.copy"
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
+    BACK = "view.back"
+    FORWARD = "view.forward"
     SELECT_TEXT = "view.select_text"
     ZOOM_IN = "view.zoom_in"
     ZOOM_OUT = "view.zoom_out"
@@ -116,6 +118,22 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="Page Down",
         accessible_name="Go to next PDF page",
         mnemonic_text="Next P&age",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.BACK,
+        menu="View",
+        text="Back",
+        shortcut="Alt+Left",
+        accessible_name="Go back to the previous internal document destination",
+        mnemonic_text="&Back",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.FORWARD,
+        menu="View",
+        text="Forward",
+        shortcut="Alt+Right",
+        accessible_name="Go forward to the next internal document destination",
+        mnemonic_text="&Forward",
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.SELECT_TEXT,

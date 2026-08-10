@@ -16,6 +16,8 @@ class WorkspaceActionState:
     copy_selected_text_enabled: bool
     previous_page_enabled: bool = False
     next_page_enabled: bool = False
+    back_link_enabled: bool = False
+    forward_link_enabled: bool = False
 
     @property
     def save_enabled(self) -> bool:
@@ -46,6 +48,8 @@ def workspace_action_state_open(
     *,
     previous_page_enabled: bool = False,
     next_page_enabled: bool = False,
+    back_link_enabled: bool = False,
+    forward_link_enabled: bool = False,
 ) -> WorkspaceActionState:
     """Return the action state shown after a workspace opens successfully."""
 
@@ -57,6 +61,8 @@ def workspace_action_state_open(
         copy_selected_text_enabled=False,
         previous_page_enabled=previous_page_enabled,
         next_page_enabled=next_page_enabled,
+        back_link_enabled=back_link_enabled,
+        forward_link_enabled=forward_link_enabled,
     )
 
 

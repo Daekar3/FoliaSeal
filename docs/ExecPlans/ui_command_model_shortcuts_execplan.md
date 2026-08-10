@@ -52,12 +52,26 @@ corpus remains open for its owning viewer, signing, and support plans.
 - [x] (2026-08-09) Focused validation passed (`165 passed`), full validation passed (`1193 passed,
   20 skipped, 1 warning`), Ruff and diff checks passed, and the real-Qt no-document menu test
   passed; the bounded launch remains limited by the known local QLocalServer endpoint error.
-- [ ] (2026-08-09) Commit the remaining command-model child outcome after the owning View zoom,
-  search, and fit increments are reconciled; keep unsupported Undo/Redo/Cut/Paste/Help/Signing/
-  Back/Forward commands out until truthful seams exist.
+- [x] (2026-08-09) Kept unsupported Undo/Redo/Cut/Paste/Help/Signing commands out while the
+  existing truthful View seams were incrementally migrated.
 - [x] (2026-08-10) Added the typed View zoom command child: Zoom In/Out use `Ctrl++`/`Ctrl+-`,
   Reset Zoom is a real menu action without a conflicting shortcut, and all three route through the
   public session port while reusing the existing clamped viewer zoom policy.
+- [x] (2026-08-10) Selected the next truthful command increment: expose the existing internal-link
+  history through View Back/Forward with `Alt+Left`/`Alt+Right`, routed through the public session
+  port and synchronized from `WorkspaceActionState`.
+- [x] (2026-08-10) Implemented typed View Back/Forward definitions, frame actions, public-port
+  callbacks, and capability/status synchronization for open, internal navigation, Back, Forward,
+  replacement, and close.
+- [x] (2026-08-10) Added fake-frame and real offscreen Qt coverage for disabled initial state,
+  shortcut dispatch, Back→Forward transitions, and branch-clears-Forward behavior.
+- [x] (2026-08-10) Reconciled `docs/ARCHITECTURE.md` and the parent compliance plan; the architecture
+  row now records the typed registry, public session-port routing, and capability/status projection.
+- [x] (2026-08-10) Full validation passed (`1437 passed, 20 skipped, 1 warning`), focused command
+  and real-Qt coverage passed (`63 passed`), Ruff/pip/diff checks passed, and the bounded GUI audit
+  exited at the known isolated `SingleInstanceUnavailable` endpoint before frame creation. No
+  matching FoliaSeal/PySide6/pytest process remained and the owned temporary root was removed.
+- [ ] Commit this increment and record the final revision.
 
 ## Surprises & Discoveries
 
@@ -85,6 +99,19 @@ corpus remains open for its owning viewer, signing, and support plans.
 - Observation: Select Text and Copy are concrete, tested frame callbacks but bypass the typed
   registry and are mounted under the wrong menus relative to UI_SPEC §7.
   Evidence: `FoliaSealAppFrame._install_menus()` and explorer review dated 2026-08-09.
+- Observation: internal-link history already has a complete application/runtime/session-port seam,
+  but the app-frame View menu has no actions or enabled-state projection for it.
+  Evidence: `SigningWorkspaceRuntime.go_back_link()`/`go_forward_link()`, the corresponding
+  `SigningWorkspaceSessionPort` methods, and the current `VIEW_COMMAND_DEFINITIONS` registry.
+- Observation: the correct disabled-state behavior is capability-based rather than simply
+  workspace-open: Back is enabled only after an internal destination is visited, Forward is enabled
+  only after going back, and a new internal navigation clears Forward.
+  Evidence: `ViewerLinkHistory` and `SigningWorkspaceRuntime.can_go_back_link()`/
+  `can_go_forward_link()`.
+- Observation: a real offscreen app-frame test can exercise the production `QAction` shortcut and
+  workspace-host mount without requiring a display-backed FoliaSeal launch by injecting a QWidget
+  shell factory that implements the public session/maintenance ports.
+  Evidence: `tests/integration/test_gui_launch_no_document.py::test_real_qt_view_history_actions_dispatch_through_open_workspace`.
 
 ## Decision Log
 
@@ -121,6 +148,13 @@ corpus remains open for its owning viewer, signing, and support plans.
   Undo/Redo/Cut/Paste/Select All, Help, Signing, and advanced View commands lack complete truthful
   seams. A typed correction improves UI_SPEC compliance without overstating capability.
   Date/Author: 2026-08-09 / Codex
+- Decision: add only View Back and Forward in the current command-model increment, using the
+  existing internal-link history callbacks and `Alt+Left`/`Alt+Right`; do not add browser history,
+  page-history aliases, or placeholder commands.
+  Rationale: UI_SPEC §7 explicitly requires Back/Forward, and the repository already owns a
+  document-internal history boundary with observable capability methods. Keeping the actions tied
+  to that boundary avoids misleading users about browser navigation or unrelated page movement.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
@@ -134,8 +168,12 @@ The offscreen Qt shortcut test proves exactly one transition per key. Loop 8 als
 existing Settings callbacks into `SETTINGS_COMMAND_DEFINITIONS`, including unique mnemonics, stable
 object names, Qt descriptions, and trigger-routing tests. The remaining gap is the rest of the
 UI_SPEC command registry and its parent scenario evidence: focus-sensitive Edit actions,
-Signing-menu topology, Help content/actions, and Fit/zoom/search/signature/history commands remain
-deferred to their owning viewer/document/support children.
+Signing-menu topology, Help content/actions, and Fit/zoom/search/signature behavior remain deferred
+to their owning viewer/document/support children. The current increment narrows the history gap by
+wiring document-internal Back/Forward actions; browser navigation and unsupported command families
+remain out of scope. Final evidence is `1437 passed, 20 skipped, 1 warning` for the full suite and
+`63 passed` for focused/offscreen command coverage; the bounded launch returned `gui_rc=1` with
+`SingleInstanceUnavailable`, then left no matching process or temporary root.
 
 ## Context and Orientation
 
@@ -159,21 +197,27 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Extend the existing typed registry rather than introducing parallel raw `_action()` definitions. Add
-`VIEW_SELECT_TEXT` and `EDIT_COPY` definitions with stable IDs, truthful Qt descriptions, and
-unique menu mnemonics. In `FoliaSealAppFrame._install_menus()`, route Select Text through the
-existing `_toggle_text_selection_mode_from_action()` callback under View and Copy through
-`_copy_selected_text_from_action()` under Edit. Keep action enablement/check state projected by
-`WorkspaceActionState` and preserve the public maintenance port. Do not add commands whose behavior
-is not implemented.
+Extend the existing typed registry rather than introducing parallel raw `_action()` definitions.
+For this increment, add `VIEW_BACK` and `VIEW_FORWARD` definitions with stable IDs, `Alt+Left` and
+`Alt+Right` shortcuts, unique mnemonics, and accessible descriptions. Add matching action fields in
+`FoliaSealAppFrame`, create them in the View menu, and route activation through
+`SigningWorkspaceSessionPort.go_back_link()` and `go_forward_link()`. Extend
+`WorkspaceActionState` and its open/closed constructors with `back_link_enabled` and
+`forward_link_enabled`; update the frame synchronization method to query the session-port
+capabilities after workspace open, link activation, Back/Forward, page navigation, replacement, and
+close. Preserve the public session-port boundary and do not add commands whose behavior is not
+implemented. Keep the earlier Select Text/Copy and zoom behavior unchanged except where list-based
+tests must include the new actions.
 
 ## Milestones
 
 Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
 Select Text and Copy metadata and menu routing through the frame boundary. Milestone 3 verifies
 menu/enablement parity in focused and real-Qt tests and records the remaining unsupported command
-families as deferred. The parent command-model acceptance remains open until all named menus have
-their owning slices and scenario evidence.
+families as deferred. Milestone 4 adds internal-link Back/Forward to the same registry, proves
+capability transitions (visit → Back → Forward and branch-clears-Forward), and runs the real
+offscreen menu/action test. The parent command-model acceptance remains open until all named menus
+have their owning slices and scenario evidence.
 
 ## Concrete Steps
 
@@ -186,6 +230,7 @@ fall back to a system Python or system Qt installation.
 
     rg -n -e '_install_menus|_command_action|text_selection|copy_selected|VIEW_COMMAND_DEFINITIONS|EDIT_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py tests/integration/test_gui_launch_no_document.py
+    QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py tests/integration/test_view_navigation_shortcuts.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -204,16 +249,16 @@ cleanup result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance for this increment is behavioral: View Select Text and Edit Copy are defined by the one
-typed registry, appear in the normative menus, retain correct document-dependent enablement/check
-state, and reach their existing public maintenance-port callbacks exactly once. File, View
-Previous/Next Page, and the five Settings actions remain green under their prior contracts. First
-Save must choose a path before submitting. The full child acceptance remains open for focus-sensitive
-Edit, Signing, Help,
-remaining View, signed-state policy, and parent scenario requirements. The focused regression suite
-passed (`165 passed`), shared-code changes keep the full suite green (`1193 passed, 20 skipped,
-1 warning`), and real-Qt no-document evidence records the visible command state and cleanup. A
-display-backed audit remains environment-limited by the known xcb/QLocalServer failures.
+Acceptance for this increment is behavioral: View Select Text, Back, and Forward plus Edit Copy are
+defined by the one typed registry, appear in the normative menus, retain correct document-dependent
+enablement/check state, and reach their existing public ports exactly once. Back is disabled until an
+internal link creates history; Back moves to the prior internal destination and enables Forward;
+Forward returns to the next destination; a new internal destination after Back clears Forward. File,
+View page/zoom actions, and Settings remain green under their prior contracts. The full child
+acceptance remains open for focus-sensitive Edit, Signing, Help, remaining View behavior, signed-state
+policy, and parent scenario requirements. Record final focused/full test counts, Ruff, diff checks,
+and the real-Qt menu/action evidence; the display-backed audit remains environment-limited by the
+known QLocalServer/`SingleInstanceUnavailable` failure.
 
 ## Evidence Record
 
@@ -223,9 +268,9 @@ cleanup result, and compatibility grep proof. Loop 2 evidence is the offscreen r
 assertion for File labels, shortcuts, tooltip/status descriptions, mnemonic text, and no-document
 enablement; Loop 5 adds `tests/integration/test_view_navigation_shortcuts.py`, whose offscreen
 QTest Page Down/Page Up sequence produced exactly one page transition and one render per key. The
-Loop 8 Settings focused pass is `44 passed`; this increment's focused pass is `165 passed` and the
-registry test was red before implementation and green afterward. The full suite is `1193 passed,
-20 skipped, 1 warning`; Ruff and diff checks pass. The
+Loop 8 Settings focused pass is `44 passed`; the prior Select Text/Copy increment's focused pass was
+`165 passed`. The new Back/Forward increment must record its focused result and red-to-green
+registry/state tests, along with the final full-suite count, Ruff, and diff results. The
 bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
 isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
 FoliaSeal/PySide6 processes after cleanup.
@@ -265,3 +310,7 @@ existing truthful Edit/Signing/Help/View seams rather than placeholder actions.
 Revision note: 2026-08-09 / Codex
 Selected the next bounded correction: typed View Select Text and Edit Copy registration with
 existing callback/state behavior; unsupported command families remain deferred.
+Revision note: 2026-08-10 / Codex
+Selected the next bounded correction: typed View Back/Forward actions over the existing internal-link
+history seam, with Alt+Left/Alt+Right shortcuts and capability-driven enablement. Browser history and
+unsupported command families remain excluded.

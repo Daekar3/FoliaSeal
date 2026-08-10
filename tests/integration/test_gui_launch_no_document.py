@@ -111,6 +111,8 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     assert [action.isCheckable() for action in view_menu.actions()] == [
         False,
         False,
+        False,
+        False,
         True,
         False,
         False,
@@ -121,6 +123,8 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         False,
     ]
     assert [action.isEnabled() for action in view_menu.actions()] == [
+        False,
+        False,
         False,
         False,
         False,
@@ -162,6 +166,205 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     assert library_dialog.controls.dialog.isVisible()
     assert not library_dialog.controls.dialog.isModal()
     library_dialog.controls.dialog.close()
+
+    frame.window.close()
+    app.processEvents()
+    if created_app:
+        app.quit()
+
+
+def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    from foliaseal.application.certificate_models import CertificateCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+    from foliaseal.presentation.qt.app_frame_command_model import AppFrameCommandId
+    from foliaseal.presentation.qt.signing_shell_port import (
+        QtSigningWorkspacePort,
+        QtSigningWorkspaceSessionPort,
+        QtWorkspaceView,
+        SigningWorkspaceBootstrap,
+        SigningWorkspaceBundle,
+    )
+
+    class HistoryShell(QWidget):
+        def __init__(self, bootstrap: SigningWorkspaceBootstrap) -> None:
+            super().__init__()
+            self.status_callback = bootstrap.on_status_change
+            self.back_available = False
+            self.forward_available = False
+            self.back_calls = 0
+            self.forward_calls = 0
+            self.container = self
+
+        def has_unsaved_changes(self) -> bool:
+            return False
+
+        def discard_draft(self) -> None:
+            return None
+
+        def cleanup_recovery_artifact(self) -> None:
+            return None
+
+        def clear_session_secrets(self) -> None:
+            return None
+
+        def choose_output_pdf_path(self) -> None:
+            return None
+
+        def has_explicit_output_pdf_path(self) -> bool:
+            return False
+
+        def apply_app_settings(self, settings: AppSettings) -> None:
+            return None
+
+        def refresh_certificate_configurations(self) -> CertificateCatalog:
+            return CertificateCatalog(schema_version=1)
+
+        def refresh_signature_profiles(self) -> None:
+            return None
+
+        def open_reusable_object_editor(self) -> bool:
+            return False
+
+        def set_document_text_selection_mode(self, enabled: bool) -> bool:
+            return bool(enabled)
+
+        def document_text_selection_mode_enabled(self) -> bool:
+            return False
+
+        def can_copy_selected_document_text(self) -> bool:
+            return False
+
+        def copy_selected_document_text(self) -> None:
+            return None
+
+        def go_to_previous_page(self) -> None:
+            return None
+
+        def go_to_next_page(self) -> None:
+            return None
+
+        def can_go_previous_page(self) -> bool:
+            return False
+
+        def can_go_next_page(self) -> bool:
+            return False
+
+        def go_back_link(self) -> None:
+            self.back_calls += 1
+            self.back_available = False
+            self.forward_available = True
+            self.status_callback("link_history_back")
+
+        def go_forward_link(self) -> None:
+            self.forward_calls += 1
+            self.forward_available = False
+            self.back_available = True
+            self.status_callback("link_history_forward")
+
+        def can_go_back_link(self) -> bool:
+            return self.back_available
+
+        def can_go_forward_link(self) -> bool:
+            return self.forward_available
+
+        def reset_zoom_view(self) -> None:
+            return None
+
+        def zoom_in_view(self) -> None:
+            return None
+
+        def zoom_out_view(self) -> None:
+            return None
+
+        def fit_page_view(self) -> None:
+            return None
+
+        def fit_width_view(self) -> None:
+            return None
+
+        def focus_document_search(self) -> None:
+            return None
+
+        def refresh_viewer(self) -> None:
+            return None
+
+        def close(self) -> bool:
+            return super().close()
+
+    class HistoryShellFactory:
+        def __init__(self) -> None:
+            self.shell: HistoryShell | None = None
+
+        def create(self, bootstrap: SigningWorkspaceBootstrap) -> SigningWorkspaceBundle:
+            self.shell = HistoryShell(bootstrap)
+            return SigningWorkspaceBundle(
+                maintenance=QtSigningWorkspacePort(self.shell),
+                session=QtSigningWorkspaceSessionPort(self.shell),
+                testing=object(),
+                view=QtWorkspaceView(self.shell),
+            )
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal"])
+    factory = HistoryShellFactory()
+    adapter = QtAppFrameAdapter()
+    frame = adapter.create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "output"),
+            default_open_directory=str(tmp_path),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+        shell_factory=factory,
+    )
+    frame.window.show()
+    app.processEvents()
+
+    fixture = Path("artifacts/preview_sweep_assets/sweep_fixture.pdf").resolve()
+    assert frame.open_pdf_path(fixture) is not None
+    app.processEvents()
+    assert factory.shell is not None
+    shell = factory.shell
+    actions = frame.command_actions()
+    back_action = actions[AppFrameCommandId.BACK]
+    forward_action = actions[AppFrameCommandId.FORWARD]
+    assert back_action.isEnabled() is False
+    assert forward_action.isEnabled() is False
+
+    shell.back_available = True
+    shell.status_callback("link_internal_navigation")
+    app.processEvents()
+    assert back_action.isEnabled() is True
+
+    frame.window.activateWindow()
+    QTest.keyClick(frame.window, Qt.Key.Key_Left, Qt.KeyboardModifier.AltModifier)
+    app.processEvents()
+    assert shell.back_calls == 1
+    assert back_action.isEnabled() is False
+    assert forward_action.isEnabled() is True
+
+    QTest.keyClick(frame.window, Qt.Key.Key_Right, Qt.KeyboardModifier.AltModifier)
+    app.processEvents()
+    assert shell.forward_calls == 1
+    assert back_action.isEnabled() is True
+    assert forward_action.isEnabled() is False
 
     frame.window.close()
     app.processEvents()

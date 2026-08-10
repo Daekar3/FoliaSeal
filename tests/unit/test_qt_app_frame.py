@@ -62,6 +62,8 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
     assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
+        AppFrameCommandId.BACK,
+        AppFrameCommandId.FORWARD,
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.ZOOM_IN,
         AppFrameCommandId.ZOOM_OUT,
@@ -80,6 +82,8 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
     assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
+        AppFrameCommandId.BACK,
+        AppFrameCommandId.FORWARD,
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.ZOOM_IN,
         AppFrameCommandId.ZOOM_OUT,
@@ -94,7 +98,7 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         "Ctrl+F",
         None,
     ]
-    assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[3:6]] == [
+    assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[5:8]] == [
         "Ctrl++",
         "Ctrl+-",
         None,
@@ -572,6 +576,10 @@ class _FakeShell:
         self.delete_later_calls = 0
         self.go_to_previous_page_calls = 0
         self.go_to_next_page_calls = 0
+        self.go_back_link_calls = 0
+        self.go_forward_link_calls = 0
+        self.back_link_available = False
+        self.forward_link_available = False
         self.zoom_in_view_calls = 0
         self.zoom_out_view_calls = 0
         self.reset_zoom_view_calls = 0
@@ -649,6 +657,28 @@ class _FakeShell:
 
     def can_go_next_page(self) -> bool:
         return self.current_page < self.page_count - 1
+
+    def go_back_link(self) -> None:
+        self.go_back_link_calls += 1
+        if self.back_link_available:
+            self.back_link_available = False
+            self.forward_link_available = True
+        if callable(self.status_callback):
+            self.status_callback("link_history_back")
+
+    def go_forward_link(self) -> None:
+        self.go_forward_link_calls += 1
+        if self.forward_link_available:
+            self.forward_link_available = False
+            self.back_link_available = True
+        if callable(self.status_callback):
+            self.status_callback("link_history_forward")
+
+    def can_go_back_link(self) -> bool:
+        return self.back_link_available
+
+    def can_go_forward_link(self) -> bool:
+        return self.forward_link_available
 
     def reset_zoom_view(self) -> None:
         self.reset_zoom_view_calls += 1
@@ -1200,7 +1230,7 @@ def test_app_frame_close_workspace_is_idempotent_and_restores_placeholder(
     assert bindings.q_message_box.warning_calls == []
     assert frame.window.menu_bar.menus[0].actions[1].enabled is False
     assert frame.window.menu_bar.menus[1].actions[0].enabled is False
-    assert frame.window.menu_bar.menus[2].actions[2].enabled is False
+    assert frame.window.menu_bar.menus[2].actions[4].enabled is False
 
 
 def test_app_frame_no_document_placeholder_exposes_open_and_library_actions(
@@ -1353,6 +1383,8 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
         "Previous &Page",
         "Next P&age",
+        "&Back",
+        "&Forward",
         "&Select Text",
         "Zoom &In",
         "Zoom &Out",
@@ -1365,6 +1397,8 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.shortcut for action in frame.window.menu_bar.menus[2].actions] == [
         "Page Up",
         "Page Down",
+        "Alt+Left",
+        "Alt+Right",
         None,
         "Ctrl++",
         "Ctrl+-",
@@ -1385,9 +1419,11 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         False,
         False,
         False,
+        False,
+        False,
     ]
-    assert frame.window.menu_bar.menus[2].actions[2].checkable is True
-    assert frame.window.menu_bar.menus[2].actions[2].icon.path.endswith("text-select.svg")
+    assert frame.window.menu_bar.menus[2].actions[4].checkable is True
+    assert frame.window.menu_bar.menus[2].actions[4].icon.path.endswith("text-select.svg")
     assert [action.text for action in frame.window.menu_bar.menus[3].actions] == [
         definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
     ]
@@ -1461,7 +1497,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     save_as_action = frame.window.menu_bar.menus[0].actions[2]
     close_action = frame.window.menu_bar.menus[0].actions[3]
     copy_selection_action = frame.window.menu_bar.menus[1].actions[0]
-    text_selection_action = frame.window.menu_bar.menus[2].actions[2]
+    text_selection_action = frame.window.menu_bar.menus[2].actions[4]
 
     assert save_action.enabled is False
     assert save_as_action.enabled is False
@@ -1656,6 +1692,8 @@ def test_view_command_registry_is_typed_and_normative() -> None:
     assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
+        AppFrameCommandId.BACK,
+        AppFrameCommandId.FORWARD,
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.ZOOM_IN,
         AppFrameCommandId.ZOOM_OUT,
@@ -1668,6 +1706,8 @@ def test_view_command_registry_is_typed_and_normative() -> None:
     assert [definition.text for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Previous Page",
         "Next Page",
+        "Back",
+        "Forward",
         "Select Text",
         "Zoom In",
         "Zoom Out",
@@ -1680,6 +1720,8 @@ def test_view_command_registry_is_typed_and_normative() -> None:
     assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Page Up",
         "Page Down",
+        "Alt+Left",
+        "Alt+Right",
         None,
         "Ctrl++",
         "Ctrl+-",
@@ -1704,41 +1746,81 @@ def test_view_page_commands_route_through_the_session_port(tmp_path: Path) -> No
     )
 
     view_actions = frame.window.menu_bar.menus[2].actions
-    assert [action.enabled for action in view_actions] == [False] * 10
+    assert [action.enabled for action in view_actions] == [False] * 12
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
-    assert [action.enabled for action in view_actions] == [False] + [True] * 9
+    assert [action.enabled for action in view_actions] == [False, True, False, False] + [True] * 8
 
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True] * 10
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, False, False, False] + [True] * 8
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [True] * 10
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [False] + [True] * 9
+    assert [action.enabled for action in view_actions] == [False, True, False, False] + [True] * 8
 
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True] * 10
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, False, False, False] + [True] * 8
     shell.go_to_previous_page()
-    assert [action.enabled for action in view_actions] == [True] * 10
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
 
-    view_actions[3].trigger()
-    view_actions[4].trigger()
     view_actions[5].trigger()
+    view_actions[6].trigger()
+    view_actions[7].trigger()
     assert shell.zoom_in_view_calls == 1
     assert shell.zoom_out_view_calls == 1
     assert shell.reset_zoom_view_calls == 1
-    view_actions[6].trigger()
-    view_actions[7].trigger()
+    view_actions[8].trigger()
+    view_actions[9].trigger()
     assert shell.fit_page_view_calls == 1
     assert shell.fit_width_view_calls == 1
-    view_actions[8].trigger()
+    view_actions[10].trigger()
     assert shell.focus_document_search_calls == 1
 
     assert shell.go_to_previous_page_calls == 3
     assert shell.go_to_next_page_calls == 4
+
+
+def test_view_internal_link_history_commands_route_and_follow_capabilities(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    actions = frame.command_actions()
+    back_action = actions[AppFrameCommandId.BACK]
+    forward_action = actions[AppFrameCommandId.FORWARD]
+    assert back_action.enabled is False
+    assert forward_action.enabled is False
+
+    shell.back_link_available = True
+    shell.status_callback("link_internal_navigation")
+    assert back_action.enabled is True
+    assert forward_action.enabled is False
+
+    back_action.trigger()
+    assert shell.go_back_link_calls == 1
+    assert back_action.enabled is False
+    assert forward_action.enabled is True
+
+    forward_action.trigger()
+    assert shell.go_forward_link_calls == 1
+    assert back_action.enabled is True
+    assert forward_action.enabled is False
+
+    shell.back_link_available = True
+    shell.forward_link_available = False
+    shell.status_callback("link_internal_navigation")
+    assert back_action.enabled is True
+    assert forward_action.enabled is False
 
 
 def test_app_frame_certificate_creation_routes_to_dialog_port(

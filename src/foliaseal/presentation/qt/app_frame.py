@@ -399,6 +399,8 @@ class FoliaSealAppFrame:
         self._exit_action: Any | None = None
         self._previous_page_action: Any | None = None
         self._next_page_action: Any | None = None
+        self._back_link_action: Any | None = None
+        self._forward_link_action: Any | None = None
         self._command_actions: dict[AppFrameCommandId, Any] = {}
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
@@ -860,6 +862,14 @@ class FoliaSealAppFrame:
         self._with_current_session_port(lambda session: session.go_to_next_page())
         self._sync_page_navigation_actions()
 
+    def _go_back_link(self) -> None:
+        self._with_current_session_port(lambda session: session.go_back_link())
+        self._sync_page_navigation_actions()
+
+    def _go_forward_link(self) -> None:
+        self._with_current_session_port(lambda session: session.go_forward_link())
+        self._sync_page_navigation_actions()
+
     def command_actions(self) -> dict[AppFrameCommandId, Any]:
         """Return a snapshot of frame-owned actions keyed by stable command ID."""
 
@@ -1289,6 +1299,18 @@ class FoliaSealAppFrame:
             self._go_to_next_page,
             enabled=False,
         )
+        self._back_link_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.BACK,
+            self._go_back_link,
+            enabled=False,
+        )
+        self._forward_link_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.FORWARD,
+            self._go_forward_link,
+            enabled=False,
+        )
         self._text_selection_mode_action = self._command_action(
             view_menu,
             AppFrameCommandId.SELECT_TEXT,
@@ -1469,6 +1491,8 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._close_action, state.close_enabled)
         self._set_action_enabled(self._previous_page_action, state.previous_page_enabled)
         self._set_action_enabled(self._next_page_action, state.next_page_enabled)
+        self._set_action_enabled(self._back_link_action, state.back_link_enabled)
+        self._set_action_enabled(self._forward_link_action, state.forward_link_enabled)
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
         self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
@@ -1507,6 +1531,8 @@ class FoliaSealAppFrame:
                 self._workspace_action_state,
                 previous_page_enabled=session.can_go_previous_page(),
                 next_page_enabled=session.can_go_next_page(),
+                back_link_enabled=session.can_go_back_link(),
+                forward_link_enabled=session.can_go_forward_link(),
             )
         )
         self._sync_document_text_actions()
@@ -1758,6 +1784,15 @@ class FoliaSealAppFrame:
 
     def _handle_status_change(self, status: str) -> None:
         if status == "navigation_changed":
+            self._sync_page_navigation_actions()
+        elif status in {
+            "link_internal_navigation",
+            "link_history_back",
+            "link_history_forward",
+            "link_history_back_unavailable",
+            "link_history_forward_unavailable",
+            "link_navigation_failed",
+        }:
             self._sync_page_navigation_actions()
         elif status in {"document_text_selection_changed", "document_text_mode_changed"}:
             self._sync_document_text_actions()
