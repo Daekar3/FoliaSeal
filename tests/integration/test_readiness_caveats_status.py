@@ -48,7 +48,12 @@ def test_real_qt_properties_panel_prioritizes_changed_source_safety(tmp_path: Pa
         reusable_objects=ReusableSigningObjects(
             InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
         ),
+        )
+    panel._on_source_ignore = lambda: (  # noqa: SLF001
+        workflow.document_source_monitor.acknowledge_current_source(),
+        panel.refresh_source_safety(),
     )
+    panel._source_ignore_button.clicked.connect(panel._on_source_ignore)  # noqa: SLF001
     try:
         source.write_bytes(source.read_bytes() + b"changed")
         readiness = panel.readiness()
@@ -56,6 +61,13 @@ def test_real_qt_properties_panel_prioritizes_changed_source_safety(tmp_path: Pa
         assert readiness.recommended_action.value == "review_document_safety"
         assert readiness.can_sign is False
         assert "changed on disk" in readiness.detail
+        panel.refresh_source_safety()
+        assert not panel._source_safety_container.isHidden()  # noqa: SLF001
+        assert not panel._source_reload_button.isHidden()  # noqa: SLF001
+        assert not panel._source_ignore_button.isHidden()  # noqa: SLF001
+        assert panel._source_locate_button.isHidden()  # noqa: SLF001
+        panel._source_ignore_button.click()  # noqa: SLF001
+        assert panel._source_safety_container.isHidden()  # noqa: SLF001
     finally:
         panel.dispose()
         app.processEvents()

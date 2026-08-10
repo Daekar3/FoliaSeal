@@ -40,6 +40,10 @@ class SigningWorkspaceEnvironment:
     on_error: Callable[[str], None] | None
     on_status_change: Callable[[str], None] | None
     on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None
+    on_source_reload: Callable[[], Any] | None = None
+    on_source_ignore: Callable[[], Any] | None = None
+    on_source_locate: Callable[[], Any] | None = None
+    on_source_close: Callable[[], Any] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
     recovery_reopen_target: Callable[[str | Path], Any | None] | None = None
@@ -65,6 +69,10 @@ class SigningWorkspaceEnvironment:
             on_error=self.on_error,
             on_status_change=self.on_status_change,
             on_external_link_confirmation=self.on_external_link_confirmation,
+            on_source_reload=self.on_source_reload,
+            on_source_ignore=self.on_source_ignore,
+            on_source_locate=self.on_source_locate,
+            on_source_close=self.on_source_close,
             on_open_signature_library=self.on_open_signature_library,
             untrusted_recovery=untrusted_recovery,
         )

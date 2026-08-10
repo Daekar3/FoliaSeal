@@ -23,15 +23,20 @@ temporary/final paths.
 - [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
 - [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [x] docs/ExecPlans/ui_document_source_change_recovery_execplan.md adds explicit source-change
+  recovery while preserving this plan's dirty-draft and candidate lifecycle ownership.
 
 ## Progress
 
 - [x] (2026-08-09) Audit the current implementation and identify the missing dirty-state and close-event seams; explorer report recorded below.
 - [x] (2026-08-09) Add a red focused contract suite for dirty projection, discard, replacement cancellation, and native close routing; the pre-implementation run was `2 failed, 16 passed` and the focused contract is now green.
 - [x] (2026-08-09) Implement the smallest complete workflow/typed-port/Qt frame path, including candidate prepare/commit ordering and action-specific consequence-verb decisions.
-- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft only where this slice proves its retirement condition; do not rename unrelated evidence infrastructure.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; focused/regression and real offscreen Qt validation are green, while display-backed GUI acceptance remains environment-blocked (`xcb`/`:0`) and must stay explicitly open.
-- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
+- [x] (2026-08-10) Add the child source-change recovery path without introducing product-facing phase labels;
+  crash journals/autosave remain explicitly deferred.
+- [x] (2026-08-10) Run focused, regression, and real offscreen Qt validation; display-backed GUI acceptance
+  remains environment-blocked (`xcb`/`:0`) and stays explicitly open.
+- [x] (2026-08-10) Update this plan and relevant architecture/status documentation; the source-change
+  recovery child is now ready for its complete slice commit.
 
 ## Surprises & Discoveries
 
@@ -83,10 +88,10 @@ temporary/final paths.
 
 ## Outcomes & Retrospective
 
-Implementation and focused validation are complete. The lifecycle-focused unit suite is green
-(`75 passed`), the real offscreen native-close integration test is green (`1 passed`), and the full
-suite is green (`1191 passed, 20 skipped, 1 warning`); the bounded display-backed audit and final
-commit remain. The slice does not
+Implementation and focused validation are complete. The lifecycle-focused unit suite remains green,
+the source-change child adds draft-preserving Reload/Locate/Ignore coverage, and the full suite is
+green (`1428 passed, 20 skipped, 1 warning`); the bounded display-backed audit and final commit
+remain. The slice does not
 provide a crash-recovery journal, autosave, or interrupted-session restoration; those remain an
 explicit follow-on requirement.
 

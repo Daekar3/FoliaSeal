@@ -14,7 +14,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
+- [x] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md supplies the dirty-draft and
+  candidate replacement lifecycle; source-change recovery is implemented in the child listed below.
 - [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
 - [x] docs/ExecPlans/ui_safe_links_source_safety_contracts_execplan.md provides pure link and
   source-change decisions; renderer/workspace integration remains open.
@@ -60,11 +61,16 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   internal-link navigation/history and external confirmation/launch, while source-change recovery,
   condition-only banners, and the remaining legacy-cleanup requirements stay open.
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-10) Draft-preserving source-change recovery is implemented in
+  `ui_document_source_change_recovery_execplan.md`: changed sources expose Reload/Ignore, missing
+  sources expose Locate/Close, candidate replacement is atomic, and authored state/secrets survive
+  transfer. Focused and offscreen coverage is green; final commit and broader parent cleanup remain.
+
+- [x] (2026-08-09) Audit current behavior and add a failing focused test.
+- [x] (2026-08-09) Implement the smallest complete model/application/Qt path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean processes and artifacts.
+- [x] (2026-08-10) Update this plan and relevant docs; the complete source-recovery slice is being committed.
 
 ## Surprises & Discoveries
 

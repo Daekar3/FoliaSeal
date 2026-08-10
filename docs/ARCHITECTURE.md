@@ -68,6 +68,7 @@ The canonical repository document split is:
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, QtPdf geometry plus Poppler interactive-viewer rasterisation, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed; the interactive viewer also late-resolves the Linux `pdftoppm` executable. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, preset certificate display-name lookup, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/signing_readiness.py` | Pure ordered projection of the active signing workspace's readiness state. | Consumes document-safety status first, then converts selected-preset, certificate, placement, validation, and signability facts into one immutable stage/detail/action result; it has no Qt, persistence, certificate parsing, or source-monitor mutation ownership. |
+| `src/foliaseal/application/signing_draft_workflow.py` | Qt-free signing-draft state and source-transfer boundary. | Owns `SigningDraftSnapshot` plus capture/restore of authored state across a validated source replacement; it carries draft values and clean-baseline state without composing candidate workspaces or mutating Qt widgets. |
 | `src/foliaseal/application/document_source_monitor.py` | Application-owned source identity/fingerprint boundary for mounted workspaces. | Captures the open-time `(device, inode, size, mtime_ns)` identity and projects changed, missing, or unknown source status without reloading or mutating the workspace; AppFrame/workspace composition owns its lifecycle. |
 | `src/foliaseal/application/document_links.py` | Neutral read-only document-link inspection contract. | `DocumentLink` carries page-local PDF-space rectangles and raw URL/internal-page destinations; `DocumentLinkInspector` keeps extraction behind the concrete PDF adapter. |
 | `src/foliaseal/application/document_link_activation.py` | Pure Pan-only link hit-testing, activation policy projection, and internal-page history. | `DocumentLinkActivationService` resolves one PDF-space pointer location through `document_safety.py`; `ViewerLinkHistory` owns bounded Back/Forward page-index state without launching URLs or mutating widgets. |
@@ -492,7 +493,31 @@ The canonical repository document split is:
 - Owns: `SourceFingerprint`, `fingerprint_source()`, `DocumentSourceMonitor.for_path()`, `decision()`, and `acknowledge_current_source()`.
 - Does not own: PDF reload, source locating, ignore/acknowledgement UI, banner mutation, renderer refresh, or signing-draft mutation.
 - Key collaborators: `document_safety.py`, `signing_readiness.py`, `app_frame_workspace_open.py`, and the future workspace lifecycle/safe-links children.
-- Known constraints: The fingerprint is metadata-only `(st_dev, st_ino, st_size, st_mtime_ns)` and missing/unreadable sources produce unknown/missing decisions through the pure safety policy. `decision()` is read-only; only an owning reload or explicit ignore flow may call `acknowledge_current_source()`. Reload/locate/ignore actions, safety banners, and draft-preserving lifecycle mutation remain explicitly deferred to the safe-links and document-lifecycle children rather than this application boundary.
+- Known constraints: The fingerprint is metadata-only `(st_dev, st_ino, st_size, st_mtime_ns)` and missing/unreadable sources produce unknown/missing decisions through the pure safety policy. `decision()` is read-only; only an owning reload or explicit ignore flow may call `acknowledge_current_source()`. Reload/locate/ignore actions, safety banners, and draft-preserving lifecycle mutation remain outside this application boundary and are owned by the Qt shell/AppFrame recovery boundary below.
+- Status: Implemented and confirmed by focused tests; condition polling/banner presentation and recovery actions are owned by the Qt shell/AppFrame boundary below.
+
+### Source-change recovery
+
+- Location: `src/foliaseal/application/signing_draft_workflow.py`,
+  `src/foliaseal/presentation/qt/signing_workspace_properties_panel.py`,
+  `src/foliaseal/presentation/qt/signing_shell.py`, and `src/foliaseal/presentation/qt/app_frame.py`
+- Responsibility: Preserve authored signing state while the AppFrame replaces a mounted source
+  only after a candidate workspace has been prepared and validated.
+- Owns: Qt-free `SigningDraftSnapshot` capture/restore, the condition-only source-safety banner,
+  one-second source-identity polling, and AppFrame actions for Reload, Ignore, Locate, and Close.
+- Does not own: crash journals, autosave, restart restoration, or background draft persistence.
+- Key collaborators: `DocumentSourceMonitor`, `SigningWorkspaceHost.prepare()`,
+  `SigningWorkspaceHost.replace_prepared()`, and `SigningWorkspaceLifecycle`.
+- Main entry points: `SigningDraftWorkflow.snapshot_for_source_transfer()`,
+  `restore_source_transfer()`, `FoliaSealAppFrame._replace_source_preserving_draft()`,
+  `_ignore_source_change()`, `_locate_missing_source()`, and `close_workspace()`.
+- Known constraints: The shell timer only refreshes the condition and visibility of the source
+  banner; it does not reload or mutate the draft. Reload and Locate capture a
+  `SigningDraftSnapshot`, prepare a candidate, restore the snapshot into that candidate, and
+  atomically publish it through `replace_prepared()`; a failed prepare/mount disposes the
+  candidate and leaves the prior workspace active. Ignore acknowledges the observed identity
+  without remounting, while Close follows the ordinary dirty-draft decision. Crash-journal,
+  autosave, interrupted-draft persistence, and restart restoration remain explicitly deferred.
 - Status: Implemented and confirmed by focused tests.
 
 ### Document link activation and history
@@ -1672,6 +1697,7 @@ Default local validation from README:
 |---|---|---|
 | 2026-08-10 | Added Pan-only document-link activation and internal-page history. | Historical precursor: `DocumentLinkActivationService` performs pure PDF-space hit testing, `ViewerLinkHistory` owns Back/Forward page outcomes, `PopplerPdfRenderBackend.inspect_links()` delegates optionally to QtPdf, `SigningWorkspaceRuntime` routes typed activation/history outcomes, and `PdfViewerWidgetAdapter` maps stationary Pan clicks through zoom/pan/page transforms while keeping drags as pan gestures. AppFrame confirmation/launch is documented by the subsequent safe-links slice; source reload/banner lifecycle remains deferred. |
 | 2026-08-10 | Added AppFrame-owned external-link confirmation and safe launch boundary. | AppFrame now presents a consequence-labeled, cancel-default confirmation using bounded display text, passes only the complete sanitized launch target to an injected Qt `QDesktopServices` launcher after approval, and defers active-signing requests while retaining only the newest pending request. Source reload/recovery and banner lifecycle remain deferred to safe-links/document-lifecycle children. |
+| 2026-08-10 | Added source-change recovery and draft-transfer ownership. | `SigningDraftSnapshot` transfers authored state across a validated replacement; AppFrame prepares and atomically mounts a candidate for Reload/Locate, while Ignore acknowledges the observed identity and Close follows ordinary dirty-draft policy. The shell owns condition-only one-second polling/banner refresh; crash journals, autosave, and restart restoration remain deferred. |
 | 2026-08-10 | Added the QtPdf document-link inspection boundary. | Historical precursor: `DocumentLink`/`DocumentLinkInspector` first carried read-only page-local link facts, and `QtPdfRenderBackend.inspect_links()` extracted valid URL/internal-page links without activation while normalizing Qt top-left rectangles to PDF bottom-left coordinates; Pan hit testing and activation/history were added by the subsequent slice. Reload/banner lifecycle remains deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added the document-source safety readiness boundary. | `DocumentSourceMonitor` now owns metadata-only source fingerprints and changed/missing/unknown decisions at workspace composition; `signing_readiness.py` consumes document safety before setup/readiness stages. Reload, locate, ignore, banner mutation, and draft-preserving lifecycle actions remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added real signed-appearance raster parity evidence. | A Qt-backed integration test signs a real PDF, renders its embedded annotation appearance, and asserts pixel-identical RGBA output against the frozen canonical preview for text-only and managed-image alpha-preserved/flattened cases. |

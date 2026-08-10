@@ -430,6 +430,10 @@ class FoliaSealAppFrame:
                 on_error=self._emit_error,
                 on_status_change=self._handle_status_change,
                 on_external_link_confirmation=self._handle_external_link_confirmation,
+                on_source_reload=self._reload_current_source,
+                on_source_ignore=self._ignore_source_change,
+                on_source_locate=self._locate_missing_source,
+                on_source_close=self.close_workspace,
                 on_open_signature_library=self.show_first_use_preset_library,
             ),
             workspace_open_port=self._workspace_open_port,
@@ -586,6 +590,70 @@ class FoliaSealAppFrame:
             handle = self._workspace_host.replace_prepared(candidate)
         except Exception as exc:
             self._emit_error(f"Unable to open preserved PDF: {exc}")
+            return None
+        self._apply_workspace_action_state(workspace_action_state_open())
+        self._sync_page_navigation_actions()
+        return handle.view.mount_target()
+
+    def _reload_current_source(self) -> Any | None:
+        """Reload the mounted source after an explicit changed-source action."""
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return None
+        return self._replace_source_preserving_draft(workspace.source_pdf)
+
+    def _ignore_source_change(self) -> bool:
+        """Acknowledge the observed source identity without remounting it."""
+        workflow = self.current_signing_workflow
+        if workflow is None or workflow.document_source_monitor is None:
+            return False
+        workflow.document_source_monitor.acknowledge_current_source()
+        shell = self.current_shell
+        refresh = getattr(shell, "refresh_source_safety", None)
+        if callable(refresh):
+            refresh()
+        self._handle_status_change("document_source_acknowledged")
+        return True
+
+    def _locate_missing_source(self) -> Any | None:
+        """Choose a replacement PDF for a missing source and preserve the draft."""
+        selected = self._bindings.q_file_dialog.getOpenFileName(
+            self.window,
+            "Locate source PDF",
+            self._app_settings.default_open_directory,
+            "PDF files (*.pdf)",
+        )
+        selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
+        if not selected_path:
+            return None
+        return self._replace_source_preserving_draft(Path(selected_path))
+
+    def _replace_source_preserving_draft(self, pdf_path: str | Path) -> Any | None:
+        """Replace the source only after a validated candidate receives the live draft."""
+        active = self._workspace_host.active()
+        if active is None:
+            return None
+        snapshot = active.signing_workflow.snapshot_for_source_transfer()
+        candidate: WorkspaceHandle | None = None
+        try:
+            candidate = self._workspace_host.prepare(pdf_path)
+            candidate.signing_workflow.restore_source_transfer(
+                snapshot,
+                input_pdf_path=str(candidate.source_pdf),
+            )
+            monitor = candidate.signing_workflow.document_source_monitor
+            if monitor is not None:
+                monitor.acknowledge_current_source()
+            refresh_draft = getattr(
+                candidate.view.mount_target(), "refresh_transferred_draft", None
+            )
+            if callable(refresh_draft):
+                refresh_draft()
+            handle = self._workspace_host.replace_prepared(candidate)
+        except Exception as exc:
+            if candidate is not None:
+                candidate.view.dispose()
+            self._emit_error(f"Unable to replace source PDF: {exc}")
             return None
         self._apply_workspace_action_state(workspace_action_state_open())
         self._sync_page_navigation_actions()

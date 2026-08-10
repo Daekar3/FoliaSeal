@@ -161,7 +161,7 @@ _EXPORT_MODULES = {
         ),
         "signing_draft_contracts",
     ),
-    "SigningDraftWorkflow": "signing_draft_workflow",
+    **dict.fromkeys(("SigningDraftSnapshot", "SigningDraftWorkflow"), "signing_draft_workflow"),
     **dict.fromkeys(
         (
             "CanonicalSignaturePreviewSnapshot",

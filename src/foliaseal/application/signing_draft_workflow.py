@@ -68,6 +68,33 @@ def _issue(
     )
 
 
+@dataclass(frozen=True)
+class SigningDraftSnapshot:
+    """In-memory authored state transferred across a validated source replacement."""
+
+    output_pdf_path: str
+    certificate_path: str
+    passphrase: str
+    tsa_url: str
+    output_path_confirmed: bool
+    source_overwrite_authorized: bool
+    timestamp_required: bool
+    trust_policy: TimestampTrustPolicy | None
+    certificate_alias: str | None
+    selected_certificate_configuration_id: str | None
+    selected_appearance_profile_id: str | None
+    selected_placement_profile_id: str | None
+    selected_signature_preset_id: str | None
+    signature_rect: SignatureRect | None
+    signature_field_name: str | None
+    signature_appearance: SignatureAppearance | None
+    signature_placement_defaults: SignaturePlacementDefaults | None
+    placement_context: _contracts.SignaturePlacementContext | None
+    preview_signing_time: datetime | None
+    preview_fingerprint: tuple[object, ...] | None
+    clean_draft_snapshot: tuple[object, ...]
+
+
 @dataclass
 class SigningDraftWorkflow:
     """Application-layer state machine for visible-signature signing drafts."""
@@ -125,6 +152,65 @@ class SigningDraftWorkflow:
     def mark_clean(self) -> None:
         """Mark the current draft values as the new clean baseline."""
         self._clean_draft_snapshot = self._draft_snapshot()
+
+    def snapshot_for_source_transfer(self) -> SigningDraftSnapshot:
+        """Capture authored state before replacing the mounted source PDF."""
+        return SigningDraftSnapshot(
+            output_pdf_path=self.output_pdf_path,
+            certificate_path=self.certificate_path,
+            passphrase=self.passphrase,
+            tsa_url=self.tsa_url,
+            output_path_confirmed=self.output_path_confirmed,
+            source_overwrite_authorized=self.source_overwrite_authorized,
+            timestamp_required=self.timestamp_required,
+            trust_policy=self.trust_policy,
+            certificate_alias=self.certificate_alias,
+            selected_certificate_configuration_id=self.selected_certificate_configuration_id,
+            selected_appearance_profile_id=self.selected_appearance_profile_id,
+            selected_placement_profile_id=self.selected_placement_profile_id,
+            selected_signature_preset_id=self.selected_signature_preset_id,
+            signature_rect=self.signature_rect,
+            signature_field_name=self.signature_field_name,
+            signature_appearance=self.signature_appearance,
+            signature_placement_defaults=self.signature_placement_defaults,
+            placement_context=self.placement_context,
+            preview_signing_time=self._preview_signing_time,
+            preview_fingerprint=self._preview_fingerprint,
+            clean_draft_snapshot=self._clean_draft_snapshot,
+        )
+
+    def restore_source_transfer(
+        self,
+        snapshot: SigningDraftSnapshot,
+        *,
+        input_pdf_path: str,
+    ) -> None:
+        """Restore authored state into a validated candidate workflow."""
+        self.input_pdf_path = input_pdf_path
+        self.output_pdf_path = snapshot.output_pdf_path
+        self.certificate_path = snapshot.certificate_path
+        self.passphrase = snapshot.passphrase
+        self.tsa_url = snapshot.tsa_url
+        self.output_path_confirmed = snapshot.output_path_confirmed
+        self.source_overwrite_authorized = snapshot.source_overwrite_authorized
+        self.timestamp_required = snapshot.timestamp_required
+        self.trust_policy = snapshot.trust_policy
+        self.certificate_alias = snapshot.certificate_alias
+        self.selected_certificate_configuration_id = snapshot.selected_certificate_configuration_id
+        self.selected_appearance_profile_id = snapshot.selected_appearance_profile_id
+        self.selected_placement_profile_id = snapshot.selected_placement_profile_id
+        self.selected_signature_preset_id = snapshot.selected_signature_preset_id
+        self.signature_rect = snapshot.signature_rect
+        self.signature_field_name = snapshot.signature_field_name
+        self.signature_appearance = snapshot.signature_appearance
+        self.signature_placement_defaults = snapshot.signature_placement_defaults
+        self.placement_context = snapshot.placement_context
+        self._preview_signing_time = snapshot.preview_signing_time
+        self._preview_fingerprint = snapshot.preview_fingerprint
+        self._clean_draft_snapshot = snapshot.clean_draft_snapshot
+        self._certificate_preview_values = None
+        self._certificate_preview_available = False
+        self._invalidate_preview_snapshot()
 
     def confirm_output_pdf_path(self, output_pdf_path: str) -> None:
         """Record a user-confirmed output path and protect it as draft state."""

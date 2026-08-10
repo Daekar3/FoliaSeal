@@ -239,6 +239,45 @@ def test_preview_and_final_request_share_the_frozen_signing_time(tmp_path: Path)
     assert signing_time == workflow.preview_signing_time.strftime(_appearance().datetime_format)
 
 
+def test_source_transfer_snapshot_preserves_authored_state_and_invalidates_preview(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "input.pdf"
+    replacement = tmp_path / "replacement.pdf"
+    source.write_bytes(b"source")
+    replacement.write_bytes(b"replacement")
+    workflow = _workflow(tmp_path)
+    workflow.input_pdf_path = str(source)
+    workflow.set_signature_appearance(_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(page_index=1, left_pt=24.0, bottom_pt=18.0, width_pt=220.0, height_pt=80.0)
+    )
+    workflow.confirm_output_pdf_path(str(tmp_path / "confirmed.pdf"))
+    workflow.authorize_source_overwrite()
+    workflow.selected_certificate_configuration_id = "certificate-1"
+    workflow.selected_appearance_profile_id = "appearance-1"
+    workflow.selected_placement_profile_id = "placement-1"
+    workflow.selected_signature_preset_id = "preset-1"
+    workflow.preview()
+    snapshot = workflow.snapshot_for_source_transfer()
+
+    candidate = _workflow(tmp_path)
+    candidate.restore_source_transfer(snapshot, input_pdf_path=str(replacement))
+
+    assert candidate.input_pdf_path == str(replacement)
+    assert candidate.output_pdf_path == snapshot.output_pdf_path
+    assert candidate.certificate_path == snapshot.certificate_path
+    assert candidate.passphrase == snapshot.passphrase
+    assert candidate.signature_rect == snapshot.signature_rect
+    assert candidate.signature_appearance == snapshot.signature_appearance
+    assert candidate.output_path_confirmed is True
+    assert candidate.source_overwrite_authorized is True
+    assert candidate.selected_signature_preset_id == "preset-1"
+    assert candidate.has_unsaved_changes == workflow.has_unsaved_changes
+    assert candidate.preview_signing_time is None
+    assert candidate.build_signing_request().signing_time is None
+
+
 def test_workflow_preview_uses_certificate_values_when_pkcs12_is_readable(tmp_path: Path) -> None:
     cert_path = tmp_path / "cert.p12"
     _write_test_pkcs12(cert_path, passphrase="secret")

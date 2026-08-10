@@ -139,6 +139,7 @@ class QtSigningWidgetBindings:
     qt: Any
     q_shortcut: type[Any] | None = None
     q_key_sequence: type[Any] | None = None
+    q_timer: type[Any] | None = None
 
 class SigningRequestExecutor(Protocol):
     """Executes a validated signing request and returns a signing result."""
@@ -203,6 +204,10 @@ class SigningWorkspaceWidget:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
         on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None,
+        on_source_reload: Callable[[], Any] | None = None,
+        on_source_ignore: Callable[[], Any] | None = None,
+        on_source_locate: Callable[[], Any] | None = None,
+        on_source_close: Callable[[], Any] | None = None,
         on_open_signature_library: Callable[[], Any] | None = None,
         untrusted_recovery: bool = False,
     ) -> None:
@@ -253,6 +258,10 @@ class SigningWorkspaceWidget:
                 on_error=on_error,
                 on_status_change=on_status_change,
                 on_external_link_confirmation=on_external_link_confirmation,
+                on_source_reload=on_source_reload,
+                on_source_ignore=on_source_ignore,
+                on_source_locate=on_source_locate,
+                on_source_close=on_source_close,
                 on_open_signature_library=on_open_signature_library,
                 untrusted_recovery=untrusted_recovery,
                 viewer_widget_builder=build_qt_pdf_viewer_widget,
@@ -279,8 +288,22 @@ class SigningWorkspaceWidget:
         )
         self._shell_controller.install_into(self)
         self._shell_controller.bootstrap()
+        self._source_monitor_timer = None
+        if bindings.q_timer is not None:
+            self._source_monitor_timer = bindings.q_timer(self.widget)
+            timeout = getattr(self._source_monitor_timer, "timeout", None)
+            connect = getattr(timeout, "connect", None)
+            if callable(connect):
+                connect(self.refresh_source_safety)
+            start = getattr(self._source_monitor_timer, "start", None)
+            if callable(start):
+                start(1000)
 
     def _dispose_composition(self) -> None:
+        timer = getattr(self, "_source_monitor_timer", None)
+        stop = getattr(timer, "stop", None)
+        if callable(stop):
+            stop()
         composition = getattr(self, "_composition_boundary", None)
         if composition is not None:
             composition.dispose()
@@ -318,6 +341,23 @@ class SigningWorkspaceWidget:
     def clear_session_secrets(self) -> None:
         """Clear credentials retained for this mounted signing session."""
         self._draft_workflow.clear_session_secrets()
+
+    def refresh_source_safety(self) -> Any:
+        """Poll source identity and refresh the condition-only recovery banner."""
+        panel = getattr(self, "_properties_panel", None)
+        refresh = getattr(panel, "refresh_source_safety", None)
+        return refresh() if callable(refresh) else self._draft_workflow.document_safety_decision()
+
+    def refresh_transferred_draft(self) -> None:
+        """Refresh mounted controls after the frame transfers an authored draft."""
+        panel = getattr(self, "_properties_panel", None)
+        load = getattr(panel, "load_from_workflow", None)
+        if callable(load):
+            load()
+        reload_state = getattr(getattr(self, "_action_bridge", None), "reload_state", None)
+        if callable(reload_state):
+            reload_state()
+        self.refresh_source_safety()
 
     def setFocus(self) -> Any:  # noqa: N802
         """Focus the mounted Qt container for harness/session interactions."""
@@ -559,6 +599,10 @@ class SigningShellAdapter:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
         on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None,
+        on_source_reload: Callable[[], Any] | None = None,
+        on_source_ignore: Callable[[], Any] | None = None,
+        on_source_locate: Callable[[], Any] | None = None,
+        on_source_close: Callable[[], Any] | None = None,
         on_open_signature_library: Callable[[], Any] | None = None,
         untrusted_recovery: bool = False,
     ) -> Any:
@@ -583,6 +627,10 @@ class SigningShellAdapter:
             on_error=on_error,
             on_status_change=on_status_change,
             on_external_link_confirmation=on_external_link_confirmation,
+            on_source_reload=on_source_reload,
+            on_source_ignore=on_source_ignore,
+            on_source_locate=on_source_locate,
+            on_source_close=on_source_close,
             on_open_signature_library=on_open_signature_library,
             untrusted_recovery=untrusted_recovery,
         )
@@ -603,6 +651,10 @@ class SigningShellAdapter:
             on_error=bootstrap.on_error,
             on_status_change=bootstrap.on_status_change,
             on_external_link_confirmation=bootstrap.on_external_link_confirmation,
+            on_source_reload=bootstrap.on_source_reload,
+            on_source_ignore=bootstrap.on_source_ignore,
+            on_source_locate=bootstrap.on_source_locate,
+            on_source_close=bootstrap.on_source_close,
             on_open_signature_library=bootstrap.on_open_signature_library,
             untrusted_recovery=bootstrap.untrusted_recovery,
         )
@@ -641,6 +693,7 @@ class SigningShellAdapter:
             qt=getattr(qt_core, "Qt"),
             q_shortcut=getattr(qt_gui, "QShortcut", None),
             q_key_sequence=getattr(qt_gui, "QKeySequence", None),
+            q_timer=getattr(qt_core, "QTimer", None),
         )
 
     def _load_copy_text_callback(self) -> Callable[[str], Any] | None:

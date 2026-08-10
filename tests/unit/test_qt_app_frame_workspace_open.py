@@ -138,6 +138,18 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     def _confirm_external(_decision) -> None:
         return None
 
+    def _reload_source() -> None:
+        return None
+
+    def _ignore_source() -> None:
+        return None
+
+    def _locate_source() -> None:
+        return None
+
+    def _close_source() -> None:
+        return None
+
     reusable_objects = _reusable_objects()
     outcome = service.open_workspace(
         OpenWorkspaceCommand(
@@ -155,6 +167,10 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
             on_error=lambda message: None,
             on_status_change=lambda status: None,
             on_external_link_confirmation=_confirm_external,
+            on_source_reload=_reload_source,
+            on_source_ignore=_ignore_source,
+            on_source_locate=_locate_source,
+            on_source_close=_close_source,
             on_open_signature_library=_open_library,
         )
     )
@@ -173,6 +189,10 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     assert shell_factory.bootstrap_calls[0].sign_executor is sign_executor
     assert shell_factory.bootstrap_calls[0].on_open_signed_output is _reopen_target
     assert shell_factory.bootstrap_calls[0].on_external_link_confirmation is _confirm_external
+    assert shell_factory.bootstrap_calls[0].on_source_reload is _reload_source
+    assert shell_factory.bootstrap_calls[0].on_source_ignore is _ignore_source
+    assert shell_factory.bootstrap_calls[0].on_source_locate is _locate_source
+    assert shell_factory.bootstrap_calls[0].on_source_close is _close_source
     assert shell_factory.bootstrap_calls[0].on_open_signature_library is _open_library
 
 

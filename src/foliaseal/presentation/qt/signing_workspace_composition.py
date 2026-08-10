@@ -167,6 +167,10 @@ class QtSigningWorkspaceCompositionRequest:
     on_status_change: Callable[[str], None] | None = None
     document_link_inspector: DocumentLinkInspector | None = None
     on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None
+    on_source_reload: Callable[[], Any] | None = None
+    on_source_ignore: Callable[[], Any] | None = None
+    on_source_locate: Callable[[], Any] | None = None
+    on_source_close: Callable[[], Any] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
     untrusted_recovery: bool = False
 
@@ -256,6 +260,10 @@ def _assemble_signing_workspace_composition(
     on_copy_text = request.on_copy_text
     on_error = request.on_error
     on_status_change = request.on_status_change
+    on_source_reload = request.on_source_reload
+    on_source_ignore = request.on_source_ignore
+    on_source_locate = request.on_source_locate
+    on_source_close = request.on_source_close
     viewer_widget_builder = request.viewer_widget_builder
     host_actions = request.host_actions
     choose_output_pdf_path = host_actions.choose_output_pdf_path
@@ -592,6 +600,10 @@ def _assemble_signing_workspace_composition(
         on_page_change=runtime.on_page_change,
         on_error=runtime.emit_error,
         on_open_library=open_signature_library,
+        on_source_reload=on_source_reload,
+        on_source_ignore=on_source_ignore,
+        on_source_locate=on_source_locate,
+        on_source_close=on_source_close,
     )
     register_disposable(properties_panel)
     setup_port = PanelSigningWorkspaceSetupAdapter(properties_panel)

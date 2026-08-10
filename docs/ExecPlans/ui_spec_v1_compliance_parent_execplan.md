@@ -382,12 +382,15 @@ Release tranche:
   unresolved source. Focused validation is `49 passed`; full regression is `1398 passed, 20
   skipped, 1 warning`. Reload/Locate/Ignore banners and draft-preserving reload remain open in the
   safe-links/lifecycle children.
-- [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
+- [x] (2026-08-10) Document-lifecycle and source-change recovery slices are implemented and validated:
+  dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
-  close use consequence-verb policy with conditional Sign and save. Focused tests, real offscreen
-  native-close integration, and the full suite are green; display-backed acceptance remains
-  environment-blocked by unavailable xcb `DISPLAY=:0`, and crash recovery remains a separate plan.
+  close use consequence-verb policy with conditional Sign and save; changed/missing source states
+  now expose explicit Reload/Ignore or Locate/Close recovery while preserving authored draft state.
+  Focused tests, real offscreen integration, and the full suite (`1428 passed, 20 skipped, 1 warning`)
+  are green; display-backed acceptance remains environment-blocked by unavailable xcb `DISPLAY=:0`,
+  and crash recovery remains a separate plan.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

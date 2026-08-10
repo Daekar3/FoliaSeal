@@ -15,7 +15,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
-from foliaseal.application.document_safety import SourceChangeStatus
+from foliaseal.application.document_safety import SourceChangeDecision, SourceChangeStatus
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator,
@@ -340,6 +340,10 @@ class SignaturePropertiesPanel:
         on_page_change: Callable[[int], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_open_library: Callable[[], Any] | None = None,
+        on_source_reload: Callable[[], Any] | None = None,
+        on_source_ignore: Callable[[], Any] | None = None,
+        on_source_locate: Callable[[], Any] | None = None,
+        on_source_close: Callable[[], Any] | None = None,
     ) -> None:
         if reusable_objects is None:
             raise ValueError("reusable_objects is required for the signature properties panel.")
@@ -359,6 +363,10 @@ class SignaturePropertiesPanel:
         self._on_page_change = on_page_change
         self._on_error = on_error
         self._on_open_library = on_open_library
+        self._on_source_reload = on_source_reload or (lambda: None)
+        self._on_source_ignore = on_source_ignore or (lambda: None)
+        self._on_source_locate = on_source_locate or (lambda: None)
+        self._on_source_close = on_source_close or (lambda: None)
         self._suspend_updates = False
         self._control_issue: SigningDraftValidationIssue | None = None
         self._canonical_preview_lifecycle = QtCanonicalPreviewLifecycle(
@@ -383,6 +391,32 @@ class SignaturePropertiesPanel:
             destroy_connect(lambda *_args: self.dispose())
         self._layout = bindings.q_vbox_layout(self.widget)
         self._layout.setContentsMargins(8, 8, 8, 8)
+        self._source_safety_container = bindings.q_widget()
+        source_safety_layout = bindings.q_vbox_layout(self._source_safety_container)
+        source_safety_layout.setContentsMargins(8, 8, 8, 8)
+        source_safety_layout.setSpacing(4)
+        self._source_safety_label = bindings.q_label()
+        if hasattr(self._source_safety_label, "setWordWrap"):
+            self._source_safety_label.setWordWrap(True)
+        source_safety_buttons = bindings.q_hbox_layout()
+        self._source_reload_button = bindings.q_push_button("Reload")
+        self._source_ignore_button = bindings.q_push_button("Ignore")
+        self._source_locate_button = bindings.q_push_button("Locate")
+        self._source_close_button = bindings.q_push_button("Close")
+        self._source_reload_button.clicked.connect(self._on_source_reload)  # type: ignore[attr-defined]
+        self._source_ignore_button.clicked.connect(self._on_source_ignore)  # type: ignore[attr-defined]
+        self._source_locate_button.clicked.connect(self._on_source_locate)  # type: ignore[attr-defined]
+        self._source_close_button.clicked.connect(self._on_source_close)  # type: ignore[attr-defined]
+        source_safety_layout.addWidget(self._source_safety_label)
+        source_safety_layout.addLayout(source_safety_buttons)
+        for button in (
+            self._source_reload_button,
+            self._source_ignore_button,
+            self._source_locate_button,
+            self._source_close_button,
+        ):
+            source_safety_buttons.addWidget(button)
+        self._layout.addWidget(self._source_safety_container)
 
         self._certificate_controls = self._build_certificate_configuration_controls()
         self._signature_preset_controls = self._build_signature_preset_controls()
@@ -410,6 +444,7 @@ class SignaturePropertiesPanel:
             self._workflow.set_signature_appearance(SignatureAppearance())
 
         self.load_from_workflow()
+        self.refresh_source_safety()
 
     @property
     def container(self) -> Any:
@@ -486,6 +521,36 @@ class SignaturePropertiesPanel:
 
     def refresh_preview(self) -> SigningDraftPreview:
         return self._render_setup_state()
+
+    def refresh_source_safety(self) -> SourceChangeDecision:
+        """Refresh the condition-only source banner and return its current decision."""
+        decision = self._workflow.document_safety_decision()
+        changed = decision.status in {SourceChangeStatus.CHANGED, SourceChangeStatus.UNKNOWN}
+        missing = decision.status is SourceChangeStatus.MISSING
+        visible = changed or missing
+        set_visible = getattr(self._source_safety_container, "setVisible", None)
+        if callable(set_visible):
+            set_visible(visible)
+        if not visible:
+            return decision
+        message = (
+            "The source PDF changed on disk. Reload it or keep the currently mounted copy."
+            if changed
+            else "The source PDF is no longer available. Locate it or close this document."
+        )
+        setter = getattr(self._source_safety_label, "setText", None)
+        if callable(setter):
+            setter(message)
+        for button, button_visible in (
+            (self._source_reload_button, changed),
+            (self._source_ignore_button, changed),
+            (self._source_locate_button, missing),
+            (self._source_close_button, missing),
+        ):
+            set_button_visible = getattr(button, "setVisible", None)
+            if callable(set_button_visible):
+                set_button_visible(button_visible)
+        return decision
 
     def load_from_workflow(self) -> None:
         self._render_setup_state()

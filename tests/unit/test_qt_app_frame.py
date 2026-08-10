@@ -9,6 +9,7 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableSigningObjects,
 )
 from foliaseal.application.signing_executor import LazySigningRequestExecutor
+from foliaseal.domain.models import SignatureRect
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
@@ -985,6 +986,91 @@ def test_app_frame_reopens_signed_output_from_shell_callback(tmp_path: Path) -> 
         str(tmp_path / "source" / "contract.pdf"),
         str(tmp_path / "signed" / "contract-signed.pdf"),
     ]
+
+
+def test_app_frame_source_reload_and_ignore_preserve_the_authored_draft(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    second = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_SequenceShellFactory(first, second),
+        render_backend_factory=lambda: object(),
+    )
+    source = tmp_path / "source" / "contract.pdf"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"original")
+    frame.open_pdf_path(source)
+    workflow = frame.current_signing_workflow
+    assert workflow is not None
+    workflow.passphrase = "keep-this-secret"
+    workflow.set_signature_rect(
+        SignatureRect(page_index=0, left_pt=20.0, bottom_pt=20.0, width_pt=180.0, height_pt=60.0)
+    )
+    snapshot = workflow.snapshot_for_source_transfer()
+    source.write_bytes(b"changed")
+
+    # The real frame owns the callback through the typed bootstrap seam.
+    callback = frame._workspace_host._environment.on_source_reload  # noqa: SLF001
+    assert callback is not None
+    reloaded = callback()
+
+    assert reloaded is second
+    assert frame.current_shell is second
+    assert first.close_calls == 1
+    assert frame.current_signing_workflow is not workflow
+    assert frame.current_signing_workflow is not None
+    assert frame.current_signing_workflow.passphrase == snapshot.passphrase
+    assert frame.current_signing_workflow.signature_rect == snapshot.signature_rect
+    assert frame.current_signing_workflow.has_unsaved_changes is True
+    assert frame.current_signing_workflow.document_safety_decision().status.value == "unchanged"
+
+
+def test_app_frame_locates_missing_source_before_replacing_workspace(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    second = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_SequenceShellFactory(first, second),
+        render_backend_factory=lambda: object(),
+    )
+    source = tmp_path / "source" / "missing.pdf"
+    replacement = tmp_path / "source" / "replacement.pdf"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"source")
+    replacement.write_bytes(b"replacement")
+    frame.open_pdf_path(source)
+    workflow = frame.current_signing_workflow
+    assert workflow is not None
+    workflow.passphrase = "preserve-me"
+    source.unlink()
+    bindings.q_file_dialog.next_open_file_name = str(replacement)
+
+    callback = frame._workspace_host._environment.on_source_locate  # noqa: SLF001
+    assert callback is not None
+    located = callback()
+
+    assert located is second
+    assert frame.current_workspace is not None
+    assert frame.current_workspace.source_pdf == replacement
+    assert frame.current_signing_workflow is not None
+    assert frame.current_signing_workflow.passphrase == "preserve-me"
+    assert bindings.q_file_dialog.open_calls[-1][1] == "Locate source PDF"
+
+    source.write_bytes(b"changed-again")
+    current_shell = frame.current_shell
+    ignore = frame._workspace_host._environment.on_source_ignore  # noqa: SLF001
+    assert ignore is not None
+    assert ignore() is True
+    assert frame.current_shell is current_shell
+    assert frame.current_signing_workflow.document_safety_decision().status.value == "unchanged"
 
 
 def test_app_frame_replacing_workspace_closes_previous_shell(
