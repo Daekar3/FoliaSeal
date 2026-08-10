@@ -173,6 +173,38 @@ def test_workflow_builds_preview_and_final_request(tmp_path: Path) -> None:
     assert request.signature_rect == workflow.current_signature_rect
 
 
+def test_existing_signature_field_target_locks_geometry_and_reaches_request(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    rect = SignatureRect(page_index=1, left_pt=24.0, bottom_pt=36.0, width_pt=180.0, height_pt=54.0)
+    workflow.set_signature_appearance(_appearance())
+    workflow.select_signature_field(field_name="Approval", signature_rect=rect)
+
+    request = workflow.build_signing_request()
+
+    assert request.signature_field_name == "Approval"
+    assert request.signature_rect == rect
+    with pytest.raises(ValueError, match="page and geometry are fixed"):
+        workflow.update_signature_rect(left_pt=30.0)
+    with pytest.raises(ValueError, match="clear the field target"):
+        workflow.clear_signature_rect()
+
+
+def test_existing_signature_field_rejects_mismatched_placement_profile(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    rect = SignatureRect(page_index=1, left_pt=24.0, bottom_pt=36.0, width_pt=180.0, height_pt=54.0)
+    workflow.select_signature_field(field_name="Approval", signature_rect=rect)
+
+    with pytest.raises(ValueError, match="does not match the existing field"):
+        workflow.apply_signature_preset_values(
+            appearance=_appearance(),
+            placement_defaults=SignaturePlacementDefaults(width_pt=220.0, height_pt=80.0),
+            signature_preset_id="preset",
+            appearance_profile_id="appearance",
+            placement_profile_id="placement",
+            certificate_configuration_id=None,
+        )
+
+
 def test_preview_signing_time_is_invalidated_by_draft_mutation(tmp_path: Path) -> None:
     workflow = _workflow(tmp_path)
     workflow.set_signature_appearance(_appearance())

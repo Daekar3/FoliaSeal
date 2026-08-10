@@ -20,7 +20,7 @@ from pyhanko.pdf_utils.font.opentype import GlyphAccumulatorFactory
 from pyhanko.pdf_utils.layout import AxisAlignment, BoxConstraints, InnerScaling
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
-from pyhanko.sign import validation
+from pyhanko.sign import fields, validation
 from pyhanko.sign.timestamps.dummy_client import DummyTimeStamper
 from pyhanko_certvalidator import ValidationContext
 from pyhanko_certvalidator.registry import SimpleCertificateStore
@@ -165,6 +165,23 @@ def _write_test_pdf(path: Path) -> None:
     writer = PdfFileWriter()
     empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
     writer.insert_page(PageObject(contents=empty_stream, media_box=(0, 0, 612, 792)))
+    with path.open("wb") as handle:
+        writer.write(handle)
+
+
+def _write_test_pdf_with_unsigned_field(path: Path, *, field_name: str) -> None:
+    writer = PdfFileWriter()
+    empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
+    writer.insert_page(PageObject(contents=empty_stream, media_box=(0, 0, 612, 792)))
+    fields.append_signature_field(
+        writer,
+        fields.SigFieldSpec(
+            sig_field_name=field_name,
+            on_page=0,
+            box=(24, 36, 584, 216),
+            empty_field_appearance=True,
+        ),
+    )
     with path.open("wb") as handle:
         writer.write(handle)
 
@@ -499,6 +516,39 @@ def test_pyhanko_signer_consumes_supplied_prepared_plan(tmp_path: Path) -> None:
 
     assert output.timestamp_present is False
     assert PyHankoSignatureVerifier().verify(str(output_pdf)).signature_count == 1
+
+
+def test_pyhanko_signer_fills_existing_visible_signature_field(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf_with_unsigned_field(input_pdf, field_name="Approval")
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=build_signature_rect(
+            page_index=0,
+            left_pt=24.0,
+            bottom_pt=36.0,
+            width_pt=560.0,
+            height_pt=180.0,
+        ),
+        signature_appearance=build_signature_appearance(image_stamp_path=None),
+        signature_field_name="Approval",
+    )
+    backend_request = SigningBackendRequest.from_signing_request(request)
+
+    output = PyHankoPdfSigner().sign(backend_request)
+    output_pdf.write_bytes(output.output_bytes)
+
+    review = PyHankoDocumentReviewInspector().inspect(str(output_pdf))
+    assert review.signature_count == 1
+    assert review.signature_items[0].field_name == "Approval"
 
 
 def test_phase3_signing_executor_supports_invisible_incremental_signing(

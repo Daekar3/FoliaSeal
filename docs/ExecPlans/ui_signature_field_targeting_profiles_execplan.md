@@ -14,17 +14,24 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md
-- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
-- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
+- [x] docs/ExecPlans/ui_document_signatures_review_execplan.md
+- [x] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
+- [x] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited current behavior and added red-to-green focused tests for workflow,
+  backend request propagation, existing-field signing, and the review surface.
+- [x] (2026-08-10) Implemented the typed field-target path: Document Signatures exposes Use for
+  new signature, the draft carries the field name, and pyHanko fills the existing field only.
+- [x] (2026-08-10) Locked targeted page/geometry controls and rejected mismatched placement-profile
+  dimensions with an explicit Use/adjust/place-manually explanation; no compatibility path was
+  added and no obsolete product-facing phase3 label was introduced.
+- [x] (2026-08-10) Ran focused tests, full suite (1318 passed, 20 skipped, 1 warning), Ruff, diff
+  check, and bounded offscreen GUI lifecycle validation; the isolated single-instance socket
+  limitation remained, with no FoliaSeal/python processes or temporary audit root left behind.
+- [x] (2026-08-10) Reconciled this plan and the parent plan; implementation committed as the
+  field-targeting tranche.
 
 ## Surprises & Discoveries
 
@@ -43,7 +50,14 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The Document Signatures dialog now enables Use for new signature only for an unsigned field with
+known page geometry. Selecting it carries the exact field name and discovered rectangle through
+the draft and signing request; pyHanko signs that existing field with `existing_fields_only=True`.
+Targeted page/left/bottom/width/height controls are disabled, and a placement profile with a
+different width or height is rejected with an explicit manual-resolution message. Unsigned fields
+without geometry remain review-only and direct the user to Place manually. The bounded GUI launch
+still cannot claim an isolated local socket in this environment (`SingleInstanceUnavailable`), but
+the Qt integration test and backend fixture demonstrate the behavior and cleanup is clean.
 
 ## Context and Orientation
 
@@ -117,6 +131,18 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 "no SVG" decision alongside the evidence row.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
+
+Evidence: UI_SPEC WF02, section 10, SUR06, acceptance scenario 4. Focused workflow/use-case/review
+tests and `tests/unit/test_phase3_signing_backend.py::test_pyhanko_signer_fills_existing_visible_signature_field`
+are green; the full command `.venv/bin/pytest -q` reports 1318 passed, 20 skipped, 1 warning.
+The backend fixture used field `Approval` at page 0, `(24,36)-(584,216)` and filled that existing
+field without creating another one. The mismatch test used a 220x80 profile against a 180x54
+target and observed the explicit rejection. No SVG was added: existing document-review and
+placement overlays are the owning visual realization. The bounded GUI command exited with the
+known isolated `SingleInstanceUnavailable` socket limitation; the audit root and processes were
+cleaned. The new contract is typed through `SigningRequest`, `SigningBackendRequest`,
+`SigningWorkspaceSessionPort`, and the Qt dialog callback; no legacy adapter was retained solely
+for this slice.
 
 ## Idempotence and Recovery
 

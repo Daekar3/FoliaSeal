@@ -115,6 +115,8 @@ class SigningWorkspaceSessionPort(Protocol):
         height_pt: float,
     ) -> SignatureRect: ...
 
+    def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None: ...
+
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None: ...
     def preview(self) -> SigningDraftPreview: ...
     def snapshot(self) -> SigningWorkspaceSnapshot: ...
@@ -278,6 +280,9 @@ class QtSigningWorkspaceSessionPort:
 
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
         self.shell_widget.apply_signature_rect_placement(signature_rect)
+
+    def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None:
+        self.shell_widget.select_signature_field(field_name, signature_rect)
 
     def preview(self) -> SigningDraftPreview:
         return self.shell_widget.preview()

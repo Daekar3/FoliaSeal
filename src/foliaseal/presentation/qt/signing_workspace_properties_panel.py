@@ -996,6 +996,9 @@ class SignaturePropertiesPanel:
         self._suspend_updates = True
         try:
             self._setup_form.load(state.visible_signature_setup_draft)
+            self._setup_form.set_placement_editable(
+                self._coordinator.workflow.signature_field_name is None
+            )
             self._render_certificate_configuration_controls(
                 names=state.certificate_configuration_names,
                 selected_name=state.selected_certificate_configuration_name,

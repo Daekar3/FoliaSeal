@@ -95,7 +95,9 @@ Placement, preview, and signing tranche:
 - [x] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md — keyboard creation/movement/resize,
   numeric-field history, Delete/undo/redo, snap bypass, off-page recovery, and lifecycle clearing
   are implemented and reconciled.
-- [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
+- [x] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md — explicit Use for new
+  signature from Document Signatures, existing-field-only backend signing, fixed target geometry,
+  and placement-profile mismatch rejection are implemented and validated in the current tranche.
 - [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
@@ -274,6 +276,12 @@ Release tranche:
   tranche landed. Current validation is `1314 passed, 20 skipped, 1 warning`; bounded GUI launch
   exits at the known isolated single-instance endpoint and leaves no process or temporary audit-root
   debris.
+- [x] (2026-08-10) Implemented existing unsigned-field targeting: Document Signatures exposes
+  Use for new signature for eligible visible fields, the typed draft/request carries the field name,
+  pyHanko fills the existing field only, targeted geometry controls are locked, and mismatched
+  placement profiles are rejected with a manual-resolution explanation. Full validation is
+  `1318 passed, 20 skipped, 1 warning`; bounded GUI cleanup is clean and the isolated socket
+  limitation remains the only launch-audit blocker.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

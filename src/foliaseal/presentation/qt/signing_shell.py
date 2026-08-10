@@ -457,6 +457,9 @@ class SigningWorkspaceWidget:
     def signature_rect(self) -> SignatureRect | None:
         return self._runtime.signature_rect()
 
+    def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None:
+        self._runtime.select_signature_field(field_name, signature_rect)
+
     def set_selected_certificate_configuration_id(self, configuration_id: str | None) -> None:
         self._runtime.set_selected_certificate_configuration_id(configuration_id)
 

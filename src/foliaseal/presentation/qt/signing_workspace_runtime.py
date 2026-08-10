@@ -62,6 +62,7 @@ def _snapshot_current_request(workflow: SigningDraftWorkflow) -> SigningRequest 
         trust_policy=workflow.trust_policy,
         certificate_alias=workflow.certificate_alias,
         signature_rect=signature_rect,
+        signature_field_name=getattr(workflow, "signature_field_name", None),
         signature_appearance=signature_appearance,
     )
 
@@ -387,6 +388,22 @@ class SigningWorkspaceRuntime:
             .placement_context
         )
         self.apply_placement_context(placement_context)
+        self.sync_signature_overlay()
+        self._refresh_sign_button_state_required()()
+
+    def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None:
+        """Target an existing unsigned field and lock its page/geometry."""
+        self._draft_workflow.select_signature_field(
+            field_name=field_name,
+            signature_rect=signature_rect,
+        )
+        self._properties_panel_required().set_signature_rect(signature_rect, notify=False)
+        jump_to_page = getattr(self._viewer_workflow_required(), "jump_to_page", None)
+        if callable(jump_to_page):
+            jump_to_page(signature_rect.page_index)
+        refresh = getattr(self._viewer_widget_required(), "refresh", None)
+        if callable(refresh):
+            refresh(navigation=True)
         self.sync_signature_overlay()
         self._refresh_sign_button_state_required()()
 

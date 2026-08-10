@@ -53,6 +53,8 @@ def test_document_signatures_window_is_modeless_and_cleans_up(tmp_path: Path) ->
             signature_id="Countersignature:unsigned",
             kind="unsigned_field",
             field_name="Countersignature",
+            page_index=1,
+            highlight_rect=PdfRect(x1=18, y1=28, x2=178, y2=82),
         ),
     )
     summary = DocumentReviewSummary(
@@ -155,6 +157,7 @@ def test_document_signatures_window_is_modeless_and_cleans_up(tmp_path: Path) ->
 
     dialog.controls.item_list.setCurrentRow(1)
     app.processEvents()
+    assert dialog.controls.use_button.isEnabled()
     dialog.controls.item_list.setCurrentRow(0)
     app.processEvents()
     assert session.selected == [
@@ -162,11 +165,11 @@ def test_document_signatures_window_is_modeless_and_cleans_up(tmp_path: Path) ->
         "Approval:signed",
     ]
     assert session.focused == 2
-    assert jumped_pages == [0]
+    assert jumped_pages == [1, 0]
     assert viewer.review_overlay == (0, PdfRect(x1=10, y1=20, x2=120, y2=70))
     dialog.controls.item_list.setCurrentRow(1)
     app.processEvents()
-    assert viewer.review_overlay is None
+    assert viewer.review_overlay == (1, PdfRect(x1=18, y1=28, x2=178, y2=82))
     dialog.controls.item_list.setCurrentRow(0)
     app.processEvents()
     assert session.selected == [

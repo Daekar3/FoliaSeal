@@ -228,7 +228,9 @@ class PyHankoPdfSigner:
         if not input_path.exists():
             raise FileNotFoundError(request.input_pdf_path)
         prepared = prepared or prepare_phase3_signing_plan(request)
-        signature_field_name = _next_signature_field_name(input_path)
+        signature_field_name = request.signature_field_name or _next_signature_field_name(
+            input_path
+        )
         signer = _load_simple_signer(request.certificate_path, request.passphrase)
         if any(
             issue.severity == SigningDraftValidationSeverity.ERROR for issue in prepared.fit_issues
@@ -240,7 +242,7 @@ class PyHankoPdfSigner:
             timestamper = self._build_timestamper(request.tsa_url)
         semantics = prepared.visible_semantics
         stamp_style = None
-        field_spec: fields.SigFieldSpec
+        field_spec: fields.SigFieldSpec | None
         if prepared.visible:
             appearance = request.signature_appearance
             signature_rect = request.signature_rect
@@ -254,12 +256,14 @@ class PyHankoPdfSigner:
                 layout_plan=prepared.layout_plan,
                 preparation=prepared.layout_preparation,
             )
-            field_spec = fields.SigFieldSpec(
-                sig_field_name=signature_field_name,
-                on_page=signature_rect.page_index,
-                box=_rect_to_box(signature_rect),
-                readable_field_name="Visible signature",
-            )
+            field_spec = None
+            if request.signature_field_name is None:
+                field_spec = fields.SigFieldSpec(
+                    sig_field_name=signature_field_name,
+                    on_page=signature_rect.page_index,
+                    box=_rect_to_box(signature_rect),
+                    readable_field_name="Visible signature",
+                )
         else:
             field_spec = fields.SigFieldSpec(
                 sig_field_name=signature_field_name,
@@ -292,7 +296,11 @@ class PyHankoPdfSigner:
                 new_field_spec=field_spec,
             )
             try:
-                signer_engine.sign_pdf(writer, output=signed_output)
+                signer_engine.sign_pdf(
+                    writer,
+                    existing_fields_only=request.signature_field_name is not None,
+                    output=signed_output,
+                )
             except TimestampRequestError as exc:
                 raise TsaUnavailableError(str(exc)) from exc
         output_bytes = signed_output.getvalue()

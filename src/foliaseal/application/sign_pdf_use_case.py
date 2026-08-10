@@ -154,6 +154,7 @@ class SigningBackendRequest:
     certificate_alias: str | None
     signature_rect: SignatureRect | None
     signature_appearance: SigningBackendAppearance | None
+    signature_field_name: str | None = None
     signing_time: datetime | None = None
     render_port: PreviewRasterRenderer | None = None
 
@@ -182,6 +183,7 @@ class SigningBackendRequest:
             certificate_alias=request.certificate_alias,
             signature_rect=request.signature_rect,
             signature_appearance=appearance,
+            signature_field_name=request.signature_field_name,
             signing_time=request.signing_time,
         )
 

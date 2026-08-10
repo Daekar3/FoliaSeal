@@ -17,6 +17,7 @@ class DocumentSignaturesDialogControls:
     dialog: Any
     item_list: Any
     detail_text: Any
+    use_button: Any
     close_button: Any
 
 
@@ -30,10 +31,12 @@ class DocumentSignaturesDialog:
         parent: Any,
         state: DocumentReviewWorkspaceState,
         on_select: Callable[[str], Any],
+        on_use_unsigned_field: Callable[[str], Any] | None = None,
         on_close: Callable[[], Any] | None = None,
     ) -> None:
         self._bindings = bindings
         self._on_select = on_select
+        self._on_use_unsigned_field = on_use_unsigned_field
         self._on_close = on_close
         self._items: tuple[DocumentSignatureReviewItem, ...] = ()
         self._updating = False
@@ -72,6 +75,7 @@ class DocumentSignaturesDialog:
         finally:
             self._updating = False
         self._render_detail(target_row)
+        self._sync_use_button(target_row)
 
     def close(self) -> None:
         close = getattr(self.controls.dialog, "close", None)
@@ -105,6 +109,9 @@ class DocumentSignaturesDialog:
         detail_text.setReadOnly(True)
         detail_text.setAccessibleName("Selected document signature details")
         detail_layout.addWidget(detail_text, 1)
+        use_button = self._bindings.q_push_button("Use for new signature")
+        use_button.setAccessibleName("Use selected unsigned field for new signature")
+        detail_layout.addWidget(use_button)
         close_button = self._bindings.q_push_button("Close")
         close_button.setAccessibleName("Close Document Signatures")
         detail_layout.addWidget(close_button)
@@ -112,6 +119,7 @@ class DocumentSignaturesDialog:
         root.addWidget(catalog_column, 1)
         root.addWidget(detail_column, 2)
         item_list.currentRowChanged.connect(self._handle_row_changed)
+        use_button.clicked.connect(self._handle_use_unsigned_field)
         close_button.clicked.connect(self.close)
         finished = getattr(dialog, "finished", None)
         if hasattr(finished, "connect"):
@@ -120,16 +128,40 @@ class DocumentSignaturesDialog:
             dialog=dialog,
             item_list=item_list,
             detail_text=detail_text,
+            use_button=use_button,
             close_button=close_button,
         )
 
     def _handle_row_changed(self, row: int) -> None:
         if self._updating or not (0 <= row < len(self._items)):
             self._render_detail(row)
+            self._sync_use_button(row)
             return
         item = self._items[row]
         self._on_select(item.signature_id or item.label)
         self._render_detail(row)
+        self._sync_use_button(row)
+
+    def _handle_use_unsigned_field(self) -> None:
+        row = self.controls.item_list.currentRow()
+        if not (0 <= row < len(self._items)):
+            return
+        item = self._items[row]
+        if item.kind != "unsigned_field" or item.field_name is None:
+            return
+        if self._on_use_unsigned_field is not None:
+            self._on_use_unsigned_field(item.field_name)
+
+    def _sync_use_button(self, row: int) -> None:
+        enabled = (
+            0 <= row < len(self._items)
+            and self._items[row].kind == "unsigned_field"
+            and self._items[row].field_name is not None
+            and self._on_use_unsigned_field is not None
+        )
+        setter = getattr(self.controls.use_button, "setEnabled", None)
+        if callable(setter):
+            setter(enabled)
 
     def _render_detail(self, row: int) -> None:
         if not (0 <= row < len(self._items)):

@@ -309,6 +309,19 @@ class QtVisibleSignatureSetupForm:
     def set_placement_enabled(self, enabled: bool) -> None:
         self._placement_enabled = bool(enabled)
 
+    def set_placement_editable(self, editable: bool) -> None:
+        """Enable or lock page/geometry controls for fixed existing fields."""
+        for widget in (
+            self._placement_controls.page_spin,
+            self._placement_controls.left_spin,
+            self._placement_controls.bottom_spin,
+            self._placement_controls.width_spin,
+            self._placement_controls.height_spin,
+        ):
+            setter = getattr(widget, "setEnabled", None)
+            if callable(setter):
+                setter(bool(editable))
+
     def _build_placement_controls(self) -> PlacementControls:
         bindings = self._bindings
         container = bindings.q_group_box("Placement on page")

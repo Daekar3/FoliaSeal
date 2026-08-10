@@ -80,6 +80,7 @@ class SigningDraftWorkflow:
     selected_placement_profile_id: str | None = None
     selected_signature_preset_id: str | None = None
     signature_rect: SignatureRect | None = None
+    signature_field_name: str | None = None
     signature_appearance: SignatureAppearance | None = None
     signature_placement_defaults: SignaturePlacementDefaults | None = None
     placement_context: _contracts.SignaturePlacementContext | None = None
@@ -136,6 +137,7 @@ class SigningDraftWorkflow:
         """Discard the current draft and clear credentials before workspace disposal."""
         self.clear_session_secrets()
         self.signature_rect = None
+        self.signature_field_name = None
         self.signature_appearance = None
         self.signature_placement_defaults = None
         self.placement_context = None
@@ -150,6 +152,7 @@ class SigningDraftWorkflow:
     def _draft_snapshot(self) -> tuple[object, ...]:
         return (
             self.signature_rect,
+            self.signature_field_name,
             self.signature_appearance,
             self.output_path_confirmed,
             self.source_overwrite_authorized,
@@ -174,6 +177,7 @@ class SigningDraftWorkflow:
             trust_policy=request.trust_policy,
             certificate_alias=request.certificate_alias,
             signature_rect=request.signature_rect,
+            signature_field_name=request.signature_field_name,
             signature_appearance=request.signature_appearance,
             signature_placement_defaults=None,
             placement_context=placement_context,
@@ -209,6 +213,10 @@ class SigningDraftWorkflow:
 
     def set_signature_rect(self, signature_rect: SignatureRect | None) -> None:
         """Set the PDF-space rectangle used for the visible signature."""
+        if self.signature_field_name is not None and signature_rect != self.signature_rect:
+            raise ValueError(
+                "An existing signature field is selected; its page and geometry are fixed."
+            )
         self.signature_rect = signature_rect
         self._invalidate_preview_snapshot()
         self.selected_placement_profile_id = None
@@ -216,10 +224,39 @@ class SigningDraftWorkflow:
 
     def clear_signature_rect(self) -> None:
         """Remove the current signature rectangle."""
+        if self.signature_field_name is not None:
+            raise ValueError(
+                "An existing signature field is selected; clear the field target first."
+            )
         self.signature_rect = None
         self._invalidate_preview_snapshot()
         self.selected_placement_profile_id = None
         self.selected_signature_preset_id = None
+
+    def select_signature_field(
+        self,
+        *,
+        field_name: str,
+        signature_rect: SignatureRect,
+    ) -> None:
+        """Target one existing unsigned visible field without changing its geometry."""
+        normalized_name = field_name.strip()
+        if not normalized_name:
+            raise ValueError("An existing signature field name is required.")
+        self.signature_field_name = normalized_name
+        self.signature_rect = signature_rect
+        self.signature_placement_defaults = SignaturePlacementDefaults(
+            width_pt=signature_rect.width_pt,
+            height_pt=signature_rect.height_pt,
+        )
+        self.selected_placement_profile_id = None
+        self.selected_signature_preset_id = None
+        self._invalidate_preview_snapshot()
+
+    def clear_signature_field_selection(self) -> None:
+        """Return to creating a new signature field at an editable placement."""
+        self.signature_field_name = None
+        self._invalidate_preview_snapshot()
 
     def update_signature_rect(
         self,
@@ -231,6 +268,10 @@ class SigningDraftWorkflow:
         height_pt: float | None = None,
     ) -> SignatureRect:
         """Apply numeric fine-tuning to the current signature rectangle."""
+        if self.signature_field_name is not None:
+            raise ValueError(
+                "An existing signature field is selected; its page and geometry are fixed."
+            )
         if self.signature_rect is None and (
             page_index is None
             or left_pt is None
@@ -371,6 +412,16 @@ class SigningDraftWorkflow:
         certificate_configuration_id: str | None,
     ) -> None:
         """Apply draft-facing signature preset values without requiring a schema DTO."""
+        if self.signature_field_name is not None and placement_defaults is not None:
+            current_rect = self.signature_rect
+            if current_rect is not None and (
+                placement_defaults.width_pt != current_rect.width_pt
+                or placement_defaults.height_pt != current_rect.height_pt
+            ):
+                raise ValueError(
+                    "The selected placement profile does not match the existing field. "
+                    "Use the field geometry, adjust the profile, or place manually."
+                )
         self.signature_appearance = appearance
         self._invalidate_preview_snapshot()
         self.signature_placement_defaults = placement_defaults
@@ -495,6 +546,7 @@ class SigningDraftWorkflow:
             trust_policy=self.trust_policy,
             certificate_alias=self.certificate_alias,
             signature_rect=self.signature_rect,
+            signature_field_name=self.signature_field_name,
             signature_appearance=self.signature_appearance,
             signing_time=(
                 self._preview_signing_time

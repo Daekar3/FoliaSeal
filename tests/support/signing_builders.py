@@ -436,6 +436,7 @@ def build_signing_request(
     certificate_alias: str | None = "signing-cert",
     signature_rect: SignatureRect | None = None,
     signature_appearance: SignatureAppearance | None = None,
+    signature_field_name: str | None = None,
 ) -> SigningRequest:
     """Build a signing request using stable defaults for unit tests."""
     return SigningRequest(
@@ -449,6 +450,7 @@ def build_signing_request(
         certificate_alias=certificate_alias,
         signature_rect=signature_rect or build_signature_rect(),
         signature_appearance=signature_appearance or build_signature_appearance(),
+        signature_field_name=signature_field_name,
     )
 
 

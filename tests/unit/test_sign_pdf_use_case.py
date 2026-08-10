@@ -181,6 +181,35 @@ def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
     )
 
 
+def test_sign_use_case_preserves_existing_signature_field_target(tmp_path: Path) -> None:
+    request = replace(
+        build_signing_request(
+            tmp_path,
+            signature_appearance=build_signature_appearance(),
+        ),
+        signature_field_name="Approval",
+    )
+    output = SigningOutput(
+        output_bytes=b"signed-pdf",
+        output_pdf_version="1.7",
+        signature_subfilter="adbe.pkcs7.detached",
+        timestamp_present=True,
+    )
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(output=output),
+        verifier=StubVerifier(
+            summary=VerificationSummary(signature_count=1, timestamp_present=True)
+        ),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is True
+    assert use_case.signer.last_request.signature_field_name == "Approval"
+
+
 def test_sign_use_case_blocks_certification_restricted_inputs_before_signing(
     tmp_path: Path,
 ) -> None:

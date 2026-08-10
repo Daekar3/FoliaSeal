@@ -477,6 +477,7 @@ class SigningRequest:
     certificate_alias: str | None = None
     signature_rect: SignatureRect | None = None
     signature_appearance: SignatureAppearance | None = None
+    signature_field_name: str | None = None
     signing_time: datetime | None = None
     allow_source_overwrite: bool = False
 
@@ -494,6 +495,10 @@ class SigningRequest:
             self.certificate_alias,
             "certificate_alias",
         )
+        signature_field_name = _require_optional_non_empty_str(
+            self.signature_field_name,
+            "signature_field_name",
+        )
         object.__setattr__(self, "input_pdf_path", input_pdf_path)
         object.__setattr__(self, "output_pdf_path", output_pdf_path)
         object.__setattr__(self, "certificate_path", certificate_path)
@@ -501,6 +506,7 @@ class SigningRequest:
         object.__setattr__(self, "timestamp_required", timestamp_required)
         object.__setattr__(self, "trust_policy", trust_policy)
         object.__setattr__(self, "certificate_alias", certificate_alias)
+        object.__setattr__(self, "signature_field_name", signature_field_name)
         if trust_policy is not None and not isinstance(trust_policy, TimestampTrustPolicy):
             raise ValueError("trust_policy must be a TimestampTrustPolicy value.")
         if self.signature_rect is not None and not isinstance(self.signature_rect, SignatureRect):

@@ -27,7 +27,7 @@ from foliaseal.application.signing_material_resolver import (
     RepositoryBackedCertificateSigningMaterialPort,
 )
 from foliaseal.application.viewer_workflow import ViewerWorkflow
-from foliaseal.domain.models import SigningRequest
+from foliaseal.domain.models import SignatureRect, SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.app_settings_ui import (
     AppearanceMode,
@@ -1024,6 +1024,7 @@ class FoliaSealAppFrame:
             parent=self.window,
             state=workspace.session.document_review_state(),
             on_select=self._select_document_signature,
+            on_use_unsigned_field=self._use_unsigned_signature_field,
             on_close=self._close_document_signatures,
         )
         return self._document_signatures_dialog.show()
@@ -1035,6 +1036,46 @@ class FoliaSealAppFrame:
         state = workspace.session.select_document_review_item(signature_id)
         if self._document_signatures_dialog is not None:
             self._document_signatures_dialog.refresh(state)
+        workspace.session.focus()
+
+    def _use_unsigned_signature_field(self, field_name: str) -> None:
+        """Target a visible unsigned field from the modeless review surface."""
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return
+        item = next(
+            (
+                candidate
+                for candidate in workspace.session.document_review_state()
+                .review.review_summary.signature_items
+                if candidate.kind == "unsigned_field" and candidate.field_name == field_name
+            ),
+            None,
+        )
+        if item is None or item.page_index is None or item.highlight_rect is None:
+            self._emit_error(
+                f"Field '{field_name}' has no visible page geometry; use Place manually."
+            )
+            return
+        rect = item.highlight_rect
+        try:
+            workspace.session.select_signature_field(
+                field_name,
+                SignatureRect(
+                    page_index=item.page_index,
+                    left_pt=rect.x1,
+                    bottom_pt=rect.y1,
+                    width_pt=rect.x2 - rect.x1,
+                    height_pt=rect.y2 - rect.y1,
+                ),
+            )
+        except (ValueError, AttributeError) as exc:
+            self._emit_error(str(exc))
+            return
+        self._show_information(
+            f"Using existing field '{field_name}'. Its page and geometry are fixed."
+        )
+        self._close_document_signatures()
         workspace.session.focus()
 
     def _close_document_signatures(self) -> None:
