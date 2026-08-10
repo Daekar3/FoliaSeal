@@ -377,6 +377,15 @@ class SigningWorkspaceWidget:
     def refresh_document_review(self) -> DocumentReviewSummary:
         return self._runtime.refresh_document_review()
 
+    def document_review_state(self) -> Any:
+        return self._runtime.document_review_state()
+
+    def select_document_review_item(self, signature_id: str) -> Any:
+        return self._runtime.select_document_review_item(signature_id)
+
+    def clear_document_review_highlight(self) -> None:
+        self._runtime.clear_document_review_highlight()
+
     def search_document_text(self) -> DocumentTextSearchState:
         return self._runtime.search_document_text()
 

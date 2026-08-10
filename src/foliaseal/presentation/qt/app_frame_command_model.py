@@ -21,6 +21,7 @@ class AppFrameCommandId(StrEnum):
     FIT_PAGE = "view.fit_page"
     FIT_WIDTH = "view.fit_width"
     FIND = "view.find"
+    DOCUMENT_SIGNATURES = "view.document_signatures"
     APPLICATION_SETTINGS = "settings.application"
     MANAGE_REUSABLE_OBJECTS = "settings.manage_reusable_objects"
     CREATE_CERTIFICATE = "settings.create_certificate"
@@ -144,6 +145,14 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="Ctrl+F",
         accessible_name="Find text in the current PDF",
         mnemonic_text="&Find",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.DOCUMENT_SIGNATURES,
+        menu="View",
+        text="Document Signatures",
+        shortcut=None,
+        accessible_name="Review document signatures",
+        mnemonic_text="Document &Signatures",
     ),
 )
 

@@ -46,6 +46,14 @@ class SigningWorkspaceReviewBridge:
         state = self._document_review_workspace.select_review_signature(index)
         self.apply_state(state)
 
+    def select_review_item(self, signature_id: str) -> None:
+        self.apply_transition(self._document_review_workspace.select_review_item(signature_id))
+
+    def clear_review_highlight(self) -> None:
+        clearer = getattr(self._viewer_widget, "clear_review_highlight_overlay", None)
+        if callable(clearer):
+            clearer()
+
     def apply_transition(self, transition: DocumentReviewWorkspaceTransition) -> None:
         self.apply_state(transition.state)
         self._apply_effects(transition.effects)
@@ -77,6 +85,20 @@ class SigningWorkspaceReviewBridge:
                     page_index=effects.search_highlight_page_index,
                     current_highlight_rects=effects.search_highlight_rects,
                     secondary_highlight_rects=effects.search_secondary_highlight_rects,
+                )
+        if effects.clear_review_highlight:
+            clearer = getattr(self._viewer_widget, "clear_review_highlight_overlay", None)
+            if callable(clearer):
+                clearer()
+        elif (
+            effects.review_highlight_page_index is not None
+            and effects.review_highlight_rect is not None
+        ):
+            setter = getattr(self._viewer_widget, "set_review_highlight_overlay", None)
+            if callable(setter):
+                setter(
+                    page_index=effects.review_highlight_page_index,
+                    highlight_rect=effects.review_highlight_rect,
                 )
         if effects.jump_to_page_index is None:
             return

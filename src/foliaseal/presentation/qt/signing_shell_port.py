@@ -11,6 +11,7 @@ from foliaseal.application import SigningDraftWorkflow
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import DocumentReviewSummary
+from foliaseal.application.document_review_workspace import DocumentReviewWorkspaceState
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
@@ -94,6 +95,9 @@ class SigningWorkspaceSessionPort(Protocol):
 
     def refresh_viewer(self) -> None: ...
     def refresh_document_review(self) -> DocumentReviewSummary: ...
+    def document_review_state(self) -> DocumentReviewWorkspaceState: ...
+    def select_document_review_item(self, signature_id: str) -> DocumentReviewWorkspaceState: ...
+    def clear_document_review_highlight(self) -> None: ...
 
     def set_signature_rect(
         self,
@@ -225,6 +229,23 @@ class QtSigningWorkspaceSessionPort:
 
     def refresh_document_review(self) -> DocumentReviewSummary:
         return self.shell_widget.refresh_document_review()
+
+    def document_review_state(self) -> DocumentReviewWorkspaceState:
+        getter = getattr(self.shell_widget, "document_review_state", None)
+        if not callable(getter):
+            raise RuntimeError("The active shell does not expose document review state.")
+        return getter()
+
+    def select_document_review_item(self, signature_id: str) -> DocumentReviewWorkspaceState:
+        selector = getattr(self.shell_widget, "select_document_review_item", None)
+        if not callable(selector):
+            raise RuntimeError("The active shell does not expose document review selection.")
+        return selector(signature_id)
+
+    def clear_document_review_highlight(self) -> None:
+        clearer = getattr(self.shell_widget, "clear_document_review_highlight", None)
+        if callable(clearer):
+            clearer()
 
     def set_signature_rect(
         self,

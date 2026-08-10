@@ -301,6 +301,26 @@ def test_search_highlights_keep_current_and_quiet_rectangles_independent(monkeyp
     assert preview._current_text_search_secondary_qrects() == ()
 
 
+def test_review_highlight_overlay_is_independent_and_clears(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    preview.attach_scroll_container(_FakeScrollArea())
+    preview.refresh()
+    rect = PdfRect(x1=20.0, y1=25.0, x2=80.0, y2=65.0)
+
+    preview.set_review_highlight_overlay(page_index=0, highlight_rect=rect)
+
+    assert preview._current_review_highlight_qrect() is not None
+    assert preview._current_text_highlight_qrects() == ()
+    preview.clear_review_highlight_overlay()
+    assert preview._current_review_highlight_qrect() is None
+
+
 def test_wheel_without_scroll_container_cannot_change_page(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
     workflow = ViewerWorkflow(

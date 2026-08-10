@@ -1,9 +1,29 @@
+from datetime import UTC
+
+from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
     DocumentSignatureReviewItem,
     PyHankoDocumentReviewInspector,
+    _signature_integrity_status,
     summarize_document_review,
 )
 from foliaseal.infra.certification import CertificationPolicyResult
+
+
+def test_document_review_integrity_status_distinguishes_required_states() -> None:
+    class _Status:
+        intact = True
+        valid = True
+        docmdp_ok = True
+        modification_level = type("_ModificationLevel", (), {"name": "FORM_FILLING"})()
+
+    class _InvalidStatus:
+        intact = False
+        valid = False
+
+    assert _signature_integrity_status(_Status(), True) == "changed_after_signature"
+    assert _signature_integrity_status(_InvalidStatus(), False) == "invalid"
+    assert _signature_integrity_status(None, None) == "could_not_verify"
 
 
 def test_summarize_document_review_for_unsigned_pdf() -> None:
@@ -153,6 +173,120 @@ def test_document_review_inspector_reports_signed_restricted_pdf(monkeypatch, tm
         in summary.signature_items[0].drill_in_detail
     )
     assert "Recommended next step:" not in summary.signature_items[0].drill_in_detail
+
+
+def test_document_review_projects_signed_and_unsigned_fields_with_geometry_and_times(
+    monkeypatch, tmp_path
+) -> None:
+    from datetime import datetime
+
+    pdf_path = tmp_path / "review-fields.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+
+    class _Ref:
+        def __init__(self, value: int) -> None:
+            self.reference = value
+
+        def get_object(self):
+            return self
+
+    class _Annotation(dict):
+        def raw_get(self, key):
+            return self[key]
+
+    class _FieldRef:
+        def __init__(self, annotation) -> None:
+            self.annotation = annotation
+
+        def get_object(self):
+            return self.annotation
+
+    page_refs = {_Ref(0).reference: _Ref(0), _Ref(1).reference: _Ref(1)}
+    visible_annotation = _Annotation({"/Rect": (10, 20, 110, 70), "/P": _Ref(1)})
+    empty_annotation = _Annotation({"/Rect": (15, 25, 115, 75), "/P": _Ref(0)})
+    visible_field = _FieldRef(visible_annotation)
+    empty_field = _FieldRef(empty_annotation)
+
+    class _Subject:
+        human_friendly = "CN=Alice Example"
+
+    class _SignerCert:
+        subject = _Subject()
+
+    class _TimestampStatus:
+        valid = True
+        intact = True
+        trusted = True
+        timestamp = datetime(2026, 8, 10, 12, 30, tzinfo=UTC)
+
+    class _Status:
+        intact = True
+        valid = True
+        timestamp_validity = _TimestampStatus()
+
+    class _Signature:
+        fq_name = "Approval"
+        signer_cert = _SignerCert()
+        self_reported_timestamp = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
+        sig_field = visible_field
+
+    class _Reader:
+        embedded_signatures = [_Signature()]
+        root = {"/Pages": {"/Count": 2}}
+
+        def __init__(self, _handle) -> None:
+            pass
+
+        def find_page_for_modification(self, page_index):
+            return page_refs[page_index], None
+
+    monkeypatch.setattr("foliaseal.application.document_review.PdfFileReader", _Reader)
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.inspect_pdf_certification_reader",
+        lambda _reader: CertificationPolicyResult(
+            docmdp_permission=None,
+            certification_restricted=False,
+            restriction_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.enumerate_sig_fields",
+        lambda _reader, filled_status=None: iter(
+            (
+                ("Approval", object(), visible_field),
+                ("Blank", None, empty_field),
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.get_single_field_annot",
+        lambda field: field,
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.validation.validate_pdf_signature",
+        lambda signature, signer_validation_context: _Status(),
+    )
+    monkeypatch.setattr(
+        "foliaseal.application.document_review.ValidationContext",
+        lambda trust_roots: object(),
+    )
+
+    summary = PyHankoDocumentReviewInspector().inspect(str(pdf_path))
+
+    assert summary.signature_count == 1
+    assert [item.kind for item in summary.signature_items] == [
+        "signed_visible",
+        "unsigned_field",
+    ]
+    signed_item = summary.signature_items[0]
+    assert signed_item.signature_id == "Approval:signed"
+    assert signed_item.page_index == 1
+    assert signed_item.highlight_rect == PdfRect(10, 20, 110, 70)
+    assert signed_item.claimed_signing_time == "2026-08-10 12:00:00+00:00"
+    assert signed_item.trusted_timestamp == "2026-08-10 12:30:00+00:00"
+    assert "Claimed signing time" in signed_item.drill_in_detail
+    assert summary.signature_items[1].signature_id == "Blank:unsigned"
+    assert summary.signature_items[1].page_index == 0
 
 
 def test_summarize_document_review_next_action_guidance_for_not_evaluated_signature() -> None:

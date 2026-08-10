@@ -61,6 +61,7 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     WorkspaceOpenPort,
     WorkspaceOpenService,
 )
+from foliaseal.presentation.qt.document_signatures_dialog import DocumentSignaturesDialog
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
 )
@@ -111,6 +112,11 @@ class QtAppFrameBindings:
     q_color: type[Any] | None = None
     q_local_server: type[Any] | None = None
     q_local_socket: type[Any] | None = None
+    q_widget: type[Any] | None = None
+    q_hbox_layout: type[Any] | None = None
+    q_vbox_layout: type[Any] | None = None
+    q_list_widget: type[Any] | None = None
+    q_text_edit: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -356,9 +362,12 @@ class FoliaSealAppFrame:
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
         self._find_action: Any | None = None
+        self._document_signatures_action: Any | None = None
         self._placeholder_open_button: Any | None = None
         self._placeholder_library_button: Any | None = None
         self._reusable_object_library: Any | None = None
+        self._document_signatures_dialog: DocumentSignaturesDialog | None = None
+        self._closing_document_signatures = False
         self._workspace_action_state = workspace_action_state_closed()
 
         self.window = bindings.q_main_window()
@@ -456,6 +465,10 @@ class FoliaSealAppFrame:
     def reusable_object_library_dialog(self) -> Any | None:
         return self._dialog_compatibility.reusable_object_library_dialog
 
+    @property
+    def document_signatures_dialog(self) -> DocumentSignaturesDialog | None:
+        return self._document_signatures_dialog
+
     def choose_open_pdf(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
             self.window,
@@ -483,6 +496,7 @@ class FoliaSealAppFrame:
         if not self._confirm_discard_if_dirty(action="open"):
             candidate.view.dispose()
             return None
+        self._close_document_signatures()
         try:
             handle = self._workspace_host.replace_prepared(candidate)
         except Exception as exc:
@@ -498,6 +512,7 @@ class FoliaSealAppFrame:
 
         if not self._confirm_discard_if_dirty():
             return False
+        self._close_document_signatures()
         self._workspace_host.close()
         self._set_placeholder()
         return True
@@ -680,6 +695,7 @@ class FoliaSealAppFrame:
     def _handle_window_close_event(self, event: Any) -> None:
         """Route native main-window close through the same draft policy as File > Close."""
         if self._confirm_discard_if_dirty(action="close"):
+            self._close_document_signatures()
             self._workspace_host.close()
             accept = getattr(event, "accept", None)
             if callable(accept):
@@ -760,6 +776,56 @@ class FoliaSealAppFrame:
         self._reusable_object_library = dialog
         dialog.show()
         return dialog
+
+    def show_document_signatures(self) -> Any | None:
+        """Open or refresh the one modeless Document Signatures surface."""
+
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return None
+        if self._document_signatures_dialog is not None:
+            self._document_signatures_dialog.refresh(workspace.session.document_review_state())
+            return self._document_signatures_dialog.show()
+        self._document_signatures_dialog = DocumentSignaturesDialog(
+            bindings=self._bindings,
+            parent=self.window,
+            state=workspace.session.document_review_state(),
+            on_select=self._select_document_signature,
+            on_close=self._close_document_signatures,
+        )
+        return self._document_signatures_dialog.show()
+
+    def _select_document_signature(self, signature_id: str) -> None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return
+        state = workspace.session.select_document_review_item(signature_id)
+        if self._document_signatures_dialog is not None:
+            self._document_signatures_dialog.refresh(state)
+        workspace.session.focus()
+
+    def _close_document_signatures(self) -> None:
+        if self._closing_document_signatures:
+            return
+        self._closing_document_signatures = True
+        dialog = self._document_signatures_dialog
+        self._document_signatures_dialog = None
+        try:
+            workspace = self._workspace_host.active()
+            if workspace is not None:
+                clear_highlight = getattr(
+                    workspace.session,
+                    "clear_document_review_highlight",
+                    None,
+                )
+                if callable(clear_highlight):
+                    clear_highlight()
+            if dialog is not None:
+                close = getattr(dialog.controls.dialog, "close", None)
+                if callable(close):
+                    close()
+        finally:
+            self._closing_document_signatures = False
 
     def _open_reusable_object_editor(self) -> bool:
         workspace = self._workspace_host.active()
@@ -844,6 +910,12 @@ class FoliaSealAppFrame:
             view_menu,
             AppFrameCommandId.FIND,
             self._focus_document_search,
+            enabled=False,
+        )
+        self._document_signatures_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.DOCUMENT_SIGNATURES,
+            self.show_document_signatures,
             enabled=False,
         )
         settings_menu = menu_bar.addMenu("Settings")
@@ -957,6 +1029,7 @@ class FoliaSealAppFrame:
     def _exit_application(self) -> Any | None:
         if not self._confirm_discard_if_dirty(action="exit"):
             return None
+        self._close_document_signatures()
         self._workspace_host.close()
         quit_application = getattr(self._bindings.q_application, "quit", None)
         if callable(quit_application):
@@ -981,6 +1054,7 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._fit_page_action, state.workspace_open)
         self._set_action_enabled(self._fit_width_action, state.workspace_open)
         self._set_action_enabled(self._find_action, state.workspace_open)
+        self._set_action_enabled(self._document_signatures_action, state.workspace_open)
 
     @staticmethod
     def _set_action_enabled(action: Any | None, enabled: bool) -> None:
@@ -1478,6 +1552,11 @@ class QtAppFrameAdapter:
             q_color=getattr(qt_gui, "QColor"),
             q_local_server=getattr(qt_network, "QLocalServer"),
             q_local_socket=getattr(qt_network, "QLocalSocket"),
+            q_widget=getattr(qt_widgets, "QWidget"),
+            q_hbox_layout=getattr(qt_widgets, "QHBoxLayout"),
+            q_vbox_layout=getattr(qt_widgets, "QVBoxLayout"),
+            q_list_widget=getattr(qt_widgets, "QListWidget"),
+            q_text_edit=getattr(qt_widgets, "QTextEdit"),
         )
 
 

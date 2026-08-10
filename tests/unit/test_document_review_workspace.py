@@ -167,6 +167,63 @@ def test_workspace_search_emits_page_jump_for_current_match() -> None:
     )
 
 
+def test_workspace_review_item_emits_independent_jump_and_highlight_effect() -> None:
+    item = DocumentSignatureReviewItem(
+        label="Signature 1",
+        signer_subject="CN=Alice Example",
+        cryptographic_validation_passed=True,
+        detail="CN=Alice Example: verified locally.",
+        signature_id="Approval:signed",
+        kind="signed_visible",
+        field_name="Approval",
+        page_index=2,
+        highlight_rect=PdfRect(x1=12, y1=24, x2=112, y2=74),
+    )
+    session = _session(
+        summary=DocumentReviewSummary(
+            headline="Signature review",
+            detail="Found 1 embedded signature.",
+            signature_count=1,
+            signature_items=(item,),
+        )
+    )
+
+    session.load()
+    transition = session.select_review_item("Approval:signed")
+
+    assert transition.effects.jump_to_page_index == 2
+    assert transition.effects.review_highlight_page_index == 2
+    assert transition.effects.review_highlight_rect == item.highlight_rect
+    assert transition.effects.clear_highlights is False
+    assert transition.state.review.selected_signature_id == "Approval:signed"
+
+
+def test_workspace_review_item_without_geometry_clears_only_review_highlight() -> None:
+    item = DocumentSignatureReviewItem(
+        label="Signature 1",
+        signer_subject=None,
+        cryptographic_validation_passed=None,
+        detail="Signer unavailable.",
+        signature_id="Approval:signed",
+        kind="signed_invisible",
+    )
+    session = _session(
+        summary=DocumentReviewSummary(
+            headline="Signature review",
+            detail="Found 1 embedded signature.",
+            signature_count=1,
+            signature_items=(item,),
+        )
+    )
+
+    session.load()
+    transition = session.select_review_item("Approval:signed")
+
+    assert transition.effects.jump_to_page_index is None
+    assert transition.effects.review_highlight_rect is None
+    assert transition.effects.clear_review_highlight is True
+
+
 def test_workspace_search_emits_current_and_quiet_same_page_highlights() -> None:
     matches = (
         DocumentTextMatch(

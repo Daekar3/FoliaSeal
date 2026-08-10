@@ -37,6 +37,9 @@ class DocumentReviewWorkspaceViewerEffects:
     search_highlight_rects: tuple[PdfRect, ...] = ()
     search_secondary_highlight_rects: tuple[PdfRect, ...] = ()
     clear_search_highlights: bool = False
+    review_highlight_page_index: int | None = None
+    review_highlight_rect: PdfRect | None = None
+    clear_review_highlight: bool = False
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,7 @@ class DocumentReviewCardState:
     selected_signature_label: str | None
     selected_signature_detail: str
     selector_enabled: bool
+    selected_signature_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -103,6 +107,7 @@ class DocumentReviewWorkspaceSession:
             signature_count=None,
         )
         self._selected_review_signature_label: str | None = None
+        self._selected_review_signature_id: str | None = None
         self._text_search_state = self._document_text_search_session.current_state()
         self._text_selection_state = self._document_text_selection_session.clear()
         self._text_selection_mode_enabled = False
@@ -125,9 +130,44 @@ class DocumentReviewWorkspaceSession:
         signature_items = self._review_summary.signature_items
         if index < 0 or index >= len(signature_items):
             self._selected_review_signature_label = None
+            self._selected_review_signature_id = None
             return self._build_state()
-        self._selected_review_signature_label = signature_items[index].label
+        item = signature_items[index]
+        self._selected_review_signature_label = item.label
+        self._selected_review_signature_id = item.signature_id or item.label
         return self._build_state()
+
+    def select_review_item(self, signature_id: str) -> DocumentReviewWorkspaceTransition:
+        """Select a stable review item and return an optional page/highlight effect."""
+
+        item = next(
+            (
+                candidate
+                for candidate in self._review_summary.signature_items
+                if (candidate.signature_id or candidate.label) == signature_id
+            ),
+            None,
+        )
+        if item is None:
+            self._selected_review_signature_label = None
+            self._selected_review_signature_id = None
+            return DocumentReviewWorkspaceTransition(
+                state=self._build_state(),
+                effects=DocumentReviewWorkspaceViewerEffects(clear_review_highlight=True),
+            )
+        self._selected_review_signature_label = item.label
+        self._selected_review_signature_id = item.signature_id or item.label
+        effects = DocumentReviewWorkspaceViewerEffects(clear_review_highlight=True)
+        if item.page_index is not None and item.highlight_rect is not None:
+            effects = DocumentReviewWorkspaceViewerEffects(
+                jump_to_page_index=item.page_index,
+                review_highlight_page_index=item.page_index,
+                review_highlight_rect=item.highlight_rect,
+            )
+        return DocumentReviewWorkspaceTransition(
+            state=self._build_state(),
+            effects=effects,
+        )
 
     def search_text(self, query: str) -> DocumentReviewWorkspaceTransition:
         self._text_search_state = self._document_text_search_session.search(query)
@@ -252,9 +292,10 @@ class DocumentReviewWorkspaceSession:
                 review_summary=self._review_summary,
                 signature_labels=review_signature_labels,
                 selected_signature_index=selected_index,
-                selected_signature_label=selected_label,
-                selected_signature_detail=selected_detail,
-                selector_enabled=review_selector_enabled,
+            selected_signature_label=selected_label,
+            selected_signature_detail=selected_detail,
+            selector_enabled=review_selector_enabled,
+            selected_signature_id=self._selected_review_signature_id,
             ),
             document_text=DocumentTextWorkspaceState(
                 search_state=self._text_search_state,
@@ -272,6 +313,7 @@ class DocumentReviewWorkspaceSession:
     ) -> tuple[int | None, str | None, str, bool, tuple[str, ...]]:
         if not signature_items:
             self._selected_review_signature_label = None
+            self._selected_review_signature_id = None
             return None, None, "", False, ()
         review_signature_labels = tuple(item.label for item in signature_items)
         selected_label = self._selected_review_signature_label
@@ -279,12 +321,20 @@ class DocumentReviewWorkspaceSession:
             (
                 index
                 for index, item in enumerate(signature_items)
-                if item.label == selected_label
+                if (item.signature_id or item.label) == self._selected_review_signature_id
             ),
-            len(signature_items) - 1,
+            next(
+                (
+                    index
+                    for index, item in enumerate(signature_items)
+                    if item.label == selected_label
+                ),
+                len(signature_items) - 1,
+            ),
         )
         selected_item = signature_items[selected_index]
         self._selected_review_signature_label = selected_item.label
+        self._selected_review_signature_id = selected_item.signature_id or selected_item.label
         return (
             selected_index,
             selected_item.label,

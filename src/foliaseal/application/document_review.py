@@ -3,14 +3,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
+from pyhanko.pdf_utils.form_tools import get_single_field_annot
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.sign import validation
+from pyhanko.sign.fields import enumerate_sig_fields
 from pyhanko_certvalidator import ValidationContext
 
+from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.infra.certification import inspect_pdf_certification_reader
+
+DocumentSignatureKind = Literal["signed_visible", "signed_invisible", "unsigned_field"]
+DocumentSignatureIntegrityStatus = Literal[
+    "valid",
+    "changed_after_signature",
+    "invalid",
+    "could_not_verify",
+    "unsigned",
+]
 
 
 @dataclass(frozen=True)
@@ -38,6 +51,14 @@ class DocumentSignatureReviewItem:
     cryptographic_validation_passed: bool | None
     detail: str
     drill_in_detail: str = ""
+    signature_id: str = ""
+    kind: DocumentSignatureKind = "signed_visible"
+    field_name: str | None = None
+    page_index: int | None = None
+    highlight_rect: PdfRect | None = None
+    claimed_signing_time: str | None = None
+    trusted_timestamp: str | None = None
+    integrity_status: DocumentSignatureIntegrityStatus = "could_not_verify"
 
 
 class DocumentReviewInspector(Protocol):
@@ -156,29 +177,45 @@ class PyHankoDocumentReviewInspector:
                 reader = PdfFileReader(handle)
                 embedded_signatures = list(reader.embedded_signatures)
                 certification = inspect_pdf_certification_reader(reader)
+                signature_items = _build_signature_review_items(
+                    reader,
+                    embedded_signatures,
+                    docmdp_permission=certification.docmdp_permission,
+                    certification_restricted=certification.certification_restricted,
+                    restriction_reason=certification.restriction_reason,
+                )
                 if not embedded_signatures:
                     return summarize_document_review(
                         signature_count=0,
-                        signature_items=(),
+                        signature_items=signature_items,
                         docmdp_permission=certification.docmdp_permission,
                         certification_restricted=certification.certification_restricted,
                         restriction_reason=certification.restriction_reason,
                     )
 
-                signature_items = tuple(
-                    _signature_review_item(
-                        signature,
-                        index=index,
-                        latest_index=len(embedded_signatures) - 1,
-                        docmdp_permission=certification.docmdp_permission,
-                        certification_restricted=certification.certification_restricted,
-                        restriction_reason=certification.restriction_reason,
-                    )
-                    for index, signature in enumerate(embedded_signatures)
-                )
                 signature = embedded_signatures[-1]
                 signer_subject = _signer_subject(signature)
-                cryptographic_validation_passed = _verify_signature_locally(signature)
+                latest_name = str(getattr(signature, "fq_name", ""))
+                latest_item = next(
+                    (
+                        item
+                        for item in signature_items
+                        if item.field_name == latest_name
+                    ),
+                    None,
+                )
+                if latest_item is None:
+                    signed_items = tuple(
+                        item
+                        for item in signature_items
+                        if item.kind in {"signed_visible", "signed_invisible"}
+                    )
+                    latest_item = signed_items[-1] if signed_items else None
+                cryptographic_validation_passed = (
+                    latest_item.cryptographic_validation_passed
+                    if latest_item is not None
+                    else _verify_signature_locally(signature)
+                )
                 return summarize_document_review(
                     signature_count=len(embedded_signatures),
                     signature_items=signature_items,
@@ -195,6 +232,148 @@ class PyHankoDocumentReviewInspector:
             )
 
 
+def _build_signature_review_items(
+    reader: PdfFileReader,
+    embedded_signatures: list[object],
+    *,
+    docmdp_permission: str | None,
+    certification_restricted: bool,
+    restriction_reason: str | None,
+) -> tuple[DocumentSignatureReviewItem, ...]:
+    """Project filled and empty PDF signature fields into document-order items."""
+
+    by_field_name = {
+        str(getattr(signature, "fq_name", "")): signature
+        for signature in embedded_signatures
+        if str(getattr(signature, "fq_name", ""))
+    }
+    items: list[DocumentSignatureReviewItem] = []
+    seen_signed_names: set[str] = set()
+    try:
+        field_records = tuple(
+            enumerate_sig_fields(reader, filled_status=None)
+        )
+    except Exception:
+        field_records = ()
+
+    for field_name, field_value, field_ref in field_records:
+        name = str(field_name)
+        page_index, highlight_rect = _field_annotation_geometry(reader, field_ref)
+        signature = by_field_name.get(name)
+        if signature is not None:
+            seen_signed_names.add(name)
+            index = embedded_signatures.index(signature)
+            items.append(
+                _signature_review_item(
+                    signature,
+                    index=index,
+                    latest_index=len(embedded_signatures) - 1,
+                    docmdp_permission=docmdp_permission,
+                    certification_restricted=certification_restricted,
+                    restriction_reason=restriction_reason,
+                    signature_id=f"{name}:signed",
+                    field_name=name,
+                    page_index=page_index,
+                    highlight_rect=highlight_rect,
+                )
+            )
+        elif field_value is None:
+            items.append(
+                DocumentSignatureReviewItem(
+                    label=f"Unsigned field: {name}",
+                    signer_subject=None,
+                    cryptographic_validation_passed=None,
+                    detail="This signature field is available for an explicit new signature.",
+                    drill_in_detail=(
+                        f"Field: {name}.\n"
+                        "Status: unsigned signature field.\n"
+                        "Choose it explicitly when you are ready to place a new signature."
+                    ),
+                    signature_id=f"{name}:unsigned",
+                    kind="unsigned_field",
+                    field_name=name,
+                    page_index=page_index,
+                    highlight_rect=highlight_rect,
+                    integrity_status="unsigned",
+                )
+            )
+
+    for index, signature in enumerate(embedded_signatures):
+        field_name = str(getattr(signature, "fq_name", "")) or f"Signature {index + 1}"
+        if field_name in seen_signed_names:
+            continue
+        page_index, highlight_rect = _field_annotation_geometry(
+            reader,
+            getattr(signature, "sig_field", None),
+        )
+        items.append(
+            _signature_review_item(
+                signature,
+                index=index,
+                latest_index=len(embedded_signatures) - 1,
+                docmdp_permission=docmdp_permission,
+                certification_restricted=certification_restricted,
+                restriction_reason=restriction_reason,
+                signature_id=f"{field_name}:signed",
+                field_name=field_name,
+                page_index=page_index,
+                highlight_rect=highlight_rect,
+            )
+        )
+    return tuple(items)
+
+
+def _field_annotation_geometry(
+    reader: PdfFileReader,
+    field_ref: object,
+) -> tuple[int | None, PdfRect | None]:
+    """Read one signature annotation's page and PDF-space rectangle safely."""
+
+    if field_ref is None:
+        return None, None
+    field = getattr(field_ref, "get_object", lambda: field_ref)()
+    try:
+        annotation = get_single_field_annot(field)
+    except Exception:
+        annotation = field
+    rect = None
+    for key in ("/Rect",):
+        getter = getattr(annotation, "get", None)
+        if callable(getter):
+            rect = getter(key)
+        if rect is not None:
+            break
+    try:
+        values = tuple(float(value) for value in rect) if rect is not None else ()
+        if len(values) != 4:
+            return _annotation_page_index(reader, annotation), None
+        highlight_rect = PdfRect(
+            x1=values[0],
+            y1=values[1],
+            x2=values[2],
+            y2=values[3],
+        ).normalized()
+    except (TypeError, ValueError):
+        highlight_rect = None
+    return _annotation_page_index(reader, annotation), highlight_rect
+
+
+def _annotation_page_index(reader: PdfFileReader, annotation: object) -> int | None:
+    getter = getattr(annotation, "raw_get", None)
+    page_ref = getter("/P") if callable(getter) else getattr(annotation, "P", None)
+    if page_ref is None:
+        return None
+    try:
+        page_count = int(reader.root["/Pages"]["/Count"])
+        for page_index in range(page_count):
+            candidate_ref, _resources = reader.find_page_for_modification(page_index)
+            if getattr(candidate_ref, "reference", None) == getattr(page_ref, "reference", None):
+                return page_index
+    except Exception:
+        return None
+    return None
+
+
 def _signer_subject(signature: object) -> str | None:
     signer_cert = getattr(signature, "signer_cert", None)
     if signer_cert is None:
@@ -206,18 +385,75 @@ def _signer_subject(signature: object) -> str | None:
     return human_friendly if isinstance(human_friendly, str) else str(subject)
 
 
-def _verify_signature_locally(signature: object) -> bool | None:
+def _signature_validation_status(signature: object) -> object | None:
+    """Return PyHanko's status object without leaking it across the application boundary."""
+
     signer_cert = getattr(signature, "signer_cert", None)
     if signer_cert is None:
         return None
     try:
-        status = validation.validate_pdf_signature(
+        return validation.validate_pdf_signature(
             signature,
             signer_validation_context=ValidationContext(trust_roots=[signer_cert]),
         )
     except Exception:
-        return False
-    return bool(status.intact and status.valid)
+        return None
+
+
+def _signature_status_passed(status: object | None) -> bool | None:
+    if status is None:
+        return None
+    intact = getattr(status, "intact", None)
+    valid = getattr(status, "valid", None)
+    if intact is None or valid is None:
+        return None
+    return bool(intact and valid)
+
+
+def _signature_integrity_status(
+    status: object | None,
+    cryptographic_validation_passed: bool | None,
+) -> DocumentSignatureIntegrityStatus:
+    """Classify integrity separately from certificate trust and signer identity."""
+
+    if status is None or cryptographic_validation_passed is None:
+        return "could_not_verify"
+    if not cryptographic_validation_passed:
+        return "invalid"
+    try:
+        modification_level = getattr(status, "modification_level", None)
+    except Exception:
+        modification_level = None
+    if modification_level is not None:
+        level_name = getattr(modification_level, "name", str(modification_level))
+        if level_name != "NONE":
+            return "changed_after_signature"
+    return "valid"
+
+
+def _verify_signature_locally(signature: object) -> bool | None:
+    return _signature_status_passed(_signature_validation_status(signature))
+
+
+def _format_review_time(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat(sep=" ", timespec="seconds")
+    text = str(value).strip()
+    return text or None
+
+
+def _trusted_timestamp_from_status(status: object | None) -> str | None:
+    timestamp_status = getattr(status, "timestamp_validity", None)
+    if timestamp_status is None:
+        return None
+    if not all(
+        bool(getattr(timestamp_status, attribute, False))
+        for attribute in ("valid", "intact", "trusted")
+    ):
+        return None
+    return _format_review_time(getattr(timestamp_status, "timestamp", None))
 
 
 def _signature_review_item(
@@ -228,9 +464,22 @@ def _signature_review_item(
     docmdp_permission: str | None,
     certification_restricted: bool,
     restriction_reason: str | None,
+    signature_id: str | None = None,
+    field_name: str | None = None,
+    page_index: int | None = None,
+    highlight_rect: PdfRect | None = None,
 ) -> DocumentSignatureReviewItem:
     signer_subject = _signer_subject(signature)
-    cryptographic_validation_passed = _verify_signature_locally(signature)
+    validation_status = _signature_validation_status(signature)
+    cryptographic_validation_passed = _signature_status_passed(validation_status)
+    integrity_status = _signature_integrity_status(
+        validation_status,
+        cryptographic_validation_passed,
+    )
+    claimed_signing_time = _format_review_time(
+        getattr(signature, "self_reported_timestamp", None)
+    )
+    trusted_timestamp = _trusted_timestamp_from_status(validation_status)
     label = f"Signature {index + 1}"
     if index == latest_index:
         label = f"{label} (latest)"
@@ -244,19 +493,56 @@ def _signature_review_item(
         status_text = "needs local verification attention"
     else:
         status_text = "local verification not evaluated"
+    time_lines = []
+    if claimed_signing_time is not None:
+        time_lines.append(f"Claimed signing time: {claimed_signing_time}.")
+    else:
+        time_lines.append("Claimed signing time: not available.")
+    if trusted_timestamp is not None:
+        time_lines.append(f"Trusted timestamp: {trusted_timestamp}.")
+    else:
+        time_lines.append("Trusted timestamp: not available.")
+    drill_in_detail = _signature_drill_in_detail(
+        signer_subject=signer_subject,
+        cryptographic_validation_passed=cryptographic_validation_passed,
+        docmdp_permission=docmdp_permission,
+        certification_restricted=certification_restricted,
+        restriction_reason=restriction_reason,
+    )
+    integrity_lines = [f"Integrity status: {_integrity_status_label(integrity_status)}."]
+    if integrity_status == "changed_after_signature":
+        docmdp_text = "permitted by the document policy" if getattr(
+            validation_status, "docmdp_ok", None
+        ) else "not permitted by the document policy"
+        integrity_lines.append(f"Changes after signature: {docmdp_text}.")
+    drill_in_detail = "\n".join(
+        (*drill_in_detail.splitlines(), *integrity_lines, *time_lines)
+    )
     return DocumentSignatureReviewItem(
         label=label,
         signer_subject=signer_subject,
         cryptographic_validation_passed=cryptographic_validation_passed,
         detail=f"{subject_text}: {status_text}.",
-        drill_in_detail=_signature_drill_in_detail(
-            signer_subject=signer_subject,
-            cryptographic_validation_passed=cryptographic_validation_passed,
-            docmdp_permission=docmdp_permission,
-            certification_restricted=certification_restricted,
-            restriction_reason=restriction_reason,
-        ),
+        drill_in_detail=drill_in_detail,
+        signature_id=signature_id or label,
+        kind="signed_visible" if highlight_rect is not None else "signed_invisible",
+        field_name=field_name,
+        page_index=page_index,
+        highlight_rect=highlight_rect,
+        claimed_signing_time=claimed_signing_time,
+        trusted_timestamp=trusted_timestamp,
+        integrity_status=integrity_status,
     )
+
+
+def _integrity_status_label(status: DocumentSignatureIntegrityStatus) -> str:
+    return {
+        "valid": "valid",
+        "changed_after_signature": "changed after signature",
+        "invalid": "invalid",
+        "could_not_verify": "could not be verified locally",
+        "unsigned": "unsigned",
+    }[status]
 
 
 def _signature_drill_in_detail(

@@ -82,6 +82,8 @@ class PdfViewerWidgetAdapter:
                 self._text_search_highlight_page_index: int | None = None
                 self._text_search_highlight_rects: tuple[PdfRect, ...] = ()
                 self._text_search_secondary_highlight_rects: tuple[PdfRect, ...] = ()
+                self._review_highlight_page_index: int | None = None
+                self._review_highlight_rect: PdfRect | None = None
                 self._initial_fit_pending = True
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
@@ -138,6 +140,10 @@ class PdfViewerWidgetAdapter:
                             )
                             painter.setPen(bindings.q_pen(bindings.q_color(180, 83, 9), 2))
                             painter.drawRect(highlight_rect.normalized())
+                        review_rect = self._current_review_highlight_qrect()
+                        if review_rect is not None:
+                            painter.setPen(bindings.q_pen(bindings.q_color(124, 58, 237), 3))
+                            painter.drawRect(review_rect.normalized())
 
                     if self._selection_rect is not None:
                         if self._interaction_mode == "text" and callable(fill_rect):
@@ -451,6 +457,21 @@ class PdfViewerWidgetAdapter:
                 self._text_search_secondary_highlight_rects = ()
                 self.update()
 
+            def set_review_highlight_overlay(
+                self,
+                *,
+                page_index: int,
+                highlight_rect: PdfRect,
+            ) -> None:
+                self._review_highlight_page_index = page_index
+                self._review_highlight_rect = highlight_rect
+                self.update()
+
+            def clear_review_highlight_overlay(self) -> None:
+                self._review_highlight_page_index = None
+                self._review_highlight_rect = None
+                self.update()
+
             def set_interaction_mode(self, mode: str) -> None:
                 if mode not in {"signature", "text"}:
                     raise ValueError(f"Unsupported viewer interaction mode: {mode}")
@@ -680,6 +701,27 @@ class PdfViewerWidgetAdapter:
 
             def _current_text_search_secondary_qrects(self) -> tuple[Any, ...]:
                 return self._project_text_search_rects(self._text_search_secondary_highlight_rects)
+
+            def _current_review_highlight_qrect(self) -> Any | None:
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None or self._review_highlight_rect is None:
+                    return None
+                if self._review_highlight_page_index != snapshot.page_index:
+                    return None
+                view_rect = pdf_rect_to_view_rect(
+                    pdf_rect=self._review_highlight_rect,
+                    transform=ViewTransform(
+                        zoom=snapshot.zoom,
+                        pan_x=snapshot.pan_x,
+                        pan_y=snapshot.pan_y,
+                    ),
+                    page_box=snapshot.page_box,
+                    rotation=snapshot.rotation,
+                )
+                return bindings.q_rect(
+                    bindings.q_point(int(view_rect.x1), int(view_rect.y1)),
+                    bindings.q_point(int(view_rect.x2), int(view_rect.y2)),
+                )
 
             def _project_text_search_rects(
                 self,
@@ -999,6 +1041,20 @@ def build_qt_pdf_viewer_widget(
 
         def clear_text_search_highlight_overlay(self) -> None:
             preview_widget.clear_text_search_highlight_overlay()
+
+        def set_review_highlight_overlay(
+            self,
+            *,
+            page_index: int,
+            highlight_rect: PdfRect,
+        ) -> None:
+            preview_widget.set_review_highlight_overlay(
+                page_index=page_index,
+                highlight_rect=highlight_rect,
+            )
+
+        def clear_review_highlight_overlay(self) -> None:
+            preview_widget.clear_review_highlight_overlay()
 
         def set_interaction_mode(self, mode: str) -> None:
             preview_widget.set_interaction_mode(mode)
