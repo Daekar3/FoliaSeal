@@ -293,6 +293,18 @@ class SigningWorkspaceWidget:
         """Close the mounted Qt container and release shell-owned resources."""
         return self._shell_controller.close()
 
+    def has_unsaved_changes(self) -> bool:
+        """Expose the draft's typed dirty projection to the frame lifecycle."""
+        return self._draft_workflow.has_unsaved_changes
+
+    def discard_draft(self) -> None:
+        """Clear the draft and session credentials before lifecycle disposal."""
+        self._draft_workflow.discard_draft()
+
+    def clear_session_secrets(self) -> None:
+        """Clear credentials retained for this mounted signing session."""
+        self._draft_workflow.clear_session_secrets()
+
     def setFocus(self) -> Any:  # noqa: N802
         """Focus the mounted Qt container for harness/session interactions."""
         focus = getattr(self.widget, "setFocus", None)

@@ -75,7 +75,7 @@ class SigningActionCoordinator:
         return self._build_state()
 
     def accept_output_path(self, selected_path: str) -> SigningActionState:
-        self._workflow.output_pdf_path = selected_path
+        self._workflow.confirm_output_pdf_path(selected_path)
         self._clear_previous_signing_result()
         self._result_text = f"Output will be saved to: {selected_path}"
         self._result_kind = "neutral"
@@ -127,6 +127,8 @@ class SigningActionCoordinator:
 
         self._last_signing_result = result
         if result.success:
+            self._workflow.mark_clean()
+            self._workflow.clear_session_secrets()
             self._last_successful_output_path = request.output_pdf_path
             self._result_text = format_signing_completion_message(
                 result, request.output_pdf_path

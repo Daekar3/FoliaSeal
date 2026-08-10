@@ -49,6 +49,15 @@ class SigningWorkspaceBootstrap:
 class SigningWorkspacePort(Protocol):
     """Explicit caller-facing contract for an active signing workspace."""
 
+    def has_unsaved_changes(self) -> bool:
+        """Return whether user-authored signing values differ from the clean baseline."""
+
+    def discard_draft(self) -> None:
+        """Discard the in-memory draft before its workspace is disposed."""
+
+    def clear_session_secrets(self) -> None:
+        """Clear credentials retained only for the current signing session."""
+
     def choose_output_pdf_path(self) -> str | None:
         """Drive the shell's Save As behavior."""
 
@@ -155,6 +164,15 @@ class QtSigningWorkspacePort:
     """Port adapter over the concrete Qt signing shell widget."""
 
     shell_widget: Any
+
+    def has_unsaved_changes(self) -> bool:
+        return bool(self.shell_widget.has_unsaved_changes())
+
+    def discard_draft(self) -> None:
+        self.shell_widget.discard_draft()
+
+    def clear_session_secrets(self) -> None:
+        self.shell_widget.clear_session_secrets()
 
     def choose_output_pdf_path(self) -> str | None:
         return self.shell_widget.choose_output_pdf_path()

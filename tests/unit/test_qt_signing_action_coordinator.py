@@ -118,6 +118,7 @@ def test_signing_action_coordinator_accept_output_path_clears_previous_success(
     updated = coordinator.accept_output_path(str(tmp_path / "other.pdf"))
 
     assert workflow.output_pdf_path == str(tmp_path / "other.pdf")
+    assert workflow.output_path_confirmed is True
     assert updated.last_signing_result is None
     assert updated.result_text == f"Output will be saved to: {tmp_path / 'other.pdf'}"
     assert updated.can_open_signed_output is False
@@ -213,6 +214,8 @@ def test_signing_action_coordinator_success_tracks_signed_state(tmp_path: Path) 
     assert transition.state.stage_text == "Step 6 of 6 — Verify signed PDF"
     assert transition.state.can_open_signed_output is True
     assert transition.state.recommended_action == "open_signed_output"
+    assert workflow.has_unsaved_changes is False
+    assert workflow.passphrase == ""
     assert coordinator.open_signed_output() == workflow.output_pdf_path
 
 

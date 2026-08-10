@@ -209,6 +209,18 @@ class _FakeRect:
         return self._height
 
 
+class _FakeCloseEvent:
+    def __init__(self) -> None:
+        self.accepted = False
+        self.ignored = False
+
+    def accept(self) -> None:
+        self.accepted = True
+
+    def ignore(self) -> None:
+        self.ignored = True
+
+
 class _FakeLabel:
     def __init__(self, text="") -> None:
         self.text = text
@@ -393,15 +405,27 @@ class _FakeFileDialog:
 
 
 class _FakeMessageBox:
+    Discard = 1
+    Yes = Discard
+    Cancel = 2
+    No = Cancel
+    Save = 3
+
     def __init__(self) -> None:
         self.warning_calls = []
         self.information_calls = []
+        self.question_calls = []
+        self.next_question_result = self.No
 
     def warning(self, parent, title, text):
         self.warning_calls.append((parent, title, text))
 
     def information(self, parent, title, text):
         self.information_calls.append((parent, title, text))
+
+    def question(self, parent, title, text):
+        self.question_calls.append((parent, title, text))
+        return self.next_question_result
 
 
 class _FakeQPdfDocument:
@@ -466,6 +490,9 @@ class _FakeShell:
         self.current_page = 0
         self.page_count = 1
         self.status_callback = None
+        self.unsaved_changes = False
+        self.discard_draft_calls = 0
+        self.clear_session_secrets_calls = 0
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -486,6 +513,17 @@ class _FakeShell:
 
     def has_explicit_output_pdf_path(self):
         return self.explicit_output_pdf_path
+
+    def has_unsaved_changes(self):
+        return self.unsaved_changes
+
+    def discard_draft(self) -> None:
+        self.discard_draft_calls += 1
+        self.unsaved_changes = False
+        self.clear_session_secrets()
+
+    def clear_session_secrets(self) -> None:
+        self.clear_session_secrets_calls += 1
 
     def submit_sign_request(self):
         self.submit_sign_request_calls += 1
@@ -539,6 +577,15 @@ class _FakeShellPort:
 
     def has_explicit_output_pdf_path(self):
         return self.shell_widget.has_explicit_output_pdf_path()
+
+    def has_unsaved_changes(self):
+        return self.shell_widget.has_unsaved_changes()
+
+    def discard_draft(self) -> None:
+        self.shell_widget.discard_draft()
+
+    def clear_session_secrets(self) -> None:
+        self.shell_widget.clear_session_secrets()
 
     def apply_app_settings(self, settings) -> None:
         self.shell_widget.apply_app_settings(settings)
@@ -744,6 +791,14 @@ def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path
     assert shell.set_document_text_selection_mode_calls == [True]
     assert port.copy_selected_document_text() == "Alice Example"
     assert shell.copy_selected_document_text_calls == 1
+
+    shell.unsaved_changes = True
+    assert port.has_unsaved_changes() is True
+    port.clear_session_secrets()
+    assert shell.clear_session_secrets_calls == 1
+    port.discard_draft()
+    assert shell.discard_draft_calls == 1
+    assert port.has_unsaved_changes() is False
 
 
 def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(
@@ -1180,6 +1235,110 @@ def test_app_frame_file_lifecycle_routes_save_close_and_exit(tmp_path: Path) -> 
 
     exit_action.trigger()
     assert _FakeQApplication.quit_calls == 1
+
+
+def test_app_frame_dirty_lifecycle_requires_confirmation_and_routes_native_close(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    canceled_candidate = _FakeShell()
+    second = _FakeShell()
+    third = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_SequenceShellFactory(first, canceled_candidate, second, third),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    first.unsaved_changes = True
+    assert frame.open_pdf_path(tmp_path / "source" / "second.pdf") is None
+    assert frame.current_shell is first
+    assert first.discard_draft_calls == 0
+    assert canceled_candidate.close_calls == 1
+    assert len(bindings.q_message_box.question_calls) == 1
+    _, prompt_title, prompt_text = bindings.q_message_box.question_calls[0]
+    assert prompt_title == "Discard unsigned signing draft?"
+    assert "Continue editing" in prompt_text
+    assert "open another PDF without saving" in prompt_text
+
+    bindings.q_message_box.next_question_result = _FakeMessageBox.Yes
+    assert frame.open_pdf_path(tmp_path / "source" / "second.pdf") is second
+    assert first.discard_draft_calls == 1
+    assert first.close_calls == 1
+
+    second.unsaved_changes = True
+    bindings.q_message_box.next_question_result = _FakeMessageBox.No
+    assert frame.close_workspace() is False
+    assert frame.current_shell is second
+    assert second.discard_draft_calls == 0
+
+    bindings.q_message_box.next_question_result = _FakeMessageBox.Yes
+    assert frame.close_workspace() is True
+    assert frame.current_workspace is None
+    assert second.discard_draft_calls == 1
+
+    frame.open_pdf_path(tmp_path / "source" / "third.pdf")
+    third.unsaved_changes = True
+    event = _FakeCloseEvent()
+    bindings.q_message_box.next_question_result = _FakeMessageBox.No
+    frame._handle_window_close_event(event)
+    assert event.ignored is True
+    assert event.accepted is False
+    assert frame.current_shell is third
+
+    bindings.q_message_box.next_question_result = _FakeMessageBox.Yes
+    frame._handle_window_close_event(event)
+    assert event.accepted is True
+    assert third.discard_draft_calls == 1
+    assert frame.current_workspace is None
+
+
+def test_app_frame_failed_candidate_does_not_discard_dirty_workspace(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    shell.unsaved_changes = True
+    _FakeQPdfDocument.next_status = _FakeQPdfDocument.Error.Failed
+
+    assert frame.open_pdf_path(tmp_path / "source" / "invalid.pdf") is None
+    assert frame.current_shell is shell
+    assert shell.unsaved_changes is True
+    assert shell.discard_draft_calls == 0
+    assert bindings.q_message_box.question_calls == []
+
+
+def test_app_frame_ready_dirty_prompt_offers_sign_and_save(tmp_path: Path, monkeypatch) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    second = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_SequenceShellFactory(first, second),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "first.pdf")
+    first.unsaved_changes = True
+    monkeypatch.setattr(frame, "_workspace_ready_to_sign", lambda workspace: True)
+    monkeypatch.setattr(frame, "_sign_and_save_current_workspace", lambda workspace: True)
+    bindings.q_message_box.next_question_result = _FakeMessageBox.Save
+
+    assert frame.open_pdf_path(tmp_path / "source" / "second.pdf") is second
+    _, _, prompt_text = bindings.q_message_box.question_calls[0]
+    assert "Sign and save it before open another PDF" in prompt_text
+    assert first.discard_draft_calls == 0
 
 
 def test_file_command_registry_is_typed_and_normative() -> None:

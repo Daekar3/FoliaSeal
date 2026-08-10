@@ -66,6 +66,7 @@ class SigningDraftWorkflow:
     certificate_path: str
     passphrase: str
     tsa_url: str
+    output_path_confirmed: bool = False
     timestamp_required: bool = True
     trust_policy: TimestampTrustPolicy | None = None
     certificate_alias: str | None = None
@@ -90,6 +91,57 @@ class SigningDraftWorkflow:
     _certificate_preview_available: bool = field(default=False, init=False, repr=False)
     _preview_signing_time: datetime | None = field(default=None, init=False, repr=False)
     _preview_fingerprint: tuple[object, ...] | None = field(default=None, init=False, repr=False)
+    _clean_draft_snapshot: tuple[object, ...] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Capture the clean baseline used to protect an in-progress draft."""
+        self._clean_draft_snapshot = self._draft_snapshot()
+
+    @property
+    def has_unsaved_changes(self) -> bool:
+        """Return whether authored signing values differ from the clean baseline.
+
+        Selecting a reusable preset identifier is intentionally not part of this
+        projection. Placement, visible appearance/content, and an explicitly
+        confirmed output path are the values whose accidental loss would destroy
+        a user's signing draft.
+        """
+        return self._draft_snapshot() != self._clean_draft_snapshot
+
+    def mark_clean(self) -> None:
+        """Mark the current draft values as the new clean baseline."""
+        self._clean_draft_snapshot = self._draft_snapshot()
+
+    def confirm_output_pdf_path(self, output_pdf_path: str) -> None:
+        """Record a user-confirmed output path and protect it as draft state."""
+        self.output_pdf_path = output_pdf_path
+        self.output_path_confirmed = True
+        self._invalidate_preview_snapshot()
+
+    def clear_session_secrets(self) -> None:
+        """Clear credentials held only for the current in-memory signing session."""
+        self.passphrase = ""
+
+    def discard_draft(self) -> None:
+        """Discard the current draft and clear credentials before workspace disposal."""
+        self.clear_session_secrets()
+        self.signature_rect = None
+        self.signature_appearance = None
+        self.signature_placement_defaults = None
+        self.placement_context = None
+        self.output_path_confirmed = False
+        self.selected_appearance_profile_id = None
+        self.selected_placement_profile_id = None
+        self.selected_signature_preset_id = None
+        self._invalidate_preview_snapshot()
+        self._clean_draft_snapshot = self._draft_snapshot()
+
+    def _draft_snapshot(self) -> tuple[object, ...]:
+        return (
+            self.signature_rect,
+            self.signature_appearance,
+            self.output_path_confirmed,
+        )
 
     @classmethod
     def from_signing_request(

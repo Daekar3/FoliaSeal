@@ -7,10 +7,15 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can close or replace a document safely and recover without retaining passwords or destroying a draft in the real FoliaSeal GUI. It is mapped to UI_SPEC WF01, WF05, section 16, and acceptance scenarios 6 and 7. The
-slice is intentionally one vertical path through the relevant persistent
-model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
-generic refactor.
+After this slice, a user can begin editing a signing draft and then use File > Open, File > Close,
+or File > Exit without an accidental replacement or silent discard. A dirty draft is detected from
+the user-owned signing values (placement, appearance/content, and an explicitly confirmed output
+path); the frame asks whether to continue editing or discard it, and cancellation leaves the
+current workspace mounted. The same decision is available to the native window-close event. This
+slice is the first safe lifecycle seam for UI_SPEC WF01, WF05, section 16, and acceptance scenarios
+6 and 7. It deliberately does not invent an on-disk recovery journal or claim crash recovery;
+that requires a separate transaction-artifact plan once the signing transaction exposes its owned
+temporary/final paths.
 
 ## Child ExecPlan Dependencies
 
@@ -21,10 +26,11 @@ generic refactor.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; record evidence and clean up.
+- [x] (2026-08-09) Audit the current implementation and identify the missing dirty-state and close-event seams; explorer report recorded below.
+- [x] (2026-08-09) Add a red focused contract suite for dirty projection, discard, replacement cancellation, and native close routing; the pre-implementation run was `2 failed, 16 passed` and the focused contract is now green.
+- [x] (2026-08-09) Implement the smallest complete workflow/typed-port/Qt frame path, including candidate prepare/commit ordering and action-specific consequence-verb decisions.
+- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft only where this slice proves its retirement condition; do not rename unrelated evidence infrastructure.
+- [ ] (2026-08-09) Run focused, regression, and GUI validation; focused/regression and real offscreen Qt validation are green, while display-backed GUI acceptance remains environment-blocked (`xcb`/`:0`) and must stay explicitly open.
 - [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
 
 ## Surprises & Discoveries
@@ -32,6 +38,19 @@ generic refactor.
 - Observation: replacement and close decisions cross app-frame open routing, draft workflow, and
   lifecycle state; password clearing and recovery must be tested at each terminal transition.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: there is no recovery journal, close-event policy hook, or draft baseline in the
+  current checkout, and the frame's output-path explicitness is private to the action bridge.
+  Evidence: 2026-08-09 explorer review of `app_frame.py`, `signing_draft_workflow.py`,
+  `signing_workspace_lifecycle.py`, and `signing_workspace_action_bridge.py`.
+- Observation: prompting before composition could discard a dirty draft even when the replacement
+  PDF was invalid. The lifecycle now exposes `prepare()` and `replace_prepared()` so candidate
+  composition/validation happens first; a canceled decision disposes only the candidate.
+  Evidence: `test_app_frame_failed_candidate_does_not_discard_dirty_workspace` and the lifecycle
+  boundary implementation.
+- Observation: the real QMessageBox can provide explicit `Continue editing`, `Discard draft`, and
+  conditional `Sign and save` buttons; fake bindings use the existing question seam for deterministic
+  unit coverage. Escape/window close maps to Continue editing.
+  Evidence: `_ask_workspace_decision_with_custom_buttons()` and focused app-frame tests.
 
 ## Decision Log
 
@@ -41,10 +60,35 @@ generic refactor.
 - Decision: keep this change limited to one observable document close, dirty-draft, and recovery lifecycle outcome.
   Rationale: narrow commits make GUI regressions and recovery auditable.
   Date/Author: 2026-08-09 / Codex
+- Decision: implement the dirty-state and decision-policy seam first, and defer crash recovery.
+  Rationale: no current transaction boundary exposes owned temporary/final artifacts, so a journal
+  would either claim unsafe recovery or risk deleting unrelated files. A typed lifecycle seam makes
+  the later journal additive and gives Open/Close/Exit correct behavior now.
+  Date/Author: 2026-08-09 / Codex
+- Decision: treat preset selection alone as clean; compare only placement, appearance/content, and
+  explicit output-path confirmation in the draft baseline.
+  Rationale: UI_SPEC describes reusable preset choice as a selection aid, while those three values
+  are the user-authored signing draft that must be protected.
+  Date/Author: 2026-08-09 / Codex
+- Decision: compose an Open candidate before asking the dirty decision, then mount it only after the
+  decision succeeds.
+  Rationale: UI_SPEC requires candidate validation before replacing a document; disposing a dirty
+  draft before a failed PDF load would silently lose the user's edits.
+  Date/Author: 2026-08-09 / Codex
+- Decision: use an explicit custom QMessageBox when the real Qt binding is available and retain a
+  three-argument question fallback for existing fake bindings.
+  Rationale: real users need consequence verbs and Continue editing as the default, while the
+  fallback keeps headless tests deterministic without introducing a second policy.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. At completion, state what a novice can now do, which tests and live evidence prove it, and any remaining gap.
+Implementation and focused validation are complete. The lifecycle-focused unit suite is green
+(`75 passed`), the real offscreen native-close integration test is green (`1 passed`), and the full
+suite is green (`1191 passed, 20 skipped, 1 warning`); the bounded display-backed audit and final
+commit remain. The slice does not
+provide a crash-recovery journal, autosave, or interrupted-session restoration; those remain an
+explicit follow-on requirement.
 
 ## Context and Orientation
 
@@ -68,16 +112,23 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Implement action-specific dirty prompts, File Close/Exit behavior, secret-free crash recovery detection, and safe handling of app-owned temporary/final artifacts. A failed transaction must preserve the draft and never delete unrelated files. Add typed seams where the current code passes raw widget internals or compatibility
-kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
-old path once focused tests prove no callers remain. Keep user-facing terminology from UI_SPEC.md,
-not schema/backend names.
+Implement a typed dirty-state projection on `SigningDraftWorkflow` and expose it through the
+maintenance port of the workspace bundle. Add explicit `discard_draft()` and
+`clear_session_secrets()` operations so the frame does not reach through child widgets. Route Open,
+Close, Exit, and the native `QMainWindow.closeEvent` through one frame-owned policy that asks before
+discarding a dirty draft; cancellation must preserve the active handle and mounted widget. Mark a
+draft clean after successful signing. Preserve the public frame/workspace contract while migrating
+consumers, then delete any old path only after focused tests prove no callers remain. Keep
+user-facing terminology from UI_SPEC.md, not schema/backend names. Do not add a recovery journal in
+this slice; create a follow-on plan when transaction-owned artifact paths are available.
 
 ## Milestones
 
-Milestone 1 adds tests for protected-document prompts, dirty drafts, replacement, and password
-clearing. Milestone 2 wires lifecycle transitions through the frame and draft workflow. Milestone 3
-proves recovery and cleanup after close, replacement, success, and exit.
+Milestone 1 adds red tests for dirty projection, preset-only cleanliness, discard, replacement
+cancellation, and native close routing. Milestone 2 wires lifecycle transitions through the frame,
+typed workspace maintenance port, and draft workflow. Milestone 3 runs the full regression and
+bounded GUI checks, records that secrets are cleared on the implemented discard/close path, and
+documents the separately required recovery-journal follow-on.
 
 ## Concrete Steps
 
@@ -88,8 +139,8 @@ before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install
 dependency installation is unavailable, stop and report that environment blocker; do not silently
 fall back to a system Python or system Qt installation.
 
-    rg -n -e 'close|discard|recovery|password' src/foliaseal/presentation/qt/app_frame_workspace_open.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_workspace_lifecycle.py
-    .venv/bin/pytest -q tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_workspace_lifecycle.py
+    rg -n -e 'close|discard|recovery|password|dirty|unsaved' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/application/signing_draft_workflow.py src/foliaseal/presentation/qt/signing_workspace_lifecycle.py src/foliaseal/presentation/qt/signing_workspace_action_bridge.py
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signing_workspace_lifecycle.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -106,25 +157,38 @@ Expected evidence is the stated user-visible behavior plus a mandatory Qt-test o
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
 cleanup result; the bounded timeout is only a lifecycle check.
 
+Current validation evidence: `.venv/bin/pytest -q` completed with `1191 passed, 20 skipped, 1
+warning`; lifecycle-focused tests completed with `75 passed`; the real offscreen native-close test
+completed with `1 passed`; `.venv/bin/ruff check src tests` and `git diff --check` passed. The
+offscreen CLI walkthrough exited `1` because the sandbox could not claim the local-instance socket;
+the display-backed audit exited `134` because `xcb` could not connect to `DISPLAY=:0`. Both exact
+temporary roots were removed and process inspection found no FoliaSeal/PySide6 processes. A
+display-backed session remains an environment-dependent follow-on acceptance check.
+
 ## Validation and Acceptance
 
-Acceptance is behavioral: Close/Open/Exit preserves data by default, discards only after explicit confirmation, and recovery offers only verified safe actions; ordinary drafts are not silently autosaved or restored. The focused regression suite must pass, the full
-suite must remain green when shared code changed, and the GUI audit must record the visible result
-and cleanup. A passing import or unit test without the stated user-visible behavior is insufficient.
+Acceptance is behavioral: Close/Open/Exit preserves a dirty draft when the user cancels, discards
+only after explicit confirmation, and clears the in-memory passphrase on the confirmed discard/close
+path. A successful sign marks the draft clean. Native window close uses the same policy. Crash
+recovery remains explicitly unimplemented and must not be presented as available. The focused
+regression suite must pass, the full suite must remain green when shared code changed, and the GUI
+audit must record the visible result and cleanup. A passing import or unit test without the stated
+user-visible behavior is insufficient.
 
 ## Required Acceptance Cases
 
-Password-protected PDFs prompt before replacement. Session password memory is cleared on Close,
-replacement, successful signing, and Exit. Certification and ordinary-signature restrictions are
-preflighted, uncertain prohibited changes block signing, and recovery never deletes unrelated files
-or presents an unverified artifact as safe.
+Password-protected drafts prompt before replacement. Session password memory is cleared when the
+confirmed discard/close path runs. Successful signing marks the draft clean. Certification and
+ordinary-signature restrictions remain owned by the existing signing preflight. Crash recovery and
+artifact cleanup are not acceptance claims for this slice and must be covered by a follow-on plan.
 
 ## Evidence Record
 
 Before completion, record agreement with `docs/ui/main-workspace-document-open-exploratory.svg`,
-the exact lifecycle/recovery test command and result, each close/replace/
-success/exit password-clearing observation, GUI input sequence, evidence path, cleanup, and
-compatibility grep proof.
+the exact lifecycle test command and result, dirty/preset/cancel/discard/native-close observations,
+the in-memory password-clearing assertion, GUI input sequence if the display-backed audit is
+available, evidence path, cleanup, and compatibility grep proof. Record the deferred recovery
+journal as an explicit next plan rather than implying it was verified here.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
@@ -136,7 +200,8 @@ contract, record that the test was red before implementation and green afterward
 Use temporary sibling outputs and isolated configuration for repeatable tests. If implementation
 fails halfway, keep the source PDF and unsigned draft intact, terminate owned processes, remove only
 this slice's generated artifacts, and update Progress with completed and remaining work. Re-running
-the tests must not mutate user data or resurrect retired compatibility code.
+the tests must not mutate user data or resurrect retired compatibility code. Because this slice does
+not create a recovery journal, do not claim that a crash can be recovered.
 
 ## Artifacts and Notes
 
@@ -147,11 +212,18 @@ absolute paths.
 ## Interfaces and Dependencies
 
 Use existing typed application workflows and public Qt ports rather than private child-widget
-reach-through. Create tests/integration/test_document_lifecycle_recovery.py for isolated recovery
-fixtures. The final interface must be exercised by tests/unit/test_qt_app_frame_workspace_open.py,
-tests/unit/test_signing_draft_workflow.py, and that integration test.
-workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
-retirement condition recorded in this plan.
+reach-through. Add `has_unsaved_changes()`, `discard_draft()`, and `clear_session_secrets()` to the
+maintenance port and its Qt adapter. Add a frame-owned decision helper and a native close-event
+adapter in `app_frame.py`. Exercise the final interface with `tests/unit/test_qt_app_frame.py`,
+`tests/unit/test_signing_draft_workflow.py`, and `tests/unit/test_signing_workspace_lifecycle.py`;
+add an integration recovery fixture only in the follow-on artifact-journal plan. Any compatibility
+adapter retained temporarily must have a named consumer and a retirement condition recorded in this
+plan.
 
 Revision note: 2026-08-09 / Codex
-Created as child ui_document_lifecycle_recovery_execplan.md of the approved SPEC/UI_SPEC compliance breakdown.
+Narrowed the original recovery/lifecycle proposal to the implementable dirty-state and close-policy
+vertical slice after explorer review found no transaction-owned artifact boundary for safe crash
+recovery. Added candidate prepare/commit ordering and UI_SPEC consequence-verb decisions after
+compliance review found premature discard and generic prompting. Updated purpose, progress,
+discoveries, decisions, milestones, validation, acceptance, evidence, and interfaces to prevent
+overstating completion.

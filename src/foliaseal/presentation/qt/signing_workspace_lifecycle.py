@@ -35,6 +35,12 @@ class SigningWorkspaceLifecyclePort(Protocol):
     def replace(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
         """Compose and mount a workspace, replacing the current one atomically."""
 
+    def prepare(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
+        """Compose a candidate without changing the active mounted workspace."""
+
+    def replace_prepared(self, handle: WorkspaceHandle) -> WorkspaceHandle:
+        """Mount a previously prepared candidate and publish it atomically."""
+
     def close(self) -> None:
         """Close the active workspace, if any, without raising for repeated calls."""
 
@@ -66,7 +72,14 @@ class SigningWorkspaceLifecycle:
     def replace(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
         """Compose and mount a candidate before disposing the old workspace."""
 
-        handle = self._workspace_open_port.open_workspace(command)
+        return self.replace_prepared(self.prepare(command))
+
+    def prepare(self, command: OpenWorkspaceCommand) -> WorkspaceHandle:
+        """Compose a candidate without changing the active mounted workspace."""
+        return self._workspace_open_port.open_workspace(command)
+
+    def replace_prepared(self, handle: WorkspaceHandle) -> WorkspaceHandle:
+        """Mount a prepared candidate before disposing the old workspace."""
         candidate = handle.view.mount_target()
         previous = self._active
 

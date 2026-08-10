@@ -361,6 +361,7 @@ class FoliaSealAppFrame:
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
+        setattr(self.window, "_foliaseal_close_event_handler", self._handle_window_close_event)
         self._apply_window_baseline()
         self._workspace_mount = QtWorkspaceMount(self.window)
         self._workspace_host = SigningWorkspaceHost(
@@ -472,7 +473,16 @@ class FoliaSealAppFrame:
 
     def open_pdf_path(self, pdf_path: str | Path) -> Any | None:
         try:
-            handle = self._workspace_host.open(pdf_path)
+            candidate = self._workspace_host.prepare(pdf_path)
+        except Exception as exc:
+            self._emit_error(f"Unable to open PDF: {exc}")
+            return None
+
+        if not self._confirm_discard_if_dirty(action="open"):
+            candidate.view.dispose()
+            return None
+        try:
+            handle = self._workspace_host.replace_prepared(candidate)
         except Exception as exc:
             self._emit_error(f"Unable to open PDF: {exc}")
             return None
@@ -481,11 +491,201 @@ class FoliaSealAppFrame:
         self._sync_page_navigation_actions()
         return handle.view.mount_target()
 
-    def close_workspace(self) -> None:
+    def close_workspace(self) -> bool:
         """Close the active signing workspace and restore the placeholder view."""
 
+        if not self._confirm_discard_if_dirty():
+            return False
         self._workspace_host.close()
         self._set_placeholder()
+        return True
+
+    def _confirm_discard_if_dirty(self, *, action: str = "close") -> bool:
+        """Apply the UI_SPEC draft decision before a close, exit, or replacement."""
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return True
+        if not workspace.maintenance.has_unsaved_changes():
+            workspace.maintenance.clear_session_secrets()
+            return True
+
+        ready_to_sign = self._workspace_ready_to_sign(workspace)
+        message_box = self._bindings.q_message_box
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return False
+        title = "Discard unsigned signing draft?"
+        action_text = {"open": "open another PDF", "exit": "exit FoliaSeal"}.get(
+            action, "close this document"
+        )
+        choice_text = (
+            f"Sign and save it before {action_text}"
+            if ready_to_sign
+            else f"{action_text} without saving"
+        )
+        body = (
+            "Continue editing, discard this unsigned signing draft, or "
+            f"{choice_text}?"
+        )
+        decision = self._ask_workspace_decision(
+            message_box,
+            parent=self.window,
+            question=question,
+            title=title,
+            text=body,
+            offer_save=ready_to_sign,
+        )
+        if decision == "continue":
+            return False
+        if ready_to_sign and decision == "save":
+            return self._sign_and_save_current_workspace(workspace)
+        if decision == "discard":
+            workspace.maintenance.discard_draft()
+            return True
+        return False
+
+    def _workspace_ready_to_sign(self, workspace: WorkspaceHandle) -> bool:
+        try:
+            return bool(workspace.session.preview().can_submit)
+        except Exception:
+            return False
+
+    def _sign_and_save_current_workspace(self, workspace: WorkspaceHandle) -> bool:
+        workspace.session.submit_sign_request()
+        result = workspace.session.snapshot().last_signing_result
+        return bool(result is not None and result.success)
+
+    @classmethod
+    def _ask_workspace_decision(
+        cls,
+        message_box: Any,
+        *,
+        parent: Any,
+        question: Callable[..., Any],
+        title: str,
+        text: str,
+        offer_save: bool,
+    ) -> str:
+        """Return ``continue``, ``discard``, or ``save`` from the lifecycle prompt."""
+        custom_decision = cls._ask_workspace_decision_with_custom_buttons(
+            message_box,
+            parent=parent,
+            title=title,
+            text=text,
+            offer_save=offer_save,
+        )
+        if custom_decision is not None:
+            return custom_decision
+
+        discard_value = cls._message_box_button(message_box, "Discard", "Yes")
+        cancel_value = cls._message_box_button(message_box, "Cancel", "No")
+        save_value = cls._message_box_button(message_box, "Save", "Save")
+        buttons = [discard_value, cancel_value]
+        if offer_save and save_value is not None:
+            buttons.insert(0, save_value)
+        result = cls._question_with_buttons(
+            question,
+            parent=parent,
+            title=title,
+            text=text,
+            buttons=buttons,
+            default_button=cancel_value,
+        )
+        if result == discard_value:
+            return "discard"
+        if offer_save and result == save_value:
+            return "save"
+        return "continue"
+
+    @staticmethod
+    def _ask_workspace_decision_with_custom_buttons(
+        message_box: Any,
+        *,
+        parent: Any,
+        title: str,
+        text: str,
+        offer_save: bool,
+    ) -> str | None:
+        """Use explicit consequence-verb buttons when the real QMessageBox is available."""
+        if not isinstance(message_box, type):
+            return None
+        try:
+            dialog = message_box(parent)
+        except Exception:
+            return None
+        add_button = getattr(dialog, "addButton", None)
+        if not callable(add_button):
+            return None
+        role_type = getattr(message_box, "ButtonRole", None)
+        if role_type is None:
+            return None
+        try:
+            continue_button = add_button("Continue editing", role_type.RejectRole)
+            discard_button = add_button("Discard draft", role_type.DestructiveRole)
+            save_button = (
+                add_button("Sign and save", role_type.AcceptRole) if offer_save else None
+            )
+            dialog.setWindowTitle(title)
+            dialog.setText(text)
+            set_default = getattr(dialog, "setDefaultButton", None)
+            if callable(set_default):
+                set_default(continue_button)
+            exec_method = getattr(dialog, "exec", None) or getattr(dialog, "exec_", None)
+            if not callable(exec_method):
+                return None
+            exec_method()
+            clicked = getattr(dialog, "clickedButton", lambda: None)()
+        except Exception:
+            return None
+        if clicked is discard_button:
+            return "discard"
+        if save_button is not None and clicked is save_button:
+            return "save"
+        if clicked is continue_button:
+            return "continue"
+        return "continue"
+
+    @staticmethod
+    def _message_box_button(message_box: Any, name: str, fallback: str) -> Any:
+        value = getattr(message_box, name, None)
+        if value is not None:
+            return value
+        return getattr(getattr(message_box, "StandardButton", None), name, None) or getattr(
+            message_box, fallback, None
+        )
+
+    @staticmethod
+    def _question_with_buttons(
+        question: Callable[..., Any],
+        *,
+        parent: Any,
+        title: str,
+        text: str,
+        buttons: list[Any],
+        default_button: Any,
+    ) -> Any:
+        usable_buttons = [button for button in buttons if button is not None]
+        if len(usable_buttons) >= 2:
+            try:
+                combined = usable_buttons[0]
+                for button in usable_buttons[1:]:
+                    combined = combined | button
+                return question(parent, title, text, combined, default_button)
+            except TypeError:
+                pass
+        return question(parent, title, text)
+
+    def _handle_window_close_event(self, event: Any) -> None:
+        """Route native main-window close through the same draft policy as File > Close."""
+        if self._confirm_discard_if_dirty(action="close"):
+            self._workspace_host.close()
+            accept = getattr(event, "accept", None)
+            if callable(accept):
+                accept()
+            return
+        ignore = getattr(event, "ignore", None)
+        if callable(ignore):
+            ignore()
 
     def _go_to_previous_page(self) -> None:
         self._with_current_session_port(lambda session: session.go_to_previous_page())
@@ -731,6 +931,9 @@ class FoliaSealAppFrame:
         )
 
     def _exit_application(self) -> Any | None:
+        if not self._confirm_discard_if_dirty(action="exit"):
+            return None
+        self._workspace_host.close()
         quit_application = getattr(self._bindings.q_application, "quit", None)
         if callable(quit_application):
             return quit_application()
@@ -1179,8 +1382,18 @@ class QtAppFrameAdapter:
                 f"Details: {exc}"
             ) from exc
 
+        q_main_window_base = getattr(qt_widgets, "QMainWindow")
+
+        class _FoliaSealMainWindow(q_main_window_base):
+            def closeEvent(self, event: Any) -> None:  # noqa: N802
+                handler = getattr(self, "_foliaseal_close_event_handler", None)
+                if callable(handler):
+                    handler(event)
+                    return
+                super().closeEvent(event)
+
         return QtAppFrameBindings(
-            q_main_window=getattr(qt_widgets, "QMainWindow"),
+            q_main_window=_FoliaSealMainWindow,
             q_dialog=getattr(qt_widgets, "QDialog"),
             q_form_layout=getattr(qt_widgets, "QFormLayout"),
             q_label=getattr(qt_widgets, "QLabel"),

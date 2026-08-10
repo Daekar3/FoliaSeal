@@ -75,9 +75,15 @@ class SigningWorkspaceHost:
     def open(self, source_pdf: str | Path) -> WorkspaceHandle:
         """Atomically replace the active workspace with ``source_pdf``."""
 
-        return self._lifecycle.replace(
-            self._environment.command_for(Path(source_pdf))
-        )
+        return self._lifecycle.replace(self._environment.command_for(Path(source_pdf)))
+
+    def prepare(self, source_pdf: str | Path) -> WorkspaceHandle:
+        """Compose a candidate without changing the active mounted workspace."""
+        return self._lifecycle.prepare(self._environment.command_for(Path(source_pdf)))
+
+    def replace_prepared(self, handle: WorkspaceHandle) -> WorkspaceHandle:
+        """Mount and publish a candidate after the frame's discard decision."""
+        return self._lifecycle.replace_prepared(handle)
 
     def close(self) -> None:
         """Dispose the active workspace, if any."""

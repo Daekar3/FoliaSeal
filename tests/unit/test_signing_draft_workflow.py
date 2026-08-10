@@ -607,3 +607,43 @@ def test_workflow_allows_empty_signer_label_prefix_and_keeps_preview_clean(
     assert preview.signer_label_prefix == ""
     assert preview.title == ""
     assert preview.can_submit is True
+
+
+def test_workflow_dirty_projection_protects_authored_values_but_not_preset_selection(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+
+    assert workflow.has_unsaved_changes is False
+    workflow.selected_signature_preset_id = "preset-team-standard"
+    assert workflow.has_unsaved_changes is False
+
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=12.0,
+            bottom_pt=18.0,
+            width_pt=160.0,
+            height_pt=64.0,
+        )
+    )
+    assert workflow.has_unsaved_changes is True
+
+    workflow.mark_clean()
+    assert workflow.has_unsaved_changes is False
+
+    workflow.confirm_output_pdf_path(str(tmp_path / "confirmed.pdf"))
+    assert workflow.has_unsaved_changes is True
+
+
+def test_workflow_discard_clears_session_secret_and_resets_dirty_projection(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(_appearance())
+    assert workflow.has_unsaved_changes is True
+
+    workflow.discard_draft()
+
+    assert workflow.passphrase == ""
+    assert workflow.has_unsaved_changes is False
