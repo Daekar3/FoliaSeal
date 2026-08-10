@@ -9,8 +9,8 @@ from dataclasses import dataclass
 class ViewerZoomLimits:
     """Clamp configuration for interactive zoom controls."""
 
-    minimum: float = 0.25
-    maximum: float = 4.0
+    minimum: float = 0.10
+    maximum: float = 8.0
     step: float = 1.25
 
     def validate(self) -> None:
@@ -39,6 +39,7 @@ class ViewerSession:
         self._zoom_limits = zoom_limits or ViewerZoomLimits()
         self._zoom_limits.validate()
         self._zoom = self._default_zoom()
+        self._zoom_mode = "fit_page"
 
     @property
     def page_count(self) -> int:
@@ -51,6 +52,16 @@ class ViewerSession:
     @property
     def zoom(self) -> float:
         return self._zoom
+
+    @property
+    def zoom_limits(self) -> ViewerZoomLimits:
+        return self._zoom_limits
+
+    @property
+    def zoom_mode(self) -> str:
+        """Return ``fit_page``, ``fit_width``, or ``custom`` for the current view."""
+
+        return self._zoom_mode
 
     def can_go_previous(self) -> bool:
         return self._current_page > 0
@@ -76,22 +87,27 @@ class ViewerSession:
 
     def zoom_in(self) -> float:
         self._zoom = min(self._zoom * self._zoom_limits.step, self._zoom_limits.maximum)
+        self._zoom_mode = "custom"
         return self._zoom
 
     def zoom_out(self) -> float:
         self._zoom = max(self._zoom / self._zoom_limits.step, self._zoom_limits.minimum)
+        self._zoom_mode = "custom"
         return self._zoom
 
     def reset_zoom(self) -> float:
         self._zoom = self._default_zoom()
+        self._zoom_mode = "custom"
         return self._zoom
 
     def fit_to_width(self, viewport_width_px: float, page_width_px: float) -> float:
         self._zoom = self._fit_zoom(viewport_extent=viewport_width_px, page_extent=page_width_px)
+        self._zoom_mode = "fit_width"
         return self._zoom
 
     def fit_to_page(self, viewport_height_px: float, page_height_px: float) -> float:
         self._zoom = self._fit_zoom(viewport_extent=viewport_height_px, page_extent=page_height_px)
+        self._zoom_mode = "fit_page"
         return self._zoom
 
     def _fit_zoom(self, *, viewport_extent: float, page_extent: float) -> float:

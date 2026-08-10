@@ -18,6 +18,8 @@ class AppFrameCommandId(StrEnum):
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
     SELECT_TEXT = "view.select_text"
+    FIT_PAGE = "view.fit_page"
+    FIT_WIDTH = "view.fit_width"
     APPLICATION_SETTINGS = "settings.application"
     MANAGE_REUSABLE_OBJECTS = "settings.manage_reusable_objects"
     CREATE_CERTIFICATE = "settings.create_certificate"
@@ -117,6 +119,22 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut=None,
         accessible_name="Select document text",
         mnemonic_text="&Select Text",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.FIT_PAGE,
+        menu="View",
+        text="Fit Page",
+        shortcut="Ctrl+0",
+        accessible_name="Fit PDF page in viewer",
+        mnemonic_text="Fit &Page",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.FIT_WIDTH,
+        menu="View",
+        text="Fit Width",
+        shortcut="Ctrl+Shift+0",
+        accessible_name="Fit PDF page width in viewer",
+        mnemonic_text="Fit &Width",
     ),
 )
 

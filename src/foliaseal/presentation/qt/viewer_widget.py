@@ -79,6 +79,7 @@ class PdfViewerWidgetAdapter:
                 self._interaction_mode = "signature"
                 self._text_highlight_page_index: int | None = None
                 self._text_highlight_rects: tuple[PdfRect, ...] = ()
+                self._initial_fit_pending = True
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
                 start_time = perf_counter() if elapsed_ms is None else None
@@ -140,13 +141,23 @@ class PdfViewerWidgetAdapter:
 
             def wheelEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 delta = event.angleDelta().y()
-                if delta > 0:
-                    self._emit_interaction("wheel_zoom_in")
-                    self._workflow.zoom_in()
-                elif delta < 0:
-                    self._emit_interaction("wheel_zoom_out")
-                    self._workflow.zoom_out()
-                self.refresh(navigation=False)
+                if self._has_control_modifier(event):
+                    if delta > 0:
+                        self._emit_interaction("wheel_zoom_in")
+                        self._workflow.zoom_in()
+                    elif delta < 0:
+                        self._emit_interaction("wheel_zoom_out")
+                        self._workflow.zoom_out()
+                    self.refresh(navigation=False)
+                    event.accept()
+                    return
+                if self._scroll_container is None:
+                    self._emit_interaction("wheel_pan_unavailable")
+                    event.accept()
+                    return
+                self._emit_interaction("wheel_pan")
+                scroll_bar = self._vertical_scroll_bar()
+                scroll_bar.setValue(scroll_bar.value() - delta)
                 event.accept()
 
             def keyPressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
@@ -173,9 +184,17 @@ class PdfViewerWidgetAdapter:
                     return
 
                 if key == bindings.qt.Key_0:
-                    self._emit_interaction("key_zoom_reset")
-                    self._workflow.reset_zoom()
-                    self.refresh(navigation=False)
+                    if self._has_control_modifier(event):
+                        if self._has_shift_modifier(event):
+                            self._emit_interaction("key_fit_width")
+                            self.fit_width_view()
+                        else:
+                            self._emit_interaction("key_fit_page")
+                            self.fit_page_view()
+                    else:
+                        self._emit_interaction("key_zoom_reset")
+                        self._workflow.reset_zoom()
+                        self.refresh(navigation=False)
                     event.accept()
                     return
 
@@ -372,6 +391,12 @@ class PdfViewerWidgetAdapter:
                 self._overlay_signature_rect = signature_rect
                 self.update()
 
+            def fit_page_view(self) -> None:
+                self._fit_view(mode="page")
+
+            def fit_width_view(self) -> None:
+                self._fit_view(mode="width")
+
             def clear_signature_overlay(self) -> None:
                 self._overlay_signature_rect = None
                 self.update()
@@ -415,6 +440,14 @@ class PdfViewerWidgetAdapter:
                     self.releaseMouse()
                 super().hideEvent(event)
 
+            def showEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                show_event = getattr(super(), "showEvent", None)
+                if callable(show_event):
+                    show_event(event)
+                if self._initial_fit_pending:
+                    self._initial_fit_pending = False
+                    self.fit_page_view()
+
             def _emit_error(self, summary: str, exc: Exception | None = None) -> None:
                 if self._on_error is not None:
                     if exc is None:
@@ -436,6 +469,38 @@ class PdfViewerWidgetAdapter:
                 if callable(resize):
                     resize(result.width_px, result.height_px)
                 self.update()
+
+            def _fit_view(self, *, mode: str) -> None:
+                if self._scroll_container is None:
+                    return
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None:
+                    self.refresh()
+                    snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None or snapshot.zoom <= 0:
+                    return
+                viewport = self._scroll_container.viewport()
+                if mode == "page":
+                    viewport_extent = float(viewport.height())
+                    page_extent = float(snapshot.image_height_px) / snapshot.zoom
+                    if viewport_extent <= 0 or page_extent <= 0:
+                        return
+                    self._workflow.fit_to_page(
+                        viewport_height_px=viewport_extent,
+                        page_height_px=page_extent,
+                    )
+                elif mode == "width":
+                    viewport_extent = float(viewport.width())
+                    page_extent = float(snapshot.image_width_px) / snapshot.zoom
+                    if viewport_extent <= 0 or page_extent <= 0:
+                        return
+                    self._workflow.fit_to_width(
+                        viewport_width_px=viewport_extent,
+                        page_width_px=page_extent,
+                    )
+                else:
+                    raise ValueError(f"Unsupported viewer fit mode: {mode}")
+                self.refresh(navigation=False)
 
             def _navigate(self, *, action: Callable[[], Any], summary: str) -> None:
                 start_time = perf_counter()
@@ -499,6 +564,16 @@ class PdfViewerWidgetAdapter:
                 modifiers = event.modifiers()
                 shift_mask = bindings.qt.KeyboardModifier.ShiftModifier
                 return bool(modifiers & shift_mask)
+
+            def _has_control_modifier(self, event: Any) -> bool:
+                modifiers = event.modifiers()
+                keyboard_modifier = getattr(bindings.qt, "KeyboardModifier", bindings.qt)
+                control_mask = getattr(
+                    keyboard_modifier,
+                    "ControlModifier",
+                    getattr(bindings.qt, "ControlModifier", 0),
+                )
+                return bool(modifiers & control_mask)
 
             @staticmethod
             def _is_selection_drag(origin: Any, current: Any) -> bool:
@@ -812,6 +887,12 @@ def build_qt_pdf_viewer_widget(
 
         def reset_zoom_view(self) -> None:
             preview_widget.reset_zoom_view()
+
+        def fit_page_view(self) -> None:
+            preview_widget.fit_page_view()
+
+        def fit_width_view(self) -> None:
+            preview_widget.fit_width_view()
 
         def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
             preview_widget.set_signature_overlay(signature_rect)

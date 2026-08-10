@@ -321,11 +321,17 @@ def _assemble_signing_workspace_composition(
     )
     text_selection_button = bindings.q_push_button("")
     copy_selection_button = bindings.q_push_button("")
+    fit_page_button = bindings.q_push_button("Fit Page")
+    fit_width_button = bindings.q_push_button("Fit Width")
     for button in (previous_page_button, next_page_button):
         button_fixed_width = getattr(button, "setFixedWidth", None)
         if callable(button_fixed_width):
             button_fixed_width(28)
     for button, width in ((text_selection_button, 32), (copy_selection_button, 32)):
+        button_fixed_width = getattr(button, "setFixedWidth", None)
+        if callable(button_fixed_width):
+            button_fixed_width(width)
+    for button, width in ((fit_page_button, 68), (fit_width_button, 72)):
         button_fixed_width = getattr(button, "setFixedWidth", None)
         if callable(button_fixed_width):
             button_fixed_width(width)
@@ -342,6 +348,13 @@ def _assemble_signing_workspace_composition(
         set_icon = getattr(button, "setIcon", None)
         if callable(set_icon):
             set_icon(bindings.q_icon(icon_path(icon_name)))
+        set_tooltip = getattr(button, "setToolTip", None)
+        if callable(set_tooltip):
+            set_tooltip(tooltip)
+    for button, tooltip in (
+        (fit_page_button, "Fit the whole PDF page in the viewer"),
+        (fit_width_button, "Fit the PDF page width in the viewer"),
+    ):
         set_tooltip = getattr(button, "setToolTip", None)
         if callable(set_tooltip):
             set_tooltip(tooltip)
@@ -362,6 +375,8 @@ def _assemble_signing_workspace_composition(
         viewer_navigation_row.addWidget(toolbar_gap)
     viewer_navigation_row.addWidget(text_selection_button)
     viewer_navigation_row.addWidget(copy_selection_button)
+    viewer_navigation_row.addWidget(fit_page_button)
+    viewer_navigation_row.addWidget(fit_width_button)
     viewer_navigation_row.addWidget(interaction_mode_label)
     if hasattr(viewer_navigation_row, "addStretch"):
         viewer_navigation_row.addStretch()
@@ -420,10 +435,18 @@ def _assemble_signing_workspace_composition(
         if callable(set_checked):
             set_checked(result)
 
+    def fit_page_view() -> None:
+        viewer_widget.fit_page_view()
+
+    def fit_width_view() -> None:
+        viewer_widget.fit_width_view()
+
     previous_page_button.clicked.connect(go_previous_page)  # type: ignore[attr-defined]
     next_page_button.clicked.connect(go_next_page)  # type: ignore[attr-defined]
     text_selection_button.clicked.connect(toggle_text_selection_mode)  # type: ignore[attr-defined]
     copy_selection_button.clicked.connect(copy_selected_document_text)  # type: ignore[attr-defined]
+    fit_page_button.clicked.connect(fit_page_view)  # type: ignore[attr-defined]
+    fit_width_button.clicked.connect(fit_width_view)  # type: ignore[attr-defined]
     return_pressed = getattr(page_input, "returnPressed", None)
     if hasattr(return_pressed, "connect"):
         return_pressed.connect(jump_to_entered_page)  # type: ignore[attr-defined]
@@ -435,6 +458,8 @@ def _assemble_signing_workspace_composition(
         "next_page_button": next_page_button,
         "text_selection_button": text_selection_button,
         "copy_selection_button": copy_selection_button,
+        "fit_page_button": fit_page_button,
+        "fit_width_button": fit_width_button,
         "interaction_mode_label": interaction_mode_label,
     }
     properties_panel = SignaturePropertiesPanel(

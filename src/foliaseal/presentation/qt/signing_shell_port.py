@@ -115,6 +115,8 @@ class SigningWorkspaceSessionPort(Protocol):
     def can_go_previous_page(self) -> bool: ...
     def can_go_next_page(self) -> bool: ...
     def reset_zoom_view(self) -> None: ...
+    def fit_page_view(self) -> None: ...
+    def fit_width_view(self) -> None: ...
     def focus(self) -> None: ...
 
 
@@ -271,6 +273,12 @@ class QtSigningWorkspaceSessionPort:
 
     def reset_zoom_view(self) -> None:
         self.shell_widget.reset_zoom_view()
+
+    def fit_page_view(self) -> None:
+        self.shell_widget.fit_page_view()
+
+    def fit_width_view(self) -> None:
+        self.shell_widget.fit_width_view()
 
     def focus(self) -> None:
         self.shell_widget.setFocus()

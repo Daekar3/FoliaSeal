@@ -827,6 +827,18 @@ class FoliaSealAppFrame:
             checkable=True,
             icon_name="text-select.svg",
         )
+        self._fit_page_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.FIT_PAGE,
+            self._fit_page_view,
+            enabled=False,
+        )
+        self._fit_width_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.FIT_WIDTH,
+            self._fit_width_view,
+            enabled=False,
+        )
         settings_menu = menu_bar.addMenu("Settings")
         self._command_action(
             settings_menu,
@@ -959,6 +971,8 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
         self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
+        self._set_action_enabled(self._fit_page_action, state.workspace_open)
+        self._set_action_enabled(self._fit_width_action, state.workspace_open)
 
     @staticmethod
     def _set_action_enabled(action: Any | None, enabled: bool) -> None:
@@ -1034,6 +1048,12 @@ class FoliaSealAppFrame:
             )
             self._sync_document_text_actions()
         return result
+
+    def _fit_page_view(self) -> None:
+        self._with_current_session_port(lambda session_port: session_port.fit_page_view())
+
+    def _fit_width_view(self) -> None:
+        self._with_current_session_port(lambda session_port: session_port.fit_width_view())
 
     def _copy_selected_text_from_action(self) -> str | None:
         return self._with_current_shell_port(

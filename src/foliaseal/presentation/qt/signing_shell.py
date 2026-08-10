@@ -366,6 +366,12 @@ class SigningWorkspaceWidget:
     def reset_zoom_view(self) -> None:
         self._viewer_widget.reset_zoom_view()
 
+    def fit_page_view(self) -> None:
+        self._viewer_widget.fit_page_view()
+
+    def fit_width_view(self) -> None:
+        self._viewer_widget.fit_width_view()
+
     def refresh_document_review(self) -> DocumentReviewSummary:
         return self._runtime.refresh_document_review()
 

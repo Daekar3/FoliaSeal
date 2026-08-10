@@ -602,6 +602,8 @@ class _FakeViewerWidget(_FakeWidget):
         self.text_highlight_page_index = None
         self.text_highlight_rects = ()
         self.interaction_mode = "signature"
+        self.fit_page_calls = 0
+        self.fit_width_calls = 0
 
     def refresh(self, *, elapsed_ms=None, navigation=False):
         self.refresh_calls.append((elapsed_ms, navigation))
@@ -627,6 +629,12 @@ class _FakeViewerWidget(_FakeWidget):
 
     def set_interaction_mode(self, mode):
         self.interaction_mode = mode
+
+    def fit_page_view(self):
+        self.fit_page_calls += 1
+
+    def fit_width_view(self):
+        self.fit_width_calls += 1
 
     def go_to_next_page(self):
         self.workflow.go_next_page()
@@ -1525,15 +1533,24 @@ def test_signing_shell_document_review_page_navigation_buttons_track_viewer_stat
     assert controls["next_page_button"].fixed_width == 28
     assert controls["text_selection_button"].fixed_width == 32
     assert controls["copy_selection_button"].fixed_width == 32
+    assert controls["fit_page_button"].fixed_width == 68
+    assert controls["fit_width_button"].fixed_width == 72
     assert controls["text_selection_button"].icon.path.endswith("text-select.svg")
     assert controls["copy_selection_button"].icon.path.endswith("copy.svg")
     assert controls["text_selection_button"].tooltip == "Text selection mode"
     assert controls["copy_selection_button"].tooltip == "Copy selected text"
+    assert controls["fit_page_button"].tooltip == "Fit the whole PDF page in the viewer"
+    assert controls["fit_width_button"].tooltip == "Fit the PDF page width in the viewer"
     assert controls["interaction_mode_label"].text() == (
         "Placement mode — drag on the page to draw or resize the signature"
     )
     assert controls["previous_page_button"]._enabled is False
     assert controls["next_page_button"]._enabled is True
+
+    controls["fit_page_button"].click()
+    controls["fit_width_button"].click()
+    assert widget.viewer_widget.fit_page_calls == 1
+    assert widget.viewer_widget.fit_width_calls == 1
 
     controls["next_page_button"].click()
 

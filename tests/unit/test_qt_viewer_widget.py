@@ -70,9 +70,11 @@ class _FakeQt:
     Key_Left = 20
     Key_Home = 21
     Key_End = 22
+    ControlModifier = 1 << 1
 
     class KeyboardModifier:
         ShiftModifier = 1 << 0
+        ControlModifier = 1 << 1
 
 
 class _FakePoint:
@@ -122,12 +124,16 @@ class _FakeMouseEvent:
 
 
 class _FakeKeyEvent:
-    def __init__(self, *, key: int):
+    def __init__(self, *, key: int, modifiers: int = _FakeQt.NoModifier):
         self._key = key
         self.accepted = False
+        self._modifiers = modifiers
 
     def key(self):
         return self._key
+
+    def modifiers(self):
+        return self._modifiers
 
     def accept(self):
         self.accepted = True
@@ -142,15 +148,147 @@ class _FakeWheelDelta:
 
 
 class _FakeWheelEvent:
-    def __init__(self, *, delta_y: int):
+    def __init__(self, *, delta_y: int, modifiers: int = _FakeQt.NoModifier):
         self._delta = _FakeWheelDelta(delta_y)
+        self._modifiers = modifiers
         self.accepted = False
 
     def angleDelta(self):
         return self._delta
 
+    def modifiers(self):
+        return self._modifiers
+
     def accept(self):
         self.accepted = True
+
+
+def test_wheel_pans_without_changing_page_and_ctrl_wheel_zoom_is_explicit(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=2),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    scroll = _FakeScrollArea()
+    preview.attach_scroll_container(scroll)
+    preview.refresh()
+    initial_zoom = workflow.session.zoom
+
+    preview.wheelEvent(_FakeWheelEvent(delta_y=120))
+    assert workflow.session.current_page == 0
+    assert workflow.session.zoom == initial_zoom
+    assert scroll.verticalScrollBar().value() < 0 or scroll.horizontalScrollBar().value() < 0
+
+    preview.wheelEvent(
+        _FakeWheelEvent(delta_y=120, modifiers=_FakeQt.ControlModifier)
+    )
+    assert workflow.session.current_page == 0
+    assert workflow.session.zoom > initial_zoom
+
+
+def test_fit_page_and_width_use_scroll_viewport_without_changing_page(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=2),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    preview.attach_scroll_container(_FakeScrollArea())
+    preview.refresh()
+
+    preview.fit_page_view()
+    assert workflow.session.zoom == pytest.approx(0.8)
+    assert workflow.session.zoom_mode == "fit_page"
+    assert workflow.session.current_page == 0
+
+    preview.fit_width_view()
+    assert workflow.session.zoom == pytest.approx(0.9)
+    assert workflow.session.zoom_mode == "fit_width"
+    assert workflow.session.current_page == 0
+
+
+def test_first_visible_view_uses_fit_page(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    scroll = _FakeScrollArea()
+    preview.attach_scroll_container(scroll)
+    preview.refresh()
+
+    preview.showEvent(object())
+
+    assert workflow.session.zoom_mode == "fit_page"
+    assert workflow.session.zoom == pytest.approx(0.8)
+
+
+def test_fit_modes_preserve_signature_overlay_page_and_coordinates(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=2),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    preview.attach_scroll_container(_FakeScrollArea())
+    preview.refresh()
+    signature = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=30.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+    preview.set_signature_overlay(signature)
+
+    for fit in (preview.fit_page_view, preview.fit_width_view):
+        fit()
+        snapshot = workflow.snapshot
+        assert snapshot is not None
+        assert snapshot.page_index == signature.page_index
+        actual = preview._current_overlay_view_rect()
+        expected = pdf_rect_to_view_rect(
+            pdf_rect=PdfRect(
+                x1=signature.left_pt,
+                y1=signature.bottom_pt,
+                x2=signature.left_pt + signature.width_pt,
+                y2=signature.bottom_pt + signature.height_pt,
+            ),
+            transform=ViewTransform(
+                zoom=snapshot.zoom,
+                pan_x=snapshot.pan_x,
+                pan_y=snapshot.pan_y,
+            ),
+            page_box=snapshot.page_box,
+            rotation=snapshot.rotation,
+        )
+        assert actual is not None
+        assert actual.x1 == pytest.approx(expected.x1)
+        assert actual.y1 == pytest.approx(expected.y1)
+        assert actual.x2 == pytest.approx(expected.x2)
+        assert actual.y2 == pytest.approx(expected.y2)
+
+
+def test_wheel_without_scroll_container_cannot_change_page(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=2),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    event = _FakeWheelEvent(delta_y=-120)
+
+    preview.wheelEvent(event)
+
+    assert event.accepted is True
+    assert workflow.session.current_page == 0
 
 
 class _FakeRect:
@@ -225,6 +363,7 @@ class _FakeScrollArea(_FakeWidget):
         self.focus_proxy = None
         self._horizontal_scroll_bar = _FakeScrollBar()
         self._vertical_scroll_bar = _FakeScrollBar()
+        self._viewport = _FakeViewport()
 
     def setWidget(self, widget):  # noqa: N802
         self.widget = widget
@@ -240,6 +379,17 @@ class _FakeScrollArea(_FakeWidget):
 
     def verticalScrollBar(self):  # noqa: N802
         return self._vertical_scroll_bar
+
+    def viewport(self):
+        return self._viewport
+
+
+class _FakeViewport:
+    def width(self):
+        return 180
+
+    def height(self):
+        return 160
 
 
 class _FakeScrollBar:
@@ -291,10 +441,11 @@ class _FakePixmap:
 
 class _OverlayRenderBackend:
     def render_page(self, request):  # pragma: no cover - simple test helper
+        size = int(200 * request.zoom)
         return RenderPageResult(
-            width_px=200,
-            height_px=200,
-            rgba_bytes=b"\x00" * (200 * 200 * 4),
+            width_px=size,
+            height_px=size,
+            rgba_bytes=b"\x00" * (size * size * 4),
         )
 
     def get_page_geometry(self, document_path: str, page_index: int):  # pragma: no cover
@@ -784,7 +935,10 @@ def test_zoom_refresh_resizes_widget_with_rendered_page(monkeypatch):
     assert widget.minimum_size == (260, 320)
     assert widget.size == (260, 320)
 
-    widget.wheelEvent(_FakeWheelEvent(delta_y=-120))
+    widget.attach_scroll_container(_FakeScrollArea())
+    widget.wheelEvent(
+        _FakeWheelEvent(delta_y=-120, modifiers=_FakeQt.ControlModifier)
+    )
 
     assert widget.minimum_size == (140, 180)
     assert widget.size == (140, 180)

@@ -88,3 +88,17 @@ def test_fit_rejects_non_positive_extents() -> None:
 
     with pytest.raises(ValueError, match="page"):
         session.fit_to_page(viewport_height_px=100, page_height_px=0)
+
+
+def test_default_zoom_limits_match_ui_spec_range() -> None:
+    session = ViewerSession(page_count=1)
+
+    assert session.zoom_limits.minimum == pytest.approx(0.10)
+    assert session.zoom_limits.maximum == pytest.approx(8.0)
+
+    for _ in range(20):
+        session.zoom_out()
+    assert session.zoom == pytest.approx(0.10)
+    for _ in range(40):
+        session.zoom_in()
+    assert session.zoom == pytest.approx(8.0)

@@ -108,8 +108,20 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     assert [action.toolTip() for action in view_menu.actions()] == [
         definition.accessible_name for definition in VIEW_COMMAND_DEFINITIONS
     ]
-    assert [action.isCheckable() for action in view_menu.actions()] == [False, False, True]
-    assert [action.isEnabled() for action in view_menu.actions()] == [False, False, False]
+    assert [action.isCheckable() for action in view_menu.actions()] == [
+        False,
+        False,
+        True,
+        False,
+        False,
+    ]
+    assert [action.isEnabled() for action in view_menu.actions()] == [
+        False,
+        False,
+        False,
+        False,
+        False,
+    ]
 
     settings_menu = next(
         menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Settings"
