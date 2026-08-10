@@ -71,8 +71,13 @@ Reusable-object and certificate tranche:
 - [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
 - [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
+- [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — typed inspection,
+  atomic import, and retained-file Configure are committed in `ad712ad7e` and `498d5c791`;
+  expiration sorting and the broader certificate lifecycle remain open.
+- [x] docs/ExecPlans/ui_certificate_create_export_password_execplan.md — guided five-year create,
+  password-confirmed identity fields, password-validated encrypted backup, secure remember/
+  preserve/disable, and deletion/reference behavior are implemented and validated in the current
+  slice; expiration sorting and password change remain open.
 - [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
 
 Placement, preview, and signing tranche:
@@ -163,7 +168,13 @@ Release tranche:
 - [x] (2026-08-10) Added the bounded certificate-import inspection increment: Settings Import now
   has a typed, non-mutating Inspect step for identity, issuer, validity, private-key presence, and
   warnings, then revalidates before the existing atomic configured-entry commit. Retained-file
-  Configure action, expiration sorting, and create/export/password lifecycle remain open.
+  Configure is now reachable from the Library and creates a typed configuration without changing
+  the managed file; expiration sorting and create/export/password lifecycle remain open.
+- [x] (2026-08-10) Implemented the certificate create/export/password lifecycle slice: guided
+  five-year self-signed creation now accepts full-name identity fields with confirmation, backup
+  export validates the existing encrypted PKCS#12 password, and management Save preserves,
+  enables, or explicitly disables remembered passwords through the secure-secret boundary. Full
+  suite and bounded GUI evidence remain at the child commit gate.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

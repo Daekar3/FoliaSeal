@@ -49,8 +49,13 @@ class CertificateCreationDialogControls:
     """Controls used by the certificate creation dialog."""
 
     dialog: Any
+    common_name: Any
     display_name: Any
+    email: Any
+    title: Any
+    organization: Any
     passphrase: Any
+    passphrase_confirmation: Any
     save_password: Any
     create_button: Any
     cancel_button: Any
@@ -66,6 +71,8 @@ class CertificateConfigurationManagementDialogControls:
     configuration_helper_label: Any
     display_name: Any
     notes: Any
+    remember_password: Any
+    password: Any
     managed_certificate_selector: Any
     managed_certificate_helper_label: Any
     save_button: Any
@@ -284,6 +291,7 @@ class CertificateCreationDialog:
         self._certificate_manager = certificate_manager
         self._on_create = on_create
         self.creation_result = None
+        self._display_name_autofill = True
         self.controls = self._build_controls(parent=parent)
 
     def exec(self) -> Any | None:
@@ -295,8 +303,12 @@ class CertificateCreationDialog:
         return self.creation_result
 
     def create_certificate(self) -> Any | None:
+        common_name = self.controls.common_name.text().strip()
         display_name = self.controls.display_name.text().strip()
+        if not display_name:
+            display_name = common_name
         passphrase = self.controls.passphrase.text()
+        passphrase_confirmation = self.controls.passphrase_confirmation.text()
         save_password = bool(self.controls.save_password.isChecked())
         try:
             result = self._certificate_manager.create(
@@ -304,6 +316,11 @@ class CertificateCreationDialog:
                     display_name=display_name,
                     passphrase=passphrase,
                     save_password=save_password,
+                    passphrase_confirmation=passphrase_confirmation,
+                    common_name=common_name,
+                    email=self.controls.email.text(),
+                    title=self.controls.title.text(),
+                    organization=self.controls.organization.text(),
                 )
             )
         except Exception as exc:
@@ -320,6 +337,15 @@ class CertificateCreationDialog:
                 "Certificate created",
                 "Certificate created successfully.",
             )
+        if result.managed_certificate is not None:
+            question = getattr(self._bindings.q_message_box, "question", None)
+            yes = getattr(self._bindings.q_message_box, "Yes", 1)
+            if callable(question) and question(
+                self.controls.dialog,
+                "Certificate created",
+                "Would you like to export an encrypted backup now?",
+            ) == yes:
+                self._export_backup(result, passphrase)
         accept = getattr(self.controls.dialog, "accept", None)
         if callable(accept):
             accept()
@@ -341,25 +367,44 @@ class CertificateCreationDialog:
             "configuration for the main signing workflow."
         )
         introduction_label.setWordWrap(True)
+        common_name = self._bindings.q_line_edit("")
         display_name = self._bindings.q_line_edit("")
+        email = self._bindings.q_line_edit("")
+        title = self._bindings.q_line_edit("")
+        organization = self._bindings.q_line_edit("")
         passphrase = self._bindings.q_line_edit("")
+        passphrase_confirmation = self._bindings.q_line_edit("")
         save_password = self._bindings.q_check_box("Save password securely")
         create_button = self._bindings.q_push_button("Create")
         cancel_button = self._bindings.q_push_button("Cancel")
 
         layout.addRow("", introduction_label)
+        layout.addRow("Full name", common_name)
         layout.addRow("Display name", display_name)
+        layout.addRow("Email (optional)", email)
+        layout.addRow("Title (optional)", title)
+        layout.addRow("Organization (optional)", organization)
         layout.addRow("Password", passphrase)
+        layout.addRow("Confirm password", passphrase_confirmation)
         layout.addRow("", save_password)
         layout.addRow(create_button, cancel_button)
 
         create_button.clicked.connect(self.create_certificate)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
+        common_name.textChanged.connect(self._prefill_display_name)  # type: ignore[attr-defined]
+        display_name.textChanged.connect(self._track_display_name_edit)  # type: ignore[attr-defined]
+        self._set_password_mode(passphrase)
+        self._set_password_mode(passphrase_confirmation)
 
         return CertificateCreationDialogControls(
             dialog=dialog,
+            common_name=common_name,
             display_name=display_name,
+            email=email,
+            title=title,
+            organization=organization,
             passphrase=passphrase,
+            passphrase_confirmation=passphrase_confirmation,
             save_password=save_password,
             create_button=create_button,
             cancel_button=cancel_button,
@@ -369,6 +414,54 @@ class CertificateCreationDialog:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.controls.dialog, "Certificate creation error", message)
+
+    def _export_backup(self, result: Any, passphrase: str) -> Path | None:
+        managed = result.managed_certificate
+        if managed is None:
+            return None
+        selected = self._bindings.q_file_dialog.getSaveFileName(
+            self.controls.dialog,
+            "Export certificate backup",
+            managed.storage_filename,
+            "PKCS#12 files (*.p12 *.pfx);;All files (*)",
+        )
+        selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
+        if not selected_path:
+            return None
+        try:
+            exported = self._certificate_manager.export(
+                ExportCertificateRequest(
+                    certificate_id=managed.managed_certificate_id,
+                    destination_path=selected_path,
+                    passphrase=passphrase,
+                )
+            ).exported_path
+        except Exception as exc:
+            self._show_error(str(exc))
+            return None
+        information = getattr(self._bindings.q_message_box, "information", None)
+        if callable(information) and exported is not None:
+            information(
+                self.controls.dialog,
+                "Certificate backup exported",
+                f"Encrypted certificate backup exported to {exported}.",
+            )
+        return exported
+
+    def _prefill_display_name(self, value: str) -> None:
+        if self._display_name_autofill:
+            self.controls.display_name.setText(value)
+
+    def _track_display_name_edit(self, value: str) -> None:
+        if value != self.controls.common_name.text():
+            self._display_name_autofill = False
+
+    def _set_password_mode(self, widget: Any) -> None:
+        setter = getattr(widget, "setEchoMode", None)
+        echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
+        password_mode = getattr(echo_mode, "Password", None)
+        if callable(setter) and password_mode is not None:
+            setter(password_mode)
 
 
 class CertificateConfigurationManagementDialog:
@@ -452,9 +545,13 @@ class CertificateConfigurationManagementDialog:
         if configuration is None:
             self.controls.display_name.setText("")
             self.controls.notes.setText("")
+            self.controls.remember_password.setChecked(False)
+            self.controls.password.setText("")
             return None
         self.controls.display_name.setText(configuration.display_name)
         self.controls.notes.setText(configuration.notes or "")
+        self.controls.remember_password.setChecked(configuration.save_password)
+        self.controls.password.setText("")
         return configuration
 
     def save_selected_configuration(self) -> CertificateConfiguration | None:
@@ -473,6 +570,8 @@ class CertificateConfigurationManagementDialog:
                     configuration_id=configuration.certificate_configuration_id,
                     display_name=self.controls.display_name.text(),
                     notes=self.controls.notes.text(),
+                    save_password=bool(self.controls.remember_password.isChecked()),
+                    passphrase=self.controls.password.text() or None,
                 )
             )
         except Exception as exc:
@@ -548,17 +647,51 @@ class CertificateConfigurationManagementDialog:
         selected_path = str(selected[0] if isinstance(selected, tuple) else selected).strip()
         if not selected_path:
             return None
+        catalog = self._certificate_manager.snapshot()
+        configuration = next(
+            (
+                item
+                for item in catalog.certificate_configurations
+                if item.managed_certificate_id == certificate_id
+            ),
+            None,
+        )
+        passphrase = None
+        if configuration is None or not configuration.save_password:
+            passphrase = self._prompt_export_password()
+            if passphrase is None and callable(
+                getattr(getattr(self._bindings, "q_input_dialog", None), "getText", None)
+            ):
+                return None
         try:
             result = self._certificate_manager.export(
                 ExportCertificateRequest(
                     certificate_id=certificate_id,
                     destination_path=selected_path,
+                    passphrase=passphrase,
                 )
             )
         except Exception as exc:
-            self._show_error(str(exc))
-            self.reload_configurations()
-            return None
+            if passphrase is None and "password" in str(exc).casefold():
+                passphrase = self._prompt_export_password()
+                if passphrase is None:
+                    return None
+                try:
+                    result = self._certificate_manager.export(
+                        ExportCertificateRequest(
+                            certificate_id=certificate_id,
+                            destination_path=selected_path,
+                            passphrase=passphrase,
+                        )
+                    )
+                except Exception as retry_exc:
+                    self._show_error(str(retry_exc))
+                    self.reload_configurations()
+                    return None
+            else:
+                self._show_error(str(exc))
+                self.reload_configurations()
+                return None
 
         self._emit_changed_if_needed(result.operation != "exported")
         self._show_information(f"Managed certificate exported to {result.exported_path}.")
@@ -593,6 +726,8 @@ class CertificateConfigurationManagementDialog:
         managed_certificate_selector = self._bindings.q_combo_box()
         managed_certificate_helper_label = self._bindings.q_label("")
         managed_certificate_helper_label.setWordWrap(True)
+        remember_password = self._bindings.q_check_box("Remember password securely")
+        password = self._bindings.q_line_edit("")
         save_button = self._bindings.q_push_button("Save")
         delete_button = self._bindings.q_push_button("Delete")
         export_certificate_button = self._bindings.q_push_button("Export certificate")
@@ -604,6 +739,8 @@ class CertificateConfigurationManagementDialog:
         layout.addRow("", configuration_helper_label)
         layout.addRow("Display name", display_name)
         layout.addRow("Notes", notes)
+        layout.addRow("", remember_password)
+        layout.addRow("Password", password)
         layout.addRow("Managed certificate", managed_certificate_selector)
         layout.addRow("", managed_certificate_helper_label)
         layout.addRow("", save_button)
@@ -620,6 +757,7 @@ class CertificateConfigurationManagementDialog:
         export_certificate_button.clicked.connect(self.export_selected_managed_certificate)  # type: ignore[attr-defined]
         delete_certificate_button.clicked.connect(self.delete_selected_managed_certificate)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
+        self._set_password_mode(password)
 
         return CertificateConfigurationManagementDialogControls(
             dialog=dialog,
@@ -628,6 +766,8 @@ class CertificateConfigurationManagementDialog:
             configuration_helper_label=configuration_helper_label,
             display_name=display_name,
             notes=notes,
+            remember_password=remember_password,
+            password=password,
             managed_certificate_selector=managed_certificate_selector,
             managed_certificate_helper_label=managed_certificate_helper_label,
             save_button=save_button,
@@ -702,6 +842,46 @@ class CertificateConfigurationManagementDialog:
         information = getattr(self._bindings.q_message_box, "information", None)
         if callable(information):
             information(self.controls.dialog, "Certificate configuration", message)
+
+    def _prompt_export_password(self) -> str | None:
+        input_dialog = getattr(self._bindings, "q_input_dialog", None)
+        get_text = getattr(input_dialog, "getText", None)
+        if not callable(get_text):
+            return None
+        mode = getattr(input_dialog, "Password", None)
+        try:
+            selected = (
+                get_text(
+                    self.controls.dialog,
+                    "Export certificate",
+                    "Certificate password",
+                    mode,
+                )
+                if mode is not None
+                else get_text(
+                    self.controls.dialog,
+                    "Export certificate",
+                    "Certificate password",
+                )
+            )
+        except TypeError:
+            selected = get_text(
+                self.controls.dialog,
+                "Export certificate",
+                "Certificate password",
+            )
+        if isinstance(selected, tuple):
+            value, accepted = selected
+            return str(value) if accepted and str(value).strip() else None
+        value = str(selected)
+        return value if value.strip() else None
+
+    def _set_password_mode(self, widget: Any) -> None:
+        setter = getattr(widget, "setEchoMode", None)
+        echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
+        password_mode = getattr(echo_mode, "Password", None)
+        if callable(setter) and password_mode is not None:
+            setter(password_mode)
 
 
 class AppFrameCertificateDialogService:

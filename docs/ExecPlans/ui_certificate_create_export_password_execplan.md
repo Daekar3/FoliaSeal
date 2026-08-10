@@ -14,15 +14,31 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
+- [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — content inspection,
+  atomic import, and retained-file Configure are committed in `ad712ad7e` and `498d5c791`.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the existing manager, secure-secret boundary, catalog repository,
+  certificate dialogs, and governing UI_SPEC workflow. The existing create/export/delete paths
+  are present, but creation is one-year and lacks confirmation/subject fields; management Save
+  also clears remembered passwords instead of preserving or explicitly disabling them.
+- [x] (2026-08-10) Added red focused tests for five-year identity construction, password
+  confirmation, remembered-password preservation/disable, and export password validation; the
+  pre-implementation run reported four failures for the missing request fields and behavior.
+- [x] (2026-08-10) Implemented five-year self-signed creation with full-name, email, title, and
+  organization subject fields; the Qt dialog now requires matching confirmation and pre-fills the
+  display name. Management Save preserves remembered secrets, explicit disable removes them, and
+  enabling validates the supplied password before secure storage. Export validates a supplied or
+  remembered password before copying encrypted bytes and leaves managed state unchanged.
+- [x] (2026-08-10) Reviewed changed source and tests for migrated compatibility or phase3 product
+  cruft. No new phase3 nomenclature was introduced; the remaining dialog compatibility snapshot is
+  still consumed by app-frame tests and has no safe retirement condition in this slice.
+- [x] (2026-08-10) Ran focused manager/dialog/app-frame validation: Ruff and `git diff --check`
+  are clean and the focused manager/dialog command reports 29 passed. Full-suite, bounded GUI,
+  and cleanup evidence are recorded below.
+- [x] (2026-08-10) Updated this plan, the parent compliance record, and `docs/ARCHITECTURE.md`;
+  the behavior and documentation are ready for the commit gate.
 
 ## Surprises & Discoveries
 
@@ -30,19 +46,46 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   the five-year UI_SPEC recommendation is an explicit behavior change rather than a label-only
   adjustment.
   Evidence: src/foliaseal/application/certificate_manager.py:358-360.
+- Observation: the existing management Save request has no password intent and always writes
+  `save_password=False`, which can silently discard a remembered secret.
+  Evidence: `CertificateManager.save_configuration()` reconstructs the configuration with a null
+  `password_secret_ref`; the management dialog exposes only display name and notes.
+- Observation: raw repository export already preserves the encrypted `.p12` bytes and managed
+  state, but the application boundary does not yet validate the existing password before a GUI
+  backup.
+  Evidence: `CertificateManager.export()` delegates directly to
+  `export_managed_certificate_by_id()` without a passphrase or certificate-content check.
 
 ## Decision Log
 
 - Decision: obey SPEC.md, SCHEMAS.md, and UI_SPEC.md in that precedence order.
   Rationale: these are the repository's explicit authority boundaries.
   Date/Author: 2026-08-09 / Codex
-- Decision: keep the slice limited to one user-visible certificate creation, export, remembered passwords, and deletion outcome.
+- Decision: keep the slice limited to one user-visible certificate creation, export, remembered
+  passwords, and deletion outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: preserve the existing positional `display_name`/`passphrase` constructor shape for
+  headless callers while adding optional subject fields and confirmation to the typed request.
+  Rationale: the real GUI path will use the complete guided form, while existing application tests
+  remain explicit callers rather than an excuse to keep a product-facing compatibility surface.
+  Date/Author: 2026-08-10 / Codex
+- Decision: make remembered-password intent explicit in `SaveConfigurationRequest`: omitted intent
+  preserves current state, `False` removes the secure secret, and `True` requires secure storage
+  plus a validated password before persistence.
+  Rationale: a rename or notes edit must never erase a credential, and disabling must be a visible,
+  deliberate user action as required by UI_SPEC section 15.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+This slice now provides the complete guided certificate lifecycle promised here: a five-year
+self-signed certificate can be created with full-name identity fields and matching password
+confirmation; the user is offered an encrypted backup whose supplied password is validated; and
+the management dialog can preserve, enable, or explicitly disable a remembered password without
+putting the secret in catalog JSON. Configuration deletion still preserves the managed file, while
+managed-file deletion remains guarded by configuration references. Expiration sorting and password
+change are separate product gaps and remain in their owning plans/out-of-scope boundaries.
 
 ## Context and Orientation
 
@@ -105,7 +148,9 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+cleanup result; the bounded timeout is only a lifecycle check. In this environment the bounded
+offscreen launch reached its timeout (`launch_rc=124`) without leaving a process; the fake-binding
+Qt tests are the authoritative visible-flow evidence and no display-backed success is claimed.
 
 ## Validation and Acceptance
 
@@ -130,6 +175,22 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
+Evidence for this implementation:
+
+- The red manager run reported four failures before the new request fields and behavior existed.
+- Focused command `.venv/bin/pytest -q tests/unit/test_certificate_manager.py
+  tests/unit/test_qt_app_frame_certificate_management.py` reports `29 passed`; the broader impacted
+  command reports `93 passed`.
+- Full repository command `.venv/bin/pytest -q` reports `1266 passed, 20 skipped, 1 warning` in
+  48.49 seconds; the warning is the pre-existing Pillow `Image.getdata` deprecation.
+- Visible fake-Qt scenarios cover full-name/subject-field creation, matching confirmation, the
+  post-create encrypted-backup offer, password validation, and remember-password enablement. No
+  passwords or generated certificate files were committed.
+- Bounded offscreen launch under isolated XDG roots timed out at 30 seconds (`launch_rc=124`), the
+  temporary root was removed, and the process audit found no FoliaSeal/PySide6/pytest process.
+- No SVG was added: this Settings certificate surface uses existing dialog topology and does not
+  alter the normative Library topology.
+
 ## Idempotence and Recovery
 
 Use temporary configuration and sibling output paths. If work fails halfway, preserve user PDFs and
@@ -146,6 +207,10 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
 or workspace ports. The final behavior must be exercised by tests/unit/test_certificate_manager.py tests/unit/test_certificate_storage.py tests/unit/test_secret_storage.py and tests/unit/test_qt_app_frame_certificate_management.py. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
+
+Revision note: 2026-08-10 / Codex
+Completed the guided five-year create/export/password lifecycle, added red-to-green manager and
+Qt evidence, and recorded the bounded GUI timeout/cleanup limitation.
 
 Revision note: 2026-08-09 / Codex
 Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.

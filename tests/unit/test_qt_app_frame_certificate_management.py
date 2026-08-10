@@ -44,8 +44,13 @@ def test_certificate_creation_dialog_creates_and_refreshes(tmp_path: Path) -> No
 
     outcome = service.show_creation_dialog()
     dialog = outcome.compatibility.creation_dialog
+    dialog.controls.common_name.setText("Alice Example")
     dialog.controls.display_name.setText("Alice Signing")
     dialog.controls.passphrase.setText("correct horse")
+    dialog.controls.passphrase_confirmation.setText("correct horse")
+    dialog.controls.email.setText("alice@example.test")
+    dialog.controls.title.setText("Board Secretary")
+    dialog.controls.organization.setText("Example Org")
     result = dialog.create_certificate()
 
     assert result is not None
@@ -55,7 +60,10 @@ def test_certificate_creation_dialog_creates_and_refreshes(tmp_path: Path) -> No
         configuration.managed_certificate_id
     )
     assert managed_certificate.source_kind == "created"
-    assert managed_certificate.subject_summary.common_name == "Alice Signing"
+    assert managed_certificate.subject_summary.common_name == "Alice Example"
+    assert managed_certificate.subject_summary.email == "alice@example.test"
+    assert managed_certificate.subject_summary.title == "Board Secretary"
+    assert managed_certificate.subject_summary.company == "Example Org"
     assert (
         certificate_store.managed_certificate_dir / managed_certificate.storage_filename
     ).exists()
@@ -75,8 +83,10 @@ def test_certificate_creation_dialog_saves_password_outside_catalog(
     )
 
     dialog = service.show_creation_dialog().compatibility.creation_dialog
+    dialog.controls.common_name.setText("Alice Example")
     dialog.controls.display_name.setText("Alice Signing")
     dialog.controls.passphrase.setText("correct horse")
+    dialog.controls.passphrase_confirmation.setText("correct horse")
     dialog.controls.save_password.setChecked(True)
     result = dialog.create_certificate()
 
@@ -189,6 +199,57 @@ def test_certificate_import_dialog_saves_password_outside_catalog(
     )
     assert secret_store.secrets[configuration.password_secret_ref] == passphrase
     assert passphrase not in certificate_store.catalog_path.read_text(encoding="utf-8")
+
+
+def test_certificate_creation_dialog_offers_encrypted_backup_after_success(
+    tmp_path: Path,
+) -> None:
+    bindings, certificate_store, _, _, service = _build_service(tmp_path)
+    destination = tmp_path / "backup" / "alice.p12"
+    bindings.q_message_box.next_question_result = bindings.q_message_box.Yes
+    bindings.q_file_dialog.next_save_file_name = str(destination)
+
+    dialog = service.show_creation_dialog().compatibility.creation_dialog
+    dialog.controls.common_name.setText("Alice Example")
+    dialog.controls.display_name.setText("Alice Signing")
+    dialog.controls.passphrase.setText("correct horse")
+    dialog.controls.passphrase_confirmation.setText("correct horse")
+    result = dialog.create_certificate()
+
+    assert result is not None
+    assert destination.exists()
+    assert destination.read_bytes() == (
+        certificate_store.managed_certificate_dir
+        / result.managed_certificate.storage_filename
+    ).read_bytes()
+    assert bindings.q_message_box.question_calls[-1][1] == "Certificate created"
+    assert bindings.q_message_box.information_calls[-1][1] == "Certificate backup exported"
+
+
+def test_certificate_management_dialog_enables_remembered_password_after_validation(
+    tmp_path: Path,
+) -> None:
+    bindings, certificate_store, secret_store, refresh_log, service = _build_service(tmp_path)
+    creation = service.show_creation_dialog().compatibility.creation_dialog
+    creation.controls.common_name.setText("Alice Example")
+    creation.controls.display_name.setText("Alice Signing")
+    creation.controls.passphrase.setText("correct horse")
+    creation.controls.passphrase_confirmation.setText("correct horse")
+    assert creation.create_certificate() is not None
+
+    management = service.show_management_dialog().compatibility.management_dialog
+    management.controls.remember_password.setChecked(True)
+    management.controls.password.setText("correct horse")
+    saved = management.save_selected_configuration()
+
+    assert saved is not None
+    assert saved.save_password is True
+    assert saved.password_secret_ref is not None
+    assert secret_store.secrets[saved.password_secret_ref] == "correct horse"
+    assert refresh_log == ["refresh", "refresh"]
+    assert certificate_store.load_catalog().configuration_by_id(
+        saved.certificate_configuration_id
+    ).save_password is True
 
 
 def test_certificate_import_choose_button_prefills_path_and_name(

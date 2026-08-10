@@ -160,6 +160,59 @@ def test_manager_create_and_import_return_typed_operations(tmp_path: Path) -> No
     assert imported.managed_certificate.subject_summary.common_name == "Alice Imported"
 
 
+def test_manager_create_uses_five_year_identity_fields_and_confirmation(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    manager = _manager(store, ids=("managed-created", "config-created"))
+
+    result = manager.create(
+        CreateCertificateRequest(
+            display_name="Alice Signing",
+            passphrase="secret",
+            passphrase_confirmation="secret",
+            common_name="Alice Example",
+            email="alice@example.test",
+            title="Board Secretary",
+            organization="Example Org",
+        )
+    )
+
+    assert result.managed_file_path is not None
+    key, certificate, _ = pkcs12.load_key_and_certificates(
+        result.managed_file_path.read_bytes(), b"secret"
+    )
+    assert key is not None
+    assert certificate is not None
+    assert certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == (
+        "Alice Example"
+    )
+    assert certificate.subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS)[0].value == (
+        "alice@example.test"
+    )
+    assert certificate.subject.get_attributes_for_oid(NameOID.TITLE)[0].value == (
+        "Board Secretary"
+    )
+    assert certificate.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value == (
+        "Example Org"
+    )
+    assert certificate.not_valid_after_utc.year == 2031
+
+
+def test_manager_create_rejects_mismatched_confirmation(tmp_path: Path) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    manager = _manager(store)
+
+    with pytest.raises(ValueError, match="passwords do not match"):
+        manager.create(
+            CreateCertificateRequest(
+                display_name="Alice Signing",
+                passphrase="secret",
+                passphrase_confirmation="different",
+            )
+        )
+
+
 def test_manager_inspects_import_without_mutating_catalog(tmp_path: Path) -> None:
     store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
     source = tmp_path / "alice.p12"
@@ -275,6 +328,73 @@ def test_manager_save_and_delete_configuration_preserves_managed_certificate(
     catalog = manager.snapshot()
     assert catalog.certificate_configurations == ()
     assert catalog.managed_certificates
+
+
+def test_manager_save_configuration_preserves_and_explicitly_disables_password(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    secret_store = FakeSecretStore()
+    store.save_catalog(build_certificate_catalog())
+    configuration = store.load_catalog().certificate_configurations[0]
+    secret_ref = "secret://test/cert-config-default"
+    secret_store.values[secret_ref] = "secret"
+    store.save_catalog(
+        replace(
+            store.load_catalog(),
+            certificate_configurations=(
+                replace(configuration, save_password=True, password_secret_ref=secret_ref),
+            ),
+        )
+    )
+    manager = _manager(store, secret_store=secret_store)
+
+    preserved = manager.save_configuration(
+        SaveConfigurationRequest("cert-config-default", "Renamed Signing", "Notes")
+    )
+    assert preserved.certificate_configuration is not None
+    assert preserved.certificate_configuration.save_password is True
+    assert secret_store.values[secret_ref] == "secret"
+
+    disabled = manager.save_configuration(
+        SaveConfigurationRequest(
+            "cert-config-default",
+            "Renamed Signing",
+            "Notes",
+            save_password=False,
+        )
+    )
+    assert disabled.certificate_configuration is not None
+    assert disabled.certificate_configuration.save_password is False
+    assert secret_ref not in secret_store.values
+
+
+def test_manager_export_validates_supplied_password_without_mutating_state(
+    tmp_path: Path,
+) -> None:
+    store = CertificateCatalogStore(storage_dir=tmp_path / "Certificates")
+    manager = _manager(store, ids=("managed-created", "config-created"))
+    created = manager.create(CreateCertificateRequest("Alice Signing", "secret"))
+    assert created.managed_certificate is not None
+    destination = tmp_path / "backup" / "alice.p12"
+
+    with pytest.raises(ValueError, match="password"):
+        manager.export(
+            ExportCertificateRequest(
+                created.managed_certificate.managed_certificate_id,
+                destination,
+                passphrase="wrong",
+            )
+        )
+    exported = manager.export(
+        ExportCertificateRequest(
+            created.managed_certificate.managed_certificate_id,
+            destination,
+            passphrase="secret",
+        )
+    )
+    assert exported.exported_path == destination
+    assert manager.snapshot() == created.catalog
 
 
 def test_manager_blocks_deleting_configuration_referenced_by_preset(tmp_path: Path) -> None:

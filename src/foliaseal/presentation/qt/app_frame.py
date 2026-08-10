@@ -124,6 +124,7 @@ class QtAppFrameBindings:
     q_icon: type[Any]
     q_application: type[Any]
     qpdf_document: type[Any]
+    q_input_dialog: Any | None = None
     q_palette: type[Any] | None = None
     q_color: type[Any] | None = None
     q_local_server: type[Any] | None = None
@@ -1854,6 +1855,7 @@ class QtAppFrameAdapter:
             q_icon=getattr(qt_gui, "QIcon"),
             q_application=getattr(qt_widgets, "QApplication"),
             qpdf_document=getattr(qtpdf, "QPdfDocument"),
+            q_input_dialog=getattr(qt_widgets, "QInputDialog"),
             q_palette=getattr(qt_gui, "QPalette"),
             q_color=getattr(qt_gui, "QColor"),
             q_local_server=getattr(qt_network, "QLocalServer"),

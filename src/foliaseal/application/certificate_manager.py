@@ -37,6 +37,11 @@ class CreateCertificateRequest:
     display_name: str
     passphrase: str
     save_password: bool = False
+    passphrase_confirmation: str | None = None
+    common_name: str | None = None
+    email: str | None = None
+    title: str | None = None
+    organization: str | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +57,9 @@ class SaveConfigurationRequest:
     configuration_id: str
     display_name: str
     notes: str
+    save_password: bool | None = None
+    passphrase: str | None = None
+    passphrase_confirmation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +75,7 @@ class ConfigureCertificateRequest:
 class ExportCertificateRequest:
     certificate_id: str
     destination_path: str | Path
+    passphrase: str | None = None
 
 
 @dataclass(frozen=True)
@@ -160,12 +169,25 @@ class CertificateManager:
         name = self._normalized_name(request.display_name)
         if not isinstance(request.passphrase, str) or not request.passphrase.strip():
             raise ValueError("Certificate password cannot be blank.")
+        if (
+            request.passphrase_confirmation is not None
+            and request.passphrase != request.passphrase_confirmation
+        ):
+            raise ValueError("Certificate passwords do not match.")
+        common_name = self._normalized_name(request.common_name or name)
         catalog = self.snapshot()
         self._ensure_unique_name(catalog, name)
         managed_id, configuration_id = self._new_id(), self._new_id()
         created_at = self._now()
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        certificate = self._build_certificate(key=key, display_name=name, created_at=created_at)
+        certificate = self._build_certificate(
+            key=key,
+            common_name=common_name,
+            email=self._optional_value(request.email),
+            title=self._optional_value(request.title),
+            organization=self._optional_value(request.organization),
+            created_at=created_at,
+        )
         payload = pkcs12.serialize_key_and_certificates(
             name=name.encode("utf-8"),
             key=key,
@@ -182,7 +204,7 @@ class CertificateManager:
             storage_filename=f"cert_{managed_id}.p12",
             source_kind="created",
             created_at=self._now_iso(created_at),
-            subject_summary=ManagedCertificateSubjectSummary(common_name=name),
+            subject_summary=self._subject_summary(certificate),
         )
         configuration = CertificateConfiguration(
             schema_version=1,
@@ -252,11 +274,20 @@ class CertificateManager:
         ):
             raise ConfigValidationError(f"Certificate configuration '{name}' already exists.")
         updated = replace(configuration, display_name=name, notes=request.notes.strip() or None)
-        return CertificateOperationResult(
-            catalog=self.store.save_configuration(updated),
-            operation="configuration_saved",
-            certificate_configuration=updated,
-        )
+        requested_save = request.save_password
+        if requested_save is None:
+            return CertificateOperationResult(
+                catalog=self.store.save_configuration(updated),
+                operation="configuration_saved",
+                certificate_configuration=updated,
+            )
+        if requested_save:
+            return self._save_configuration_with_password(
+                updated,
+                request.passphrase,
+                request.passphrase_confirmation,
+            )
+        return self._disable_configuration_password(updated)
 
     def configure_managed_certificate(
         self,
@@ -333,14 +364,98 @@ class CertificateManager:
         )
 
     def export(self, request: ExportCertificateRequest) -> CertificateOperationResult:
+        catalog = self.snapshot()
+        passphrase = request.passphrase
+        if passphrase is None:
+            configuration = next(
+                (
+                    item
+                    for item in catalog.certificate_configurations
+                    if item.managed_certificate_id == request.certificate_id
+                ),
+                None,
+            )
+            if configuration is not None and configuration.save_password:
+                if self.secret_store is None or configuration.password_secret_ref is None:
+                    raise ConfigValidationError(
+                        "Saved certificate password is unavailable. Enter it manually to export."
+                    )
+                passphrase = self.secret_store.get_secret(configuration.password_secret_ref)
+                if not passphrase:
+                    raise ConfigValidationError(
+                        "Saved certificate password is unavailable. Enter it manually to export."
+                    )
+        if passphrase is not None:
+            self._validate_export_password(request.certificate_id, passphrase)
         exported = self.store.export_managed_certificate_by_id(
             request.certificate_id,
             request.destination_path,
         )
         return CertificateOperationResult(
-            catalog=self.snapshot(),
+            catalog=catalog,
             operation="exported",
             exported_path=exported,
+        )
+
+    def _save_configuration_with_password(
+        self,
+        configuration: CertificateConfiguration,
+        passphrase: str | None,
+        passphrase_confirmation: str | None,
+    ) -> CertificateOperationResult:
+        self._require_secret_store()
+        if passphrase is None:
+            if not configuration.save_password or configuration.password_secret_ref is None:
+                raise ConfigValidationError(
+                    "Enter the certificate password before enabling secure password saving."
+                )
+            return CertificateOperationResult(
+                catalog=self.store.save_configuration(configuration),
+                operation="configuration_saved",
+                certificate_configuration=configuration,
+            )
+        self._validate_password_confirmation(passphrase, passphrase_confirmation)
+        self._validate_export_password(configuration.managed_certificate_id, passphrase)
+        secret_ref = configuration.password_secret_ref
+        if secret_ref is None:
+            secret_ref = self.secret_store.secret_ref_for_configuration(  # type: ignore[union-attr]
+                configuration.certificate_configuration_id
+            )
+        previous_secret = self.secret_store.get_secret(secret_ref)  # type: ignore[union-attr]
+        self.secret_store.set_secret(secret_ref, passphrase)  # type: ignore[union-attr]
+        updated = replace(configuration, save_password=True, password_secret_ref=secret_ref)
+        try:
+            catalog = self.store.save_configuration(updated)
+        except Exception as exc:
+            self._restore_secret_value(secret_ref, previous_secret, exc)
+            raise
+        return CertificateOperationResult(
+            catalog=catalog,
+            operation="configuration_saved",
+            certificate_configuration=updated,
+        )
+
+    def _disable_configuration_password(
+        self,
+        configuration: CertificateConfiguration,
+    ) -> CertificateOperationResult:
+        secret_ref = configuration.password_secret_ref
+        previous_secret: str | None = None
+        if secret_ref is not None:
+            self._require_secret_store()
+            previous_secret = self.secret_store.get_secret(secret_ref)  # type: ignore[union-attr]
+            self.secret_store.delete_secret(secret_ref)  # type: ignore[union-attr]
+        updated = replace(configuration, save_password=False, password_secret_ref=None)
+        try:
+            catalog = self.store.save_configuration(updated)
+        except Exception as exc:
+            if secret_ref is not None:
+                self._restore_secret_value(secret_ref, previous_secret, exc)
+            raise
+        return CertificateOperationResult(
+            catalog=catalog,
+            operation="configuration_saved",
+            certificate_configuration=updated,
         )
 
     def _commit_new_certificate(
@@ -418,6 +533,22 @@ class CertificateManager:
                 f"{original_error} The saved password could not be restored: {exc}"
             ) from exc
 
+    def _restore_secret_value(
+        self,
+        secret_ref: str,
+        previous_secret: str | None,
+        original_error: Exception,
+    ) -> None:
+        try:
+            if previous_secret is None:
+                self.secret_store.delete_secret(secret_ref)  # type: ignore[union-attr]
+            else:
+                self.secret_store.set_secret(secret_ref, previous_secret)  # type: ignore[union-attr]
+        except Exception as exc:
+            raise CertificateManagerError(
+                f"{original_error} The saved password could not be restored: {exc}"
+            ) from exc
+
     @staticmethod
     def _normalized_name(value: str) -> str:
         name = value.strip()
@@ -448,9 +579,26 @@ class CertificateManager:
 
     @staticmethod
     def _build_certificate(
-        *, key: rsa.RSAPrivateKey, display_name: str, created_at: datetime
+        *,
+        key: rsa.RSAPrivateKey,
+        common_name: str,
+        email: str | None,
+        title: str | None,
+        organization: str | None,
+        created_at: datetime,
     ) -> x509.Certificate:
-        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, display_name)])
+        attributes = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)]
+        if email is not None:
+            attributes.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, email))
+        if title is not None:
+            attributes.append(x509.NameAttribute(NameOID.TITLE, title))
+        if organization is not None:
+            attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, organization))
+        subject = issuer = x509.Name(attributes)
+        try:
+            valid_until = created_at.replace(year=created_at.year + 5)
+        except ValueError:
+            valid_until = created_at.replace(year=created_at.year + 5, day=28)
         return (
             x509.CertificateBuilder()
             .subject_name(subject)
@@ -458,10 +606,34 @@ class CertificateManager:
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
             .not_valid_before(created_at - timedelta(days=1))
-            .not_valid_after(created_at + timedelta(days=365))
+            .not_valid_after(valid_until)
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .sign(key, hashes.SHA256())
         )
+
+    @staticmethod
+    def _optional_value(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @staticmethod
+    def _validate_password_confirmation(
+        passphrase: str,
+        confirmation: str | None,
+    ) -> None:
+        if not passphrase.strip():
+            raise ValueError("Certificate password cannot be blank.")
+        if confirmation is not None and passphrase != confirmation:
+            raise ValueError("Certificate passwords do not match.")
+
+    def _validate_export_password(self, certificate_id: str, passphrase: str) -> None:
+        if not passphrase.strip():
+            raise ValueError("Certificate export requires a password.")
+        certificate = self.snapshot().managed_certificate_by_id(certificate_id)
+        material = self.store.material_for(certificate)
+        self._load_pkcs12(Path(material.certificate_path), passphrase)
 
     @staticmethod
     def _load_pkcs12(source: Path, passphrase: str) -> tuple[object, object]:
