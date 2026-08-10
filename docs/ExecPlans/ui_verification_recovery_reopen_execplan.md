@@ -50,8 +50,8 @@ Qt surface, focused tests, and observable acceptance.
   review findings were addressed for strict validity, required timestamp/trust, every-signature
   verification, explicit artifact cleanup, and the distinct untrusted reopen/permission gate.
   Display-backed recovery acceptance remains environment-blocked by `SingleInstanceUnavailable`.
-- [ ] (2026-08-10) Commit the completed recovery closeout and record the remaining
-  dependency-ordered blockers.
+- [x] (2026-08-10) Committed the completed recovery closeout and recorded the remaining
+  dependency-ordered blockers as `6370e3f0b`.
 
 ## Surprises & Discoveries
 
@@ -222,4 +222,4 @@ Closed the recovery child after reconciling the parent and architecture docs. Cu
 recovery/app-frame/sidebar/document-review evidence is `52 passed`; the full suite is `1440 passed,
 20 skipped, 1 warning`; the bounded GUI launch remains environment-limited by
 `SingleInstanceUnavailable`, with owned processes and temporary roots cleaned up. The closeout is
-prepared for commit in the current working tree.
+committed as `6370e3f0b`.
