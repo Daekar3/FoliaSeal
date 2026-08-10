@@ -407,6 +407,7 @@ class FoliaSealAppFrame:
                 reopen_target=self.open_pdf_path,
                 on_error=self._emit_error,
                 on_status_change=self._handle_status_change,
+                on_open_signature_library=self.show_reusable_object_library,
             ),
             workspace_open_port=self._workspace_open_port,
             mount_port=self._workspace_mount,

@@ -132,6 +132,9 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     def _reopen_target(_path) -> None:
         return None
 
+    def _open_library() -> None:
+        return None
+
     reusable_objects = _reusable_objects()
     outcome = service.open_workspace(
         OpenWorkspaceCommand(
@@ -148,6 +151,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
             reopen_target=_reopen_target,
             on_error=lambda message: None,
             on_status_change=lambda status: None,
+            on_open_signature_library=_open_library,
         )
     )
 
@@ -164,6 +168,7 @@ def test_workspace_open_service_builds_shell_outcome_from_command(tmp_path: Path
     assert shell_factory.bootstrap_calls[0].reusable_objects is reusable_objects
     assert shell_factory.bootstrap_calls[0].sign_executor is sign_executor
     assert shell_factory.bootstrap_calls[0].on_open_signed_output is _reopen_target
+    assert shell_factory.bootstrap_calls[0].on_open_signature_library is _open_library
 
 
 def test_workspace_open_service_raises_when_pdf_load_fails(tmp_path: Path) -> None:

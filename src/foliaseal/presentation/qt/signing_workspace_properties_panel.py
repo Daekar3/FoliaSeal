@@ -56,8 +56,10 @@ class SignaturePresetControls:
     container: Any
     preset_combo: Any
     preset_name: Any
+    helper_label: Any
     save_button: Any
     delete_button: Any
+    open_library_button: Any
 
 
 @dataclass(frozen=True)
@@ -244,6 +246,18 @@ def _set_text(line_edit: Any, value: str) -> None:
         setter(value)
 
 
+def _set_widget_text(widget: Any, value: str) -> None:
+    setter = getattr(widget, "setText", None)
+    if callable(setter):
+        setter(value)
+
+
+def _set_widget_enabled(widget: Any, enabled: bool) -> None:
+    setter = getattr(widget, "setEnabled", None)
+    if callable(setter):
+        setter(enabled)
+
+
 def _text(line_edit: Any) -> str:
     getter = getattr(line_edit, "text", None)
     if callable(getter):
@@ -318,6 +332,7 @@ class SignaturePropertiesPanel:
         on_change: Callable[[], None] | None = None,
         on_page_change: Callable[[int], None] | None = None,
         on_error: Callable[[str], None] | None = None,
+        on_open_library: Callable[[], Any] | None = None,
     ) -> None:
         if reusable_objects is None:
             raise ValueError("reusable_objects is required for the signature properties panel.")
@@ -336,6 +351,7 @@ class SignaturePropertiesPanel:
         self._on_change = on_change
         self._on_page_change = on_page_change
         self._on_error = on_error
+        self._on_open_library = on_open_library
         self._suspend_updates = False
         self._control_issue: SigningDraftValidationIssue | None = None
         self._canonical_preview_lifecycle = QtCanonicalPreviewLifecycle(
@@ -800,9 +816,11 @@ class SignaturePropertiesPanel:
         preset_name.setPlaceholderText("Enter a preset name")
         save_button = bindings.q_push_button("Save preset")
         delete_button = bindings.q_push_button("Delete preset")
+        open_library_button = bindings.q_push_button("Create or manage presets…")
 
         layout.addRow("Signature preset", preset_combo)
         layout.addRow("", helper_label)
+        layout.addRow("", open_library_button)
 
         preset_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
             lambda _text: self._on_signature_preset_selected()
@@ -818,13 +836,19 @@ class SignaturePropertiesPanel:
         delete_button.clicked.connect(  # type: ignore[attr-defined]
             self.delete_current_signature_preset
         )
+        if self._on_open_library is not None:
+            open_library_button.clicked.connect(self._on_open_library)  # type: ignore[attr-defined]
+        else:
+            _set_widget_enabled(open_library_button, False)
 
         controls = SignaturePresetControls(
             container=container,
             preset_combo=preset_combo,
             preset_name=preset_name,
+            helper_label=helper_label,
             save_button=save_button,
             delete_button=delete_button,
+            open_library_button=open_library_button,
         )
         return controls
 
@@ -872,6 +896,14 @@ class SignaturePropertiesPanel:
 
         preset_combo.addItem(SIGNATURE_PRESET_PLACEHOLDER)
         preset_combo.addItems(preset_names)
+        helper_text = (
+            "No saved presets yet. Open the Signature Library to create a required Appearance "
+            "and your first preset."
+            if not preset_names
+            else "Signature presets reuse saved appearance and placement choices. "
+            "A preset may leave the current certificate unchanged."
+        )
+        _set_widget_text(self._signature_preset_controls.helper_label, helper_text)
         current_name = selected_name if selected_name in preset_names else None
         _set_combo_text(preset_combo, current_name or SIGNATURE_PRESET_PLACEHOLDER)
         if current_name is None:

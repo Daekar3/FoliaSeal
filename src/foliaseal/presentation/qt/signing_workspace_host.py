@@ -38,6 +38,7 @@ class SigningWorkspaceEnvironment:
     reopen_target: Callable[[str | Path], Any | None] | None
     on_error: Callable[[str], None] | None
     on_status_change: Callable[[str], None] | None
+    on_open_signature_library: Callable[[], Any] | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
 
     def command_for(self, source_pdf: Path) -> OpenWorkspaceCommand:
@@ -53,6 +54,7 @@ class SigningWorkspaceEnvironment:
             reopen_target=self.reopen_target,
             on_error=self.on_error,
             on_status_change=self.on_status_change,
+            on_open_signature_library=self.on_open_signature_library,
         )
 
 

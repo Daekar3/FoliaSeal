@@ -45,6 +45,7 @@ class SigningWorkspaceBootstrap:
     on_open_signed_output: Callable[[str | Path], Any | None] | None = None
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
+    on_open_signature_library: Callable[[], Any] | None = None
 
 
 class SigningWorkspacePort(Protocol):

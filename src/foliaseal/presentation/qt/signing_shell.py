@@ -201,6 +201,7 @@ class SigningWorkspaceWidget:
         on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        on_open_signature_library: Callable[[], Any] | None = None,
     ) -> None:
         if reusable_objects is None:
             raise ValueError("reusable_objects is required for the signing workspace widget.")
@@ -248,6 +249,7 @@ class SigningWorkspaceWidget:
                 on_copy_text=on_copy_text,
                 on_error=on_error,
                 on_status_change=on_status_change,
+                on_open_signature_library=on_open_signature_library,
                 viewer_widget_builder=build_qt_pdf_viewer_widget,
                 host_actions=QtSigningWorkspaceHostActions(
                     choose_output_pdf_path=self.choose_output_pdf_path,
@@ -522,6 +524,7 @@ class SigningShellAdapter:
         on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        on_open_signature_library: Callable[[], Any] | None = None,
     ) -> Any:
         copy_text_callback = on_copy_text or self._load_copy_text_callback()
         return SigningWorkspaceWidget(
@@ -543,6 +546,7 @@ class SigningShellAdapter:
             on_copy_text=copy_text_callback,
             on_error=on_error,
             on_status_change=on_status_change,
+            on_open_signature_library=on_open_signature_library,
         )
 
     def create_from_bootstrap(self, bootstrap: Any) -> SigningWorkspaceWidget:
@@ -560,6 +564,7 @@ class SigningShellAdapter:
             on_open_signed_output=bootstrap.on_open_signed_output,
             on_error=bootstrap.on_error,
             on_status_change=bootstrap.on_status_change,
+            on_open_signature_library=bootstrap.on_open_signature_library,
         )
 
     def _load_bindings(self) -> QtSigningWidgetBindings:
@@ -636,6 +641,7 @@ def build_qt_signing_shell(
     on_copy_text: Callable[[str], Any] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
+    on_open_signature_library: Callable[[], Any] | None = None,
 ) -> SigningWorkspaceWidget:
     """Build the declared signing-shell facade around its Qt container."""
 
@@ -658,4 +664,5 @@ def build_qt_signing_shell(
         on_copy_text=on_copy_text,
         on_error=on_error,
         on_status_change=on_status_change,
+        on_open_signature_library=on_open_signature_library,
     )

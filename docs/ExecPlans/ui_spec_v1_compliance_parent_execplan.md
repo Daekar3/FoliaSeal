@@ -150,6 +150,11 @@ Release tranche:
   controls, with stable-id-aware `SaveAppearance` persistence and no active-document mutation.
   Nested breadcrumb/detail-pane navigation, labeled sample preview, suspended preset return,
   reason/location defaults, dirty prompts, and active-placement invalidation remain open.
+- [x] (2026-08-10) Added the bounded first-use preset entry increment: an empty preset catalog now
+  gives explicit no-preset guidance in the signing rail and routes `Create or manage presets…`
+  through typed workspace composition to the existing modeless Presets-first Library. Opening the
+  Library does not mutate the active draft; nested editor suspension/return and per-document input
+  prompts remain open in the first-use/certificate children.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

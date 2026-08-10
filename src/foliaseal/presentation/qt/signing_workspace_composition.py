@@ -133,6 +133,7 @@ class QtSigningWorkspaceHostActions:
     clear_selected_document_text: Callable[[], Any]
     get_app_settings: Callable[[], AppSettings]
     set_app_settings: Callable[[AppSettings], None]
+    open_signature_library: Callable[[], Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +162,7 @@ class QtSigningWorkspaceCompositionRequest:
     on_copy_text: Callable[[str], Any] | None = None
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
+    on_open_signature_library: Callable[[], Any] | None = None
 
 
 class QtSigningWorkspaceComposition:
@@ -260,6 +262,9 @@ def _assemble_signing_workspace_composition(
     clear_selected_document_text = host_actions.clear_selected_document_text
     get_app_settings = host_actions.get_app_settings
     set_app_settings = host_actions.set_app_settings
+    open_signature_library = (
+        request.on_open_signature_library or host_actions.open_signature_library
+    )
     if reusable_objects is None:
         raise ValueError("reusable_objects is required to compose a signing workspace.")
 
@@ -473,6 +478,7 @@ def _assemble_signing_workspace_composition(
         on_change=runtime.on_panel_change,
         on_page_change=runtime.on_page_change,
         on_error=runtime.emit_error,
+        on_open_library=open_signature_library,
     )
     register_disposable(properties_panel)
     setup_port = PanelSigningWorkspaceSetupAdapter(properties_panel)

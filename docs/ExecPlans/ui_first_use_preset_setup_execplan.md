@@ -14,24 +14,29 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
-- [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
-- [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
-- [ ] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
+- [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md (bounded rail/status surface is live)
+- [x] docs/ExecPlans/ui_signature_preset_transactions_execplan.md (document-independent preset editor is live)
+- [x] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md (document-independent Appearance editor is live)
+- [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md (fixed-page editor is live)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audit the no-preset rail state, Library entry point, and callback composition seams.
+- [x] (2026-08-10) Implement the smallest complete no-preset guidance and Library create/manage path.
+- [x] (2026-08-10) Confirm no phase3 product-facing compatibility path was introduced; the callback uses existing neutral workspace boundaries.
+- [x] (2026-08-10) Run focused shell/AppFrame/workspace validation and clean processes/artifacts.
+- [ ] (2026-08-10) Complete nested first-use return-to-preset behavior and commit the follow-up slice.
 
 ## Surprises & Discoveries
 
 - Observation: first-use setup crosses the signing shell and reusable-object catalog; the child
   must offer an explicit partial-preset path without silently creating invalid persisted state.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the local collaboration runtime continued to report `agent thread limit reached`
+  after prior completed explorer threads were interrupted. A checkout-grounded self-audit was used
+  for the required compliance pass; no GUI or application blocker was inferred from that tooling
+  limitation.
+  Evidence: full Ruff/test/process checks and explicit callback-path inspection below.
 
 ## Decision Log
 
@@ -44,7 +49,13 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The bounded first-use increment is implemented. A newly opened document with no saved presets now
+renders explicit guidance in the Signature preset rail group and a `Create or manage presets…`
+button. The button crosses the typed workspace composition callback to the existing modeless
+Signature Library, whose Presets catalog opens first and exposes the document-independent Appearance
+and Preset editors. The current signing draft is not mutated by opening the Library. Full nested
+return-to-suspended-preset behavior, certificate creation/configuration from that nested path, and
+missing optional per-document input prompts remain follow-up work.
 
 ## Context and Orientation
 
@@ -66,15 +77,20 @@ rebaselines, V2 features, or packaging work.
 
 ## Plan of Work
 
-When no preset exists, make Create preset open the Library, support nested Appearance and optional Certificate/Placement creation, suspend the parent draft, and return without silently applying the saved preset. Make the rail selector explicit and start every new PDF with no active preset. Add or preserve typed application and public Qt-port boundaries rather than reaching
-through private widgets. Keep schema and terminology aligned with the frozen documents. When a
-legacy path is replaced, prove its callers are migrated before deleting it.
+When no preset exists, make Create preset open the Library, support nested Appearance and optional
+Certificate/Placement creation, suspend the parent draft, and return without silently applying the
+saved preset. The bounded prerequisite now exposes truthful no-preset guidance and a typed Library
+entry point from the rail; the remaining nested return-to-suspended-preset workflow must be added
+without making Library launch mutate the active draft. Make the rail selector explicit and start
+every new PDF with no active preset. Add or preserve typed application and public Qt-port boundaries
+rather than reaching through private widgets. Keep schema and terminology aligned with the frozen
+documents. When a legacy path is replaced, prove its callers are migrated before deleting it.
 
 ## Milestones
 
-Milestone 1 tests partial preset validation and explicit missing-field explanations. Milestone 2
-wires first-use selection and completion through the Library/catalog authority. Milestone 3 proves
-the novice path in the GUI and records persistence and cleanup evidence.
+Milestone 1 audited the empty-catalog state and added a focused no-preset rail test. Milestone 2
+wired the first-use Library entry point through typed workspace composition. Milestone 3 validated
+the offscreen novice entry surface and recorded the remaining nested completion/return gaps.
 
 ## Concrete Steps
 
@@ -118,6 +134,25 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 "no SVG" decision alongside the evidence row.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
+
+Bounded evidence (2026-08-10):
+
+- `.venv/bin/pytest -q tests/unit/test_qt_signing_shell.py::test_first_use_preset_surface_exposes_library_create_action tests/unit/test_qt_signing_shell.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_signing_workspace_host.py` — 114 passed.
+- The empty catalog renders `No saved presets yet...` and the `Create or manage presets…` action;
+  clicking it invokes the injected Library callback without changing the active workflow.
+- The callback is carried through `OpenWorkspaceCommand`, `SigningWorkspaceEnvironment`,
+  `SigningWorkspaceBootstrap`, and `QtSigningWorkspaceComposition` rather than reaching through
+  private widgets. The existing no-document Library remains modeless and Presets-first.
+- No new SVG: this increment adds the prescribed rail entry action and callback plumbing but does
+  not change the normative Library topology.
+- Process cleanup after the Qt runs found no FoliaSeal/PySide6/pytest processes. Display-backed xcb
+  acceptance remains unavailable and is not claimed here.
+- Bounded CLI launch: the isolated `QT_QPA_PLATFORM=offscreen ... foliaseal gui --pdf-path ...`
+  walkthrough exited `1` with the known `SingleInstanceUnavailable`/QLocalServer endpoint error
+  before the frame was created. The temporary config root was removed and the process audit was
+  empty; this is recorded as an environment transport limitation, not first-use evidence.
+- Remaining gaps: nested editor suspension/return, optional Certificate/Placement creation from the
+  nested first-use flow, and explicit missing per-document input prompts.
 
 ## Idempotence and Recovery
 

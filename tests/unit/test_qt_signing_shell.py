@@ -803,6 +803,36 @@ def test_shell_factory_preserves_reusable_object_identity(
     assert widget.properties_panel._coordinator.reusable_objects is service
 
 
+def test_first_use_preset_surface_exposes_library_create_action(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    opened: list[str] = []
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        reusable_objects=build_reusable_objects_fixture(),
+        on_open_signature_library=lambda: opened.append("library"),
+    )
+
+    controls = widget.properties_panel._signature_preset_controls
+    assert controls.helper_label.text().startswith("No saved presets yet")
+    controls.open_library_button.click()
+
+    assert opened == ["library"]
+
+
 def test_signing_shell_output_dialog_uses_app_settings_default_directory(
     monkeypatch,
     tmp_path: Path,

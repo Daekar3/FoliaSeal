@@ -44,6 +44,7 @@ class OpenWorkspaceCommand:
     reopen_target: Callable[[str | Path], Any | None] | None = None
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
+    on_open_signature_library: Callable[[], Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +152,7 @@ class SigningWorkspaceCompositionService:
                 on_open_signed_output=command.reopen_target,
                 on_error=command.on_error,
                 on_status_change=command.on_status_change,
+                on_open_signature_library=command.on_open_signature_library,
             )
         )
         return WorkspaceHandle(
