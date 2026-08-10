@@ -50,6 +50,7 @@ class LinkDecision:
     page_index: int | None = None
     reason: str | None = None
     launcher: None = None
+    launch_destination: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,7 @@ def classify_link_destination(
             kind=LinkDecisionKind.CONFIRM_EXTERNAL,
             destination=destination,
             reason="External destinations require confirmation before opening.",
+            launch_destination=_launch_destination(raw_destination),
         )
     return LinkDecision(
         kind=LinkDecisionKind.BLOCK,
@@ -160,6 +162,18 @@ def _display_destination(raw_destination: str | None) -> str:
     )
     normalized = " ".join(normalized.split())
     return normalized[:512]
+
+
+def _launch_destination(raw_destination: str | None) -> str:
+    """Return the complete sanitized target while display text stays bounded."""
+
+    if raw_destination is None:
+        return ""
+    normalized = "".join(
+        character if not _is_control_character(character) else " "
+        for character in raw_destination.strip()
+    )
+    return " ".join(normalized.split())
 
 
 def _is_control_character(character: str) -> bool:

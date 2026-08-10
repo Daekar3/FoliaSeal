@@ -140,11 +140,18 @@ def test_malformed_internal_destinations_are_blocked(destination: str) -> None:
 
 
 def test_display_destination_is_bounded_and_has_no_control_characters() -> None:
-    decision = classify_link_destination("https://example.test/\x00\x7f\x85" + "x" * 600)
+    raw_destination = "https://example.test/\x00\x7f\x85" + "x" * 600
+    decision = classify_link_destination(raw_destination)
 
     assert decision.kind is LinkDecisionKind.CONFIRM_EXTERNAL
     assert len(decision.destination) <= 512
     assert all(
         not (ord(character) < 32 or 0x7F <= ord(character) <= 0x9F)
         for character in decision.destination
+    )
+    assert decision.launch_destination is not None
+    assert len(decision.launch_destination) > len(decision.destination)
+    assert all(
+        not (ord(character) < 32 or 0x7F <= ord(character) <= 0x9F)
+        for character in decision.launch_destination
     )

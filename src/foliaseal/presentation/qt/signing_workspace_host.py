@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
+from foliaseal.application.document_safety import LinkDecision
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.domain.models import SigningRequest
@@ -38,6 +39,7 @@ class SigningWorkspaceEnvironment:
     reopen_target: Callable[[str | Path], Any | None] | None
     on_error: Callable[[str], None] | None
     on_status_change: Callable[[str], None] | None
+    on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
     recovery_reopen_target: Callable[[str | Path], Any | None] | None = None
@@ -62,6 +64,7 @@ class SigningWorkspaceEnvironment:
             ),
             on_error=self.on_error,
             on_status_change=self.on_status_change,
+            on_external_link_confirmation=self.on_external_link_confirmation,
             on_open_signature_library=self.on_open_signature_library,
             untrusted_recovery=untrusted_recovery,
         )

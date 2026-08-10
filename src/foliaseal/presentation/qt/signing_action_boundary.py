@@ -70,6 +70,8 @@ class SigningActionBoundary:
         )
 
     def submit(self) -> SigningActionBoundaryResult:
+        if self._on_status_change is not None:
+            self._on_status_change("sign_started")
         transition = self._coordinator.submit()
         if transition.status_event is not None and self._on_status_change is not None:
             self._on_status_change(transition.status_event)
@@ -107,7 +109,10 @@ class SigningActionBoundary:
         )
 
     def return_to_draft(self) -> SigningActionBoundaryResult:
-        return SigningActionBoundaryResult(state=self._coordinator.return_to_draft())
+        result = SigningActionBoundaryResult(state=self._coordinator.return_to_draft())
+        if self._on_status_change is not None:
+            self._on_status_change("recovery_return_to_draft")
+        return result
 
     def cleanup_recovery_artifact(self) -> None:
         self._coordinator.cleanup_recovery_artifact()

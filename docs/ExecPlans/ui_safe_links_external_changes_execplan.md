@@ -25,6 +25,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] docs/ExecPlans/ui_safe_links_pan_activation_execplan.md consumes the link facts for Pan-only
   hit testing, internal navigation/history, and non-executing external/blocked outcomes; source
   reload and condition-only banner behavior remain separate.
+- [x] docs/ExecPlans/ui_safe_links_external_confirmation_execplan.md provides the production
+  consequence-labeled confirmation, complete-target launcher boundary, and active-signing pending
+  request policy; source reload/recovery remains open.
 
 ## Progress
 
@@ -48,6 +51,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   is `183 passed` and the full regression is `1417 passed, 20 skipped, 1 warning`. The parent is
   still open only for external-confirmation UI, source-change recovery, and its remaining cleanup
   requirements.
+- [x] (2026-08-10) Completed the external-confirmation child: approved `http`, `https`, and
+  `mailto` links now show a cancel-default dialog and launch only after approval; blocked links do
+  not reach the dialog, long targets preserve a complete sanitized launch value, and active-signing
+  requests defer/reconcile by status. Focused validation is `55 passed`; full regression is
+  `1425 passed, 20 skipped, 1 warning`. Source-change reload/Locate/Ignore/Close remains open.
 
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.

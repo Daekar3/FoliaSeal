@@ -91,7 +91,7 @@ def test_signing_action_boundary_submit_emits_status_event(tmp_path: Path) -> No
 
     assert result.request == request
     assert result.status_event == "sign_success"
-    assert status_events == ["sign_success"]
+    assert status_events == ["sign_started", "sign_success"]
     assert result.state.can_open_signed_output is True
 
 

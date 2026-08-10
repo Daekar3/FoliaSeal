@@ -17,6 +17,11 @@ from foliaseal.application import (
     SigningDraftWorkflow,
     build_default_signing_executor,
 )
+from foliaseal.application.document_safety import (
+    LinkDecision,
+    LinkDecisionKind,
+    classify_link_destination,
+)
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import SavePlacement
 from foliaseal.application.signature_image_import import ManagedSignatureImageStore
@@ -71,6 +76,10 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     WorkspaceOpenService,
 )
 from foliaseal.presentation.qt.document_signatures_dialog import DocumentSignaturesDialog
+from foliaseal.presentation.qt.external_link_confirmation import (
+    ExternalLinkOutcome,
+    ExternalLinkRequestResult,
+)
 from foliaseal.presentation.qt.placement_profile_editor_dialog import (
     PlacementProfileEditorDialog,
 )
@@ -135,6 +144,8 @@ class QtAppFrameBindings:
     q_text_edit: type[Any] | None = None
     q_double_spin_box: type[Any] | None = None
     q_spin_box: type[Any] | None = None
+    q_desktop_services: Any | None = None
+    q_url: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -329,6 +340,7 @@ class FoliaSealAppFrame:
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        external_link_launcher: Callable[[str], bool] | None = None,
     ) -> None:
         self._bindings = bindings
         self._app_settings_store = app_settings_store or AppSettingsStore.default()
@@ -369,6 +381,9 @@ class FoliaSealAppFrame:
         self._on_sign_request = on_sign_request
         self._on_error = on_error
         self._on_status_change = on_status_change
+        self._external_link_launcher = external_link_launcher
+        self._pending_external_link: LinkDecision | None = None
+        self._signing_transaction_active = False
         self._workspace_open_port: WorkspaceOpenPort = WorkspaceOpenService(
             page_count_port=QtPdfPageCountLoader(bindings.qpdf_document),
             composition_port=SigningWorkspaceCompositionService(
@@ -414,6 +429,7 @@ class FoliaSealAppFrame:
                 recovery_reopen_target=self.open_recovery_pdf_path,
                 on_error=self._emit_error,
                 on_status_change=self._handle_status_change,
+                on_external_link_confirmation=self._handle_external_link_confirmation,
                 on_open_signature_library=self.show_first_use_preset_library,
             ),
             workspace_open_port=self._workspace_open_port,
@@ -1549,11 +1565,144 @@ class FoliaSealAppFrame:
         if callable(information):
             information(self.window, "FoliaSeal", message)
 
+    def _handle_external_link_confirmation(
+        self, decision: LinkDecision
+    ) -> ExternalLinkRequestResult:
+        """Confirm and, only after approval, open one safe external destination."""
+
+        validated = classify_link_destination(decision.launch_destination or decision.destination)
+        if validated.kind is not LinkDecisionKind.CONFIRM_EXTERNAL:
+            return ExternalLinkRequestResult(
+                outcome=ExternalLinkOutcome.IGNORED,
+                destination=validated.destination,
+            )
+        decision = validated
+        if self._signing_transaction_active:
+            replaced = self._pending_external_link is not None
+            self._pending_external_link = decision
+            self._handle_status_change(
+                "external_link_replaced" if replaced else "external_link_deferred"
+            )
+            return ExternalLinkRequestResult(
+                outcome=(
+                    ExternalLinkOutcome.REPLACED if replaced else ExternalLinkOutcome.DEFERRED
+                ),
+                destination=decision.destination,
+                launch_destination=decision.launch_destination,
+            )
+        return self._present_external_link_confirmation(decision)
+
+    def _present_external_link_confirmation(
+        self, decision: LinkDecision
+    ) -> ExternalLinkRequestResult:
+        """Show a cancel-default confirmation and invoke the injected launcher once."""
+
+        if decision.kind is not LinkDecisionKind.CONFIRM_EXTERNAL or not decision.destination:
+            return ExternalLinkRequestResult(
+                outcome=ExternalLinkOutcome.IGNORED,
+                destination=decision.destination,
+            )
+        if not self._ask_external_link_confirmation(decision.destination):
+            return ExternalLinkRequestResult(
+                outcome=ExternalLinkOutcome.CANCELED,
+                destination=decision.destination,
+                launch_destination=decision.launch_destination,
+            )
+        launcher = self._external_link_launcher or self._launch_external_url
+        launch_destination = decision.launch_destination or decision.destination
+        try:
+            launched = bool(launcher(launch_destination))
+        except Exception as exc:  # pragma: no cover - defensive desktop integration guard
+            self._emit_error(f"Unable to open external link: {exc}")
+            launched = False
+        if not launched:
+            self._emit_error("Unable to open external link.")
+            return ExternalLinkRequestResult(
+                outcome=ExternalLinkOutcome.FAILED,
+                destination=decision.destination,
+                launch_destination=launch_destination,
+            )
+        return ExternalLinkRequestResult(
+            outcome=ExternalLinkOutcome.OPENED,
+            destination=decision.destination,
+            launch_destination=launch_destination,
+            launched=True,
+        )
+
+    def _ask_external_link_confirmation(self, destination: str) -> bool:
+        """Return true only for an explicit ``Open link`` choice."""
+
+        message_box = self._bindings.q_message_box
+        title = "Open external link?"
+        text = (
+            "This PDF requests an external destination. Open it in the system handler?\n\n"
+            f"{destination}"
+        )
+        if isinstance(message_box, type):
+            try:
+                dialog = message_box(self.window)
+                add_button = getattr(dialog, "addButton", None)
+                role_type = getattr(message_box, "ButtonRole", None)
+                if callable(add_button) and role_type is not None:
+                    open_button = add_button("Open link", role_type.AcceptRole)
+                    cancel_button = add_button("Cancel", role_type.RejectRole)
+                    dialog.setWindowTitle(title)
+                    dialog.setText(text)
+                    set_default = getattr(dialog, "setDefaultButton", None)
+                    if callable(set_default):
+                        set_default(cancel_button)
+                    exec_method = getattr(dialog, "exec", None) or getattr(dialog, "exec_", None)
+                    if callable(exec_method):
+                        exec_method()
+                        return getattr(dialog, "clickedButton", lambda: None)() is open_button
+            except Exception:
+                pass
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return False
+        yes = self._message_box_button(message_box, "Yes", "Open")
+        no = self._message_box_button(message_box, "No", "Cancel")
+        result = self._question_with_buttons(
+            question,
+            parent=self.window,
+            title=title,
+            text=text,
+            buttons=[yes, no],
+            default_button=no,
+        )
+        return result == yes
+
+    def _launch_external_url(self, destination: str) -> bool:
+        """Open a confirmed destination through Qt's desktop-services API only."""
+
+        desktop_services = self._bindings.q_desktop_services
+        q_url = self._bindings.q_url
+        open_url = getattr(desktop_services, "openUrl", None)
+        if not callable(open_url) or q_url is None:
+            return False
+        return bool(open_url(q_url(destination)))
+
+    def _offer_pending_external_link(self) -> None:
+        pending = self._pending_external_link
+        self._pending_external_link = None
+        if pending is not None:
+            self._present_external_link_confirmation(pending)
+
     def _handle_status_change(self, status: str) -> None:
         if status == "navigation_changed":
             self._sync_page_navigation_actions()
         elif status in {"document_text_selection_changed", "document_text_mode_changed"}:
             self._sync_document_text_actions()
+        elif status == "sign_started":
+            self._signing_transaction_active = True
+        elif status == "sign_success":
+            self._signing_transaction_active = False
+            self._offer_pending_external_link()
+        elif status in {"sign_failure", "verify_failure"}:
+            self._signing_transaction_active = False
+        elif status in {"verify_success", "recovery_return_to_draft"}:
+            self._signing_transaction_active = False
+            self._offer_pending_external_link()
         if self._on_status_change is not None:
             self._on_status_change(status)
 
@@ -1731,6 +1880,7 @@ class QtAppFrameAdapter:
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        external_link_launcher: Callable[[str], bool] | None = None,
     ) -> FoliaSealAppFrame:
         return FoliaSealAppFrame(
             bindings=self._bindings,
@@ -1744,6 +1894,7 @@ class QtAppFrameAdapter:
             on_sign_request=on_sign_request,
             on_error=on_error,
             on_status_change=on_status_change,
+            external_link_launcher=external_link_launcher,
         )
 
     def launch(
@@ -1761,6 +1912,7 @@ class QtAppFrameAdapter:
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        external_link_launcher: Callable[[str], bool] | None = None,
         instance_coordinator: SingleInstanceCoordinator | None = None,
     ) -> int:
         q_application = self._bindings.q_application
@@ -1804,6 +1956,7 @@ class QtAppFrameAdapter:
                 on_sign_request=on_sign_request,
                 on_error=on_error,
                 on_status_change=on_status_change,
+                external_link_launcher=external_link_launcher,
             )
             frame_holder.append(frame)
             restore_geometry = getattr(frame, "restore_window_geometry", None)
@@ -1865,6 +2018,7 @@ class QtAppFrameAdapter:
         try:
             qt_widgets = importlib.import_module("PySide6.QtWidgets")
             qt_gui = importlib.import_module("PySide6.QtGui")
+            qt_core = importlib.import_module("PySide6.QtCore")
             qt_network = importlib.import_module("PySide6.QtNetwork")
             qtpdf = importlib.import_module("PySide6.QtPdf")
         except Exception as exc:  # pragma: no cover - environment dependent
@@ -1913,6 +2067,8 @@ class QtAppFrameAdapter:
             q_text_edit=getattr(qt_widgets, "QTextEdit"),
             q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
             q_spin_box=getattr(qt_widgets, "QSpinBox"),
+            q_desktop_services=getattr(qt_gui, "QDesktopServices", None),
+            q_url=getattr(qt_core, "QUrl", None),
         )
 
 
@@ -1928,6 +2084,7 @@ def build_qt_app_frame_host(
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
+    external_link_launcher: Callable[[str], bool] | None = None,
 ) -> FoliaSealAppFrame:
     """Build the real FoliaSeal app-frame host."""
 
@@ -1943,6 +2100,7 @@ def build_qt_app_frame_host(
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,
+        external_link_launcher=external_link_launcher,
     )
 
 
@@ -1960,6 +2118,7 @@ def launch_qt_app_frame(
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
+    external_link_launcher: Callable[[str], bool] | None = None,
     instance_coordinator: SingleInstanceCoordinator | None = None,
 ) -> int:
     """Create QApplication, show the FoliaSeal main window, and run the event loop."""
@@ -1978,5 +2137,6 @@ def launch_qt_app_frame(
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,
+        external_link_launcher=external_link_launcher,
         instance_coordinator=instance_coordinator,
     )

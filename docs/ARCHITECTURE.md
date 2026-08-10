@@ -79,10 +79,11 @@ The canonical repository document split is:
 | `src/foliaseal/application/certificate_secret_store.py` | Application-owned saved-certificate-secret protocol and error boundary. | `CertificateSecretStoreError` is the manager-facing failure type; infrastructure adapters may subclass it without leaking infrastructure imports into application policy. |
 | `src/foliaseal/infra/config/certificate_codecs.py` | Concrete JSON codec for application certificate models. | Owns persisted key/schema-version mapping and malformed-payload validation while `CertificateCatalogStore` owns paths, atomic writes, and managed-file operations. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
-| `src/foliaseal/application/document_safety.py` | Pure document-safety policy for PDF destinations and source-change decisions. | Owns non-executable link classification, Pan-only mode gating, bounded display destinations, and unchanged/changed/missing/unknown source projections. It imports only the Python standard library; renderer extraction, filesystem monitoring, Qt banners, URL launching, and draft-preserving reload remain outside this boundary. |
+| `src/foliaseal/application/document_safety.py` | Pure document-safety policy for PDF destinations and source-change decisions. | Owns non-executable link classification, Pan-only mode gating, bounded display destinations, complete sanitized external launch targets, and unchanged/changed/missing/unknown source projections. It imports only the Python standard library; renderer extraction, filesystem monitoring, Qt banners, URL launching, and draft-preserving reload remain outside this boundary. |
 | `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; app-frame, signing-shell, workspace, lifecycle, reporting, matrix, snapshotter, render, runtime, projection, provider, runner-factory, and artifact responsibilities are documented in their focused modules below. `evidence_harness_runtime.py` owns the typed lazy operation bundle, `evidence_harness_projection.py` owns pure matrix projection, `evidence_interactive_capture.py` owns the stable capture DTO/payload projection/JSON normalization/artifact policy, `evidence_runner_providers.py` owns Qt-free operation-scoped provider records, `evidence_runner_factories.py` owns lazy runner graph construction from those records, and `phase3_harness.py` remains the concrete composition root; its capture padding consumes `VisibleSignatureLayoutPolicy` rather than backend-private geometry helpers. The application service/program remains the caller boundary. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_open.py` | App-frame-facing workspace-open boundary for one PDF or preserved recovery artifact. | Owns page-count loading, `ViewerWorkflow` / `SigningDraftWorkflow` creation, output-path defaulting, explicit untrusted-recovery bootstrap context, shell bootstrap assembly, and construction of the typed `WorkspaceHandle`; widget installation and active-handle publication belong to `SigningWorkspaceHost`. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_action_state.py` | Qt-free app-frame projection of workspace QAction policy. | `WorkspaceActionState` and its pure closed/open/selection-result constructors describe whether Save, Save As, Close, Previous Page, Next Page, text selection, and Copy selected text should be enabled or checked. The projection owns policy only; `FoliaSealAppFrame` remains responsible for mutating the concrete QActions. |
+| `src/foliaseal/presentation/qt/external_link_confirmation.py` | Typed result boundary for AppFrame-owned external-link confirmation and launch outcomes. | Defines `ExternalLinkOutcome` and `ExternalLinkRequestResult`; dialog ownership, pending-request policy, and the injected Qt launcher remain at the AppFrame edge. |
 | `src/foliaseal/presentation/qt/app_frame_command_model.py` | Typed registry of top-level File, Edit, View, and Settings commands. | `AppFrameCommandId` and immutable `AppFrameCommandDefinition` records provide stable IDs, menu text, shortcuts, unique mnemonic labels, and accessible names; `FILE_COMMAND_DEFINITIONS`, `EDIT_COMMAND_DEFINITIONS`, `VIEW_COMMAND_DEFINITIONS`, `SETTINGS_COMMAND_DEFINITIONS`, and `ALL_COMMAND_DEFINITIONS` form one registry, and the frame maps these definitions to its owned Qt actions. Edit Copy (`Ctrl+C`), View Select Text, Zoom In/Out (`Ctrl++`/`Ctrl+-`), Reset Zoom, Fit Page (`Ctrl+0`), Fit Width (`Ctrl+Shift+0`), and Find (`Ctrl+F`) are truthful actions routed through public workspace ports; unsupported Undo/Redo/Cut/Paste, Signing, Help, and remaining View commands are intentionally absent until behavior seams exist. |
 | `src/foliaseal/infra/config/app_settings_ui.py` | Typed projection of application UI preferences. | `AppUiSettings` projects the known `AppSettings.ui` mapping into immutable `AppearanceMode` (`system`, `light`, or `dark`) and optional `MainWindowGeometry` values, and merges them back without discarding unknown/future UI keys; invalid or legacy appearance/geometry values safely fall back to their absent/system defaults. `MainWindowGeometry` enforces the 1100x700 minimum and JSON-safe integer coordinates/dimensions plus maximized state. |
 | `src/foliaseal/presentation/qt/app_frame_theme.py` | Application-chrome palette controller. | `apply_appearance_mode()` applies System/Light/Dark colors to the Qt application palette while leaving document/PDF appearance outside the app theme; it starts from the current palette so native accent and other unrelated roles remain intact. |
@@ -450,11 +451,39 @@ The canonical repository document split is:
   applies Pan-only destination policy; `SigningWorkspaceRuntime.on_viewer_link_click()` routes
   allowed internal-page jumps, external-confirmation outcomes, and blocked/unavailable statuses,
   while `ViewerLinkHistory` supplies internal-page Back/Forward outcomes. Unknown source identity
-  is never treated as unchanged; destinations are bounded for display and no result carries a
-  launcher callback. URL launching and external confirmation UI, plus source reload/banner
-  lifecycle, remain explicitly deferred to safe-links and document-lifecycle children.
+  is never treated as unchanged; `LinkDecision.destination` is a bounded display value while
+  `LinkDecision.launch_destination` is the complete sanitized target reserved for an approved
+  launch, and no result carries a launcher callback. AppFrame owns the consequence-labeled
+  confirmation and injected Qt launch edge; source reload/recovery and banner lifecycle remain
+  explicitly deferred to safe-links and document-lifecycle children.
 - Status: Implemented and confirmed by focused tests; extraction, Pan hit testing, internal-page
-  activation, and history are integrated while URL/lifecycle effects remain deferred.
+  activation/history, and AppFrame confirmation/launch are integrated while source recovery and
+  lifecycle effects remain deferred.
+
+### Qt external-link confirmation
+
+- Location: `src/foliaseal/presentation/qt/external_link_confirmation.py` and
+  `src/foliaseal/presentation/qt/app_frame.py`
+- Responsibility: Keep external-link consequence labeling, approval, launch, and active-signing
+  deferral at the AppFrame presentation boundary.
+- Owns: `ExternalLinkOutcome`, `ExternalLinkRequestResult`, the cancel-default confirmation
+  dialog, pending newest-request replacement, and the injected Qt `QDesktopServices`/`QUrl`
+  launcher.
+- Does not own: destination classification/sanitization, PDF link extraction, Pan hit testing,
+  source reload/recovery, or safety-banner lifecycle.
+- Key collaborators: `document_safety.py`, `SigningWorkspaceRuntime`, and the injected Qt
+  bindings/launcher seam.
+- Main entry points: `_handle_external_link_confirmation()`,
+  `_present_external_link_confirmation()`, and `_offer_pending_external_link()`.
+- Known constraints: The confirmation labels the consequence and displays only the bounded
+  `destination`; after explicit Open, only the complete sanitized `launch_destination` reaches
+  the injected `QDesktopServices` launcher. While an active signing transaction is in progress,
+  AppFrame defers external requests and retains only the newest one, returning a typed replaced
+  outcome when a newer request supersedes it; the pending request is offered after the transaction
+  returns to a safe state. Source reload/recovery, locate/ignore actions, and banner mutation
+  remain deferred to the safe-links/document-lifecycle children.
+- Status: Implemented and confirmed by focused tests; source recovery and lifecycle effects remain
+  deferred.
 
 ### Document source monitor
 
@@ -657,7 +686,7 @@ boundary fakeable while preserving native Qt shortcuts.
 - Does not own: app-frame production-port policy, widget-export compatibility, signing-action state-machine ownership, or Phase 3 evidence serialization.
 - Key collaborators: `SigningDraftWorkflow`, `ViewerWorkflow`, `DocumentReviewWorkspaceSession`, `SignaturePropertiesPanel`, `signing_workspace_diagnostics.py`, `signing_workspace_testing_adapter.py`, and `signing_workspace_orchestrator.py`.
 - Main entry points: `SigningWorkspaceRuntime.snapshot()`, `on_viewer_link_click()`, `go_back_link()`, `go_forward_link()`, and its existing workspace mutation/read verbs.
-- Known constraints: Snapshot production must preserve the same binding errors and live values as the existing individual accessors; action-coordinator result state is supplied by the explicit testing adapter rather than duplicated in runtime. Link activation reports typed status/confirmation outcomes and delegates actual external URL launching/confirmation UI to an injected presentation callback.
+- Known constraints: Snapshot production must preserve the same binding errors and live values as the existing individual accessors; action-coordinator result state is supplied by the explicit testing adapter rather than duplicated in runtime. Link activation reports typed status/confirmation outcomes and delegates external-link presentation to the AppFrame-owned confirmation boundary, which performs the injected Qt launch after approval.
 - Status: Confirmed by code and tests.
 
 ### Qt canonical preview lifecycle
@@ -1641,7 +1670,8 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
-| 2026-08-10 | Added Pan-only document-link activation and internal-page history. | `DocumentLinkActivationService` performs pure PDF-space hit testing, `ViewerLinkHistory` owns Back/Forward page outcomes, `PopplerPdfRenderBackend.inspect_links()` delegates optionally to QtPdf, `SigningWorkspaceRuntime` routes typed activation/history outcomes, and `PdfViewerWidgetAdapter` maps stationary Pan clicks through zoom/pan/page transforms while keeping drags as pan gestures. URL launching, external confirmation UI, and source reload/banner lifecycle remain deferred. |
+| 2026-08-10 | Added Pan-only document-link activation and internal-page history. | Historical precursor: `DocumentLinkActivationService` performs pure PDF-space hit testing, `ViewerLinkHistory` owns Back/Forward page outcomes, `PopplerPdfRenderBackend.inspect_links()` delegates optionally to QtPdf, `SigningWorkspaceRuntime` routes typed activation/history outcomes, and `PdfViewerWidgetAdapter` maps stationary Pan clicks through zoom/pan/page transforms while keeping drags as pan gestures. AppFrame confirmation/launch is documented by the subsequent safe-links slice; source reload/banner lifecycle remains deferred. |
+| 2026-08-10 | Added AppFrame-owned external-link confirmation and safe launch boundary. | AppFrame now presents a consequence-labeled, cancel-default confirmation using bounded display text, passes only the complete sanitized launch target to an injected Qt `QDesktopServices` launcher after approval, and defers active-signing requests while retaining only the newest pending request. Source reload/recovery and banner lifecycle remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added the QtPdf document-link inspection boundary. | Historical precursor: `DocumentLink`/`DocumentLinkInspector` first carried read-only page-local link facts, and `QtPdfRenderBackend.inspect_links()` extracted valid URL/internal-page links without activation while normalizing Qt top-left rectangles to PDF bottom-left coordinates; Pan hit testing and activation/history were added by the subsequent slice. Reload/banner lifecycle remains deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added the document-source safety readiness boundary. | `DocumentSourceMonitor` now owns metadata-only source fingerprints and changed/missing/unknown decisions at workspace composition; `signing_readiness.py` consumes document safety before setup/readiness stages. Reload, locate, ignore, banner mutation, and draft-preserving lifecycle actions remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added real signed-appearance raster parity evidence. | A Qt-backed integration test signs a real PDF, renders its embedded annotation appearance, and asserts pixel-identical RGBA output against the frozen canonical preview for text-only and managed-image alpha-preserved/flattened cases. |
