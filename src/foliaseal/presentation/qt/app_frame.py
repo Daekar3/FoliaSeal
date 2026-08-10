@@ -383,6 +383,7 @@ class FoliaSealAppFrame:
         self._on_status_change = on_status_change
         self._external_link_launcher = external_link_launcher
         self._pending_external_link: LinkDecision | None = None
+        self._pending_open_request: OpenRequest | None = None
         self._signing_transaction_active = False
         self._workspace_open_port: WorkspaceOpenPort = WorkspaceOpenService(
             page_count_port=QtPdfPageCountLoader(bindings.qpdf_document),
@@ -583,6 +584,86 @@ class FoliaSealAppFrame:
         self._apply_workspace_action_state(workspace_action_state_open())
         self._sync_page_navigation_actions()
         return handle.view.mount_target()
+
+    @property
+    def pending_open_request(self) -> OpenRequest | None:
+        """Return the newest forwarded open request deferred during signing."""
+
+        return self._pending_open_request
+
+    def handle_open_request(self, request: OpenRequest) -> None:
+        """Apply or defer one forwarded request without creating another window."""
+
+        if request.pdf_path is None:
+            self._raise_window()
+            return
+        if self._signing_transaction_active:
+            replaced = self._pending_open_request is not None
+            self._pending_open_request = request
+            self._handle_status_change(
+                "open_request_replaced" if replaced else "open_request_deferred"
+            )
+            self._show_information(
+                "A signing transaction is active. "
+                f"The request for {Path(request.pdf_path).name} is queued; "
+                "the newest request replaces any older one."
+            )
+            self._raise_window()
+            return
+        self.open_pdf_path(request.pdf_path)
+        self._raise_window()
+
+    def cancel_pending_open_request(self) -> bool:
+        """Discard a deferred forwarded request without changing the active workspace."""
+
+        if self._pending_open_request is None:
+            return False
+        self._pending_open_request = None
+        self._handle_status_change("open_request_cancelled")
+        return True
+
+    def _offer_pending_open_request(self) -> None:
+        pending = self._pending_open_request
+        self._pending_open_request = None
+        if pending is None or pending.pdf_path is None:
+            return
+        if not self._ask_pending_open_request(pending.pdf_path):
+            self._handle_status_change("open_request_cancelled")
+            return
+        self._handle_status_change("open_request_accepted")
+        self.open_pdf_path(pending.pdf_path)
+
+    def _ask_pending_open_request(self, pdf_path: str) -> bool:
+        """Ask whether to open a request that waited for signing to finish."""
+
+        message_box = self._bindings.q_message_box
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return False
+        open_button = self._message_box_button(message_box, "Yes", "Open")
+        cancel_button = self._message_box_button(message_box, "No", "Cancel")
+        result = self._question_with_buttons(
+            question,
+            parent=self.window,
+            title="Open queued PDF?",
+            text=(
+                "A PDF open request arrived while signing was active. "
+                f"Open {Path(pdf_path).name} now?"
+            ),
+            buttons=[open_button, cancel_button],
+            default_button=cancel_button,
+        )
+        return result == open_button
+
+    def _raise_window(self) -> None:
+        """Raise and activate the existing main window after an open request."""
+
+        raise_window = getattr(self.window, "raise_", None)
+        if callable(raise_window):
+            raise_window()
+        activate = getattr(self.window, "activateWindow", None)
+        if callable(activate):
+            activate()
 
     def open_recovery_pdf_path(self, pdf_path: str | Path) -> Any | None:
         """Open a preserved artifact in an explicit untrusted recovery workspace."""
@@ -2009,11 +2090,14 @@ class FoliaSealAppFrame:
         elif status == "sign_success":
             self._signing_transaction_active = False
             self._offer_pending_external_link()
+            self._offer_pending_open_request()
         elif status in {"sign_failure", "verify_failure"}:
             self._signing_transaction_active = False
+            self._offer_pending_open_request()
         elif status in {"verify_success", "recovery_return_to_draft"}:
             self._signing_transaction_active = False
             self._offer_pending_external_link()
+            self._offer_pending_open_request()
         self._sync_signing_command_action()
         self._sync_signing_placement_actions()
         self._sync_edit_history_actions()
@@ -2249,9 +2333,7 @@ class QtAppFrameAdapter:
                 pending_requests.append(request)
                 return
             frame = frame_holder[0]
-            if request.pdf_path is not None:
-                frame.open_pdf_path(request.pdf_path)
-            self._raise_frame_window(frame)
+            frame.handle_open_request(request)
 
         coordinator.set_request_handler(handle_open_request)
         try:

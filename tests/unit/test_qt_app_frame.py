@@ -2397,6 +2397,12 @@ def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_
         def open_pdf_path(self, path) -> None:
             self.opened_paths.append(path)
 
+        def handle_open_request(self, request: OpenRequest) -> None:
+            if request.pdf_path is not None:
+                self.open_pdf_path(request.pdf_path)
+            self.window.raise_()
+            self.window.activateWindow()
+
     monkeypatch.setattr(
         app_frame_module.QtAppFrameAdapter,
         "_load_bindings",
@@ -2519,6 +2525,12 @@ def test_launch_qt_app_frame_delivers_queued_request_to_primary_frame(
         def open_pdf_path(self, path) -> None:
             self.opened_paths.append(path)
 
+        def handle_open_request(self, request: OpenRequest) -> None:
+            if request.pdf_path is not None:
+                self.open_pdf_path(request.pdf_path)
+            self.window.raise_()
+            self.window.activateWindow()
+
     monkeypatch.setattr(
         app_frame_module.QtAppFrameAdapter,
         "_load_bindings",
@@ -2539,6 +2551,68 @@ def test_launch_qt_app_frame_delivers_queued_request_to_primary_frame(
     assert frame.window.raise_calls == 1
     assert frame.window.activate_calls == 1
     assert coordinator.close_calls == 1
+
+
+def test_app_frame_defers_forwarded_open_requests_during_signing_and_can_cancel(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(first),
+        render_backend_factory=lambda: object(),
+    )
+    current = tmp_path / "source" / "current.pdf"
+    newer = tmp_path / "source" / "newer.pdf"
+    frame.open_pdf_path(current)
+    original_workspace = frame.current_workspace
+
+    frame._handle_status_change("sign_started")
+    frame.handle_open_request(OpenRequest(pdf_path=str(current.resolve())))
+    frame.handle_open_request(OpenRequest(pdf_path=str(newer.resolve())))
+
+    assert frame.current_workspace is original_workspace
+    assert frame.pending_open_request == OpenRequest(pdf_path=str(newer.resolve()))
+    assert len(bindings.q_message_box.information_calls) == 2
+    assert "newer.pdf" in bindings.q_message_box.information_calls[-1][2]
+
+    bindings.q_message_box.next_question_result = bindings.q_message_box.No
+    frame._handle_status_change("sign_failure")
+    assert frame.pending_open_request is None
+    assert frame.current_workspace is original_workspace
+    assert bindings.q_message_box.question_calls[-1][1] == "Open queued PDF?"
+
+
+def test_app_frame_accepts_deferred_forwarded_open_request_after_signing(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    second = _FakeShell()
+    shells = _SequenceShellFactory(first, second)
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=shells,
+        render_backend_factory=lambda: object(),
+    )
+    current = tmp_path / "source" / "current.pdf"
+    newer = tmp_path / "source" / "newer.pdf"
+    frame.open_pdf_path(current)
+    frame._handle_status_change("sign_started")
+    frame.handle_open_request(OpenRequest(pdf_path=str(newer.resolve())))
+
+    bindings.q_message_box.next_question_result = bindings.q_message_box.Yes
+    frame._handle_status_change("sign_success")
+
+    assert frame.pending_open_request is None
+    assert frame.current_workspace is not None
+    assert frame.current_workspace.source_pdf == newer.resolve()
+    assert len(shells.shells) == 0
 
 
 def test_launch_qt_app_frame_reuses_existing_application(monkeypatch, tmp_path: Path) -> None:
