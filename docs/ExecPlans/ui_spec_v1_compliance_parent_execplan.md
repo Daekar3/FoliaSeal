@@ -46,6 +46,9 @@ Foundation tranche:
 
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
+- [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
+  route through the public workspace session port; broader View Back/Forward and remaining command
+  families remain open with their owning children.
 - [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md — fixed 320px signing rail, protected
   read-only status region, typed recommended action, and offscreen geometry evidence are complete
   in `8d67d1652`; asynchronous/state-machine follow-up remains open.
@@ -311,6 +314,10 @@ Release tranche:
   presentation edges. Focused validation is `181 passed`, the full suite is `1349 passed, 20
   skipped, 1 warning`, and the bounded launch audit cleaned its isolated root and processes after
   the known `SingleInstanceUnavailable` endpoint limitation.
+- [x] (2026-08-10) Added the typed View zoom command child: Zoom In/Out and Reset Zoom are real
+  frame actions routed through the public session port and existing clamped viewer policy. Focused
+  validation is `206 passed`, the full suite is `1351 passed, 20 skipped, 1 warning`, and the
+  bounded launch audit cleaned its isolated root and processes after the known endpoint limitation.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

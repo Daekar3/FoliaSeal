@@ -52,6 +52,12 @@ class _Shell:
     def reset_zoom_view(self):
         self.calls.append("reset_zoom")
 
+    def zoom_in_view(self):
+        self.calls.append("zoom_in")
+
+    def zoom_out_view(self):
+        self.calls.append("zoom_out")
+
     def fit_page_view(self):
         self.calls.append("fit_page")
 
@@ -83,6 +89,8 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
     session.go_to_previous_page()
     session.go_to_next_page()
     session.reset_zoom_view()
+    session.zoom_in_view()
+    session.zoom_out_view()
     session.fit_page_view()
     session.fit_width_view()
     session.focus()
@@ -98,6 +106,8 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
         "previous",
         "next",
         "reset_zoom",
+        "zoom_in",
+        "zoom_out",
         "fit_page",
         "fit_width",
         "focus",

@@ -18,6 +18,9 @@ class AppFrameCommandId(StrEnum):
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
     SELECT_TEXT = "view.select_text"
+    ZOOM_IN = "view.zoom_in"
+    ZOOM_OUT = "view.zoom_out"
+    RESET_ZOOM = "view.reset_zoom"
     FIT_PAGE = "view.fit_page"
     FIT_WIDTH = "view.fit_width"
     FIND = "view.find"
@@ -121,6 +124,30 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut=None,
         accessible_name="Select document text",
         mnemonic_text="&Select Text",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.ZOOM_IN,
+        menu="View",
+        text="Zoom In",
+        shortcut="Ctrl++",
+        accessible_name="Zoom in the PDF viewer",
+        mnemonic_text="Zoom &In",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.ZOOM_OUT,
+        menu="View",
+        text="Zoom Out",
+        shortcut="Ctrl+-",
+        accessible_name="Zoom out the PDF viewer",
+        mnemonic_text="Zoom &Out",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.RESET_ZOOM,
+        menu="View",
+        text="Reset Zoom",
+        shortcut=None,
+        accessible_name="Reset PDF viewer zoom",
+        mnemonic_text="Reset &Zoom",
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.FIT_PAGE,

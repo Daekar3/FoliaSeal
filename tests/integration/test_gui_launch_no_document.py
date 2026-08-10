@@ -116,8 +116,14 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         False,
         False,
         False,
+        False,
+        False,
+        False,
     ]
     assert [action.isEnabled() for action in view_menu.actions()] == [
+        False,
+        False,
+        False,
         False,
         False,
         False,

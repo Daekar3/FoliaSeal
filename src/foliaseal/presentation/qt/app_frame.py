@@ -1266,6 +1266,24 @@ class FoliaSealAppFrame:
             checkable=True,
             icon_name="text-select.svg",
         )
+        self._zoom_in_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.ZOOM_IN,
+            self._zoom_in_view,
+            enabled=False,
+        )
+        self._zoom_out_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.ZOOM_OUT,
+            self._zoom_out_view,
+            enabled=False,
+        )
+        self._reset_zoom_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.RESET_ZOOM,
+            self._reset_zoom_view,
+            enabled=False,
+        )
         self._fit_page_action = self._command_action(
             view_menu,
             AppFrameCommandId.FIT_PAGE,
@@ -1423,6 +1441,9 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
         self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
+        self._set_action_enabled(self._zoom_in_action, state.workspace_open)
+        self._set_action_enabled(self._zoom_out_action, state.workspace_open)
+        self._set_action_enabled(self._reset_zoom_action, state.workspace_open)
         self._set_action_enabled(self._fit_page_action, state.workspace_open)
         self._set_action_enabled(self._fit_width_action, state.workspace_open)
         self._set_action_enabled(self._find_action, state.workspace_open)
@@ -1505,6 +1526,15 @@ class FoliaSealAppFrame:
 
     def _fit_page_view(self) -> None:
         self._with_current_session_port(lambda session_port: session_port.fit_page_view())
+
+    def _zoom_in_view(self) -> None:
+        self._with_current_session_port(lambda session_port: session_port.zoom_in_view())
+
+    def _zoom_out_view(self) -> None:
+        self._with_current_session_port(lambda session_port: session_port.zoom_out_view())
+
+    def _reset_zoom_view(self) -> None:
+        self._with_current_session_port(lambda session_port: session_port.reset_zoom_view())
 
     def _fit_width_view(self) -> None:
         self._with_current_session_port(lambda session_port: session_port.fit_width_view())

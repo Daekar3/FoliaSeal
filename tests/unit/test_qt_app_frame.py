@@ -62,6 +62,9 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
         AppFrameCommandId.SELECT_TEXT,
+        AppFrameCommandId.ZOOM_IN,
+        AppFrameCommandId.ZOOM_OUT,
+        AppFrameCommandId.RESET_ZOOM,
         AppFrameCommandId.FIT_PAGE,
         AppFrameCommandId.FIT_WIDTH,
         AppFrameCommandId.FIND,
@@ -77,6 +80,9 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
         AppFrameCommandId.SELECT_TEXT,
+        AppFrameCommandId.ZOOM_IN,
+        AppFrameCommandId.ZOOM_OUT,
+        AppFrameCommandId.RESET_ZOOM,
         AppFrameCommandId.FIT_PAGE,
         AppFrameCommandId.FIT_WIDTH,
         AppFrameCommandId.FIND,
@@ -85,6 +91,11 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
     assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[-3:]] == [
         "Ctrl+Shift+0",
         "Ctrl+F",
+        None,
+    ]
+    assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[3:6]] == [
+        "Ctrl++",
+        "Ctrl+-",
         None,
     ]
 
@@ -553,6 +564,9 @@ class _FakeShell:
         self.delete_later_calls = 0
         self.go_to_previous_page_calls = 0
         self.go_to_next_page_calls = 0
+        self.zoom_in_view_calls = 0
+        self.zoom_out_view_calls = 0
+        self.reset_zoom_view_calls = 0
         self.current_page = 0
         self.page_count = 1
         self.status_callback = None
@@ -629,7 +643,13 @@ class _FakeShell:
         return self.current_page < self.page_count - 1
 
     def reset_zoom_view(self) -> None:
-        return None
+        self.reset_zoom_view_calls += 1
+
+    def zoom_in_view(self) -> None:
+        self.zoom_in_view_calls += 1
+
+    def zoom_out_view(self) -> None:
+        self.zoom_out_view_calls += 1
 
     def fit_page_view(self) -> None:
         self.fit_page_view_calls = getattr(self, "fit_page_view_calls", 0) + 1
@@ -1187,6 +1207,9 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Previous &Page",
         "Next P&age",
         "&Select Text",
+        "Zoom &In",
+        "Zoom &Out",
+        "Reset &Zoom",
         "Fit &Page",
         "Fit &Width",
         "&Find",
@@ -1196,12 +1219,18 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Page Up",
         "Page Down",
         None,
+        "Ctrl++",
+        "Ctrl+-",
+        None,
         "Ctrl+0",
         "Ctrl+Shift+0",
         "Ctrl+F",
         None,
     ]
     assert [action.enabled for action in frame.window.menu_bar.menus[2].actions] == [
+        False,
+        False,
+        False,
         False,
         False,
         False,
@@ -1481,6 +1510,9 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         AppFrameCommandId.PREVIOUS_PAGE,
         AppFrameCommandId.NEXT_PAGE,
         AppFrameCommandId.SELECT_TEXT,
+        AppFrameCommandId.ZOOM_IN,
+        AppFrameCommandId.ZOOM_OUT,
+        AppFrameCommandId.RESET_ZOOM,
         AppFrameCommandId.FIT_PAGE,
         AppFrameCommandId.FIT_WIDTH,
         AppFrameCommandId.FIND,
@@ -1490,6 +1522,9 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         "Previous Page",
         "Next Page",
         "Select Text",
+        "Zoom In",
+        "Zoom Out",
+        "Reset Zoom",
         "Fit Page",
         "Fit Width",
         "Find",
@@ -1498,6 +1533,9 @@ def test_view_command_registry_is_typed_and_normative() -> None:
     assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Page Up",
         "Page Down",
+        None,
+        "Ctrl++",
+        "Ctrl+-",
         None,
         "Ctrl+0",
         "Ctrl+Shift+0",
@@ -1519,71 +1557,37 @@ def test_view_page_commands_route_through_the_session_port(tmp_path: Path) -> No
     )
 
     view_actions = frame.window.menu_bar.menus[2].actions
-    assert [action.enabled for action in view_actions] == [
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-        False,
-    ]
+    assert [action.enabled for action in view_actions] == [False] * 10
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
-    assert [action.enabled for action in view_actions] == [
-        False,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-    ]
+    assert [action.enabled for action in view_actions] == [False] + [True] * 9
 
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True] * 10
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [
-        True,
-        False,
-        True,
-        True,
-        True,
-        True,
-        True,
-    ]
+    assert [action.enabled for action in view_actions] == [True, False] + [True] * 8
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True] * 10
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [
-        False,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True,
-    ]
+    assert [action.enabled for action in view_actions] == [False] + [True] * 9
 
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True] * 10
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [
-        True,
-        False,
-        True,
-        True,
-        True,
-        True,
-        True,
-    ]
+    assert [action.enabled for action in view_actions] == [True, False] + [True] * 8
     shell.go_to_previous_page()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True] * 10
 
     view_actions[3].trigger()
     view_actions[4].trigger()
+    view_actions[5].trigger()
+    assert shell.zoom_in_view_calls == 1
+    assert shell.zoom_out_view_calls == 1
+    assert shell.reset_zoom_view_calls == 1
+    view_actions[6].trigger()
+    view_actions[7].trigger()
     assert shell.fit_page_view_calls == 1
     assert shell.fit_width_view_calls == 1
-    view_actions[5].trigger()
+    view_actions[8].trigger()
     assert shell.focus_document_search_calls == 1
 
     assert shell.go_to_previous_page_calls == 3

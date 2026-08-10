@@ -218,6 +218,27 @@ def test_fit_page_and_width_use_scroll_viewport_without_changing_page(monkeypatc
     assert workflow.session.current_page == 0
 
 
+def test_public_zoom_commands_change_exact_zoom_without_changing_page(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=2),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    preview.attach_scroll_container(_FakeScrollArea())
+    preview.refresh()
+    initial_page = workflow.session.current_page
+    initial_zoom = workflow.session.zoom
+
+    preview.zoom_in_view()
+    assert workflow.session.zoom > initial_zoom
+    preview.zoom_out_view()
+    assert workflow.session.zoom == pytest.approx(initial_zoom)
+    preview.reset_zoom_view()
+    assert workflow.session.zoom == pytest.approx(1.0)
+    assert workflow.session.current_page == initial_page
+
 def test_first_visible_view_uses_fit_page(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
     workflow = ViewerWorkflow(

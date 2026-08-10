@@ -925,6 +925,14 @@ class PdfViewerWidgetAdapter:
                 self._workflow.reset_zoom()
                 self.refresh(navigation=False)
 
+            def zoom_in_view(self) -> None:
+                self._workflow.zoom_in()
+                self.refresh(navigation=False)
+
+            def zoom_out_view(self) -> None:
+                self._workflow.zoom_out()
+                self.refresh(navigation=False)
+
             def _horizontal_scroll_bar(self) -> Any:
                 if self._scroll_container is None:
                     raise RuntimeError("Scroll container is not attached.")
@@ -1350,6 +1358,12 @@ def build_qt_pdf_viewer_widget(
 
         def reset_zoom_view(self) -> None:
             preview_widget.reset_zoom_view()
+
+        def zoom_in_view(self) -> None:
+            preview_widget.zoom_in_view()
+
+        def zoom_out_view(self) -> None:
+            preview_widget.zoom_out_view()
 
         def fit_page_view(self) -> None:
             preview_widget.fit_page_view()

@@ -158,6 +158,51 @@ def test_fit_shortcuts_dispatch_once_and_initial_view_fits_page() -> None:
             app.quit()
 
 
+def test_zoom_shortcut_dispatches_once_when_viewer_has_local_key_fallback() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QAction
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QMainWindow
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal-zoom-shortcut-test"])
+
+    backend = _RenderBackend()
+    workflow = ViewerWorkflow(
+        document_path="/tmp/zoom-shortcut-test.pdf",
+        render_backend=backend,
+        session=ViewerSession(page_count=2),
+    )
+    viewer = build_qt_pdf_viewer_widget(workflow=workflow)
+    window = QMainWindow()
+    window.setCentralWidget(viewer)
+    zoom_in_action = QAction("Zoom In", window)
+    zoom_in_action.setShortcut("Ctrl++")
+    zoom_in_action.triggered.connect(viewer.zoom_in_view)
+    window.addAction(zoom_in_action)
+    viewer.refresh()
+    window.show()
+    viewer.setFocus()
+    app.processEvents()
+    workflow.session.reset_zoom()
+
+    try:
+        QTest.keyClick(viewer.widget(), Qt.Key_Plus, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+        assert workflow.session.zoom == pytest.approx(1.25)
+        assert workflow.session.zoom_mode == "custom"
+    finally:
+        window.close()
+        app.processEvents()
+        if created_app:
+            app.quit()
+
+
 def test_find_shortcut_focuses_and_selects_the_search_query() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")

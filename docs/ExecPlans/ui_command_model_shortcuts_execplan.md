@@ -52,8 +52,12 @@ corpus remains open for its owning viewer, signing, and support plans.
 - [x] (2026-08-09) Focused validation passed (`165 passed`), full validation passed (`1193 passed,
   20 skipped, 1 warning`), Ruff and diff checks passed, and the real-Qt no-document menu test
   passed; the bounded launch remains limited by the known local QLocalServer endpoint error.
-- [ ] (2026-08-09) Commit this bounded increment; keep unsupported Undo/Redo/Cut/Paste/Help/Signing/
-  fit/search commands out.
+- [ ] (2026-08-09) Commit the remaining command-model child outcome after the owning View zoom,
+  search, and fit increments are reconciled; keep unsupported Undo/Redo/Cut/Paste/Help/Signing/
+  Back/Forward commands out until truthful seams exist.
+- [x] (2026-08-10) Added the typed View zoom command child: Zoom In/Out use `Ctrl++`/`Ctrl+-`,
+  Reset Zoom is a real menu action without a conflicting shortcut, and all three route through the
+  public session port while reusing the existing clamped viewer zoom policy.
 
 ## Surprises & Discoveries
 
