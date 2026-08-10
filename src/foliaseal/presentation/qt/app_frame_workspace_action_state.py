@@ -14,8 +14,12 @@ class WorkspaceActionState:
     text_selection_enabled: bool
     text_selection_checked: bool
     copy_selected_text_enabled: bool
+    copy_enabled: bool = False
     undo_placement_enabled: bool = False
     redo_placement_enabled: bool = False
+    cut_enabled: bool = False
+    paste_enabled: bool = False
+    select_all_enabled: bool = False
     previous_page_enabled: bool = False
     next_page_enabled: bool = False
     back_link_enabled: bool = False
@@ -92,4 +96,24 @@ def workspace_action_state_with_document_text_result(
         state,
         text_selection_checked=bool(selection_mode_enabled),
         copy_selected_text_enabled=bool(can_copy_selected_text),
+        copy_enabled=bool(can_copy_selected_text),
+    )
+
+
+def workspace_action_state_with_native_edit_result(
+    state: WorkspaceActionState,
+    *,
+    copy_enabled: bool,
+    cut_enabled: bool,
+    paste_enabled: bool,
+    select_all_enabled: bool,
+) -> WorkspaceActionState:
+    """Project focused-native-editor capabilities onto Edit actions."""
+
+    return replace(
+        state,
+        copy_enabled=bool(copy_enabled),
+        cut_enabled=bool(cut_enabled),
+        paste_enabled=bool(paste_enabled),
+        select_all_enabled=bool(select_all_enabled),
     )

@@ -66,6 +66,7 @@ from foliaseal.presentation.qt.app_frame_workspace_action_state import (
     workspace_action_state_closed,
     workspace_action_state_open,
     workspace_action_state_with_document_text_result,
+    workspace_action_state_with_native_edit_result,
     workspace_action_state_with_selection_result,
 )
 from foliaseal.presentation.qt.app_frame_workspace_open import (
@@ -404,6 +405,9 @@ class FoliaSealAppFrame:
         self._exit_action: Any | None = None
         self._undo_action: Any | None = None
         self._redo_action: Any | None = None
+        self._cut_action: Any | None = None
+        self._paste_action: Any | None = None
+        self._select_all_action: Any | None = None
         self._previous_page_action: Any | None = None
         self._next_page_action: Any | None = None
         self._back_link_action: Any | None = None
@@ -423,6 +427,8 @@ class FoliaSealAppFrame:
         self._reusable_object_library: Any | None = None
         self._document_signatures_dialog: DocumentSignaturesDialog | None = None
         self._closing_document_signatures = False
+        self._connected_native_editor_ids: set[int] = set()
+        self._native_clipboard_connected = False
         self._workspace_action_state = workspace_action_state_closed()
 
         self.window = bindings.q_main_window()
@@ -1023,40 +1029,112 @@ class FoliaSealAppFrame:
         signal = getattr(application, "focusChanged", None)
         connect = getattr(signal, "connect", None)
         if callable(connect):
-            connect(lambda _old, _new: self._sync_edit_history_actions())
+            connect(lambda _old, _new: self._handle_focus_change())
+        self._connect_native_edit_signals()
+
+    def _handle_focus_change(self) -> None:
+        self._connect_native_edit_signals()
+        self._sync_edit_history_actions()
+
+    def _connect_native_edit_signals(self) -> None:
+        editor = self._focused_text_editor()
+        if editor is not None and id(editor) not in self._connected_native_editor_ids:
+            selection_signal = getattr(editor, "selectionChanged", None)
+            connect = getattr(selection_signal, "connect", None)
+            if callable(connect):
+                connect(self._sync_edit_history_actions)
+                self._connected_native_editor_ids.add(id(editor))
+
+        application_type = self._bindings.q_application
+        instance_factory = getattr(application_type, "instance", None)
+        application = instance_factory() if callable(instance_factory) else None
+        clipboard_getter = getattr(application, "clipboard", None)
+        clipboard = clipboard_getter() if callable(clipboard_getter) else None
+        if clipboard is None:
+            clipboard_getter = getattr(application_type, "clipboard", None)
+            clipboard = clipboard_getter() if callable(clipboard_getter) else None
+        if not self._native_clipboard_connected:
+            connected = False
+            for signal_name in ("dataChanged", "changed"):
+                signal = getattr(clipboard, signal_name, None)
+                connect = getattr(signal, "connect", None)
+                if callable(connect):
+                    connect(lambda *_args: self._sync_edit_history_actions())
+                    connected = True
+            self._native_clipboard_connected = connected
 
     def _sync_edit_history_actions(self) -> None:
-        """Project native-text or placement-history undo state onto Edit actions."""
+        """Project native-text or placement-history state onto Edit actions."""
 
+        self._connect_native_edit_signals()
         workspace = self._workspace_host.active()
-        if workspace is None:
-            self._apply_workspace_action_state(
-                replace(
-                    self._workspace_action_state,
-                    undo_placement_enabled=False,
-                    redo_placement_enabled=False,
-                )
-            )
-            return
         editor = self._focused_text_editor()
         if editor is not None:
             undo_getter = getattr(editor, "isUndoAvailable", None)
             redo_getter = getattr(editor, "isRedoAvailable", None)
             undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
             redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+            cut_enabled = self._native_editor_has_selection(editor)
+            paste_enabled = self._native_editor_can_paste(editor)
+            select_all_enabled = True
+            copy_enabled = cut_enabled
         else:
-            session = workspace.session
-            undo_getter = getattr(session, "can_undo_placement", None)
-            redo_getter = getattr(session, "can_redo_placement", None)
-            undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
-            redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+            if workspace is None:
+                undo_enabled = False
+                redo_enabled = False
+            else:
+                session = workspace.session
+                undo_getter = getattr(session, "can_undo_placement", None)
+                redo_getter = getattr(session, "can_redo_placement", None)
+                undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
+                redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+            cut_enabled = False
+            paste_enabled = False
+            select_all_enabled = False
+            copy_enabled = self._workspace_action_state.copy_selected_text_enabled
+        state = replace(
+            self._workspace_action_state,
+            undo_placement_enabled=undo_enabled,
+            redo_placement_enabled=redo_enabled,
+        )
         self._apply_workspace_action_state(
-            replace(
-                self._workspace_action_state,
-                undo_placement_enabled=undo_enabled,
-                redo_placement_enabled=redo_enabled,
+            workspace_action_state_with_native_edit_result(
+                state,
+                copy_enabled=copy_enabled,
+                cut_enabled=cut_enabled,
+                paste_enabled=paste_enabled,
+                select_all_enabled=select_all_enabled,
             )
         )
+
+    @staticmethod
+    def _native_editor_has_selection(editor: Any) -> bool:
+        has_selected_text = getattr(editor, "hasSelectedText", None)
+        if callable(has_selected_text):
+            return bool(has_selected_text())
+        cursor_getter = getattr(editor, "textCursor", None)
+        cursor = cursor_getter() if callable(cursor_getter) else None
+        cursor_selection = getattr(cursor, "hasSelection", None)
+        return bool(cursor_selection()) if callable(cursor_selection) else False
+
+    def _native_editor_can_paste(self, editor: Any) -> bool:
+        can_paste = getattr(editor, "canPaste", None)
+        if callable(can_paste):
+            return bool(can_paste())
+        application_type = self._bindings.q_application
+        instance_factory = getattr(application_type, "instance", None)
+        application = instance_factory() if callable(instance_factory) else None
+        clipboard_getter = getattr(application, "clipboard", None)
+        clipboard = clipboard_getter() if callable(clipboard_getter) else None
+        mime_data_getter = getattr(clipboard, "mimeData", None)
+        mime_data = mime_data_getter() if callable(mime_data_getter) else None
+        has_text = getattr(mime_data, "hasText", None)
+        if callable(has_text):
+            if not has_text():
+                return False
+            text_getter = getattr(mime_data, "text", None)
+            return bool(text_getter()) if callable(text_getter) else True
+        return callable(getattr(editor, "paste", None))
 
     def _undo_edit(self) -> Any | None:
         editor = self._focused_text_editor()
@@ -1079,6 +1157,27 @@ class FoliaSealAppFrame:
             result = self._with_current_session_port(
                 lambda session_port: session_port.redo_placement()
             )
+        self._sync_edit_history_actions()
+        return result
+
+    def _cut_edit(self) -> Any | None:
+        editor = self._focused_text_editor()
+        cut = getattr(editor, "cut", None) if editor is not None else None
+        result = cut() if callable(cut) else None
+        self._sync_edit_history_actions()
+        return result
+
+    def _paste_edit(self) -> Any | None:
+        editor = self._focused_text_editor()
+        paste = getattr(editor, "paste", None) if editor is not None else None
+        result = paste() if callable(paste) else None
+        self._sync_edit_history_actions()
+        return result
+
+    def _select_all_edit(self) -> Any | None:
+        editor = self._focused_text_editor()
+        select_all = getattr(editor, "selectAll", None) if editor is not None else None
+        result = select_all() if callable(select_all) else None
         self._sync_edit_history_actions()
         return result
 
@@ -1519,12 +1618,30 @@ class FoliaSealAppFrame:
             self._redo_edit,
             enabled=False,
         )
+        self._cut_action = self._command_action(
+            edit_menu,
+            AppFrameCommandId.CUT,
+            self._cut_edit,
+            enabled=False,
+        )
         self._copy_selected_text_action = self._command_action(
             edit_menu,
             AppFrameCommandId.COPY,
-            self._copy_selected_text_from_action,
+            self._copy_edit,
             enabled=False,
             icon_name="copy.svg",
+        )
+        self._paste_action = self._command_action(
+            edit_menu,
+            AppFrameCommandId.PASTE,
+            self._paste_edit,
+            enabled=False,
+        )
+        self._select_all_action = self._command_action(
+            edit_menu,
+            AppFrameCommandId.SELECT_ALL,
+            self._select_all_edit,
+            enabled=False,
         )
         view_menu = menu_bar.addMenu("View")
         self._previous_page_action = self._command_action(
@@ -1761,13 +1878,16 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._close_action, state.close_enabled)
         self._set_action_enabled(self._undo_action, state.undo_placement_enabled)
         self._set_action_enabled(self._redo_action, state.redo_placement_enabled)
+        self._set_action_enabled(self._cut_action, state.cut_enabled)
+        self._set_action_enabled(self._paste_action, state.paste_enabled)
+        self._set_action_enabled(self._select_all_action, state.select_all_enabled)
         self._set_action_enabled(self._previous_page_action, state.previous_page_enabled)
         self._set_action_enabled(self._next_page_action, state.next_page_enabled)
         self._set_action_enabled(self._back_link_action, state.back_link_enabled)
         self._set_action_enabled(self._forward_link_action, state.forward_link_enabled)
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
-        self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
+        self._set_action_enabled(self._copy_selected_text_action, state.copy_enabled)
         self._set_action_enabled(self._zoom_in_action, state.workspace_open)
         self._set_action_enabled(self._zoom_out_action, state.workspace_open)
         self._set_action_enabled(self._reset_zoom_action, state.workspace_open)
@@ -1872,6 +1992,7 @@ class FoliaSealAppFrame:
                 can_copy_selected_text=can_copy,
             )
         )
+        self._sync_edit_history_actions()
 
     def _toggle_text_selection_mode_from_action(self) -> bool | None:
         action = self._text_selection_mode_action
@@ -1914,6 +2035,13 @@ class FoliaSealAppFrame:
         return self._with_current_shell_port(
             lambda shell_port: shell_port.copy_selected_document_text()
         )
+
+    def _copy_edit(self) -> Any | None:
+        editor = self._focused_text_editor()
+        copy = getattr(editor, "copy", None) if editor is not None else None
+        result = copy() if callable(copy) else self._copy_selected_text_from_action()
+        self._sync_edit_history_actions()
+        return result
 
     def _apply_certificate_dialog_compatibility(
         self,

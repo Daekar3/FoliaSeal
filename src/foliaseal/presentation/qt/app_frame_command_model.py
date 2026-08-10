@@ -16,7 +16,10 @@ class AppFrameCommandId(StrEnum):
     EXIT = "file.exit"
     UNDO = "edit.undo"
     REDO = "edit.redo"
+    CUT = "edit.cut"
     COPY = "edit.copy"
+    PASTE = "edit.paste"
+    SELECT_ALL = "edit.select_all"
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
     BACK = "view.back"
@@ -115,12 +118,36 @@ EDIT_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         mnemonic_text="&Redo",
     ),
     AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.CUT,
+        menu="Edit",
+        text="Cut",
+        shortcut="Ctrl+X",
+        accessible_name="Cut selected text in the focused editor",
+        mnemonic_text="Cu&t",
+    ),
+    AppFrameCommandDefinition(
         command_id=AppFrameCommandId.COPY,
         menu="Edit",
         text="Copy",
         shortcut="Ctrl+C",
-        accessible_name="Copy selected document text",
+        accessible_name="Copy selected text from the focused editor or PDF",
         mnemonic_text="&Copy",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.PASTE,
+        menu="Edit",
+        text="Paste",
+        shortcut="Ctrl+V",
+        accessible_name="Paste text into the focused editor",
+        mnemonic_text="&Paste",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.SELECT_ALL,
+        menu="Edit",
+        text="Select All",
+        shortcut="Ctrl+A",
+        accessible_name="Select all text in the focused editor",
+        mnemonic_text="Select &All",
     ),
 )
 

@@ -552,3 +552,118 @@ def test_real_qt_pending_open_surface_is_visible_and_cancelable(tmp_path: Path) 
     app.processEvents()
     if created_app:
         app.quit()
+
+
+def test_real_qt_native_edit_commands_use_focused_line_edit(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QLineEdit
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+    from foliaseal.presentation.qt.app_frame_command_model import AppFrameCommandId
+
+    class CountingLineEdit(QLineEdit):
+        def __init__(self, parent=None) -> None:
+            super().__init__(parent)
+            self.cut_calls = 0
+            self.copy_calls = 0
+            self.paste_calls = 0
+            self.select_all_calls = 0
+
+        def cut(self) -> None:
+            self.cut_calls += 1
+            super().cut()
+
+        def copy(self) -> None:
+            self.copy_calls += 1
+            super().copy()
+
+        def paste(self) -> None:
+            self.paste_calls += 1
+            super().paste()
+
+        def selectAll(self) -> None:  # noqa: N802
+            self.select_all_calls += 1
+            super().selectAll()
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    editor = CountingLineEdit(frame.window)
+    editor.setText("native text")
+    editor.show()
+    frame.window.show()
+    app.processEvents()
+    QTest.mouseClick(editor, Qt.LeftButton)
+    editor.setFocus()
+    app.processEvents()
+    assert app.focusWidget() is editor
+    app.clipboard().setText("clipboard text")
+    frame._sync_edit_history_actions()
+    actions = frame.command_actions()
+    cut_action = actions[AppFrameCommandId.CUT]
+    paste_action = actions[AppFrameCommandId.PASTE]
+    select_all_action = actions[AppFrameCommandId.SELECT_ALL]
+    copy_action = actions[AppFrameCommandId.COPY]
+    assert cut_action.isEnabled() is False
+    assert paste_action.isEnabled() is True
+    assert select_all_action.isEnabled() is True
+    assert copy_action.isEnabled() is False
+
+    app.clipboard().setText("")
+    app.processEvents()
+    assert frame._native_editor_can_paste(editor) is False
+    assert paste_action.isEnabled() is False
+    app.clipboard().setText("clipboard text")
+    app.processEvents()
+    assert paste_action.isEnabled() is True
+
+    select_all_action.trigger()
+    copy_action.trigger()
+    cut_action.trigger()
+    paste_action.trigger()
+    assert editor.select_all_calls == 1
+    assert editor.copy_calls == 1
+    assert editor.cut_calls == 1
+    assert editor.paste_calls == 1
+    assert editor.text() == "native text"
+
+    QTest.keyClick(editor, Qt.Key_A, Qt.ControlModifier)
+    assert editor.selectedText() == "native text"
+    assert cut_action.isEnabled() is True
+    assert copy_action.isEnabled() is True
+    QTest.keyClick(editor, Qt.Key_C, Qt.ControlModifier)
+    assert app.clipboard().text() == "native text"
+    QTest.keyClick(editor, Qt.Key_X, Qt.ControlModifier)
+    assert editor.text() == ""
+    QTest.keyClick(editor, Qt.Key_V, Qt.ControlModifier)
+    assert editor.text() == "native text"
+    # Qt handles keyboard Select All internally rather than dispatching
+    # through the widget's ``selectAll`` override; verify the observable
+    # selection instead of relying on that implementation detail.
+    assert editor.selectedText() == ""
+
+    frame.window.close()
+    app.processEvents()
+    if created_app:
+        app.quit()

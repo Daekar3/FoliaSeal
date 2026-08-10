@@ -52,7 +52,7 @@ def test_document_text_result_projects_mode_and_copy_capability() -> None:
         can_copy_selected_text=True,
     )
 
-    assert projected == WorkspaceActionState(True, True, True, True, True)
+    assert projected == WorkspaceActionState(True, True, True, True, True, True)
     assert state == WorkspaceActionState(True, True, True, False, False)
 
 

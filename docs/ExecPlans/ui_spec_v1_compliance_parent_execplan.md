@@ -45,9 +45,9 @@ before any reusable-object or signing UI is allowed to persist data.
 Foundation tranche:
 
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed View Back/Forward and all five
-  Signing commands now route through public seams with capability-driven enablement; the child
-  remains open for the remaining truthful command families and final parent scenario evidence.
+- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed File/View/Signing and native Edit
+  commands now route through public seams or focused-editor behavior with capability-driven enablement;
+  the child remains open for viewer Select All, Help, and final parent scenario evidence.
 - [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
   route through the public workspace session port; broader View Back/Forward and remaining command
   families remain open with their owning children.
@@ -327,8 +327,13 @@ Release tranche:
   placement-history session boundary, with capability-driven QAction state and real offscreen
   coverage, including direct viewer history replay and native editor Redo. Current focused
   command/viewer/runtime coverage is `112 passed`; the current full suite is `1443 passed, 20
-  skipped, 1 warning`. Cut/Paste, Help, and remaining command-family evidence
+  skipped, 1 warning`. Native Edit Cut/Copy/Paste/Select All are implemented in the follow-on slice;
+  viewer Select All, Help, and remaining command-family evidence
   remain open in their owning plans.
+- [x] (2026-08-10) Added native focused-editor Edit Cut/Copy/Paste/Select All with Ctrl+X/Ctrl+C/
+  Ctrl+V/Ctrl+A, signal-driven selection/clipboard enablement, and fake plus real offscreen coverage.
+  Full validation is `1449 passed, 20 skipped, 1 warning`; viewer Select All and Help remain explicitly
+  incomplete because their public document-selection and support-content seams are not ready.
 - [x] (2026-08-10) Added the bounded pointer-placement cancellation contract: existing pointer drags
   already cross the typed viewer/session/workspace bridge into a page-local `SignatureRect`; Escape
   now cancels unfinished placement or handle drags without emitting a new rectangle. Focused viewer/

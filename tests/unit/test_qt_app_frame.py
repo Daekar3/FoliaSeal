@@ -60,7 +60,10 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
     assert [definition.command_id for definition in EDIT_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.UNDO,
         AppFrameCommandId.REDO,
-        AppFrameCommandId.COPY
+        AppFrameCommandId.CUT,
+        AppFrameCommandId.COPY,
+        AppFrameCommandId.PASTE,
+        AppFrameCommandId.SELECT_ALL,
     ]
     assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
         AppFrameCommandId.PREVIOUS_PAGE,
@@ -80,7 +83,10 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
     assert [definition.shortcut for definition in EDIT_COMMAND_DEFINITIONS] == [
         "Ctrl+Z",
         "Ctrl+Shift+Z",
+        "Ctrl+X",
         "Ctrl+C",
+        "Ctrl+V",
+        "Ctrl+A",
     ]
     assert VIEW_COMMAND_DEFINITIONS[-1].menu == "View"
 
@@ -418,10 +424,17 @@ class _FakeLineEdit:
     def __init__(self, text="") -> None:
         self._text = text
         self.textChanged = _FakeSignal()
+        self.selectionChanged = _FakeSignal()
         self.undo_available = False
         self.redo_available = False
         self.undo_calls = 0
         self.redo_calls = 0
+        self.cut_calls = 0
+        self.paste_calls = 0
+        self.select_all_calls = 0
+        self.copy_calls = 0
+        self.selected = False
+        self.paste_available = True
 
     def setText(self, text):  # noqa: N802
         self._text = text
@@ -448,6 +461,28 @@ class _FakeLineEdit:
         self.redo_calls += 1
         self.redo_available = False
         self.undo_available = True
+
+    def hasSelectedText(self):  # noqa: N802
+        return self.selected
+
+    def canPaste(self):  # noqa: N802
+        return self.paste_available
+
+    def cut(self) -> None:
+        self.cut_calls += 1
+        self.selected = False
+        self.selectionChanged.emit()
+
+    def paste(self) -> None:
+        self.paste_calls += 1
+
+    def selectAll(self) -> None:  # noqa: N802
+        self.select_all_calls += 1
+        self.selected = True
+        self.selectionChanged.emit()
+
+    def copy(self) -> None:
+        self.copy_calls += 1
 
 
 class _FakeCheckBox:
@@ -1546,6 +1581,55 @@ def test_edit_undo_redo_routes_to_placement_history_unless_text_editor_has_focus
     assert editor.undo_calls == 1
     assert shell.undo_placement_calls == 1
 
+
+def test_native_edit_commands_follow_focused_editor_capabilities(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    actions = frame.command_actions()
+    cut_action = actions[AppFrameCommandId.CUT]
+    copy_action = actions[AppFrameCommandId.COPY]
+    paste_action = actions[AppFrameCommandId.PASTE]
+    select_all_action = actions[AppFrameCommandId.SELECT_ALL]
+    assert cut_action.enabled is False
+    assert copy_action.enabled is False
+    assert paste_action.enabled is False
+    assert select_all_action.enabled is False
+
+    editor = _FakeLineEdit("native text")
+    _FakeQApplication.focus_widget = editor
+    frame._sync_edit_history_actions()
+    assert cut_action.enabled is False
+    assert copy_action.enabled is False
+    assert paste_action.enabled is True
+    assert select_all_action.enabled is True
+
+    select_all_action.trigger()
+    assert editor.select_all_calls == 1
+    assert editor.selected is True
+    assert cut_action.enabled is True
+    assert copy_action.enabled is True
+
+    cut_action.trigger()
+    copy_action.trigger()
+    paste_action.trigger()
+    assert editor.cut_calls == 1
+    assert editor.copy_calls == 1
+    assert editor.paste_calls == 1
+    assert cut_action.enabled is False
+    assert copy_action.enabled is False
+
+    _FakeQApplication.focus_widget = None
+    frame._sync_edit_history_actions()
+    assert cut_action.enabled is False
+    assert paste_action.enabled is False
+    assert select_all_action.enabled is False
+
 def test_first_use_library_is_presets_first_and_refreshes_active_shell_without_selection(
     tmp_path: Path,
 ) -> None:
@@ -1652,7 +1736,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     ]
     assert all(action.checkable is False for action in frame.window.menu_bar.menus[1].actions)
     assert all(action.enabled is False for action in frame.window.menu_bar.menus[1].actions)
-    assert frame.window.menu_bar.menus[1].actions[2].icon.path.endswith("copy.svg")
+    assert frame.window.menu_bar.menus[1].actions[3].icon.path.endswith("copy.svg")
     assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
         "Previous &Page",
         "Next P&age",
@@ -1785,7 +1869,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     save_action = frame.window.menu_bar.menus[0].actions[1]
     save_as_action = frame.window.menu_bar.menus[0].actions[2]
     close_action = frame.window.menu_bar.menus[0].actions[3]
-    copy_selection_action = frame.window.menu_bar.menus[1].actions[2]
+    copy_selection_action = frame.window.menu_bar.menus[1].actions[3]
     text_selection_action = frame.window.menu_bar.menus[2].actions[4]
 
     assert save_action.enabled is False

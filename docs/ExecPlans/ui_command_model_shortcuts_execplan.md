@@ -7,14 +7,14 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, the already-supported text commands and placement history use the same typed
-command registry as File, View, Settings, and Signing. Edit contains focus-sensitive Undo and Redo
-with Ctrl+Z/Ctrl+Shift+Z: a focused native text editor keeps its own Qt undo stack, while viewer or
-placement focus routes to the public workspace placement-history boundary. The commands retain
-truthful capability state after placement mutations and lifecycle clearing, so keyboard and menu
-users see the correct topology without inventing unsupported editing features. This is a bounded
-increment toward UI_SPEC section 7 and acceptance scenarios 1 and 8; Help and other unsupported
-command families remain open for their owning plans.
+After this slice, the typed Edit registry also exposes native Cut, Copy, Paste, and Select All for
+the currently focused `QLineEdit` or `QTextEdit`, using Ctrl+X, Ctrl+C, Ctrl+V, and Ctrl+A. The existing
+focus-sensitive Undo/Redo boundary remains unchanged: native editors own their local text history,
+while viewer or placement focus routes Undo/Redo to the public placement-history boundary. When no
+native text editor owns focus, the new native-only commands stay disabled rather than pretending to
+implement viewer Select All. This is a bounded increment toward UI_SPEC section 7 and acceptance
+scenario 8; viewer text Select All and Help remain separate owning slices because they need deeper
+document-selection and support-content seams.
 
 ## Child ExecPlan Dependencies
 
@@ -27,7 +27,8 @@ command families remain open for their owning plans.
 - [x] (2026-08-09) Implement the typed File command registry and lifecycle application/Qt path.
 - [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the command-model seams was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and real-Qt validation; record evidence and clean up.
-- [ ] (2026-08-09) Update relevant architecture/status documentation, complete the remaining command menus, then commit the whole child outcome.
+- [x] (2026-08-09) Historical broad completion gate superseded by dependency-ordered command slices;
+  each completed increment now reconciles its owning architecture/status records and commit evidence.
 - [x] (2026-08-09) Loop 5: add typed View Previous Page and Next Page commands through the public
   session port; keep Fit/zoom/search/history commands deferred until their truthful seams exist.
 - [x] (2026-08-09) Loop 5 compliance fixes: synchronize boundary capability after viewer-owned
@@ -101,6 +102,14 @@ command families remain open for their owning plans.
   passed, 20 skipped, 1 warning`; the bounded GUI audit exits at `SingleInstanceUnavailable`, with
   no matching processes or temporary audit root remaining. Commit and remaining command-family
   status remain the parent handoff gates.
+- [x] (2026-08-10) Fresh-scan selected native-editor Cut, Copy, Paste, and Select All as the next truthful
+  Edit increment; viewer Select All and Help remain separate because their public seams are not ready.
+- [x] (2026-08-10) Added typed native Edit definitions, focus-sensitive state projection, native
+  editor callbacks, selection/clipboard signal synchronization, and fake/real offscreen coverage.
+- [x] (2026-08-10) Reconciled architecture/status documentation; focused validation passed (`65 passed`),
+  full validation passed (`1449 passed, 20 skipped, 1 warning`), and `git diff --check`/Ruff passed.
+  The bounded GUI launch remains limited by the known isolated `SingleInstanceUnavailable` endpoint
+  error and requires no lingering process or temporary audit root.
 
 ## Surprises & Discoveries
 
@@ -152,6 +161,12 @@ command families remain open for their owning plans.
   path-selection/readiness-flow behavior.
   Evidence: the compliance review found an unready Sign and save action enabled immediately after
   open; `SigningWorkspaceSessionPort.can_submit_sign_request()` now projects `preview().can_submit`.
+- Observation: native Cut, Copy, Paste, and Select All are dependency-ready at the AppFrame edge because
+  `_focused_text_editor()` already identifies the only widgets that may own these operations.
+  Evidence: the current frame routes Undo/Redo through the same focus seam, while the viewer's public
+  selection API has no current-page “select all extractable text” operation. This slice must therefore
+  keep the new commands disabled without a focused native editor and leave viewer Select All to a
+  later document-selection child.
 
 ## Decision Log
 
@@ -182,10 +197,10 @@ command families remain open for their owning plans.
   Rationale: each migrated Settings action has a concrete frame boundary and can expose stable
   keyboard metadata; adding commands without behavior would violate UI_SPEC's truthful-action rule.
   Date/Author: 2026-08-09 / Codex
-- Decision: register only Select Text and Copy in this increment, moving Select Text to View and
+- Decision (superseded): register only Select Text and Copy in this increment, moving Select Text to View and
   keeping Copy in Edit; do not add unsupported editing or signing placeholders.
   Rationale: both actions already have real maintenance-port behavior and state projection, while
-  Undo/Redo/Cut/Paste/Select All, Help, Signing, and advanced View commands lack complete truthful
+  Undo/Redo/Cut/Paste/Select All, Help, Signing, and advanced View commands lacked complete truthful
   seams. A typed correction improves UI_SPEC compliance without overstating capability.
   Date/Author: 2026-08-09 / Codex
 - Decision: add only View Back and Forward in the current command-model increment, using the
@@ -205,6 +220,13 @@ command families remain open for their owning plans.
   Rationale: the runtime already owns these behaviors and can expose truthful capability methods
   without moving geometry policy into AppFrame.
   Date/Author: 2026-08-10 / Codex
+- Decision: add Cut, Copy, Paste, and Select All for a focused native `QLineEdit` or `QTextEdit`,
+  using Ctrl+X, Ctrl+C, Ctrl+V, and Ctrl+A; do not claim viewer Select All in this slice.
+  Rationale: Qt already owns the correct text-edit semantics and the frame has a tested focus seam,
+  while viewer Select All requires a new current-page extraction/highlight capability. Keeping the
+  commands disabled outside native text editors is more truthful than exposing a no-op or partial
+  viewer command.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
@@ -220,9 +242,10 @@ object names, Qt descriptions, and trigger-routing tests. The remaining gap is t
 UI_SPEC command registry and its parent scenario evidence: Help content/actions and remaining View
 behavior remain deferred to their owning viewer/document/support children. The current increment
 wires document-internal Back/Forward, completes all five Signing actions, and adds focus-sensitive
-Undo/Redo over native text-editor and placement histories; browser navigation, Cut/Paste, and other
-unsupported command families remain
-out of scope. Final evidence for this increment is `1443 passed, 20 skipped, 1 warning` for the
+  Undo/Redo over native text-editor and placement histories; browser navigation, viewer Select All,
+  Help, and other unsupported command families remain out of scope. The native-editor Cut/Copy/Paste/
+  Select All increment now has focused and real offscreen coverage. Final evidence for the prior
+  increment is `1443 passed, 20 skipped, 1 warning` for the
 full suite and `112 passed` for focused command/viewer/runtime/session/offscreen coverage; the
 bounded launch returned `gui_rc=1` with
 `SingleInstanceUnavailable`, then left no matching process or temporary root.
@@ -287,6 +310,19 @@ its `isUndoAvailable()`/`isRedoAvailable()` state; otherwise route through the s
 keeps numeric fields' local editing history separate from document-placement history and avoids
 private widget reach-through from the app frame.
 
+For the current native-edit increment, add `CUT`, `COPY`, `PASTE`, and `SELECT_ALL` to
+`AppFrameCommandId` and append them to `EDIT_COMMAND_DEFINITIONS` in UI_SPEC order around Copy.
+Use Ctrl+X, Ctrl+C, Ctrl+V, and Ctrl+A, unique mnemonic text, stable object names, and truthful Qt
+tooltip/status descriptions. Add frame action fields and callbacks that call only the focused editor's
+native `cut()`, `copy()`, `paste()`, or `selectAll()` method. Extend edit-action synchronization so
+these actions are enabled only when a focused editor exposes the corresponding capability
+(`hasSelectedText` for Cut/Copy, `canPaste` where available, and any native editor for Select All);
+refresh on focus, selection, and clipboard changes; and disable them when focus leaves a native
+editor. Do not add a workspace-port method or a viewer fallback. Add fake-Qt unit tests for
+disabled/no-editor state, enablement, menu dispatch, signal-driven transitions, and focus changes,
+plus a real offscreen Qt test that drives menu actions and native keyboard shortcuts against a
+`QLineEdit` and verifies observable text/clipboard behavior without touching placement history.
+
 ## Milestones
 
 Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
@@ -302,6 +338,9 @@ Remove Placement over the public placement seam, proves fixed-field protection a
 transitions, and runs the real offscreen Signing-menu test. Milestone 7 adds Edit Undo/Redo, proves
 focus-sensitive native-text versus placement-history routing and capability transitions, and runs a
 real offscreen menu/action test that creates, mutates, undoes, and redoes a placement.
+Milestone 8 adds native-editor Cut, Paste, and Select All, proves focus-sensitive enablement and
+shortcut dispatch against a real `QLineEdit`, and records viewer Select All and Help as separate
+remaining dependency gaps.
 
 ## Concrete Steps
 
@@ -315,6 +354,8 @@ fall back to a system Python or system Qt installation.
     rg -n -e '_install_menus|_command_action|text_selection|copy_selected|SIGNING_COMMAND_DEFINITIONS|VIEW_COMMAND_DEFINITIONS|EDIT_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py tests/integration/test_gui_launch_no_document.py
     .venv/bin/pytest -q tests/unit/test_placement_history.py tests/unit/test_qt_signing_workspace_runtime.py tests/unit/test_signing_workspace_session_port.py
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py -k 'cut or paste or select_all'
+    QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py -k 'edit or text'
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py tests/integration/test_view_navigation_shortcuts.py
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py
     .venv/bin/ruff check src tests
@@ -361,6 +402,14 @@ history and disables both actions. The new focused tests must fail before the bo
 pass afterward; full regression, Ruff, diff checks, and offscreen lifecycle cleanup must remain
 green.
 
+For the native-edit increment, Edit presents Cut, Copy, Paste, and Select All with Ctrl+X, Ctrl+C,
+Ctrl+V, and Ctrl+A. With a focused `QLineEdit` containing selected text, Cut removes the selection
+and places it on the native clipboard, Paste inserts clipboard text, and Select All selects the full
+editor value. The same actions are enabled/disabled from the editor's native capability state and
+dispatch through the menu while native keyboard shortcuts retain Qt's built-in editor semantics.
+With the viewer, a button, or no native editor focused, Cut/Paste/Select All remain disabled and do not mutate placement or
+document-selection state. Viewer Select All is explicitly not claimed by this increment.
+
 ## Evidence Record
 
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
@@ -387,6 +436,13 @@ SVG artifact.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
+Native-editor evidence recorded for this increment: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
+tests/integration/test_gui_launch_no_document.py -k native_edit` passed (`1 passed`), the combined
+app-frame/state/offscreen set passed (`65 passed`), and the full suite passed (`1449 passed, 20
+skipped, 1 warning`). The real test covers Edit menu Cut/Copy/Paste/Select All, clipboard empty/nonempty
+transitions, and Ctrl+A/C/X/V observable selection, clipboard, and text behavior; keyboard Select All
+is validated by the resulting Qt selection rather than an overridden `selectAll()` call count.
+
 ## Idempotence and Recovery
 
 Use temporary sibling outputs and isolated configuration for repeatable tests. If implementation
@@ -411,8 +467,13 @@ tests/unit/test_signing_workspace_session_port.py. `QtSigningWorkspaceSessionPor
 `can_undo_placement()`, `can_redo_placement()`, `undo_placement()`, and `redo_placement()`;
 `SigningWorkspaceRuntime` must provide the corresponding typed methods and leave placement
 application/history ownership in the viewer boundary.
-workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
-retirement condition recorded in this plan.
+The native-edit increment keeps Cut/Copy/Paste/Select All at the `FoliaSealAppFrame` edge: the frame
+queries `_focused_text_editor()`, subscribes to native selection/clipboard changes, and calls only the
+focused editor's native `cut()`, `copy()`, `paste()`, or `selectAll()` methods. No new
+`SigningWorkspaceSessionPort` method is allowed for this increment; viewer Select All will require a
+separate typed document-text-selection contract.
+Any compatibility workspace adapter retained temporarily must have a named consumer and a retirement
+condition recorded in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as child ui_command_model_shortcuts_execplan.md of the approved SPEC/UI_SPEC compliance breakdown.
@@ -439,3 +500,9 @@ Selected the next bounded correction: add focus-sensitive typed Edit Undo/Redo o
 placement-history seam. Native text-editor undo remains local to the focused editor; viewer and
 placement focus use the public workspace session boundary. This closes the direct UI_SPEC command
 gap without adding unsupported editing commands.
+Revision note: 2026-08-10 / Codex
+Fresh compliance audit selected the next dependency-ready native-editor Edit increment: Cut, Copy,
+Paste, and Select All over the existing `_focused_text_editor()` seam with Ctrl+X/Ctrl+C/Ctrl+V/Ctrl+A.
+Selection and clipboard signals now keep action state current; the real offscreen test validates menu
+dispatch and observable native keyboard behavior. Viewer Select All and Help remain explicitly deferred
+because their current public document-selection and support-content contracts are incomplete.
