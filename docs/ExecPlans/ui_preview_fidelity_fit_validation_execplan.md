@@ -14,12 +14,19 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
-- [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+- [x] docs/ExecPlans/ui_pointer_signature_placement_execplan.md — pointer/keyboard placement,
+  snapping, history, and off-page recovery are implemented and reconciled in the parent corpus.
+- [x] docs/ExecPlans/ui_appearance_content_layout_execplan.md — managed image semantics,
+  staged-file cleanup, and save/reload preview-signing path parity are complete; this child still
+  owns authoritative rendered-preview fidelity and glyph/time/readiness evidence.
+- [x] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md — typed catalog-backed
+  certificate readiness and selected-material projection are implemented and reconciled.
 
 ## Progress
 
+- [x] (2026-08-10) Re-audited current behavior and reconciled the placement, Appearance, and
+  certificate dependencies against the parent plan; remaining work is the preview-specific
+  authoritative parity slice rather than dependency setup.
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
@@ -145,5 +152,8 @@ tests/unit/test_signature_preview_lifecycle.py, and tests/unit/test_visible_sign
 Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
-Revision note: 2026-08-09 / Codex
-Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Reconciled after the managed-image closeout: placement, Appearance, and certificate-readiness
+dependencies are checked against their current implementation evidence. The child remains open
+for authoritative preview/signing snapshot parity, unsupported-glyph guidance, frozen-time
+mutation coverage, and real readiness/fit-gate integration.

@@ -359,6 +359,7 @@ class FoliaSealAppFrame:
         self._reusable_objects = ReusableSigningObjects(
             self._preset_catalog_store,
             certificate_configuration_exists=self._certificate_configuration_exists,
+            image_store=self._signature_image_store,
         )
         self._sign_executor = (
             sign_executor if sign_executor is not None else build_default_signing_executor()

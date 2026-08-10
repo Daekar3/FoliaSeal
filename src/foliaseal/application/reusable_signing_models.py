@@ -22,6 +22,7 @@ from foliaseal.domain.models import (
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageAsset,
     SignatureImageProminence,
     SignatureLayoutTemplate,
     SignaturePlacementDefaults,
@@ -170,7 +171,7 @@ def _deserialize_field_binding(payload: dict[str, Any]) -> SignatureFieldBinding
 
 
 def _serialize_appearance(value: SignatureAppearance) -> dict[str, Any]:
-    return {
+    payload = {
         "signer_label_prefix": value.signer_label_prefix,
         "layout_template": value.layout_template.value,
         "stamp_position": value.stamp_position.value,
@@ -190,8 +191,66 @@ def _serialize_appearance(value: SignatureAppearance) -> dict[str, Any]:
         "company": _serialize_field_binding(value.company),
         "text_style": asdict(value.text_style),
         "box_style": asdict(value.box_style),
-        "image_stamp_path": value.image_stamp_path,
+        "image_asset": _serialize_image_asset(value.image_asset),
     }
+    # Keep old fixture/runtime callers readable while all managed editor saves use the canonical
+    # asset object. A persisted canonical appearance never contains an absolute source path.
+    if value.image_asset is None and value.image_stamp_path is not None:
+        payload["image_stamp_path"] = value.image_stamp_path
+    return payload
+
+
+def _serialize_image_asset(value: SignatureImageAsset | None) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    return {
+        "managed_asset_id": value.managed_asset_id,
+        "storage_filename": value.storage_filename,
+        "original_filename": value.original_filename,
+        "width_px": value.width_px,
+        "height_px": value.height_px,
+        "has_alpha": value.has_alpha,
+    }
+
+
+def _deserialize_image_asset(payload: object) -> SignatureImageAsset | None:
+    if payload is None:
+        return None
+    if not isinstance(payload, dict):
+        raise ReusableObjectValidationError("Field 'image_asset' must be an object or null.")
+    managed_asset_id = payload.get("managed_asset_id")
+    if managed_asset_id is not None and (
+        not isinstance(managed_asset_id, str) or not managed_asset_id.strip()
+    ):
+        raise ReusableObjectValidationError(
+            "Field 'managed_asset_id' must be a non-empty str or null."
+        )
+    storage_filename = payload.get("storage_filename")
+    original_filename = payload.get("original_filename")
+    width_px = payload.get("width_px")
+    height_px = payload.get("height_px")
+    has_alpha = payload.get("has_alpha")
+    if not isinstance(storage_filename, str) or not storage_filename.strip():
+        raise ReusableObjectValidationError("Field 'storage_filename' must be a non-empty str.")
+    if not isinstance(original_filename, str) or not original_filename.strip():
+        raise ReusableObjectValidationError("Field 'original_filename' must be a non-empty str.")
+    if isinstance(width_px, bool) or not isinstance(width_px, int) or width_px <= 0:
+        raise ReusableObjectValidationError("Field 'width_px' must be a positive int.")
+    if isinstance(height_px, bool) or not isinstance(height_px, int) or height_px <= 0:
+        raise ReusableObjectValidationError("Field 'height_px' must be a positive int.")
+    if not isinstance(has_alpha, bool):
+        raise ReusableObjectValidationError("Field 'has_alpha' must be a bool.")
+    try:
+        return SignatureImageAsset(
+            managed_asset_id=managed_asset_id,
+            storage_filename=storage_filename,
+            original_filename=original_filename,
+            width_px=width_px,
+            height_px=height_px,
+            has_alpha=has_alpha,
+        )
+    except ValueError as exc:
+        raise ReusableObjectValidationError(str(exc)) from exc
 
 
 def _deserialize_appearance(payload: dict[str, Any]) -> SignatureAppearance:
@@ -248,6 +307,7 @@ def _deserialize_appearance(payload: dict[str, Any]) -> SignatureAppearance:
             if payload.get("image_stamp_path") is None
             else _require_non_empty_str(payload, "image_stamp_path")
         ),
+        image_asset=_deserialize_image_asset(payload.get("image_asset")),
     )
 
 

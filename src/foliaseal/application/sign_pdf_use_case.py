@@ -141,11 +141,7 @@ class SigningBackendAppearance:
             text_style=appearance.text_style,
             box_style=appearance.box_style,
             image_stamp_path=appearance.image_stamp_path,
-            image_prominence=(
-                None
-                if appearance.image_prominence is SignatureImageProminence.PRIMARY
-                else appearance.image_prominence
-            ),
+            image_prominence=appearance.image_prominence,
             preserve_image_alpha=appearance.preserve_image_alpha,
         )
 

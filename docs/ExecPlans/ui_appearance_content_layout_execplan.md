@@ -43,17 +43,40 @@ unsafe image inputs produce an actionable error and leave the catalog unchanged.
   explicit confirmation before a 2048×2048 optimization.
 - [x] (2026-08-10) Exposed Browse, Remove, position, prominence, and alpha controls through the
   public Qt Appearance form and injected the managed store through AppFrame → Library → nested
-  Preset/Appearance editors. The path remains draft-only until Save.
+  Preset/Appearance editors. Catalog and parent drafts remain unchanged until Save; normalized
+  files are staged and cleaned up on Remove, replacement, discard, or Cancel.
 - [x] (2026-08-10) Made layout preparation consume explicit Supporting/Balanced/Primary
   prominence and image-only semantics while preserving the legacy low-level path when the new
   option is omitted.
 - [x] (2026-08-10) Fixed text-color round-trip and added serialization/backward-read, import,
   layout, and Qt isolation tests. Focused new/changed coverage is green; the red-before-green
   regression was reproduced by the post-commit audit and then closed.
-- [ ] Run focused, full, and bounded GUI lifecycle validation; clean all processes and temporary
-  configuration/artifact roots.
-- [ ] Update `docs/ARCHITECTURE.md`, this plan, and the parent plan with evidence; obtain the
-  post-pass compliance review and commit the coherent slice.
+- [x] (2026-08-10) Added staged managed-image ownership: replacing, Remove, parent discard, and
+  Cancel now delete normalized files created by the uncommitted draft; a failed replacement also
+  cleans the newly imported file without losing the prior draft path. Focused lifecycle coverage
+  proves both Remove/discard and replacement cleanup.
+- [x] (2026-08-10) Added a persistence-to-materialization parity test that saves a managed image,
+  reloads the catalog, and records the same persisted path at both canonical preview and signing
+  materialization while asserting one shared layout plan.
+- [x] (2026-08-10) Aligned persistence with `docs/SCHEMAS.md`: new Appearance saves persist a
+  schema-v2 `image_asset` identity/metadata object (`managed_asset_id`, filename, source name,
+  dimensions, alpha) rather than an absolute path; `ReusableSigningObjects` resolves that asset
+  through the injected catalog-local store for runtime preview/signing use. Legacy path payloads
+  remain read-compatible only.
+- [x] (2026-08-10) Removed the backend/preview Primary-to-None translation. Production Appearance
+  requests now exercise the required 75% allocation; low-level compatibility fixtures explicitly
+  pass `None` and retain their historical reservation evidence.
+- [x] (2026-08-10) Ran focused and full validation, the bounded offscreen GUI lifecycle check, and
+  cleanup verification; updated architecture/parent/child documentation and recorded the known
+  isolated single-instance endpoint limitation. No SVG changed.
+- [x] (2026-08-10) Obtained the post-pass compliance review and committed the original slice as
+  `e1e60a9bc`; the current evidence follow-up is ready for its own commit after validation.
+- [x] (2026-08-10) Implemented the review corrections: canonical schema-v2 `SignatureImageAsset`
+  persistence/runtime resolution and explicit production Primary allocation. Focused validation is
+  `151 passed`; full regression is `1384 passed, 20 skipped, 1 warning`; the bounded audit exits
+  at `SingleInstanceUnavailable` and removes its isolated root with no process residue.
+- [ ] Obtain the final post-correction compliance review, stage this correction set, and commit it
+  before starting the open authoritative preview-fidelity child.
 
 ## Surprises & Discoveries
 
@@ -72,9 +95,16 @@ unsafe image inputs produce an actionable error and leave the catalog unchanged.
 - Observation: Pillow is already a required runtime dependency (`pyproject.toml`), so no new
   imaging library is needed.
 - Observation: applying Primary allocation unconditionally changed established low-level layout
-  evidence and made existing valid fixtures fail exact-fit checks. Evidence: the first focused
-  run reported seven fit/parity failures; preserving the legacy path for omitted/default Primary
-  while applying Supporting/Balanced explicitly restored `124 passed`.
+  fixtures because those callers intentionally omit the new prominence contract. Evidence: the
+  first focused run reported seven fit/parity failures; keeping `None` only in explicit low-level
+  compatibility fixtures restored their historical evidence while production Primary now exercises
+  the required 75% lane.
+- Observation: importing a replacement image creates the new managed file before the old staged
+  file is removed. Evidence: the compliance audit identified an orphan risk if old-file deletion
+  failed; replacement cleanup now removes the new file on that error and retains the old draft.
+- Observation: persistence alone did not prove preview/signing parity. Evidence: the new
+  `test_saved_and_reloaded_managed_image_reaches_preview_and_signing` test reloads the catalog,
+  records both materializer paths, and compares the resulting canonical layout plans.
 
 ## Decision Log
 
@@ -82,10 +112,11 @@ unsafe image inputs produce an actionable error and leave the catalog unchanged.
   into the nested Qt editor, rather than letting widgets copy files or reach into the catalog
   repository. Rationale: image validation and managed storage are policy, while Qt should only
   select a source and report confirmation/error decisions. Date/Author: 2026-08-10 / Codex.
-- Decision: keep `image_stamp_path` as the persisted managed path for backward compatibility and
-  add optional `image_prominence` and `preserve_image_alpha` fields with deserialization defaults.
-  Rationale: old catalogs must load unchanged, and the existing renderer already accepts the path.
-  Date/Author: 2026-08-10 / Codex.
+- Decision: persist canonical `image_asset` metadata and retain `image_stamp_path` only as a
+  runtime-resolved compatibility value; legacy path payloads remain read-compatible. Rationale:
+  `docs/SCHEMAS.md` forbids source-path dependencies and requires stable managed filenames, while
+  existing render adapters can continue consuming a resolved runtime path. Date/Author:
+  2026-08-10 / Codex.
 - Decision: require an explicit caller confirmation when an otherwise valid source exceeds the
   2048×2048 optimization boundary; the service itself never silently downsizes. Rationale:
   UI_SPEC §9 makes optimization a user decision. Date/Author: 2026-08-10 / Codex.
@@ -93,18 +124,29 @@ unsafe image inputs produce an actionable error and leave the catalog unchanged.
   low-level request, while production Appearance requests pass the model value. Rationale: this
   keeps old evidence adapters and tests restartable during the migration. Date/Author:
   2026-08-10 / Codex.
-- Decision: treat default Primary as the existing unconstrained image lane when translating the
-  legacy backend/preview payload, and apply the explicit 35%/55% allocations for Supporting and
-  Balanced. Rationale: Primary must never silently shrink text; exact-fit blocking has precedence,
-  and existing low-level payloads do not carry an explicit user choice. Date/Author: 2026-08-10 /
-  Codex.
+- Decision: carry `SignatureImageProminence.PRIMARY` explicitly through production backend and
+  preview adapters and reserve 75% of the image axis. Rationale: UI_SPEC §9 defines Primary as a
+  real user choice; only low-level compatibility requests that omit the field may retain the
+  historical unconstrained lane. Date/Author: 2026-08-10 / Codex.
+- Decision: persist the canonical `SignatureImageAsset` metadata object and resolve its filename
+  through the catalog-local `ManagedSignatureImageStore` at runtime. Rationale: SCHEMAS.md forbids
+  source-path dependencies and permits immutable assets to be shared and garbage-collected; the
+  runtime path remains an in-memory compatibility value only. Date/Author: 2026-08-10 / Codex.
+- Decision: treat normalized files created by an Appearance draft as staged ownership until Save.
+  Rationale: the catalog must remain unchanged while Browse is immediately visible, but Cancel,
+  Remove, replacement, and abandoned parent navigation must not leak files into the managed
+  directory. Date/Author: 2026-08-10 / Codex.
 
 ## Outcomes & Retrospective
 
-The predecessor control tranche is complete and committed. This image tranche is not complete
-until an imported managed PNG can be saved, reloaded, and resolved by both preview and signing,
-and all rejection/confirmation paths have focused evidence. Record exact test counts, the GUI
-observation, cleanup result, and any remaining preview-fidelity gap here when the slice closes.
+The predecessor control tranche and this managed-image tranche are complete. An imported managed
+PNG can be saved as a canonical immutable asset, reloaded, resolved through the catalog-local
+store, and consumed by both preview and signing; rejection, optimization, replacement, Remove,
+and discard paths have focused evidence. The full suite is `1384 passed,
+20 skipped, 1 warning`; the bounded offscreen launch exits at the known isolated
+`SingleInstanceUnavailable` endpoint and leaves no FoliaSeal process or temporary root. The next
+open dependency is the authoritative preview-fidelity child, which still owns glyph coverage,
+frozen-time mutation, real readiness gating, and signed-output parity evidence.
 
 ## Context and Orientation
 
@@ -117,9 +159,14 @@ The application models and JSON codecs are in `src/foliaseal/domain/models.py` a
 `src/foliaseal/infra/config/profile_storage.py`. Shared preview/signing geometry is prepared by
 `src/foliaseal/application/visible_signature_layout.py` and materialized by its adapters.
 
-The stored image path must point into the catalog-owned managed image directory, not an arbitrary
-source file. “Content-validated” means Pillow opens and verifies the bytes, reports a supported
-raster format, and confirms that the image has one frame and at least one non-transparent pixel.
+The persisted image is a `SignatureImageAsset`, an immutable metadata record containing a stable
+managed id, plain storage filename, original filename, normalized dimensions, and alpha fact. A
+runtime `image_stamp_path` may be resolved from that asset by the injected store but is never the
+canonical persisted source path. A file imported by a dirty draft is a staged managed file: it is
+removed on draft discard, Remove, replacement, or Cancel, and becomes durable only when the catalog
+Save succeeds.
+“Content-validated” means Pillow opens and verifies the bytes, reports a supported raster format,
+and confirms that the image has one frame and at least one non-transparent pixel.
 “sRGB/RGBA” means the normalized output has a standard sRGB color interpretation and an explicit
 alpha channel. “Prominence” means the percentage of the primary axis reserved for the image when
 both image and text are present. “Image-only” means no visible field binding remains; image-only
@@ -137,7 +184,8 @@ work, packaging, broad renderer refactors, or phase3 nomenclature cleanup into t
 ## Plan of Work
 
 First add `SignatureImageProminence` with Supporting, Balanced, and Primary values and add
-`image_prominence` plus `preserve_image_alpha` to `SignatureAppearance`. Extend
+`image_prominence` plus `preserve_image_alpha` to `SignatureAppearance`. Add the canonical
+`SignatureImageAsset` metadata value required by `docs/SCHEMAS.md`. Extend
 `_serialize_appearance` and `_deserialize_appearance` so missing fields read as Primary/true and
 new fields round-trip. Add model tests proving old payloads still load and new values persist.
 
@@ -155,8 +203,10 @@ return a confirmation-required result and only thumbnail when the caller passes
 Pass one store instance from `FoliaSealAppFrame` through `ReusableObjectLibraryDialog` and nested
 Appearance/Preset editors. The setup form should expose public image controls and callbacks rather
 than importing files itself. The Appearance widget handles the file dialog, asks the standard Qt
-message box for optimization confirmation, updates only its draft path on success, and reports a
-typed error on failure. Remove clears the draft path. Position labels map to the existing
+message box for optimization confirmation, updates its staged runtime path plus canonical asset
+metadata on success, and reports a typed error on failure. `ReusableSigningObjects` resolves saved
+asset filenames through the store on catalog load. Remove clears the draft path and asset. Position
+labels map to the existing
 `SignatureStampPosition` values; prominence labels map to the new enum; alpha preservation maps to
 the new boolean. The synthetic preview must state whether an image is attached and its position/
 prominence, without reading or writing a PDF.
@@ -167,11 +217,12 @@ default. For production Appearance requests, calculate the image allocation on t
 as 35%, 55%, or 75% of available content (Supporting/Balanced/Primary), subtracting the separator
 and preserving the measured text lane. When no visible text exists, allocate all available content
 to the image and zero the text lane. Keep low-level callers that omit the value on their existing
-reservation path and add a focused geometry test for each position/prominence/image-only case.
+reservation path, but do not translate explicit production Primary to `None`; add a focused geometry
+test for each position/prominence/image-only case and a backend/preview mapping assertion.
 
 Finally update architecture ownership and plan evidence, run the compliance explorer, and commit
 only after the catalog, preview, and signing paths have all resolved the managed image path and the
-Qt editor has no active-parent mutation on Browse/Remove/Cancel.
+Qt editor has no active-parent mutation or staged-file residue on Browse/Remove/Cancel/replacement.
 
 ## Milestones
 
@@ -210,15 +261,18 @@ single-instance endpoint is unavailable:
 
 Acceptance is behavioral. A valid PNG, JPEG, or static GIF selected in the nested editor produces
 one managed PNG whose EXIF/ICC/text metadata is absent, whose orientation and alpha policy are
-correct, and whose catalog stores the managed path. An animated, vector, malformed, oversized,
-empty-alpha, or unconfirmed-optimization input leaves the draft and catalog unchanged with a
-specific error or confirmation. Save then reload returns the same enum/boolean/path values.
+correct, and whose catalog stores a schema-v2 `image_asset` rather than a source path. A reloaded
+catalog resolves that asset through the catalog-local store before preview/signing. An animated,
+vector, malformed, oversized, empty-alpha, or unconfirmed-optimization input leaves the draft and
+catalog unchanged with a specific error or confirmation. Save then reload returns the same
+asset/enum/boolean values.
 
 The editor exposes Browse, Remove, four position choices, three prominence choices, and alpha
-preservation; Cancel leaves the parent preset and catalog untouched. A changed text color persists.
-Preview and signing receive the same managed path and image-only/prominence facts. Focused tests
-must be red before each new contract and green afterward; the complete `.venv/bin/pytest -q` and
-Ruff checks must pass; the bounded GUI audit must leave no FoliaSeal process or temporary root.
+preservation; Cancel leaves the parent preset and catalog untouched and removes only the draft's
+staged files. A changed text color persists. After Save and reload, preview and signing receive
+the same managed path and image-only/prominence facts. Focused tests must be red before each new
+contract and green afterward; the complete `.venv/bin/pytest -q` and Ruff checks must pass; the
+bounded GUI audit must leave no FoliaSeal process or temporary root.
 
 ## Required Acceptance Cases
 
@@ -241,10 +295,12 @@ not change for this slice, explicitly record “no SVG change” rather than fab
 ## Idempotence and Recovery
 
 All tests use `tmp_path` and all GUI audits use an isolated XDG root. Import writes a staging file
-and atomically installs the managed PNG; a failed write removes only its own staging file. Browse,
-Remove, and Cancel change only the in-memory draft until Save. If validation or the GUI lifecycle
-fails, update Progress with completed and remaining work, terminate only owned processes, remove the
-temporary root, and retry from the last green milestone. Never delete a user's source image.
+and atomically installs the managed PNG; a failed write removes only its own staging file. Browse
+updates only the draft and tracks its staged managed file; Remove, replacement, parent discard, and
+Cancel delete that staged file, while Save clears staging
+ownership after the catalog commit. If validation or the GUI lifecycle fails, update Progress with
+completed and remaining work, terminate only owned processes, remove the temporary root, and retry
+from the last green milestone. Never delete a user's source image.
 
 ## Artifacts and Notes
 
@@ -261,7 +317,7 @@ exposes callbacks and controls but does not copy files. `SignatureAppearance` re
 model and its codec remains the only JSON persistence edge. `VisibleSignatureLayoutService` remains
 the single prepare-once boundary used by preview and signing. Pillow is the only imaging dependency.
 
-Revision note: 2026-08-10 / Codex — reconciled after the post-commit explorer review. The prior
-plan overstated completion and had stale dependency checkboxes. This revision records the completed
-bounded controls, fixes the discovered text-color defect, and defines the remaining image import,
-managed-storage, alpha/prominence, layout, test, and evidence work as one restartable slice.
+Revision note: 2026-08-10 / Codex — closed the post-pass lifecycle and parity findings. The plan
+now defines staged managed-file ownership, records replacement-failure cleanup, adds persistence
+through preview/signing evidence, and captures the exact full-suite/offscreen results. The next
+preview-fidelity child remains separate and is not claimed complete by this slice.

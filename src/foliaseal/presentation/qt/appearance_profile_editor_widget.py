@@ -296,14 +296,14 @@ class AppearanceProfileEditorWidget:
         preserve_alpha = self.controls.setup_form.build_draft().appearance.preserve_image_alpha
         try:
             try:
-                managed_path = self._image_store.import_image(
+                managed = self._image_store.import_asset(
                     source_text,
                     preserve_alpha=preserve_alpha,
                 )
             except SignatureImageOptimizationRequired as exc:
                 if not self._confirm_image_optimization(exc):
                     return
-                managed_path = self._image_store.import_image(
+                managed = self._image_store.import_asset(
                     source_text,
                     preserve_alpha=preserve_alpha,
                     allow_optimization=True,
@@ -316,11 +316,18 @@ class AppearanceProfileEditorWidget:
             try:
                 self._image_store.delete_managed_image(current_path)
             except SignatureImageImportError as exc:
+                # The new import is already in the managed directory.  Do not leave it
+                # orphaned if replacing an earlier staged image fails; retain the old draft
+                # path so the caller can retry or cancel safely.
+                try:
+                    self._image_store.delete_managed_image(str(managed.path))
+                except SignatureImageImportError:
+                    pass
                 self._on_error(str(exc))
                 return
             self._staged_image_paths.discard(current_path)
-        self.controls.setup_form.set_image_stamp_path(str(managed_path))
-        self._staged_image_paths.add(str(managed_path))
+        self.controls.setup_form.set_image_asset(str(managed.path), managed.asset)
+        self._staged_image_paths.add(str(managed.path))
 
     def _confirm_image_optimization(self, error: SignatureImageOptimizationRequired) -> bool:
         message_box = getattr(self._bindings, "q_message_box", None)

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from math import isfinite
+from pathlib import Path
 from typing import Protocol
 
 from foliaseal.domain.errors import FailureCode
@@ -351,6 +352,32 @@ class SignatureFieldBinding:
 
 
 @dataclass(frozen=True)
+class SignatureImageAsset:
+    """Stable metadata for one immutable catalog-owned signature image."""
+
+    managed_asset_id: str | None
+    storage_filename: str
+    original_filename: str
+    width_px: int
+    height_px: int
+    has_alpha: bool
+
+    def __post_init__(self) -> None:
+        if self.managed_asset_id is not None:
+            _require_non_empty_str(self.managed_asset_id, "managed_asset_id")
+        storage_filename = _require_non_empty_str(self.storage_filename, "storage_filename")
+        if Path(storage_filename).name != storage_filename or storage_filename in {".", ".."}:
+            raise ValueError("storage_filename must be a plain managed filename.")
+        _require_non_empty_str(self.original_filename, "original_filename")
+        if not isinstance(self.width_px, int) or self.width_px <= 0:
+            raise ValueError("width_px must be a positive int.")
+        if not isinstance(self.height_px, int) or self.height_px <= 0:
+            raise ValueError("height_px must be a positive int.")
+        if not isinstance(self.has_alpha, bool):
+            raise ValueError("has_alpha must be a bool.")
+
+
+@dataclass(frozen=True)
 class SignatureAppearance:
     """Normalized visible-signature appearance contract."""
 
@@ -382,7 +409,10 @@ class SignatureAppearance:
     company: SignatureFieldBinding = field(default_factory=SignatureFieldBinding)
     text_style: SignatureTextStyle = field(default_factory=SignatureTextStyle)
     box_style: SignatureBoxStyle = field(default_factory=SignatureBoxStyle)
+    # ``image_stamp_path`` is a runtime-resolved compatibility value. Persisted appearances use
+    # ``image_asset`` and resolve its storage filename through ManagedSignatureImageStore.
     image_stamp_path: str | None = None
+    image_asset: SignatureImageAsset | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -425,6 +455,8 @@ class SignatureAppearance:
             "image_stamp_path",
             _require_optional_non_empty_str(self.image_stamp_path, "image_stamp_path"),
         )
+        if self.image_asset is not None and not isinstance(self.image_asset, SignatureImageAsset):
+            raise ValueError("image_asset must be a SignatureImageAsset value or None.")
         self.validate()
 
     def validate(self) -> None:

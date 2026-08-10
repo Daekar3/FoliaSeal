@@ -17,6 +17,7 @@ from foliaseal.domain.models import (
     SignatureFieldBinding,
     SignatureFieldKey,
     SignatureFieldSource,
+    SignatureImageAsset,
     SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureStampPosition,
@@ -363,6 +364,18 @@ class QtVisibleSignatureSetupForm:
         self._appearance_template = replace(
             self._appearance_template,
             image_stamp_path=image_path,
+            image_asset=None,
+        )
+        self._set_image_path_label(image_path)
+        self._on_any_control_changed()
+
+    def set_image_asset(self, image_path: str | None, asset: SignatureImageAsset | None) -> None:
+        """Update the runtime path and canonical asset metadata in the isolated draft."""
+
+        self._appearance_template = replace(
+            self._appearance_template,
+            image_stamp_path=image_path,
+            image_asset=asset,
         )
         self._set_image_path_label(image_path)
         self._on_any_control_changed()
@@ -814,6 +827,7 @@ class QtVisibleSignatureSetupForm:
             text_style=text_style,
             box_style=box_style,
             image_stamp_path=preserved.image_stamp_path,
+            image_asset=preserved.image_asset,
         )
 
     def _set_image_path_label(self, image_path: str | None) -> None:

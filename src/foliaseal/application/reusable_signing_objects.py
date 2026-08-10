@@ -22,6 +22,10 @@ from foliaseal.application.reusable_signing_models import (
 from foliaseal.application.reusable_signing_models import (
     ReusableObjectValidationError as ConfigValidationError,
 )
+from foliaseal.application.signature_image_import import (
+    ManagedSignatureImageStore,
+    SignatureImageImportError,
+)
 from foliaseal.domain.models import SignatureAppearance, SignaturePlacementDefaults
 
 
@@ -264,9 +268,11 @@ class ReusableSigningObjects:
         repository: CatalogRepository,
         *,
         certificate_configuration_exists: Callable[[str], bool] | None = None,
+        image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._repository = repository
         self._certificate_configuration_exists = certificate_configuration_exists
+        self._image_store = image_store
         self._snapshot: ReusableCatalogSnapshot | None = None
 
     def snapshot(self) -> ReusableCatalogSnapshot:
@@ -339,19 +345,18 @@ class ReusableSigningObjects:
         self._snapshot = self._snapshot_for(updated)
         return self._snapshot
 
-    @classmethod
-    def _snapshot_for(cls, catalog: SignaturePresetCatalog) -> ReusableCatalogSnapshot:
-        view = cls._view(catalog)
+    def _snapshot_for(self, catalog: SignaturePresetCatalog) -> ReusableCatalogSnapshot:
+        view = self._view(catalog)
         resolved: dict[ReusableObjectRef, ResolvedReusableObject] = {}
         for profile in catalog.appearance_profiles:
             ref = ReusableObjectRef(ReusableObjectKind.APPEARANCE, profile.appearance_profile_id)
-            resolved[ref] = profile
+            resolved[ref] = self._resolve_image_asset(profile)
         for profile in catalog.placement_profiles:
             ref = ReusableObjectRef(ReusableObjectKind.PLACEMENT, profile.placement_profile_id)
             resolved[ref] = profile
         for preset in catalog.signature_presets:
             ref = ReusableObjectRef(ReusableObjectKind.PRESET, preset.signature_preset_id)
-            resolved[ref] = catalog.resolve_preset(preset)
+            resolved[ref] = self._resolve_preset_image_asset(catalog.resolve_preset(preset))
         refs_by_name = {
             ReusableObjectKind.APPEARANCE: {
                 item.display_name.casefold(): item.ref for item in view.appearances
@@ -369,6 +374,29 @@ class ReusableSigningObjects:
             _refs_by_name=MappingProxyType(
                 {kind: MappingProxyType(index) for kind, index in refs_by_name.items()}
             ),
+        )
+
+    def _resolve_image_asset(self, profile: AppearanceProfile) -> AppearanceProfile:
+        appearance = profile.appearance
+        if appearance.image_asset is None or self._image_store is None:
+            return profile
+        try:
+            path = self._image_store.resolve_asset(appearance.image_asset)
+        except SignatureImageImportError:
+            # Keep the canonical metadata visible to callers so the UI can report a missing asset;
+            # do not silently turn a persisted asset into an arbitrary source path.
+            return profile
+        return replace(profile, appearance=replace(appearance, image_stamp_path=str(path)))
+
+    def _resolve_preset_image_asset(
+        self,
+        preset: ResolvedSignaturePreset,
+    ) -> ResolvedSignaturePreset:
+        if preset.appearance_profile is None:
+            return preset
+        return replace(
+            preset,
+            appearance_profile=self._resolve_image_asset(preset.appearance_profile),
         )
 
     def _apply(
@@ -408,7 +436,7 @@ class ReusableSigningObjects:
                 raise ConfigValidationError(f"Appearance '{name}' already exists.")
             existing = existing_by_id or existing_by_name
             profile = AppearanceProfile(
-                schema_version=1,
+                schema_version=2,
                 appearance_profile_id=(
                     command.appearance_profile_id
                     or (existing.appearance_profile_id if existing is not None else None)
@@ -494,7 +522,7 @@ class ReusableSigningObjects:
                     else _stable_id("appearance", name)
                 )
                 appearance_profile = AppearanceProfile(
-                    schema_version=1,
+                    schema_version=2,
                     appearance_profile_id=appearance_id,
                     display_name=(
                         _appearance_by_id(catalog, appearance_id).display_name

@@ -33,10 +33,12 @@ def test_browse_remove_and_discard_clean_staged_managed_images(tmp_path: Path) -
     editor.controls.setup_form.appearance_controls.browse_image_button.click()
     staged = editor.controls.setup_form.build_draft().appearance.image_stamp_path
     assert staged is not None
+    assert editor.controls.setup_form.build_draft().appearance.image_asset is not None
     assert Path(staged).exists()
 
     editor.controls.setup_form.appearance_controls.remove_image_button.click()
     assert editor.controls.setup_form.build_draft().appearance.image_stamp_path is None
+    assert editor.controls.setup_form.build_draft().appearance.image_asset is None
     assert not Path(staged).exists()
 
     editor.controls.setup_form.appearance_controls.browse_image_button.click()
@@ -45,3 +47,38 @@ def test_browse_remove_and_discard_clean_staged_managed_images(tmp_path: Path) -
     assert Path(staged_again).exists()
     editor.discard_staged_images()
     assert not Path(staged_again).exists()
+
+
+def test_replacing_a_staged_image_removes_the_previous_managed_copy(tmp_path: Path) -> None:
+    first_source = tmp_path / "first.png"
+    second_source = tmp_path / "second.png"
+    Image.new("RGBA", (24, 24), (0, 0, 0, 255)).save(first_source)
+    Image.new("RGBA", (32, 16), (255, 0, 0, 255)).save(second_source)
+    bindings = _fake_bindings()
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    store = ManagedSignatureImageStore(tmp_path / "catalog")
+    editor = AppearanceProfileEditorWidget(
+        bindings=bindings,
+        parent=None,
+        library=service,
+        image_store=store,
+    )
+
+    bindings.q_file_dialog.next_open_file_name = str(first_source)
+    editor.controls.setup_form.appearance_controls.browse_image_button.click()
+    first_managed = editor.controls.setup_form.build_draft().appearance.image_stamp_path
+    assert first_managed is not None
+    assert Path(first_managed).exists()
+
+    bindings.q_file_dialog.next_open_file_name = str(second_source)
+    editor.controls.setup_form.appearance_controls.browse_image_button.click()
+    second_managed = editor.controls.setup_form.build_draft().appearance.image_stamp_path
+    assert second_managed is not None
+    assert second_managed != first_managed
+    assert not Path(first_managed).exists()
+    assert Path(second_managed).exists()
+
+    editor.discard_staged_images()
+    assert not Path(second_managed).exists()

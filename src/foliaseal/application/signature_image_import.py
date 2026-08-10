@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from PIL import Image, ImageCms, ImageOps
 
+from foliaseal.domain.models import SignatureImageAsset
+
 SUPPORTED_IMAGE_FORMATS = frozenset({"PNG", "JPEG", "GIF"})
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -48,6 +50,14 @@ class SignatureImageInspection:
     @property
     def pixel_count(self) -> int:
         return self.width_px * self.height_px
+
+
+@dataclass(frozen=True)
+class ManagedSignatureImageAsset:
+    """The persisted asset metadata paired with its current managed filesystem path."""
+
+    path: Path
+    asset: SignatureImageAsset
 
 
 @dataclass(frozen=True)
@@ -173,6 +183,52 @@ class ManagedSignatureImageStore:
                 temporary.unlink(missing_ok=True)
         return target
 
+    def import_asset(
+        self,
+        source_path: str | Path,
+        *,
+        preserve_alpha: bool = True,
+        allow_optimization: bool = False,
+    ) -> ManagedSignatureImageAsset:
+        """Import a normalized image and return canonical metadata plus its runtime path."""
+
+        source = Path(source_path)
+        target = self.import_image(
+            source,
+            preserve_alpha=preserve_alpha,
+            allow_optimization=allow_optimization,
+        )
+        inspection = self.inspect(target)
+        asset = SignatureImageAsset(
+            managed_asset_id=f"image-{target.stem}",
+            storage_filename=target.name,
+            original_filename=source.name,
+            width_px=inspection.width_px,
+            height_px=inspection.height_px,
+            has_alpha=inspection.has_alpha and preserve_alpha,
+        )
+        return ManagedSignatureImageAsset(path=target, asset=asset)
+
+    def resolve_asset(self, asset: SignatureImageAsset) -> Path:
+        """Resolve canonical asset metadata to a path inside this store."""
+
+        if not isinstance(asset, SignatureImageAsset):
+            raise SignatureImageImportError("Managed image asset metadata is invalid.")
+        candidate = self.managed_dir / asset.storage_filename
+        managed_root = self.managed_dir.resolve()
+        try:
+            resolved = candidate.resolve()
+            resolved.relative_to(managed_root)
+        except ValueError as exc:
+            raise SignatureImageImportError(
+                "Managed image resolution refused a path outside image storage."
+            ) from exc
+        if not resolved.is_file():
+            raise SignatureImageImportError(
+                f"Managed image asset is missing: {asset.storage_filename}"
+            )
+        return resolved
+
     def delete_managed_image(self, image_path: str | Path) -> None:
         """Remove one staged managed image, refusing paths outside this store."""
 
@@ -211,6 +267,7 @@ __all__ = [
     "MAX_IMAGE_PIXELS",
     "OPTIMIZED_IMAGE_MAX_EDGE",
     "ManagedSignatureImageStore",
+    "ManagedSignatureImageAsset",
     "SignatureImageImportError",
     "SignatureImageInspection",
     "SignatureImageOptimizationRequired",

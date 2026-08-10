@@ -121,7 +121,11 @@ Placement, preview, and signing tranche:
 - [x] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md — explicit Use for new
   signature from Document Signatures, existing-field-only backend signing, fixed target geometry,
   and placement-profile mismatch rejection are implemented and validated in the current tranche.
-- [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
+- [x] docs/ExecPlans/ui_appearance_content_layout_execplan.md — managed PNG import/normalization,
+  schema-v2 immutable image assets, image position/prominence/alpha controls, explicit Primary
+  75% allocation, staged-file cleanup, image-only layout, and save/reload preview-signing parity
+  are implemented and validated; final authoritative preview fidelity, glyph coverage, frozen-time,
+  and readiness-gate evidence remain with the preview child.
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — typed ordered readiness
@@ -347,6 +351,14 @@ Release tranche:
   frame actions routed through the public session port and existing clamped viewer policy. Focused
   validation is `206 passed`, the full suite is `1351 passed, 20 skipped, 1 warning`, and the
   bounded launch audit cleaned its isolated root and processes after the known endpoint limitation.
+- [x] (2026-08-10) Closed the managed Appearance-image evidence follow-up: staged normalized files
+  are removed on replacement, Remove, discard, and Cancel; catalog reload preserves the managed
+  asset identity and image semantics; the catalog-local resolver supplies the runtime path, and
+  canonical preview and signing materializers receive that same path and shared layout plan.
+  Explicit production Primary now reserves 75% while low-level compatibility callers omit the field.
+  Focused lifecycle/parity validation is green; full regression is `1384 passed,
+  20 skipped, 1 warning`. The bounded offscreen GUI launch still exits at the isolated
+  `SingleInstanceUnavailable` endpoint and leaves no process or temporary-root debris; no SVG changed.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

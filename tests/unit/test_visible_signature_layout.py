@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import ceil
 
 import pytest
@@ -1223,7 +1223,12 @@ def _backend_appearance(
             background_color_hex="#FFFFFF",
         ),
     )
-    return SigningBackendAppearance.from_signature_appearance(appearance)
+    # These adapter fixtures intentionally exercise the legacy low-level reservation path;
+    # production Appearance requests now carry explicit Primary/Supporting/Balanced semantics.
+    return replace(
+        SigningBackendAppearance.from_signature_appearance(appearance),
+        image_prominence=None,
+    )
 
 
 def _layout_request(
