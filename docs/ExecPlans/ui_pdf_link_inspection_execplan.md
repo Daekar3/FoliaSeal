@@ -60,6 +60,9 @@ and workspace mutation to later children. Focused validation is `3 passed`; full
 and file links are extracted with correct rectangles and then classified by the pure safety policy.
 Ruff, the full suite, `pip check`, and diff checks must pass. The bounded GUI lifecycle audit must
 remove its owned temporary root and leave no FoliaSeal process; it is not proof of link activation.
+The current fixture intentionally proves the unrotated, zero-origin page boundary; the future
+Pan-only hit-testing child must add non-zero page-box and rotated-page evidence before claiming
+production interaction coverage.
 
 ## Interfaces and Dependencies
 

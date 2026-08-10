@@ -69,6 +69,7 @@ The canonical repository document split is:
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, preset certificate display-name lookup, and catalog refresh/save/delete commands. |
 | `src/foliaseal/application/signing_readiness.py` | Pure ordered projection of the active signing workspace's readiness state. | Consumes document-safety status first, then converts selected-preset, certificate, placement, validation, and signability facts into one immutable stage/detail/action result; it has no Qt, persistence, certificate parsing, or source-monitor mutation ownership. |
 | `src/foliaseal/application/document_source_monitor.py` | Application-owned source identity/fingerprint boundary for mounted workspaces. | Captures the open-time `(device, inode, size, mtime_ns)` identity and projects changed, missing, or unknown source status without reloading or mutating the workspace; AppFrame/workspace composition owns its lifecycle. |
+| `src/foliaseal/application/document_links.py` | Neutral read-only document-link inspection contract. | `DocumentLink` carries page-local PDF-space rectangles and raw URL/internal-page destinations; `DocumentLinkInspector` keeps extraction behind the concrete PDF adapter. |
 | `src/foliaseal/application/certificate_models.py` | Canonical application-owned managed-certificate records and catalog policy. | Owns certificate/configuration invariants, stable-id/name lookup, public subject/issuer/validity/fingerprint metadata, upsert, and reference-guarded removal without JSON, filesystem, Qt, or secret-storage imports. |
 | `src/foliaseal/application/certificate_catalog_repository.py` | Application-owned certificate-catalog persistence port and in-memory adapter. | Defines the `CertificateCatalogRepository` protocol used by application services plus `InMemoryCertificateCatalogRepository` for state and boundary tests; the production filesystem implementation remains in `infra/config/certificate_storage.py`. |
 | `src/foliaseal/application/certificate_manager.py` | Application-owned certificate policy and user-facing operations. | Owns naming/ID policy, guided five-year PKCS#12 generation with subject fields and confirmation, public issuer/validity/fingerprint projection, parsing/non-mutating `CertificateImportInspection`, retained-file configuration, export-password validation, saved-secret compensation, and typed operation results; delegates managed-file/catalog commit and delete sequencing to `CertificateCatalogRepository`. |
@@ -440,14 +441,17 @@ The canonical repository document split is:
   `source_change_decision()`.
 - Does not own: PDF annotation extraction, file fingerprint acquisition, browser/file launching,
   source reload, signing-draft mutation, or banner rendering.
-- Key collaborators: the future render adapter will provide validated link rectangles/destinations;
-  the future workspace lifecycle will provide opaque fingerprints and interpret review-required
-  source states while preserving `SigningDraftWorkflow`.
-- Known constraints: unknown source identity is never treated as unchanged; only Pan mode can return
-  an allowed or confirmation-required link decision; destinations are bounded for display and no
-  result carries a launcher callback.
-- Status: Implemented and confirmed by focused tests; renderer and lifecycle integration remain
-  open in the safe-links and document-lifecycle ExecPlans.
+- Key collaborators: `DocumentLinkInspector` supplied by `QtPdfRenderBackend`,
+  `document_source_monitor.py`, and the future workspace lifecycle/safe-links children.
+- Known constraints: `QtPdfRenderBackend.inspect_links()` reads QtPdf link-model rows without
+  activating destinations and normalizes each Qt top-left rectangle into PDF bottom-left
+  `PdfRect` coordinates. Unknown source identity is never treated as unchanged; only Pan mode can
+  return an allowed or confirmation-required link decision; destinations are bounded for display
+  and no result carries a launcher callback. Pan hit testing, activation/history, and source
+  reload/banner lifecycle remain explicitly deferred to the safe-links and document-lifecycle
+  children.
+- Status: Implemented and confirmed by focused tests; link extraction is now integrated at the
+  QtPdf adapter edge while interaction/lifecycle integration remains deferred.
 
 ### Document source monitor
 
@@ -500,8 +504,8 @@ The canonical repository document split is:
 - Owns: `PdfRenderBackend`, `RenderPageRequest`, `RenderPageResult`, `PdfPageGeometry`, `RenderCachePolicy`, `QtPdfRenderBackend`, `PopplerPdfRenderBackend`.
 - Does not own: Viewer workflow state or Qt widget controls.
 - Key collaborators: `ViewerWorkflow`, `presentation/qt/viewer_widget.py`.
-- Main entry points: `PopplerPdfRenderBackend.render_page()`, `PopplerPdfRenderBackend.get_page_geometry()`, `QtPdfRenderBackend.render_page()`, `QtPdfRenderBackend.get_page_geometry()`, and `diagnostics()`.
-- Known constraints: The live `FoliaSealAppFrame` defaults to `PopplerPdfRenderBackend`. That adapter delegates page boxes, rotation, and placement-coordinate geometry to `QtPdfRenderBackend`, but delegates interactive page pixels to `pdftoppm` and returns opaque RGBA bytes. `pdftoppm` is a late-resolved Linux runtime requirement: a missing executable or unavailable Qt geometry is reported through diagnostics instead of failing on import. QtPdf remains the intentional default for canonical-preview generation and Phase 2/Phase 3 evidence, whose generated-preview scope was not implicated by the reopened signed-PDF rasterisation defect. `QtPdfRenderBackend` dynamically imports PySide6/QtPdf and includes fallback PDF metadata parsing to support page boxes/rotation.
+- Main entry points: `PopplerPdfRenderBackend.render_page()`, `PopplerPdfRenderBackend.get_page_geometry()`, `QtPdfRenderBackend.render_page()`, `QtPdfRenderBackend.get_page_geometry()`, `QtPdfRenderBackend.inspect_links()`, and `diagnostics()`.
+- Known constraints: The live `FoliaSealAppFrame` defaults to `PopplerPdfRenderBackend`. That adapter delegates page boxes, rotation, placement-coordinate geometry, and read-only link inspection to `QtPdfRenderBackend`, but delegates interactive page pixels to `pdftoppm` and returns opaque RGBA bytes. `QtPdfRenderBackend.inspect_links()` uses QtPdf's link model and normalizes top-left rectangles to PDF bottom-left coordinates without activating destinations. `pdftoppm` is a late-resolved Linux runtime requirement: a missing executable or unavailable Qt geometry is reported through diagnostics instead of failing on import. QtPdf remains the intentional default for canonical-preview generation and Phase 2/Phase 3 evidence, whose generated-preview scope was not implicated by the reopened signed-PDF rasterisation defect. `QtPdfRenderBackend` dynamically imports PySide6/QtPdf and includes fallback PDF metadata parsing to support page boxes/rotation.
 - Status: Confirmed by code and tests.
 
 ### Qt presentation layer
@@ -1180,7 +1184,7 @@ boundary fakeable while preserving native Qt shortcuts.
 - Producer: `PdfRenderBackend` implementations.
 - Consumer: `ViewerWorkflow`.
 - Stability: Confirmed application/infra boundary.
-- Backward compatibility requirements: `render_page()` returns RGBA bytes matching width*height*4; `get_page_geometry()` returns boxes and rotation for coordinate mapping. The live adapter must preserve QtPdf geometry even though it rasterises pixels with Poppler.
+- Backward compatibility requirements: `render_page()` returns RGBA bytes matching width*height*4; `get_page_geometry()` returns boxes and rotation for coordinate mapping; `inspect_links()` returns non-activating `DocumentLink` values with PDF bottom-left `PdfRect` geometry. The live adapter must preserve QtPdf geometry even though it rasterises pixels with Poppler.
 - Validation: backend checks path existence, page index, zoom; `PopplerPdfRenderBackend` has focused coverage for missing `pdftoppm`, unavailable geometry, command failure, missing output, page-number conversion, zoom-to-DPI conversion, and opaque RGBA conversion; viewer checks mapping readiness.
 - Error behavior: concrete backend raises for missing files, invalid pages, and rendering-command failures. `PopplerPdfRenderBackend.diagnostics()` identifies missing `pdftoppm` or unavailable Qt geometry; `QtPdfRenderBackend.diagnostics()` reports unavailable Qt bindings.
 - Source files: `src/foliaseal/infra/render/base.py`, `src/foliaseal/infra/render/qt_backend.py`, `src/foliaseal/infra/render/poppler_backend.py`, `tests/unit/test_poppler_render_backend.py`.
@@ -1623,6 +1627,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-08-10 | Added the QtPdf document-link inspection boundary. | `DocumentLink`/`DocumentLinkInspector` now carry read-only page-local link facts, and `QtPdfRenderBackend.inspect_links()` extracts valid URL/internal-page links without activation while normalizing Qt top-left rectangles to PDF bottom-left coordinates. Pan hit testing, activation/history, and reload/banner lifecycle remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added the document-source safety readiness boundary. | `DocumentSourceMonitor` now owns metadata-only source fingerprints and changed/missing/unknown decisions at workspace composition; `signing_readiness.py` consumes document safety before setup/readiness stages. Reload, locate, ignore, banner mutation, and draft-preserving lifecycle actions remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added real signed-appearance raster parity evidence. | A Qt-backed integration test signs a real PDF, renders its embedded annotation appearance, and asserts pixel-identical RGBA output against the frozen canonical preview for text-only and managed-image alpha-preserved/flattened cases. |
 | 2026-08-10 | Added exact bundled-font glyph validation and frozen visible-signature semantics parity. | `VisibleSignatureSemanticsService` now checks each visible text value against the selected bundled face's FontTools cmap, emits blocking field/codepoint issues, and shares the frozen preview time and prepared layout decision with final signing; `fonttools>=4.33.3` is an explicit runtime dependency. Existing Phase 3 names/contracts remain unchanged. |

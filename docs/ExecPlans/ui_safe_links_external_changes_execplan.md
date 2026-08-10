@@ -28,9 +28,10 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Explorer review established that the original full GUI slice is not yet
   implementable: the viewer is raster-only and workspace reload would discard the active draft.
   The prerequisite contract child now supplies the policy matrix without claiming GUI behavior.
-- [x] (2026-08-10) The prerequisite contract and hardening children now report 24 focused tests and
-  a green full suite (1342 passed); this parent remains open for PDF link extraction, Pan-only hit
-  testing, draft-preserving reload, and the condition-only Qt banner.
+- [x] (2026-08-10) The prerequisite contract and hardening children reported 24 focused tests and
+  a green full suite (1342 passed); the dedicated QtPdf inspection child now closes extraction.
+  This parent remains open for Pan-only hit testing, internal navigation/history, external
+  confirmation/block UI, draft-preserving reload, and the condition-only Qt banner.
 - [x] (2026-08-10) Added the QtPdf link-inspection prerequisite: generated internal and external
   annotations now cross a neutral `DocumentLink` DTO with PDF-space rectangles and the existing
   pure safety classifier. URL activation, hit testing, history, and source-change recovery remain
