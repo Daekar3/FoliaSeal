@@ -316,6 +316,7 @@ def _assemble_signing_workspace_composition(
         "on_interaction": runtime.on_viewer_interaction,
         "on_keyboard_create": runtime.create_keyboard_placement,
         "on_keyboard_move": runtime.move_keyboard_placement,
+        "on_keyboard_resize": runtime.resize_keyboard_placement,
         "on_keyboard_apply": runtime.apply_keyboard_placement,
     }
     try:
@@ -326,12 +327,14 @@ def _assemble_signing_workspace_composition(
             for name in (
                 "on_keyboard_create",
                 "on_keyboard_move",
+                "on_keyboard_resize",
                 "on_keyboard_apply",
             )
         ):
             raise
         viewer_kwargs.pop("on_keyboard_create", None)
         viewer_kwargs.pop("on_keyboard_move", None)
+        viewer_kwargs.pop("on_keyboard_resize", None)
         viewer_kwargs.pop("on_keyboard_apply", None)
         viewer_widget = viewer_widget_builder(**viewer_kwargs)
     set_viewer_mode = getattr(viewer_widget, "set_interaction_mode", None)

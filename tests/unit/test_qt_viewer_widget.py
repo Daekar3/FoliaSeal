@@ -817,7 +817,11 @@ def test_keyboard_place_enter_and_shift_arrow_are_only_active_in_place_mode(monk
         height_pt=10.0,
     )
     preview = PdfViewerWidgetAdapter().create(
-        workflow=_build_workflow(),
+        workflow=ViewerWorkflow(
+            document_path="/tmp/sample.pdf",
+            render_backend=_OverlayRenderBackend(),
+            session=ViewerSession(page_count=2),
+        ),
         on_keyboard_create=lambda: (created.append(rect) or rect),
         on_keyboard_move=lambda dx, dy: (moved.append((dx, dy)) or rect),
     )
@@ -885,6 +889,59 @@ def test_keyboard_place_delete_undo_redo_and_escape_restore_pan(monkeypatch):
     preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Escape))
     assert preview._overlay_signature_rect == second
     assert preview._interaction_mode == "pan"
+
+
+def test_keyboard_place_ctrl_arrows_resize_exactly_and_only_in_place_mode(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    rect = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    resized = []
+    current = [rect]
+
+    def resize(delta_width: float, delta_height: float) -> SignatureRect:
+        previous = current[0]
+        current[0] = SignatureRect(
+            page_index=previous.page_index,
+            left_pt=previous.left_pt,
+            bottom_pt=previous.bottom_pt,
+            width_pt=previous.width_pt + delta_width,
+            height_pt=previous.height_pt + delta_height,
+        )
+        resized.append((delta_width, delta_height))
+        return current[0]
+
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=ViewerWorkflow(
+            document_path="/tmp/sample.pdf",
+            render_backend=_OverlayRenderBackend(),
+            session=ViewerSession(page_count=2),
+        ),
+        on_keyboard_create=lambda: rect,
+        on_keyboard_resize=resize,
+    )
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Return))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right, modifiers=_FakeQt.ControlModifier))
+    preview.keyPressEvent(
+        _FakeKeyEvent(
+            key=_FakeQt.Key_Up,
+            modifiers=_FakeQt.ControlModifier | _FakeQt.KeyboardModifier.ShiftModifier,
+        )
+    )
+
+    assert resized == [(1.0, 0.0), (0.0, 10.0)]
+    assert preview._overlay_signature_rect.width_pt == 31.0
+    assert preview._overlay_signature_rect.height_pt == 20.0
+
+    preview.set_interaction_mode("pan")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right, modifiers=_FakeQt.ControlModifier))
+    assert resized == [(1.0, 0.0), (0.0, 10.0)]
 
 
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):

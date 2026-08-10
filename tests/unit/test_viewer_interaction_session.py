@@ -146,3 +146,43 @@ def test_move_signature_rect_preserves_exact_delta_without_clamping() -> None:
     assert result.signature_rect is not None
     assert result.signature_rect.left_pt == -15.0
     assert result.signature_rect.bottom_pt == 130.0
+
+
+def test_resize_signature_rect_uses_bottom_left_anchor_and_exact_delta() -> None:
+    workflow = _FakeViewerWorkflow(
+        snapshot=_FakeSnapshot(
+            page_index=0,
+            page_box=PageBox(left=0.0, bottom=0.0, right=100.0, top=100.0),
+            rotation=0,
+        )
+    )
+    session = ViewerInteractionSession(viewer_workflow=workflow)  # type: ignore[arg-type]
+
+    result = session.resize_signature_rect(
+        SignatureRect(page_index=0, left_pt=10.0, bottom_pt=20.0, width_pt=30.0, height_pt=10.0),
+        delta_width_pt=10.0,
+        delta_height_pt=-1.0,
+    )
+
+    assert result.error_message is None
+    assert result.signature_rect == SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=40.0,
+        height_pt=9.0,
+    )
+
+
+def test_resize_signature_rect_rejects_non_positive_dimensions_without_clamping() -> None:
+    workflow = _FakeViewerWorkflow(snapshot=None, current_page=0)
+    session = ViewerInteractionSession(viewer_workflow=workflow)  # type: ignore[arg-type]
+
+    result = session.resize_signature_rect(
+        SignatureRect(page_index=0, left_pt=10.0, bottom_pt=20.0, width_pt=1.0, height_pt=1.0),
+        delta_width_pt=-1.0,
+        delta_height_pt=0.0,
+    )
+
+    assert result.signature_rect is None
+    assert result.error_message == "width_pt must be a positive finite number."

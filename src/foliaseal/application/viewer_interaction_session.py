@@ -137,6 +137,27 @@ class ViewerInteractionSession:
         except ValueError as exc:
             return ViewerKeyboardPlacementResult(signature_rect=None, error_message=str(exc))
 
+    def resize_signature_rect(
+        self,
+        signature_rect: SignatureRect,
+        *,
+        delta_width_pt: float,
+        delta_height_pt: float,
+    ) -> ViewerKeyboardPlacementResult:
+        """Resize from the fixed bottom/left anchor without clamping or snapping."""
+        try:
+            return ViewerKeyboardPlacementResult(
+                signature_rect=SignatureRect(
+                    page_index=signature_rect.page_index,
+                    left_pt=signature_rect.left_pt,
+                    bottom_pt=signature_rect.bottom_pt,
+                    width_pt=signature_rect.width_pt + delta_width_pt,
+                    height_pt=signature_rect.height_pt + delta_height_pt,
+                )
+            )
+        except ValueError as exc:
+            return ViewerKeyboardPlacementResult(signature_rect=None, error_message=str(exc))
+
     def set_logical_page_index(self, page_index: int) -> int:
         return self._viewer_workflow.session.jump_to_page(page_index)
 

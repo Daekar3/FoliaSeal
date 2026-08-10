@@ -161,6 +161,24 @@ class SigningWorkspaceRuntime:
             self.apply_signature_rect_placement(result.signature_rect)
         return result.signature_rect
 
+    def resize_keyboard_placement(
+        self, delta_width_pt: float, delta_height_pt: float
+    ) -> SignatureRect | None:
+        current = self._draft_workflow.signature_rect
+        if current is None:
+            return None
+        result = self._viewer_interaction_session_required().resize_signature_rect(
+            current,
+            delta_width_pt=delta_width_pt,
+            delta_height_pt=delta_height_pt,
+        )
+        if result.error_message is not None:
+            self.emit_error(result.error_message)
+            return None
+        if result.signature_rect is not None:
+            self.apply_signature_rect_placement(result.signature_rect)
+        return result.signature_rect
+
     def apply_keyboard_placement(
         self, signature_rect: SignatureRect | None
     ) -> SignatureRect | None:

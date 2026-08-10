@@ -38,8 +38,13 @@ increments because they require additional geometry and focus seams.
 - [x] (2026-08-10) The offscreen integration sequence also covers Delete, undo, redo, and
   Escape-to-Pan against the real Qt widget; the focused viewer/history/integration set remains
   green (`159 passed`).
-- [ ] (2026-08-10) Add Ctrl-arrow resize, numeric-field traversal, snap/guides, and off-page recovery
-  in subsequent increments; then perform final documentation/commit closeout for the whole child.
+- [x] (2026-08-10) Added exact Ctrl+Arrow/Ctrl+Shift+Arrow resize from the fixed bottom/left
+  anchor through `ViewerInteractionSession` and the runtime/viewer seam. Invalid non-positive
+  dimensions are rejected without clamping; resize mutations enter the same local history. The
+  focused application/viewer/integration/runtime set is green (`49 passed` plus `120 passed`), and
+  the full suite is `1307 passed, 20 skipped, 1 warning`.
+- [ ] (2026-08-10) Add numeric-field traversal, snap/guides, and off-page recovery in subsequent
+  increments; then perform final documentation/commit closeout for the whole child.
 
 ## Surprises & Discoveries
 
@@ -61,9 +66,10 @@ increments because they require additional geometry and focus seams.
 
 The creation/movement and history increments are complete: Place-mode Enter creates a centered
 3×1-inch placement scaled proportionally to a smaller page; Arrow/Shift+Arrow move it by exact
-1/10-point deltas; Delete removes it; and Ctrl+Z/Ctrl+Shift+Z restore local placement mutations.
-Escape exits Place mode to Pan while preserving a completed overlay. The remaining child scope is
-Ctrl-arrow resize, numeric-field traversal, snap/guides, and off-page recovery.
+1/10-point deltas; Ctrl+Arrow/Ctrl+Shift+Arrow resize from the fixed anchor by exact 1/10-point
+deltas; Delete removes it; and Ctrl+Z/Ctrl+Shift+Z restore local placement mutations. Escape exits
+Place mode to Pan while preserving a completed overlay. The remaining child scope is numeric-field
+traversal, snap/guides, and off-page recovery.
 
 ## Context and Orientation
 
@@ -156,6 +162,6 @@ or workspace ports. The final behavior must be exercised by tests/unit/test_work
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-10 / Codex
-Implemented keyboard creation/movement and the typed Delete/history tracer after the Pan/Place
-topology landed. The plan remains open for resize, numeric traversal, snap/guides, and off-page
+Implemented keyboard creation/movement, exact resize, and the typed Delete/history tracer after the
+Pan/Place topology landed. The plan remains open for numeric traversal, snap/guides, and off-page
 recovery.

@@ -246,6 +246,11 @@ Release tranche:
   viewer/history/runtime/composition/offscreen validation is `159 passed`; the full suite remains
   `1304 passed, 20 skipped, 1 warning`; resize, numeric traversal, snap/guides, and off-page
   recovery remain open.
+- [x] (2026-08-10) Added exact Place-mode Ctrl+Arrow/Ctrl+Shift+Arrow resize through the typed
+  application/runtime seam, anchored at bottom/left and rejecting invalid shrink without silent
+  clamping; resize joins placement history. Focused viewer/application/runtime validation is green
+  and the full suite is `1307 passed, 20 skipped, 1 warning`. Numeric traversal, snap/guides, and
+  off-page recovery remain open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
