@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.document_links import DocumentLink
 from foliaseal.infra.render.base import (
     PdfPageGeometry,
     RenderBackendDiagnostic,
@@ -19,6 +21,8 @@ from foliaseal.infra.render.base import (
 @dataclass(frozen=True)
 class _QtBindings:
     qpdf_document: type[Any]
+    qpdf_link_model: type[Any]
+    qmodel_index: type[Any]
     qimage: type[Any]
     qsize: type[Any]
     qpdf_document_render_options: type[Any]
@@ -111,6 +115,43 @@ class QtPdfRenderBackend:
             expected_size=target_width * target_height * 4,
         )
         return RenderPageResult(width_px=target_width, height_px=target_height, rgba_bytes=raw)
+
+    def inspect_links(self, document_path: str, page_index: int) -> tuple[DocumentLink, ...]:
+        """Inspect page links through QtPdf without activating destinations."""
+        document = self._open_document(document_path)
+        page_index = self._validated_page_index(document, page_index)
+        link_model = self._bindings.qpdf_link_model()  # type: ignore[union-attr]
+        link_model.setDocument(document)
+        link_model.setPage(page_index)
+        root_index = self._bindings.qmodel_index()  # type: ignore[union-attr]
+        links: list[DocumentLink] = []
+        page_height = float(document.pagePointSize(page_index).toTuple()[1])
+        link_role = self._bindings.qpdf_link_model.Role.Link.value  # type: ignore[union-attr]
+        for row in range(int(link_model.rowCount(root_index))):
+            model_index = link_model.index(row, 0)
+            link = link_model.data(model_index, link_role)
+            if link is None:
+                continue
+            url = link.url()
+            target_page = int(link.page())
+            if not link.isValid() and (not url.isValid() or url.isEmpty()):
+                continue
+            rectangles = tuple(
+                _qt_link_rect_to_pdf_rect(rect, page_index=page_index, page_height=page_height)
+                for rect in link.rectangles()
+            )
+            if not rectangles:
+                continue
+            raw_destination = url.toString() if not url.isEmpty() else None
+            links.append(
+                DocumentLink(
+                    page_index=page_index,
+                    rectangles=rectangles,
+                    raw_destination=raw_destination or None,
+                    internal_page_index=target_page if target_page >= 0 else None,
+                )
+            )
+        return tuple(links)
 
     def _open_document(self, document_path: str) -> Any:
         if not Path(document_path).exists():
@@ -216,8 +257,10 @@ class QtPdfRenderBackend:
     def _load_bindings(self) -> _QtBindings | None:
         try:
             qpdf_document = self._import_type("PySide6.QtPdf", "QPdfDocument")
+            qpdf_link_model = self._import_type("PySide6.QtPdf", "QPdfLinkModel")
             qimage = self._import_type("PySide6.QtGui", "QImage")
             qsize = self._import_type("PySide6.QtCore", "QSize")
+            qmodel_index = self._import_type("PySide6.QtCore", "QModelIndex")
             qpdf_document_render_options = self._import_type(
                 "PySide6.QtPdf", "QPdfDocumentRenderOptions"
             )
@@ -226,6 +269,8 @@ class QtPdfRenderBackend:
             return None
         return _QtBindings(
             qpdf_document=qpdf_document,
+            qpdf_link_model=qpdf_link_model,
+            qmodel_index=qmodel_index,
             qimage=qimage,
             qsize=qsize,
             qpdf_document_render_options=qpdf_document_render_options,
@@ -254,6 +299,21 @@ class _PdfMetadataCacheEntry:
 def _document_signature(path: Path) -> tuple[int, int]:
     stat_result = path.stat()
     return (stat_result.st_mtime_ns, stat_result.st_size)
+
+
+def _qt_link_rect_to_pdf_rect(rect: Any, *, page_index: int, page_height: float) -> PdfRect:
+    """Convert QtPdf's top-left page coordinates into PDF bottom-left coordinates."""
+    left = float(rect.left())
+    top = float(rect.top())
+    width = float(rect.width())
+    height = float(rect.height())
+    bottom = page_height - top - height
+    return PdfRect(
+        x1=left,
+        y1=bottom,
+        x2=left + width,
+        y2=bottom + height,
+    )
 
 
 def _fallback_geometry_is_safe(*, document: Any, page_index: int) -> bool:

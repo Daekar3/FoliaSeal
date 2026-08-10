@@ -55,6 +55,7 @@ _EXPORT_MODULES = {
         ("DocumentSourceMonitor", "SourceFingerprint", "fingerprint_source"),
         "document_source_monitor",
     ),
+    **dict.fromkeys(("DocumentLink", "DocumentLinkInspector"), "document_links"),
     **dict.fromkeys(
         (
             "LinkDecision",
@@ -367,6 +368,8 @@ __all__ = [
     "SourceChangeStatus",
     "classify_link_destination",
     "source_change_decision",
+    "DocumentLink",
+    "DocumentLinkInspector",
     "SigningReadiness",
     "SigningReadinessAction",
     "SigningReadinessInputs",

@@ -50,6 +50,8 @@ def test_qt_backend_geometry_uses_qpdfdocument_page_apis(monkeypatch) -> None:
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=object,
         qsize=object,
         qpdf_document_render_options=object,
@@ -91,6 +93,8 @@ def test_qt_backend_geometry_caches_metadata_for_repeated_requests(monkeypatch) 
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=object,
         qsize=object,
         qpdf_document_render_options=object,
@@ -140,6 +144,8 @@ def test_qt_backend_geometry_invalidates_metadata_cache_when_file_signature_chan
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=object,
         qsize=object,
         qpdf_document_render_options=object,
@@ -189,6 +195,8 @@ def test_qt_backend_geometry_falls_back_to_qtpdf_page_size_when_parser_fails(
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=object,
         qsize=object,
         qpdf_document_render_options=object,
@@ -231,6 +239,8 @@ def test_qt_backend_geometry_caches_fallback_metadata_after_parser_failure(
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=object,
         qsize=object,
         qpdf_document_render_options=object,
@@ -281,6 +291,8 @@ def test_qt_backend_fallback_geometry_marks_mapping_unavailable_when_page_size_i
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=object,
         qsize=object,
         qpdf_document_render_options=object,
@@ -362,6 +374,8 @@ def test_qt_backend_render_uses_qpdfdocument_render(monkeypatch) -> None:
     backend._bindings_error = None
     backend._bindings = _QtBindings(
         qpdf_document=object,
+        qpdf_link_model=object,
+        qmodel_index=object,
         qimage=_QImage,
         qsize=_QSize,
         qpdf_document_render_options=_RenderOptions,

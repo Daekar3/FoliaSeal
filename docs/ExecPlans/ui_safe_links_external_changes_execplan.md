@@ -20,6 +20,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   source-change decisions; renderer/workspace integration remains open.
 - [x] docs/ExecPlans/ui_safe_links_contract_hardening_execplan.md closes the contract-level
   unknown-identity, mode-gating, malformed-destination, and architecture-documentation findings.
+- [x] docs/ExecPlans/ui_pdf_link_inspection_execplan.md provides neutral QtPdf page-link facts;
+  Pan-mode hit testing, destination confirmation, history, and source-change recovery remain here.
 
 ## Progress
 
@@ -29,6 +31,10 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) The prerequisite contract and hardening children now report 24 focused tests and
   a green full suite (1342 passed); this parent remains open for PDF link extraction, Pan-only hit
   testing, draft-preserving reload, and the condition-only Qt banner.
+- [x] (2026-08-10) Added the QtPdf link-inspection prerequisite: generated internal and external
+  annotations now cross a neutral `DocumentLink` DTO with PDF-space rectangles and the existing
+  pure safety classifier. URL activation, hit testing, history, and source-change recovery remain
+  intentionally unimplemented in this parent.
 
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.

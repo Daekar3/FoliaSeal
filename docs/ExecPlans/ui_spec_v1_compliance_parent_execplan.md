@@ -70,6 +70,8 @@ Document-flow tranche:
   modeless review surface are committed; the bounded later-approval permission gate is now covered
   by the verification-recovery child, while broader reopen/display policy remains open.
 - [ ] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
+- [x] docs/ExecPlans/ui_pdf_link_inspection_execplan.md — neutral QtPdf link extraction and
+  PDF-space rectangle normalization are implemented; activation and reload remain with safe-links.
 - [x] docs/ExecPlans/ui_safe_links_source_safety_contracts_execplan.md — pure destination safety
   and source-change decision contracts are implemented and tested; renderer and draft-preserving
   workspace integration remain open in the safe-links and lifecycle children.
