@@ -122,7 +122,13 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
 def test_help_command_is_typed_and_uses_f1() -> None:
     from foliaseal.presentation.qt.app_frame_command_model import HELP_COMMAND_DEFINITIONS
 
-    assert len(HELP_COMMAND_DEFINITIONS) == 1
+    assert [definition.command_id for definition in HELP_COMMAND_DEFINITIONS] == [
+        AppFrameCommandId.HELP,
+        AppFrameCommandId.KEYBOARD_SHORTCUTS,
+        AppFrameCommandId.DATA_LOCATIONS,
+        AppFrameCommandId.OPEN_DIAGNOSTIC_LOGS,
+        AppFrameCommandId.ABOUT,
+    ]
     definition = HELP_COMMAND_DEFINITIONS[0]
     assert definition.command_id is AppFrameCommandId.HELP
     assert definition.menu == "Help"
@@ -1852,7 +1858,9 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.text for action in frame.window.menu_bar.menus[5].actions] == [
         definition.mnemonic_text for definition in HELP_COMMAND_DEFINITIONS
     ]
-    assert [action.shortcut for action in frame.window.menu_bar.menus[5].actions] == ["F1"]
+    assert [action.shortcut for action in frame.window.menu_bar.menus[5].actions] == [
+        definition.shortcut for definition in HELP_COMMAND_DEFINITIONS
+    ]
     assert [action.tool_tip for action in frame.window.menu_bar.menus[5].actions] == [
         definition.accessible_name for definition in HELP_COMMAND_DEFINITIONS
     ]
@@ -2327,6 +2335,36 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
     bindings.q_file_dialog.next_open_file_name = ""
     frame.choose_open_pdf()
     assert bindings.q_file_dialog.open_calls[-1][2] == str(next_open_dir)
+
+
+def test_app_frame_settings_restore_defaults_is_cancel_safe(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    settings_store = AppSettingsStore(storage_dir=tmp_path / "config")
+    original = _settings(tmp_path)
+    settings_store.save_settings(original)
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=original,
+        app_settings_store=settings_store,
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    frame.show_app_settings()
+    dialog = frame.settings_dialog
+    dialog.controls.default_open_directory.setText(str(tmp_path / "changed-source"))
+    dialog.controls.default_output_directory.setText(str(tmp_path / "changed-signed"))
+    dialog.controls.appearance_mode.setCurrentIndex(2)
+    dialog.controls.restore_defaults_button.click()
+
+    defaults = AppSettings.default()
+    assert dialog.controls.default_open_directory.text() == defaults.default_open_directory
+    assert dialog.controls.default_output_directory.text() == defaults.default_output_directory
+    assert dialog.controls.appearance_mode.currentText() == "System"
+
+    dialog.cancel()
+    assert frame.app_settings == original
+    assert settings_store.load_settings() == original
 
 
 def test_app_frame_settings_dialog_browse_buttons_choose_directories(

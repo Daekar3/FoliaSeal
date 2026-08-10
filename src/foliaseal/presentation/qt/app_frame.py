@@ -32,6 +32,7 @@ from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialPort,
     RepositoryBackedCertificateSigningMaterialPort,
 )
+from foliaseal.application.support_diagnostics import DiagnosticLogWriter, SupportLocations
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect, SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -109,6 +110,11 @@ from foliaseal.presentation.qt.single_instance import (
     endpoint_name,
     request_for_path,
 )
+from foliaseal.presentation.qt.support_dialogs import (
+    AboutDialog,
+    DataLocationsDialog,
+    KeyboardShortcutsDialog,
+)
 from foliaseal.resources.icons import icon_path
 
 
@@ -167,6 +173,7 @@ class AppSettingsDialogControls:
     appearance_mode: Any
     save_button: Any
     cancel_button: Any
+    restore_defaults_button: Any
 
 
 @dataclass(frozen=True)
@@ -263,6 +270,8 @@ class AppSettingsDialog:
         appearance_mode.setCurrentIndex(mode_index)
         save_button = self._bindings.q_push_button("Save")
         cancel_button = self._bindings.q_push_button("Cancel")
+        restore_defaults_button = self._bindings.q_push_button("Restore defaults")
+        restore_defaults_button.setAccessibleName("Restore application settings defaults")
 
         layout.addRow("Default open folder", default_open_directory)
         layout.addRow("", default_open_directory_browse_button)
@@ -271,6 +280,7 @@ class AppSettingsDialog:
         layout.addRow("Appearance", appearance_mode)
         layout.addRow("", save_button)
         layout.addRow("", cancel_button)
+        layout.addRow("", restore_defaults_button)
 
         default_open_directory_browse_button.clicked.connect(  # type: ignore[attr-defined]
             lambda: self._choose_directory(
@@ -288,6 +298,7 @@ class AppSettingsDialog:
         )
         save_button.clicked.connect(self.save)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.cancel)  # type: ignore[attr-defined]
+        restore_defaults_button.clicked.connect(self.restore_defaults)  # type: ignore[attr-defined]
 
         return AppSettingsDialogControls(
             dialog=dialog,
@@ -298,7 +309,17 @@ class AppSettingsDialog:
             appearance_mode=appearance_mode,
             save_button=save_button,
             cancel_button=cancel_button,
+            restore_defaults_button=restore_defaults_button,
         )
+
+    def restore_defaults(self) -> None:
+        defaults = AppSettings.default()
+        self.controls.default_open_directory.setText(defaults.default_open_directory)
+        self.controls.default_output_directory.setText(defaults.default_output_directory)
+        index = next(
+            index for index, mode in enumerate(AppearanceMode) if mode is AppearanceMode.SYSTEM
+        )
+        self.controls.appearance_mode.setCurrentIndex(index)
 
     def _choose_directory(self, *, title: str, current_path: str, target: Any) -> None:
         selected = self._bindings.q_file_dialog.getExistingDirectory(
@@ -388,6 +409,8 @@ class FoliaSealAppFrame:
         self._on_sign_request = on_sign_request
         self._on_error = on_error
         self._on_status_change = on_status_change
+        self._support_locations = SupportLocations.for_environment()
+        self._diagnostic_log_writer = DiagnosticLogWriter(self._support_locations)
         self._external_link_launcher = external_link_launcher
         self._pending_external_link: LinkDecision | None = None
         self._pending_open_request: OpenRequest | None = None
@@ -429,6 +452,7 @@ class FoliaSealAppFrame:
         self._reusable_object_library: Any | None = None
         self._document_signatures_dialog: DocumentSignaturesDialog | None = None
         self._help_viewer: HelpViewerDialog | None = None
+        self._support_dialogs: dict[str, Any] = {}
         self._closing_document_signatures = False
         self._connected_native_editor_ids: set[int] = set()
         self._native_clipboard_connected = False
@@ -587,6 +611,58 @@ class FoliaSealAppFrame:
             self._help_viewer.show_topic(topic_id)
         self._help_viewer.show()
         return self._help_viewer
+
+    def _show_support_dialog(self, key: str, factory: Callable[[Callable[[], None]], Any]) -> Any:
+        dialog = self._support_dialogs.get(key)
+        if dialog is None:
+            dialog = factory(lambda: self._support_dialogs.pop(key, None))
+            self._support_dialogs[key] = dialog
+        dialog.show()
+        return dialog
+
+    def show_keyboard_shortcuts(self) -> Any:
+        return self._show_support_dialog(
+            "keyboard_shortcuts",
+            lambda on_closed: KeyboardShortcutsDialog(
+                bindings=self._bindings, parent=self.window, on_closed=on_closed
+            ),
+        )
+
+    def show_data_locations(self) -> Any:
+        return self._show_support_dialog(
+            "data_locations",
+            lambda on_closed: DataLocationsDialog(
+                bindings=self._bindings,
+                parent=self.window,
+                locations=self._support_locations,
+                on_closed=on_closed,
+            ),
+        )
+
+    def show_about(self) -> Any:
+        return self._show_support_dialog(
+            "about",
+            lambda on_closed: AboutDialog(
+                bindings=self._bindings, parent=self.window, on_closed=on_closed
+            ),
+        )
+
+    def open_diagnostic_logs_folder(self) -> bool:
+        path = self._support_locations.ensure_logs_dir()
+        desktop_services = self._bindings.q_desktop_services
+        q_url = self._bindings.q_url
+        open_url = getattr(desktop_services, "openUrl", None)
+        from_local_file = getattr(q_url, "fromLocalFile", None) if q_url is not None else None
+        if not callable(open_url) or not callable(from_local_file):
+            self._emit_error("Unable to open diagnostic logs folder.")
+            return False
+        try:
+            opened = bool(open_url(from_local_file(str(path))))
+        except Exception:
+            opened = False
+        if not opened:
+            self._emit_error("Unable to open diagnostic logs folder.")
+        return opened
 
     def _clear_help_viewer(self) -> None:
         self._help_viewer = None
@@ -1822,6 +1898,14 @@ class FoliaSealAppFrame:
             AppFrameCommandId.HELP,
             lambda: self.show_help(),
         )
+        self._command_action(
+            help_menu, AppFrameCommandId.KEYBOARD_SHORTCUTS, self.show_keyboard_shortcuts
+        )
+        self._command_action(help_menu, AppFrameCommandId.DATA_LOCATIONS, self.show_data_locations)
+        self._command_action(
+            help_menu, AppFrameCommandId.OPEN_DIAGNOSTIC_LOGS, self.open_diagnostic_logs_folder
+        )
+        self._command_action(help_menu, AppFrameCommandId.ABOUT, self.show_about)
 
     def _action(
         self,
@@ -2135,6 +2219,16 @@ class FoliaSealAppFrame:
         self._apply_workspace_action_state(workspace_action_state_closed())
 
     def _emit_error(self, message: str) -> None:
+        try:
+            self._diagnostic_log_writer.write(
+                level="error",
+                error_code="UI_ERROR",
+                stage="app_frame",
+                detail=message,
+            )
+        except OSError:
+            # A support log must never prevent the user-facing error surface.
+            pass
         if self._on_error is not None:
             self._on_error(message)
         warning = getattr(self._bindings.q_message_box, "warning", None)

@@ -38,6 +38,10 @@ class AppFrameCommandId(StrEnum):
     IMPORT_CERTIFICATE = "settings.import_certificate"
     MANAGE_CERTIFICATE_CONFIGURATIONS = "settings.manage_certificate_configurations"
     HELP = "help.open"
+    KEYBOARD_SHORTCUTS = "help.keyboard_shortcuts"
+    DATA_LOCATIONS = "help.data_locations"
+    OPEN_DIAGNOSTIC_LOGS = "help.open_diagnostic_logs"
+    ABOUT = "help.about"
     SIGNATURE_LIBRARY = "signing.signature_library"
     SIGN_AND_SAVE = "signing.sign_and_save"
     PLACE_SIGNATURE = "signing.place_signature"
@@ -305,6 +309,33 @@ HELP_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="F1",
         accessible_name="Open FoliaSeal Help",
         mnemonic_text="&Help",
+    ),
+    AppFrameCommandDefinition(
+        AppFrameCommandId.KEYBOARD_SHORTCUTS,
+        "Help",
+        "Keyboard Shortcuts",
+        None,
+        "Show Keyboard Shortcuts",
+        "Keyboard &Shortcuts",
+    ),
+    AppFrameCommandDefinition(
+        AppFrameCommandId.DATA_LOCATIONS,
+        "Help",
+        "Data Locations",
+        None,
+        "Show FoliaSeal data locations",
+        "&Data Locations",
+    ),
+    AppFrameCommandDefinition(
+        AppFrameCommandId.OPEN_DIAGNOSTIC_LOGS,
+        "Help",
+        "Open Diagnostic Logs Folder",
+        None,
+        "Open diagnostic logs folder",
+        "Open Diagnostic &Logs Folder",
+    ),
+    AppFrameCommandDefinition(
+        AppFrameCommandId.ABOUT, "Help", "About", None, "About FoliaSeal", "&About"
     ),
 )
 
