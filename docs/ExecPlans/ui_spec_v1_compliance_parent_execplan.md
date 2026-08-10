@@ -125,12 +125,14 @@ Placement, preview, and signing tranche:
   schema-v2 immutable image assets, image position/prominence/alpha controls, explicit Primary
   75% allocation, staged-file cleanup, image-only layout, and save/reload preview-signing parity
   are implemented and validated; final authoritative preview fidelity, glyph coverage, frozen-time,
-  and readiness-gate evidence remain with the preview child.
+  and preview-specific fit/readiness evidence remain with the preview child, while document-safety
+  readiness is owned by the readiness-caveats child.
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — typed ordered readiness
-  projection and action vocabulary landed in the current slice; document-safety integration and
-  the remaining full rail state machine remain with their owning children.
+  projection and action vocabulary landed in the current slice; document-safety source gating is
+  now implemented by the readiness-caveats child, while the remaining full rail state machine
+  remains with its owning children.
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
   are committed; confirmation/source policy is now bounded in its follow-on child, while async
@@ -372,6 +374,12 @@ Release tranche:
   covered. The preview child still has the display-backed/test-adapter GUI walkthrough open because
   the isolated launch reaches `SingleInstanceUnavailable` before window creation. Current full
   regression is `1393 passed, 20 skipped, 1 warning`.
+- [x] (2026-08-10) Added the first document-safety readiness increment: workspace composition now
+  captures metadata-only source identity, the rail prioritizes changed/missing/unknown source
+  status before preset/certificate setup, and direct workflow request construction rejects an
+  unresolved source. Focused validation is `49 passed`; full regression is `1398 passed, 20
+  skipped, 1 warning`. Reload/Locate/Ignore banners and draft-preserving reload remain open in the
+  safe-links/lifecycle children.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

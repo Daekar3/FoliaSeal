@@ -36,6 +36,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean owned processes and
   temporary configuration artifacts.
 - [x] (2026-08-10) Update this plan and relevant docs, then commit the child slice.
+- [x] (2026-08-10) Add a typed document-source monitor at workspace composition, feed its
+  changed/missing/unknown decision into the ordered readiness projection, and cover the rail
+  blocker without claiming Reload/Locate behavior that belongs to the safe-links/lifecycle child.
+- [x] (2026-08-10) Enforce the same source-safety decision at direct workflow request
+  construction, so headless callers cannot sign a changed, missing, or unverifiable source.
 
 ## Surprises & Discoveries
 
@@ -51,13 +56,22 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible readiness states, caveats, and next-action guidance outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: treat document safety as the first readiness blocker, but keep reload/locate/ignore
+  mutations outside this slice. A composition-owned source monitor supplies an immutable decision
+  to the panel; the future safe-links/lifecycle child owns the condition-only banner and
+  draft-preserving recovery operation.
+  Rationale: UI_SPEC WF04 requires document safety to precede setup, while the current viewer has no
+  safe reload seam. This adds truthful blocking without silently discarding or replacing a draft.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-The typed readiness child now supplies one ordered state and recommended action to the rail while
-preserving signed/recovery/no-document precedence. The remaining gaps are document-safety
-integration, full appearance/fit readiness vocabulary, asynchronous signing progress, and the
-remaining rail state-machine work assigned to the other children.
+The typed readiness child supplies one ordered state and recommended action to the rail while
+preserving signed/recovery/no-document precedence. The composition now captures source identity,
+the panel prioritizes changed/missing/unknown safety before setup, and direct workflow request
+construction rejects unresolved source safety. Reload/locate/ignore, condition-only banners,
+full appearance/fit readiness vocabulary, asynchronous signing progress, and the remaining rail
+state-machine work remain assigned to the other children.
 
 ## Context and Orientation
 
@@ -132,6 +146,14 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
+Current evidence: the focused source/readiness/action set is `49 passed`; the full suite is
+`1398 passed, 20 skipped, 1 warning`; Ruff, `pip check`, and `git diff --check` pass. The offscreen
+properties-panel integration test observes a changed source and asserts the `document_safety` /
+`review_document_safety` state before setup. The bounded CLI walkthrough exits at the known
+isolated `SingleInstanceUnavailable` endpoint before window creation; its exact temporary root is
+removed and process inspection finds no FoliaSeal/PySide6 process. A display-backed
+banner/reload walkthrough remains deferred to the safe-links/lifecycle children.
+
 ## Idempotence and Recovery
 
 Use temporary configuration and sibling output paths. If work fails halfway, preserve user PDFs and
@@ -146,7 +168,9 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 ## Interfaces and Dependencies
 
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
-or workspace ports. Create tests/integration/test_readiness_caveats_status.py. The final behavior
+or workspace ports. The source-safety increment is exercised by
+`tests/unit/test_document_source_monitor.py` and
+`tests/integration/test_readiness_caveats_status.py`; the final behavior
 must be exercised by tests/unit/test_qt_signing_action_coordinator.py,
 tests/unit/test_signing_workspace_sidebar.py, and that integration test. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.

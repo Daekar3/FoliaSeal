@@ -20,6 +20,12 @@ from foliaseal.application.coordinate_transform import (
     view_rect_to_pdf_rect,
     visible_page_dimensions,
 )
+from foliaseal.application.document_safety import (
+    SourceChangeAction,
+    SourceChangeDecision,
+    SourceChangeStatus,
+)
+from foliaseal.application.document_source_monitor import DocumentSourceMonitor
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileSourcePage,
     ResolvedSignaturePreset,
@@ -90,6 +96,7 @@ class SigningDraftWorkflow:
         repr=False,
     )
     fit_validator: VisibleSignatureFitValidator | None = field(default=None, repr=False)
+    document_source_monitor: DocumentSourceMonitor | None = field(default=None, repr=False)
     _certificate_preview_values: dict[SignatureFieldKey, str] | None = field(
         default=None,
         init=False,
@@ -198,6 +205,15 @@ class SigningDraftWorkflow:
         if self._preview_fingerprint != self._current_preview_fingerprint():
             return None
         return self._preview_signing_time
+
+    def document_safety_decision(self) -> SourceChangeDecision:
+        """Return the mounted source decision without reloading or changing the draft."""
+        if self.document_source_monitor is None:
+            return SourceChangeDecision(
+                status=SourceChangeStatus.UNCHANGED,
+                action=SourceChangeAction.NONE,
+            )
+        return self.document_source_monitor.decision()
 
     @property
     def current_signature_appearance(self) -> SignatureAppearance | None:
@@ -449,7 +465,29 @@ class SigningDraftWorkflow:
     def validation_issues(self) -> tuple[_contracts.SigningDraftValidationIssue, ...]:
         """Return blocking and non-blocking problems for the current draft."""
         semantics = self._resolve_visible_signature_semantics()
-        return self._validation_issues_for_semantics(semantics)
+        issues = list(self._validation_issues_for_semantics(semantics))
+        source_decision = self.document_safety_decision()
+        if source_decision.status is not SourceChangeStatus.UNCHANGED:
+            source_message = {
+                SourceChangeStatus.CHANGED: (
+                    "The source PDF changed on disk. Review or reload it before signing."
+                ),
+                SourceChangeStatus.MISSING: (
+                    "The source PDF is no longer available. Locate it or close this document."
+                ),
+                SourceChangeStatus.UNKNOWN: (
+                    "The source PDF identity could not be verified. Review it before signing."
+                ),
+            }[source_decision.status]
+            issues.insert(
+                0,
+                _issue(
+                    "document_safety_unresolved",
+                    source_message,
+                    field_name="document_safety",
+                ),
+            )
+        return tuple(issues)
 
     def _validation_issues_for_semantics(
         self,

@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 from foliaseal.application import SigningDraftWorkflow, suggest_signed_output_path
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
+from foliaseal.application.document_source_monitor import DocumentSourceMonitor
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.application.viewer_session import ViewerSession
@@ -135,6 +136,7 @@ class SigningWorkspaceCompositionService:
             passphrase="",
             tsa_url="",
             timestamp_required=False,
+            document_source_monitor=DocumentSourceMonitor.for_path(source_path),
         )
         reusable_objects = command.reusable_objects
         if reusable_objects is None:

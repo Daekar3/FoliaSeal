@@ -5,10 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from foliaseal.application.document_safety import SourceChangeStatus
+
 
 class SigningReadinessStage(StrEnum):
     """Ordered user-facing stages before a signing request can be submitted."""
 
+    DOCUMENT_SAFETY = "document_safety"
     SELECT_PRESET = "select_preset"
     SETUP_REQUIRED = "setup_required"
     PLACE_SIGNATURE = "place_signature"
@@ -19,6 +22,7 @@ class SigningReadinessStage(StrEnum):
 class SigningReadinessAction(StrEnum):
     """At most one recommended next action for a readiness state."""
 
+    REVIEW_DOCUMENT_SAFETY = "review_document_safety"
     CHOOSE_SETUP = "choose_setup"
     COMPLETE_SETUP = "complete_setup"
     PLACE_SIGNATURE = "place_signature"
@@ -39,6 +43,8 @@ class SigningReadinessInputs:
     validation_text: str
     ready_to_sign: bool
     has_saved_presets: bool = False
+    document_safety_status: SourceChangeStatus = SourceChangeStatus.UNCHANGED
+    document_safety_detail: str = ""
 
 
 @dataclass(frozen=True)
@@ -55,6 +61,28 @@ class SigningReadiness:
 
 def project_signing_readiness(inputs: SigningReadinessInputs) -> SigningReadiness:
     """Project setup facts into the ordered UI_SPEC readiness vocabulary."""
+    if inputs.document_safety_status is not SourceChangeStatus.UNCHANGED:
+        detail = inputs.document_safety_detail.strip()
+        if not detail:
+            detail = {
+                SourceChangeStatus.CHANGED: (
+                    "The source PDF changed on disk. Review or reload it before signing."
+                ),
+                SourceChangeStatus.MISSING: (
+                    "The source PDF is no longer available. Locate it or close this document."
+                ),
+                SourceChangeStatus.UNKNOWN: (
+                    "The source PDF identity could not be verified. Review it before signing."
+                ),
+            }[inputs.document_safety_status]
+        return SigningReadiness(
+            stage=SigningReadinessStage.DOCUMENT_SAFETY,
+            heading="Review document safety",
+            detail=detail,
+            can_sign=False,
+            recommended_action=SigningReadinessAction.REVIEW_DOCUMENT_SAFETY,
+        )
+
     if not inputs.selected_preset_name and not inputs.has_saved_presets:
         return SigningReadiness(
             stage=SigningReadinessStage.SELECT_PRESET,

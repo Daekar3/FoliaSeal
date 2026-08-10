@@ -67,7 +67,8 @@ The canonical repository document split is:
 | `src/foliaseal/application/phase3_fidelity_contract.py` | Versioned release-fidelity manifest contract for the tracked Phase 3 corpus. | Validates `manifest_version`, `phase3_fidelity_v1` tolerances/critical counters, and per-scenario expected outcomes/diagnostics before matrix execution. |
 | `src/foliaseal/infra/` | Concrete adapters for certification, config JSON storage, QtPdf geometry plus Poppler interactive-viewer rasterisation, timestamp authority integration, and trust policy context creation. | Depends on pyHanko, cryptography, PySide6 at runtime where needed; the interactive viewer also late-resolves the Linux `pdftoppm` executable. |
 | `src/foliaseal/application/signature_properties_coordinator.py` | Application-layer reconciliation boundary for signing-shell certificate and preset state. | Owns display-name selection state, validation/readiness text, preset certificate display-name lookup, and catalog refresh/save/delete commands. |
-| `src/foliaseal/application/signing_readiness.py` | Pure ordered projection of the active signing workspace's readiness state. | Converts selected-preset, certificate, placement, validation, and signability facts into one immutable stage/detail/action result; it has no Qt, persistence, certificate parsing, or document-safety ownership. |
+| `src/foliaseal/application/signing_readiness.py` | Pure ordered projection of the active signing workspace's readiness state. | Consumes document-safety status first, then converts selected-preset, certificate, placement, validation, and signability facts into one immutable stage/detail/action result; it has no Qt, persistence, certificate parsing, or source-monitor mutation ownership. |
+| `src/foliaseal/application/document_source_monitor.py` | Application-owned source identity/fingerprint boundary for mounted workspaces. | Captures the open-time `(device, inode, size, mtime_ns)` identity and projects changed, missing, or unknown source status without reloading or mutating the workspace; AppFrame/workspace composition owns its lifecycle. |
 | `src/foliaseal/application/certificate_models.py` | Canonical application-owned managed-certificate records and catalog policy. | Owns certificate/configuration invariants, stable-id/name lookup, public subject/issuer/validity/fingerprint metadata, upsert, and reference-guarded removal without JSON, filesystem, Qt, or secret-storage imports. |
 | `src/foliaseal/application/certificate_catalog_repository.py` | Application-owned certificate-catalog persistence port and in-memory adapter. | Defines the `CertificateCatalogRepository` protocol used by application services plus `InMemoryCertificateCatalogRepository` for state and boundary tests; the production filesystem implementation remains in `infra/config/certificate_storage.py`. |
 | `src/foliaseal/application/certificate_manager.py` | Application-owned certificate policy and user-facing operations. | Owns naming/ID policy, guided five-year PKCS#12 generation with subject fields and confirmation, public issuer/validity/fingerprint projection, parsing/non-mutating `CertificateImportInspection`, retained-file configuration, export-password validation, saved-secret compensation, and typed operation results; delegates managed-file/catalog commit and delete sequencing to `CertificateCatalogRepository`. |
@@ -447,6 +448,16 @@ The canonical repository document split is:
   result carries a launcher callback.
 - Status: Implemented and confirmed by focused tests; renderer and lifecycle integration remain
   open in the safe-links and document-lifecycle ExecPlans.
+
+### Document source monitor
+
+- Location: `src/foliaseal/application/document_source_monitor.py`
+- Responsibility: Capture and compare the mounted PDF's local source identity for readiness gating.
+- Owns: `SourceFingerprint`, `fingerprint_source()`, `DocumentSourceMonitor.for_path()`, `decision()`, and `acknowledge_current_source()`.
+- Does not own: PDF reload, source locating, ignore/acknowledgement UI, banner mutation, renderer refresh, or signing-draft mutation.
+- Key collaborators: `document_safety.py`, `signing_readiness.py`, `app_frame_workspace_open.py`, and the future workspace lifecycle/safe-links children.
+- Known constraints: The fingerprint is metadata-only `(st_dev, st_ino, st_size, st_mtime_ns)` and missing/unreadable sources produce unknown/missing decisions through the pure safety policy. `decision()` is read-only; only an owning reload or explicit ignore flow may call `acknowledge_current_source()`. Reload/locate/ignore actions, safety banners, and draft-preserving lifecycle mutation remain explicitly deferred to the safe-links and document-lifecycle children rather than this application boundary.
+- Status: Implemented and confirmed by focused tests.
 
 ### Viewer workflow and coordinate geometry
 
@@ -1612,6 +1623,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-08-10 | Added the document-source safety readiness boundary. | `DocumentSourceMonitor` now owns metadata-only source fingerprints and changed/missing/unknown decisions at workspace composition; `signing_readiness.py` consumes document safety before setup/readiness stages. Reload, locate, ignore, banner mutation, and draft-preserving lifecycle actions remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added real signed-appearance raster parity evidence. | A Qt-backed integration test signs a real PDF, renders its embedded annotation appearance, and asserts pixel-identical RGBA output against the frozen canonical preview for text-only and managed-image alpha-preserved/flattened cases. |
 | 2026-08-10 | Added exact bundled-font glyph validation and frozen visible-signature semantics parity. | `VisibleSignatureSemanticsService` now checks each visible text value against the selected bundled face's FontTools cmap, emits blocking field/codepoint issues, and shares the frozen preview time and prepared layout decision with final signing; `fonttools>=4.33.3` is an explicit runtime dependency. Existing Phase 3 names/contracts remain unchanged. |
 | 2026-08-10 | Added reusable signature-image prominence and managed import boundaries. | `SignatureAppearance` now persists `SignatureImageProminence`, `preserve_image_alpha`, and schema-v2 `SignatureImageAsset` metadata with backward-read defaults; `ManagedSignatureImageStore` validates, normalizes, resolves, and atomically stores catalog-local PNGs, and AppFrame injects it through the Library into nested Appearance/Preset editors. Production layout reserves explicit 35%/55%/75% prominence; only low-level compatibility callers may omit the field. |

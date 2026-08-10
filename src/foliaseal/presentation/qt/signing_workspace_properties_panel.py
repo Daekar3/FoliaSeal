@@ -15,6 +15,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.document_safety import SourceChangeStatus
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator,
@@ -427,6 +428,7 @@ class SignaturePropertiesPanel:
     def readiness(self) -> SigningReadiness:
         state = self.load_setup_state()
         certificate_readiness = state.certificate_readiness
+        document_safety = self._workflow.document_safety_decision()
         direct_certificate_available = bool(self._coordinator.workflow.certificate_path)
         certificate_selected = (
             state.selected_certificate_configuration_name is not None
@@ -434,6 +436,22 @@ class SignaturePropertiesPanel:
         )
         return project_signing_readiness(
             SigningReadinessInputs(
+                document_safety_status=document_safety.status,
+                document_safety_detail=(
+                    {
+                        SourceChangeStatus.CHANGED: (
+                            "The source PDF changed on disk. Review or reload it before signing."
+                        ),
+                        SourceChangeStatus.MISSING: (
+                            "The source PDF is no longer available. Locate it or close "
+                            "this document."
+                        ),
+                        SourceChangeStatus.UNKNOWN: (
+                            "The source PDF identity could not be verified. Review it "
+                            "before signing."
+                        ),
+                    }.get(document_safety.status, "")
+                ),
                 selected_preset_name=state.selected_signature_preset_name,
                 has_saved_presets=bool(state.signature_preset_names),
                 certificate_selected=certificate_selected,
