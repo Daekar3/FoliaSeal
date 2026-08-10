@@ -27,7 +27,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Add a Library-owned Appearance detail/editor mode that preserves the master selection and suspends/restores the parent catalog/name draft.
 - [x] (2026-08-10) Add a visible breadcrumb/back path, a sticky preview explicitly labeled as synthetic sample data, and typed Save/Discard/Continue prompts for dirty child state.
 - [x] (2026-08-10) Prove nested Save/Cancel, parent restoration, child-widget cleanup, and real offscreen Qt mounting with focused tests.
-- [ ] (2026-08-10) Complete full-suite validation, final compliance review, documentation reconciliation, bounded GUI audit, and commit.
+- [x] (2026-08-10) Complete full-suite validation, final compliance review, documentation reconciliation, bounded GUI audit, and commit.
 
 ## Surprises & Discoveries
 
@@ -224,6 +224,9 @@ Follow-up evidence (2026-08-10):
   `AppearanceProfileEditorDialog`; the remaining wrapper is only directly exercised by its focused
   compatibility tests and is documented with its retirement condition above.
 
+Commit closeout: `3f571f9d2 feat(gui): add transactional appearance editor`; the worktree was clean
+after the commit and `git show --check` passed.
+
 ## Idempotence and Recovery
 
 Use temporary configuration and sibling output paths. If work fails halfway, preserve user PDFs and
@@ -245,6 +248,15 @@ breadcrumb, and synthetic-preview non-persistence behavior. The final behavior m
 `tests/unit/test_qt_visible_signature_setup_form.py`,
 `tests/unit/test_signature_appearance_models.py`, and that transaction test. Any temporary adapter
 must name its remaining consumer and retirement condition in this plan.
+
+Outcomes & Retrospective closeout (2026-08-10): The production Library now provides a complete
+Appearance child transaction for the scoped UI_SPEC surface: nested detail replacement, breadcrumb,
+sticky labeled synthetic preview, content-only controls, stable-id Save, typed dirty resolution,
+parent restoration, and child-widget cleanup. Full validation reached 1357 passed and 20 skipped;
+the bounded launch audit still reports the environment's isolated single-instance endpoint error,
+with no leaked processes or temporary roots. The compatibility modal wrapper remains deliberately
+thin and its retirement condition is documented. Preset-child suspension, reason/location defaults,
+active-placement invalidation, and final rendered-preview fidelity are the next separate slices.
 
 Revision note: 2026-08-10 / Codex
 Reconciled after a fresh checkout review. The follow-up slice is now explicit about the

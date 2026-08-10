@@ -88,7 +88,7 @@ Reusable-object and certificate tranche:
   pin/rename/delete routing, confirmation-safe mutation lifecycle, expiration preference propagation,
   and Library preferences validated in the current follow-up slice.
 - [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
-- [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
+- [x] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
 - [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
 - [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — typed inspection,
   atomic import, and retained-file Configure are committed in `ad712ad7e` and `498d5c791`;
@@ -200,13 +200,15 @@ Release tranche:
   controls, with stable-id-aware `SaveAppearance` persistence and no active-document mutation.
   Nested breadcrumb/detail-pane navigation, labeled sample preview, suspended preset return,
   reason/location defaults, dirty prompts, and active-placement invalidation remain open.
-- [ ] (2026-08-10) Implemented the production nested Appearance detail-pane increment pending its
-  final commit gate: `AppearanceProfileEditorWidget` now replaces the Library detail column with a
-  breadcrumb, sticky labeled synthetic preview, content-only controls, stable-id Save, and typed
+- [x] (2026-08-10) Completed the production nested Appearance detail-pane increment in
+  `3f571f9d2`: `AppearanceProfileEditorWidget` replaces the Library detail column with a breadcrumb,
+  sticky labeled synthetic preview, content-only controls, stable-id Save, and typed
   Save/Discard/Continue resolution; `ReusableObjectLibraryDialog` suspends/restores the parent
   catalog selection/name draft and removes child widgets on exit. The modal dialog is now only a
   compatibility/test wrapper. Preset-child return, reason/location defaults, active-placement
-  invalidation, and final preview fidelity remain open in their owning children.
+  invalidation, and final preview fidelity remain open in their owning children. Full validation is
+  1357 passed and 20 skipped; the bounded launch audit's isolated single-instance error is recorded
+  as an environment limitation with cleanup confirmed.
 - [x] (2026-08-10) Added the bounded first-use preset entry increment: an empty preset catalog now
   gives explicit no-preset guidance in the signing rail and routes `Create or manage presets…`
   through typed workspace composition to the existing modeless Presets-first Library. Opening the
