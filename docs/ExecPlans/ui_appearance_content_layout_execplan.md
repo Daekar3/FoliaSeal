@@ -145,8 +145,9 @@ store, and consumed by both preview and signing; rejection, optimization, replac
 and discard paths have focused evidence. The full suite is `1384 passed,
 20 skipped, 1 warning`; the bounded offscreen launch exits at the known isolated
 `SingleInstanceUnavailable` endpoint and leaves no FoliaSeal process or temporary root. The next
-open dependency is the authoritative preview-fidelity child, which still owns glyph coverage,
-frozen-time mutation, real readiness gating, and signed-output parity evidence.
+open dependency is the authoritative preview-fidelity child, which owns the remaining glyph,
+frozen-time, readiness, and GUI walkthrough closure; rendered signed-output parity and managed
+alpha evidence are now implemented and recorded by that child.
 
 ## Context and Orientation
 

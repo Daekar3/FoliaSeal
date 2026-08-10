@@ -10,6 +10,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import NameOID
+from pyhanko.pdf_utils import generic
+from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application.certificate_models import (
     CertificateCatalog,
@@ -421,6 +423,15 @@ def write_test_pkcs12(path: Path, *, passphrase: str, common_name: str = "Alice 
             encryption_algorithm=serialization.BestAvailableEncryption(passphrase.encode()),
         )
     )
+
+
+def write_test_pdf(path: Path) -> None:
+    """Write a minimal one-page PDF suitable for signing integration tests."""
+    writer = PdfFileWriter()
+    empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
+    writer.insert_page(PageObject(contents=empty_stream, media_box=(0, 0, 612, 792)))
+    with path.open("wb") as handle:
+        writer.write(handle)
 
 
 def build_signing_request(

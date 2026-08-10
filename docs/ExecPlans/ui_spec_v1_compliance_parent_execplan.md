@@ -364,8 +364,14 @@ Release tranche:
   final request construction; frozen preview time remains the value carried into signing; and a
   materialized preview/backend layout-plan parity test covers the glyph-safe path while the blocked
   path proves submission is rejected. Full regression is `1390 passed, 20 skipped, 1 warning`.
-  Rendered signed-artifact comparison, managed-alpha evidence, exact-fit walkthrough, and the
-  isolated single-instance GUI limitation remain open in the preview child.
+- [x] (2026-08-10) Closed the rendered preview/signed-appearance parity evidence portion of the
+  preview child: `tests/integration/test_preview_signed_output_parity.py` signs a real PDF,
+  renders the embedded annotation appearance through the Qt PDF backend, and asserts an exact
+  RGBA match with the frozen canonical preview. Parameterized managed-image cases cover preserved
+  and flattened alpha normalization; exact-fit workflow/readiness/request rejection remains
+  covered. The preview child still has the display-backed/test-adapter GUI walkthrough open because
+  the isolated launch reaches `SingleInstanceUnavailable` before window creation. Current full
+  regression is `1393 passed, 20 skipped, 1 warning`.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
@@ -727,3 +733,5 @@ Updated after the Library mutation-lifecycle slice to reconcile completed certif
 sorting, confirmation-safe deletion, retained-certificate Configure refresh/reselection, and the
 current `1277 passed, 20 skipped, 1 warning` regression evidence; remaining open children are not
 treated as complete from these bounded results.
+Updated after the preview rendered-parity slice to record actual signed annotation raster evidence,
+managed-image alpha-policy coverage, and the remaining display-backed acceptance limitation.

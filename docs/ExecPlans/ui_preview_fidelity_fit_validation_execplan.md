@@ -40,13 +40,17 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   semantics and frozen time shared by preview/signing, and surface the issue through readiness.
 - [x] (2026-08-10) Added materialized preview/backend layout-plan parity coverage for a glyph-safe
   appearance and a glyph-blocked workflow/request case.
-- [ ] (2026-08-10) Complete authoritative rendered-preview parity evidence, including exact-fit
-  blocking, managed-image alpha, and one offscreen GUI walkthrough.
+- [x] (2026-08-10) Completed authoritative rendered-preview parity evidence: a real PDF is signed,
+  its embedded annotation appearance is rendered through the Qt PDF backend, and the raster is
+  pixel-identical to the canonical frozen preview. Managed images cover both preserved and
+  flattened alpha policies; exact-fit blocking remains covered at workflow/readiness/request
+  boundaries.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-10) Validation is complete for focused tests (`139 passed`), full regression
-  (`1390 passed, 20 skipped, 1 warning`), Ruff, `pip check`, and owned temporary cleanup; the real
-  launch still stops at `SingleInstanceUnavailable` before window creation, so display-backed or
-  test-adapter GUI evidence remains.
+- [x] (2026-08-10) Implementation validation is complete: the focused parity/fit/renderer set is
+  `58 passed`, the full regression is `1393 passed, 20 skipped, 1 warning`, Ruff and `pip check`
+  are clean, and all owned temporary preview/config roots are removed. The real launch still stops
+  at `SingleInstanceUnavailable` before window creation, so display-backed or test-adapter GUI
+  evidence remains open.
 - [ ] (2026-08-10) Update this plan and relevant docs, then commit.
 
 ## Surprises & Discoveries
@@ -84,12 +88,20 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   Rationale: the current workflow already passes the frozen time into `SigningRequest`; duplicating
   that state would increase drift risk without improving the user-visible contract.
   Date/Author: 2026-08-10 / Codex
+- Decision: make signed-output raster parity an integration contract at the existing direct
+  annotation-render boundary, comparing at the same zoom with transparent canvas preserved.
+  Rationale: this exercises the actual embedded PDF appearance rather than only comparing two
+  application layout plans, and it makes alpha behavior observable without introducing a second
+  renderer.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-The implementation is not yet complete. The plan currently has a verified dependency baseline and
-an identified glyph/readiness gap; record the focused red/green evidence and any remaining UI
-polish gaps after implementation.
+The implementation now has a verified rendered-parity and managed-alpha contract. The remaining
+closure item is a display-backed or test-adapter GUI walkthrough; the bounded real launch is still
+blocked by the environment's single-instance endpoint before a window is created. The test also
+confirmed that alpha policy belongs to managed-image normalization: direct source paths are not
+silently flattened by the signing renderer.
 
 ## Context and Orientation
 
@@ -176,9 +188,17 @@ contract, record that the test was red before implementation and green afterward
 
 Current evidence: the pre-change glyph contract test failed during collection because
 `unsupported_glyphs` was absent; the focused semantics/coordinator/workflow/renderer set now passes
-`139 passed`, and the full suite passes `1390 passed, 20 skipped, 1 warning`. `pip check` reports no
+`139 passed`, and the full suite previously passed `1390 passed, 20 skipped, 1 warning`. `pip check` reports no
 broken requirements after making FontTools an explicit runtime dependency. The materialized parity
 test is `tests/unit/test_signing_preview_renderer.py::test_materialized_preview_and_signing_share_layout_and_block_unsupported_glyph`.
+The rendered artifact parity test is
+`tests/integration/test_preview_signed_output_parity.py::test_canonical_preview_matches_actual_signed_annotation_raster`;
+it signs a real one-page PDF, renders the embedded `/AP` stream through `QtPdfRenderBackend`, and
+asserts an exact RGBA diff of zero at zoom 2.0. Its parameterized managed-image companion covers
+preserved and flattened alpha and asserts the normalized asset policy before the same exact diff.
+The exact-fit workflow gate remains covered by
+`tests/unit/test_signing_draft_workflow.py::test_workflow_blocks_compact_rectangles_that_backend_will_reject`
+and the coordinator readiness projection tests.
 The bounded real-launch audit uses an isolated `/tmp/foliaseal-preview-audit-*` root and currently
 returns `SingleInstanceUnavailable` before Qt window creation in this headless environment; the
 owned root is removed and no FoliaSeal process remains. A display-backed or test-adapter walkthrough
@@ -198,7 +218,9 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 ## Interfaces and Dependencies
 
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
-or workspace ports. The final behavior must be exercised by tests/unit/test_signing_preview_renderer.py,
+or workspace ports. The final behavior must be exercised by
+tests/integration/test_preview_signed_output_parity.py,
+tests/unit/test_signing_preview_renderer.py,
 tests/unit/test_signature_preview_layout.py, tests/unit/test_visible_signature_fit_validator.py,
 tests/unit/test_signature_preview_lifecycle.py, and tests/unit/test_visible_signature_rendered_fit_adapters.py.
 Any temporary adapter must
