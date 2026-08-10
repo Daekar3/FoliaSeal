@@ -7,14 +7,13 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, the typed Edit registry also exposes native Cut, Copy, Paste, and Select All for
-the currently focused `QLineEdit` or `QTextEdit`, using Ctrl+X, Ctrl+C, Ctrl+V, and Ctrl+A. The existing
+This child establishes the typed Edit registry and native Cut, Copy, Paste, and Select All for the
+currently focused `QLineEdit` or `QTextEdit`, using Ctrl+X, Ctrl+C, Ctrl+V, and Ctrl+A. The existing
 focus-sensitive Undo/Redo boundary remains unchanged: native editors own their local text history,
-while viewer or placement focus routes Undo/Redo to the public placement-history boundary. When no
-native text editor owns focus, the new native-only commands stay disabled rather than pretending to
-implement viewer Select All. This is a bounded increment toward UI_SPEC section 7 and acceptance
-scenario 8; viewer text Select All and Help remain separate owning slices because they need deeper
-document-selection and support-content seams.
+while viewer or placement focus routes Undo/Redo to the public placement-history boundary. The same
+Select All action now delegates to the completed document-selection child when no native text editor
+owns focus; Help remains a separate owning slice because it needs a support-content seam. This is a
+bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
 
 ## Child ExecPlan Dependencies
 
@@ -110,6 +109,9 @@ document-selection and support-content seams.
   full validation passed (`1449 passed, 20 skipped, 1 warning`), and `git diff --check`/Ruff passed.
   The bounded GUI launch remains limited by the known isolated `SingleInstanceUnavailable` endpoint
   error and requires no lingering process or temporary audit root.
+- [x] (2026-08-10) Reconciled the completed viewer Select All child into the shared Edit command
+  contract; native editor precedence remains at AppFrame, and the no-native-editor path now uses
+  the public workspace session port for current-page document text. Help remains deferred.
 
 ## Surprises & Discoveries
 
@@ -504,5 +506,6 @@ Revision note: 2026-08-10 / Codex
 Fresh compliance audit selected the next dependency-ready native-editor Edit increment: Cut, Copy,
 Paste, and Select All over the existing `_focused_text_editor()` seam with Ctrl+X/Ctrl+C/Ctrl+V/Ctrl+A.
 Selection and clipboard signals now keep action state current; the real offscreen test validates menu
-dispatch and observable native keyboard behavior. Viewer Select All and Help remain explicitly deferred
-because their current public document-selection and support-content contracts are incomplete.
+dispatch and observable native keyboard behavior. Viewer Select All was subsequently implemented in
+`ui_document_select_all_execplan.md` over the public document-selection contract, preserving native
+editor precedence; Help and final release scenario evidence remain explicitly deferred.

@@ -14,10 +14,15 @@ class _FakeSelectionEngine:
         *,
         selection: DocumentTextSelection | None = None,
         error: Exception | None = None,
+        select_all_selection: DocumentTextSelection | None = None,
+        select_all_error: Exception | None = None,
     ) -> None:
         self.selection = selection
         self.error = error
+        self.select_all_selection = select_all_selection
+        self.select_all_error = select_all_error
         self.calls = []
+        self.select_all_calls = []
 
     def select(
         self,
@@ -30,6 +35,17 @@ class _FakeSelectionEngine:
         if self.error is not None:
             raise self.error
         return self.selection
+
+    def select_all(
+        self,
+        input_pdf_path: str,
+        *,
+        page_index: int,
+    ) -> DocumentTextSelection | None:
+        self.select_all_calls.append((input_pdf_path, page_index))
+        if self.select_all_error is not None:
+            raise self.select_all_error
+        return self.select_all_selection
 
 
 def test_document_text_selection_session_reports_empty_selection(tmp_path: Path) -> None:
@@ -92,6 +108,41 @@ def test_document_text_selection_session_reports_selection_errors(tmp_path: Path
     assert state.selection is None
     assert state.status_text == "Text selection unavailable."
     assert "backend offline" in state.detail_text
+
+
+def test_document_text_selection_session_select_all_tracks_current_page(tmp_path: Path) -> None:
+    selection = DocumentTextSelection(
+        page_index=2,
+        text="Alice Example on page three",
+        highlight_rects=(PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),),
+    )
+    engine = _FakeSelectionEngine(select_all_selection=selection)
+    session = DocumentTextSelectionSession(
+        input_pdf_path=str(tmp_path / "sample.pdf"),
+        selection_engine=engine,
+    )
+
+    state = session.select_all(page_index=2)
+
+    assert engine.select_all_calls == [(str(tmp_path / "sample.pdf"), 2)]
+    assert state.selection == selection
+    assert state.status_text == "Selected text on page 3."
+    assert state.can_copy is True
+
+
+def test_document_text_selection_session_select_all_reports_backend_failure(
+    tmp_path: Path,
+) -> None:
+    session = DocumentTextSelectionSession(
+        input_pdf_path=str(tmp_path / "sample.pdf"),
+        selection_engine=_FakeSelectionEngine(select_all_error=RuntimeError("parser offline")),
+    )
+
+    state = session.select_all(page_index=0)
+
+    assert state.selection is None
+    assert state.status_text == "Text selection unavailable."
+    assert "parser offline" in state.detail_text
 
 
 class _FakePoint:
@@ -186,6 +237,34 @@ class _FakeNoBoundsQPdfDocument(_FakeQPdfDocument):
     def getSelection(self, page_index: int, start: _FakeQPointF, end: _FakeQPointF):
         type(self).last_selection_call = (page_index, start, end)
         return _FakeSelection(text="Alice Example", polygons=())
+
+
+class _FakeAllTextQPdfDocument(_FakeQPdfDocument):
+    last_select_all_call = None
+
+    def getAllText(self, page_index: int):  # noqa: N802
+        type(self).last_select_all_call = ("all_text", page_index)
+        return _FakeSelection(text="Alice Example on page", polygons=())
+
+    def getSelectionAtIndex(self, page_index: int, start_index: int, max_length: int):  # noqa: N802
+        type(self).last_select_all_call = (page_index, start_index, max_length)
+        return _FakeSelection(
+            text="Alice Example on page",
+            polygons=(
+                (
+                    _FakePoint(10.0, 12.0),
+                    _FakePoint(40.0, 12.0),
+                    _FakePoint(40.0, 16.0),
+                    _FakePoint(10.0, 16.0),
+                ),
+            ),
+        )
+
+
+class _FakeEmptyAllTextQPdfDocument(_FakeAllTextQPdfDocument):
+    def getAllText(self, page_index: int):  # noqa: N802
+        del page_index
+        return _FakeSelection(text="   ", polygons=())
 
 
 def test_qt_pdf_document_text_selection_engine_returns_text_and_highlights(
@@ -314,3 +393,44 @@ def test_qt_pdf_document_text_selection_engine_falls_back_when_bounds_are_empty(
 
     assert selection is not None
     assert selection.highlight_rects == (PdfRect(x1=4.0, y1=8.0, x2=12.0, y2=20.0),)
+
+
+def test_qt_pdf_document_text_selection_engine_selects_all_page_text(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "sample.pdf"
+    source_path.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(
+        "foliaseal.infra.document_text_selection.QPdfDocument",
+        _FakeAllTextQPdfDocument,
+    )
+    monkeypatch.setattr(
+        "foliaseal.infra.document_text_selection.QPointF",
+        _FakeQPointF,
+    )
+
+    selection = QtPdfDocumentTextSelectionEngine().select_all(
+        str(source_path),
+        page_index=1,
+    )
+
+    assert selection is not None
+    assert selection.page_index == 1
+    assert selection.text == "Alice Example on page"
+    assert selection.highlight_rects == (PdfRect(x1=10.0, y1=84.0, x2=40.0, y2=88.0),)
+    assert _FakeAllTextQPdfDocument.last_select_all_call == (1, 0, len(selection.text))
+
+
+def test_qt_pdf_document_text_selection_engine_select_all_returns_none_for_empty_page(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "sample.pdf"
+    source_path.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(
+        "foliaseal.infra.document_text_selection.QPdfDocument",
+        _FakeEmptyAllTextQPdfDocument,
+    )
+
+    assert QtPdfDocumentTextSelectionEngine().select_all(str(source_path), page_index=0) is None

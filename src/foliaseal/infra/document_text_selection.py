@@ -57,6 +57,47 @@ class QtPdfDocumentTextSelectionEngine:
         finally:
             document.close()
 
+    def select_all(
+        self,
+        input_pdf_path: str,
+        *,
+        page_index: int,
+    ) -> DocumentTextSelection | None:
+        """Select every extractable text range on one PDF page."""
+
+        source_path = Path(input_pdf_path)
+        if not source_path.exists():
+            raise FileNotFoundError(f"Document text selection file not found: {source_path}")
+
+        document = QPdfDocument()
+        try:
+            load_error = document.load(str(source_path))
+            if load_error != QPdfDocument.Error.None_:
+                raise RuntimeError(
+                    "Unable to load PDF text for selection: "
+                    f"{self._describe_load_error(load_error)}"
+                )
+            _page_width, page_height = self._page_dimensions(document, page_index)
+            page_selection = document.getAllText(page_index)
+            page_text = page_selection.text()
+            if not page_text.strip():
+                return None
+            selection = document.getSelectionAtIndex(page_index, 0, len(page_text))
+            selected_text = selection.text() or page_text
+            if not selected_text.strip():
+                return None
+            highlight_rects = tuple(
+                self._polygon_to_pdf_rect(polygon, page_height=page_height)
+                for polygon in selection.bounds()
+            )
+            return DocumentTextSelection(
+                page_index=page_index,
+                text=selected_text,
+                highlight_rects=highlight_rects,
+            )
+        finally:
+            document.close()
+
     def _page_dimensions(self, document: QPdfDocument, page_index: int) -> tuple[float, float]:
         page_size = document.pagePointSize(page_index)
         to_tuple = getattr(page_size, "toTuple", None)

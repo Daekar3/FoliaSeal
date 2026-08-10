@@ -40,6 +40,14 @@ class DocumentTextSelectionEngine(Protocol):
     ) -> DocumentTextSelection | None:
         """Return a document text selection for one page/drag rectangle."""
 
+    def select_all(
+        self,
+        input_pdf_path: str,
+        *,
+        page_index: int,
+    ) -> DocumentTextSelection | None:
+        """Return all extractable text on one page, if any."""
+
 
 class DocumentTextSelectionSession:
     """Track the current arbitrary text selection for one PDF."""
@@ -67,6 +75,20 @@ class DocumentTextSelectionSession:
                 self._input_pdf_path,
                 page_index=page_index,
                 selection_rect=selection_rect,
+            )
+        except Exception as exc:
+            self._selection = None
+            self._error_detail = str(exc)
+        return self._build_state()
+
+    def select_all(self, *, page_index: int) -> DocumentTextSelectionState:
+        """Select all extractable text on one page without changing the page."""
+
+        self._error_detail = None
+        try:
+            self._selection = self._selection_engine.select_all(
+                self._input_pdf_path,
+                page_index=page_index,
             )
         except Exception as exc:
             self._selection = None

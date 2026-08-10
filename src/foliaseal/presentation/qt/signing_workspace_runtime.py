@@ -443,6 +443,22 @@ class SigningWorkspaceRuntime:
             self._on_status_change("document_text_mode_changed")
         return transition.state.document_text.selection_mode_enabled
 
+    def can_select_all_document_text(self) -> bool:
+        """Return whether the active viewer has a current page for Select All."""
+
+        return self.logical_page_index() >= 0
+
+    def select_all_document_text(self) -> DocumentTextSelectionState:
+        """Select all extractable text on the viewer's current page."""
+
+        transition = self._document_review_workspace_required().select_all_text(
+            page_index=self.logical_page_index(),
+        )
+        self._review_bridge_required().apply_transition(transition)
+        if self._on_status_change is not None:
+            self._on_status_change("document_text_selection_changed")
+        return transition.state.document_text.selection_state
+
     def set_viewer_interaction_mode(self, mode: str) -> str:
         """Select the explicit Pan, Place, or Text viewer tool."""
         if mode not in {"pan", "signature", "text"}:

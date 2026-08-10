@@ -239,6 +239,25 @@ class DocumentReviewWorkspaceSession:
             viewer_selection_consumed=True,
         )
 
+    def select_all_text(self, *, page_index: int) -> DocumentReviewWorkspaceTransition:
+        """Select all extractable text on the supplied current viewer page."""
+
+        self._text_selection_state = self._document_text_selection_session.select_all(
+            page_index=page_index,
+        )
+        self._document_text_display_source = "selection"
+        selection = self._text_selection_state.selection
+        effects = DocumentReviewWorkspaceViewerEffects(clear_highlights=selection is None)
+        if selection is not None:
+            effects = DocumentReviewWorkspaceViewerEffects(
+                highlight_page_index=selection.page_index,
+                highlight_rects=selection.highlight_rects,
+            )
+        return DocumentReviewWorkspaceTransition(
+            state=self._build_state(),
+            effects=effects,
+        )
+
     def clear_selected_text(self) -> DocumentReviewWorkspaceTransition:
         self._text_selection_state = self._document_text_selection_session.clear()
         if self._document_text_display_source != "search":

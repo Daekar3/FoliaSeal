@@ -43,6 +43,14 @@ class _Shell:
         self.calls.append(("set_viewer_interaction_mode", mode))
         return mode
 
+    def can_select_all_document_text(self):
+        self.calls.append("can_select_all")
+        return True
+
+    def select_all_document_text(self):
+        self.calls.append("select_all")
+        return "selection-state"
+
     def can_place_signature_placement(self):
         self.calls.append("can_place")
         return True
@@ -122,6 +130,8 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
     assert session.snapshot() is shell.snapshot_value
     assert session.submit_sign_request() == "request"
     assert session.set_viewer_interaction_mode("signature") == "signature"
+    assert session.can_select_all_document_text() is True
+    assert session.select_all_document_text() == "selection-state"
     assert session.can_place_signature_placement() is True
     assert session.can_adjust_signature_placement() is True
     assert session.can_remove_signature_placement() is True
@@ -148,6 +158,8 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
         "snapshot",
         "submit_sign_request",
         "set_viewer_interaction_mode",
+        "can_select_all",
+        "select_all",
         "can_place",
         "can_adjust",
         "can_remove",

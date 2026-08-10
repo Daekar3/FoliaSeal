@@ -1082,16 +1082,27 @@ class FoliaSealAppFrame:
             if workspace is None:
                 undo_enabled = False
                 redo_enabled = False
+                select_all_enabled = False
             else:
                 session = workspace.session
                 undo_getter = getattr(session, "can_undo_placement", None)
                 redo_getter = getattr(session, "can_redo_placement", None)
                 undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
                 redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+                select_all_getter = getattr(session, "can_select_all_document_text", None)
+                select_all_enabled = (
+                    bool(select_all_getter()) if callable(select_all_getter) else False
+                )
+                copy_getter = getattr(session, "can_copy_selected_document_text", None)
+                copy_enabled = (
+                    bool(copy_getter())
+                    if callable(copy_getter)
+                    else self._workspace_action_state.copy_selected_text_enabled
+                )
+            if workspace is None:
+                copy_enabled = self._workspace_action_state.copy_selected_text_enabled
             cut_enabled = False
             paste_enabled = False
-            select_all_enabled = False
-            copy_enabled = self._workspace_action_state.copy_selected_text_enabled
         state = replace(
             self._workspace_action_state,
             undo_placement_enabled=undo_enabled,
@@ -1177,7 +1188,12 @@ class FoliaSealAppFrame:
     def _select_all_edit(self) -> Any | None:
         editor = self._focused_text_editor()
         select_all = getattr(editor, "selectAll", None) if editor is not None else None
-        result = select_all() if callable(select_all) else None
+        if callable(select_all):
+            result = select_all()
+        else:
+            result = self._with_current_session_port(
+                lambda session: session.select_all_document_text()
+            )
         self._sync_edit_history_actions()
         return result
 

@@ -231,6 +231,7 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
             self.redo_available = False
             self.undo_calls = 0
             self.redo_calls = 0
+            self.select_all_calls = 0
             self.container = self
 
         def has_unsaved_changes(self) -> bool:
@@ -268,6 +269,13 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
 
         def document_text_selection_mode_enabled(self) -> bool:
             return False
+
+        def can_select_all_document_text(self) -> bool:
+            return True
+
+        def select_all_document_text(self):
+            self.select_all_calls += 1
+            return None
 
         def can_copy_selected_document_text(self) -> bool:
             return False
@@ -409,6 +417,7 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     forward_action = actions[AppFrameCommandId.FORWARD]
     undo_action = actions[AppFrameCommandId.UNDO]
     redo_action = actions[AppFrameCommandId.REDO]
+    select_all_action = actions[AppFrameCommandId.SELECT_ALL]
     place_action = actions[AppFrameCommandId.PLACE_SIGNATURE]
     adjust_action = actions[AppFrameCommandId.ADJUST_PLACEMENT]
     remove_action = actions[AppFrameCommandId.REMOVE_PLACEMENT]
@@ -416,6 +425,7 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     assert forward_action.isEnabled() is False
     assert undo_action.isEnabled() is False
     assert redo_action.isEnabled() is False
+    assert select_all_action.isEnabled() is True
     assert place_action.isEnabled() is True
     assert adjust_action.isEnabled() is False
     assert remove_action.isEnabled() is False
@@ -438,6 +448,10 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     assert shell.redo_calls == 1
     assert undo_action.isEnabled() is True
     assert redo_action.isEnabled() is False
+
+    select_all_action.trigger()
+    QTest.keyClick(frame.window, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+    assert shell.select_all_calls == 2
 
     editor = QLineEdit(frame.window)
     editor.show()

@@ -493,6 +493,12 @@ class SigningWorkspaceWidget:
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self._runtime.set_document_text_selection_mode(enabled)
 
+    def can_select_all_document_text(self) -> bool:
+        return self._runtime.can_select_all_document_text()
+
+    def select_all_document_text(self) -> DocumentTextSelectionState:
+        return self._runtime.select_all_document_text()
+
     def set_viewer_interaction_mode(self, mode: str) -> str:
         return self._runtime.set_viewer_interaction_mode(mode)
 

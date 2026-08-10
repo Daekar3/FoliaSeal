@@ -725,6 +725,8 @@ class _FakeShell:
         self.document_text_selection_mode = False
         self.can_copy_selected_text = False
         self.copy_selected_document_text_calls = 0
+        self.can_select_all_document_text_value = True
+        self.select_all_document_text_calls = 0
         self.focus_document_search_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
         self.testing_adapter = object()
@@ -826,6 +828,13 @@ class _FakeShell:
 
     def document_text_selection_mode_enabled(self) -> bool:
         return self.document_text_selection_mode
+
+    def can_select_all_document_text(self) -> bool:
+        return self.can_select_all_document_text_value
+
+    def select_all_document_text(self):
+        self.select_all_document_text_calls += 1
+        return "selection-state"
 
     def can_copy_selected_document_text(self) -> bool:
         return self.can_copy_selected_text
@@ -1870,6 +1879,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     save_as_action = frame.window.menu_bar.menus[0].actions[2]
     close_action = frame.window.menu_bar.menus[0].actions[3]
     copy_selection_action = frame.window.menu_bar.menus[1].actions[3]
+    select_all_action = frame.window.menu_bar.menus[1].actions[5]
     text_selection_action = frame.window.menu_bar.menus[2].actions[4]
 
     assert save_action.enabled is False
@@ -1878,6 +1888,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert text_selection_action.enabled is False
     assert text_selection_action.checked is False
     assert copy_selection_action.enabled is False
+    assert select_all_action.enabled is False
     assert frame.workspace_action_state.workspace_open is False
 
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
@@ -1888,6 +1899,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert text_selection_action.enabled is True
     assert text_selection_action.checked is False
     assert copy_selection_action.enabled is False
+    assert select_all_action.enabled is True
     assert frame.workspace_action_state.workspace_open is True
 
     save_as_action.trigger()
@@ -1895,10 +1907,12 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     shell.can_copy_selected_text = True
     frame._handle_status_change("document_text_selection_changed")
     copy_selection_action.trigger()
+    select_all_action.trigger()
 
     assert shell.choose_output_pdf_path_calls == 1
     assert shell.set_document_text_selection_mode_calls == [True]
     assert shell.copy_selected_document_text_calls == 1
+    assert shell.select_all_document_text_calls == 1
     assert text_selection_action.checked is True
     assert frame.workspace_action_state.text_selection_checked is True
     assert frame.workspace_action_state.copy_selected_text_enabled is True

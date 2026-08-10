@@ -43,6 +43,7 @@ class _FakeDocumentTextSelectionEngine:
     def __init__(self, selection: DocumentTextSelection | None) -> None:
         self._selection = selection
         self.calls: list[tuple[str, int, PdfRect]] = []
+        self.select_all_calls: list[tuple[str, int]] = []
 
     def select(
         self,
@@ -52,6 +53,15 @@ class _FakeDocumentTextSelectionEngine:
         selection_rect: PdfRect,
     ) -> DocumentTextSelection | None:
         self.calls.append((input_pdf_path, page_index, selection_rect))
+        return self._selection
+
+    def select_all(
+        self,
+        input_pdf_path: str,
+        *,
+        page_index: int,
+    ) -> DocumentTextSelection | None:
+        self.select_all_calls.append((input_pdf_path, page_index))
         return self._selection
 
 
@@ -384,3 +394,42 @@ def test_workspace_consumes_viewer_selection_in_text_mode_and_emits_highlights()
     assert transition.state.document_text.status_text == "Selected text on page 1."
     assert transition.effects.highlight_page_index == 0
     assert transition.effects.highlight_rects == selection.highlight_rects
+
+
+def test_workspace_select_all_text_uses_current_page_and_preserves_search_highlights() -> None:
+    selection = DocumentTextSelection(
+        page_index=1,
+        text="Alice Example on page two",
+        highlight_rects=(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0),),
+    )
+    session = _session(
+        summary=DocumentReviewSummary(
+            headline="No signatures found",
+            detail="This PDF does not currently contain embedded signatures.",
+            signature_count=0,
+        ),
+        matches_by_query={
+            "Alice": (
+                DocumentTextMatch(
+                    page_index=1,
+                    start_index=0,
+                    end_index=5,
+                    text="Alice",
+                    context="Alice Example on page two",
+                    highlight_rects=(PdfRect(x1=40.0, y1=20.0, x2=60.0, y2=26.0),),
+                ),
+            )
+        },
+        selection=selection,
+    )
+
+    session.load()
+    session.search_text("Alice")
+    transition = session.select_all_text(page_index=1)
+
+    assert transition.state.document_text.display_source == "selection"
+    assert transition.state.document_text.selection_state.selection == selection
+    assert transition.state.document_text.selection_state.can_copy is True
+    assert transition.effects.highlight_page_index == 1
+    assert transition.effects.highlight_rects == selection.highlight_rects
+    assert transition.effects.clear_search_highlights is False

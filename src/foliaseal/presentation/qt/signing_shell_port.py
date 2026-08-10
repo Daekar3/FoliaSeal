@@ -13,6 +13,7 @@ from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.document_review_workspace import DocumentReviewWorkspaceState
 from foliaseal.application.document_safety import LinkDecision
+from foliaseal.application.document_text_selection import DocumentTextSelectionState
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
@@ -151,6 +152,8 @@ class SigningWorkspaceSessionPort(Protocol):
     def fit_page_view(self) -> None: ...
     def fit_width_view(self) -> None: ...
     def focus_document_search(self) -> None: ...
+    def can_select_all_document_text(self) -> bool: ...
+    def select_all_document_text(self) -> DocumentTextSelectionState: ...
     def focus(self) -> None: ...
 
 
@@ -403,6 +406,16 @@ class QtSigningWorkspaceSessionPort:
 
     def focus_document_search(self) -> None:
         self.shell_widget.focus_document_search()
+
+    def can_select_all_document_text(self) -> bool:
+        capability = getattr(self.shell_widget, "can_select_all_document_text", None)
+        return bool(capability()) if callable(capability) else False
+
+    def select_all_document_text(self) -> DocumentTextSelectionState:
+        selector = getattr(self.shell_widget, "select_all_document_text", None)
+        if not callable(selector):
+            raise RuntimeError("The active shell does not expose viewer Select All.")
+        return selector()
 
     def focus(self) -> None:
         self.shell_widget.setFocus()
