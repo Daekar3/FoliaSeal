@@ -1700,7 +1700,7 @@ class FoliaSealAppFrame:
 
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
-        file_menu = menu_bar.addMenu("File")
+        file_menu = menu_bar.addMenu("&File")
         self._open_action = self._command_action(
             file_menu,
             AppFrameCommandId.OPEN,
@@ -1729,7 +1729,7 @@ class FoliaSealAppFrame:
             AppFrameCommandId.EXIT,
             self._exit_application,
         )
-        edit_menu = menu_bar.addMenu("Edit")
+        edit_menu = menu_bar.addMenu("&Edit")
         self._undo_action = self._command_action(
             edit_menu,
             AppFrameCommandId.UNDO,
@@ -1767,7 +1767,7 @@ class FoliaSealAppFrame:
             self._select_all_edit,
             enabled=False,
         )
-        view_menu = menu_bar.addMenu("View")
+        view_menu = menu_bar.addMenu("&View")
         self._previous_page_action = self._command_action(
             view_menu,
             AppFrameCommandId.PREVIOUS_PAGE,
@@ -1842,7 +1842,7 @@ class FoliaSealAppFrame:
             self.show_document_signatures,
             enabled=False,
         )
-        signing_menu = menu_bar.addMenu("Signing")
+        signing_menu = menu_bar.addMenu("S&igning")
         self._signature_library_action = self._command_action(
             signing_menu,
             AppFrameCommandId.SIGNATURE_LIBRARY,
@@ -1872,7 +1872,7 @@ class FoliaSealAppFrame:
             self._save_document,
             enabled=False,
         )
-        settings_menu = menu_bar.addMenu("Settings")
+        settings_menu = menu_bar.addMenu("Se&ttings")
         self._command_action(
             settings_menu,
             AppFrameCommandId.APPLICATION_SETTINGS,
@@ -1898,7 +1898,7 @@ class FoliaSealAppFrame:
             AppFrameCommandId.MANAGE_CERTIFICATE_CONFIGURATIONS,
             self.show_certificate_management,
         )
-        help_menu = menu_bar.addMenu("Help")
+        help_menu = menu_bar.addMenu("&Help")
         self._command_action(
             help_menu,
             AppFrameCommandId.HELP,

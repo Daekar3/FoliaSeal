@@ -60,9 +60,11 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     }
 
     file_menu = next(
-        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "File"
+        menu
+        for menu in frame.window.menuBar().findChildren(QMenu)
+        if menu.title().replace("&", "") == "File"
     )
-    assert file_menu.title() == "File"
+    assert file_menu.title() == "&File"
     file_actions = file_menu.actions()
     assert [action.text() for action in file_actions] == [
         "&Open",
@@ -88,7 +90,9 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     assert [action.isEnabled() for action in file_actions] == [True, False, False, False, True]
 
     edit_menu = next(
-        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Edit"
+        menu
+        for menu in frame.window.menuBar().findChildren(QMenu)
+        if menu.title().replace("&", "") == "Edit"
     )
     assert [action.text() for action in edit_menu.actions()] == [
         definition.mnemonic_text for definition in EDIT_COMMAND_DEFINITIONS
@@ -101,7 +105,9 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     ]
 
     view_menu = next(
-        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "View"
+        menu
+        for menu in frame.window.menuBar().findChildren(QMenu)
+        if menu.title().replace("&", "") == "View"
     )
     assert [action.text() for action in view_menu.actions()] == [
         definition.mnemonic_text for definition in VIEW_COMMAND_DEFINITIONS
@@ -143,7 +149,9 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     ]
 
     signing_menu = next(
-        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Signing"
+        menu
+        for menu in frame.window.menuBar().findChildren(QMenu)
+        if menu.title().replace("&", "") == "Signing"
     )
     assert [action.text() for action in signing_menu.actions()] == [
         definition.mnemonic_text for definition in SIGNING_COMMAND_DEFINITIONS
@@ -160,7 +168,9 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     ]
 
     settings_menu = next(
-        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Settings"
+        menu
+        for menu in frame.window.menuBar().findChildren(QMenu)
+        if menu.title().replace("&", "") == "Settings"
     )
     assert [action.text() for action in settings_menu.actions()] == [
         definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS

@@ -60,7 +60,7 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Help child completed with `72` focused passes and full-suite evidence of
   `1465 passed, 20 skipped, 1 warning`; this plan retains ownership of diagnostics, accessibility,
   installed-package, and final release acceptance.
-- [x] (2026-08-10) Accessibility child completed its focused real-Qt/offscreen contract with `60`
+- [x] (2026-08-10) Accessibility child completed its focused real-Qt/offscreen contract with `64`
   passes, including explicit no-document accessible names and corrected typed View mnemonics;
   display-backed accessibility, installed-package, diagnostics, and final release acceptance remain
   open under this plan.

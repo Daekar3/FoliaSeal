@@ -39,16 +39,24 @@ as environment-dependent rather than being falsely claimed by headless tests.
   and the prior support slice is committed.
 - [x] (2026-08-10) Added and passed the red/green real-Qt acceptance test for keyboard, names/roles,
   support surfaces, settings, minimum size, and Unicode path handling.
-- [x] Fix only concrete accessibility defects exposed by those tests: explicit no-document Open/
-  Library accessible names and unique typed View mnemonics.
+- [x] (2026-08-10) Fixed the concrete accessibility defects exposed by those tests: explicit
+  no-document Open/Library accessible names and unique typed View mnemonics.
 - [x] (2026-08-10) Ran the real-Qt acceptance and AppFrame regression checks, full suite, Ruff,
   pip check, diff check, and bounded GUI audit; the focused result is `60 passed` and the full
   suite is `1469 passed, 20 skipped, 1 warning`. The bounded GUI attempt returned `gui_rc=1` at
   the isolated `SingleInstanceUnavailable` endpoint, removed its owned root, and left no matching
   process.
-- [ ] Complete display-backed screen-reader, high-contrast, physical DPI/monitor, installed-package,
-  and final release evidence in the owning release plan.
-- [ ] Commit the complete slice and record the display-backed evidence limitation.
+- [x] (2026-08-10) Compliance review found missing top-level menu mnemonics, unasserted shortcut/
+  disabled-state metadata, an unexercised diagnostic-folder action, and private test cleanup seams.
+  Added unique top-level mnemonics, expanded real-Qt assertions, stubbed the launcher at the Qt
+  boundary, and switched Settings/cleanup to public frame APIs; the focused follow-up is `64 passed`.
+- [x] (2026-08-10) Reran the full suite and bounded GUI audit after the compliance follow-up. Ruff,
+  pip check, and diff checks are clean; the full suite is `1469 passed, 20 skipped, 1 warning`.
+  The bounded GUI attempt returned `gui_rc=1` at the isolated `SingleInstanceUnavailable` endpoint,
+  removed its owned root, and left no matching process. Display-backed screen-reader,
+  high-contrast, physical DPI/monitor, installed-package, and final release evidence remain in the
+  owning release plan.
+- [ ] Commit the compliance correction and record the display-backed evidence limitation.
 
 ## Surprises & Discoveries
 
@@ -63,6 +71,12 @@ as environment-dependent rather than being falsely claimed by headless tests.
 - Observation: an offscreen Qt process still cannot prove physical screen-reader, high-contrast,
   or multi-monitor behavior. Evidence must label those as display-backed observations and keep the
   bounded offscreen test separate.
+- Observation: the first acceptance pass checked action mnemonics but not top-level menu mnemonics,
+  shortcut strings, disabled state, or the diagnostic-folder action. Evidence: the compliance review
+  compared `tests/integration/test_accessibility_acceptance.py` with UI_SPEC sections 7 and 13.
+- Observation: invoking the real `QDesktopServices.openUrl` can block under the offscreen platform.
+  Evidence: the diagnostic-folder acceptance timed out at `QPlatformServices::openDocument`; the
+  follow-up stubs that Qt boundary while still asserting FoliaSeal creates the owned log directory.
 
 ## Decision Log
 
@@ -85,6 +99,17 @@ as environment-dependent rather than being falsely claimed by headless tests.
   Rationale: the local bounded launch can stop at `SingleInstanceUnavailable` before a window is
   created, and offscreen Qt cannot represent a real assistive-technology environment.
   Date/Author: 2026-08-10 / Codex.
+- Decision: assign unique top-level menu mnemonics as `&File`, `&Edit`, `&View`, `S&igning`,
+  `Se&ttings`, and `&Help`, while preserving each menu's stable command metadata.
+  Rationale: UI_SPEC requires unique Alt-menu entry even though Signing and Settings share an initial
+  letter; these letters are unique and preserve the visible menu words.
+  Date/Author: 2026-08-10 / Codex.
+- Decision: keep the acceptance test on public frame methods and typed command snapshots; use a
+  temporary stub only at the `QDesktopServices.openUrl` boundary and never reach into `_bindings` or
+  `_support_dialogs` for behavior or cleanup.
+  Rationale: the test verifies the production contract rather than private object layout, while the
+  external desktop service is explicitly an environment boundary.
+  Date/Author: 2026-08-10 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -92,9 +117,11 @@ The bounded slice is implemented. The real-Qt offscreen acceptance verifies 1100
 geometry, no-document Open/Library names, typed File/Edit/View/Signing/Settings/Help action order,
 tooltips, shortcuts, disabled state, and unique mnemonics (including the corrected View entries),
 F1 Help, modeless support dialogs, Settings Restore defaults, and Unicode XDG path display. The
-production corrections are explicit accessible names for the no-document buttons and distinct
-mnemonics for `Fit Page`, `Find`, and `Document Signatures`. Focused acceptance plus AppFrame
-regression validation is `60 passed`; the full suite is `1469 passed, 20 skipped, 1 warning`. A display-backed screen-reader/high-contrast/DPI/monitor run,
+production corrections are explicit accessible names for the no-document buttons, distinct
+mnemonics for `Fit Page`, `Find`, and `Document Signatures`, and unique top-level menu accelerators.
+The compliance follow-up also asserts shortcuts, disabled state, and diagnostic-folder routing while
+keeping tests on public frame APIs. Focused acceptance plus AppFrame regression validation is now
+`64 passed`; the full suite is `1469 passed, 20 skipped, 1 warning`. A display-backed screen-reader/high-contrast/DPI/monitor run,
 installed-package checks, and the final release matrix remain outstanding and must not be inferred
 from offscreen success.
 
@@ -234,3 +261,8 @@ Revision note: 2026-08-10 / Codex
 Updated after the real-Qt acceptance pass to record the explicit accessible-name and unique-mnemonic
 corrections, `60` focused passes, full-suite result, bounded GUI cleanup, and remaining display-backed
 and package evidence gates.
+
+Revision note: 2026-08-10 / Codex
+Updated after compliance review to add top-level menu mnemonics, shortcut/disabled-state assertions,
+diagnostic-folder routing coverage, and public-API-only test cleanup; the follow-up focused set is
+`64 passed` and requires a fresh full-suite validation before commit.

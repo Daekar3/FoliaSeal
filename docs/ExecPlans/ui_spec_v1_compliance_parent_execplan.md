@@ -231,7 +231,7 @@ Release tranche:
 - [x] (2026-08-10) Added the bounded real-Qt accessibility acceptance child: offscreen evidence now
   covers no-document accessible names, unique typed View mnemonics, menu metadata/disabled state,
   F1 Help, modeless support dialogs, Settings Restore defaults, minimum geometry, and Unicode XDG
-  paths (`60 passed` with focused AppFrame regressions). Screen-reader, high-contrast, physical
+  paths (`64 passed` with focused AppFrame regressions). Screen-reader, high-contrast, physical
   DPI/monitor, package-install, and final release evidence remain display/environment gates.
 - [x] (2026-08-10) Completed the supported Signing command increment: Signature Library is available
   from a no-document frame, while Sign and save is routed through public session readiness and

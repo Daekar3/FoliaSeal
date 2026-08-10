@@ -1722,12 +1722,12 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     )
 
     assert [menu.title for menu in frame.window.menu_bar.menus] == [
-        "File",
-        "Edit",
-        "View",
-        "Signing",
-        "Settings",
-        "Help",
+        "&File",
+        "&Edit",
+        "&View",
+        "S&igning",
+        "Se&ttings",
+        "&Help",
     ]
     assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
         "&Open",
