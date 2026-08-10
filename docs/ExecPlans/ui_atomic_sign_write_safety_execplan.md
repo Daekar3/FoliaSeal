@@ -14,15 +14,26 @@ Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
+- [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md — the existing action bridge
+  already prompts before a ready request and confirms an existing destination, but the full
+  confirmation-summary and source-overwrite policy remains open.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the live composition. `foliaseal gui` passes no executor, so
+  `SigningActionCoordinator.submit()` builds a request and returns without signing; the existing
+  `SignPdfUseCase` writes the destination before verification. Added red acceptance coverage for
+  lazy default-executor construction and verification-before-replacement.
+- [x] (2026-08-10) Implemented the default production executor and staged output transaction.
+- [x] (2026-08-10) Reviewed compatibility/phase3 cruft; retained the historical backend only behind the
+  neutral lazy executor until its separate migration consumers are gone.
+- [x] (2026-08-10) Ran focused, regression, and GUI lifecycle validation; cleaned processes and
+  temporary roots. Focused command reports `72 passed`; full suite reports `1272 passed, 20 skipped,
+  1 warning`; Ruff and `git diff --check` are clean. The bounded launch reports the known
+  `SingleInstanceUnavailable` socket limitation with `launch_rc=1`, then cleanup succeeds.
+- [x] (2026-08-10) Updated this plan, `docs/ARCHITECTURE.md`, and the parent plan; committed the
+  bounded increment. Explicit source overwrite, richer frozen-time confirmation, asynchronous
+  progress/recovery, and package acceptance remain incomplete.
 
 ## Surprises & Discoveries
 
@@ -31,6 +42,10 @@ Qt surface, focused tests, and observable acceptance.
   behavior.
   Evidence: src/foliaseal/presentation/qt/signing_action_coordinator.py:52-107 and the live source
   paths listed below.
+- Observation: the existing action bridge already supplies a confirmation and output-overwrite
+  prompt, so default executor wiring can be delivered independently of the later richer summary
+  dialog. The executor must still reject same-path writes until the explicit source-overwrite policy
+  child changes that contract.
 
 ## Decision Log
 
@@ -40,10 +55,22 @@ Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible atomic signing, overwrite safety, passwords, and restriction checks outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: introduce a neutral lazy executor adapter whose production factory imports the historical
+  backend only on first sign, and stage/verify output before replacement while retaining the existing
+  same-input/output rejection.
+  Rationale: the GUI becomes usable without loading heavy signing dependencies at frame construction;
+  verification failures cannot replace an existing destination, and the separate source-overwrite
+  policy remains explicit rather than being silently broadened.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. Record demonstrated behavior, evidence, and remaining gaps at completion.
+The default GUI composition now supplies `LazySigningRequestExecutor`, so a ready request no longer
+silently returns without execution. `SignPdfUseCase` writes to a sibling `.tmp`, verifies that path,
+and atomically replaces the requested destination only after verification; all failure paths remove
+the temporary file and preserve an existing destination. The plan remains open for explicit
+same-source overwrite, richer frozen-time confirmation contents, asynchronous progress/recovery,
+and installed-package acceptance.
 
 ## Context and Orientation
 
@@ -93,7 +120,8 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e 'overwrite|temporary|verify|password|restriction' src/foliaseal/application/sign_pdf_use_case.py src/foliaseal/application/signing_completion.py src/foliaseal/application/output_path_policy.py src/foliaseal/application/pdf_compatibility.py
-    .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_signing_completion.py tests/unit/test_output_path_policy.py tests/unit/test_pdf_compatibility.py
+    .venv/bin/pytest -q tests/unit/test_sign_pdf_use_case.py tests/unit/test_signing_executor.py tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py
+    # 72 passed
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -129,8 +157,18 @@ artifact with recovery actions.
 
 ## Evidence Record
 
-Before completion, record the exact password/overwrite/recovery test command and result, the GUI
-input sequence and observed confirmation/error state, the evidence path, byte-preservation and
+Current evidence for the bounded increment: the new lazy-executor and staged-output tests were red
+before implementation and the focused command now reports `72 passed`; the complete suite reports
+`1272 passed, 20 skipped, 1 warning` in 47.96 seconds; Ruff and `git diff --check` pass. The
+verification-failure test proves an existing destination remains byte-for-byte unchanged and no
+`.output.pdf.*.tmp` remains. The fake Qt frame test proves the default executor is present without
+injecting a harness executor. The bounded GUI launch exits `1` with the known isolated
+`SingleInstanceUnavailable` socket limitation, then its temporary root is removed and no matching
+FoliaSeal/PySide6/pytest process remains. No SVG was added because this increment adds no new
+topology. Full password/source-overwrite/recovery evidence remains required before this plan closes.
+
+Before final completion, record the exact password/overwrite/recovery test command and result, the
+GUI input sequence and observed confirmation/error state, the evidence path, byte-preservation and
 cleanup results, and compatibility grep proof.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
@@ -159,3 +197,8 @@ text, Reason, Location, or private keys.
 
 Revision note: 2026-08-09 / Codex
 Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+
+Revision note: 2026-08-10 / Codex
+Completed the default GUI executor and verification-before-replacement increment. The plan stays
+open for explicit source overwrite, richer confirmation, asynchronous recovery, and release/package
+acceptance.

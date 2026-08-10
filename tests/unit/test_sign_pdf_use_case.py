@@ -1,4 +1,4 @@
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
@@ -65,6 +65,7 @@ class StubSigner:
 class StubVerifier:
     summary: VerificationSummary
     last_trust_policy: TimestampTrustPolicy | None = None
+    verified_paths: list[str] = field(default_factory=list)
 
     def verify(
         self,
@@ -73,6 +74,7 @@ class StubVerifier:
         trust_policy: TimestampTrustPolicy | None = None,
     ) -> VerificationSummary:
         self.last_trust_policy = trust_policy
+        self.verified_paths.append(output_pdf_path)
         return self.summary
 
 
@@ -156,6 +158,9 @@ def test_sign_use_case_success_returns_standards_fields(tmp_path: Path) -> None:
     assert result.revision_strategy == RevisionStrategy.INCREMENTAL
     assert result.standards_summary is not None
     assert (tmp_path / "output.pdf").read_bytes() == b"signed-pdf"
+    assert use_case.verifier.verified_paths
+    assert Path(use_case.verifier.verified_paths[0]) != tmp_path / "output.pdf"
+    assert not list(tmp_path.glob(".output.pdf.*.tmp"))
     assert use_case.signer.called is True
     assert isinstance(use_case.signer.last_request, SigningBackendRequest)
     assert use_case.signer.last_request.signature_appearance is not None
@@ -742,3 +747,31 @@ def test_sign_use_case_maps_oserror_during_atomic_write(
 
     assert result.success is False
     assert result.failure_code == FailureCode.ATOMIC_WRITE_FAILED
+
+
+def test_sign_use_case_preserves_existing_destination_when_verification_fails(
+    tmp_path: Path,
+) -> None:
+    request = _request(tmp_path)
+    destination = Path(request.output_pdf_path)
+    destination.write_bytes(b"previous-output")
+    use_case = SignPdfUseCase(
+        inspector=StubInspector(),
+        certificate_loader=StubCertificateLoader(),
+        signer=StubSigner(
+            output=SigningOutput(
+                output_bytes=b"unverified-output",
+                output_pdf_version="1.7",
+                signature_subfilter="adbe.pkcs7.detached",
+                timestamp_present=True,
+            )
+        ),
+        verifier=RaisingVerifier(error=ValueError("verification failed")),
+    )
+
+    result = use_case.execute(request)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.PDF_SIGNING_FAILED
+    assert destination.read_bytes() == b"previous-output"
+    assert not list(tmp_path.glob(".output.pdf.*.tmp"))

@@ -107,6 +107,10 @@ _EXPORT_MODULES = {
     **dict.fromkeys(("PreparedTextBox", "SignatureTextBoxEngine"), "signature_text_measurement"),
     "format_signing_completion_message": "signing_completion",
     **dict.fromkeys(
+        ("LazySigningRequestExecutor", "build_default_signing_executor"),
+        "signing_executor",
+    ),
+    **dict.fromkeys(
         (
             "SignaturePlacementContext",
             "SigningDraftPreview",

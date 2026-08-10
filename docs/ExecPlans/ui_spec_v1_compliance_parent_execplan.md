@@ -183,6 +183,11 @@ Release tranche:
   as unknown; Library sorting honors expiration within the existing configured/pinned partitions;
   the Qt choice uses the existing `expiration_soonest` AppSettings value. Focused `74 passed`, full
   `1269 passed, 20 skipped`, Ruff/diff clean, and bounded launch cleanup are recorded in the child.
+- [x] (2026-08-10) Added the first safe-signing increment: the production GUI now receives a
+  neutral lazy executor instead of silently returning an unexecuted request, and the signing use
+  case verifies sibling staged output before replacement. Richer confirmation summary, explicit
+  source overwrite, asynchronous progress/recovery, and package acceptance remain open in the
+  signing children.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

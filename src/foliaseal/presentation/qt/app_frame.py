@@ -15,6 +15,7 @@ from foliaseal.application import (
     PlacementEditorState,
     ReusableSigningObjects,
     SigningDraftWorkflow,
+    build_default_signing_executor,
 )
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import ReusableObjectRef, SavePlacement
@@ -359,7 +360,9 @@ class FoliaSealAppFrame:
             self._preset_catalog_store,
             certificate_configuration_exists=self._certificate_configuration_exists,
         )
-        self._sign_executor = sign_executor
+        self._sign_executor = (
+            sign_executor if sign_executor is not None else build_default_signing_executor()
+        )
         self._shell_factory = shell_factory or QtSigningWorkspaceFactory()
         self._render_backend_factory = render_backend_factory
         self._on_sign_request = on_sign_request

@@ -205,6 +205,7 @@ class SignPdfUseCase:
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""
+        staged_output_path: Path | None = None
         try:
             if self._paths_conflict(request.input_pdf_path, request.output_pdf_path):
                 return SigningResult(
@@ -257,9 +258,12 @@ class SignPdfUseCase:
                 output_pdf_version=output.output_pdf_version,
             )
 
-            self._write_atomically(request.output_pdf_path, output.output_bytes)
-            verification = self.verifier.verify(
+            staged_output_path = self._write_atomically(
                 request.output_pdf_path,
+                output.output_bytes,
+            )
+            verification = self.verifier.verify(
+                str(staged_output_path),
                 trust_policy=request.trust_policy,
             )
             if request.timestamp_required and not verification.timestamp_present:
@@ -300,6 +304,8 @@ class SignPdfUseCase:
                 signature_subfilter=output.signature_subfilter,
                 timestamp_present=verification.timestamp_present,
             )
+            self._replace_staged(staged_output_path, request.output_pdf_path)
+            staged_output_path = None
             return SigningResult(
                 success=True,
                 failure_code=None,
@@ -391,6 +397,12 @@ class SignPdfUseCase:
                 failure_code=FailureCode.UNEXPECTED_INTERNAL_ERROR,
                 message=str(exc),
             )
+        finally:
+            if staged_output_path is not None and staged_output_path.exists():
+                try:
+                    staged_output_path.unlink()
+                except OSError:
+                    pass
 
     @staticmethod
     def _paths_conflict(input_pdf_path: str, output_pdf_path: str) -> bool:
@@ -403,19 +415,21 @@ class SignPdfUseCase:
         return self.certification_inspector.inspect(input_pdf_path)
 
     @staticmethod
-    def _write_atomically(output_path: str, output_bytes: bytes) -> None:
-        """Write to temp file then atomically replace target path."""
+    def _write_atomically(output_path: str, output_bytes: bytes) -> Path:
+        """Write signed bytes to a sibling temporary path for later verification."""
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        temp_path: Path | None = None
-        try:
-            with NamedTemporaryFile(dir=destination.parent, delete=False) as temp_file:
-                temp_file.write(output_bytes)
-                temp_path = Path(temp_file.name)
-            temp_path.replace(destination)
-        finally:
-            if temp_path and temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except OSError:
-                    pass
+        with NamedTemporaryFile(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_file.write(output_bytes)
+            return Path(temp_file.name)
+
+    @staticmethod
+    def _replace_staged(staged_path: Path, output_path: str) -> None:
+        """Replace the destination only after the staged PDF verifies successfully."""
+
+        staged_path.replace(Path(output_path))

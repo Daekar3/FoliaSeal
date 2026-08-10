@@ -8,6 +8,7 @@ from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
     ReusableSigningObjects,
 )
+from foliaseal.application.signing_executor import LazySigningRequestExecutor
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.schemas import AppSettings
@@ -39,6 +40,18 @@ def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
     defaults = FoliaSealAppFrame.__init__.__kwdefaults__
     assert defaults is not None
     assert defaults["render_backend_factory"] is PopplerPdfRenderBackend
+
+
+def test_app_frame_builds_a_lazy_signing_executor_by_default(tmp_path: Path) -> None:
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    assert isinstance(frame._sign_executor, LazySigningRequestExecutor)  # noqa: SLF001
 
 
 def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
