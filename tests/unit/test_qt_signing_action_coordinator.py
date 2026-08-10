@@ -1,6 +1,10 @@
 from pathlib import Path
 
 from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.signing_readiness import (
+    SigningReadinessInputs,
+    project_signing_readiness,
+)
 from foliaseal.domain.errors import FailureCode
 from foliaseal.domain.models import SigningResult, VerificationSummary
 from foliaseal.presentation.qt.signing_action_coordinator import (
@@ -71,6 +75,22 @@ def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
     return workflow
 
 
+def _readiness(workflow: SigningDraftWorkflow, *, ready: bool, text: str):
+    return lambda: project_signing_readiness(
+        SigningReadinessInputs(
+            selected_preset_name="Approval",
+            has_saved_presets=True,
+            certificate_selected=bool(workflow.certificate_path),
+            certificate_blocking=False,
+            certificate_detail="",
+            certificate_warning=False,
+            placement_present=workflow.signature_rect is not None,
+            validation_text=text,
+            ready_to_sign=ready,
+        )
+    )
+
+
 def test_signing_action_coordinator_load_reports_place_signature_when_draft_is_empty(
     tmp_path: Path,
 ) -> None:
@@ -86,18 +106,17 @@ def test_signing_action_coordinator_load_reports_place_signature_when_draft_is_e
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: False,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=False, text=""),
     )
 
     state = coordinator.load()
 
     assert state.can_sign is False
     assert state.stage_text == "Step 3 of 6 — Place visible signature"
-    assert "Drag on the page to place the visible signature" in state.detail_text
+    assert "Place the visible signature on the page" in state.detail_text
     assert state.last_signing_result is None
     assert state.can_open_signed_output is False
-    assert state.recommended_action is None
+    assert state.recommended_action == "place_signature"
 
 
 def test_signing_action_coordinator_prioritizes_missing_signing_setup(
@@ -113,15 +132,16 @@ def test_signing_action_coordinator_prioritizes_missing_signing_setup(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: False,
-        validation_text=lambda: "Choose a certificate before signing.",
+        readiness=_readiness(
+            workflow, ready=False, text="Choose a certificate before signing."
+        ),
     )
 
     state = coordinator.load()
 
-    assert state.stage_text == "Step 2 of 6 — Choose signing setup"
-    assert "choose or create a certificate" in state.detail_text.lower()
-    assert state.recommended_action is None
+    assert state.stage_text == "Step 2 of 6 — Setup required"
+    assert "choose a certificate" in state.detail_text.lower()
+    assert state.recommended_action == "complete_setup"
 
 
 def test_signing_action_coordinator_accept_output_path_clears_previous_success(
@@ -139,8 +159,7 @@ def test_signing_action_coordinator_accept_output_path_clears_previous_success(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=executor,
         can_open_signed_output=True,
     )
@@ -173,8 +192,7 @@ def test_signing_action_coordinator_invalidate_clears_signed_state(tmp_path: Pat
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=executor,
         can_open_signed_output=True,
     )
@@ -199,8 +217,7 @@ def test_signing_action_coordinator_returns_validation_failure_without_request(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: applied.append(True),
-        is_ready_to_sign=lambda: False,
-        validation_text=lambda: "Selection is incomplete.",
+        readiness=_readiness(workflow, ready=False, text="Selection is incomplete."),
     )
 
     transition = coordinator.submit()
@@ -211,7 +228,7 @@ def test_signing_action_coordinator_returns_validation_failure_without_request(
     assert transition.error_via_emit is True
     assert transition.state.last_signing_result is None
     assert transition.state.stage_text == "Step 4 of 6 — Review readiness"
-    assert transition.state.recommended_action is None
+    assert transition.state.recommended_action == "review_readiness"
 
 
 def test_signing_action_coordinator_success_tracks_signed_state(tmp_path: Path) -> None:
@@ -229,8 +246,7 @@ def test_signing_action_coordinator_success_tracks_signed_state(tmp_path: Path) 
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=executor,
         on_sign_request=requested.append,
         can_open_signed_output=True,
@@ -260,8 +276,7 @@ def test_signing_action_coordinator_success_without_reopen_capability_has_no_rec
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=_FakeSigningExecutor(
             SigningResult(
                 success=True,
@@ -291,8 +306,7 @@ def test_signing_action_coordinator_failure_tracks_error_state(tmp_path: Path) -
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=executor,
         can_open_signed_output=True,
     )
@@ -328,8 +342,7 @@ def test_signing_action_coordinator_exposes_preserved_artifact_recovery_actions(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=executor,
         verify_preserved_artifact=executor.verify_preserved_artifact,
         can_open_preserved_copy=True,
@@ -374,8 +387,7 @@ def test_signing_action_coordinator_keeps_invalid_retry_in_recovery_state(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=executor,
         verify_preserved_artifact=executor.verify_preserved_artifact,
         can_open_preserved_copy=True,
@@ -403,8 +415,7 @@ def test_signing_action_coordinator_rejects_missing_required_timestamp_on_retry(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=_FakeSigningExecutor(result),
         verify_preserved_artifact=lambda _path: _MissingTimestampVerificationSummary(),
         can_open_preserved_copy=True,
@@ -425,8 +436,7 @@ def test_untrusted_recovery_workspace_blocks_signing_until_verified(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         verify_preserved_artifact=executor.verify_preserved_artifact,
         can_open_preserved_copy=False,
         untrusted_recovery=True,
@@ -452,8 +462,7 @@ def test_untrusted_recovery_workspace_blocks_restricted_later_approval(
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         verify_preserved_artifact=lambda _path: _RestrictedVerificationSummary(),
         untrusted_recovery=True,
     )
@@ -471,8 +480,7 @@ def test_recovery_cleanup_hook_releases_preserved_workspace_artifact(tmp_path: P
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         verify_preserved_artifact=lambda _path: _MissingTimestampVerificationSummary(),
         cleanup_preserved_artifact=cleaned.append,
         untrusted_recovery=True,
@@ -490,8 +498,7 @@ def test_signing_action_coordinator_exception_uses_emit_error_path(tmp_path: Pat
     coordinator = SigningActionCoordinator(
         workflow=workflow,
         apply_changes=lambda: None,
-        is_ready_to_sign=lambda: True,
-        validation_text=lambda: "",
+        readiness=_readiness(workflow, ready=True, text=""),
         sign_executor=_FakeSigningExecutor(error=RuntimeError("boom")),
         can_open_signed_output=True,
     )

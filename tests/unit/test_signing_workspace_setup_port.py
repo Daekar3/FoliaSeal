@@ -17,6 +17,7 @@ def test_panel_setup_adapter_forwards_only_typed_setup_capabilities() -> None:
     panel.delete_current_signature_preset.return_value = object()
     panel.apply_changes.return_value = object()
     panel.refresh_preview.return_value = object()
+    panel.readiness.return_value = object()
     adapter = PanelSigningWorkspaceSetupAdapter(panel)
 
     assert isinstance(adapter, SigningWorkspaceSetupPort)
@@ -36,6 +37,7 @@ def test_panel_setup_adapter_forwards_only_typed_setup_capabilities() -> None:
     )
     assert adapter.apply_changes() is panel.apply_changes.return_value
     assert adapter.refresh_preview() is panel.refresh_preview.return_value
+    assert adapter.readiness() is panel.readiness.return_value
     adapter.set_signature_rect(None, notify=False)
     adapter.set_signature_appearance(None)
     adapter.open_refinement_dialog()

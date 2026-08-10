@@ -8,6 +8,11 @@ from typing import Literal
 
 from foliaseal.application import format_signing_completion_message
 from foliaseal.application.signing_draft_workflow import SigningDraftWorkflow
+from foliaseal.application.signing_readiness import (
+    SigningReadiness,
+    SigningReadinessAction,
+    SigningReadinessStage,
+)
 from foliaseal.domain.models import SigningRequest, SigningResult
 
 SigningRequestExecutor = object
@@ -18,7 +23,7 @@ RecommendedAction = Literal[
     "verify_again",
     "return_to_draft",
     "open_preserved_copy",
-]
+] | SigningReadinessAction
 
 
 @dataclass(frozen=True)
@@ -58,8 +63,7 @@ class SigningActionCoordinator:
         *,
         workflow: SigningDraftWorkflow,
         apply_changes: Callable[[], None],
-        is_ready_to_sign: Callable[[], bool],
-        validation_text: Callable[[], str],
+        readiness: Callable[[], SigningReadiness],
         sign_executor: object | None = None,
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         can_open_signed_output: bool = False,
@@ -70,8 +74,7 @@ class SigningActionCoordinator:
     ) -> None:
         self._workflow = workflow
         self._apply_changes = apply_changes
-        self._is_ready_to_sign = is_ready_to_sign
-        self._validation_text = validation_text
+        self._readiness = readiness
         self._sign_executor = sign_executor
         self._on_sign_request = on_sign_request
         self._can_open_signed_output = can_open_signed_output
@@ -117,12 +120,13 @@ class SigningActionCoordinator:
 
     def submit(self) -> SigningActionTransition:
         self._apply_changes()
-        if not self._is_ready_to_sign():
+        readiness = self._readiness()
+        if not readiness.can_sign:
             self._clear_previous_signing_result()
             return SigningActionTransition(
                 request=None,
                 state=self._build_state(),
-                error_message=self._validation_text(),
+                error_message=readiness.detail,
                 error_via_emit=True,
             )
 
@@ -297,7 +301,8 @@ class SigningActionCoordinator:
         return self._last_signing_result.preserved_artifact_path
 
     def _build_state(self) -> SigningActionState:
-        can_sign = self._is_ready_to_sign() and (
+        readiness = self._readiness()
+        can_sign = readiness.can_sign and (
             not self._untrusted_recovery
             or (self._preserved_artifact_verified and self._recovery_permission_allows)
         )
@@ -327,25 +332,9 @@ class SigningActionCoordinator:
                 "Confirm the output path and review the on-page preview, then use Confirm and sign "
                 "to review the final signing summary."
             )
-        elif not self._has_signing_setup():
-            stage_text = "Step 2 of 6 — Choose signing setup"
-            detail_text = (
-                "Choose or create a certificate and signing setup in the sidebar before "
-                "placing the visible signature."
-            )
-        elif self._workflow.signature_rect is None:
-            stage_text = "Step 3 of 6 — Place visible signature"
-            detail_text = (
-                "Placement mode is active — Drag on the page to place the visible "
-                "signature, or enter placement values."
-            )
         else:
-            stage_text = "Step 4 of 6 — Review readiness"
-            validation_text = self._validation_text().strip()
-            if validation_text:
-                detail_text = validation_text
-            else:
-                detail_text = "Review the on-page preview and resolve any readiness warnings."
+            stage_text = _readiness_stage_text(readiness.stage)
+            detail_text = readiness.detail
 
         return SigningActionState(
             can_sign=can_sign,
@@ -364,36 +353,51 @@ class SigningActionCoordinator:
             ),
             can_return_to_draft=has_recovery_artifact,
             can_open_preserved_copy=(has_recovery_artifact and self._can_open_preserved_copy),
-            recommended_action=(
-                "open_signed_output"
-                if has_successful_output and self._can_open_signed_output
-                else "verify_again"
-                if (
-                    has_recovery_artifact
-                    and not self._preserved_artifact_verified
-                    and self._verify_preserved_artifact is not None
-                )
-                else "open_preserved_copy"
-                if has_recovery_artifact and self._can_open_preserved_copy
-                else "sign"
-                if can_sign
-                and (
-                    self._last_signing_result is None
-                    or not self._last_signing_result.success
-                )
-                else "return_to_draft"
-                if has_recovery_artifact
-                else "sign"
-                if can_sign
-                and (
-                    self._last_signing_result is None
-                    or not self._last_signing_result.success
-                )
-                else None
+            recommended_action=_recommended_action(
+                readiness=readiness,
+                can_sign=can_sign,
+                has_successful_output=has_successful_output,
+                has_recovery_artifact=has_recovery_artifact,
+                preserved_artifact_verified=self._preserved_artifact_verified,
+                can_open_signed_output=self._can_open_signed_output,
+                can_open_preserved_copy=self._can_open_preserved_copy,
+                can_verify_again=self._verify_preserved_artifact is not None,
             ),
         )
 
-    def _has_signing_setup(self) -> bool:
-        """Return whether the draft has the minimum material needed for signing."""
 
-        return bool(self._workflow.certificate_path and self._workflow.passphrase)
+def _readiness_stage_text(stage: SigningReadinessStage) -> str:
+    labels = {
+        SigningReadinessStage.SELECT_PRESET: "Step 2 of 6 — Select a signature preset",
+        SigningReadinessStage.SETUP_REQUIRED: "Step 2 of 6 — Setup required",
+        SigningReadinessStage.PLACE_SIGNATURE: "Step 3 of 6 — Place visible signature",
+        SigningReadinessStage.REVIEW_READINESS: "Step 4 of 6 — Review readiness",
+        SigningReadinessStage.READY: "Step 5 of 6 — Confirm and sign",
+    }
+    return labels[stage]
+
+
+def _recommended_action(
+    *,
+    readiness: SigningReadiness,
+    can_sign: bool,
+    has_successful_output: bool,
+    has_recovery_artifact: bool,
+    preserved_artifact_verified: bool,
+    can_open_signed_output: bool,
+    can_open_preserved_copy: bool,
+    can_verify_again: bool,
+) -> RecommendedAction | None:
+    if has_successful_output:
+        return "open_signed_output" if can_open_signed_output else None
+    if has_recovery_artifact and not preserved_artifact_verified and can_verify_again:
+        return "verify_again"
+    if has_recovery_artifact and can_open_preserved_copy:
+        return "open_preserved_copy"
+    if has_recovery_artifact and can_sign:
+        return readiness.recommended_action
+    if has_recovery_artifact:
+        return "return_to_draft"
+    if can_sign or readiness.recommended_action is not None:
+        return readiness.recommended_action
+    return None

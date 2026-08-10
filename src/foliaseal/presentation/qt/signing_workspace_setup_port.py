@@ -9,6 +9,7 @@ from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesViewState,
 )
+from foliaseal.application.signing_readiness import SigningReadiness
 from foliaseal.domain.models import SignatureAppearance, SignatureRect
 
 
@@ -23,6 +24,8 @@ class SigningWorkspaceSetupPort(Protocol):
     def is_ready_to_sign(self) -> bool: ...
 
     def validation_text(self) -> str: ...
+
+    def readiness(self) -> SigningReadiness: ...
 
     def refresh_preview(self) -> SigningDraftPreview: ...
 
@@ -60,6 +63,9 @@ class PanelSigningWorkspaceSetupAdapter:
 
     def validation_text(self) -> str:
         return self._panel.validation_text()
+
+    def readiness(self) -> SigningReadiness:
+        return self._panel.readiness()
 
     def refresh_preview(self) -> SigningDraftPreview:
         return self._panel.refresh_preview()

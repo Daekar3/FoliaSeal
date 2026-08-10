@@ -53,6 +53,16 @@ _EXPORT_MODULES = {
     ),
     **dict.fromkeys(
         (
+            "SigningReadiness",
+            "SigningReadinessAction",
+            "SigningReadinessInputs",
+            "SigningReadinessStage",
+            "project_signing_readiness",
+        ),
+        "signing_readiness",
+    ),
+    **dict.fromkeys(
+        (
             "HorizontalSingleLineInkReservation",
             "HorizontalSingleLineRenderedReference",
             "build_horizontal_single_line_ink_reservation",
@@ -329,6 +339,11 @@ __all__ = [
     "DocumentReviewWorkspaceTransition",
     "DocumentReviewWorkspaceViewerEffects",
     "DocumentTextWorkspaceState",
+    "SigningReadiness",
+    "SigningReadinessAction",
+    "SigningReadinessInputs",
+    "SigningReadinessStage",
+    "project_signing_readiness",
     "CertificateFieldReader",
     "CertificateFieldValues",
     "HorizontalSingleLineInkReservation",

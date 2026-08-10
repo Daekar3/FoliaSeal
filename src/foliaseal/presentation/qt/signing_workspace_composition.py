@@ -597,8 +597,7 @@ def _assemble_signing_workspace_composition(
     signing_action_coordinator = SigningActionCoordinator(
         workflow=signing_workflow,
         apply_changes=properties_panel.apply_changes,
-        is_ready_to_sign=properties_panel.is_ready_to_sign,
-        validation_text=properties_panel.validation_text,
+        readiness=setup_port.readiness,
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         can_open_signed_output=on_open_signed_output is not None,

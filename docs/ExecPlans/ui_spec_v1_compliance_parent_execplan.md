@@ -117,6 +117,9 @@ Placement, preview, and signing tranche:
 - [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
+- [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — typed ordered readiness
+  projection and action vocabulary landed in the current slice; document-safety integration and
+  the remaining full rail state machine remain with their owning children.
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
   are committed; confirmation/source policy is now bounded in its follow-on child, while async
@@ -302,6 +305,12 @@ Release tranche:
   its implementation commit `42bbbb421`: catalog-backed selection, typed ready/warning/blocked
   projections, self-signed caveat, and password-promptable handling are complete; broader
   certificate lifecycle and signing-rail stage-machine work remain explicitly open.
+- [x] (2026-08-10) Added the typed signing-readiness projection child: the active workspace now
+  derives one ordered preset/setup/placement/review/ready state and recommended action through a
+  Qt-free application contract; signed/recovery/no-document precedence remains at the existing
+  presentation edges. Focused validation is `181 passed`, the full suite is `1349 passed, 20
+  skipped, 1 warning`, and the bounded launch audit cleaned its isolated root and processes after
+  the known `SingleInstanceUnavailable` endpoint limitation.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

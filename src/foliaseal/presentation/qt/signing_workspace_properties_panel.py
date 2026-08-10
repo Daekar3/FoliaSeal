@@ -24,6 +24,11 @@ from foliaseal.application.signature_properties_coordinator import (
 from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialPort,
 )
+from foliaseal.application.signing_readiness import (
+    SigningReadiness,
+    SigningReadinessInputs,
+    project_signing_readiness,
+)
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureRect,
@@ -418,6 +423,40 @@ class SignaturePropertiesPanel:
 
     def validation_text(self) -> str:
         return self._validation_text
+
+    def readiness(self) -> SigningReadiness:
+        state = self.load_setup_state()
+        certificate_readiness = state.certificate_readiness
+        direct_certificate_available = bool(self._coordinator.workflow.certificate_path)
+        certificate_selected = (
+            state.selected_certificate_configuration_name is not None
+            or direct_certificate_available
+        )
+        return project_signing_readiness(
+            SigningReadinessInputs(
+                selected_preset_name=state.selected_signature_preset_name,
+                has_saved_presets=bool(state.signature_preset_names),
+                certificate_selected=certificate_selected,
+                certificate_blocking=(
+                    False
+                    if direct_certificate_available
+                    else (
+                        certificate_readiness.blocking
+                        if certificate_readiness is not None
+                        else False
+                    )
+                ),
+                certificate_detail=(
+                    certificate_readiness.detail if certificate_readiness is not None else ""
+                ),
+                certificate_warning=(
+                    certificate_readiness.warning if certificate_readiness is not None else False
+                ),
+                placement_present=self._coordinator.workflow.signature_rect is not None,
+                validation_text=state.validation_text,
+                ready_to_sign=state.ready_to_sign,
+            )
+        )
 
     def dispose(self) -> None:
         self._canonical_preview_lifecycle.dispose()

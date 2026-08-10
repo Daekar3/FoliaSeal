@@ -84,17 +84,27 @@ def build_qt_signing_shell(**kwargs):
     """Normalize historical shell fixtures to the required reusable-object input."""
     preset_catalog = kwargs.pop("preset_catalog", None)
     preset_catalog_store = kwargs.pop("preset_catalog_store", None)
+    empty_preset_catalog = kwargs.pop("empty_preset_catalog", False)
     reusable_objects = kwargs.get("reusable_objects")
     if reusable_objects is not None and (
         preset_catalog is not None or preset_catalog_store is not None
     ):
         raise ValueError("reusable_objects cannot be combined with legacy preset catalog inputs.")
     if reusable_objects is None:
+        if (
+            not empty_preset_catalog
+            and preset_catalog is None
+            and preset_catalog_store is None
+        ):
+            preset_catalog = build_signature_preset_catalog(
+                profiles=(build_signature_preset(name="Default"),)
+            )
         kwargs["reusable_objects"] = build_reusable_objects_fixture(
             preset_catalog=preset_catalog,
             preset_catalog_store=preset_catalog_store,
         )
-    return _build_qt_signing_shell(**kwargs)
+    widget = _build_qt_signing_shell(**kwargs)
+    return widget
 
 
 class _FakeSignal:
@@ -901,6 +911,7 @@ def test_signing_shell_close_aware_widget_exports_profile_refresh(
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
+        empty_preset_catalog=True,
     )
 
     widget.refresh_signature_profiles()

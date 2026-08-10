@@ -18,14 +18,24 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
 - [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
+- [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — prerequisite typed readiness
+  projection and action vocabulary are implemented; this parent remains open for document-safety
+  input and full rail state/action integration.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Explorer review confirmed that certificate readiness is already implemented,
+  while the action coordinator still derives stage text from untyped readiness callbacks; the
+  typed projection is split into `ui_readiness_projection_contract_execplan.md`.
+- [x] (2026-08-10) Audit current behavior and add a failing focused test; the pure projection now
+  owns the ordered readiness vocabulary.
+- [x] (2026-08-10) Implement the smallest complete model/application/Qt path through the setup
+  port, panel adapter, action coordinator, and shell fixtures.
+- [x] (2026-08-10) Retire the migrated readiness callback pair from production callers; no new
+  product-facing phase3 nomenclature or compatibility adapter was introduced.
+- [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean owned processes and
+  temporary configuration artifacts.
+- [x] (2026-08-10) Update this plan and relevant docs, then commit the child slice.
 
 ## Surprises & Discoveries
 
@@ -44,7 +54,10 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The typed readiness child now supplies one ordered state and recommended action to the rail while
+preserving signed/recovery/no-document precedence. The remaining gaps are document-safety
+integration, full appearance/fit readiness vocabulary, asynchronous signing progress, and the
+remaining rail state-machine work assigned to the other children.
 
 ## Context and Orientation
 
