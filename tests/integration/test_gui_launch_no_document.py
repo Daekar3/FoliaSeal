@@ -23,6 +23,7 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     from foliaseal.presentation.qt.app_frame_command_model import (
         EDIT_COMMAND_DEFINITIONS,
         SETTINGS_COMMAND_DEFINITIONS,
+        SIGNING_COMMAND_DEFINITIONS,
         VIEW_COMMAND_DEFINITIONS,
     )
 
@@ -140,6 +141,17 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         QKeySequence(definition.shortcut).toString() if definition.shortcut else ""
         for definition in VIEW_COMMAND_DEFINITIONS
     ]
+
+    signing_menu = next(
+        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Signing"
+    )
+    assert [action.text() for action in signing_menu.actions()] == [
+        definition.mnemonic_text for definition in SIGNING_COMMAND_DEFINITIONS
+    ]
+    assert [action.toolTip() for action in signing_menu.actions()] == [
+        definition.accessible_name for definition in SIGNING_COMMAND_DEFINITIONS
+    ]
+    assert [action.isEnabled() for action in signing_menu.actions()] == [True, False]
 
     settings_menu = next(
         menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "Settings"

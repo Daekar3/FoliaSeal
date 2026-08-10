@@ -569,6 +569,14 @@ class SigningWorkspaceWidget:
     def submit_sign_request(self) -> SigningRequest | None:
         return self._shell_surface.submit_sign_request()
 
+    def can_submit_sign_request(self) -> bool:
+        coordinator = getattr(self, "_signing_action_coordinator", None)
+        load = getattr(coordinator, "load", None)
+        if callable(load):
+            state = load()
+            return bool(state.can_sign and not state.transaction_active)
+        return bool(self.preview().can_submit)
+
     def open_signed_output(self) -> str | None:
         return self._shell_surface.open_signed_output()
 

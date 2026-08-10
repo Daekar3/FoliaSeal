@@ -127,6 +127,7 @@ class SigningWorkspaceSessionPort(Protocol):
     def preview(self) -> SigningDraftPreview: ...
     def snapshot(self) -> SigningWorkspaceSnapshot: ...
     def submit_sign_request(self) -> SigningRequest | None: ...
+    def can_submit_sign_request(self) -> bool: ...
     def open_signed_output(self) -> str | None: ...
     def go_to_previous_page(self) -> None: ...
     def go_to_next_page(self) -> None: ...
@@ -304,6 +305,15 @@ class QtSigningWorkspaceSessionPort:
 
     def submit_sign_request(self) -> SigningRequest | None:
         return self.shell_widget.submit_sign_request()
+
+    def can_submit_sign_request(self) -> bool:
+        capability = getattr(self.shell_widget, "can_submit_sign_request", None)
+        if callable(capability):
+            return bool(capability())
+        try:
+            return bool(self.shell_widget.preview().can_submit)
+        except Exception:
+            return False
 
     def open_signed_output(self) -> str | None:
         return self.shell_widget.open_signed_output()

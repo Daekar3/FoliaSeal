@@ -71,7 +71,14 @@ corpus remains open for its owning viewer, signing, and support plans.
   and real-Qt coverage passed (`63 passed`), Ruff/pip/diff checks passed, and the bounded GUI audit
   exited at the known isolated `SingleInstanceUnavailable` endpoint before frame creation. No
   matching FoliaSeal/PySide6/pytest process remained and the owned temporary root was removed.
-- [ ] Commit this increment and record the final revision.
+- [x] (2026-08-10) Committed the Back/Forward increment as `168124466`.
+- [x] (2026-08-10) Selected the next truthful command increment: add a Signing menu with Signature
+  Library and Sign and save, while keeping Place/Adjust/Remove absent until their public seams exist.
+- [x] (2026-08-10) Added the Signing menu definitions/actions and corrected Sign and save enablement
+  to use the public `can_submit_sign_request()` readiness capability rather than mere workspace-open
+  state; readiness-changing runtime events refresh the menu action and active signing disables it.
+- [ ] Implement and validate the Signing menu, reconcile architecture/status documentation, run the
+  bounded GUI audit, clean owned resources, and commit this increment.
 
 ## Surprises & Discoveries
 
@@ -112,6 +119,17 @@ corpus remains open for its owning viewer, signing, and support plans.
   workspace-host mount without requiring a display-backed FoliaSeal launch by injecting a QWidget
   shell factory that implements the public session/maintenance ports.
   Evidence: `tests/integration/test_gui_launch_no_document.py::test_real_qt_view_history_actions_dispatch_through_open_workspace`.
+- Observation: UI_SPEC requires a Signing menu, but only Signature Library and Sign and save have
+  complete frame/session behavior today; Place Signature, Adjust Placement, and Remove Placement
+  lack a single public command seam and must remain absent rather than misleading disabled actions.
+  Evidence: `FoliaSealAppFrame.show_reusable_object_library()`, `_save_document()`, and the existing
+  `SigningWorkspaceSessionPort.submit_sign_request()` boundary.
+- Observation: the existing `WorkspaceActionState.save_enabled` intentionally means only
+  workspace-open for File Save, which is too broad for a dedicated Signing-menu command. The menu
+  action therefore needs a separate public readiness capability while File Save keeps its established
+  path-selection/readiness-flow behavior.
+  Evidence: the compliance review found an unready Sign and save action enabled immediately after
+  open; `SigningWorkspaceSessionPort.can_submit_sign_request()` now projects `preview().can_submit`.
 
 ## Decision Log
 
@@ -155,6 +173,12 @@ corpus remains open for its owning viewer, signing, and support plans.
   document-internal history boundary with observable capability methods. Keeping the actions tied
   to that boundary avoids misleading users about browser navigation or unrelated page movement.
   Date/Author: 2026-08-10 / Codex
+- Decision: add only `Signature Library` and `Sign and save` to a new typed Signing menu in this
+  increment; leave Place Signature, Adjust Placement, and Remove Placement out of the registry.
+  Rationale: the first two already have complete frame/session callbacks and state policy, while
+  the placement commands do not yet share a public action seam. UI_SPEC's truthful-action rule is
+  better served by exposing two usable commands than by adding inert placeholders.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
@@ -174,6 +198,7 @@ wiring document-internal Back/Forward actions; browser navigation and unsupporte
 remain out of scope. Final evidence is `1437 passed, 20 skipped, 1 warning` for the full suite and
 `63 passed` for focused/offscreen command coverage; the bounded launch returned `gui_rc=1` with
 `SingleInstanceUnavailable`, then left no matching process or temporary root.
+The next increment must preserve this evidence while adding only the two supported Signing actions.
 
 ## Context and Orientation
 
@@ -209,6 +234,17 @@ close. Preserve the public session-port boundary and do not add commands whose b
 implemented. Keep the earlier Select Text/Copy and zoom behavior unchanged except where list-based
 tests must include the new actions.
 
+For the current increment, add `SIGNATURE_LIBRARY` and `SIGN_AND_SAVE` definitions with stable IDs,
+truthful menu text, accessible descriptions, and no shortcut unless an established shortcut already
+exists. Add a `SIGNING_COMMAND_DEFINITIONS` tuple and include it in `ALL_COMMAND_DEFINITIONS`. In
+`FoliaSealAppFrame._install_menus()`, create a Signing menu after View and before Settings; route
+Signature Library to `show_reusable_object_library()` and Sign and save to `_save_document()`. The
+library command remains enabled with the existing frame policy, including no-document launch, while
+Sign and save mirrors the current Save action's workspace-dependent enablement and calls the same
+output-path, confirmation, and session boundary. Do not add Place/Adjust/Remove until their own
+public seams exist. Preserve all File/View/Settings ordering contracts and update menu tests to use
+menu titles or typed action lookup where practical.
+
 ## Milestones
 
 Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
@@ -217,7 +253,10 @@ menu/enablement parity in focused and real-Qt tests and records the remaining un
 families as deferred. Milestone 4 adds internal-link Back/Forward to the same registry, proves
 capability transitions (visit → Back → Forward and branch-clears-Forward), and runs the real
 offscreen menu/action test. The parent command-model acceptance remains open until all named menus
-have their owning slices and scenario evidence.
+have their owning slices and scenario evidence. Milestone 5 adds the two supported Signing actions,
+proves no-document Library availability and workspace-dependent Sign and save enablement/routing,
+and runs a real offscreen menu-topology test; unsupported placement actions remain explicitly
+deferred.
 
 ## Concrete Steps
 
@@ -231,6 +270,7 @@ fall back to a system Python or system Qt installation.
     rg -n -e '_install_menus|_command_action|text_selection|copy_selected|VIEW_COMMAND_DEFINITIONS|EDIT_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py tests/integration/test_gui_launch_no_document.py
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py tests/integration/test_view_navigation_shortcuts.py
+    QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -258,7 +298,10 @@ View page/zoom actions, and Settings remain green under their prior contracts. T
 acceptance remains open for focus-sensitive Edit, Signing, Help, remaining View behavior, signed-state
 policy, and parent scenario requirements. Record final focused/full test counts, Ruff, diff checks,
 and the real-Qt menu/action evidence; the display-backed audit remains environment-limited by the
-known QLocalServer/`SingleInstanceUnavailable` failure.
+known QLocalServer/`SingleInstanceUnavailable` failure. For the current increment, the Signing menu
+must expose Signature Library in the no-document frame, expose Sign and save only when a workspace is
+open, route both actions through their existing callbacks exactly once, and omit the three unsupported
+placement commands.
 
 ## Evidence Record
 
@@ -314,3 +357,7 @@ Revision note: 2026-08-10 / Codex
 Selected the next bounded correction: typed View Back/Forward actions over the existing internal-link
 history seam, with Alt+Left/Alt+Right shortcuts and capability-driven enablement. Browser history and
 unsupported command families remain excluded.
+Revision note: 2026-08-10 / Codex
+Selected the next bounded correction: add typed Signing-menu Signature Library and Sign and save
+commands over existing frame/session callbacks. Place Signature, Adjust Placement, and Remove
+Placement remain excluded until a single public placement-command seam exists.

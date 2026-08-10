@@ -24,6 +24,7 @@ from foliaseal.presentation.qt.app_frame_command_model import (
     EDIT_COMMAND_DEFINITIONS,
     FILE_COMMAND_DEFINITIONS,
     SETTINGS_COMMAND_DEFINITIONS,
+    SIGNING_COMMAND_DEFINITIONS,
     VIEW_COMMAND_DEFINITIONS,
     AppFrameCommandId,
 )
@@ -103,6 +104,19 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         "Ctrl+-",
         None,
     ]
+
+
+def test_signing_commands_are_typed_and_keep_unsupported_placement_actions_absent() -> None:
+    assert [definition.command_id for definition in SIGNING_COMMAND_DEFINITIONS] == [
+        AppFrameCommandId.SIGNATURE_LIBRARY,
+        AppFrameCommandId.SIGN_AND_SAVE,
+    ]
+    assert [definition.text for definition in SIGNING_COMMAND_DEFINITIONS] == [
+        "Signature Library",
+        "Sign and save",
+    ]
+    assert [definition.shortcut for definition in SIGNING_COMMAND_DEFINITIONS] == [None, None]
+    assert all(definition.menu == "Signing" for definition in SIGNING_COMMAND_DEFINITIONS)
 
 
 def test_app_frame_applies_window_baseline_and_normalizes_appearance_mode(tmp_path: Path) -> None:
@@ -564,6 +578,7 @@ class _FakeShell:
         self.output_dialog_defaults = []
         self.choose_output_pdf_path_calls = 0
         self.submit_sign_request_calls = 0
+        self.can_submit_sign_request_value = False
         self.explicit_output_pdf_path = False
         self.set_document_text_selection_mode_calls = []
         self.document_text_selection_mode = False
@@ -624,6 +639,9 @@ class _FakeShell:
     def submit_sign_request(self):
         self.submit_sign_request_calls += 1
         return None
+
+    def can_submit_sign_request(self) -> bool:
+        return self.can_submit_sign_request_value
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         self.set_document_text_selection_mode_calls.append(bool(enabled))
@@ -1276,6 +1294,47 @@ def test_app_frame_library_action_is_modeless_and_reused(tmp_path: Path) -> None
     assert first.controls.dialog.visible is True
 
 
+def test_signing_menu_routes_library_and_sign_save_through_existing_boundaries(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+
+    actions = frame.command_actions()
+    library_action = actions[AppFrameCommandId.SIGNATURE_LIBRARY]
+    sign_action = actions[AppFrameCommandId.SIGN_AND_SAVE]
+    assert library_action.enabled is True
+    assert sign_action.enabled is False
+
+    library_action.trigger()
+    assert frame.reusable_object_library_dialog is not None
+
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    assert sign_action.enabled is False
+    frame.command_actions()[AppFrameCommandId.SELECT_TEXT].trigger()
+    frame._handle_status_change("document_text_mode_changed")
+    assert sign_action.enabled is False
+    shell.can_submit_sign_request_value = True
+    shell.status_callback("signing_readiness_changed")
+    assert sign_action.enabled is True
+    frame._handle_status_change("sign_started")
+    assert sign_action.enabled is False
+    frame._handle_status_change("sign_failure")
+    shell.can_submit_sign_request_value = True
+    frame._handle_status_change("signing_readiness_changed")
+    assert sign_action.enabled is True
+    sign_action.trigger()
+    assert shell.choose_output_pdf_path_calls == 1
+    assert shell.submit_sign_request_calls == 1
+
+
 def test_first_use_library_is_presets_first_and_refreshes_active_shell_without_selection(
     tmp_path: Path,
 ) -> None:
@@ -1343,6 +1402,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "File",
         "Edit",
         "View",
+        "Signing",
         "Settings",
     ]
     assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
@@ -1425,27 +1485,37 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert frame.window.menu_bar.menus[2].actions[4].checkable is True
     assert frame.window.menu_bar.menus[2].actions[4].icon.path.endswith("text-select.svg")
     assert [action.text for action in frame.window.menu_bar.menus[3].actions] == [
-        definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
+        definition.mnemonic_text for definition in SIGNING_COMMAND_DEFINITIONS
     ]
     assert [action.shortcut for action in frame.window.menu_bar.menus[3].actions] == [
-        definition.shortcut for definition in SETTINGS_COMMAND_DEFINITIONS
-    ]
-    assert [action.object_name for action in frame.window.menu_bar.menus[3].actions] == [
-        definition.command_id.value for definition in SETTINGS_COMMAND_DEFINITIONS
+        definition.shortcut for definition in SIGNING_COMMAND_DEFINITIONS
     ]
     assert [action.tool_tip for action in frame.window.menu_bar.menus[3].actions] == [
+        definition.accessible_name for definition in SIGNING_COMMAND_DEFINITIONS
+    ]
+    assert [action.enabled for action in frame.window.menu_bar.menus[3].actions] == [True, False]
+    assert [action.text for action in frame.window.menu_bar.menus[4].actions] == [
+        definition.mnemonic_text for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.shortcut for action in frame.window.menu_bar.menus[4].actions] == [
+        definition.shortcut for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.object_name for action in frame.window.menu_bar.menus[4].actions] == [
+        definition.command_id.value for definition in SETTINGS_COMMAND_DEFINITIONS
+    ]
+    assert [action.tool_tip for action in frame.window.menu_bar.menus[4].actions] == [
         definition.accessible_name for definition in SETTINGS_COMMAND_DEFINITIONS
     ]
-    assert [action.status_tip for action in frame.window.menu_bar.menus[3].actions] == [
+    assert [action.status_tip for action in frame.window.menu_bar.menus[4].actions] == [
         definition.accessible_name for definition in SETTINGS_COMMAND_DEFINITIONS
     ]
     settings_mnemonics = [
         action.text.replace("&", "").lower()
-        for action in frame.window.menu_bar.menus[3].actions
+        for action in frame.window.menu_bar.menus[4].actions
     ]
     mnemonic_letters = [
         action.text[action.text.index("&") + 1].lower()
-        for action in frame.window.menu_bar.menus[3].actions
+        for action in frame.window.menu_bar.menus[4].actions
         if "&" in action.text
     ]
     assert len(mnemonic_letters) == len(set(mnemonic_letters))
@@ -1462,7 +1532,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert not hasattr(frame.window, "show_certificate_import")
     assert not hasattr(frame.window, "show_certificate_management")
 
-    frame.window.menu_bar.menus[3].actions[0].trigger()
+    frame.window.menu_bar.menus[4].actions[0].trigger()
 
     assert frame.settings_dialog.controls.dialog.title == "Application settings"
     assert (
@@ -1470,13 +1540,13 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         == str(tmp_path / "source")
     )
 
-    frame.window.menu_bar.menus[3].actions[1].trigger()
+    frame.window.menu_bar.menus[4].actions[1].trigger()
     assert frame.reusable_object_library_dialog is not None
-    frame.window.menu_bar.menus[3].actions[2].trigger()
+    frame.window.menu_bar.menus[4].actions[2].trigger()
     assert frame.certificate_creation_dialog is not None
-    frame.window.menu_bar.menus[3].actions[3].trigger()
+    frame.window.menu_bar.menus[4].actions[3].trigger()
     assert frame.certificate_import_dialog is not None
-    frame.window.menu_bar.menus[3].actions[4].trigger()
+    frame.window.menu_bar.menus[4].actions[4].trigger()
     assert frame.certificate_management_dialog is not None
 
 

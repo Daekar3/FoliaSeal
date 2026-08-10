@@ -328,6 +328,8 @@ class SigningWorkspaceRuntime:
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_after_panel_change()
         )
+        if self._on_status_change is not None:
+            self._on_status_change("signing_readiness_changed")
 
     def clear_signature_history(self) -> None:
         clear_history = getattr(self._viewer_widget_required(), "clear_signature_history", None)
@@ -342,6 +344,8 @@ class SigningWorkspaceRuntime:
         )
         self._link_history.reset(self._viewer_workflow_required().session.current_page)
         self._refresh_page_navigation_state_required()()
+        if self._on_status_change is not None:
+            self._on_status_change("signing_readiness_changed")
 
     def on_document_review_signature_selected(self, index: int) -> None:
         self._review_bridge_required().select_review_signature(index)

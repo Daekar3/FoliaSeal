@@ -32,6 +32,8 @@ class AppFrameCommandId(StrEnum):
     CREATE_CERTIFICATE = "settings.create_certificate"
     IMPORT_CERTIFICATE = "settings.import_certificate"
     MANAGE_CERTIFICATE_CONFIGURATIONS = "settings.manage_certificate_configurations"
+    SIGNATURE_LIBRARY = "signing.signature_library"
+    SIGN_AND_SAVE = "signing.sign_and_save"
 
 
 @dataclass(frozen=True)
@@ -246,10 +248,31 @@ SETTINGS_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 )
 
 
+SIGNING_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.SIGNATURE_LIBRARY,
+        menu="Signing",
+        text="Signature Library",
+        shortcut=None,
+        accessible_name="Open Signature Library",
+        mnemonic_text="&Signature Library",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.SIGN_AND_SAVE,
+        menu="Signing",
+        text="Sign and save",
+        shortcut=None,
+        accessible_name="Sign and save PDF",
+        mnemonic_text="Sign and sa&ve",
+    ),
+)
+
+
 ALL_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     *FILE_COMMAND_DEFINITIONS,
     *EDIT_COMMAND_DEFINITIONS,
     *VIEW_COMMAND_DEFINITIONS,
+    *SIGNING_COMMAND_DEFINITIONS,
     *SETTINGS_COMMAND_DEFINITIONS,
 )
 

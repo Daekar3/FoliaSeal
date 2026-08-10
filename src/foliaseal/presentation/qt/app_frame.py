@@ -401,6 +401,8 @@ class FoliaSealAppFrame:
         self._next_page_action: Any | None = None
         self._back_link_action: Any | None = None
         self._forward_link_action: Any | None = None
+        self._signature_library_action: Any | None = None
+        self._sign_and_save_action: Any | None = None
         self._command_actions: dict[AppFrameCommandId, Any] = {}
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
@@ -714,6 +716,9 @@ class FoliaSealAppFrame:
 
     def _workspace_ready_to_sign(self, workspace: WorkspaceHandle) -> bool:
         try:
+            capability = getattr(workspace.session, "can_submit_sign_request", None)
+            if callable(capability):
+                return bool(capability())
             return bool(workspace.session.preview().can_submit)
         except Exception:
             return False
@@ -1361,6 +1366,18 @@ class FoliaSealAppFrame:
             self.show_document_signatures,
             enabled=False,
         )
+        signing_menu = menu_bar.addMenu("Signing")
+        self._signature_library_action = self._command_action(
+            signing_menu,
+            AppFrameCommandId.SIGNATURE_LIBRARY,
+            self.show_reusable_object_library,
+        )
+        self._sign_and_save_action = self._command_action(
+            signing_menu,
+            AppFrameCommandId.SIGN_AND_SAVE,
+            self._save_document,
+            enabled=False,
+        )
         settings_menu = menu_bar.addMenu("Settings")
         self._command_action(
             settings_menu,
@@ -1503,6 +1520,7 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._fit_width_action, state.workspace_open)
         self._set_action_enabled(self._find_action, state.workspace_open)
         self._set_action_enabled(self._document_signatures_action, state.workspace_open)
+        self._sync_signing_command_action()
 
     @staticmethod
     def _set_action_enabled(action: Any | None, enabled: bool) -> None:
@@ -1536,6 +1554,16 @@ class FoliaSealAppFrame:
             )
         )
         self._sync_document_text_actions()
+        self._sync_signing_command_action()
+
+    def _sync_signing_command_action(self) -> None:
+        workspace = self._workspace_host.active()
+        enabled = bool(
+            workspace is not None
+            and not self._signing_transaction_active
+            and self._workspace_ready_to_sign(workspace)
+        )
+        self._set_action_enabled(self._sign_and_save_action, enabled)
 
     def _sync_document_text_actions(self) -> None:
         workspace = self._workspace_host.active()
@@ -1806,6 +1834,7 @@ class FoliaSealAppFrame:
         elif status in {"verify_success", "recovery_return_to_draft"}:
             self._signing_transaction_active = False
             self._offer_pending_external_link()
+        self._sync_signing_command_action()
         if self._on_status_change is not None:
             self._on_status_change(status)
 
