@@ -119,6 +119,9 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   bare Home/End pass through to the focused widget hierarchy. The navigation child owns the
   implementation and its fake/real Qt evidence; this parent remains open for unrelated deferred
   command families and release gates.
+- [ ] (2026-08-10) Implement the missing typed View → Pan command over the existing public
+  `set_viewer_interaction_mode("pan")` seam; prove no-document disablement, one mode transition,
+  text-mode exit, and unchanged placement geometry in focused and real offscreen tests.
 
 ## Surprises & Discoveries
 
@@ -143,6 +146,11 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   migrated without inventing behavior; Help, Signing, and the full Edit menu do not yet have
   complete truthful seams.
   Evidence: Loop 8 explorer review and the resulting `SETTINGS_COMMAND_DEFINITIONS` registry.
+- Observation: UI_SPEC §7/§8 lists View → Pan, but the current typed registry and frame expose every
+  neighboring View command except Pan; the public session port and runtime already implement the
+  mode transition.
+  Evidence: fresh explorer audit on 2026-08-10 of `docs/UI_SPEC.md`,
+  `app_frame_command_model.py`, and `set_viewer_interaction_mode()`.
 - Observation: Select Text and Copy are concrete, tested frame callbacks but bypass the typed
   registry and are mounted under the wrong menus relative to UI_SPEC §7.
   Evidence: `FoliaSealAppFrame._install_menus()` and explorer review dated 2026-08-09.
