@@ -101,7 +101,7 @@ class ReusableObjectLibraryDialog:
         on_rename_certificate: Callable[[CertificateLibraryRef, str], bool] | None = None,
         on_delete_certificate: Callable[[CertificateLibraryRef], bool] | None = None,
         on_create: Callable[[], bool] | None = None,
-        on_edit: Callable[[], bool] | None = None,
+        on_edit: Callable[[ReusableObjectRef], bool] | None = None,
         on_create_placement: Callable[[], bool] | None = None,
         on_edit_placement: Callable[[PlacementProfile], bool] | None = None,
     ) -> None:
@@ -301,8 +301,8 @@ class ReusableObjectLibraryDialog:
         delete = self._bindings.q_push_button("Delete")
         duplicate = self._bindings.q_push_button("Duplicate")
         pin = self._bindings.q_push_button("Pin")
-        create = self._bindings.q_push_button("Create in signing workflow")
-        edit = self._bindings.q_push_button("Edit in signing workflow")
+        create = self._bindings.q_push_button("Create preset")
+        edit = self._bindings.q_push_button("Edit preset")
         create_placement = self._bindings.q_push_button("Create placement")
         edit_placement = self._bindings.q_push_button("Edit selected placement")
         save = self._bindings.q_push_button("Save")
@@ -377,7 +377,7 @@ class ReusableObjectLibraryDialog:
         if self._on_create is not None:
             create.clicked.connect(self._on_create)
         if self._on_edit is not None:
-            edit.clicked.connect(self._on_edit)
+            edit.clicked.connect(self._edit_selected_preset)
         if self._on_create_placement is not None:
             create_placement.clicked.connect(self._on_create_placement)
         else:
@@ -430,6 +430,18 @@ class ReusableObjectLibraryDialog:
             return False
         assert self._on_edit_placement is not None
         return self._on_edit_placement(profile)
+
+    def _edit_selected_preset(self) -> bool:
+        selected = self._selected_object()
+        if selected is None or not isinstance(selected[0], ReusableObjectRef):
+            self._show_error("Select a signature preset before editing it.")
+            return False
+        ref, _name = selected
+        if ref.kind is not ReusableObjectKind.PRESET:
+            self._show_error("Select a signature preset before editing it.")
+            return False
+        assert self._on_edit is not None
+        return self._on_edit(ref)
 
     def _has_list_widget(self) -> bool:
         return callable(getattr(self._bindings, "q_list_widget", None))
@@ -529,6 +541,7 @@ class ReusableObjectLibraryDialog:
         self._render_selection()
 
     def _render_selection(self) -> None:
+        _set_enabled(self.controls.create_button, self._session.catalog is LibraryCatalog.PRESETS)
         selected = self._session.selected_row()
         if selected is None:
             if self._session.catalog is LibraryCatalog.CERTIFICATES:
@@ -540,6 +553,7 @@ class ReusableObjectLibraryDialog:
             self.controls.details_label.setText(message)
             _set_enabled(self.controls.duplicate_button, False)
             _set_enabled(self.controls.pin_button, False)
+            _set_enabled(self.controls.edit_button, False)
             _set_enabled(self.controls.edit_placement_button, False)
             return
         self.controls.details_label.setText(selected.details)
@@ -555,6 +569,10 @@ class ReusableObjectLibraryDialog:
             self.controls.edit_placement_button,
             isinstance(selected.ref, ReusableObjectRef)
             and selected.ref.kind is ReusableObjectKind.PLACEMENT,
+        )
+        _set_enabled(
+            self.controls.edit_button,
+            is_reusable and selected.ref.kind is ReusableObjectKind.PRESET,
         )
 
     def _selected_object(

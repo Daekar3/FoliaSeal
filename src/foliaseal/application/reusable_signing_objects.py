@@ -180,6 +180,7 @@ class SavePreset:
     appearance_profile_id: str | None = None
     placement_profile_id: str | None = None
     certificate_configuration_id: str | None = None
+    signature_preset_id: str | None = None
     overwrite: bool = False
 
 
@@ -436,21 +437,34 @@ class ReusableSigningObjects:
                 raise ConfigValidationError(
                     "Signature preset references a missing certificate configuration."
                 )
-            self._check_duplicate(
-                catalog.signature_presets,
-                name,
-                command.overwrite,
-                "Signature preset",
+            existing_by_id = next(
+                (
+                    item
+                    for item in catalog.signature_presets
+                    if item.signature_preset_id == command.signature_preset_id
+                ),
+                None,
             )
+            existing_by_name = next(
+                (
+                    item
+                    for item in catalog.signature_presets
+                    if item.display_name.casefold() == name.casefold()
+                ),
+                None,
+            )
+            if command.signature_preset_id is not None and existing_by_id is None:
+                raise ConfigValidationError("Signature preset is no longer available.")
+            if (
+                existing_by_name is not None
+                and existing_by_id is not None
+                and existing_by_name.signature_preset_id != existing_by_id.signature_preset_id
+            ):
+                raise ConfigValidationError(f"Signature preset '{name}' already exists.")
+            if existing_by_name is not None and existing_by_id is None and not command.overwrite:
+                raise ConfigValidationError(f"Signature preset '{name}' already exists.")
+            existing = existing_by_id or existing_by_name
             if command.appearance is not None:
-                existing = next(
-                    (
-                        preset
-                        for preset in catalog.signature_presets
-                        if preset.display_name.casefold() == name.casefold()
-                    ),
-                    None,
-                )
                 appearance_id = (
                     existing.appearance_profile_id
                     if existing is not None and existing.appearance_profile_id is not None
@@ -539,14 +553,6 @@ class ReusableSigningObjects:
                     command.placement_profile_id,
                     ReusableObjectKind.PLACEMENT,
                 )
-            existing = next(
-                (
-                    item
-                    for item in catalog.signature_presets
-                    if item.display_name.casefold() == name.casefold()
-                ),
-                None,
-            )
             preset = SignaturePreset.from_profile_parts(
                 display_name=name,
                 appearance_profile_id=appearance.appearance_profile_id,

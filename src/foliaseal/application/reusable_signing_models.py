@@ -893,7 +893,10 @@ class SignaturePresetCatalog:
         values = [
             item
             for item in self.signature_presets
-            if item.display_name.casefold() != preset.display_name.casefold()
+            if (
+                item.signature_preset_id != preset.signature_preset_id
+                and item.display_name.casefold() != preset.display_name.casefold()
+            )
         ]
         values.append(preset)
         return SignaturePresetCatalog(

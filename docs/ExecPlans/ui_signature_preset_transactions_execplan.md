@@ -21,6 +21,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] (2026-08-10) Audit current behavior and add a failing focused test.
 - [x] (2026-08-10) Implement the bounded model/application/Qt reference-validation and Save-boundary path.
+- [x] (2026-08-10) Move preset Create/Edit to a document-independent modal Save/Cancel editor with typed stable references.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
 - [x] (2026-08-10) Run focused, regression, and offscreen GUI validation; clean processes and artifacts.
 - [x] (2026-08-10) Update this plan and relevant architecture docs.
@@ -40,6 +41,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   crosses an explicit `save_detail()` transaction boundary, but the full document-independent
   nested preset editor and dirty-switch/close prompts remain unimplemented.
   Evidence: `ReusableObjectLibraryDialog.save_detail()` and the compliance review boundary.
+- Observation: editing a preset by changing its name exposed an identity bug in the existing
+  name-based upsert path. `SavePreset.signature_preset_id` and id-aware catalog upsert now replace
+  the existing record by stable id, so a rename cannot create duplicate ids or silently overwrite a
+  different preset.
+  Evidence: `test_document_independent_preset_editor_edit_preserves_preset_identity`.
 - Observation: certificate-configuration deletion must be guarded from the certificate side as well
   as at preset save time. `CertificateManager.delete_configuration()` now accepts the AppFrame's
   referenced-preset id resolver and rejects deletion while a saved preset still points at it.
@@ -65,7 +71,8 @@ This slice closes the production certificate-reference validation seam and makes
 Save action an explicit application-facing transaction boundary. It does not complete the full
 UI_SPEC WF06 editor: preset component editing remains routed through the contextual signing
 workflow, reason/location defaults are not yet modeled, and dirty-switch/close or active-placement
-invalidation prompts remain open follow-on work. Certificate deletion now refuses known preset
+invalidation prompts remain open follow-on work. Preset Create/Edit now use a document-independent
+modal editor, while Appearance Create/Edit still routes through the contextual workflow. Certificate deletion now refuses known preset
 references at the AppFrame/CertificateManager composition boundary; a single cross-store commit
 transaction remains a future hardening item for external concurrent writers.
 
@@ -152,6 +159,7 @@ Current evidence (2026-08-10):
 - Updated focused set after the Save-boundary test: `21 passed`.
 - Full regression: `1243 passed, 20 skipped, 1 warning`.
 - Full regression after the deletion guard: `1244 passed, 20 skipped, 1 warning`.
+- Full regression after the document-independent editor and id-aware upsert: `1246 passed, 20 skipped, 1 warning`.
 - Offscreen Library/no-document integration: `2 passed`.
 - Ruff and `git diff --check`: clean.
 - Process audit: no FoliaSeal, PySide6, or pytest processes remained.
@@ -159,6 +167,14 @@ Current evidence (2026-08-10):
   boundary, not the Library topology.
 - Deletion guard evidence: manager-level static resolver test is green; real AppFrame temporary-store
   wiring and concurrent interleaving remain open acceptance items.
+- Document-independent preset editor evidence: `tests/unit/test_qt_app_frame_profile_library.py`
+  covers Save of an appearance-backed preset with no active workspace; offscreen AppFrame/shell
+  validation remains green (`153 passed`).
+- Stable-id edit evidence: the same focused suite proves renaming an existing preset preserves its
+  `ReusableObjectRef` while updating its display name.
+- Red/green note: the editor tests were added against the existing fake-Qt harness and required
+  two implementation corrections (data-less combo-box fallback and id-aware preset upsert); a
+  separately captured pre-implementation red run was not preserved.
 
 ## Idempotence and Recovery
 

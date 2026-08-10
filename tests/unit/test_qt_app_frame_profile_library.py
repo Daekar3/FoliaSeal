@@ -1,3 +1,4 @@
+from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
     PlacementProfileSourcePage,
@@ -8,8 +9,10 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableSigningObjects,
     SaveAppearance,
     SavePlacement,
+    SavePreset,
 )
 from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
+from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePresetEditorDialog
 from tests.support.signing_builders import build_signature_appearance
 from tests.unit.test_qt_signing_shell import _fake_bindings
 
@@ -88,3 +91,53 @@ def test_library_save_button_commits_explicit_detail_transaction() -> None:
 
     assert dialog.controls.save_button.click() is None
     assert service.view().appearance_names == ("Approved",)
+
+
+def test_document_independent_preset_editor_saves_reference_transaction() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    errors: list[str] = []
+    saved: list[bool] = []
+    editor = SignaturePresetEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        on_saved=lambda: saved.append(True),
+        on_error=errors.append,
+    )
+    editor.controls.name_input.setText("Board approval")
+    editor.controls.save_button.click()
+
+    assert errors == []
+    assert saved == [True]
+    assert service.view().preset_names == ("Board approval",)
+    assert service.view().presets[0].details.startswith("Appearance: Approval;")
+
+
+def test_document_independent_preset_editor_edit_preserves_preset_identity() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    service.execute(
+        SavePreset(
+            "Board approval",
+            appearance_profile_id=service.view().appearances[0].ref.object_id,
+        )
+    )
+    original_ref = service.view().presets[0].ref
+    editor = SignaturePresetEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        initial_ref=original_ref,
+    )
+    editor.controls.name_input.setText("Board approval v2")
+    editor.controls.save_button.click()
+
+    assert service.view().presets[0].ref == original_ref
+    assert service.view().preset_names == ("Board approval v2",)

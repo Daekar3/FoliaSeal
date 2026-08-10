@@ -67,7 +67,7 @@ Reusable-object and certificate tranche:
   catalog pin/duplicate/name/sort behavior is covered by the completed follow-on child.
 - [x] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md — persistent pins, duplicate
   semantics, normalized names, configured-first certificate projection, Name sorting, certificate
-  pin/rename/delete routing, and Library preferences validated; commit pending.
+  pin/rename/delete routing, and Library preferences validated in `ecf4f73ab`.
 - [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
 - [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
@@ -141,6 +141,10 @@ Release tranche:
   unique, pinned rows sort first, and Library catalog/sort preferences persist. Certificate expiration
   sorting, nested editors, and dirty-detail prompts remain open in owning children; typed certificate
   pin/rename/delete routing now exists and configured rows sort before retained unconfigured files.
+- [x] (2026-08-10) Added the document-independent preset-editor increment: Library Create/Edit now
+  open a modal Save/Cancel editor that writes stable appearance, placement, and certificate
+  references without an active PDF; Appearance editing, reason/location defaults, dirty prompts,
+  and active-placement invalidation remain open in the preset/appearance children.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
