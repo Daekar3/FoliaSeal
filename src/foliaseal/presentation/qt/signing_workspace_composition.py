@@ -316,14 +316,23 @@ def _assemble_signing_workspace_composition(
         "on_interaction": runtime.on_viewer_interaction,
         "on_keyboard_create": runtime.create_keyboard_placement,
         "on_keyboard_move": runtime.move_keyboard_placement,
+        "on_keyboard_apply": runtime.apply_keyboard_placement,
     }
     try:
         viewer_widget = viewer_widget_builder(**viewer_kwargs)
     except TypeError as exc:
-        if "on_keyboard_create" not in str(exc) and "on_keyboard_move" not in str(exc):
+        if not any(
+            name in str(exc)
+            for name in (
+                "on_keyboard_create",
+                "on_keyboard_move",
+                "on_keyboard_apply",
+            )
+        ):
             raise
         viewer_kwargs.pop("on_keyboard_create", None)
         viewer_kwargs.pop("on_keyboard_move", None)
+        viewer_kwargs.pop("on_keyboard_apply", None)
         viewer_widget = viewer_widget_builder(**viewer_kwargs)
     set_viewer_mode = getattr(viewer_widget, "set_interaction_mode", None)
     if callable(set_viewer_mode):

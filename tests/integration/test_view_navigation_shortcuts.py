@@ -342,10 +342,15 @@ def test_keyboard_place_enter_and_shift_arrow_update_the_overlay() -> None:
         )
         return current[0]
 
+    def apply(rect: SignatureRect | None) -> SignatureRect | None:
+        current[0] = rect
+        return rect
+
     viewer = build_qt_pdf_viewer_widget(
         workflow=workflow,
         on_keyboard_create=create,
         on_keyboard_move=move,
+        on_keyboard_apply=apply,
     )
     window = QMainWindow()
     window.resize(240, 240)
@@ -367,6 +372,30 @@ def test_keyboard_place_enter_and_shift_arrow_update_the_overlay() -> None:
         assert current[0] is not None
         assert current[0].left_pt == 10.0
         assert viewer.widget()._overlay_signature_rect == current[0]
+
+        QTest.keyClick(viewer.widget(), Qt.Key_Delete)
+        app.processEvents()
+        assert current[0] is None
+        assert viewer.widget()._overlay_signature_rect is None
+
+        QTest.keyClick(viewer.widget(), Qt.Key_Z, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+        assert current[0] is not None
+        assert current[0].left_pt == 10.0
+
+        QTest.keyClick(
+            viewer.widget(),
+            Qt.Key_Z,
+            Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+        )
+        app.processEvents()
+        assert current[0] is None
+
+        QTest.keyClick(viewer.widget(), Qt.Key_Z, Qt.KeyboardModifier.ControlModifier)
+        QTest.keyClick(viewer.widget(), Qt.Key_Escape)
+        app.processEvents()
+        assert viewer.widget()._interaction_mode == "pan"
+        assert current[0] is not None
     finally:
         window.close()
         app.processEvents()

@@ -74,6 +74,8 @@ class _FakeQt:
     Key_Escape = 23
     Key_Return = 24
     Key_Enter = 25
+    Key_Delete = 26
+    Key_Z = 27
     ControlModifier = 1 << 1
 
     class KeyboardModifier:
@@ -831,6 +833,58 @@ def test_keyboard_place_enter_and_shift_arrow_are_only_active_in_place_mode(monk
 
     assert created == [rect]
     assert moved == [(10.0, 0.0)]
+
+
+def test_keyboard_place_delete_undo_redo_and_escape_restore_pan(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    second = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    applied = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_create=lambda: first,
+        on_keyboard_move=lambda _dx, _dy: second,
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+    )
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Return))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Delete))
+    assert preview._overlay_signature_rect is None
+    assert applied[-1] is None
+
+    preview.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Z, modifiers=_FakeQt.ControlModifier)
+    )
+    assert preview._overlay_signature_rect == second
+    assert applied[-1] == second
+
+    preview.keyPressEvent(
+        _FakeKeyEvent(
+            key=_FakeQt.Key_Z,
+            modifiers=_FakeQt.ControlModifier | _FakeQt.KeyboardModifier.ShiftModifier,
+        )
+    )
+    assert preview._overlay_signature_rect is None
+    assert applied[-1] is None
+
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Z, modifiers=_FakeQt.ControlModifier))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Escape))
+    assert preview._overlay_signature_rect == second
+    assert preview._interaction_mode == "pan"
 
 
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):

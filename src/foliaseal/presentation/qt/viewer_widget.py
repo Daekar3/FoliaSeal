@@ -14,6 +14,7 @@ from foliaseal.application.coordinate_transform import (
     ViewTransform,
     pdf_rect_to_view_rect,
 )
+from foliaseal.application.placement_history import PlacementHistory
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect
 
@@ -53,6 +54,7 @@ class PdfViewerWidgetAdapter:
         on_interaction: Callable[[str], None] | None = None,
         on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
         on_keyboard_move: Callable[[float, float], SignatureRect | None] | None = None,
+        on_keyboard_apply: Callable[[SignatureRect | None], SignatureRect | None] | None = None,
     ) -> Any:
         bindings = self._bindings
 
@@ -65,6 +67,7 @@ class PdfViewerWidgetAdapter:
                 self._on_interaction = on_interaction
                 self._on_keyboard_create = on_keyboard_create
                 self._on_keyboard_move = on_keyboard_move
+                self._on_keyboard_apply = on_keyboard_apply
                 self._pixmap: Any | None = None
                 self._scroll_container: Any | None = None
                 self._drag_origin: Any | None = None
@@ -73,6 +76,7 @@ class PdfViewerWidgetAdapter:
                 self._pan_start_x = 0
                 self._pan_start_y = 0
                 self._overlay_signature_rect: SignatureRect | None = None
+                self._placement_history = PlacementHistory()
                 self._overlay_drag_handle: str | None = None
                 self._overlay_drag_view_rect: ViewRect | None = None
                 self._overlay_drag_start_view_rect: ViewRect | None = None
@@ -203,6 +207,14 @@ class PdfViewerWidgetAdapter:
                         self.update()
                         event.accept()
                         return
+                    if (
+                        self._interaction_mode == "signature"
+                        and self._overlay_signature_rect is not None
+                    ):
+                        self.set_interaction_mode("pan")
+                        self._emit_interaction("placement_mode_cancelled")
+                        event.accept()
+                        return
                     super().keyPressEvent(event)
                     return
 
@@ -221,8 +233,43 @@ class PdfViewerWidgetAdapter:
                     ):
                         rect = self._on_keyboard_create()
                         if rect is not None:
+                            self._placement_history.commit(rect)
                             self._overlay_signature_rect = rect
                             self.update()
+                    event.accept()
+                    return
+
+                delete_key = getattr(bindings.qt, "Key_Delete", None)
+                if (
+                    delete_key is not None
+                    and key == delete_key
+                    and self._interaction_mode == "signature"
+                    and self._overlay_signature_rect is not None
+                ):
+                    self._placement_history.commit(None)
+                    if self._on_keyboard_apply is not None:
+                        self._on_keyboard_apply(None)
+                    self._overlay_signature_rect = None
+                    self.update()
+                    event.accept()
+                    return
+
+                undo_key = getattr(bindings.qt, "Key_Z", None)
+                if (
+                    undo_key is not None
+                    and key == undo_key
+                    and self._interaction_mode == "signature"
+                    and self._has_control_modifier(event)
+                ):
+                    target = (
+                        self._placement_history.redo()
+                        if self._has_shift_modifier(event)
+                        else self._placement_history.undo()
+                    )
+                    if self._on_keyboard_apply is not None:
+                        self._on_keyboard_apply(target)
+                    self._overlay_signature_rect = target
+                    self.update()
                     event.accept()
                     return
 
@@ -244,6 +291,7 @@ class PdfViewerWidgetAdapter:
                         delta_y *= 10.0
                     rect = self._on_keyboard_move(delta_x, delta_y)
                     if rect is not None:
+                        self._placement_history.commit(rect)
                         self._overlay_signature_rect = rect
                         self.update()
                     event.accept()
@@ -486,6 +534,7 @@ class PdfViewerWidgetAdapter:
                 self.update()
 
             def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
+                self._placement_history.synchronize(signature_rect)
                 self._overlay_signature_rect = signature_rect
                 self.update()
 
@@ -496,6 +545,7 @@ class PdfViewerWidgetAdapter:
                 self._fit_view(mode="width")
 
             def clear_signature_overlay(self) -> None:
+                self._placement_history.clear()
                 self._overlay_signature_rect = None
                 self.update()
 
@@ -1048,6 +1098,7 @@ def build_qt_pdf_viewer_widget(
     on_interaction: Callable[[str], None] | None = None,
     on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
     on_keyboard_move: Callable[[float, float], SignatureRect | None] | None = None,
+    on_keyboard_apply: Callable[[SignatureRect | None], SignatureRect | None] | None = None,
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
 
@@ -1059,6 +1110,7 @@ def build_qt_pdf_viewer_widget(
         on_interaction=on_interaction,
         on_keyboard_create=on_keyboard_create,
         on_keyboard_move=on_keyboard_move,
+        on_keyboard_apply=on_keyboard_apply,
     )
 
     class ScrollablePdfViewer(adapter._bindings.q_scroll_area):  # type: ignore[misc,valid-type]

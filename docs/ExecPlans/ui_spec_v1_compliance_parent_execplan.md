@@ -240,6 +240,12 @@ Release tranche:
   viewer/session/shell/composition/integration validation is `165 passed`; current full suite is
   `1301 passed, 20 skipped, 1 warning`. Resize, Delete/history, snap/guides, and off-page recovery
   remain open in the keyboard-placement child.
+- [x] (2026-08-10) Added the typed placement-history increment: Place-mode Delete removes the
+  active overlay, Ctrl+Z/Ctrl+Shift+Z restore local mutations, Escape returns to Pan while retaining
+  a completed overlay, and external overlay synchronization clears stale history. Focused
+  viewer/history/runtime/composition/offscreen validation is `159 passed`; the full suite remains
+  `1304 passed, 20 skipped, 1 warning`; resize, numeric traversal, snap/guides, and off-page
+  recovery remain open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

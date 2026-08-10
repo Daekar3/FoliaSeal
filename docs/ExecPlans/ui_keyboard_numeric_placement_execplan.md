@@ -7,10 +7,10 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-The first tracer bullet of this child gives a keyboard-only user centered placement creation and
-exact movement in the real FoliaSeal GUI. It is mapped to UI_SPEC section 8 and acceptance scenarios
-3 and 8. Resize, Delete/history, snapping, and off-page recovery remain subsequent increments of
-this child because they require additional typed state and history seams.
+This child gives a keyboard-only user centered placement creation, exact movement, deletion, and
+local undo/redo history in the real FoliaSeal GUI. It is mapped to UI_SPEC section 8 and acceptance
+scenarios 3 and 8. Resize, numeric traversal, snapping, and off-page recovery remain subsequent
+increments because they require additional geometry and focus seams.
 
 ## Child ExecPlan Dependencies
 
@@ -21,18 +21,25 @@ this child because they require additional typed state and history seams.
 ## Progress
 
 - [x] (2026-08-10) Audited the keyboard-placement requirements and split the broad child at the
-  next truthful seam: centered Enter creation plus exact Arrow/Shift+Arrow movement. No existing
-  application history seam supports claiming resize, Delete, snap, or undo/redo yet.
+  next truthful seam: centered Enter creation plus exact Arrow/Shift+Arrow movement, followed by
+  a typed local history seam for Delete and undo/redo.
 - [x] (2026-08-10) Implemented typed application placement creation/movement and routed keyboard
   callbacks through the runtime/composition boundary; Enter and exact movement are consumed only in
   Place mode and do not alter Pan/Text behavior.
 - [x] (2026-08-10) Reviewed compatibility and phase3 product cruft; no migrated consumer retirement
   condition was proven in this viewer/application seam.
 - [x] (2026-08-10) Focused viewer/session/shell/composition/offscreen validation passed (`165 passed`)
-  and the full suite passed (`1301 passed, 20 skipped, 1 warning`); bounded GUI launch cleanup is
+  and the full suite passed (`1304 passed, 20 skipped, 1 warning`); bounded GUI launch cleanup is
   confirmed, with the known isolated `SingleInstanceUnavailable` endpoint limitation.
-- [ ] (2026-08-10) Add Ctrl-arrow resize, Delete/history, snap/guides, and off-page recovery in
-  subsequent increments; then perform final documentation/commit closeout for the whole child.
+- [x] (2026-08-10) Added `PlacementHistory` at the application boundary and wired Place-mode Delete,
+  Ctrl+Z, Ctrl+Shift+Z, and Escape-to-Pan through the viewer/runtime seam. External overlay changes
+  synchronize and clear stale history, while lifecycle clearing remains explicit. Focused coverage
+  is now `159 passed`.
+- [x] (2026-08-10) The offscreen integration sequence also covers Delete, undo, redo, and
+  Escape-to-Pan against the real Qt widget; the focused viewer/history/integration set remains
+  green (`159 passed`).
+- [ ] (2026-08-10) Add Ctrl-arrow resize, numeric-field traversal, snap/guides, and off-page recovery
+  in subsequent increments; then perform final documentation/commit closeout for the whole child.
 
 ## Surprises & Discoveries
 
@@ -45,17 +52,18 @@ this child because they require additional typed state and history seams.
 - Decision: obey SPEC.md, SCHEMAS.md, and UI_SPEC.md in that precedence order.
   Rationale: these are the repository's explicit authority boundaries.
   Date/Author: 2026-08-09 / Codex
-- Decision: keep this increment limited to one user-visible keyboard creation and exact movement outcome.
-  Rationale: narrow changes are independently testable and recoverable.
+- Decision: keep each keyboard increment limited to one user-visible placement outcome and one typed
+  state seam.
+  Rationale: creation/movement and history mutation are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-The first keyboard tracer bullet is complete: Place-mode Enter creates a centered 3×1-inch placement
-scaled proportionally to a smaller page, and Arrow/Shift+Arrow move it by exact 1/10-point deltas
-without clamping or snapping. The remaining child scope—Ctrl-arrow resize, Delete, numeric-field
-traversal, snap/guides, off-page recovery, and undo/redo history—requires additional typed state and
-history increments and remains open.
+The creation/movement and history increments are complete: Place-mode Enter creates a centered
+3×1-inch placement scaled proportionally to a smaller page; Arrow/Shift+Arrow move it by exact
+1/10-point deltas; Delete removes it; and Ctrl+Z/Ctrl+Shift+Z restore local placement mutations.
+Escape exits Place mode to Pan while preserving a completed overlay. The remaining child scope is
+Ctrl-arrow resize, numeric-field traversal, snap/guides, and off-page recovery.
 
 ## Context and Orientation
 
@@ -148,5 +156,6 @@ or workspace ports. The final behavior must be exercised by tests/unit/test_work
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-10 / Codex
-Implemented the first keyboard placement tracer bullet after the Pan/Place topology landed. The
-plan is intentionally still open for resize, Delete/history, snap/guides, and off-page recovery.
+Implemented keyboard creation/movement and the typed Delete/history tracer after the Pan/Place
+topology landed. The plan remains open for resize, numeric traversal, snap/guides, and off-page
+recovery.

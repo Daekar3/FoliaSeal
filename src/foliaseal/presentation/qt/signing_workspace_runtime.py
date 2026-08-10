@@ -161,6 +161,18 @@ class SigningWorkspaceRuntime:
             self.apply_signature_rect_placement(result.signature_rect)
         return result.signature_rect
 
+    def apply_keyboard_placement(
+        self, signature_rect: SignatureRect | None
+    ) -> SignatureRect | None:
+        """Apply a keyboard history target, including deletion."""
+        if signature_rect is None:
+            self._properties_panel_required().set_signature_rect(None)
+            self.sync_signature_overlay()
+            self._refresh_sign_button_state_required()()
+            return None
+        self.apply_signature_rect_placement(signature_rect)
+        return signature_rect
+
     def on_viewer_interaction(self, name: str) -> None:
         if name == "navigation_changed":
             self.clear_selected_document_text()
