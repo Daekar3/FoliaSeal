@@ -49,15 +49,20 @@ Foundation tranche:
 - [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md — fixed 320px signing rail, protected
   read-only status region, typed recommended action, and offscreen geometry evidence are complete
   in `8d67d1652`; asynchronous/state-machine follow-up remains open.
-- [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
+- [x] docs/ExecPlans/ui_window_theme_responsive_execplan.md — fixed rail/window theme and responsive
+  geometry implementation and focused/full validation are complete; final acceptance remains in the
+  product-support/release tranche.
 - [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 
 Document-flow tranche:
 
 - [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
 - [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
-- [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
-- [ ] docs/ExecPlans/ui_document_search_selection_execplan.md
+- [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md — typed fit, zoom, pan, and navigation
+  behavior is implemented and validated; final handoff status is reconciled here.
+- [x] docs/ExecPlans/ui_document_search_selection_execplan.md — bounded text search, selection,
+  highlighting, copy, and keyboard traversal are implemented and validated; final handoff status is
+  reconciled here.
 - [x] docs/ExecPlans/ui_document_signatures_review_execplan.md — bounded signature projection and
   modeless review surface are committed; the bounded later-approval permission gate is now covered
   by the verification-recovery child, while broader reopen/display policy remains open.

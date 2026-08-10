@@ -25,8 +25,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   document/search/viewer/shell/sidebar/app-frame focused set passes `223 passed`, and five real
   offscreen Qt cases cover initial fit, View shortcut dispatch, Ctrl+F focus/select-all, and
   Enter/Shift+Enter navigation; the full suite passes `1209 passed, 20 skipped, 1 warning`.
-- [x] (2026-08-10) Update this plan and relevant architecture documentation; the final commit
-  remains the handoff gate.
+- [x] (2026-08-10) Updated this plan and relevant architecture documentation; implementation and
+  validation are complete and the parent status is reconciled.
 
 ## Surprises & Discoveries
 
@@ -71,7 +71,7 @@ page-local geometry, the review session emits separate search current/quiet effe
 renders both without replacing selection overlays, and View → Find (`Ctrl+F`) focuses/selects the
 workspace query through a typed session port. Qt PDF load failures distinguish
 password/protection/parser cases; empty-text PDFs distinguish image objects from no extractable
-text without implying OCR. The final commit remains the only completion gate. The
+text without implying OCR. Implementation is complete; the parent status is the completion record. The
 viewer search geometry intentionally uses conservative per-polygon bounding rectangles;
 fragmented/multi-line visual fidelity remains a later refinement if real PDFs demonstrate excessive
 whitespace.

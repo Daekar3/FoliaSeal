@@ -34,8 +34,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-09) Focused viewer/shell/frame validation passed (`189 passed`), the real offscreen
   fit/navigation shortcut walkthrough passed (`2 passed`), the full suite passed (`1201 passed,
   20 skipped, 1 warning`), Ruff and diff checks passed, and owned Qt resources were cleaned.
-- [x] (2026-08-09) Update this plan and relevant architecture documentation with the typed fit,
-  zoom/pan ownership and recorded evidence; the final commit remains the handoff gate.
+- [x] (2026-08-09) Updated this plan and relevant architecture documentation with the typed fit,
+  zoom/pan ownership and recorded evidence; implementation and validation are complete.
 
 ## Surprises & Discoveries
 

@@ -27,7 +27,8 @@ observable offscreen acceptance, not a generic refactor.
 - [x] (2026-08-09) Add validated JSON geometry projection and restore/capture lifecycle hooks around the Qt event loop.
 - [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the named geometry/settings seams was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and offscreen Qt validation; record evidence and clean up.
-- [x] (2026-08-09) Update relevant architecture/status documentation and this plan; commit remains the final handoff gate.
+- [x] (2026-08-09) Updated relevant architecture/status documentation and this plan; the bounded
+  implementation and validation are complete, with final acceptance owned by the release tranche.
 
 ## Surprises & Discoveries
 
