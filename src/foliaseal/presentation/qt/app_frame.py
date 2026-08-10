@@ -69,9 +69,6 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     WorkspaceOpenPort,
     WorkspaceOpenService,
 )
-from foliaseal.presentation.qt.appearance_profile_editor_dialog import (
-    AppearanceProfileEditorDialog,
-)
 from foliaseal.presentation.qt.document_signatures_dialog import DocumentSignaturesDialog
 from foliaseal.presentation.qt.placement_profile_editor_dialog import (
     PlacementProfileEditorDialog,
@@ -133,6 +130,8 @@ class QtAppFrameBindings:
     q_widget: type[Any] | None = None
     q_hbox_layout: type[Any] | None = None
     q_vbox_layout: type[Any] | None = None
+    q_scroll_area: type[Any] | None = None
+    q_group_box: type[Any] | None = None
     q_list_widget: type[Any] | None = None
     q_splitter: type[Any] | None = None
     q_text_edit: type[Any] | None = None
@@ -834,8 +833,6 @@ class FoliaSealAppFrame:
             on_rename_certificate=self._rename_certificate,
             on_delete_certificate=self._delete_certificate,
             on_configure_certificate=self._configure_certificate,
-            on_create_appearance=self._open_appearance_profile_editor,
-            on_edit_appearance=self._edit_appearance_profile,
             on_create=self._open_signature_preset_editor,
             on_edit=self._edit_signature_preset,
             on_create_placement=self._open_placement_profile_editor,
@@ -1103,36 +1100,6 @@ class FoliaSealAppFrame:
 
     def _open_signature_preset_editor(self) -> bool:
         return self._run_signature_preset_editor()
-
-    def _open_appearance_profile_editor(self) -> bool:
-        return self._run_appearance_profile_editor()
-
-    def _edit_appearance_profile(self, ref: ReusableObjectRef) -> bool:
-        return self._run_appearance_profile_editor(initial_ref=ref)
-
-    def _run_appearance_profile_editor(
-        self,
-        *,
-        initial_ref: ReusableObjectRef | None = None,
-    ) -> bool:
-        saved = False
-
-        def on_saved() -> None:
-            nonlocal saved
-            saved = True
-            if self._reusable_object_library is not None:
-                self._reusable_object_library.refresh()
-
-        editor = AppearanceProfileEditorDialog(
-            bindings=self._bindings,
-            parent=self.window,
-            library=self._reusable_objects,
-            initial_ref=initial_ref,
-            on_saved=on_saved,
-            on_error=self._emit_error,
-        )
-        editor.open()
-        return saved
 
     def _edit_signature_preset(self, ref: ReusableObjectRef) -> bool:
         return self._run_signature_preset_editor(initial_ref=ref)
@@ -1959,6 +1926,8 @@ class QtAppFrameAdapter:
             q_widget=getattr(qt_widgets, "QWidget"),
             q_hbox_layout=getattr(qt_widgets, "QHBoxLayout"),
             q_vbox_layout=getattr(qt_widgets, "QVBoxLayout"),
+            q_scroll_area=getattr(qt_widgets, "QScrollArea"),
+            q_group_box=getattr(qt_widgets, "QGroupBox"),
             q_list_widget=getattr(qt_widgets, "QListWidget"),
             q_splitter=getattr(qt_widgets, "QSplitter"),
             q_text_edit=getattr(qt_widgets, "QTextEdit"),

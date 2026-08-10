@@ -231,6 +231,145 @@ def test_library_exposes_appearance_create_and_edit_actions() -> None:
     assert edited == [service.view().appearances[0].ref.object_id]
 
 
+def test_library_owns_nested_appearance_editor_and_discards_dirty_child() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    bindings = _fake_bindings()
+    dialog = ReusableObjectLibraryDialog(
+        bindings=bindings,
+        parent=None,
+        library=service,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.appearance_editor
+    assert editor is not None
+    assert dialog.controls.detail_view.visible is False
+    assert dialog.controls.appearance_editor_host.visible is True
+    assert (
+        "Signature Library / Appearances / New appearance"
+        in editor.controls.breadcrumb_label.text()
+    )
+    assert "Sample preview (synthetic data" in editor.controls.sample_preview_label.text()
+
+    editor.controls.name_input.setText("Discarded appearance")
+    assert editor.dirty is True
+    bindings.q_message_box.next_result = bindings.q_message_box.Discard
+    editor.controls.cancel_button.click()
+
+    assert dialog.controls.appearance_editor is None
+    assert service.view().appearance_names == ()
+    assert dialog.controls.detail_view.visible is True
+
+
+def test_nested_appearance_editor_save_preserves_identity_and_preview_is_not_persisted() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    original_ref = service.view().appearances[0].ref
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.edit_button.click()
+    editor = dialog.controls.appearance_editor
+    assert editor is not None
+    assert "Sample signer: Ada Example" in editor.controls.sample_preview_label.text()
+    editor.controls.name_input.setText("Approved")
+    editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Signed by Board")
+    editor.controls.save_button.click()
+
+    assert dialog.controls.appearance_editor is None
+    updated = service.view().appearances[0]
+    assert updated.ref == original_ref
+    assert updated.display_name == "Approved"
+    profile = service.resolve(original_ref)
+    assert profile.appearance.signer_label_prefix == "Signed by Board"
+    assert "Ada Example" not in str(profile.appearance)
+
+
+def test_nested_appearance_editor_continue_keeps_dirty_child_until_discard() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    bindings = _fake_bindings()
+    dialog = ReusableObjectLibraryDialog(
+        bindings=bindings,
+        parent=None,
+        library=service,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.edit_button.click()
+    editor = dialog.controls.appearance_editor
+    assert editor is not None
+    editor.controls.name_input.setText("Unsaved")
+
+    bindings.q_message_box.next_result = bindings.q_message_box.Cancel
+    editor.controls.cancel_button.click()
+    assert dialog.controls.appearance_editor is editor
+    assert editor.dirty is True
+
+    bindings.q_message_box.next_result = bindings.q_message_box.Discard
+    editor.controls.cancel_button.click()
+    assert dialog.controls.appearance_editor is None
+    assert service.view().appearance_names == ("Approval",)
+
+
+def test_nested_appearance_editor_removes_old_widget_on_reopen() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+
+    for _ in range(3):
+        dialog.controls.create_button.click()
+        editor = dialog.controls.appearance_editor
+        assert editor is not None
+        editor.controls.cancel_button.click()
+
+    assert dialog.controls.appearance_editor is None
+    assert dialog._appearance_editor_host_layout.items == []  # noqa: SLF001
+
+
+def test_nested_appearance_editor_restores_parent_catalog_selection_and_draft() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+    parent_ref = dialog._session.selected_ref  # noqa: SLF001
+    dialog.controls.name_input.setText("Parent draft")
+    dialog.controls.create_button.click()
+    assert dialog.controls.appearance_editor is not None
+
+    dialog.controls.appearance_editor.controls.cancel_button.click()
+
+    assert dialog._session.catalog.value == "Appearances"  # noqa: SLF001
+    assert dialog._session.selected_ref == parent_ref  # noqa: SLF001
+    assert dialog._session.draft_name == "Parent draft"  # noqa: SLF001
+
+
 def test_library_exposes_configure_action_for_retained_certificate() -> None:
     service = ReusableSigningObjects(
         InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))

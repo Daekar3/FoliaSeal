@@ -23,7 +23,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implement the document-independent Appearance create/edit model/application/Qt path.
 - [x] (2026-08-10) Confirm no phase3 product-facing compatibility path was introduced; evidence-only phase3 modules remain outside this product slice.
 - [x] (2026-08-10) Run focused, regression, and offscreen Qt validation; clean processes and artifacts.
-- [ ] (2026-08-10) Complete the full UI_SPEC nested Library detail-pane experience and commit that follow-up slice.
+- [x] (2026-08-10) Re-audit the current worktree and confirm the remaining gap is localized to `ReusableObjectLibraryDialog` and its Appearance editor composition; no product decision is pending.
+- [x] (2026-08-10) Add a Library-owned Appearance detail/editor mode that preserves the master selection and suspends/restores the parent catalog/name draft.
+- [x] (2026-08-10) Add a visible breadcrumb/back path, a sticky preview explicitly labeled as synthetic sample data, and typed Save/Discard/Continue prompts for dirty child state.
+- [x] (2026-08-10) Prove nested Save/Cancel, parent restoration, child-widget cleanup, and real offscreen Qt mounting with focused tests.
+- [ ] (2026-08-10) Complete full-suite validation, final compliance review, documentation reconciliation, bounded GUI audit, and commit.
 
 ## Surprises & Discoveries
 
@@ -36,6 +40,18 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   inferred from the tooling limitation.
   Evidence: `collaboration.spawn_agent` returned `agent thread limit reached` after completed agents
   were interrupted; focused, regression, full-suite, Ruff, and process-cleanup checks were run here.
+- Observation: a modeless nested editor must remove its child widget on every exit, not merely hide
+  it, because repeated Create/Back cycles otherwise retain signal-connected editors in the detail
+  layout.
+  Evidence: the compliance review reproduced host-layout growth from 1 to 3 children before the
+  fix; `test_nested_appearance_editor_removes_old_widget_on_reopen` now proves zero children after
+  three cycles.
+- Observation: a textual synthetic preview can satisfy the labeled/non-persistent contract while
+  the final rendered preview remains a separate fidelity concern, provided it stays outside the
+  scrolling controls and is explicitly labeled.
+  Evidence: the widget keeps the preview label above a `QScrollArea`; the real offscreen test reads
+  `Sample preview (synthetic data — never saved)` and the persisted `SignatureAppearance` contains
+  no synthetic signer text.
 
 ## Decision Log
 
@@ -45,16 +61,35 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible appearance editor transaction and nested navigation outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: make `ReusableObjectLibraryDialog` own the nested Appearance editor session instead of opening another modal dialog.
+  Rationale: UI_SPEC SUR03/SUR04 and WF03/WF06 require the detail column to be replaced by a breadcrumb-bearing child editor while the parent draft remains suspended; the existing modal `AppearanceProfileEditorDialog` cannot provide that topology.
+  Date/Author: 2026-08-10 / Codex
+- Decision: reuse the existing typed Appearance draft and `QtVisibleSignatureSetupForm` appearance controls, but compose only content/style controls in the Library detail pane.
+  Rationale: this preserves schema and persistence policy while avoiding a second implementation of image/text fields; document placement and active-signature invalidation are outside this slice.
+  Date/Author: 2026-08-10 / Codex
+- Decision: represent dirty child state with an explicit session object/callback boundary rather than reading widget internals from `AppFrame`.
+  Rationale: switching catalogs, Back, and closing the modeless Library must resolve Save, Discard, or Continue editing deterministically and remain testable without a live document.
+  Date/Author: 2026-08-10 / Codex
+- Decision: retain `AppearanceProfileEditorDialog` only as a wrapper around
+  `AppearanceProfileEditorWidget` for direct/test callers while removing it from production
+  AppFrame routing.
+  Rationale: the nested Library path is the governing UI topology, but deleting the compatibility
+  wrapper in the same behavior slice would unnecessarily break existing direct consumers; its
+  retirement condition is no production or test caller outside the wrapper contract.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-The bounded slice is implemented. `AppearanceProfileEditorDialog` reuses the existing
+The bounded prerequisite slice is implemented. `AppearanceProfileEditorDialog` now wraps the shared
+`AppearanceProfileEditorWidget`, which reuses the existing
 `QtVisibleSignatureSetupForm` appearance controls, opens from Library Create/Edit without an
 active document, and persists through `SaveAppearance.appearance_profile_id` so renaming an edited
 profile preserves its stable reference. Cancel leaves the catalog unchanged. The implementation is
-intentionally modal; UI_SPEC's nested breadcrumb/detail-pane navigation, labeled sample preview,
-reason/location defaults, dirty-detail prompts, and active-placement invalidation prompts remain
-open follow-up work.
+intentionally modal; the current follow-up migrates the same transaction into the Library detail
+pane. The follow-up closes the breadcrumb/detail-pane, labeled sample preview, suspended-parent,
+dirty-child, and child-lifecycle gaps for production Appearance Create/Edit. It intentionally does
+not claim reason/location defaults, preset-child return, active-placement invalidation, or final
+renderer-fidelity validation.
 
 ## Context and Orientation
 
@@ -76,15 +111,25 @@ rebaselines, V2 features, or packaging work.
 
 ## Plan of Work
 
-Move reusable Appearance editing into the Library detail pane with content-first controls, synthetic
-sample preview labeled as sample, breadcrumb navigation, and suspended parent preset draft. The
-bounded prerequisite now exists as a document-independent modal editor: it provides the typed
-Save/Cancel transaction and stable-id persistence seam without silently applying or closing a parent
-document draft. The remaining nested detail-pane and preview behavior must be implemented as a
-separate follow-up rather than hidden behind the modal adapter. Add or preserve typed application
-and public Qt-port boundaries rather than reaching through private widgets. Keep schema and
-terminology aligned with the frozen documents. When a legacy path is replaced, prove its callers
-are migrated before deleting it.
+Start at `src/foliaseal/presentation/qt/app_frame_profile_library.py`, where the modeless
+`ReusableObjectLibraryDialog` already owns the three-column catalog and currently routes Appearance
+Create/Edit to `AppFrame._run_appearance_profile_editor`. Replace that route with a Library-owned
+child-editor state that stores the prior catalog/selection/detail snapshot, mounts the existing
+typed Appearance draft controls in the detail column, and exposes a breadcrumb such as
+`Signature Library / Appearances / <name>`. The parent selection must remain suspended while the
+child is open. Back, catalog switching, and Library close must call one typed resolver that offers
+Save, Discard, or Continue editing when the child is dirty; Continue leaves the child active, Save
+commits through the existing `SaveAppearance` application boundary and restores the parent detail,
+and Discard restores the pre-edit snapshot without changing the catalog.
+
+The child detail must be content-first and include the existing appearance/content controls plus a
+sticky preview area with an always-visible `Sample preview` label. Synthetic signer data is local
+to the preview widget and must never enter the persisted draft. Do not add placement, document
+identity, active-placement invalidation, image normalization, or fit-validation policy here. Add
+public typed methods/callbacks for the Library session and keep `AppFrame` responsible only for
+composition; do not reach through private Qt widget fields. Once all Appearance callers use the new
+Library-owned path and tests prove the modal route is no longer needed, remove only dead compatibility
+code made obsolete by this migration and record the removal.
 
 ## Milestones
 
@@ -102,8 +147,8 @@ before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install
 dependency installation is unavailable, stop and report that environment blocker; do not silently
 fall back to a system Python or system Qt installation.
 
-    rg -n -e 'Save|Cancel|Appearance|preview' src/foliaseal/presentation/qt/signing_workspace_refinement_dialog.py src/foliaseal/presentation/qt/visible_signature_setup_form.py
-    .venv/bin/pytest -q tests/unit/test_qt_visible_signature_setup_form.py tests/unit/test_reusable_signing_models.py tests/unit/test_signature_preview_lifecycle.py
+    rg -n -e 'Save|Cancel|Appearance|preview|breadcrumb|dirty' src/foliaseal/presentation/qt/app_frame_profile_library.py src/foliaseal/presentation/qt/appearance_profile_editor_dialog.py src/foliaseal/presentation/qt/visible_signature_setup_form.py
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame_profile_library.py tests/unit/test_qt_visible_signature_setup_form.py tests/unit/test_reusable_signing_models.py tests/unit/test_signature_preview_lifecycle.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -117,21 +162,24 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. The bounded slice evidence is `tests/unit/test_qt_app_frame_profile_library.py` and
-the offscreen Qt regression suite; the exact input sequence is create/edit from the Library's
-Appearances catalog, change signer-label/name, Save or Cancel, and verify catalog identity/state.
-Record the exact input sequence, widget state, expected observation, evidence path, and cleanup
-result; the bounded timeout is only a lifecycle check.
+walkthrough. The exact input sequence is: open Manage Signature Library, choose Appearances, choose
+Create or Edit, observe the breadcrumb and `Sample preview` label, change a field, choose Back and
+verify the Save/Discard/Continue prompt, then Save or Discard and verify that the parent detail and
+stable catalog identity are restored. Record the exact input sequence, widget state, expected
+observation, evidence path, and cleanup result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance for this bounded slice is behavioral: creating or editing an Appearance from the
-document-independent Library surface writes only after Save, preserves stable identity on edit,
-and leaves the previous persisted state unchanged on Cancel. The full nested behavior remains open:
-creating an Appearance from a suspended preset must return to that editor with the reference attached
-only after Save, and Cancel at either level must preserve the previous persisted state. Focused tests
-must pass, shared-code changes must leave the full suite green, and the GUI audit must record the
-visible result and cleanup.
+Acceptance for this slice is behavioral: creating or editing an Appearance from the modeless Library
+replaces only the detail column, displays a breadcrumb and labeled synthetic preview, keeps the
+parent selection suspended, and writes only after an explicit Save. Back, catalog switching, and
+close resolve dirty child state with Save, Discard, or Continue; Discard leaves the previous
+persisted state and selection unchanged; Save preserves stable identity on edit and restores the
+parent detail. Focused tests must cover Create, Edit, Save, Cancel/Discard, dirty prompts, and
+synthetic-preview non-persistence. Shared-code changes must leave the full suite green, and the GUI
+audit must record the visible result and cleanup. Preset-child return, reason/location defaults,
+active-placement invalidation, and renderer-fidelity validation remain explicitly outside this
+slice and must not be claimed as complete here.
 
 ## Evidence Record
 
@@ -144,7 +192,7 @@ Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
-Bounded evidence (2026-08-10):
+Bounded prerequisite evidence (2026-08-10):
 
 - `.venv/bin/pytest -q tests/unit/test_qt_app_frame_profile_library.py tests/unit/test_reusable_signing_objects.py` — 20 passed.
 - `.venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_qt_signing_shell.py tests/unit/test_qt_visible_signature_setup_form.py` — 157 passed.
@@ -155,6 +203,26 @@ Bounded evidence (2026-08-10):
   dialogs. Display-backed xcb acceptance remains unavailable and is not claimed here.
 - Remaining gaps: nested breadcrumb navigation, labeled sample preview, suspended preset return,
   reason/location defaults, dirty prompts, and active-placement invalidation.
+
+Follow-up evidence (2026-08-10):
+
+- Focused command/result: `.venv/bin/pytest -q tests/unit/test_qt_app_frame_profile_library.py tests/unit/test_qt_app_frame.py tests/integration/test_signature_library_topology.py` — 66 passed; `.venv/bin/pytest -q tests/unit/test_qt_app_frame_profile_library.py tests/unit/test_qt_visible_signature_setup_form.py` — 23 passed.
+- UI_SPEC IDs and normative SVG: `SUR03`, `SUR04`, `WF03`, `WF06`; `docs/ui/appearance-profile-editor-exploratory.svg`.
+- GUI input sequence: open the modeless Library, choose Appearances, choose Create, observe
+  `Signature Library / Appearances / New appearance` and `Sample preview (synthetic data — never
+  saved)`, edit the name, choose Back, select Discard, and verify the parent detail returns without
+  a catalog entry. A real offscreen Qt test also saves `Offscreen appearance` and verifies the
+  nested editor closes and the catalog contains the saved name. Repeated open/back cycles remove the
+  child widget from the host layout.
+- `.venv/bin/pytest -q` — 1357 passed, 20 skipped, 1 existing Pillow deprecation warning.
+- `.venv/bin/ruff check src tests` and `git diff --check` — clean.
+- Bounded lifecycle command with isolated `XDG_CONFIG_HOME`/`XDG_CACHE_HOME` exited 1 with the
+  known `SingleInstanceUnavailable` endpoint error; no FoliaSeal/PySide6/pytest processes remained
+  and the temporary audit root was removed. This environment limitation does not invalidate the
+  offscreen Qt integration test and is not claimed as display-backed acceptance.
+- Compatibility proof: production `app_frame.py` no longer imports or routes through
+  `AppearanceProfileEditorDialog`; the remaining wrapper is only directly exercised by its focused
+  compatibility tests and is documented with its retirement condition above.
 
 ## Idempotence and Recovery
 
@@ -170,10 +238,16 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 ## Interfaces and Dependencies
 
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
-or workspace ports. Create tests/unit/test_qt_appearance_editor_transaction.py for nested Save/Cancel
-behavior. The final behavior must be exercised by tests/unit/test_qt_visible_signature_setup_form.py,
-tests/unit/test_signature_appearance_models.py, and that new test. Any temporary adapter must
-name its remaining consumer and retirement condition in this plan.
+or workspace ports. Extend or create
+`tests/unit/test_qt_appearance_editor_transaction.py` for nested Save/Cancel, dirty-resolution,
+breadcrumb, and synthetic-preview non-persistence behavior. The final behavior must be exercised by
+`tests/unit/test_qt_app_frame_profile_library.py`,
+`tests/unit/test_qt_visible_signature_setup_form.py`,
+`tests/unit/test_signature_appearance_models.py`, and that transaction test. Any temporary adapter
+must name its remaining consumer and retirement condition in this plan.
 
-Revision note: 2026-08-09 / Codex
-Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Reconciled after a fresh checkout review. The follow-up slice is now explicit about the
+Library-owned nested detail mode, suspended parent state, dirty-resolution contract, labeled
+synthetic preview, exact UI_SPEC/SVG evidence, and forbidden scope so the implementation can be
+completed and audited without relying on prior conversation.

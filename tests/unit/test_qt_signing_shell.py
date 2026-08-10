@@ -221,6 +221,9 @@ class _FakeWidget:
         if callable(close_event):
             close_event(None)
 
+    def deleteLater(self):  # noqa: N802
+        self.deleted = True
+
 
 class _FakeLayout:
     def __init__(self, parent=None) -> None:
@@ -239,6 +242,9 @@ class _FakeLayout:
 
     def addLayout(self, layout, *args):  # noqa: N802
         self.items.append((layout, args))
+
+    def removeWidget(self, widget):  # noqa: N802
+        self.items = [item for item in self.items if item[0] is not widget]
 
     def addRow(self, *args):  # noqa: N802
         for item in args:
@@ -404,13 +410,16 @@ class _FakeComboBox(_FakeWidget):
 class _FakeMessageBox:
     Yes = 1
     No = 0
+    Save = 2
+    Discard = 3
+    Cancel = 4
 
     def __init__(self) -> None:
         self.calls = []
         self.next_result = self.Yes
 
-    def question(self, parent, title, text):  # noqa: N802
-        self.calls.append((parent, title, text))
+    def question(self, parent, title, text, *buttons):  # noqa: N802
+        self.calls.append((parent, title, text, *buttons))
         return self.next_result
 
     def warning(self, parent, title, text):  # noqa: N802
