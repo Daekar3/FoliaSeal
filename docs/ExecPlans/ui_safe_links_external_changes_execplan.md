@@ -16,8 +16,17 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
 - [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
 - [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
+- [x] docs/ExecPlans/ui_safe_links_source_safety_contracts_execplan.md provides pure link and
+  source-change decisions; renderer/workspace integration remains open.
 
 ## Progress
+
+- [x] (2026-08-10) Explorer review established that the original full GUI slice is not yet
+  implementable: the viewer is raster-only and workspace reload would discard the active draft.
+  The prerequisite contract child now supplies the policy matrix without claiming GUI behavior.
+- [x] (2026-08-10) The prerequisite contract child now reports 14 focused tests and a green full
+  suite; this parent remains open for PDF link extraction, Pan-only hit testing, draft-preserving
+  reload, and the condition-only Qt banner.
 
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
