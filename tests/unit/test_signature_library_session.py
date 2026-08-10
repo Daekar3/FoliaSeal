@@ -164,6 +164,51 @@ def test_certificate_catalog_projects_one_combined_entry_and_unconfigured_files(
     assert rows[0].ref.object_id == "managed-configured"
 
 
+def test_certificate_catalog_keeps_pinned_retained_rows_before_unpinned_configured_rows() -> None:
+    retained = ManagedCertificate(
+        schema_version=1,
+        managed_certificate_id="managed-retained",
+        display_name="Retained certificate",
+        storage_filename="retained.p12",
+        source_kind="imported",
+        created_at="2026-08-10T00:00:00Z",
+        pinned=True,
+        subject_summary=ManagedCertificateSubjectSummary(common_name="Retained"),
+    )
+    configured = ManagedCertificate(
+        schema_version=1,
+        managed_certificate_id="managed-configured",
+        display_name="Configured certificate",
+        storage_filename="configured.p12",
+        source_kind="created",
+        created_at="2026-08-10T00:00:00Z",
+        subject_summary=ManagedCertificateSubjectSummary(common_name="Configured"),
+    )
+    session = SignatureLibrarySession(
+        _session()._library,  # noqa: SLF001 - test keeps one service boundary
+        CertificateCatalog(
+            schema_version=1,
+            managed_certificates=(configured, retained),
+            certificate_configurations=(
+                CertificateConfiguration(
+                    schema_version=1,
+                    certificate_configuration_id="config-configured",
+                    display_name="Configured signing",
+                    managed_certificate_id="managed-configured",
+                    save_password=False,
+                ),
+            ),
+        ),
+        initial_catalog=LibraryCatalog.CERTIFICATES,
+    )
+
+    rows = session.rows()
+
+    assert rows[0].ref.object_id == "managed-retained"
+    assert rows[0].pinned is True
+    assert rows[1].configured is True
+
+
 def test_certificate_catalog_expiration_sort_puts_known_dates_first_and_unknown_last() -> None:
     session = SignatureLibrarySession(
         _session()._library,  # noqa: SLF001 - test keeps one service boundary

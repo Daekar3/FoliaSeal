@@ -252,6 +252,8 @@ class ReusableObjectLibraryDialog:
             self._show_error("Select a saved object before deleting it.")
             return False
         ref, _name = selected
+        if not self._confirm_delete(_name):
+            return False
         if not isinstance(ref, ReusableObjectRef):
             if self._on_delete_certificate is None or not self._on_delete_certificate(ref):
                 return False
@@ -481,7 +483,22 @@ class ReusableObjectLibraryDialog:
                 and ref.configuration_id is None
                 and self._on_configure_certificate is not None
             ):
-                return self._on_configure_certificate(ref)
+                configured = self._on_configure_certificate(ref)
+                if configured:
+                    self.refresh()
+                    refreshed_ref = next(
+                        (
+                            candidate.ref
+                            for candidate in self._rows
+                            if isinstance(candidate.ref, CertificateLibraryRef)
+                            and candidate.ref.object_id == ref.object_id
+                        ),
+                        None,
+                    )
+                    self._session.select(refreshed_ref)
+                    self._render_master_list()
+                    self._render_selection()
+                return configured
             self._show_error("Select a retained certificate file to configure it.")
             return False
         if not isinstance(ref, ReusableObjectRef):
@@ -714,3 +731,22 @@ class ReusableObjectLibraryDialog:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
             warning(self.controls.dialog, "Reusable signing object error", message)
+
+    def _confirm_delete(self, display_name: str) -> bool:
+        """Require an explicit Yes before any catalog deletion is dispatched."""
+
+        message_box = getattr(self._bindings, "q_message_box", None)
+        question = getattr(message_box, "question", None)
+        yes = getattr(message_box, "Yes", None)
+        if yes is None:
+            standard_button = getattr(message_box, "StandardButton", None)
+            yes = getattr(standard_button, "Yes", None)
+        if not callable(question) or yes is None:
+            self._show_error("Deletion confirmation is unavailable; nothing was deleted.")
+            return False
+        result = question(
+            self.controls.dialog,
+            "Delete saved object?",
+            f"Delete saved object '{display_name}'?",
+        )
+        return result == yes

@@ -15,7 +15,11 @@ from foliaseal.application.signature_library_session import CertificateLibraryRe
 from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
 from foliaseal.presentation.qt.appearance_profile_editor_dialog import AppearanceProfileEditorDialog
 from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePresetEditorDialog
-from tests.support.signing_builders import build_certificate_catalog, build_signature_appearance
+from tests.support.signing_builders import (
+    build_certificate_catalog,
+    build_certificate_configuration,
+    build_signature_appearance,
+)
 from tests.unit.test_qt_signing_shell import _fake_bindings
 
 
@@ -250,6 +254,107 @@ def test_library_exposes_configure_action_for_retained_certificate() -> None:
     dialog.controls.edit_button.click()
 
     assert configured == [CertificateLibraryRef("managed-cert-default")]
+
+
+def test_library_refreshes_retained_certificate_row_after_configuration() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    managed = build_certificate_catalog(certificate_configurations=())
+    configured = build_certificate_catalog(
+        managed_certificates=managed.managed_certificates,
+        certificate_configurations=(
+            build_certificate_configuration(
+                managed_certificate_id=managed.managed_certificates[0].managed_certificate_id
+            ),
+        ),
+    )
+    current = [managed]
+
+    def configure(_ref: CertificateLibraryRef) -> bool:
+        current[0] = configured
+        return True
+
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=managed,
+        certificate_catalog_provider=lambda: current[0],
+        on_configure_certificate=configure,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Certificates")
+    dialog.controls.object_selector.setCurrentIndex(0)
+
+    assert dialog.controls.edit_button.click() is None
+    assert dialog._rows[0].configured is True  # noqa: SLF001 - verifies the public row refresh
+    assert "Configured signing certificate" in dialog.controls.details_label.text()
+
+
+def test_library_delete_requires_confirmation_before_mutating_reusable_object() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    bindings = _fake_bindings()
+    dialog = ReusableObjectLibraryDialog(bindings=bindings, parent=None, library=service)
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+
+    bindings.q_message_box.next_result = bindings.q_message_box.No
+    assert dialog.delete_selected() is False
+    assert service.view().appearance_names == ("Approval",)
+    assert bindings.q_message_box.calls[-1][1:] == (
+        "Delete saved object?",
+        "Delete saved object 'Approval'?",
+    )
+
+    bindings.q_message_box.next_result = bindings.q_message_box.Yes
+    assert dialog.delete_selected() is True
+    assert service.view().appearance_names == ()
+
+
+def test_library_delete_confirmation_gates_certificate_callback() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    bindings = _fake_bindings()
+    deleted: list[CertificateLibraryRef] = []
+    dialog = ReusableObjectLibraryDialog(
+        bindings=bindings,
+        parent=None,
+        library=service,
+        certificate_catalog=build_certificate_catalog(certificate_configurations=()),
+        on_delete_certificate=lambda ref: deleted.append(ref) or True,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Certificates")
+    dialog.controls.object_selector.setCurrentIndex(0)
+
+    bindings.q_message_box.next_result = bindings.q_message_box.No
+    assert dialog.delete_selected() is False
+    assert deleted == []
+
+    bindings.q_message_box.next_result = bindings.q_message_box.Yes
+    assert dialog.delete_selected() is True
+    assert deleted == [CertificateLibraryRef("managed-cert-default")]
+
+
+def test_library_expiration_sort_propagates_persisted_preference() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    preferences: list[tuple[str, str]] = []
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        on_preferences_changed=lambda catalog, sort: preferences.append((catalog, sort)),
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Certificates")
+    dialog.controls.sort_selector.setCurrentIndex(2)
+
+    assert preferences[-1] == ("Certificates", "expiration_soonest")
 
 
 def test_library_exposes_expiration_sort_choice() -> None:

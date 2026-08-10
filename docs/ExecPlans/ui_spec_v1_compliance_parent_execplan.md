@@ -63,21 +63,24 @@ Reusable-object and certificate tranche:
 
 - [x] docs/ExecPlans/ui_signature_library_topology_execplan.md — bounded modeless topology, catalog
   navigation/search, certificate projection, and transactional name draft landed; nested editors,
-  certificate create/import/configure flows, expiration sorting, and dirty prompts remain open;
-  catalog pin/duplicate/name/sort behavior is covered by the completed follow-on child.
+  certificate create/import/configure flows and dirty prompts remain open; catalog
+  pin/duplicate/name/sort behavior is covered by the completed follow-on child.
 - [x] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md — persistent pins, duplicate
   semantics, normalized names, configured-first certificate projection, Name sorting, certificate
-  pin/rename/delete routing, and Library preferences validated in `ecf4f73ab`.
+  pin/rename/delete routing, confirmation-safe mutation lifecycle, expiration preference propagation,
+  and Library preferences validated in the current follow-up slice.
 - [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
 - [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
 - [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — typed inspection,
   atomic import, and retained-file Configure are committed in `ad712ad7e` and `498d5c791`;
-  expiration sorting and the broader certificate lifecycle remain open.
+  expiration sorting is completed by the dedicated validity child; the broader certificate
+  lifecycle remains open.
 - [x] docs/ExecPlans/ui_certificate_create_export_password_execplan.md — guided five-year create,
   password-confirmed identity fields, password-validated encrypted backup, secure remember/
   preserve/disable, and deletion/reference behavior are implemented and validated in the current
-  slice; expiration sorting and password change remain open.
+  slice; expiration sorting is completed by the dedicated validity child and password change remains
+  open.
 - [x] docs/ExecPlans/ui_certificate_validity_expiration_sort_execplan.md — persist public issuer,
   validity, subject-DN, and fingerprint metadata and expose the already-declared expiration sort;
   focused/full validation and cleanup are recorded in the child.
@@ -110,7 +113,9 @@ Release tranche:
   any child that persists reusable objects.
 - [ ] (2026-08-09) Resolve the live contract blockers identified during review: default GUI signing
   execution, placement-schema alignment, Library/AppSettings restart state, and a real
-  single-instance process boundary.
+  single-instance process boundary. The first three now have bounded implementations and evidence;
+  the remaining acceptance limitation is display-backed single-instance forwarding in this
+  environment, which still reports `SingleInstanceUnavailable` with an isolated endpoint.
 - [x] (2026-08-09) Completed the first foundation slice: no-document launch now exposes direct Open
   PDF and Signature Library actions with focused unit/integration evidence and clean teardown.
 - [x] (2026-08-09) Completed the File-command foundation slice: a typed registry now routes Open,
@@ -146,9 +151,15 @@ Release tranche:
   Duplicate/Pin, dirty prompts, and Library-specific preferences remain open in their owning plans.
 - [x] (2026-08-10) Implemented the catalog search/sort/pinning foundation: persistent pins now cover
   reusable and certificate records, duplicate objects reset pin state, names are case-insensitively
-  unique, pinned rows sort first, and Library catalog/sort preferences persist. Certificate expiration
-  sorting, nested editors, and dirty-detail prompts remain open in owning children; typed certificate
-  pin/rename/delete routing now exists and configured rows sort before retained unconfigured files.
+  unique, pinned rows sort first, and Library catalog/sort preferences persist. Certificate validity
+  metadata and expiration sorting now live in the dedicated child; typed certificate
+  pin/rename/delete routing, confirmation-safe mutation, and configured rows before retained
+  unconfigured files are covered here.
+- [x] (2026-08-10) Closed the Library mutation-lifecycle follow-up: successful retained-certificate
+  Configure refreshes/reselects the open modeless row; reusable-object and certificate Delete
+  actions require explicit Yes confirmation before dispatch; expiration preference propagation and
+  pinned-versus-configured precedence have focused coverage. Full regression is `1277 passed, 20
+  skipped, 1 warning`; bounded GUI launch remains limited by the isolated single-instance endpoint.
 - [x] (2026-08-10) Added the document-independent preset-editor increment: Library Create/Edit now
   open a modal Save/Cancel editor that writes stable appearance, placement, and certificate
   references without an active PDF; Appearance editing, reason/location defaults, dirty prompts,
@@ -172,7 +183,8 @@ Release tranche:
   has a typed, non-mutating Inspect step for identity, issuer, validity, private-key presence, and
   warnings, then revalidates before the existing atomic configured-entry commit. Retained-file
   Configure is now reachable from the Library and creates a typed configuration without changing
-  the managed file; expiration sorting and create/export/password lifecycle remain open.
+  the managed file; expiration sorting is now covered by the validity child, while create/export/
+  password lifecycle remains open here.
 - [x] (2026-08-10) Implemented the certificate create/export/password lifecycle slice: guided
   five-year self-signed creation now accepts full-name identity fields with confirmation, backup
   export validates the existing encrypted PKCS#12 password, and management Save preserves,
@@ -300,8 +312,8 @@ Focused and full validation remained green through the final loop (`1185 passed,
 1 warning`), with bounded CLI audits cleaning up their isolated roots and recording the environment's
 `SingleInstanceUnavailable` local-endpoint limitation.
 
-The parent is not complete. All 29 child checkboxes remain open because the remaining requirements
-include full document lifecycle/recovery, Library topology and transactions, certificate flows,
+The parent is not complete. Several child checkboxes remain open because the remaining requirements
+include full document lifecycle/recovery, nested Library transactions and editors, certificate flows,
 pointer/keyboard placement, preview fidelity, atomic sign/write/verification/recovery, complete
 Edit/View/Signing/Help command surfaces, rail divider/Library/monitor/DPI persistence, accessibility
 and packaged-release acceptance. The bounded slices deliberately recorded these gaps instead of
@@ -545,3 +557,7 @@ paths, environment preflight, active-versus-historical corpus guidance, and full
 Updated after the document-lifecycle slice review to record candidate prepare/commit ordering,
 typed dirty-draft/secret lifecycle seams, consequence-verb close policy, real offscreen native-close
 evidence, and the environment-specific display/socket limitations without claiming crash recovery.
+Updated after the Library mutation-lifecycle slice to reconcile completed certificate expiration
+sorting, confirmation-safe deletion, retained-certificate Configure refresh/reselection, and the
+current `1277 passed, 20 skipped, 1 warning` regression evidence; remaining open children are not
+treated as complete from these bounded results.

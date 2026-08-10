@@ -35,16 +35,43 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   and the merged identity semantics are now explicit.
 - [x] (2026-08-10) Ran focused, regression, offscreen GUI, static, diff, and process-cleanup
   validation; no owned FoliaSeal/PySide6/pytest process remains.
-- [x] (2026-08-10) Updated architecture/parent documentation; commit is the remaining handoff gate.
+- [x] (2026-08-10) Updated architecture documentation for the Library mutation boundary; the
+  current follow-up commit is the remaining handoff gate.
 - [x] (2026-08-10) Reconciled the former expiration deferral with
   `ui_certificate_validity_expiration_sort_execplan.md`: this child owns row identity ordering while
   the certificate child owns public validity metadata and the expiration-specific control.
+- [x] (2026-08-10) Fresh compliance review identified the remaining Library mutation-lifecycle gap;
+  successful retained-certificate configuration must refresh an already-open Library, and every
+  destructive Delete action must ask for explicit confirmation before invoking a mutation callback.
+- [x] (2026-08-10) Added red Qt-boundary coverage for configure-to-row refresh, Delete cancellation,
+  referenced-delete preservation, and expiration-sort preference propagation; the implementation and
+  complete validation are recorded in the subsequent checked entries.
+- [x] (2026-08-10) Added red coverage for configure-to-row refresh, Delete cancellation/acceptance
+  for reusable and certificate rows, expiration preference propagation, and global pinned-versus-
+  configured precedence; the new focused suite initially failed on the two missing UI behaviors.
+- [x] (2026-08-10) Implemented confirmation-gated Delete and successful Configure refresh/reselect
+  in `ReusableObjectLibraryDialog` without moving reference or persistence policy into Qt.
+- [x] (2026-08-10) Focused mutation/catalog/session tests pass: `22 passed`; Ruff and
+  `git diff --check` are clean for the changed modules.
+- [x] (2026-08-10) Full regression passes: `1277 passed, 20 skipped, 1 warning in 48.66s`; the
+  warning is the pre-existing Pillow `Image.getdata` deprecation in `tests/unit/test_phase3_harness.py`.
+- [x] (2026-08-10) Bounded offscreen GUI launch reached the known isolated single-instance socket
+  limitation (`SingleInstanceUnavailable`, exit code 1) before frame creation; process audit was
+  empty and `/tmp/foliaseal-library-audit-BiU3I7` was removed.
 
 ## Surprises & Discoveries
 
 - Observation: catalog persistence is implemented separately from the AppSettings restart state;
   this child owns the explicit bridge for last-catalog, sort, and stable pin semantics.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: `_edit_selected_object()` returned the retained-certificate configuration callback
+  without refreshing the modeless Library, so the visible row could remain stale until a later
+  reopen or unrelated refresh. Evidence: `src/foliaseal/presentation/qt/app_frame_profile_library.py`
+  called `self._on_configure_certificate(ref)` directly at the certificate branch.
+- Observation: `delete_selected()` invoked reusable-object and certificate deletion callbacks
+  without a modal question, contrary to UI_SPEC WF06 and the modal destructive-decision topology.
+  Evidence: the method dispatched directly to `ReusableSigningObjects.execute(DeleteObject(...))`
+  or `_on_delete_certificate`.
 
 ## Decision Log
 
@@ -54,6 +81,18 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible catalog search, sort, pinning, naming, and deletion rules outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: keep destructive confirmation in the Library presentation boundary, immediately before
+  a typed mutation or AppFrame certificate callback, and treat Cancel or an unavailable question
+  API as a no-op.
+  Rationale: the application/catalog authorities already enforce references and persistence; the
+  UI boundary is the correct place to ask the user without allowing a canceled action to mutate
+  state or duplicating policy in storage.
+  Date/Author: 2026-08-10 / Codex
+- Decision: refresh the modeless Library only after a successful retained-certificate configure
+  callback and preserve the existing session/search/sort state while rebuilding its rows.
+  Rationale: configuration changes the merged certificate row identity, so a refresh is necessary
+  for truthful status while the session already owns safe selection/search state.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
@@ -64,6 +103,13 @@ catalog/sort choices without restoring an open window or draft.
 Certificate import/create/configure UI, nested editors, and
 dirty-detail prompts remain explicit follow-on work owned by certificate/editor children; the
 Library now routes certificate pin, rename, and delete operations through typed AppFrame callbacks.
+
+The mutation-lifecycle follow-up is implemented: successful retained-certificate configuration
+refreshes and reselects the merged row, and Delete is confirmation-gated before any reusable or
+certificate mutation. Expiration sort now has explicit Qt preference-propagation coverage, and a
+session test records the global pinned-first precedence when a pinned retained file competes with an
+unpinned configured row. Nested editors, dirty-detail prompts, and active-placement invalidation
+remain explicit follow-on boundaries.
 
 ## Context and Orientation
 
@@ -101,7 +147,14 @@ preserved while Library open state/session drafts remain non-restorable.
 Milestone 1 adds model/store tests for normalized names, stable pins, sorting, duplicate identity,
 and AppSettings keys. Milestone 2 wires the Library controls and refresh behavior through the catalog
   authority. Milestone 3 proves restart persistence and deletion safety in the GUI, then records
-  evidence and cleanup. Certificate expiration ordering remains a separate certificate-model milestone.
+  evidence and cleanup. Certificate validity metadata and expiration ordering are implemented by
+  the separate certificate-model child; this child owns the merged-row precedence and Qt preference
+  propagation that consume that result.
+Milestone 4 closes the mutation lifecycle by refreshing the open Library after successful
+certificate configuration, asking for confirmation before destructive actions, and proving the
+expiration preference reaches the persistent settings callback without changing the session-only
+search state. The milestone is complete once the focused tests, full regression, static checks, and
+bounded GUI/process cleanup are recorded below.
 
 ## Concrete Steps
 
@@ -128,14 +181,19 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
 walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+cleanup result; the bounded timeout is only a lifecycle check. The mutation follow-up must include
+the exact confirmation title/text for both reusable and certificate rows, the unchanged catalog after
+Cancel, the refreshed configured row after Configure, and the persisted
+`library_sort=expiration_soonest` callback value.
 
 ## Validation and Acceptance
 
 Acceptance is behavioral: Each of the four catalogs has predictable live filtering, pinned-first
 ordering, and Name A-Z/Z-A sorting; configured certificate rows precede retained unconfigured files;
 invalid names and referenced-object deletion are explained and
-cannot corrupt persisted references. Focused tests must pass, shared-code changes must
+cannot corrupt persisted references. Delete must ask before either mutation authority is invoked;
+Cancel leaves the catalog unchanged, while Yes reaches the existing reference checks. Successful
+retained-certificate Configure must refresh and reselect the merged row as configured. Focused tests must pass, shared-code changes must
 leave the full suite green, and the GUI audit must record the visible result and cleanup.
 
 ## Required Acceptance Cases
@@ -146,16 +204,23 @@ Referenced deletion is blocked or resolved without dangling references, duplicat
 new stable identity and start unpinned, and pinned entries remain first after rename or merged search
 results. Certificate validity metadata and expiration sorting are owned by
 `ui_certificate_validity_expiration_sort_execplan.md`; certificate pin/rename/delete are routed
-through the existing certificate authority.
+through the existing certificate authority. Delete confirmation is required before either authority
+is invoked, and a successful retained-certificate Configure refreshes the open Library row.
 
 ## Evidence Record
 
-Evidence recorded: the focused catalog/session/Qt/AppSettings command passed `58 tests`; the full
-regression passed `1241 passed, 20 skipped, 1 warning`; Ruff and `git diff --check` are clean; the
+Evidence recorded for the original catalog implementation: its focused catalog/session/Qt/AppSettings
+command passed `58 tests`, and its baseline regression passed `1241 passed, 20 skipped, 1 warning`;
+the mutation follow-up focused command passed `22 tests`; Ruff and `git diff --check` are clean; the
 offscreen Library/no-document integration passed `2 tests`; process audit was empty. The GUI surface
 now exposes search, Name A-Z/Z-A sort, pin, duplicate, rename, and delete controls, with configured
 certificate rows before retained unconfigured files. The certificate validity child adds the
 expiration choice without changing this catalog's identity ordering.
+The mutation follow-up adds red/green proof for confirmation-cancel and confirmation-accept,
+configure refresh/reselection, expiration preference propagation, and global pinned precedence. The
+complete regression now reports `1277 passed, 20 skipped, 1 warning`; the bounded offscreen launch
+was limited by the isolated single-instance socket before frame creation, with no owned process or
+temporary audit root remaining.
 
 Before completion, record the exact catalog/AppSettings test command and result, the GUI search,
 sort, pin, duplicate, rename, and delete sequence with observed rows, the evidence path and restart result,
@@ -196,3 +261,13 @@ deferrals.
 Revision note: 2026-08-10 / Codex
 Updated after the validity-metadata audit so the catalog child owns merged-row ordering while the
 certificate child owns public certificate metadata and the expiration-specific UI choice.
+
+Revision note: 2026-08-10 / Codex
+Reopened for the fresh mutation-lifecycle review: added the open-Library configure refresh,
+confirmation-gated Delete, explicit expiration-preference acceptance, and their required evidence so
+the plan does not overstate completion.
+
+Revision note: 2026-08-10 / Codex
+Reconciled the post-implementation architecture review: expiration sorting is now described as a
+completed dependency owned by the validity child, while this child records merged-row precedence and
+preference propagation; no functional blocker was found.
