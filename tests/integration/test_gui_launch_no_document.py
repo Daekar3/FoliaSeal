@@ -12,6 +12,7 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
+    from PySide6.QtGui import QPalette
     from PySide6.QtWidgets import QApplication, QMenu, QPushButton
 
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -24,9 +25,16 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     created_app = app is None
     if app is None:
         app = QApplication(["foliaseal"])
+    accent_before = app.palette().color(QPalette.Highlight).name()
 
     frame = QtAppFrameAdapter().create_frame(
-        app_settings=AppSettings.default(tmp_path / "home"),
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={"appearance_mode": "dark"},
+        ),
         app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
         certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
         preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
@@ -35,6 +43,11 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     app.processEvents()
 
     assert frame.current_workspace is None
+    assert frame.window.minimumWidth() == 1100
+    assert frame.window.minimumHeight() == 700
+    assert frame.appearance_mode == "dark"
+    assert app.palette().color(QPalette.Window).name() == "#202124"
+    assert app.palette().color(QPalette.Highlight).name() == accent_before
     assert {button.text() for button in frame.window.findChildren(QPushButton)} >= {
         "Open a PDF…",
         "Manage Signature Library…",

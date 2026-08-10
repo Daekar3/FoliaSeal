@@ -21,6 +21,7 @@ from foliaseal.application.signing_material_resolver import (
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+from foliaseal.infra.config.app_settings_ui import AppearanceMode, AppUiSettings
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
@@ -41,6 +42,7 @@ from foliaseal.presentation.qt.app_frame_command_model import (
 from foliaseal.presentation.qt.app_frame_profile_library import (
     ReusableObjectLibraryDialog,
 )
+from foliaseal.presentation.qt.app_frame_theme import apply_appearance_mode
 from foliaseal.presentation.qt.app_frame_workspace_action_state import (
     WorkspaceActionState,
     workspace_action_state_closed,
@@ -92,6 +94,8 @@ class QtAppFrameBindings:
     q_icon: type[Any]
     q_application: type[Any]
     qpdf_document: type[Any]
+    q_palette: type[Any] | None = None
+    q_color: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -103,6 +107,7 @@ class AppSettingsDialogControls:
     default_open_directory_browse_button: Any
     default_output_directory: Any
     default_output_directory_browse_button: Any
+    appearance_mode: Any
     save_button: Any
     cancel_button: Any
 
@@ -152,7 +157,14 @@ class AppSettingsDialog:
                 default_open_directory=self.controls.default_open_directory.text().strip(),
                 default_output_directory=(self.controls.default_output_directory.text().strip()),
                 linux_packaging_channel=self._settings.linux_packaging_channel,
-                ui=dict(self._settings.ui),
+                ui=AppUiSettings.from_mapping(
+                    {
+                        **self._settings.ui,
+                        "appearance_mode": str(
+                            self.controls.appearance_mode.currentData() or AppearanceMode.SYSTEM
+                        ),
+                    }
+                ).to_mapping(self._settings.ui),
             )
             self._settings_store.save_settings(settings)
         except (ConfigValidationError, OSError, ValueError) as exc:
@@ -184,6 +196,16 @@ class AppSettingsDialog:
             self._settings.default_output_directory
         )
         default_output_directory_browse_button = self._bindings.q_push_button("Browse...")
+        appearance_mode = self._bindings.q_combo_box()
+        for mode in AppearanceMode:
+            appearance_mode.addItem(mode.value.title(), mode.value)
+        current_mode = self._settings.ui_settings.appearance_mode.value
+        mode_index = next(
+            index
+            for index, mode in enumerate(AppearanceMode)
+            if mode.value == current_mode
+        )
+        appearance_mode.setCurrentIndex(mode_index)
         save_button = self._bindings.q_push_button("Save")
         cancel_button = self._bindings.q_push_button("Cancel")
 
@@ -191,6 +213,7 @@ class AppSettingsDialog:
         layout.addRow("", default_open_directory_browse_button)
         layout.addRow("Default output folder", default_output_directory)
         layout.addRow("", default_output_directory_browse_button)
+        layout.addRow("Appearance", appearance_mode)
         layout.addRow("", save_button)
         layout.addRow("", cancel_button)
 
@@ -217,6 +240,7 @@ class AppSettingsDialog:
             default_open_directory_browse_button=default_open_directory_browse_button,
             default_output_directory=default_output_directory,
             default_output_directory_browse_button=default_output_directory_browse_button,
+            appearance_mode=appearance_mode,
             save_button=save_button,
             cancel_button=cancel_button,
         )
@@ -249,6 +273,8 @@ class AppSettingsDialog:
 
 class FoliaSealAppFrame:
     """Application frame that owns top-level menus and document opening."""
+
+    MAIN_WINDOW_MINIMUM_SIZE = (1100, 700)
 
     def __init__(
         self,
@@ -319,6 +345,7 @@ class FoliaSealAppFrame:
 
         self.window = bindings.q_main_window()
         self.window.setWindowTitle("FoliaSeal")
+        self._apply_window_baseline()
         self._workspace_mount = QtWorkspaceMount(self.window)
         self._workspace_host = SigningWorkspaceHost(
             environment=SigningWorkspaceEnvironment(
@@ -354,6 +381,12 @@ class FoliaSealAppFrame:
     @property
     def app_settings(self) -> AppSettings:
         return self._app_settings
+
+    @property
+    def appearance_mode(self) -> str:
+        """Return the normalized application-chrome appearance mode."""
+
+        return self._app_settings.ui_settings.appearance_mode.value
 
     @property
     def workspace_action_state(self) -> WorkspaceActionState:
@@ -760,8 +793,21 @@ class FoliaSealAppFrame:
         if callable(warning):
             warning(self.window, "FoliaSeal", message)
 
+    def _apply_window_baseline(self) -> None:
+        set_minimum_size = getattr(self.window, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(*self.MAIN_WINDOW_MINIMUM_SIZE)
+        ui_settings = self._app_settings.ui_settings
+        apply_appearance_mode(
+            mode=ui_settings.appearance_mode,
+            q_application=self._bindings.q_application,
+            q_palette=self._bindings.q_palette,
+            q_color=self._bindings.q_color,
+        )
+
     def _apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
+        self._apply_window_baseline()
         self._with_current_shell_port(lambda shell_port: shell_port.apply_app_settings(settings))
 
     def _refresh_shell_certificate_configurations(self) -> None:
@@ -900,6 +946,8 @@ class QtAppFrameAdapter:
             q_icon=getattr(qt_gui, "QIcon"),
             q_application=getattr(qt_widgets, "QApplication"),
             qpdf_document=getattr(qtpdf, "QPdfDocument"),
+            q_palette=getattr(qt_gui, "QPalette"),
+            q_color=getattr(qt_gui, "QColor"),
         )
 
 

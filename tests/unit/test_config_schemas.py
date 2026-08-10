@@ -12,6 +12,7 @@ from foliaseal.application.reusable_signing_models import (
 )
 from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
+from foliaseal.infra.config.app_settings_ui import AppearanceMode
 from foliaseal.infra.config.certificate_codecs import (
     decode_certificate_catalog,
     encode_certificate_catalog,
@@ -87,6 +88,46 @@ def test_app_settings_defaults_to_home_directories(tmp_path) -> None:
     assert settings.default_open_directory == str(tmp_path)
     assert settings.linux_packaging_channel == "primary"
     assert settings.ui == {}
+    assert settings.ui_settings.appearance_mode is AppearanceMode.SYSTEM
+
+
+def test_app_settings_ui_settings_normalizes_supported_mode() -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"appearance_mode": "Dark"},
+    )
+
+    assert settings.ui_settings.appearance_mode is AppearanceMode.DARK
+
+
+def test_app_settings_ui_settings_falls_back_for_invalid_mode() -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"appearance_mode": "neon"},
+    )
+
+    assert settings.ui_settings.appearance_mode is AppearanceMode.SYSTEM
+
+
+def test_app_ui_settings_merge_keeps_unrecognized_ui_preferences() -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"appearance_mode": "light", "future_preference": 7},
+    )
+
+    assert settings.ui_settings.to_mapping(settings.ui) == {
+        "appearance_mode": "light",
+        "future_preference": 7,
+    }
 
 
 def test_app_settings_round_trip_preserves_ui_mapping() -> None:

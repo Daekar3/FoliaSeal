@@ -37,6 +37,27 @@ def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
     assert defaults["render_backend_factory"] is PopplerPdfRenderBackend
 
 
+def test_app_frame_applies_window_baseline_and_normalizes_appearance_mode(tmp_path: Path) -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "signed"),
+        default_open_directory=str(tmp_path / "source"),
+        linux_packaging_channel="unknown",
+        ui={"appearance_mode": "DARK"},
+    )
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=settings,
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    assert frame.window.minimum_size == (1100, 700)
+    assert frame.appearance_mode == "dark"
+
+
 class _FakeSignal:
     def __init__(self) -> None:
         self._callbacks = []
@@ -121,9 +142,13 @@ class _FakeMainWindow:
         self.central_widget = None
         self.menu_bar = _FakeMenuBar()
         self.show_calls = 0
+        self.minimum_size = None
 
     def setWindowTitle(self, title):  # noqa: N802
         self.title = title
+
+    def setMinimumSize(self, width, height):  # noqa: N802
+        self.minimum_size = (width, height)
 
     def menuBar(self):  # noqa: N802
         return self.menu_bar
@@ -1114,6 +1139,7 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
     dialog = frame.settings_dialog
     dialog.controls.default_open_directory.setText(str(next_open_dir))
     dialog.controls.default_output_directory.setText(str(next_output_dir))
+    dialog.controls.appearance_mode.setCurrentIndex(2)
     saved = dialog.save()
     frame.show_app_settings()
 
@@ -1122,7 +1148,7 @@ def test_app_frame_settings_dialog_saves_defaults_and_updates_open_dialog(
         default_open_directory=str(next_open_dir),
         default_output_directory=str(next_output_dir),
         linux_packaging_channel="unknown",
-        ui={},
+        ui={"appearance_mode": "dark"},
     )
     assert settings_store.load_settings() == saved
     assert frame.app_settings == saved

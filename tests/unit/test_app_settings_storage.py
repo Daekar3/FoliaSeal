@@ -55,6 +55,20 @@ def test_app_settings_store_saves_and_reloads_human_readable_json(
     assert store.load_settings() == settings
 
 
+def test_app_settings_store_projects_invalid_appearance_mode_to_system(tmp_path: Path) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "out"),
+        default_open_directory=str(tmp_path / "in"),
+        linux_packaging_channel="primary",
+        ui={"appearance_mode": "neon"},
+    )
+    store.save_settings(settings)
+
+    assert store.load_settings().ui_settings.appearance_mode.value == "system"
+
+
 def test_app_settings_store_removes_temp_file_when_replace_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

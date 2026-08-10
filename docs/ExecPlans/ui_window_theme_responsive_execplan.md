@@ -15,21 +15,26 @@ generic refactor.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are the frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 
 ## Progress
 
-- [ ] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-09) Audit the current implementation and write failing focused tests for the typed appearance/minimum-size baseline.
+- [x] (2026-08-09) Implement the smallest complete typed settings and Qt frame baseline.
 - [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; record evidence and clean up.
-- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
+- [x] (2026-08-09) Run focused, regression, and offscreen Qt validation; record evidence and clean up.
+- [ ] (2026-08-09) Update relevant architecture/status documentation, complete geometry/restart/responsive follow-up slices, then commit the whole child outcome.
 
 ## Surprises & Discoveries
 
 - Observation: window settings and geometry persistence are currently owned by the frame/settings
   boundary, so responsive and restart behavior must be tested there instead of in child widgets.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the current frame has no close-event or shutdown persistence seam, so this loop can
+  safely implement only typed appearance mode and minimum-size initialization; geometry restore,
+  monitor clamping, Library sizing, and rail persistence need later lifecycle slices.
+  Evidence: `QtAppFrameAdapter.launch()` retains the frame locally and calls `exec()` without a
+  frame shutdown hook; `FoliaSealAppFrame` previously set only its title before this slice.
 
 ## Decision Log
 
@@ -39,10 +44,21 @@ generic refactor.
 - Decision: keep this change limited to one observable window geometry, theme, and responsive baseline outcome.
   Rationale: narrow commits make GUI regressions and recovery auditable.
   Date/Author: 2026-08-09 / Codex
+- Decision: Loop 3 is bounded to typed `appearance_mode` (`system`, `light`, `dark`), safe invalid
+  fallback to `system`, and the main-frame 1100x700 minimum with UI-chrome palette application.
+  Rationale: these behaviors have existing frame/settings seams and can be proven offscreen without
+  inventing a premature geometry persistence lifecycle.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. At completion, state what a novice can now do, which tests and live evidence prove it, and any remaining gap.
+The baseline slice is implemented but this child remains open: a user receives a 1100x700 logical
+minimum frame and can select a typed System/Light/Dark preference in Application Settings; the
+selection persists through AppSettings and invalid modes safely fall back to System. Focused
+schema/storage, frame, and offscreen Qt checks prove the baseline, including preservation of the
+current native accent role while UI surface/text roles change. Geometry persistence, monitor clamping,
+Library minimums/columns, rail width, DPI rerender, and toolbar overflow remain explicitly deferred
+to later lifecycle and responsive slices.
 
 ## Context and Orientation
 
@@ -70,7 +86,7 @@ Own the canonical AppSettings UI keys and migration: appearance mode, main-windo
 maximized state, signing-rail divider, Library geometry, Library columns, last catalog, and sort.
 Enforce the 1100x700 main and 1000x650 Library
 minimums, remembered geometry/rail width, System/Light/Dark palette selection, high-DPI scaling,
-monitor clamping, and non-wrapping toolbar behavior. Do not let PDF or appearance colors follow the app palette. Add typed seams where the current code passes raw widget internals or compatibility
+monitor clamping, and non-wrapping toolbar behavior. Do not let PDF or appearance colors follow the app palette. Loop 3 establishes only the typed appearance/minimum-size baseline; add typed seams where the current code passes raw widget internals or compatibility
 kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
 old path once focused tests prove no callers remain. Keep user-facing terminology from UI_SPEC.md,
 not schema/backend names. Add typed AppSettings keys for geometry and Library preferences, write a
@@ -80,9 +96,9 @@ either implementation metadata or an explicit removal/rejection; do not create a
 
 ## Milestones
 
-Milestone 1 adds typed AppSettings keys and geometry/DPI tests, keeping Library sessions non-restored.
-Milestone 2 wires theme, minimum-size, and responsive layout behavior through the frame. Milestone 3
-proves restart preferences, scaling, and cleanup in a bounded GUI audit.
+Milestone 1 adds the typed appearance key and fallback tests. Milestone 2 wires theme and the
+1100x700 minimum through the frame. Later milestones must add a close-event-owned geometry/restart
+seam before claiming persistence, scaling, Library, rail, or toolbar acceptance.
 
 ## Concrete Steps
 
@@ -93,7 +109,7 @@ before continuing with `python3 -m venv .venv && .venv/bin/python -m pip install
 dependency installation is unavailable, stop and report that environment blocker; do not silently
 fall back to a system Python or system Qt installation.
 
-    rg -n -e 'setMinimumSize|AppSettings|geometry|theme' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/infra/config/app_settings_storage.py
+    rg -n -e 'setMinimumSize|appearance_mode|AppSettings|geometry|theme' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/infra/config
     .venv/bin/pytest -q tests/unit/test_app_settings_storage.py tests/unit/test_qt_app_frame.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
@@ -108,20 +124,23 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record resize/theme/restart inputs, observed geometry/palette, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+walkthrough. Record appearance/minimum-size inputs, observed frame state, evidence path, and cleanup
+result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: Resizing and moving across monitors preserves a reachable canvas and right rail; theme changes affect UI chrome only; persisted geometry is restored without reopening documents or dialogs. The focused regression suite must pass, the full
-suite must remain green when shared code changed, and the GUI audit must record the visible result
-and cleanup. A passing import or unit test without the stated user-visible behavior is insufficient.
+Acceptance for Loop 3 is behavioral for the baseline: typed System/Light/Dark settings round-trip with
+invalid-value fallback, the real frame enforces a 1100x700 logical minimum, and palette changes are
+limited to Qt UI chrome while rendered PDF/appearance content remains data-driven. Geometry/restart,
+monitor, Library, rail, DPI, and toolbar acceptance remains open to its later slices. Focused tests,
+the full suite, and offscreen Qt evidence must remain green with clean teardown.
 
 ## Evidence Record
 
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
-test command/result, resize/theme/restart input sequence and observed geometry, evidence path and
-cleanup result, serialized settings result, and compatibility grep proof.
+test command/result, appearance/minimum-size input sequence and observed frame state, evidence path,
+cleanup result, serialized settings result, and compatibility grep proof. Loop 3 evidence explicitly
+does not claim restart geometry or Library/rail persistence.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.

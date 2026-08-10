@@ -250,3 +250,11 @@ class AppSettings:
             "linux_packaging_channel": self.linux_packaging_channel,
             "ui": _copy_mapping(self.ui),
         }
+
+    @property
+    def ui_settings(self):
+        """Return the typed UI preference projection with safe legacy fallback."""
+
+        from foliaseal.infra.config.app_settings_ui import AppUiSettings
+
+        return AppUiSettings.from_mapping(self.ui)

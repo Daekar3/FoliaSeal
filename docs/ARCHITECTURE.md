@@ -75,6 +75,8 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/app_frame_workspace_open.py` | App-frame-facing workspace-open boundary for one PDF. | Owns page-count loading, `ViewerWorkflow` / `SigningDraftWorkflow` creation, output-path defaulting, shell bootstrap assembly, and construction of the typed `WorkspaceHandle`; widget installation and active-handle publication belong to `SigningWorkspaceHost`. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_action_state.py` | Qt-free app-frame projection of workspace QAction policy. | `WorkspaceActionState` and its pure closed/open/selection-result constructors describe whether Save, Save As, Close, text selection, and Copy selected text should be enabled or checked. The projection owns policy only; `FoliaSealAppFrame` remains responsible for mutating the concrete QActions. |
 | `src/foliaseal/presentation/qt/app_frame_command_model.py` | Typed registry of top-level File commands. | `AppFrameCommandId` and immutable `AppFrameCommandDefinition` records provide stable IDs, menu text, shortcuts, mnemonic labels, and accessible names; the frame maps these definitions to its owned Qt actions. |
+| `src/foliaseal/infra/config/app_settings_ui.py` | Typed projection of application UI preferences. | `AppUiSettings` projects the known `AppSettings.ui` mapping into an immutable `AppearanceMode` (`system`, `light`, or `dark`) value and merges it back without discarding unknown/future UI keys; invalid or legacy values safely fall back to `system`. |
+| `src/foliaseal/presentation/qt/app_frame_theme.py` | Application-chrome palette controller. | `apply_appearance_mode()` applies System/Light/Dark colors to the Qt application palette while leaving document/PDF appearance outside the app theme; it starts from the current palette so native accent and other unrelated roles remain intact. |
 | `src/foliaseal/presentation/qt/signing_workspace_lifecycle.py` | App-frame-facing lifecycle coordinator for the active signing workspace. | `SigningWorkspaceLifecycle` composes a candidate `WorkspaceHandle` through `WorkspaceOpenPort`, mounts it through `WorkspaceMountPort`/`QtWorkspaceMount`, publishes the handle only after mounting, and disposes the prior widget only after replacement succeeds; `close()` disposes the active widget idempotently. |
 | `src/foliaseal/presentation/qt/signing_workspace_host.py` | Deep app-frame host for opening, replacing, and closing one signing workspace. | `SigningWorkspaceHost.open(path)`, `.active()`, and `.close()` are the frame-facing lifecycle contract; it owns command construction and delegates atomic replacement to `SigningWorkspaceLifecycle`. |
 | `src/foliaseal/presentation/qt/app_frame_certificate_management.py` | App-frame-facing certificate-management boundary for Settings certificate actions. | Owns certificate dialog construction/execution and delegates typed create, import, rename, delete, and export requests to `CertificateManager` while leaving menu routing and the explicitly transitional window-level dialog snapshot in `app_frame.py`. |
@@ -1121,10 +1123,10 @@ The canonical repository document split is:
 - Consumer: Qt app-frame Settings menu and Open-file behavior; Qt signing shell save-output file-dialog default directory behavior.
 - Stability: Persisted file contract.
 - Storage path: `${XDG_CONFIG_HOME:-~/.config}/FoliaSeal/settings.json`.
-- Format: JSON object with `schema_version`, `default_output_directory`, `default_open_directory`, `linux_packaging_channel`, and `ui`.
+- Format: JSON object with `schema_version`, `default_output_directory`, `default_open_directory`, `linux_packaging_channel`, and `ui`. `AppSettings.ui_settings` exposes the typed `AppUiSettings` projection; its known `appearance_mode` value is merged back into the mapping without dropping unknown UI keys.
 - Validation: `AppSettings.from_dict()` rejects malformed shape/types and blank directory strings.
 - Error behavior: missing or blank file loads home-directory defaults; invalid JSON raises `ConfigValidationError`; save failures preserve the original filesystem exception and remove `settings.json.tmp` when cleanup is possible.
-- Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/app_settings_storage.py`.
+- Source files: `src/foliaseal/infra/config/schemas.py`, `src/foliaseal/infra/config/app_settings_ui.py`, `src/foliaseal/infra/config/app_settings_storage.py`.
 
 ### Timestamp and trust contract
 
@@ -1228,6 +1230,14 @@ The canonical repository document split is:
 7. Settings/Application settings opens an editable dialog for default open and output directories, saves through `AppSettingsStore`, and refreshes the frame/current shell settings through the live workspace port.
 8. Settings certificate actions route through `app_frame_certificate_management.py`, which constructs and executes the dialogs, delegates typed create, import, rename, delete, and export operations to `CertificateManager`, and then refreshes the loaded signing shell certificate selector through the live workspace port when an operation result reports a catalog change.
 9. Open and certificate operation failures are reported through the frame warning/error callback path.
+
+### Qt app-frame appearance and minimum-size baseline
+
+`AppSettings.ui` is an extensible persisted mapping, but known application-chrome preferences cross the boundary through the typed `AppUiSettings` projection in `infra/config/app_settings_ui.py`. `AppearanceMode` accepts `system`, `light`, and `dark`; malformed or older values resolve to `system`, and serialization merges the known field back into the existing mapping so future UI preferences survive a save.
+
+`AppSettingsDialog` owns the Application settings form, including its Appearance selector. Saving constructs and persists the typed projection together with the directory defaults, then `FoliaSealAppFrame` reapplies the resulting settings to the live frame. The `app_frame_theme.py` controller owns palette application: System restores the platform standard palette, while Light and Dark override only application-chrome roles from a copy of the current palette. This preserves native accent and other unrelated Qt roles, and does not recolor PDF/document content.
+
+`FoliaSealAppFrame` establishes a `1100x700` logical-pixel minimum for the main window before applying the selected application palette. This is the current Loop 3 baseline only. Remembered geometry and restart restoration, Library minimum/geometry, signing-rail width persistence, DPI/monitor-aware rerendering, and toolbar overflow/persistence remain future work; this slice does not claim those behaviors.
 
 ### Qt signing workflow
 
@@ -1416,6 +1426,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-08-09 | Documented the typed app-frame appearance/minimum-size baseline. | `AppUiSettings`/`AppearanceMode` project persisted UI preferences, `AppSettingsDialog` exposes the appearance selector, `app_frame_theme.py` applies application-chrome palettes while preserving native accent roles, and `FoliaSealAppFrame` enforces a 1100x700 minimum; geometry/restart, Library/rail, DPI, and toolbar persistence remain future work. |
 | 2026-08-09 | Added the typed app-frame File-command registry and command-action routing note. | `app_frame_command_model.py` now owns stable command metadata, `FoliaSealAppFrame` owns the command-to-QAction mapping and Qt metadata application, and File callbacks route through typed maintenance/session ports with an explicit output-path seam. |
 | 2026-08-08 | Removed legacy catalog-shaped inputs from the production Qt signing shell and properties coordinator. | `ReusableSigningObjects` is now a required canonical service at both boundaries; AppFrame remains the persistence composition root, while test-only fixture normalizers keep the current historical test call shapes isolated from production. The first bounded internal `phase3` nomenclature rename is tracked separately in `evidence_core_nomenclature_retirement_execplan.md`. |
 | 2026-08-06 | Threaded the AppFrame-owned `ReusableSigningObjects` identity through the production Qt workspace graph. | Historical precursor to the 2026-08-08 boundary cleanup: workspace open, bootstrap, composition, properties panel, and coordinator first shared one service before the remaining production catalog-shaped kwargs were removed. |
