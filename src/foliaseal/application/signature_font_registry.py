@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
+
+from fontTools.ttLib import TTFont
 
 
 @dataclass(frozen=True)
@@ -79,6 +82,41 @@ def validate_signature_font_request(
     except ValueError as exc:
         return str(exc)
     return None
+
+
+def unsupported_glyphs(
+    font_family: str,
+    *,
+    bold: bool = False,
+    italic: bool = False,
+    text: str,
+) -> tuple[str, ...]:
+    """Return distinct text characters absent from the exact bundled font face.
+
+    This deliberately checks the selected file's Unicode character map instead of asking the
+    operating system for a fallback font. The result is stable across preview and signing and
+    lets the readiness surface identify the first unsupported character.
+    """
+
+    face = resolve_signature_font_face(font_family, bold=bold, italic=italic)
+    codepoints = _font_codepoints(face.font_file)
+    unsupported: list[str] = []
+    for character in text:
+        if character in "\r\n\t" or ord(character) in codepoints or character in unsupported:
+            continue
+        unsupported.append(character)
+    return tuple(unsupported)
+
+
+@lru_cache(maxsize=32)
+def _font_codepoints(font_file: Path) -> frozenset[int]:
+    """Load one bundled font cmap once for the process."""
+
+    font = TTFont(str(font_file), lazy=False)
+    try:
+        return frozenset(font.getBestCmap() or {})
+    finally:
+        font.close()
 
 
 def _canonical_family(font_family: str) -> str:

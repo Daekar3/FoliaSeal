@@ -299,3 +299,32 @@ def test_semantics_passes_resolved_stamp_text_to_fit_validator() -> None:
     assert fit_validator.requests[0].signature_rect == rect
     assert fit_validator.requests[0].appearance == appearance
     assert fit_validator.requests[0].stamp_text == "Digitally signed by\nAlice"
+
+
+def test_semantics_blocks_unsupported_glyph_with_field_and_character_guidance() -> None:
+    service = VisibleSignatureSemanticsService(
+        certificate_reader=_FakeCertificateReader(
+            CertificateFieldValues(
+                available=True,
+                values={SignatureFieldKey.COMMON_NAME: "Alice ☃"},
+            )
+        ),
+        clock=_FixedClock(datetime(2026, 5, 1, 14, 30, tzinfo=UTC)),
+    )
+    appearance = SignatureAppearance(
+        signer_label_prefix="Digitally signed by",
+        common_name=SignatureFieldBinding(source=SignatureFieldSource.DERIVED),
+        signing_time=SignatureFieldBinding(
+            source=SignatureFieldSource.HIDDEN,
+            show_in_visible_appearance=False,
+        ),
+    )
+
+    semantics = service.resolve(_request(appearance=appearance))
+
+    glyph_issues = [issue for issue in semantics.issues if issue.code == "unsupported_glyph"]
+    assert len(glyph_issues) == 1
+    assert glyph_issues[0].field_name == "common_name"
+    assert "'☃'" in glyph_issues[0].message
+    assert "U+2603" in glyph_issues[0].message
+    assert semantics.can_submit_visible_signature is False

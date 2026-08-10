@@ -11,6 +11,7 @@ from foliaseal.application.sign_pdf_use_case import (
     SigningBackendAppearance,
     SigningBackendFieldBinding,
 )
+from foliaseal.application.signature_font_registry import unsupported_glyphs
 from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftValidationIssue,
@@ -219,15 +220,37 @@ class VisibleSignatureSemanticsService:
             metadata_contact_info=_metadata_value(fields, SignatureFieldKey.EMAIL),
         )
 
-        issues: tuple[SigningDraftValidationIssue, ...] = ()
+        issues_list: list[SigningDraftValidationIssue] = []
+        issues_list.extend(
+            _glyph_issues(
+                appearance=appearance,
+                text=title_text,
+                field_name="signer_label_prefix",
+                label="Signer label",
+            )
+        )
+        for field in fields:
+            if field.visible and field.text:
+                issues_list.extend(
+                    _glyph_issues(
+                        appearance=appearance,
+                        text=field.text,
+                        field_name=field.field_key.value,
+                        label=field.label,
+                    )
+                )
+
         if request.signature_rect is not None:
-            issues = self._fit_validator.validate(
-                VisibleSignatureFitRequest(
-                    signature_rect=request.signature_rect,
-                    appearance=appearance,
-                    stamp_text=text.stamp_text,
+            issues_list.extend(
+                self._fit_validator.validate(
+                    VisibleSignatureFitRequest(
+                        signature_rect=request.signature_rect,
+                        appearance=appearance,
+                        stamp_text=text.stamp_text,
+                    )
                 )
             )
+        issues = tuple(issues_list)
         return VisibleSignatureSemantics(
             fields=fields,
             text=text,
@@ -284,6 +307,46 @@ class VisibleSignatureSemanticsService:
             source=binding.source,
             hint=hint,
         )
+
+
+def _glyph_issues(
+    *,
+    appearance: SignatureAppearance | SigningBackendAppearance,
+    text: str,
+    field_name: str,
+    label: str,
+) -> tuple[SigningDraftValidationIssue, ...]:
+    """Turn exact bundled-face coverage failures into readiness issues."""
+
+    try:
+        missing = unsupported_glyphs(
+            appearance.text_style.font_family,
+            bold=appearance.text_style.bold,
+            italic=appearance.text_style.italic,
+            text=text,
+        )
+    except ValueError as exc:
+        return (
+            SigningDraftValidationIssue(
+                code="unsupported_signature_font",
+                message=str(exc),
+                field_name="font_family",
+                severity=SigningDraftValidationSeverity.ERROR,
+            ),
+        )
+
+    return tuple(
+        SigningDraftValidationIssue(
+            code="unsupported_glyph",
+            message=(
+                f"{label} contains unsupported character {character!r} (U+{ord(character):04X}). "
+                "Choose a supported value or remove the character."
+            ),
+            field_name=field_name,
+            severity=SigningDraftValidationSeverity.ERROR,
+        )
+        for character in missing
+    )
 
 
 def _iter_field_bindings(

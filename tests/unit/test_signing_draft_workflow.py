@@ -221,6 +221,24 @@ def test_preview_signing_time_is_invalidated_by_draft_mutation(tmp_path: Path) -
     assert changed_request.signing_time is None
 
 
+def test_preview_and_final_request_share_the_frozen_signing_time(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(_appearance())
+    workflow.set_signature_rect(
+        SignatureRect(page_index=0, left_pt=10.0, bottom_pt=10.0, width_pt=220.0, height_pt=80.0)
+    )
+
+    preview = workflow.preview()
+    request = workflow.build_signing_request()
+    signing_time = next(
+        field.text for field in preview.fields if field.field_key == SignatureFieldKey.SIGNING_TIME
+    )
+
+    assert workflow.preview_signing_time is not None
+    assert request.signing_time == workflow.preview_signing_time
+    assert signing_time == workflow.preview_signing_time.strftime(_appearance().datetime_format)
+
+
 def test_workflow_preview_uses_certificate_values_when_pkcs12_is_readable(tmp_path: Path) -> None:
     cert_path = tmp_path / "cert.p12"
     _write_test_pkcs12(cert_path, passphrase="secret")
@@ -379,6 +397,41 @@ def test_workflow_blocks_compact_rectangles_that_backend_will_reject(
     assert preview.can_submit is False
     assert any(issue.code.startswith("visible_signature_layout") for issue in preview.issues)
     with pytest.raises(SigningDraftValidationError):
+        workflow.build_signing_request()
+
+
+def test_workflow_blocks_unsupported_glyph_before_readiness_and_request_build(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(
+        SignatureAppearance(
+            common_name=SignatureFieldBinding(
+                source=SignatureFieldSource.OVERRIDE,
+                override_text="Alice ☃",
+            ),
+            signing_time=SignatureFieldBinding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(
+        SignatureRect(
+            page_index=0,
+            left_pt=10.0,
+            bottom_pt=10.0,
+            width_pt=220.0,
+            height_pt=80.0,
+        )
+    )
+
+    preview = workflow.preview()
+
+    assert preview.can_submit is False
+    issue = next(issue for issue in preview.issues if issue.code == "unsupported_glyph")
+    assert issue.field_name == "common_name"
+    with pytest.raises(SigningDraftValidationError, match="unsupported character"):
         workflow.build_signing_request()
 
 

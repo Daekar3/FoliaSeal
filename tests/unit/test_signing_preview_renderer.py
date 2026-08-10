@@ -9,12 +9,14 @@ from foliaseal.application import compare_preview_to_request, render_signing_pre
 from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.phase3_signing_backend import (
     _BackendHorizontalInkMeasurer,
+    _prepare_backend_layout,
     _visible_signature_fit_issues_for_stamp_text,
 )
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftPreview,
+    SigningDraftValidationError,
 )
 from foliaseal.application.signing_draft_workflow import SigningDraftWorkflow
 from foliaseal.application.signing_preview_renderer import (
@@ -538,6 +540,55 @@ def test_preview_parity_report_matches_the_final_request(tmp_path: Path) -> None
 
     assert report.is_consistent is True
     assert report.issues == ()
+
+
+def test_materialized_preview_and_signing_share_layout_and_block_unsupported_glyph(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    appearance = build_signature_appearance(
+        layout_template=SignatureLayoutTemplate.MULTI_LINE,
+        image_stamp_path=None,
+    )
+    rect = build_signature_rect(page_index=0, width_pt=440.0, height_pt=140.0)
+    workflow.set_signature_appearance(appearance)
+    workflow.set_signature_rect(rect)
+
+    preview = workflow.preview()
+    preview_layout = _canonical_preview_layout(
+        preview,
+        include_text=True,
+        include_stamp=True,
+        include_border=True,
+    )
+    backend_layout = _prepare_backend_layout(
+        signature_rect=rect,
+        signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
+        stamp_text=preview.stamp_text or "",
+        stamp_background=None,
+    )
+    snapshot = render_canonical_signature_preview(preview, zoom=1.0)
+
+    assert preview.can_submit is True
+    assert snapshot is not None
+    assert snapshot.appearance_snapshot is not None
+    assert preview_layout.layout_plan == backend_layout.preparation.layout_plan
+    assert snapshot.appearance_snapshot.text_fragments
+
+    blocked_appearance = replace(
+        appearance,
+        common_name=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="Alice ☃",
+        ),
+    )
+    workflow.set_signature_appearance(blocked_appearance)
+    blocked_preview = workflow.preview()
+
+    assert blocked_preview.can_submit is False
+    assert any(issue.code == "unsupported_glyph" for issue in blocked_preview.issues)
+    with pytest.raises(SigningDraftValidationError, match="unsupported character"):
+        workflow.build_signing_request()
 
 
 def test_preview_parity_report_detects_request_drift(tmp_path: Path) -> None:

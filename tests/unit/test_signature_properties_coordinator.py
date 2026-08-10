@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,12 @@ from foliaseal.application.signing_draft_contracts import SignaturePlacementCont
 from foliaseal.application.signing_material_resolver import (
     RepositoryBackedCertificateSigningMaterialPort,
 )
-from foliaseal.domain.models import SignaturePlacementDefaults, SignatureRect
+from foliaseal.domain.models import (
+    SignatureFieldBinding,
+    SignatureFieldSource,
+    SignaturePlacementDefaults,
+    SignatureRect,
+)
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import (
     PROFILE_DIRECTORY_NAME,
@@ -158,6 +164,31 @@ def test_coordinator_projects_selected_certificate_readiness(tmp_path: Path) -> 
     assert selected.certificate_readiness.status is CertificateReadinessStatus.READY
     assert selected.ready_to_sign is True
     assert "ready for local signing" in selected.certificate_readiness.detail
+
+
+def test_coordinator_readiness_surfaces_unsupported_glyph_guidance(tmp_path: Path) -> None:
+    workflow = _ready_workflow(tmp_path)
+    appearance = workflow.signature_appearance
+    assert appearance is not None
+    workflow.set_signature_appearance(
+        replace(
+            appearance,
+            common_name=SignatureFieldBinding(
+                source=SignatureFieldSource.OVERRIDE,
+                override_text="Alice ☃",
+            ),
+        )
+    )
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+
+    state = coordinator.load()
+
+    assert state.ready_to_sign is False
+    assert "unsupported character '☃' (U+2603)" in state.validation_text
 
 
 def test_production_coordinator_requires_canonical_reusable_objects(tmp_path: Path) -> None:

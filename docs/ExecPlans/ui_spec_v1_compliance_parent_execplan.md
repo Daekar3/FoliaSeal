@@ -359,6 +359,13 @@ Release tranche:
   Focused lifecycle/parity validation is green; full regression is `1384 passed,
   20 skipped, 1 warning`. The bounded offscreen GUI launch still exits at the isolated
   `SingleInstanceUnavailable` endpoint and leaves no process or temporary-root debris; no SVG changed.
+- [x] (2026-08-10) Added the first authoritative preview-fidelity gate: exact bundled font cmap
+  coverage now emits field/character blocking issues through semantics, coordinator readiness, and
+  final request construction; frozen preview time remains the value carried into signing; and a
+  materialized preview/backend layout-plan parity test covers the glyph-safe path while the blocked
+  path proves submission is rejected. Full regression is `1390 passed, 20 skipped, 1 warning`.
+  Rendered signed-artifact comparison, managed-alpha evidence, exact-fit walkthrough, and the
+  isolated single-instance GUI limitation remain open in the preview child.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
