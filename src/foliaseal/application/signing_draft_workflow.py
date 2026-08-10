@@ -614,7 +614,10 @@ class SigningDraftWorkflow:
     def preview(self) -> _contracts.SigningDraftPreview:
         """Return a normalized, UI-friendly preview payload."""
         appearance = self.signature_appearance
-        semantics = self._resolve_visible_signature_semantics(capture_signing_time=True)
+        semantics = self._resolve_visible_signature_semantics(
+            signing_time=self.preview_signing_time,
+            capture_signing_time=True,
+        )
         issues = self._validation_issues_for_semantics(semantics)
         fields = tuple(
             _contracts.SigningDraftPreviewField(

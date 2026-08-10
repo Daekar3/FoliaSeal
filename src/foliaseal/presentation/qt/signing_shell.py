@@ -623,6 +623,12 @@ class SigningShellAdapter:
     def __init__(self) -> None:
         self._bindings = self._load_bindings()
 
+    @property
+    def bindings(self) -> QtSigningWidgetBindings:
+        """Expose the typed Qt bindings for narrow adapter-owned composition tests."""
+
+        return self._bindings
+
     def create(
         self,
         *,

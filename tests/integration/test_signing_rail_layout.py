@@ -34,7 +34,7 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
     find_calls: list[str] = []
     previous_calls: list[str] = []
     sidebar = SigningWorkspaceSidebar(
-        bindings=SigningShellAdapter()._load_bindings(),
+        bindings=SigningShellAdapter().bindings,
         properties_widget=QWidget(),
         on_choose_output=lambda: None,
         on_sign=lambda: None,

@@ -52,7 +52,7 @@ def test_real_qt_properties_panel_prioritizes_changed_source_safety(tmp_path: Pa
         document_source_monitor=DocumentSourceMonitor.for_path(source),
     )
     panel = SignaturePropertiesPanel(
-        bindings=SigningShellAdapter()._load_bindings(),
+        bindings=SigningShellAdapter().bindings,
         workflow=workflow,
         reusable_objects=ReusableSigningObjects(
             InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))

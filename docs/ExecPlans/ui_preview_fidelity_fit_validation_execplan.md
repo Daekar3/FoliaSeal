@@ -45,13 +45,18 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   pixel-identical to the canonical frozen preview. Managed images cover both preserved and
   flattened alpha policies; exact-fit blocking remains covered at workflow/readiness/request
   boundaries.
+- [x] (2026-08-10) Added the deterministic Qt adapter walkthrough
+  `tests/integration/test_preview_readiness_walkthrough.py`. It sequences the public properties
+  panel through placement, unsupported-glyph field/character guidance, exact-fit blocking, and a
+  ready preview/request. The first run exposed repeated preview refreshes regenerating signing time;
+  `SigningDraftWorkflow.preview()` now reuses the frozen time while the draft fingerprint is unchanged.
 - [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [x] (2026-08-10) Implementation validation is complete: the focused parity/fit/renderer set is
-  `58 passed`, the full regression is `1393 passed, 20 skipped, 1 warning`, Ruff and `pip check`
-  are clean, and all owned temporary preview/config roots are removed. The real launch still stops
-  at `SingleInstanceUnavailable` before window creation, so display-backed or test-adapter GUI
-  evidence remains open.
-- [ ] (2026-08-10) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Implementation and adapter validation are complete: the focused parity/fit/
+  renderer/readiness set is `104 passed`. The bounded real launch still stops at
+  `SingleInstanceUnavailable` before window creation, so display-backed evidence remains open.
+- [x] (2026-08-10) Closed the documentation and validation gates: the full suite is `1482 passed,
+  20 skipped, 1 warning`; Ruff, `pip check`, and `git diff --check` are clean. No commit is made
+  by this slice. Compatibility/nomenclature retirement remains open.
 
 ## Surprises & Discoveries
 
@@ -69,6 +74,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   validation.
   Evidence: `fontTools.ttLib.TTFont(...).getBestCmap()` reports no snowman/emoji coverage in the
   bundled Noto faces while DejaVu Sans Mono covers the snowman.
+- Observation: calling `SigningDraftWorkflow.preview()` repeatedly regenerated the signing time even
+  when the draft fingerprint was unchanged, so a UI refresh could diverge from the request time.
+  Evidence: the new adapter walkthrough failed before the fix with different `request.signing_time`
+  and `workflow.preview_signing_time` values; reusing the existing frozen value now keeps repeated
+  preview renders stable.
 
 ## Decision Log
 
@@ -94,14 +104,22 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   application layout plans, and it makes alpha behavior observable without introducing a second
   renderer.
   Date/Author: 2026-08-10 / Codex
+- Decision: reuse `SigningDraftWorkflow.preview_signing_time` when the current draft fingerprint is
+  unchanged before resolving another preview.
+  Rationale: preview refreshes are presentation updates, not new signing decisions; repeated renders
+  must preserve the timestamp that the user reviewed and that the final request carries.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-The implementation now has a verified rendered-parity and managed-alpha contract. The remaining
-closure item is a display-backed or test-adapter GUI walkthrough; the bounded real launch is still
-blocked by the environment's single-instance endpoint before a window is created. The test also
-confirmed that alpha policy belongs to managed-image normalization: direct source paths are not
-silently flattened by the signing renderer.
+The implementation now has a verified rendered-parity, managed-alpha, frozen-time, glyph-guidance,
+and exact-fit contract. The deterministic Qt adapter walkthrough proves the public properties-panel
+sequence: `place_signature`; an unsupported glyph in `Common name` with `U+2603` (snowman) guidance;
+exact-fit review blocking; a ready state; repeated preview refreshes preserving the frozen signing
+time; request timestamp equality; and cleanup. The bounded real launch is still blocked by the
+environment's single-instance endpoint before a window is created, and compatibility/nomenclature
+retirement remains a separate corpus gate. The tests also confirmed that alpha policy belongs to
+managed-image normalization: direct source paths are not silently flattened by the signing renderer.
 
 ## Context and Orientation
 
@@ -147,7 +165,7 @@ dependency installation is unavailable, stop and report that environment blocker
 fall back to a system Python or system Qt installation.
 
     rg -n -e 'render|fit|glyph|time|image' src/foliaseal/application/signing_preview_renderer.py src/foliaseal/presentation/qt/signature_preview_layout.py src/foliaseal/application/visible_signature_fit_validator.py src/foliaseal/application/signature_font_registry.py
-    .venv/bin/pytest -q tests/unit/test_signing_preview_renderer.py tests/unit/test_signature_preview_layout.py tests/unit/test_visible_signature_fit_validator.py tests/unit/test_visible_signature_rendered_fit_adapters.py
+    .venv/bin/pytest -q tests/integration/test_preview_signed_output_parity.py tests/integration/test_preview_readiness_walkthrough.py tests/integration/test_readiness_caveats_status.py tests/integration/test_signing_rail_layout.py tests/unit/test_signing_preview_renderer.py tests/unit/test_signing_draft_workflow.py tests/unit/test_signature_preview_layout.py tests/unit/test_visible_signature_fit_validator.py tests/unit/test_visible_signature_rendered_fit_adapters.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -161,8 +179,9 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     test ! -e "$audit_root"
 
 Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+walkthrough. The deterministic Qt adapter walkthrough is the local evidence path when no display is
+available; record its exact input sequence, readiness state, expected observation, and cleanup. A
+bounded real launch remains only a lifecycle check and must not be treated as display acceptance.
 
 ## Validation and Acceptance
 
@@ -187,8 +206,12 @@ Also record the exact focused test node and expected result (`N passed`); when t
 contract, record that the test was red before implementation and green afterward.
 
 Current evidence: the pre-change glyph contract test failed during collection because
-`unsupported_glyphs` was absent; the focused semantics/coordinator/workflow/renderer set now passes
-`139 passed`, and the full suite previously passed `1390 passed, 20 skipped, 1 warning`. `pip check` reports no
+`unsupported_glyphs` was absent; the focused parity/fit/renderer/readiness command now passes
+`104 passed`, and the repeated-refresh walkthrough caught and fixed preview timestamp drift.
+`SigningDraftWorkflow.preview()` reuses the frozen time when the draft fingerprint is unchanged,
+so repeated refreshes preserve the reviewed value and the final request carries an equal timestamp.
+The walkthrough's public states are `place_signature`, unsupported `Common name`/`U+2603` guidance,
+exact-fit blocking, ready, repeated refresh, request equality, and cleanup. `pip check` reports no
 broken requirements after making FontTools an explicit runtime dependency. The materialized parity
 test is `tests/unit/test_signing_preview_renderer.py::test_materialized_preview_and_signing_share_layout_and_block_unsupported_glyph`.
 The rendered artifact parity test is
@@ -201,8 +224,12 @@ The exact-fit workflow gate remains covered by
 and the coordinator readiness projection tests.
 The bounded real-launch audit uses an isolated `/tmp/foliaseal-preview-audit-*` root and currently
 returns `SingleInstanceUnavailable` before Qt window creation in this headless environment; the
-owned root is removed and no FoliaSeal process remains. A display-backed or test-adapter walkthrough
-is still required before this child can close.
+owned root is removed and no FoliaSeal process remains. The deterministic adapter walkthrough is
+`tests/integration/test_preview_readiness_walkthrough.py`, records the placement, glyph, exact-fit,
+ready, repeated-refresh, timestamp-equality, and cleanup states through the public panel surface,
+and does not claim screen-reader, high-contrast, DPI/monitor, physical-display, or package-manager
+evidence. Those gates, plus legacy phase3 compatibility/nomenclature retirement, remain open; this
+child does not claim full release compliance.
 
 ## Idempotence and Recovery
 
@@ -220,6 +247,7 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
 or workspace ports. The final behavior must be exercised by
 tests/integration/test_preview_signed_output_parity.py,
+tests/integration/test_preview_readiness_walkthrough.py,
 tests/unit/test_signing_preview_renderer.py,
 tests/unit/test_signature_preview_layout.py, tests/unit/test_visible_signature_fit_validator.py,
 tests/unit/test_signature_preview_lifecycle.py, and tests/unit/test_visible_signature_rendered_fit_adapters.py.
@@ -227,8 +255,9 @@ Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-10 / Codex
-Reconciled after the managed-image closeout and glyph/frozen-time implementation. Placement,
-Appearance, and certificate-readiness dependencies are checked against current evidence; exact
-bundled-font cmap validation now reaches preview/readiness/request construction. The child remains
-open for rendered preview/signing artifact parity, managed-alpha evidence, exact-fit/readiness
-walkthrough, and the bounded GUI limitation described above.
+Reconciled after the managed-image closeout, glyph/frozen-time implementation, rendered parity, and
+the deterministic Qt readiness walkthrough. The walkthrough exposed repeated preview timestamp drift,
+which is now fixed by reusing the frozen time for an unchanged draft fingerprint. Placement,
+Appearance, and certificate-readiness dependencies remain checked against current evidence. The
+child is closed for this implementation/evidence slice; external display-backed/package gates and
+legacy compatibility/nomenclature retirement remain open as described above.

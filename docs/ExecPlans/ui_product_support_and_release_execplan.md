@@ -38,7 +38,10 @@ Qt surface, focused tests, and observable acceptance.
 - [ ] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md
 - [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
 - [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
-- [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
+- [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md — authoritative preview/signing
+  parity, glyph and exact-fit readiness guidance, frozen-time refresh stability, and deterministic
+  public-panel walkthrough are complete; display-backed accessibility/DPI/monitor, package-manager,
+  and legacy phase3 compatibility/nomenclature gates remain open.
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [ ] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
@@ -75,10 +78,21 @@ Qt surface, focused tests, and observable acceptance.
   reason `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:`;
   temporary extraction/process cleanup succeeded and no generated artifact was committed. The
   display-backed accessibility/GUI and real package-manager installation gates remain open.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Preview/readiness closure evidence is complete: focused parity/fit/renderer/
+  readiness validation is `104 passed`; the full suite is `1482 passed, 20 skipped, 1 warning`;
+  Ruff, `pip check`, and `git diff --check` are clean. The deterministic walkthrough covers the
+  public placement, unsupported `Common name`/`U+2603`, exact-fit blocking, ready, repeated-refresh
+  frozen-time, request-timestamp equality, and cleanup states. This release plan remains open for display-backed
+  screen-reader/high-contrast/DPI/monitor, package-manager installation, diagnostics, and legacy
+  phase3 compatibility/nomenclature retirement; no full release-compliance claim is made.
+- [ ] (remaining release gate) Implement any remaining smallest complete model/application/Qt paths
+  owned by the unchecked children above.
+- [ ] (remaining release gate) Retire migrated compatibility or phase3 product cruft whose
+  consumers are gone; this is intentionally separate from the preview behavior closure.
+- [ ] (remaining release gate) Run the final focused, regression, display-backed, and package-manager
+  validation; clean processes and artifacts.
+- [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
+  corpus after the remaining children close.
 
 ## Surprises & Discoveries
 
