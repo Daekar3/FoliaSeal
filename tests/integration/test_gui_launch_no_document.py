@@ -12,7 +12,7 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
-    from PySide6.QtWidgets import QApplication, QPushButton
+    from PySide6.QtWidgets import QApplication, QMenu, QPushButton
 
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
     from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -39,6 +39,34 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         "Open a PDF…",
         "Manage Signature Library…",
     }
+
+    file_menu = next(
+        menu for menu in frame.window.menuBar().findChildren(QMenu) if menu.title() == "File"
+    )
+    assert file_menu.title() == "File"
+    file_actions = file_menu.actions()
+    assert [action.text() for action in file_actions] == [
+        "&Open",
+        "&Save",
+        "Save &As",
+        "&Close",
+        "E&xit",
+    ]
+    assert [action.shortcut().toString() for action in file_actions] == [
+        "Ctrl+O",
+        "Ctrl+S",
+        "Ctrl+Shift+S",
+        "Ctrl+W",
+        "Ctrl+Q",
+    ]
+    assert [action.toolTip() for action in file_actions] == [
+        "Open PDF",
+        "Sign and save PDF",
+        "Save signed PDF as",
+        "Close PDF",
+        "Exit FoliaSeal",
+    ]
+    assert [action.isEnabled() for action in file_actions] == [True, False, False, False, True]
 
     library_button = next(
         button

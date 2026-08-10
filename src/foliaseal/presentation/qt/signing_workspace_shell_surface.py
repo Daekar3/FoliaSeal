@@ -39,6 +39,9 @@ class SigningWorkspaceShellSurface:
     def choose_output_pdf_path(self) -> str | None:
         return self._action_bridge.choose_output_pdf_path()
 
+    def has_explicit_output_pdf_path(self) -> bool:
+        return self._action_bridge.has_explicit_output_pdf_path()
+
     def refresh_certificate_configurations(self) -> CertificateCatalog:
         return self._action_bridge.refresh_certificate_configurations()
 

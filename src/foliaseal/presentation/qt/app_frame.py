@@ -34,6 +34,10 @@ from foliaseal.presentation.qt.app_frame_certificate_management import (
     CertificateDialogCompatibilityState,
     CertificateDialogPort,
 )
+from foliaseal.presentation.qt.app_frame_command_model import (
+    AppFrameCommandId,
+    file_command_definition,
+)
 from foliaseal.presentation.qt.app_frame_profile_library import (
     ReusableObjectLibraryDialog,
 )
@@ -301,7 +305,11 @@ class FoliaSealAppFrame:
         )
         self._dialog_compatibility = AppFrameDialogCompatibilityState()
         self._open_action: Any | None = None
+        self._save_action: Any | None = None
         self._save_as_action: Any | None = None
+        self._close_action: Any | None = None
+        self._exit_action: Any | None = None
+        self._command_actions: dict[AppFrameCommandId, Any] = {}
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
         self._placeholder_open_button: Any | None = None
@@ -429,6 +437,11 @@ class FoliaSealAppFrame:
         self._workspace_host.close()
         self._set_placeholder()
 
+    def command_actions(self) -> dict[AppFrameCommandId, Any]:
+        """Return a snapshot of frame-owned actions keyed by stable command ID."""
+
+        return dict(self._command_actions)
+
     def show_app_settings(self) -> AppSettings | None:
         dialog = AppSettingsDialog(
             bindings=self._bindings,
@@ -498,19 +511,34 @@ class FoliaSealAppFrame:
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
         file_menu = menu_bar.addMenu("File")
-        self._open_action = self._action(
-            "Open file",
+        self._open_action = self._command_action(
+            file_menu,
+            AppFrameCommandId.OPEN,
             self.choose_open_pdf,
-            shortcut="Ctrl+O",
         )
-        file_menu.addAction(self._open_action)
-        self._save_as_action = self._action(
-            "Save As...",
-            self._choose_save_as,
-            shortcut="Ctrl+Shift+S",
+        self._save_action = self._command_action(
+            file_menu,
+            AppFrameCommandId.SAVE,
+            self._save_document,
             enabled=False,
         )
-        file_menu.addAction(self._save_as_action)
+        self._save_as_action = self._command_action(
+            file_menu,
+            AppFrameCommandId.SAVE_AS,
+            self._choose_save_as,
+            enabled=False,
+        )
+        self._close_action = self._command_action(
+            file_menu,
+            AppFrameCommandId.CLOSE,
+            self.close_workspace,
+            enabled=False,
+        )
+        self._exit_action = self._command_action(
+            file_menu,
+            AppFrameCommandId.EXIT,
+            self._exit_application,
+        )
         edit_menu = menu_bar.addMenu("Edit")
         self._text_selection_mode_action = self._action(
             "Text selection mode",
@@ -555,6 +583,8 @@ class FoliaSealAppFrame:
         enabled: bool = True,
         checkable: bool = False,
         icon_name: str | None = None,
+        object_name: str | None = None,
+        accessible_name: str | None = None,
     ) -> Any:
         action = self._bindings.q_action(text, self.window)
         if icon_name is not None:
@@ -573,14 +603,70 @@ class FoliaSealAppFrame:
         set_checkable = getattr(action, "setCheckable", None)
         if callable(set_checkable):
             set_checkable(checkable)
+        set_object_name = getattr(action, "setObjectName", None)
+        if object_name is not None and callable(set_object_name):
+            set_object_name(object_name)
+        set_tool_tip = getattr(action, "setToolTip", None)
+        if accessible_name is not None and callable(set_tool_tip):
+            set_tool_tip(accessible_name)
+        set_status_tip = getattr(action, "setStatusTip", None)
+        if accessible_name is not None and callable(set_status_tip):
+            set_status_tip(accessible_name)
+        return action
+
+    def _command_action(
+        self,
+        menu: Any,
+        command_id: AppFrameCommandId,
+        callback: Callable[[], Any],
+        *,
+        enabled: bool = True,
+    ) -> Any:
+        definition = file_command_definition(command_id)
+        action = self._action(
+            definition.mnemonic_text,
+            callback,
+            shortcut=definition.shortcut,
+            enabled=enabled,
+            object_name=definition.command_id.value,
+            accessible_name=definition.accessible_name,
+        )
+        self._command_actions[command_id] = action
+        menu.addAction(action)
         return action
 
     def _choose_save_as(self) -> str | None:
-        return self._with_current_shell_port(lambda shell_port: shell_port.choose_output_pdf_path())
+        selected = self._with_current_shell_port(
+            lambda shell_port: shell_port.choose_output_pdf_path()
+        )
+        return selected if selected else None
+
+    def _save_document(self) -> Any | None:
+        output_path_selected = self._with_current_shell_port(
+            lambda shell_port: shell_port.has_explicit_output_pdf_path()
+        )
+        if not output_path_selected and self._choose_save_as() is None:
+            return None
+        return self._with_current_session_port(
+            lambda session_port: session_port.submit_sign_request()
+        )
+
+    def _exit_application(self) -> Any | None:
+        quit_application = getattr(self._bindings.q_application, "quit", None)
+        if callable(quit_application):
+            return quit_application()
+        instance_factory = getattr(self._bindings.q_application, "instance", None)
+        application = instance_factory() if callable(instance_factory) else None
+        quit_instance = getattr(application, "quit", None)
+        if callable(quit_instance):
+            return quit_instance()
+        return None
 
     def _apply_workspace_action_state(self, state: WorkspaceActionState) -> None:
         self._workspace_action_state = state
+        self._set_action_enabled(self._save_action, state.save_enabled)
         self._set_action_enabled(self._save_as_action, state.save_as_enabled)
+        self._set_action_enabled(self._close_action, state.close_enabled)
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
         self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
@@ -696,6 +782,15 @@ class FoliaSealAppFrame:
         if workspace is None:
             return None
         return action(workspace.maintenance)
+
+    def _with_current_session_port(
+        self,
+        action: Callable[[Any], Any | None],
+    ) -> Any | None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return None
+        return action(workspace.session)
 
 
 class QtAppFrameAdapter:

@@ -41,6 +41,12 @@ class SigningWorkspaceActionBridge:
         self._signing_action_boundary = signing_action_boundary
         self._draft_workflow = draft_workflow
         self._app_settings_getter = app_settings_getter
+        self._has_explicit_output_pdf_path = False
+
+    def has_explicit_output_pdf_path(self) -> bool:
+        """Return whether Save As has accepted a path for the current draft."""
+
+        return self._has_explicit_output_pdf_path
 
     def reload_state(self) -> None:
         self._apply_signing_action_state(self._signing_action_boundary.load())
@@ -107,6 +113,7 @@ class SigningWorkspaceActionBridge:
         self._apply_signing_action_state(
             self._signing_action_boundary.accept_output_path(selected_path).state
         )
+        self._has_explicit_output_pdf_path = True
         return selected_path
 
     def refresh_certificate_configurations(self) -> CertificateCatalog:

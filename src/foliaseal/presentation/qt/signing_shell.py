@@ -436,6 +436,9 @@ class SigningWorkspaceWidget:
     def choose_output_pdf_path(self) -> str | None:
         return self._shell_surface.choose_output_pdf_path()
 
+    def has_explicit_output_pdf_path(self) -> bool:
+        return self._shell_surface.has_explicit_output_pdf_path()
+
     @property
     def last_signing_result(self) -> SigningResult | None:
         """Return the most recent signing result, if a real executor ran."""

@@ -100,6 +100,10 @@ Release tranche:
   single-instance process boundary.
 - [x] (2026-08-09) Completed the first foundation slice: no-document launch now exposes direct Open
   PDF and Signature Library actions with focused unit/integration evidence and clean teardown.
+- [x] (2026-08-09) Completed the File-command foundation slice: a typed registry now routes Open,
+  Save, Save As, Close, and Exit with shortcuts, mnemonics, Qt-supported descriptions, and an
+  explicit first-Save output-path seam; the command-model child remains open for its remaining
+  menus and signed-state policy.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -122,6 +126,11 @@ Release tranche:
   Evidence: `tests/integration/test_gui_launch_no_document.py` passed under
   `QT_QPA_PLATFORM=offscreen`, while `DISPLAY=:0 ... scripts/live_gui_parent_audit.py` exited 134
   because xcb could not connect; cleanup found no FoliaSeal processes.
+- Observation: the second implementation loop can safely land the File lifecycle independently, but
+  the full command-model child still depends on viewer, signing-rail, support, and signed-output
+  policy slices for truthful enablement and complete menu coverage.
+  Evidence: `ui_command_model_shortcuts_execplan.md` records the bounded File acceptance and its
+  deferred Edit/View/Signing/Settings/Help owners.
 
 ## Decision Log
 

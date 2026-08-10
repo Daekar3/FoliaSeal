@@ -15,6 +15,18 @@ class WorkspaceActionState:
     text_selection_checked: bool
     copy_selected_text_enabled: bool
 
+    @property
+    def save_enabled(self) -> bool:
+        """Return whether the active workspace can receive Save."""
+
+        return self.workspace_open
+
+    @property
+    def close_enabled(self) -> bool:
+        """Return whether the active workspace can be closed."""
+
+        return self.workspace_open
+
 
 def workspace_action_state_closed() -> WorkspaceActionState:
     """Return the action state shown while the placeholder is mounted."""

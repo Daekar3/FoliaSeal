@@ -14,17 +14,23 @@ from foliaseal.presentation.qt.app_frame_workspace_action_state import (
 
 
 def test_closed_state_disables_all_workspace_actions() -> None:
-    assert workspace_action_state_closed() == WorkspaceActionState(
+    state = workspace_action_state_closed()
+    assert state == WorkspaceActionState(
         False,
         False,
         False,
         False,
         False,
     )
+    assert state.save_enabled is False
+    assert state.close_enabled is False
 
 
 def test_open_state_enables_actions_and_starts_unchecked() -> None:
-    assert workspace_action_state_open() == WorkspaceActionState(True, True, True, False, True)
+    state = workspace_action_state_open()
+    assert state == WorkspaceActionState(True, True, True, False, True)
+    assert state.save_enabled is True
+    assert state.close_enabled is True
 
 
 def test_selection_result_is_immutable_and_changes_only_checked_flag() -> None:

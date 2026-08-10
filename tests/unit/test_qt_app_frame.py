@@ -18,6 +18,10 @@ from foliaseal.presentation.qt.app_frame import (
     FoliaSealAppFrame,
     QtAppFrameBindings,
 )
+from foliaseal.presentation.qt.app_frame_command_model import (
+    FILE_COMMAND_DEFINITIONS,
+    AppFrameCommandId,
+)
 from foliaseal.presentation.qt.signing_shell_port import (
     QtSigningWorkspacePort,
     QtSigningWorkspaceSessionPort,
@@ -55,6 +59,9 @@ class _FakeAction:
         self.checkable = False
         self.checked = False
         self.icon = None
+        self.object_name = None
+        self.tool_tip = None
+        self.status_tip = None
 
     def setShortcut(self, shortcut):  # noqa: N802
         self.shortcut = shortcut
@@ -67,6 +74,15 @@ class _FakeAction:
 
     def setCheckable(self, checkable):  # noqa: N802
         self.checkable = bool(checkable)
+
+    def setObjectName(self, name):  # noqa: N802
+        self.object_name = name
+
+    def setToolTip(self, text):  # noqa: N802
+        self.tool_tip = text
+
+    def setStatusTip(self, text):  # noqa: N802
+        self.status_tip = text
 
     def setChecked(self, checked):  # noqa: N802
         self.checked = bool(checked)
@@ -336,6 +352,7 @@ class _FakeQApplication:
     created_argv = []
     exec_result = 0
     exec_calls = 0
+    quit_calls = 0
 
     def __init__(self, argv) -> None:
         self.argv = list(argv)
@@ -350,6 +367,10 @@ class _FakeQApplication:
         type(self).exec_calls += 1
         return type(self).exec_result
 
+    @classmethod
+    def quit(cls):
+        cls.quit_calls += 1
+
 
 class _FakeShell:
     def __init__(self) -> None:
@@ -358,6 +379,8 @@ class _FakeShell:
         self.applied_settings = []
         self.output_dialog_defaults = []
         self.choose_output_pdf_path_calls = 0
+        self.submit_sign_request_calls = 0
+        self.explicit_output_pdf_path = False
         self.set_document_text_selection_mode_calls = []
         self.copy_selected_document_text_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
@@ -379,7 +402,15 @@ class _FakeShell:
 
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
+        self.explicit_output_pdf_path = True
         return "/tmp/signed-output.pdf"
+
+    def has_explicit_output_pdf_path(self):
+        return self.explicit_output_pdf_path
+
+    def submit_sign_request(self):
+        self.submit_sign_request_calls += 1
+        return None
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         self.set_document_text_selection_mode_calls.append(bool(enabled))
@@ -405,6 +436,9 @@ class _FakeShellPort:
 
     def choose_output_pdf_path(self):
         return self.shell_widget.choose_output_pdf_path()
+
+    def has_explicit_output_pdf_path(self):
+        return self.shell_widget.has_explicit_output_pdf_path()
 
     def apply_app_settings(self, settings) -> None:
         self.shell_widget.apply_app_settings(settings)
@@ -494,6 +528,7 @@ def _fake_bindings() -> QtAppFrameBindings:
     _FakeQApplication.created_argv = []
     _FakeQApplication.exec_result = 0
     _FakeQApplication.exec_calls = 0
+    _FakeQApplication.quit_calls = 0
     return QtAppFrameBindings(
         q_main_window=_FakeMainWindow,
         q_dialog=_FakeDialog,
@@ -841,12 +876,36 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
 
     assert [menu.title for menu in frame.window.menu_bar.menus] == ["File", "Edit", "Settings"]
     assert [action.text for action in frame.window.menu_bar.menus[0].actions] == [
-        "Open file",
-        "Save As...",
+        "&Open",
+        "&Save",
+        "Save &As",
+        "&Close",
+        "E&xit",
     ]
     assert frame.window.menu_bar.menus[0].actions[0].shortcut == "Ctrl+O"
-    assert frame.window.menu_bar.menus[0].actions[1].shortcut == "Ctrl+Shift+S"
-    assert frame.window.menu_bar.menus[0].actions[1].enabled is False
+    assert [action.shortcut for action in frame.window.menu_bar.menus[0].actions] == [
+        "Ctrl+O",
+        "Ctrl+S",
+        "Ctrl+Shift+S",
+        "Ctrl+W",
+        "Ctrl+Q",
+    ]
+    assert [action.enabled for action in frame.window.menu_bar.menus[0].actions] == [
+        True,
+        False,
+        False,
+        False,
+        True,
+    ]
+    assert [action.object_name for action in frame.window.menu_bar.menus[0].actions] == [
+        command_id.value for command_id in AppFrameCommandId
+    ]
+    assert [action.tool_tip for action in frame.window.menu_bar.menus[0].actions] == [
+        definition.accessible_name for definition in FILE_COMMAND_DEFINITIONS
+    ]
+    assert [action.status_tip for action in frame.window.menu_bar.menus[0].actions] == [
+        definition.accessible_name for definition in FILE_COMMAND_DEFINITIONS
+    ]
     assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
         "Text selection mode",
         "Copy selected text",
@@ -894,11 +953,15 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
         render_backend_factory=lambda: object(),
     )
 
-    save_as_action = frame.window.menu_bar.menus[0].actions[1]
+    save_action = frame.window.menu_bar.menus[0].actions[1]
+    save_as_action = frame.window.menu_bar.menus[0].actions[2]
+    close_action = frame.window.menu_bar.menus[0].actions[3]
     text_selection_action = frame.window.menu_bar.menus[1].actions[0]
     copy_selection_action = frame.window.menu_bar.menus[1].actions[1]
 
+    assert save_action.enabled is False
     assert save_as_action.enabled is False
+    assert close_action.enabled is False
     assert text_selection_action.enabled is False
     assert text_selection_action.checked is False
     assert copy_selection_action.enabled is False
@@ -906,7 +969,9 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
 
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
 
+    assert save_action.enabled is True
     assert save_as_action.enabled is True
+    assert close_action.enabled is True
     assert text_selection_action.enabled is True
     assert text_selection_action.checked is False
     assert copy_selection_action.enabled is True
@@ -921,6 +986,53 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     assert shell.copy_selected_document_text_calls == 1
     assert text_selection_action.checked is True
     assert frame.workspace_action_state.text_selection_checked is True
+
+
+def test_app_frame_file_lifecycle_routes_save_close_and_exit(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+
+    file_actions = frame.window.menu_bar.menus[0].actions
+    save_action, close_action, exit_action = file_actions[1], file_actions[3], file_actions[4]
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    save_action.trigger()
+    assert shell.choose_output_pdf_path_calls == 1
+    assert shell.submit_sign_request_calls == 1
+
+    close_action.trigger()
+    assert frame.current_workspace is None
+    assert close_action.enabled is False
+
+    exit_action.trigger()
+    assert _FakeQApplication.quit_calls == 1
+
+
+def test_file_command_registry_is_typed_and_normative() -> None:
+    assert [definition.command_id for definition in FILE_COMMAND_DEFINITIONS] == list(
+        AppFrameCommandId
+    )
+    assert [definition.text for definition in FILE_COMMAND_DEFINITIONS] == [
+        "Open",
+        "Save",
+        "Save As",
+        "Close",
+        "Exit",
+    ]
+    assert [definition.mnemonic_text for definition in FILE_COMMAND_DEFINITIONS] == [
+        "&Open",
+        "&Save",
+        "Save &As",
+        "&Close",
+        "E&xit",
+    ]
 
 
 def test_app_frame_certificate_creation_routes_to_dialog_port(

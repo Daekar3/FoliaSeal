@@ -52,6 +52,9 @@ class SigningWorkspacePort(Protocol):
     def choose_output_pdf_path(self) -> str | None:
         """Drive the shell's Save As behavior."""
 
+    def has_explicit_output_pdf_path(self) -> bool:
+        """Return whether the user has accepted an output path for this draft."""
+
     def apply_app_settings(self, settings: AppSettings) -> None:
         """Apply updated app settings to the live shell."""
 
@@ -153,6 +156,9 @@ class QtSigningWorkspacePort:
 
     def choose_output_pdf_path(self) -> str | None:
         return self.shell_widget.choose_output_pdf_path()
+
+    def has_explicit_output_pdf_path(self) -> bool:
+        return bool(self.shell_widget.has_explicit_output_pdf_path())
 
     def apply_app_settings(self, settings: AppSettings) -> None:
         self.shell_widget.apply_app_settings(settings)
