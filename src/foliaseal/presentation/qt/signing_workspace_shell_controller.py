@@ -53,6 +53,9 @@ class SigningWorkspaceShellController:
             "main_row",
         ):
             setattr(shell, f"_{name}", getattr(composition, name))
+        rail_splitter = getattr(composition, "rail_splitter", None)
+        if rail_splitter is not None:
+            shell._rail_splitter = rail_splitter
         destroyed_signal = getattr(shell, "destroyed", None)
         destroy_connect = getattr(destroyed_signal, "connect", None)
         if callable(destroy_connect):

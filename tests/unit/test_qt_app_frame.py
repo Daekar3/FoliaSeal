@@ -2520,6 +2520,35 @@ def test_app_frame_restores_and_captures_main_window_geometry(tmp_path: Path) ->
     }
 
 
+def test_app_frame_capture_includes_workspace_owned_ui_settings(tmp_path: Path) -> None:
+    shell = _FakeShell()
+    captured_settings: list[AppSettings] = []
+
+    def capture_ui_settings(settings: AppSettings) -> AppSettings:
+        captured_settings.append(settings)
+        return AppSettings(
+            schema_version=settings.schema_version,
+            default_output_directory=settings.default_output_directory,
+            default_open_directory=settings.default_open_directory,
+            linux_packaging_channel=settings.linux_packaging_channel,
+            ui={**settings.ui, "rail_width": 444},
+        )
+
+    shell.capture_ui_settings = capture_ui_settings
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+    )
+
+    assert frame.open_pdf_path(tmp_path / "source.pdf") is shell
+    captured = frame.capture_window_geometry()
+
+    assert captured_settings == [_settings(tmp_path)]
+    assert captured.ui_settings.rail_width == 444
+
+
 def test_app_frame_capture_enforces_minimum_geometry(tmp_path: Path) -> None:
     frame = FoliaSealAppFrame(
         bindings=_fake_bindings(),

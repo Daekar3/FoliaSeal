@@ -1414,6 +1414,7 @@ class FoliaSealAppFrame:
             main_window_geometry=ui.main_window_geometry,
             library_last_catalog=catalog.strip().lower() or "presets",
             library_sort=ui.library_sort.__class__.from_value(sort),
+            rail_width=ui.rail_width,
         )
         ui_mapping = updated_ui.to_mapping(self._app_settings.ui)
         ui_mapping["library_last_catalog"] = updated_ui.library_last_catalog
@@ -2471,6 +2472,17 @@ class FoliaSealAppFrame:
     def capture_window_geometry(self) -> AppSettings:
         """Capture the current main-window rectangle into the in-memory settings."""
 
+        def capture_workspace_ui(view: Any) -> AppSettings:
+            capture = getattr(view, "capture_ui_settings", None)
+            if not callable(capture):
+                return self._app_settings
+            captured = capture(self._app_settings)
+            return captured if isinstance(captured, AppSettings) else self._app_settings
+
+        captured_workspace = self._with_current_workspace_view(capture_workspace_ui)
+        if isinstance(captured_workspace, AppSettings):
+            self._app_settings = captured_workspace
+
         geometry_getter = getattr(self.window, "geometry", None)
         if not callable(geometry_getter):
             return self._app_settings
@@ -2493,6 +2505,7 @@ class FoliaSealAppFrame:
             main_window_geometry=geometry,
             library_last_catalog=self._app_settings.ui_settings.library_last_catalog,
             library_sort=self._app_settings.ui_settings.library_sort,
+            rail_width=self._app_settings.ui_settings.rail_width,
         )
         self._app_settings = AppSettings(
             schema_version=self._app_settings.schema_version,
@@ -2542,6 +2555,15 @@ class FoliaSealAppFrame:
         if workspace is None:
             return None
         return action(workspace.maintenance)
+
+    def _with_current_workspace_view(
+        self,
+        action: Callable[[Any], Any | None],
+    ) -> Any | None:
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return None
+        return action(workspace.view)
 
     def _with_current_session_port(
         self,

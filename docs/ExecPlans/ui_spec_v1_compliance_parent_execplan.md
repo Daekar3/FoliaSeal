@@ -58,6 +58,10 @@ Foundation tranche:
 - [x] docs/ExecPlans/ui_window_theme_responsive_execplan.md — fixed rail/window theme and responsive
   geometry implementation and focused/full validation are complete; final acceptance remains in the
   product-support/release tranche.
+- [x] docs/ExecPlans/ui_rail_divider_persistence_execplan.md — remembered, user-adjustable canvas/
+  signing-rail divider and independent scroll-region evidence are implemented and validated in the
+  offscreen integration node; final parent acceptance remains with the display-backed/release
+  gates.
 - [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 
 Document-flow tranche:
@@ -257,6 +261,12 @@ Release tranche:
   F1 Help, modeless support dialogs, Settings Restore defaults, minimum geometry, and Unicode XDG
   paths (`64 passed` with focused AppFrame regressions). Screen-reader, high-contrast, physical
   DPI/monitor, package-install, and final release evidence remain display/environment gates.
+- [x] (2026-08-10) Completed the remembered signing-rail divider child: `AppUiSettings.rail_width`
+  normalizes a 280–640px range around a 320px default, production composition uses an injected
+  `QSplitter`, the public workspace-view lifecycle captures the live width, and the real offscreen
+  integration test proves movement, `AppSettingsStore` save/reload, unknown-key preservation,
+  rebuild restoration, and independent viewer/properties scroll areas. Display-backed and remaining
+  Library/monitor/DPI/toolbar release gates remain open.
 - [x] (2026-08-10) Completed the supported Signing command increment: Signature Library is available
   from a no-document frame, while Sign and save is routed through public session readiness and
   transaction state; readiness/status changes keep the action truthful. Placement commands were
@@ -642,8 +652,9 @@ Focused and full validation remained green through the final loop (`1185 passed,
 The parent is not complete. Several child checkboxes remain open because the remaining requirements
 include full document lifecycle/recovery, nested Library transactions and editors, certificate flows,
 pointer/keyboard placement, preview fidelity, atomic sign/write/verification/recovery, complete
-Edit/View/Signing/Help command surfaces, rail divider/Library/monitor/DPI persistence, accessibility
-and packaged-release acceptance. The bounded slices deliberately recorded these gaps instead of
+Edit/View/Signing/Help command surfaces, Library/monitor/DPI/toolbar persistence, accessibility
+and packaged-release acceptance. The remembered rail divider is now complete; the bounded slices
+deliberately recorded the remaining gaps instead of
 claiming compliance from narrow tests.
 
 ## Context and Orientation

@@ -9,8 +9,10 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 After this bounded follow-up, a user can close and relaunch FoliaSeal and recover the main window's
 last valid position, size, and maximized state without reopening a document or dialog. This slice
-implements only the main-frame geometry portion of UI_SPEC section 12 and acceptance scenario 9;
-rail-divider, Library, DPI/monitor, and toolbar persistence remain explicit follow-up work. The
+implements only the main-frame geometry portion of UI_SPEC section 12 and acceptance scenario 9.
+Rail-divider persistence is now implemented by the dedicated
+`ui_rail_divider_persistence_execplan.md` child; Library, DPI/monitor, and toolbar persistence
+remain explicit follow-up work. The
 slice is one vertical path through typed settings, the frame lifecycle, focused tests, and
 observable offscreen acceptance, not a generic refactor.
 
@@ -63,7 +65,7 @@ observable offscreen acceptance, not a generic refactor.
   values. Restore them before showing the frame, clamp position to the available screen when Qt
   exposes one, enforce the existing 1100x700 minimum, and capture/save after `app.exec()` returns.
   Do not persist documents, drafts, dialogs, Library state, rail width, or monitor-specific DPI
-  data in this slice.
+  data in this geometry-only slice; rail width is owned by the dedicated divider child.
   Rationale: this completes the missing lifecycle seam while keeping the serialized contract stable
   across Qt versions and leaving the larger responsive topology to its owning plans.
   Date/Author: 2026-08-09 / Codex
@@ -74,8 +76,9 @@ The baseline slice is implemented and this follow-up is now scoped to main-frame
 After completion, a valid saved rectangle and maximized flag round-trip through `AppSettings`,
 restore before the frame is shown, and capture after the event loop exits. Missing, malformed, or
 undersized geometry falls back to the 1100x700 baseline while unknown UI keys survive. Monitor
-clamping, Library minimums/columns, rail divider width, DPI rerender, and toolbar overflow remain
-explicitly deferred to later lifecycle and responsive slices.
+clamping, Library minimums/columns, DPI rerender, and toolbar overflow remain explicitly deferred
+to later lifecycle and responsive slices. The remembered rail divider is tracked and validated in
+`ui_rail_divider_persistence_execplan.md`.
 
 ## Context and Orientation
 
@@ -156,16 +159,18 @@ round-trip through settings; malformed, undersized, or absent geometry falls bac
 baseline; restore happens before the frame is shown; capture happens after normal event-loop return
 and also in the controlled exception cleanup path; and unknown UI keys remain intact. Position is
 clamped when an available Qt screen is exposed, while full multi-monitor resizing remains deferred.
-The existing typed System/Light/Dark and UI-chrome palette behavior must remain green. Rail-divider,
-Library, monitor/DPI, and toolbar persistence remain open to later slices. Focused tests, the full
-suite, and offscreen Qt evidence must pass with clean teardown.
+The existing typed System/Light/Dark and UI-chrome palette behavior must remain green. Library,
+monitor/DPI, and toolbar persistence remain open to later slices; the rail-divider follow-up has
+its own focused evidence record. Focused tests, the full suite, and offscreen Qt evidence must pass
+with clean teardown.
 
 ## Evidence Record
 
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
 test command/result, geometry input and observed restore/capture/maximized state, evidence path,
 cleanup result, serialized settings result, and compatibility grep proof. This bounded evidence
-explicitly does not claim rail-divider, Library, full monitor/DPI, or toolbar persistence.
+explicitly does not claim Library, full monitor/DPI, or toolbar persistence; rail-divider evidence
+is recorded by `ui_rail_divider_persistence_execplan.md`.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.

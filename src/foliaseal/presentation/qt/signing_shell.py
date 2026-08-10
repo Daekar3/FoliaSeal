@@ -140,6 +140,7 @@ class QtSigningWidgetBindings:
     q_shortcut: type[Any] | None = None
     q_key_sequence: type[Any] | None = None
     q_timer: type[Any] | None = None
+    q_splitter: type[Any] | None = None
 
 class SigningRequestExecutor(Protocol):
     """Executes a validated signing request and returns a signing result."""
@@ -350,7 +351,7 @@ class SigningWorkspaceWidget:
 
     def cleanup_recovery_artifact(self) -> None:
         """Release a preserved recovery artifact without changing draft state."""
-        self._composition_boundary.action_bridge.cleanup_recovery_artifact()
+        self._action_bridge.cleanup_recovery_artifact()
 
     def clear_session_secrets(self) -> None:
         """Clear credentials retained for this mounted signing session."""
@@ -616,6 +617,10 @@ class SigningWorkspaceWidget:
         """Refresh reusable signing-profile selectors after Settings changes."""
         self._shell_surface.refresh_signature_profiles()
 
+    def capture_ui_settings(self, settings: AppSettings) -> AppSettings:
+        """Capture workspace-owned UI preferences without exposing child widgets."""
+        return self._composition_boundary.capture_ui_settings(settings)
+
 
 class SigningShellAdapter:
     """Factory for the FoliaSeal Qt signing shell."""
@@ -745,6 +750,7 @@ class SigningShellAdapter:
             q_shortcut=getattr(qt_gui, "QShortcut", None),
             q_key_sequence=getattr(qt_gui, "QKeySequence", None),
             q_timer=getattr(qt_core, "QTimer", None),
+            q_splitter=getattr(qt_widgets, "QSplitter"),
         )
 
     def _load_copy_text_callback(self) -> Callable[[str], Any] | None:

@@ -13,6 +13,9 @@ from foliaseal.application.reusable_signing_models import (
 from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.app_settings_ui import (
+    DEFAULT_RAIL_WIDTH,
+    MAX_RAIL_WIDTH,
+    MIN_RAIL_WIDTH,
     AppearanceMode,
     AppUiSettings,
     MainWindowGeometry,
@@ -117,6 +120,51 @@ def test_app_settings_ui_settings_falls_back_for_invalid_mode() -> None:
     )
 
     assert settings.ui_settings.appearance_mode is AppearanceMode.SYSTEM
+
+
+def test_app_settings_ui_settings_normalizes_remembered_rail_width() -> None:
+    assert AppSettings.default().ui_settings.rail_width == DEFAULT_RAIL_WIDTH
+    assert AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"rail_width": MIN_RAIL_WIDTH - 1},
+    ).ui_settings.rail_width == MIN_RAIL_WIDTH
+    assert AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"rail_width": MAX_RAIL_WIDTH + 1},
+    ).ui_settings.rail_width == MAX_RAIL_WIDTH
+    assert AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"rail_width": "wide"},
+    ).ui_settings.rail_width == DEFAULT_RAIL_WIDTH
+
+
+def test_app_ui_settings_round_trips_rail_width_and_unknown_keys() -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"future_preference": 7},
+    )
+
+    merged = AppUiSettings(
+        rail_width=512,
+    ).to_mapping(settings.ui)
+
+    assert merged == {
+        "appearance_mode": "system",
+        "future_preference": 7,
+        "rail_width": 512,
+    }
 
 
 def test_app_ui_settings_merge_keeps_unrecognized_ui_preferences() -> None:

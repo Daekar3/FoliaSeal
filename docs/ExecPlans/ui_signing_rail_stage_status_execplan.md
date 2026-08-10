@@ -7,12 +7,13 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can use a fixed right rail whose interactive signing controls remain in
+After this slice, a user can use the approximately 320-pixel right rail whose interactive signing controls remain in
 the upper controls area while a protected lower region shows only read-only readiness/result
 status and visibly identifies at most one recommended action. This is the bounded portion of UI_SPEC
 SUR02, SUR07, section 11, and acceptance scenarios 2 and 5 that the current coordinator can
-truthfully support. It does not claim the full asynchronous signing, verification, dirty-draft, or
-remembered-divider state machine; those remain explicit follow-up work. The slice is one vertical
+truthfully support. It does not claim the full asynchronous signing, verification, or dirty-draft
+state machine; those remain explicit follow-up work. The remembered divider and independently
+scrollable regions are implemented by `ui_rail_divider_persistence_execplan.md`. The slice is one vertical
 path through the relevant application workflow, Qt surface, focused tests, and observable
 acceptance, not a generic refactor.
 
@@ -99,9 +100,9 @@ read-only status region, visible and accessible recommended-action styling, coor
 coverage, and real offscreen Qt geometry evidence. The coordinator now also projects a typed
 `saved_but_not_verified` status for `POST_VERIFY_FAILED` with a preserved artifact, retaining
 recovery actions and disabling Sign and save until recovery resolves; ordinary pre-write failures
-use `signing_failed`. Full asynchronous Signing, dirty-draft
-policy, independently scrollable split regions, and remembered divider width remain deferred to
-their owning plans.
+use `signing_failed`. Full asynchronous Signing and dirty-draft policy remain deferred to their
+owning plans; independent scroll regions and remembered divider width are covered by
+`ui_rail_divider_persistence_execplan.md`.
 This bounded child is complete in `8d67d1652`.
 
 ## Context and Orientation
@@ -193,8 +194,8 @@ coordinator tests. The focused regression suite, full suite, and offscreen Qt ge
 pass, and the bounded GUI audit must record the visible result and cleanup. The `Saved but not
 verified` state is now implemented by the readiness/recovery follow-up and is covered at both the
 coordinator and sidebar-rendering boundaries. The remaining full UI_SPEC items are No document open,
-Signing progress, dirty-draft prompts, independently scrollable regions, and remembered divider;
-those remain explicit acceptance items for later child plans, not claims of this slice.
+Signing progress and dirty-draft prompts; independent scroll regions and remembered divider are
+covered by the dedicated divider child, not claimed as part of this bounded coordinator slice.
 
 ## Evidence Record
 

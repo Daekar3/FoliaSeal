@@ -162,6 +162,7 @@ class WorkspaceViewPort(Protocol):
 
     def mount_target(self) -> object: ...
     def dispose(self) -> None: ...
+    def capture_ui_settings(self, settings: AppSettings) -> AppSettings: ...
 
 
 class SigningWorkspaceFactory(Protocol):
@@ -202,6 +203,12 @@ class QtWorkspaceView:
         delete_later = getattr(container, "deleteLater", None)
         if callable(delete_later):
             delete_later()
+
+    def capture_ui_settings(self, settings: AppSettings) -> AppSettings:
+        capture = getattr(self.shell, "capture_ui_settings", None)
+        if not callable(capture):
+            return settings
+        return capture(settings)
 
 
 @dataclass(frozen=True)

@@ -40,6 +40,7 @@ from foliaseal.domain.models import (
     SigningRequest,
 )
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+from foliaseal.infra.config.app_settings_ui import AppUiSettings, normalize_rail_width
 from foliaseal.infra.config.schemas import AppSettings
 from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
 from foliaseal.infra.document_text_selection import QtPdfDocumentTextSelectionEngine
@@ -118,9 +119,35 @@ class SigningWorkspaceComposition:
     testing_adapter: SigningWorkspaceTestingAdapter
     shell_surface: SigningWorkspaceShellSurface
     main_row: Any
+    rail_splitter: Any
 
     def bootstrap(self) -> None:
         self.orchestrator.bootstrap()
+
+    def capture_ui_settings(self, settings: AppSettings) -> AppSettings:
+        """Project the current splitter width into the caller's settings."""
+
+        sizes = getattr(self.rail_splitter, "sizes", None)
+        if not callable(sizes):
+            return settings
+        values = sizes()
+        if not isinstance(values, (list, tuple)) or len(values) < 2:
+            return settings
+        current = settings.ui_settings
+        ui_settings = AppUiSettings(
+            appearance_mode=current.appearance_mode,
+            main_window_geometry=current.main_window_geometry,
+            library_last_catalog=current.library_last_catalog,
+            library_sort=current.library_sort,
+            rail_width=normalize_rail_width(values[1]),
+        )
+        return AppSettings(
+            schema_version=settings.schema_version,
+            default_output_directory=settings.default_output_directory,
+            default_open_directory=settings.default_open_directory,
+            linux_packaging_channel=settings.linux_packaging_channel,
+            ui=ui_settings.to_mapping(settings.ui),
+        )
 
 
 @dataclass(frozen=True)
@@ -218,6 +245,11 @@ class QtSigningWorkspaceComposition:
             self.dispose()
             raise
         return self._assembled
+
+    def capture_ui_settings(self, settings: AppSettings) -> AppSettings:
+        """Capture layout-owned UI settings through the composition boundary."""
+
+        return self.build().capture_ui_settings(settings)
 
     def bootstrap(self) -> None:
         """Bootstrap the assembled workspace exactly once."""
@@ -628,6 +660,7 @@ def _assemble_signing_workspace_composition(
         on_text_selection_mode_changed=set_document_text_selection_mode,
         on_copy_selected_text=copy_selected_document_text,
         on_clear_selected_text=clear_selected_document_text,
+        fixed_width=getattr(bindings, "q_splitter", None) is None,
     )
     document_text_controls = sidebar.document_text_controls
     properties_scroll = sidebar.properties_scroll
@@ -737,12 +770,46 @@ def _assemble_signing_workspace_composition(
     viewer_column.setSpacing(4)
     viewer_column.addWidget(viewer_navigation_container)
     viewer_column.addWidget(viewer_widget)
-    main_row = bindings.q_hbox_layout()
-    main_row.setContentsMargins(0, 0, 0, 0)
-    main_row.setSpacing(8)
-    main_row.addWidget(viewer_column_container, 1)
-    main_row.addWidget(sidebar.container)
-    layout.addLayout(main_row)
+    splitter_factory = getattr(bindings, "q_splitter", None)
+    if splitter_factory is not None:
+        rail_splitter = splitter_factory()
+        set_orientation = getattr(rail_splitter, "setOrientation", None)
+        if callable(set_orientation):
+            set_orientation(bindings.qt.Horizontal)
+        add_widget = getattr(rail_splitter, "addWidget", None)
+        if callable(add_widget):
+            add_widget(viewer_column_container)
+            add_widget(sidebar.container)
+        set_stretch_factor = getattr(rail_splitter, "setStretchFactor", None)
+        if callable(set_stretch_factor):
+            set_stretch_factor(0, 1)
+            set_stretch_factor(1, 0)
+        desired_rail_width = normalize_rail_width(app_settings.ui_settings.rail_width)
+
+        def restore_rail_width() -> None:
+            width = getattr(rail_splitter, "width", lambda: 0)()
+            if type(width) is not int or width <= desired_rail_width:
+                return
+            set_sizes = getattr(rail_splitter, "setSizes", None)
+            if callable(set_sizes):
+                set_sizes([width - desired_rail_width, desired_rail_width])
+
+        timer = getattr(bindings, "q_timer", None)
+        single_shot = getattr(timer, "singleShot", None) if timer is not None else None
+        if callable(single_shot):
+            single_shot(0, restore_rail_width)
+        else:
+            restore_rail_width()
+        main_row = rail_splitter
+        layout.addWidget(rail_splitter)
+    else:
+        main_row = bindings.q_hbox_layout()
+        main_row.setContentsMargins(0, 0, 0, 0)
+        main_row.setSpacing(8)
+        main_row.addWidget(viewer_column_container, 1)
+        main_row.addWidget(sidebar.container)
+        rail_splitter = main_row
+        layout.addLayout(main_row)
     # The source notice is a condition-only canvas overlay, so position it only
     # after the viewer has been mounted and the workspace layout has a parent.
     properties_panel.refresh_source_safety()
@@ -769,4 +836,5 @@ def _assemble_signing_workspace_composition(
         testing_adapter=testing_adapter,
         shell_surface=shell_surface,
         main_row=main_row,
+        rail_splitter=rail_splitter,
     )

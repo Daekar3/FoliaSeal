@@ -106,6 +106,8 @@ class SigningWorkspaceSidebar:
     """Build the production sidebar used by the signing workspace."""
 
     RAIL_WIDTH = 320
+    RAIL_MIN_WIDTH = 280
+    RAIL_MAX_WIDTH = 640
     STATUS_REGION_MINIMUM_HEIGHT = 200
 
     def __init__(
@@ -127,21 +129,23 @@ class SigningWorkspaceSidebar:
         on_verify_again: Callable[[], Any] | None = None,
         on_return_to_draft: Callable[[], Any] | None = None,
         on_open_preserved_copy: Callable[[], Any] | None = None,
+        fixed_width: bool = True,
     ) -> None:
         self._bindings = bindings
         self._updating_document_review_selector = False
         self._updating_text_selection_mode_checkbox = False
         self.container = bindings.q_widget()
-        set_fixed_width = getattr(self.container, "setFixedWidth", None)
-        if callable(set_fixed_width):
-            set_fixed_width(self.RAIL_WIDTH)
+        if fixed_width:
+            set_fixed_width = getattr(self.container, "setFixedWidth", None)
+            if callable(set_fixed_width):
+                set_fixed_width(self.RAIL_WIDTH)
         else:
             set_minimum_width = getattr(self.container, "setMinimumWidth", None)
             set_maximum_width = getattr(self.container, "setMaximumWidth", None)
             if callable(set_minimum_width):
-                set_minimum_width(self.RAIL_WIDTH)
+                set_minimum_width(self.RAIL_MIN_WIDTH)
             if callable(set_maximum_width):
-                set_maximum_width(self.RAIL_WIDTH)
+                set_maximum_width(self.RAIL_MAX_WIDTH)
         self._layout = bindings.q_vbox_layout(self.container)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(8)

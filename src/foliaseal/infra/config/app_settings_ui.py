@@ -6,6 +6,18 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+DEFAULT_RAIL_WIDTH = 320
+MIN_RAIL_WIDTH = 280
+MAX_RAIL_WIDTH = 640
+
+
+def normalize_rail_width(value: object) -> int:
+    """Return a safe remembered signing-rail width in logical pixels."""
+
+    if type(value) is not int:
+        return DEFAULT_RAIL_WIDTH
+    return max(MIN_RAIL_WIDTH, min(MAX_RAIL_WIDTH, value))
+
 
 class AppearanceMode(StrEnum):
     """Supported application-chrome appearance modes."""
@@ -97,6 +109,7 @@ class AppUiSettings:
     main_window_geometry: MainWindowGeometry | None = None
     library_last_catalog: str = "presets"
     library_sort: LibrarySortOrder = LibrarySortOrder.NAME_ASCENDING
+    rail_width: int = DEFAULT_RAIL_WIDTH
 
     @classmethod
     def from_mapping(cls, payload: dict[str, Any]) -> AppUiSettings:
@@ -112,6 +125,7 @@ class AppUiSettings:
                 or "presets"
             ),
             library_sort=LibrarySortOrder.from_value(payload.get("library_sort")),
+            rail_width=normalize_rail_width(payload.get("rail_width", DEFAULT_RAIL_WIDTH)),
         )
 
     def to_mapping(self, existing: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -125,4 +139,6 @@ class AppUiSettings:
             mapping["library_last_catalog"] = self.library_last_catalog
         if "library_sort" in mapping or self.library_sort is not LibrarySortOrder.NAME_ASCENDING:
             mapping["library_sort"] = self.library_sort.value
+        if "rail_width" in mapping or self.rail_width != DEFAULT_RAIL_WIDTH:
+            mapping["rail_width"] = normalize_rail_width(self.rail_width)
         return mapping
