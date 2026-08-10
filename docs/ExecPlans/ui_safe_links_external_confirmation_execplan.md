@@ -48,6 +48,8 @@ visible in the real app without adding URL I/O to application policy code.
 - [x] (2026-08-10) Bounded offscreen GUI launch reached the known isolated
   `SingleInstanceUnavailable` endpoint (`gui_rc=1`); process inspection found no FoliaSeal/PySide6/
   pytest process and the owned temporary root was removed.
+- [x] (2026-08-10) Committed as `96594a95f` (`feat(ui): confirm safe external PDF links`); the
+  worktree was clean after staging exactly the intended 13 files.
 
 ## Surprises & Discoveries
 

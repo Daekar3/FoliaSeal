@@ -56,6 +56,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   not reach the dialog, long targets preserve a complete sanitized launch value, and active-signing
   requests defer/reconcile by status. Focused validation is `55 passed`; full regression is
   `1425 passed, 20 skipped, 1 warning`. Source-change reload/Locate/Ignore/Close remains open.
+- [x] (2026-08-10) External confirmation was committed in `96594a95f`; this parent now has
+  internal-link navigation/history and external confirmation/launch, while source-change recovery,
+  condition-only banners, and the remaining legacy-cleanup requirements stay open.
 
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
