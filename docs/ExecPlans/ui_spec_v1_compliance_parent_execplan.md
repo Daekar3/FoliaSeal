@@ -62,6 +62,9 @@ Foundation tranche:
   signing-rail divider and independent scroll-region evidence are implemented and validated in the
   offscreen integration node; final parent acceptance remains with the display-backed/release
   gates.
+- [ ] docs/ExecPlans/ui_library_geometry_persistence_execplan.md — remembered Signature Library
+  dialog geometry and three-column splitter widths; this is the active follow-up to the completed
+  Library topology and typed UI-settings children.
 - [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 
 Document-flow tranche:
