@@ -69,6 +69,14 @@ from foliaseal.presentation.qt.signing_workspace_host import (
     SigningWorkspaceHost,
 )
 from foliaseal.presentation.qt.signing_workspace_lifecycle import QtWorkspaceMount
+from foliaseal.presentation.qt.single_instance import (
+    NoopSingleInstanceCoordinator,
+    OpenRequest,
+    QtLocalInstanceCoordinator,
+    SingleInstanceCoordinator,
+    endpoint_name,
+    request_for_path,
+)
 from foliaseal.resources.icons import icon_path
 
 
@@ -96,6 +104,8 @@ class QtAppFrameBindings:
     qpdf_document: type[Any]
     q_palette: type[Any] | None = None
     q_color: type[Any] | None = None
+    q_local_server: type[Any] | None = None
+    q_local_socket: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -888,6 +898,7 @@ class QtAppFrameAdapter:
         on_sign_request: Callable[[SigningRequest], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        instance_coordinator: SingleInstanceCoordinator | None = None,
     ) -> int:
         q_application = self._bindings.q_application
         instance_getter = getattr(q_application, "instance", None)
@@ -898,32 +909,85 @@ class QtAppFrameAdapter:
                 launch_argv = ["foliaseal", "gui"]
             app = q_application(launch_argv)
 
-        frame = self.create_frame(
-            app_settings=app_settings,
+        coordinator = instance_coordinator or self._build_instance_coordinator(
             app_settings_store=app_settings_store,
-            certificate_catalog_store=certificate_catalog_store,
-            certificate_secret_provider=certificate_secret_provider,
-            preset_catalog_store=preset_catalog_store,
-            sign_executor=sign_executor,
-            shell_factory=shell_factory,
-            on_sign_request=on_sign_request,
-            on_error=on_error,
-            on_status_change=on_status_change,
         )
-        show = getattr(frame.window, "show", None)
-        if callable(show):
-            show()
-        if initial_pdf_path is not None:
-            frame.open_pdf_path(initial_pdf_path)
-        exec_method = getattr(app, "exec", None)
-        if not callable(exec_method):
-            return 0
-        return int(exec_method())
+        pending_requests: list[OpenRequest] = []
+        frame_holder: list[Any] = []
+
+        def handle_open_request(request: OpenRequest) -> None:
+            if not frame_holder:
+                pending_requests.append(request)
+                return
+            frame = frame_holder[0]
+            if request.pdf_path is not None:
+                frame.open_pdf_path(request.pdf_path)
+            self._raise_frame_window(frame)
+
+        coordinator.set_request_handler(handle_open_request)
+        try:
+            is_primary = coordinator.start_or_forward(request_for_path(initial_pdf_path))
+            if not is_primary:
+                return 0
+
+            frame = self.create_frame(
+                app_settings=app_settings,
+                app_settings_store=app_settings_store,
+                certificate_catalog_store=certificate_catalog_store,
+                certificate_secret_provider=certificate_secret_provider,
+                preset_catalog_store=preset_catalog_store,
+                sign_executor=sign_executor,
+                shell_factory=shell_factory,
+                on_sign_request=on_sign_request,
+                on_error=on_error,
+                on_status_change=on_status_change,
+            )
+            frame_holder.append(frame)
+            show = getattr(frame.window, "show", None)
+            if callable(show):
+                show()
+            if initial_pdf_path is not None:
+                frame.open_pdf_path(initial_pdf_path)
+            for request in pending_requests:
+                handle_open_request(request)
+            exec_method = getattr(app, "exec", None)
+            if not callable(exec_method):
+                return 0
+            return int(exec_method())
+        finally:
+            coordinator.close()
+
+    def _build_instance_coordinator(
+        self,
+        *,
+        app_settings_store: AppSettingsStore | None,
+    ) -> SingleInstanceCoordinator:
+        if self._bindings.q_local_server is None or self._bindings.q_local_socket is None:
+            return NoopSingleInstanceCoordinator()
+        store = app_settings_store or AppSettingsStore.default()
+        return QtLocalInstanceCoordinator(
+            endpoint=endpoint_name(store.storage_dir),
+            q_local_server=self._bindings.q_local_server,
+            q_local_socket=self._bindings.q_local_socket,
+        )
+
+    @staticmethod
+    def _raise_frame_window(frame: Any) -> None:
+        window = getattr(frame, "window", None)
+        if window is None:
+            return
+        raise_window = getattr(window, "raise_", None)
+        if callable(raise_window):
+            raise_window()
+        activate = getattr(window, "activateWindow", None)
+        if callable(activate):
+            activate()
 
     def _load_bindings(self) -> QtAppFrameBindings:
         try:
             qt_widgets = importlib.import_module("PySide6.QtWidgets")
             qt_gui = importlib.import_module("PySide6.QtGui")
+            qt_network = importlib.import_module("PySide6.QtNetwork")
             qtpdf = importlib.import_module("PySide6.QtPdf")
         except Exception as exc:  # pragma: no cover - environment dependent
             raise QtAppFrameBindingsUnavailable(
@@ -948,6 +1012,8 @@ class QtAppFrameAdapter:
             qpdf_document=getattr(qtpdf, "QPdfDocument"),
             q_palette=getattr(qt_gui, "QPalette"),
             q_color=getattr(qt_gui, "QColor"),
+            q_local_server=getattr(qt_network, "QLocalServer"),
+            q_local_socket=getattr(qt_network, "QLocalSocket"),
         )
 
 
@@ -995,6 +1061,7 @@ def launch_qt_app_frame(
     on_sign_request: Callable[[SigningRequest], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_status_change: Callable[[str], None] | None = None,
+    instance_coordinator: SingleInstanceCoordinator | None = None,
 ) -> int:
     """Create QApplication, show the FoliaSeal main window, and run the event loop."""
 
@@ -1012,4 +1079,5 @@ def launch_qt_app_frame(
         on_sign_request=on_sign_request,
         on_error=on_error,
         on_status_change=on_status_change,
+        instance_coordinator=instance_coordinator,
     )

@@ -29,6 +29,7 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBootstrap,
     SigningWorkspaceBundle,
 )
+from foliaseal.presentation.qt.single_instance import OpenRequest
 
 
 def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
@@ -143,6 +144,8 @@ class _FakeMainWindow:
         self.menu_bar = _FakeMenuBar()
         self.show_calls = 0
         self.minimum_size = None
+        self.raise_calls = 0
+        self.activate_calls = 0
 
     def setWindowTitle(self, title):  # noqa: N802
         self.title = title
@@ -158,6 +161,12 @@ class _FakeMainWindow:
 
     def show(self) -> None:
         self.show_calls += 1
+
+    def raise_(self) -> None:
+        self.raise_calls += 1
+
+    def activateWindow(self) -> None:  # noqa: N802
+        self.activate_calls += 1
 
 
 class _FakeLabel:
@@ -494,6 +503,27 @@ class _FakeShellFactory:
             testing=self.shell_widget.testing_adapter,
             view=QtWorkspaceView(self.shell_widget),
         )
+
+
+class _FakeInstanceCoordinator:
+    def __init__(self, *, primary: bool, queued_request: OpenRequest | None = None) -> None:
+        self.primary = primary
+        self.queued_request = queued_request
+        self.handler = None
+        self.requests = []
+        self.close_calls = 0
+
+    def set_request_handler(self, handler) -> None:
+        self.handler = handler
+
+    def start_or_forward(self, request: OpenRequest) -> bool:
+        self.requests.append(request)
+        if self.primary and self.queued_request is not None:
+            self.handler(self.queued_request)
+        return self.primary
+
+    def close(self) -> None:
+        self.close_calls += 1
 
 
 class _SequenceShellFactory:
@@ -1332,6 +1362,77 @@ def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_
     frame = _FakeLaunchFrame.instances[0]
     assert frame.window.show_calls == 1
     assert frame.opened_paths == ["/tmp/sample.pdf"]
+
+
+def test_launch_qt_app_frame_forwards_secondary_request_without_creating_window(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    coordinator = _FakeInstanceCoordinator(primary=False)
+    monkeypatch.setattr(
+        app_frame_module.QtAppFrameAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+
+    exit_code = app_frame_module.launch_qt_app_frame(
+        argv=["foliaseal", "gui"],
+        initial_pdf_path=tmp_path / "contract.pdf",
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        instance_coordinator=coordinator,
+    )
+
+    assert exit_code == 0
+    assert coordinator.requests == [
+        OpenRequest(pdf_path=str((tmp_path / "contract.pdf").resolve()))
+    ]
+    assert coordinator.close_calls == 1
+
+
+def test_launch_qt_app_frame_delivers_queued_request_to_primary_frame(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    coordinator = _FakeInstanceCoordinator(
+        primary=True,
+        queued_request=OpenRequest(pdf_path=str((tmp_path / "queued.pdf").resolve())),
+    )
+
+    class _FakeLaunchFrame:
+        instances = []
+
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            self.window = _FakeMainWindow()
+            self.opened_paths = []
+            type(self).instances.append(self)
+
+        def open_pdf_path(self, path) -> None:
+            self.opened_paths.append(path)
+
+    monkeypatch.setattr(
+        app_frame_module.QtAppFrameAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    monkeypatch.setattr(app_frame_module, "FoliaSealAppFrame", _FakeLaunchFrame)
+
+    exit_code = app_frame_module.launch_qt_app_frame(
+        argv=["foliaseal", "gui"],
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        instance_coordinator=coordinator,
+    )
+
+    frame = _FakeLaunchFrame.instances[0]
+    assert exit_code == 0
+    assert frame.opened_paths == [str((tmp_path / "queued.pdf").resolve())]
+    assert frame.window.raise_calls == 1
+    assert frame.window.activate_calls == 1
+    assert coordinator.close_calls == 1
 
 
 def test_launch_qt_app_frame_reuses_existing_application(monkeypatch, tmp_path: Path) -> None:

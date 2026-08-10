@@ -16,21 +16,29 @@ generic refactor.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are the frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 
 ## Progress
 
-- [ ] (2026-08-09) Audit the current implementation and write a failing focused test for the stated outcome.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
+- [x] (2026-08-09) Audit the current launcher and write failing protocol/launcher/Qt transport tests.
+- [x] (2026-08-09) Implement the bounded single-owner and initial/second-invocation forwarding path.
 - [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; record evidence and clean up.
-- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit.
+- [x] (2026-08-09) Run focused, regression, and bounded Qt validation; record evidence and clean up.
+- [ ] (2026-08-09) Update relevant architecture/status documentation, complete deferred-draft policy, then commit the whole child outcome.
 
 ## Surprises & Discoveries
 
 - Observation: app-frame open methods are in-process calls and do not by themselves implement a
   second-process handoff; this child must add and test an explicit platform/process boundary.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
+- Observation: the current public workspace ports do not expose dirty-draft or active-signing
+  deferral state, so this loop stops at safe owner/forwarding transport and leaves pending-request
+  UI policy to the document lifecycle child.
+  Evidence: `SigningWorkspacePort`, `SigningWorkspaceSessionPort`, and `SigningWorkspaceHost` expose
+  open/close/session verbs but no dirty or transaction decision contract.
+- Observation: the current sandbox's QLocalServer cannot bind a Unix endpoint (`Unknown error 1`),
+  so the production transport has an offscreen integration test that skips with an explicit
+  environment diagnostic; pure protocol and injected-launch tests remain green.
 
 ## Decision Log
 
@@ -40,10 +48,22 @@ generic refactor.
 - Decision: keep this change limited to one observable single-instance and open-request routing outcome.
   Rationale: narrow commits make GUI regressions and recovery auditable.
   Date/Author: 2026-08-09 / Codex
+- Decision: Loop 4 delivers a typed bounded JSON protocol, per-user QLocalServer/QLocalSocket owner
+  boundary, secondary send-and-exit behavior, Qt-event-loop delivery, and stale-endpoint cleanup;
+  dirty-draft deferral, full content validation, and pending-request UI remain a separate child.
+  Rationale: those policies require public workspace state seams that do not yet exist.
+  Date/Author: 2026-08-09 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. At completion, state what a novice can now do, which tests and live evidence prove it, and any remaining gap.
+The bounded owner boundary is implemented: a primary FoliaSeal launch claims a per-user local
+endpoint, a second invocation sends an optional absolute PDF path and exits without creating a second
+window, and the owner routes queued requests to the existing frame while raising it. Protocol size,
+shape, absolute-path, owner-lock, and cleanup seams are tested; focused launcher/Qt tests pass
+(`39 passed`, with the environment-limited QLocalServer integration explicitly skipped). Dirty-draft
+deferral, password/restriction/first-render validation, pending filename/cancel UI, and the real
+two-process smoke evidence remain owned by later lifecycle work; stale-endpoint recovery is not
+claimed as live transport evidence in this environment.
 
 ## Context and Orientation
 
@@ -67,13 +87,14 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Implement one-process/one-main-window routing for an OS open request or a second invocation. Create
+Implement one-process/one-main-window routing for an OS open request or a second invocation. Loop 4
+implements the owner/transport foundation and initial/forwarded delivery. Create
 `tests/integration/test_single_instance_open_routing.py` as the process-level contract test; it owns
 the primary-owner startup race, second-invocation forwarding, and deferred-request assertions.
 Introduce a small platform/process boundary for forwarding the path to the existing frame; do not
 pretend the current app-frame methods provide IPC. Validate the candidate PDF before replacing the
 current document, defer an external request during active signing, and expose the pending filename
-and cancel action. Use a localhost-free `QLocalServer`/`QLocalSocket` endpoint derived from the
+and cancel action in the dependent lifecycle child. Use a localhost-free `QLocalServer`/`QLocalSocket` endpoint derived from the
 user config directory, with a lock/primary-owner handshake, bounded startup retry, and a clear
 fallback error when the primary process is alive but not listening. Add typed seams where the current code passes raw widget internals or compatibility
 kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
@@ -125,9 +146,11 @@ the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: A second open request does not create tabs or a second document window; a valid request reaches the existing frame only after validation and dirty-draft policy; an active signing transaction defers it safely. The focused regression suite must pass, the full
-suite must remain green when shared code changed, and the GUI audit must record the visible result
-and cleanup. A passing import or unit test without the stated user-visible behavior is insufficient.
+Acceptance for Loop 4 is behavioral for the owner boundary: a second invocation does not create a
+second frame, sends a bounded absolute-path request to the primary, and the primary delivers it on
+the Qt event loop while raising the existing window. Dirty-draft/active-signing policy and complete
+PDF content validation remain explicitly deferred. Focused protocol/launcher tests, the full suite,
+and any available Qt transport evidence must remain green with clean process/socket teardown.
 
 ## Required Acceptance Cases
 
@@ -138,9 +161,10 @@ explicit cancel action; no second window or tab is created.
 
 ## Evidence Record
 
-Before completion, record the exact two-process test and smoke command results, primary/secondary
-input sequence and forwarding logs, evidence path, cleanup of both owned processes and temp roots,
-and compatibility grep proof.
+Before completion, record the exact protocol/launcher test and available Qt transport result,
+primary/secondary input sequence, evidence path, cleanup of owned processes/socket roots, and
+compatibility grep proof. The current QLocalServer bind limitation must remain recorded rather than
+silently treated as a passing two-process audit.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
