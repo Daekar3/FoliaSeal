@@ -12,7 +12,11 @@ from foliaseal.application.reusable_signing_models import (
 )
 from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
-from foliaseal.infra.config.app_settings_ui import AppearanceMode
+from foliaseal.infra.config.app_settings_ui import (
+    AppearanceMode,
+    AppUiSettings,
+    MainWindowGeometry,
+)
 from foliaseal.infra.config.certificate_codecs import (
     decode_certificate_catalog,
     encode_certificate_catalog,
@@ -128,6 +132,38 @@ def test_app_ui_settings_merge_keeps_unrecognized_ui_preferences() -> None:
         "appearance_mode": "light",
         "future_preference": 7,
     }
+
+
+def test_app_ui_settings_round_trips_main_window_geometry_and_unknown_keys() -> None:
+    geometry = MainWindowGeometry(x=12, y=34, width=1200, height=800, maximized=True)
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"appearance_mode": "dark", "future_preference": 7},
+    )
+
+    merged = AppUiSettings(
+        appearance_mode=settings.ui_settings.appearance_mode,
+        main_window_geometry=geometry,
+    ).to_mapping(settings.ui)
+
+    assert merged == {
+        "appearance_mode": "dark",
+        "future_preference": 7,
+        "main_window_geometry": geometry.to_mapping(),
+    }
+
+
+def test_main_window_geometry_rejects_malformed_or_undersized_payloads() -> None:
+    assert MainWindowGeometry.from_mapping({"x": 1}) is None
+    assert MainWindowGeometry.from_mapping(
+        {"x": 0, "y": 0, "width": 1099, "height": 700}
+    ) is None
+    assert MainWindowGeometry.from_mapping(
+        {"x": 0, "y": 0, "width": 1100, "height": 700, "maximized": "yes"}
+    ) is None
 
 
 def test_app_settings_round_trip_preserves_ui_mapping() -> None:

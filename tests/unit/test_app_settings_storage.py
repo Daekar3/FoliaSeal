@@ -7,6 +7,7 @@ from foliaseal.infra.config.app_settings_storage import (
     AppSettingsStore,
     default_app_settings_directory,
 )
+from foliaseal.infra.config.app_settings_ui import MainWindowGeometry
 from foliaseal.infra.config.schemas import AppSettings, ConfigValidationError
 
 
@@ -67,6 +68,39 @@ def test_app_settings_store_projects_invalid_appearance_mode_to_system(tmp_path:
     store.save_settings(settings)
 
     assert store.load_settings().ui_settings.appearance_mode.value == "system"
+
+
+def test_app_settings_store_round_trips_main_window_geometry(tmp_path: Path) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "out"),
+        default_open_directory=str(tmp_path / "in"),
+        linux_packaging_channel="primary",
+        ui={
+            "appearance_mode": "light",
+            "future_preference": "keep",
+            "main_window_geometry": MainWindowGeometry(
+                x=20,
+                y=30,
+                width=1200,
+                height=800,
+                maximized=True,
+            ).to_mapping(),
+        },
+    )
+
+    store.save_settings(settings)
+
+    loaded = store.load_settings()
+    assert loaded.ui_settings.main_window_geometry == MainWindowGeometry(
+        x=20,
+        y=30,
+        width=1200,
+        height=800,
+        maximized=True,
+    )
+    assert loaded.ui["future_preference"] == "keep"
 
 
 def test_app_settings_store_removes_temp_file_when_replace_fails(

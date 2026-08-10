@@ -113,6 +113,10 @@ Release tranche:
   recommended-action styling/accessibility, and has coordinator plus real offscreen sidebar evidence.
   The full UI_SPEC state machine, asynchronous progress, verification/recovery, independently
   scrollable regions, and remembered divider remain open in this child and their owning children.
+- [x] (2026-08-09) Loop 7 completed the bounded main-window geometry/restart slice: validated
+  `MainWindowGeometry` survives settings round-trip, restores before display, captures after the
+  event loop (including controlled cleanup), and preserves unknown UI keys. Rail-divider, Library,
+  full monitor/DPI, and toolbar persistence remain open in the window child.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -145,6 +149,11 @@ Release tranche:
   UI_SPEC states are named as deferrals.
   Evidence: Loop 6 compliance review and `ui_signing_rail_stage_status_execplan.md` revision note
   dated 2026-08-09.
+- Observation: main-window geometry persistence can use the existing `AppSettings.ui` merge and
+  atomic store without a schema-version bump, but the full UI_SPEC responsive contract is broader
+  than one rectangle and maximized flag.
+  Evidence: Loop 7 explorer review, `MainWindowGeometry`, and the window child ExecPlan's explicit
+  rail/Library/monitor/DPI/toolbar deferrals.
 
 ## Decision Log
 

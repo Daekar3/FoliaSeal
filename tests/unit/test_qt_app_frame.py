@@ -147,12 +147,30 @@ class _FakeMainWindow:
         self.minimum_size = None
         self.raise_calls = 0
         self.activate_calls = 0
+        self.geometry_value = _FakeRect(0, 0, 1100, 700)
+        self.maximized = False
+        self.geometry_set_calls = []
+        self.maximize_calls = 0
 
     def setWindowTitle(self, title):  # noqa: N802
         self.title = title
 
     def setMinimumSize(self, width, height):  # noqa: N802
         self.minimum_size = (width, height)
+
+    def setGeometry(self, x, y, width, height):  # noqa: N802
+        self.geometry_set_calls.append((x, y, width, height))
+        self.geometry_value = _FakeRect(x, y, width, height)
+
+    def geometry(self):
+        return self.geometry_value
+
+    def isMaximized(self):  # noqa: N802
+        return self.maximized
+
+    def showMaximized(self):  # noqa: N802
+        self.maximized = True
+        self.maximize_calls += 1
 
     def menuBar(self):  # noqa: N802
         return self.menu_bar
@@ -168,6 +186,26 @@ class _FakeMainWindow:
 
     def activateWindow(self) -> None:  # noqa: N802
         self.activate_calls += 1
+
+
+class _FakeRect:
+    def __init__(self, x, y, width, height) -> None:
+        self._x = x
+        self._y = y
+        self._width = width
+        self._height = height
+
+    def x(self):
+        return self._x
+
+    def y(self):
+        return self._y
+
+    def width(self):
+        return self._width
+
+    def height(self):
+        return self._height
 
 
 class _FakeLabel:
@@ -1398,6 +1436,96 @@ def test_qt_app_frame_adapter_create_frame_returns_frame_host(
     assert frame.window.title == "FoliaSeal"
 
 
+def test_app_frame_restores_and_captures_main_window_geometry(tmp_path: Path) -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "out"),
+        default_open_directory=str(tmp_path / "in"),
+        linux_packaging_channel="primary",
+        ui={
+            "appearance_mode": "system",
+            "main_window_geometry": {
+                "x": 40,
+                "y": 50,
+                "width": 1200,
+                "height": 800,
+                "maximized": True,
+            },
+        },
+    )
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=settings,
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+
+    assert frame.restore_window_geometry() is True
+    assert frame.window.geometry_set_calls == [(40, 50, 1200, 800)]
+    frame.window.show()
+    frame.apply_restored_window_state()
+    assert frame.window.maximize_calls == 1
+
+    frame.window.geometry_value = _FakeRect(70, 80, 1300, 900)
+    frame.window.maximized = False
+    captured = frame.capture_window_geometry()
+
+    assert captured.ui_settings.main_window_geometry is not None
+    assert captured.ui_settings.main_window_geometry.to_mapping() == {
+        "x": 70,
+        "y": 80,
+        "width": 1300,
+        "height": 900,
+        "maximized": False,
+    }
+
+
+def test_app_frame_capture_enforces_minimum_geometry(tmp_path: Path) -> None:
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+    frame.window.geometry_value = _FakeRect(-20, -10, 400, 300)
+
+    captured = frame.capture_window_geometry()
+
+    assert captured.ui_settings.main_window_geometry.to_mapping() == {
+        "x": -20,
+        "y": -10,
+        "width": 1100,
+        "height": 700,
+        "maximized": False,
+    }
+
+
+def test_app_frame_ignores_malformed_persisted_geometry(tmp_path: Path) -> None:
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "out"),
+        default_open_directory=str(tmp_path / "in"),
+        linux_packaging_channel="primary",
+        ui={
+            "main_window_geometry": {
+                "x": 10,
+                "y": 20,
+                "width": 400,
+                "height": 300,
+                "maximized": True,
+            }
+        },
+    )
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=settings,
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+
+    assert frame.restore_window_geometry() is False
+    assert frame.window.geometry_set_calls == []
+    frame.apply_restored_window_state()
+    assert frame.window.maximize_calls == 0
+
+
 def test_qt_app_frame_adapter_no_longer_exposes_raw_window_create() -> None:
     assert not hasattr(app_frame_module.QtAppFrameAdapter, "create")
 
@@ -1462,6 +1590,55 @@ def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_
     frame = _FakeLaunchFrame.instances[0]
     assert frame.window.show_calls == 1
     assert frame.opened_paths == ["/tmp/sample.pdf"]
+
+
+def test_launch_qt_app_frame_restores_before_show_and_persists_after_exec(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    events = []
+    _FakeQApplication.exec_result = 4
+
+    class _FakeLaunchFrame:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            self.window = _FakeMainWindow()
+
+        def restore_window_geometry(self) -> None:
+            events.append("restore")
+
+        def apply_restored_window_state(self) -> None:
+            events.append("maximize")
+
+        def capture_window_geometry(self) -> None:
+            events.append("capture")
+
+        def persist_captured_window_geometry(self) -> None:
+            events.append("persist")
+
+    original_show = _FakeMainWindow.show
+
+    def show(self) -> None:
+        events.append("show")
+        original_show(self)
+
+    monkeypatch.setattr(_FakeMainWindow, "show", show)
+    monkeypatch.setattr(
+        app_frame_module.QtAppFrameAdapter,
+        "_load_bindings",
+        lambda self: bindings,
+    )
+    monkeypatch.setattr(app_frame_module, "FoliaSealAppFrame", _FakeLaunchFrame)
+
+    exit_code = app_frame_module.launch_qt_app_frame(
+        argv=["foliaseal", "gui"],
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+    )
+
+    assert exit_code == 4
+    assert events == ["restore", "show", "maximize", "capture", "persist"]
 
 
 def test_launch_qt_app_frame_forwards_secondary_request_without_creating_window(

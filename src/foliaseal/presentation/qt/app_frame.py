@@ -21,7 +21,11 @@ from foliaseal.application.signing_material_resolver import (
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
-from foliaseal.infra.config.app_settings_ui import AppearanceMode, AppUiSettings
+from foliaseal.infra.config.app_settings_ui import (
+    AppearanceMode,
+    AppUiSettings,
+    MainWindowGeometry,
+)
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import (
@@ -861,6 +865,108 @@ class FoliaSealAppFrame:
             q_color=self._bindings.q_color,
         )
 
+    def restore_window_geometry(self) -> bool:
+        """Restore the saved main-window rectangle before the frame is shown."""
+
+        geometry = self._app_settings.ui_settings.main_window_geometry
+        if geometry is None:
+            self._restore_maximized = False
+            return False
+
+        x, y = geometry.x, geometry.y
+        screen = self._window_screen()
+        available_geometry = (
+            getattr(screen, "availableGeometry", lambda: None)() if screen is not None else None
+        )
+        if available_geometry is not None:
+            available_x = _qt_rect_value(available_geometry, "x")
+            available_y = _qt_rect_value(available_geometry, "y")
+            available_width = _qt_rect_value(available_geometry, "width")
+            available_height = _qt_rect_value(available_geometry, "height")
+            if None not in (
+                available_x,
+                available_y,
+                available_width,
+                available_height,
+            ):
+                x = min(
+                    max(x, available_x),
+                    max(available_x, available_x + available_width - geometry.width),
+                )
+                y = min(
+                    max(y, available_y),
+                    max(available_y, available_y + available_height - geometry.height),
+                )
+
+        set_geometry = getattr(self.window, "setGeometry", None)
+        if callable(set_geometry):
+            set_geometry(x, y, geometry.width, geometry.height)
+        self._restore_maximized = geometry.maximized
+        return True
+
+    def apply_restored_window_state(self) -> None:
+        """Apply the saved maximized state after the frame has been shown."""
+
+        if not getattr(self, "_restore_maximized", False):
+            return
+        show_maximized = getattr(self.window, "showMaximized", None)
+        if callable(show_maximized):
+            show_maximized()
+
+    def capture_window_geometry(self) -> AppSettings:
+        """Capture the current main-window rectangle into the in-memory settings."""
+
+        geometry_getter = getattr(self.window, "geometry", None)
+        if not callable(geometry_getter):
+            return self._app_settings
+        rectangle = geometry_getter()
+        values = {
+            name: _qt_rect_value(rectangle, name)
+            for name in ("x", "y", "width", "height")
+        }
+        if any(value is None for value in values.values()):
+            return self._app_settings
+        try:
+            geometry = MainWindowGeometry(
+                x=values["x"],
+                y=values["y"],
+                width=max(values["width"], MainWindowGeometry.MIN_WIDTH),
+                height=max(values["height"], MainWindowGeometry.MIN_HEIGHT),
+                maximized=bool(getattr(self.window, "isMaximized", lambda: False)()),
+            )
+        except (TypeError, ValueError):
+            return self._app_settings
+        ui_settings = AppUiSettings(
+            appearance_mode=self._app_settings.ui_settings.appearance_mode,
+            main_window_geometry=geometry,
+        )
+        self._app_settings = AppSettings(
+            schema_version=self._app_settings.schema_version,
+            default_output_directory=self._app_settings.default_output_directory,
+            default_open_directory=self._app_settings.default_open_directory,
+            linux_packaging_channel=self._app_settings.linux_packaging_channel,
+            ui=ui_settings.to_mapping(self._app_settings.ui),
+        )
+        return self._app_settings
+
+    def persist_captured_window_geometry(self) -> None:
+        """Atomically save captured settings without preventing application shutdown."""
+
+        try:
+            self._app_settings_store.save_settings(self._app_settings)
+        except (ConfigValidationError, OSError, ValueError) as exc:
+            if self._on_error is not None:
+                self._on_error(f"Unable to save window settings: {exc}")
+
+    def _window_screen(self) -> Any | None:
+        screen_getter = getattr(self.window, "screen", None)
+        screen = screen_getter() if callable(screen_getter) else None
+        if screen is not None:
+            return screen
+        application = self._bindings.q_application
+        primary_screen = getattr(application, "primaryScreen", None)
+        return primary_screen() if callable(primary_screen) else None
+
     def _apply_app_settings(self, settings: AppSettings) -> None:
         self._app_settings = settings
         self._apply_window_baseline()
@@ -893,6 +999,15 @@ class FoliaSealAppFrame:
         if workspace is None:
             return None
         return action(workspace.session)
+
+def _qt_rect_value(rectangle: Any, name: str) -> int | None:
+    """Read a QRect-like integer property from real or fake Qt objects."""
+
+    value = getattr(rectangle, name, None)
+    if not callable(value):
+        return None
+    result = value()
+    return result if type(result) is int else None
 
 
 class QtAppFrameAdapter:
@@ -989,9 +1104,15 @@ class QtAppFrameAdapter:
                 on_status_change=on_status_change,
             )
             frame_holder.append(frame)
+            restore_geometry = getattr(frame, "restore_window_geometry", None)
+            if callable(restore_geometry):
+                restore_geometry()
             show = getattr(frame.window, "show", None)
             if callable(show):
                 show()
+            apply_restored_state = getattr(frame, "apply_restored_window_state", None)
+            if callable(apply_restored_state):
+                apply_restored_state()
             if initial_pdf_path is not None:
                 frame.open_pdf_path(initial_pdf_path)
             for request in pending_requests:
@@ -999,7 +1120,16 @@ class QtAppFrameAdapter:
             exec_method = getattr(app, "exec", None)
             if not callable(exec_method):
                 return 0
-            return int(exec_method())
+            try:
+                exit_code = int(exec_method())
+            finally:
+                capture_geometry = getattr(frame, "capture_window_geometry", None)
+                if callable(capture_geometry):
+                    capture_geometry()
+                persist_geometry = getattr(frame, "persist_captured_window_geometry", None)
+                if callable(persist_geometry):
+                    persist_geometry()
+            return exit_code
         finally:
             coordinator.close()
 
