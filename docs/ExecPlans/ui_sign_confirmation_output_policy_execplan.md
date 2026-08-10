@@ -41,7 +41,8 @@ Qt surface, focused tests, and observable acceptance.
   of the broad exception-swallowing fallback. Real display-backed dialog acceptance remains
   environment-blocked at the isolated single-instance endpoint; exact existing-field identity is
   deferred to `ui_signature_field_targeting_profiles_execplan.md`.
-- [ ] (2026-08-10) Commit the completed slice and record the next dependency-ordered blocker.
+- [x] (2026-08-10) Commit the completed slice as `def5ce0f5` and record the next
+  dependency-ordered blocker.
 
 ## Surprises & Discoveries
 
@@ -196,4 +197,6 @@ Revision note: 2026-08-10 / Codex
 Implemented and reviewed the confirmation/output-policy vertical slice after the live audit and
 red/green tests; updated the acceptance contract, compatibility note, and evidence requirements.
 Current focused evidence is `136 passed`; full regression and cleanup are recorded; display-backed
-acceptance is explicitly environment-blocked, and commit is the remaining gate for this slice.
+acceptance is explicitly environment-blocked. Documentation closeout is committed as
+`def5ce0f5`; the next dependency-ordered blocker is display-backed acceptance when a usable
+single-instance GUI environment is available.
