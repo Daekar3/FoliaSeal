@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from foliaseal.domain.models import SigningRequest, SigningResult
+from foliaseal.domain.models import SigningRequest, SigningResult, VerificationSummary
 
 
 def _build_historical_backend() -> object:
@@ -28,6 +28,14 @@ class LazySigningRequestExecutor:
             self._delegate = self.factory()
         execute = getattr(self._delegate, "execute")
         return execute(request)
+
+    def verify_preserved_artifact(self, artifact_path: str) -> VerificationSummary:
+        """Re-run local verification through the lazily-created backend."""
+
+        if self._delegate is None:
+            self._delegate = self.factory()
+        verify = getattr(self._delegate, "verify_preserved_artifact")
+        return verify(artifact_path)
 
 
 def build_default_signing_executor() -> LazySigningRequestExecutor:

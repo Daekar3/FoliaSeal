@@ -2,7 +2,7 @@ from pathlib import Path
 
 from foliaseal.application import SigningDraftWorkflow
 from foliaseal.domain.errors import FailureCode
-from foliaseal.domain.models import SigningResult
+from foliaseal.domain.models import SigningResult, VerificationSummary
 from foliaseal.presentation.qt.signing_action_coordinator import (
     SigningActionCoordinator,
 )
@@ -20,6 +20,32 @@ class _FakeSigningExecutor:
         if self.error is not None:
             raise self.error
         return self.result
+
+
+class _FakeRecoveryExecutor(_FakeSigningExecutor):
+    def __init__(self, result=None, *, verify_error: Exception | None = None) -> None:
+        super().__init__(result)
+        self.verify_error = verify_error
+        self.verify_calls: list[str] = []
+
+    def verify_preserved_artifact(self, artifact_path: str):
+        self.verify_calls.append(artifact_path)
+        if self.verify_error is not None:
+            raise self.verify_error
+        return VerificationSummary(
+            signature_count=1,
+            timestamp_present=True,
+            signatures_cryptographically_valid=True,
+        )
+
+
+class _InvalidVerificationSummary:
+    signatures_cryptographically_valid = False
+
+
+class _MissingTimestampVerificationSummary:
+    signatures_cryptographically_valid = True
+    timestamp_present = False
 
 
 def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
@@ -275,6 +301,112 @@ def test_signing_action_coordinator_failure_tracks_error_state(tmp_path: Path) -
     assert transition.state.can_open_signed_output is False
     assert transition.state.recommended_action == "sign"
     assert coordinator.open_signed_output() is None
+
+
+def test_signing_action_coordinator_exposes_preserved_artifact_recovery_actions(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    preserved = str(tmp_path / "preserved.tmp")
+    executor = _FakeRecoveryExecutor(
+        SigningResult(
+            success=False,
+            failure_code=FailureCode.POST_VERIFY_FAILED,
+            message="Post-sign verification failed; preserved artifact is untrusted.",
+            preserved_artifact_path=preserved,
+        )
+    )
+    cleaned: list[str] = []
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: True,
+        validation_text=lambda: "",
+        sign_executor=executor,
+        verify_preserved_artifact=executor.verify_preserved_artifact,
+        can_open_preserved_copy=True,
+        cleanup_preserved_artifact=cleaned.append,
+    )
+
+    transition = coordinator.submit()
+
+    assert transition.state.can_verify_again is True
+    assert transition.state.can_return_to_draft is True
+    assert transition.state.can_open_preserved_copy is True
+    assert transition.state.recommended_action == "verify_again"
+    assert coordinator.open_preserved_copy() == preserved
+
+    verified = coordinator.verify_again()
+    assert verified.status_event == "verify_success"
+    assert executor.verify_calls == [preserved]
+    assert "verified locally" in verified.state.result_text
+    assert verified.state.recommended_action == "open_preserved_copy"
+
+    returned = coordinator.return_to_draft()
+    assert returned.last_signing_result is None
+    assert returned.can_verify_again is False
+    assert returned.recommended_action == "sign"
+    assert cleaned == [preserved]
+
+
+def test_signing_action_coordinator_keeps_invalid_retry_in_recovery_state(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    preserved = str(tmp_path / "preserved.tmp")
+    executor = _FakeRecoveryExecutor(
+        SigningResult(
+            success=False,
+            failure_code=FailureCode.POST_VERIFY_FAILED,
+            message="untrusted",
+            preserved_artifact_path=preserved,
+        )
+    )
+    executor.verify_preserved_artifact = lambda _path: _InvalidVerificationSummary()
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: True,
+        validation_text=lambda: "",
+        sign_executor=executor,
+        verify_preserved_artifact=executor.verify_preserved_artifact,
+        can_open_preserved_copy=True,
+    )
+
+    coordinator.submit()
+    retry = coordinator.verify_again()
+
+    assert retry.status_event == "verify_failure"
+    assert retry.state.can_verify_again is True
+    assert retry.state.recommended_action == "verify_again"
+
+
+def test_signing_action_coordinator_rejects_missing_required_timestamp_on_retry(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    preserved = str(tmp_path / "preserved.tmp")
+    result = SigningResult(
+        success=False,
+        failure_code=FailureCode.POST_VERIFY_FAILED,
+        message="timestamp missing",
+        preserved_artifact_path=preserved,
+    )
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: True,
+        validation_text=lambda: "",
+        sign_executor=_FakeSigningExecutor(result),
+        verify_preserved_artifact=lambda _path: _MissingTimestampVerificationSummary(),
+        can_open_preserved_copy=True,
+    )
+
+    coordinator.submit()
+    retry = coordinator.verify_again()
+
+    assert retry.status_event == "verify_failure"
+    assert "trusted preserved artifact" in retry.state.result_text
 
 
 def test_signing_action_coordinator_exception_uses_emit_error_path(tmp_path: Path) -> None:

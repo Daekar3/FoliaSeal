@@ -204,6 +204,16 @@ class SignPdfUseCase:
     compatibility_profile: PdfCompatibilityProfile = PdfCompatibilityProfile()
     preview_render_port: PreviewRasterRenderer | None = None
 
+    def verify_preserved_artifact(
+        self,
+        artifact_path: str,
+        *,
+        trust_policy: TimestampTrustPolicy | None = None,
+    ) -> VerificationSummary:
+        """Re-run local verification on an explicitly preserved artifact."""
+
+        return self.verifier.verify(artifact_path, trust_policy=trust_policy)
+
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""
         staged_output_path: Path | None = None
@@ -268,21 +278,75 @@ class SignPdfUseCase:
                 request.output_pdf_path,
                 output.output_bytes,
             )
-            verification = self.verifier.verify(
-                str(staged_output_path),
-                trust_policy=request.trust_policy,
-            )
-            if request.timestamp_required and not verification.timestamp_present:
+            try:
+                verification = self.verifier.verify(
+                    str(staged_output_path),
+                    trust_policy=request.trust_policy,
+                )
+            except TimestampTrustMaterialError as exc:
+                preserved_artifact_path = str(staged_output_path)
+                staged_output_path = None
+                return SigningResult(
+                    success=False,
+                    failure_code=FailureCode.TIMESTAMP_TRUST_MATERIAL_INVALID,
+                    message=(
+                        "Post-sign verification failed; the preserved artifact must not be "
+                        f"relied upon yet: {exc}"
+                    ),
+                    output_pdf_version=output.output_pdf_version,
+                    signature_subfilter=output.signature_subfilter,
+                    preserved_artifact_path=preserved_artifact_path,
+                )
+            except ValueError as exc:
+                preserved_artifact_path = str(staged_output_path)
+                staged_output_path = None
+                return SigningResult(
+                    success=False,
+                    failure_code=FailureCode.PDF_SIGNING_FAILED,
+                    message=(
+                        "Post-sign verification failed; the preserved artifact must not be "
+                        f"relied upon yet: {exc}"
+                    ),
+                    output_pdf_version=output.output_pdf_version,
+                    signature_subfilter=output.signature_subfilter,
+                    preserved_artifact_path=preserved_artifact_path,
+                )
+            except Exception as exc:
+                preserved_artifact_path = str(staged_output_path)
+                staged_output_path = None
                 return SigningResult(
                     success=False,
                     failure_code=FailureCode.POST_VERIFY_FAILED,
-                    message="Post-sign verification did not find expected timestamp token.",
+                    message=(
+                        "Post-sign verification failed; the preserved artifact must not be "
+                        f"relied upon yet: {exc}"
+                    ),
+                    output_pdf_version=output.output_pdf_version,
+                    signature_subfilter=output.signature_subfilter,
+                    preserved_artifact_path=preserved_artifact_path,
+                )
+            if request.timestamp_required and not verification.timestamp_present:
+                preserved_artifact_path = str(staged_output_path)
+                staged_output_path = None
+                return SigningResult(
+                    success=False,
+                    failure_code=FailureCode.POST_VERIFY_FAILED,
+                    message=(
+                        "Post-sign verification did not find the expected timestamp token; "
+                        "the preserved artifact must not be relied upon yet."
+                    ),
+                    output_pdf_version=output.output_pdf_version,
+                    signature_subfilter=output.signature_subfilter,
+                    timestamp_present=verification.timestamp_present,
+                    preserved_artifact_path=preserved_artifact_path,
                 )
             if request.trust_policy is not None and verification.timestamp_present:
                 if (
                     verification.timestamp_cryptographically_valid is False
                     or verification.tsa_chain_trusted is False
                 ):
+                    preserved_artifact_path = str(staged_output_path)
+                    staged_output_path = None
                     return SigningResult(
                         success=False,
                         failure_code=FailureCode.TIMESTAMP_TRUST_FAILED,
@@ -302,6 +366,7 @@ class SignPdfUseCase:
                         or certification.docmdp_permission,
                         certification_restricted=verification.certification_restricted,
                         restriction_reason=verification.restriction_reason,
+                        preserved_artifact_path=preserved_artifact_path,
                     )
 
             standards_summary = self.compatibility_profile.build_standards_summary(

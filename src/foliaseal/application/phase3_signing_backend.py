@@ -339,18 +339,23 @@ class PyHankoSignatureVerifier:
             if not embedded_signatures:
                 raise ValueError("No embedded signature fields were found in the output PDF.")
 
-            signature = embedded_signatures[-1]
-            validation_context = ValidationContext(trust_roots=[signature.signer_cert])
             timestamp_validation_context = build_timestamp_validation_context(trust_policy)
-            status = validation.validate_pdf_signature(
-                signature,
-                signer_validation_context=validation_context,
-                ts_validation_context=timestamp_validation_context,
-            )
+            statuses = []
+            for index, signature in enumerate(embedded_signatures, start=1):
+                validation_context = ValidationContext(trust_roots=[signature.signer_cert])
+                status = validation.validate_pdf_signature(
+                    signature,
+                    signer_validation_context=validation_context,
+                    ts_validation_context=timestamp_validation_context,
+                )
+                if not status.intact or not status.valid:
+                    raise ValueError(
+                        f"Signature {index} of {len(embedded_signatures)} failed "
+                        "cryptographic validation."
+                    )
+                statuses.append(status)
+            status = statuses[-1]
             certification = inspect_pdf_certification_reader(reader)
-
-        if not status.intact or not status.valid:
-            raise ValueError("The signed PDF failed cryptographic validation.")
 
         timestamp_validity = getattr(status, "timestamp_validity", None)
         timestamp_cryptographically_valid = None
@@ -380,6 +385,7 @@ class PyHankoSignatureVerifier:
 
         return VerificationSummary(
             signature_count=len(embedded_signatures),
+            signatures_cryptographically_valid=True,
             timestamp_present=_status_has_timestamp(status),
             timestamp_cryptographically_valid=timestamp_cryptographically_valid,
             tsa_chain_trusted=tsa_chain_trusted,
@@ -398,6 +404,9 @@ class Phase3SigningExecutor:
 
     def execute(self, request: SigningRequest) -> SigningResult:
         return self.use_case.execute(request)
+
+    def verify_preserved_artifact(self, artifact_path: str) -> VerificationSummary:
+        return self.use_case.verify_preserved_artifact(artifact_path)
 
 
 def build_phase3_signing_executor(

@@ -96,5 +96,27 @@ class SigningActionBoundary:
             opened_output_path=output_path,
         )
 
+    def verify_again(self) -> SigningActionBoundaryResult:
+        transition = self._coordinator.verify_again()
+        if transition.status_event is not None and self._on_status_change is not None:
+            self._on_status_change(transition.status_event)
+        return SigningActionBoundaryResult(
+            state=transition.state,
+            status_event=transition.status_event,
+            error_message=transition.error_message,
+        )
+
+    def return_to_draft(self) -> SigningActionBoundaryResult:
+        return SigningActionBoundaryResult(state=self._coordinator.return_to_draft())
+
+    def open_preserved_copy(self) -> SigningActionBoundaryResult:
+        output_path = self._coordinator.open_preserved_copy()
+        if output_path is not None and self._on_open_signed_output is not None:
+            self._on_open_signed_output(output_path)
+        return SigningActionBoundaryResult(
+            state=self._coordinator.load(),
+            opened_output_path=output_path,
+        )
+
     def invalidate(self, reason: str) -> SigningActionBoundaryResult:
         return SigningActionBoundaryResult(state=self._coordinator.invalidate(reason))

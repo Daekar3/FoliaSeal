@@ -24,6 +24,9 @@ class SigningActionControls:
     choose_output_button: Any
     sign_button: Any
     open_signed_output_button: Any
+    verify_again_button: Any
+    return_to_draft_button: Any
+    open_preserved_copy_button: Any
     result_label: Any
 
 
@@ -67,6 +70,9 @@ class SigningWorkspaceSidebarSurface:
     choose_output_button: Any
     sign_button: Any
     open_signed_output_button: Any
+    verify_again_button: Any
+    return_to_draft_button: Any
+    open_preserved_copy_button: Any
     sign_result_label: Any
     flow_journey_label: Any
     flow_stage_label: Any
@@ -118,6 +124,9 @@ class SigningWorkspaceSidebar:
         on_text_selection_mode_changed: Callable[[bool], Any],
         on_copy_selected_text: Callable[[], Any],
         on_clear_selected_text: Callable[[], Any],
+        on_verify_again: Callable[[], Any] | None = None,
+        on_return_to_draft: Callable[[], Any] | None = None,
+        on_open_preserved_copy: Callable[[], Any] | None = None,
     ) -> None:
         self._bindings = bindings
         self._updating_document_review_selector = False
@@ -149,6 +158,9 @@ class SigningWorkspaceSidebar:
             on_choose_output=on_choose_output,
             on_sign=on_sign,
             on_open_signed_output=on_open_signed_output,
+            on_verify_again=on_verify_again or (lambda: None),
+            on_return_to_draft=on_return_to_draft or (lambda: None),
+            on_open_preserved_copy=on_open_preserved_copy or (lambda: None),
         )
         self.document_review_controls = self._build_document_review_controls()
         self.document_text_controls = self._build_document_text_controls(
@@ -181,6 +193,9 @@ class SigningWorkspaceSidebar:
         self.open_signed_output_button = (
             self.signing_action_controls.open_signed_output_button
         )
+        self.verify_again_button = self.signing_action_controls.verify_again_button
+        self.return_to_draft_button = self.signing_action_controls.return_to_draft_button
+        self.open_preserved_copy_button = self.signing_action_controls.open_preserved_copy_button
         self.result_label = self.signing_action_controls.result_label
         self.surface = SigningWorkspaceSidebarSurface(
             container=self.container,
@@ -190,6 +205,9 @@ class SigningWorkspaceSidebar:
             choose_output_button=self.choose_output_button,
             sign_button=self.sign_button,
             open_signed_output_button=self.open_signed_output_button,
+            verify_again_button=self.verify_again_button,
+            return_to_draft_button=self.return_to_draft_button,
+            open_preserved_copy_button=self.open_preserved_copy_button,
             sign_result_label=self.result_label,
             flow_journey_label=self.signing_action_controls.journey_label,
             flow_stage_label=self.signing_action_controls.stage_label,
@@ -232,6 +250,9 @@ class SigningWorkspaceSidebar:
     def render_signing_action_state(self, state: SigningActionState) -> None:
         self.sign_button.setEnabled(state.can_sign)
         self.open_signed_output_button.setEnabled(state.can_open_signed_output)
+        self.verify_again_button.setEnabled(state.can_verify_again)
+        self.return_to_draft_button.setEnabled(state.can_return_to_draft)
+        self.open_preserved_copy_button.setEnabled(state.can_open_preserved_copy)
         self.signing_action_controls.stage_label.setText(state.stage_text)
         self.signing_action_controls.detail_label.setText(state.detail_text)
         _set_widget_width_limit(
@@ -256,6 +277,9 @@ class SigningWorkspaceSidebar:
         buttons = {
             "sign": self.sign_button,
             "open_signed_output": self.open_signed_output_button,
+            "verify_again": self.verify_again_button,
+            "return_to_draft": self.return_to_draft_button,
+            "open_preserved_copy": self.open_preserved_copy_button,
         }
         for name, button in buttons.items():
             is_primary = name == action_name
@@ -271,9 +295,16 @@ class SigningWorkspaceSidebar:
                 )
             set_accessible_name = getattr(button, "setAccessibleName", None)
             if callable(set_accessible_name):
+                labels = {
+                    "sign": "Confirm and sign",
+                    "open_signed_output": "Open signed PDF",
+                    "verify_again": "Verify again",
+                    "return_to_draft": "Return to draft",
+                    "open_preserved_copy": "Open preserved copy",
+                }
                 set_accessible_name(
                     "Recommended next action: "
-                    + ("Confirm and sign" if name == "sign" else "Open signed PDF")
+                    + labels.get(name, name)
                     if is_primary
                     else ""
                 )
@@ -359,6 +390,9 @@ class SigningWorkspaceSidebar:
         on_choose_output: Callable[[], Any],
         on_sign: Callable[[], Any],
         on_open_signed_output: Callable[[], Any],
+        on_verify_again: Callable[[], Any],
+        on_return_to_draft: Callable[[], Any],
+        on_open_preserved_copy: Callable[[], Any],
     ) -> SigningActionControls:
         container = self._bindings.q_group_box("Sign PDF")
         _style_panel(container)
@@ -379,6 +413,15 @@ class SigningWorkspaceSidebar:
         sign_button = self._bindings.q_push_button("Confirm and sign")
         open_signed_output_button = self._bindings.q_push_button("Open signed PDF")
         open_signed_output_button.setEnabled(False)
+        verify_again_button = self._bindings.q_push_button("Verify again")
+        return_to_draft_button = self._bindings.q_push_button("Return to draft")
+        open_preserved_copy_button = self._bindings.q_push_button("Open preserved copy")
+        for button in (
+            verify_again_button,
+            return_to_draft_button,
+            open_preserved_copy_button,
+        ):
+            button.setEnabled(False)
         result_label = self._bindings.q_label("")
         for label in (journey_label, stage_label, detail_label):
             if hasattr(label, "setWordWrap"):
@@ -396,9 +439,15 @@ class SigningWorkspaceSidebar:
         choose_output_button.clicked.connect(on_choose_output)  # type: ignore[attr-defined]
         sign_button.clicked.connect(on_sign)  # type: ignore[attr-defined]
         open_signed_output_button.clicked.connect(on_open_signed_output)  # type: ignore[attr-defined]
+        verify_again_button.clicked.connect(on_verify_again)  # type: ignore[attr-defined]
+        return_to_draft_button.clicked.connect(on_return_to_draft)  # type: ignore[attr-defined]
+        open_preserved_copy_button.clicked.connect(on_open_preserved_copy)  # type: ignore[attr-defined]
         layout.addWidget(choose_output_button)
         layout.addWidget(sign_button)
         layout.addWidget(open_signed_output_button)
+        layout.addWidget(verify_again_button)
+        layout.addWidget(return_to_draft_button)
+        layout.addWidget(open_preserved_copy_button)
         status_layout.addWidget(journey_label)
         status_layout.addWidget(stage_label)
         status_layout.addWidget(detail_label)
@@ -412,6 +461,9 @@ class SigningWorkspaceSidebar:
             choose_output_button=choose_output_button,
             sign_button=sign_button,
             open_signed_output_button=open_signed_output_button,
+            verify_again_button=verify_again_button,
+            return_to_draft_button=return_to_draft_button,
+            open_preserved_copy_button=open_preserved_copy_button,
             result_label=result_label,
         )
 

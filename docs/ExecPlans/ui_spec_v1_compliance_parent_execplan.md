@@ -56,7 +56,8 @@ Document-flow tranche:
 - [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
 - [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
 - [ ] docs/ExecPlans/ui_document_search_selection_execplan.md
-- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md
+- [x] docs/ExecPlans/ui_document_signatures_review_execplan.md — bounded signature projection and
+  modeless review surface are committed; later-approval permission policy remains open.
 - [ ] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
 
 Reusable-object and certificate tranche:
@@ -95,7 +96,9 @@ Placement, preview, and signing tranche:
 - [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
-- [ ] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
+- [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
+  are committed; confirmation/source policy is now bounded in its follow-on child, while async
+  recovery and package acceptance remain open.
 - [ ] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
 
 Release tranche:
@@ -206,6 +209,13 @@ Release tranche:
   session-local authorization and staged verification. Focused `158 passed`, full `1285 passed,
   20 skipped, 1 warning`, Ruff/diff clean; display-backed acceptance remains blocked by the isolated
   single-instance endpoint and exact existing-field identity remains with the field-targeting child.
+- [x] (2026-08-10) Added the bounded verification-recovery increment: post-write verification
+  failures now preserve an explicitly untrusted sibling artifact, expose its path through
+  `SigningResult`, and project Verify again, Return to draft, and Open preserved copy through typed
+  coordinator/boundary/sidebar actions. Later-approval permission analysis and full reopen policy
+  remain open; focused recovery/coordinator/sidebar/application coverage is green (`205 passed`),
+  full suite is `1288 passed, 20 skipped, 1 warning`, and the bounded GUI launch remains limited by
+  the isolated single-instance endpoint with cleanup confirmed.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from foliaseal.application import (
@@ -488,6 +489,9 @@ def _assemble_signing_workspace_composition(
         on_choose_output=choose_output_pdf_path,
         on_sign=submit_sign_request,
         on_open_signed_output=open_signed_output,
+        on_verify_again=lambda: action_bridge.verify_again(),
+        on_return_to_draft=lambda: action_bridge.return_to_draft(),
+        on_open_preserved_copy=lambda: action_bridge.open_preserved_copy(),
         on_find_text=search_document_text,
         on_previous_text_match=previous_document_text_match,
         on_next_text_match=next_document_text_match,
@@ -517,6 +521,9 @@ def _assemble_signing_workspace_composition(
         sign_executor=sign_executor,
         on_sign_request=on_sign_request,
         can_open_signed_output=on_open_signed_output is not None,
+        verify_preserved_artifact=getattr(sign_executor, "verify_preserved_artifact", None),
+        can_open_preserved_copy=on_open_signed_output is not None,
+        cleanup_preserved_artifact=lambda path: Path(path).unlink(missing_ok=True),
     )
     signing_action_boundary = SigningActionBoundary(
         coordinator=signing_action_coordinator,

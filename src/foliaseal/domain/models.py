@@ -542,6 +542,7 @@ class VerificationSummary:
     docmdp_permission: str | None = None
     certification_restricted: bool = False
     restriction_reason: str | None = None
+    signatures_cryptographically_valid: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -563,6 +564,7 @@ class SigningResult:
     operation_type: DocumentOperationType = DocumentOperationType.SIGN
     revision_strategy: RevisionStrategy = RevisionStrategy.INCREMENTAL
     standards_summary: str | None = None
+    preserved_artifact_path: str | None = None
 
 
 class DocumentOperation(Protocol):

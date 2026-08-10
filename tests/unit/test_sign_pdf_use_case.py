@@ -568,6 +568,11 @@ def test_sign_use_case_returns_post_verify_failed_when_timestamp_not_found(tmp_p
 
     assert result.success is False
     assert result.failure_code == FailureCode.POST_VERIFY_FAILED
+    assert result.preserved_artifact_path is not None
+    preserved = Path(result.preserved_artifact_path)
+    assert preserved.exists()
+    assert preserved.read_bytes() == b"signed-pdf"
+    assert preserved != tmp_path / "output.pdf"
 
 
 def test_sign_use_case_allows_missing_timestamp_when_optional(tmp_path: Path) -> None:
@@ -808,4 +813,7 @@ def test_sign_use_case_preserves_existing_destination_when_verification_fails(
     assert result.success is False
     assert result.failure_code == FailureCode.PDF_SIGNING_FAILED
     assert destination.read_bytes() == b"previous-output"
-    assert not list(tmp_path.glob(".output.pdf.*.tmp"))
+    assert result.preserved_artifact_path is not None
+    preserved = Path(result.preserved_artifact_path)
+    assert preserved.exists()
+    assert preserved.read_bytes() == b"unverified-output"

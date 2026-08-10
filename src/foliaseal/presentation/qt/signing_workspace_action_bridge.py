@@ -95,6 +95,17 @@ class SigningWorkspaceActionBridge:
         result = self._signing_action_boundary.open_signed_output()
         return result.opened_output_path
 
+    def verify_again(self) -> None:
+        self._apply_signing_action_state(self._signing_action_boundary.verify_again().state)
+
+    def return_to_draft(self) -> None:
+        self._apply_signing_action_state(self._signing_action_boundary.return_to_draft().state)
+
+    def open_preserved_copy(self) -> str | None:
+        result = self._signing_action_boundary.open_preserved_copy()
+        self._apply_signing_action_state(result.state)
+        return result.opened_output_path
+
     def choose_output_pdf_path(self) -> str | None:
         initial_path = self._default_output_dialog_path()
         selected = self._bindings.q_file_dialog.getSaveFileName(

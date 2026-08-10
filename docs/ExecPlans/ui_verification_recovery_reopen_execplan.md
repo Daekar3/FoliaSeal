@@ -14,15 +14,32 @@ Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md, docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
+- [x] docs/ExecPlans/ui_document_signatures_review_execplan.md, docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
+  (their bounded implementations are committed; parent checkboxes are being reconciled separately)
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the post-write verifier cleanup path, result projection, action coordinator,
+  boundary, sidebar, and production composition. The staged artifact was deleted after verification
+  failures and the GUI exposed only a generic error.
+- [x] (2026-08-10) Added red focused coverage for preserved post-verification artifacts and typed
+  recovery actions; the tests failed before the new result/state contract and pass after it.
+- [x] (2026-08-10) Implemented the bounded application/Qt recovery path: failed post-write
+  verification preserves an explicitly untrusted sibling, `SigningResult` carries its path, and
+  the action rail exposes Verify again, Return to draft, and Open preserved copy.
+- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No safe retirement condition
+  was met; historical evidence names remain external contracts and no new product-facing phase3
+  nomenclature was introduced.
+- [x] (2026-08-10) Run focused, regression, and GUI validation; clean processes and artifacts:
+  focused application/action/sidebar/composition command `205 passed`; full suite `1288 passed,
+  20 skipped, 1 warning`; backend/recovery subset `149 passed`; Ruff and diff checks clean. The
+  bounded offscreen app launch exits at `SingleInstanceUnavailable`, leaves no matching processes,
+  and removes its temporary configuration root.
+- [x] (2026-08-10) Updated this plan, the parent plan, and `docs/ARCHITECTURE.md`; independent
+  review findings were addressed for strict validity, required timestamp/trust, every-signature
+  verification, and explicit artifact cleanup. Display-backed recovery acceptance remains
+  environment-blocked; the commit is the remaining gate.
+- [ ] (2026-08-10) Commit the completed slice and record the next dependency-ordered blocker.
 
 ## Surprises & Discoveries
 
@@ -39,10 +56,32 @@ Qt surface, focused tests, and observable acceptance.
 - Decision: keep the slice limited to one user-visible verification failure recovery, reopen, and later approval outcome.
   Rationale: narrow changes are independently testable and recoverable.
   Date/Author: 2026-08-09 / Codex
+- Decision: preserve only artifacts produced after the write boundary and label them explicitly
+  untrusted; pre-write failures and successful replacement continue to remove owned temporary files.
+  Rationale: recovery needs bytes for Verify again/Open preserved copy without weakening the guarantee
+  that an unverified artifact is never reported as the signed output.
+  Date/Author: 2026-08-10 / Codex
+- Decision: explicit Return to draft is the cleanup boundary for a preserved artifact; Verify again
+  retains it for further inspection, and Open preserved copy never promotes or replaces the requested
+  destination.
+  Rationale: recovery files are app-owned but must remain available across the user's recovery
+  choices without becoming indefinite orphaned temporary files.
+  Date/Author: 2026-08-10 / Codex
+- Decision: Verify again requires an explicit cryptographically-valid summary, required timestamp,
+  and required timestamp trust; the backend validates every embedded signature before returning
+  that summary.
+  Rationale: a non-raising verifier result or a valid newest signature must not make an older or
+  trust-incomplete artifact appear safe for later approval.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Not started. Record demonstrated behavior, evidence, and remaining gaps at completion.
+The bounded recovery path now preserves post-write verification failures and projects typed retry,
+return, and preserved-copy actions into the signing rail. Verification retry interprets structured
+cryptographic validity, every-signature coverage, required timestamp, and required timestamp trust;
+it remains read-only and never promotes the preserved artifact to `last_successful_output_path`.
+Explicit Return to draft removes only the app-owned preserved file. Later-approval permission
+analysis and full document reopen policy remain explicit follow-up work.
 
 ## Context and Orientation
 
@@ -141,10 +180,14 @@ absolute paths unless the repository explicitly requires a fixture.
 
 Use AppSettings, the public Qt frame/workspace ports, packaged Markdown help, the CLI parser in
 src/foliaseal/__main__.py, and build helpers under src/foliaseal/build/. The final behavior must be
-exercised by tests/unit/test_signing_completion.py, tests/unit/test_document_review.py,
-tests/unit/test_qt_app_frame_workspace_open.py, and tests/integration/test_verification_recovery_reopen.py.
+exercised by tests/unit/test_sign_pdf_use_case.py, tests/unit/test_qt_signing_action_coordinator.py,
+tests/unit/test_signing_workspace_sidebar.py, tests/unit/test_signing_completion.py,
+tests/unit/test_document_review.py, tests/unit/test_qt_app_frame_workspace_open.py, and
+tests/integration/test_verification_recovery_reopen.py.
 New help/diagnostic surfaces must not expose secrets, PDF contents, selected
 text, Reason, Location, or private keys.
 
-Revision note: 2026-08-09 / Codex
-Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Implemented the bounded preserved-artifact recovery vertical slice after the live audit and red
+tests; updated dependencies and the architecture boundary. Full validation, GUI audit, independent
+review, and commit remain the final gates.

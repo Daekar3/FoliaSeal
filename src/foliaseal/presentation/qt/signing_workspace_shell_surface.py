@@ -63,3 +63,12 @@ class SigningWorkspaceShellSurface:
 
     def open_signed_output(self) -> str | None:
         return self._action_bridge.open_signed_output()
+
+    def verify_again(self) -> None:
+        self._action_bridge.verify_again()
+
+    def return_to_draft(self) -> None:
+        self._action_bridge.return_to_draft()
+
+    def open_preserved_copy(self) -> str | None:
+        return self._action_bridge.open_preserved_copy()
