@@ -7,9 +7,12 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can first-use creation and explicit selection of a required-Appearance preset in the real FoliaSeal GUI. It is mapped to UI_SPEC WF02/WF03 and acceptance scenario 2. The
-slice is one vertical path through the relevant persistent model,
-application workflow, Qt surface, focused tests, and observable acceptance.
+After this slice, a first-time user can open the Signature Library from the empty preset rail,
+land in the Presets catalog regardless of the last Library catalog used, create a required-
+Appearance preset through the already-live nested editor, return to the active document, and
+explicitly select the newly saved preset. The Library refreshes the live rail without silently
+applying the preset or mutating the active signing draft. This is the remaining first-use slice
+mapped to UI_SPEC WF02/WF03 and acceptance scenario 2.
 
 ## Child ExecPlan Dependencies
 
@@ -25,7 +28,12 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implement the smallest complete no-preset guidance and Library create/manage path.
 - [x] (2026-08-10) Confirm no phase3 product-facing compatibility path was introduced; the callback uses existing neutral workspace boundaries.
 - [x] (2026-08-10) Run focused shell/AppFrame/workspace validation and clean processes/artifacts.
-- [ ] (2026-08-10) Complete nested first-use return-to-preset behavior and commit the follow-up slice.
+- [x] (2026-08-10) Force first-use Library entry to the Presets catalog without changing the
+  persisted last-catalog preference.
+- [x] (2026-08-10) Notify the active signing shell after reusable-object saves so the new preset is
+  visible in the live rail, while leaving selection explicit.
+- [x] (2026-08-10) Add focused/offscreen first-use coverage and reconcile documentation; commit is
+  the remaining closeout step.
 
 ## Surprises & Discoveries
 
@@ -49,13 +57,14 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-The bounded first-use increment is implemented. A newly opened document with no saved presets now
-renders explicit guidance in the Signature preset rail group and a `Create or manage presets…`
-button. The button crosses the typed workspace composition callback to the existing modeless
-Signature Library, whose Presets catalog opens first and exposes the document-independent Appearance
-and Preset editors. The current signing draft is not mutated by opening the Library. Full nested
-return-to-suspended-preset behavior, certificate creation/configuration from that nested path, and
-missing optional per-document input prompts remain follow-up work.
+The initial first-use increment is implemented: a newly opened document with no saved presets
+renders explicit guidance and a `Create or manage presets…` button through typed workspace
+composition. The remaining gap is observable after the button is used: the modeless Library may
+restore a non-Presets catalog and its successful saves do not yet refresh the live signing rail.
+The nested Preset → Appearance → Preset return path is already complete in
+`ui_signature_preset_transactions_execplan.md`; this slice connects that path to first-use entry
+and explicit rail selection. Certificate creation/configuration, placement capture, and missing
+optional per-document prompts remain separate children.
 
 ## Context and Orientation
 
@@ -77,20 +86,25 @@ rebaselines, V2 features, or packaging work.
 
 ## Plan of Work
 
-When no preset exists, make Create preset open the Library, support nested Appearance and optional
-Certificate/Placement creation, suspend the parent draft, and return without silently applying the
-saved preset. The bounded prerequisite now exposes truthful no-preset guidance and a typed Library
-entry point from the rail; the remaining nested return-to-suspended-preset workflow must be added
-without making Library launch mutate the active draft. Make the rail selector explicit and start
-every new PDF with no active preset. Add or preserve typed application and public Qt-port boundaries
-rather than reaching through private widgets. Keep schema and terminology aligned with the frozen
-documents. When a legacy path is replaced, prove its callers are migrated before deleting it.
+When the empty-preset rail action invokes the Library, pass an explicit first-use intent through the
+existing typed callback boundary so `ReusableObjectLibraryDialog` starts at
+`LibraryCatalog.PRESETS` without persisting or overwriting `library_last_catalog`. Add a typed
+reusable-object-change callback from the Library to AppFrame and route it through the public shell
+refresh port (`refresh_signature_profiles`) after successful Appearance and Preset saves. Do not
+auto-select the new preset: WF03 requires an explicit user selection in the rail after returning.
+Ensure the callback never mutates the active document draft by itself. Add focused tests for
+Presets-first entry, nested Appearance Save followed by Preset Save, live rail refresh, explicit
+selection, and unchanged draft state. Add or preserve typed application and public Qt-port
+boundaries rather than reaching through private widgets. Keep schema and terminology aligned with
+the frozen documents. When a legacy path is replaced, prove its callers are migrated before
+deleting it.
 
 ## Milestones
 
 Milestone 1 audited the empty-catalog state and added a focused no-preset rail test. Milestone 2
-wired the first-use Library entry point through typed workspace composition. Milestone 3 validated
-the offscreen novice entry surface and recorded the remaining nested completion/return gaps.
+wired the first-use Library entry point through typed workspace composition. Milestone 3 makes the
+entry Presets-first and connects successful Library saves to the live rail refresh while keeping
+selection explicit, then validates the complete offscreen novice path.
 
 ## Concrete Steps
 
@@ -151,8 +165,27 @@ Bounded evidence (2026-08-10):
   walkthrough exited `1` with the known `SingleInstanceUnavailable`/QLocalServer endpoint error
   before the frame was created. The temporary config root was removed and the process audit was
   empty; this is recorded as an environment transport limitation, not first-use evidence.
-- Remaining gaps: nested editor suspension/return, optional Certificate/Placement creation from the
-  nested first-use flow, and explicit missing per-document input prompts.
+- First-use implementation evidence: `tests/unit/test_qt_app_frame_profile_library.py` covers
+  non-persisting Presets focus and nested Appearance/Preset save notifications; the AppFrame unit
+  test proves the active shell refresh callback runs while
+  `current_signing_workflow.selected_signature_preset_id` remains `None`.
+- Real offscreen first-use integration: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
+  tests/integration/test_signature_library_topology.py` => `4 passed`; it creates and saves a
+  required-Appearance preset after forcing Presets-first entry and confirms the Library returns to
+  its normal detail surface.
+- Focused regression: `.venv/bin/pytest -q tests/unit/test_qt_app_frame_profile_library.py
+  tests/unit/test_qt_app_frame.py tests/unit/test_qt_signing_shell.py
+  tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_signing_workspace_host.py
+  tests/integration/test_signature_library_topology.py` => `191 passed`; Ruff and
+  `git diff --check` are clean.
+- Full regression after this slice: `1367 passed, 20 skipped, 1 warning in 50.14s`.
+- Final bounded lifecycle audit: exit `1` with the expected isolated `SingleInstanceUnavailable`
+  endpoint error; no FoliaSeal/PySide6/pytest processes remained and the temporary root was
+  removed.
+- Remaining gaps: optional Certificate/Placement creation from the nested first-use flow and
+  explicit missing per-document input prompts. Nested editor suspension/return, Presets-first
+  entry, live rail refresh, and explicit selection behavior are complete in this slice and its
+  dependencies.
 
 ## Idempotence and Recovery
 
@@ -171,5 +204,8 @@ Use the existing typed application workflows, schema models, persistence stores,
 or workspace ports. The final behavior must be exercised by tests/unit/test_qt_signing_shell.py, reusable-object tests, and a first-use Qt integration test. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
-Revision note: 2026-08-09 / Codex
-Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-10 / Codex
+Closed after implementation and compliance review: first-use entry now focuses Presets without
+persisting navigation, successful nested saves refresh the active shell, and the user explicitly
+selects the new preset. Certificate/Placement creation and per-document input prompts remain in
+their owning children.

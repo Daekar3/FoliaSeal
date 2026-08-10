@@ -110,6 +110,7 @@ class ReusableObjectLibraryDialog:
         initial_catalog: str = "presets",
         library_sort: str = LibrarySort.NAME_ASCENDING.value,
         on_preferences_changed: Callable[[str, str], None] | None = None,
+        on_reusable_objects_changed: Callable[[], None] | None = None,
         on_toggle_certificate_pin: Callable[[CertificateLibraryRef, bool], bool] | None = None,
         on_rename_certificate: Callable[[CertificateLibraryRef, str], bool] | None = None,
         on_delete_certificate: Callable[[CertificateLibraryRef], bool] | None = None,
@@ -132,6 +133,7 @@ class ReusableObjectLibraryDialog:
         self._on_edit_placement = on_edit_placement
         self._certificate_catalog_provider = certificate_catalog_provider
         self._on_preferences_changed = on_preferences_changed
+        self._on_reusable_objects_changed = on_reusable_objects_changed
         self._on_toggle_certificate_pin = on_toggle_certificate_pin
         self._on_rename_certificate = on_rename_certificate
         self._on_delete_certificate = on_delete_certificate
@@ -177,6 +179,34 @@ class ReusableObjectLibraryDialog:
         if self._appearance_editor is None and self._preset_editor is None:
             self._render_selection()
 
+    def focus_catalog(self, catalog: str | LibraryCatalog) -> bool:
+        """Show a catalog without persisting a navigation preference change."""
+
+        if self._nested_editor_active() and not self._resolve_active_nested_editor():
+            return False
+        try:
+            selected_catalog = (
+                catalog
+                if isinstance(catalog, LibraryCatalog)
+                else next(
+                    item
+                    for item in LibraryCatalog
+                    if item.value.casefold() == str(catalog).strip().casefold()
+                )
+            )
+        except StopIteration:
+            return False
+        self._session.select_catalog(selected_catalog)
+        self._rows = self._session.rows()
+        self._render_catalog_navigation()
+        self._render_master_list()
+        self._render_selection()
+        return True
+
+    def _notify_reusable_objects_changed(self) -> None:
+        if self._on_reusable_objects_changed is not None:
+            self._on_reusable_objects_changed()
+
     def rename_selected(self) -> bool:
         selected = self._selected_object()
         new_name = self._session.draft_name or self.controls.name_input.text().strip()
@@ -195,6 +225,7 @@ class ReusableObjectLibraryDialog:
             self._session.commit_detail()
             self._render_master_list()
             self._render_selection()
+            self._notify_reusable_objects_changed()
             return True
         try:
             self._library.execute(RenameObject(ref=ref, new_name=new_name))
@@ -204,6 +235,7 @@ class ReusableObjectLibraryDialog:
         self.refresh()
         self._set_selector_text(new_name)
         self._session.commit_detail()
+        self._notify_reusable_objects_changed()
         return True
 
     def duplicate_selected(self) -> bool:
@@ -224,6 +256,7 @@ class ReusableObjectLibraryDialog:
         )
         self._render_master_list()
         self._render_selection()
+        self._notify_reusable_objects_changed()
         return True
 
     def toggle_pin_selected(self) -> bool:
@@ -253,6 +286,7 @@ class ReusableObjectLibraryDialog:
         self._session.select(ref)
         self._render_master_list()
         self._render_selection()
+        self._notify_reusable_objects_changed()
         return True
 
     def cancel_detail(self) -> bool:
@@ -280,6 +314,7 @@ class ReusableObjectLibraryDialog:
             if self._on_delete_certificate is None or not self._on_delete_certificate(ref):
                 return False
             self.refresh()
+            self._notify_reusable_objects_changed()
             return True
         try:
             self._library.execute(DeleteObject(ref=ref))
@@ -287,6 +322,7 @@ class ReusableObjectLibraryDialog:
             self._show_error(str(exc))
             return False
         self.refresh()
+        self._notify_reusable_objects_changed()
         return True
 
     def _build_controls(self, parent: Any) -> ReusableObjectLibraryControls:
@@ -546,6 +582,7 @@ class ReusableObjectLibraryDialog:
                 + ("New preset" if initial_ref is None else self._display_name_for_ref(initial_ref))
             ),
             on_saved=self._preset_editor_saved,
+            on_reusable_objects_changed=self._notify_reusable_objects_changed,
             on_cancel_requested=self._preset_editor_cancel_requested,
             on_error=self._show_error,
         )
@@ -560,6 +597,7 @@ class ReusableObjectLibraryDialog:
         editor = self._preset_editor
         saved_ref = None if editor is None else editor.saved_ref
         self._leave_nested_preset_editor(saved_ref=saved_ref)
+        self._notify_reusable_objects_changed()
 
     def _preset_editor_cancel_requested(self) -> bool:
         return self._resolve_nested_preset_editor()
@@ -656,6 +694,7 @@ class ReusableObjectLibraryDialog:
         editor = self._appearance_editor
         saved_ref = None if editor is None else editor.saved_ref
         self._leave_nested_appearance_editor(saved_ref=saved_ref)
+        self._notify_reusable_objects_changed()
 
     def _appearance_editor_cancel_requested(self) -> None:
         self._resolve_nested_appearance_editor()

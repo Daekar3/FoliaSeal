@@ -60,6 +60,7 @@ class SignaturePresetEditorWidget:
         initial_ref: ReusableObjectRef | None = None,
         breadcrumb: str = "Signature Library / Presets",
         on_saved: Callable[[], None] | None = None,
+        on_reusable_objects_changed: Callable[[], None] | None = None,
         on_cancel_requested: Callable[[], bool] | None = None,
         on_error: Callable[[str], None] | None = None,
     ) -> None:
@@ -69,6 +70,7 @@ class SignaturePresetEditorWidget:
         self._initial_ref = initial_ref
         self._breadcrumb = breadcrumb
         self._on_saved = on_saved or (lambda: None)
+        self._on_reusable_objects_changed = on_reusable_objects_changed or (lambda: None)
         self._on_cancel_requested = on_cancel_requested or (lambda: True)
         self._on_error = on_error or (lambda _message: None)
         self._suspend_updates = True
@@ -361,6 +363,7 @@ class SignaturePresetEditorWidget:
         self._refresh_appearance_selector(saved_ref)
         self._leave_appearance_child()
         self._dirty = True
+        self._on_reusable_objects_changed()
 
     def _appearance_child_cancel_requested(self) -> None:
         self.resolve_child()

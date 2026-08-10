@@ -91,7 +91,9 @@ Reusable-object and certificate tranche:
   now uses the Library-owned nested Preset → Appearance editor path with child-first resolution,
   stable-reference return, and full focused/offscreen regression evidence.
 - [x] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
-- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
+- [x] docs/ExecPlans/ui_first_use_preset_setup_execplan.md — empty-preset entry is Presets-first
+  without changing navigation preference; nested saves refresh the live rail while selection stays
+  explicit.
 - [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — typed inspection,
   atomic import, and retained-file Configure are committed in `ad712ad7e` and `498d5c791`;
   expiration sorting is completed by the dedicated validity child; the broader certificate
@@ -222,8 +224,16 @@ Release tranche:
 - [x] (2026-08-10) Added the bounded first-use preset entry increment: an empty preset catalog now
   gives explicit no-preset guidance in the signing rail and routes `Create or manage presets…`
   through typed workspace composition to the existing modeless Presets-first Library. Opening the
-  Library does not mutate the active draft; nested editor suspension/return and per-document input
-  prompts remain open in the first-use/certificate children.
+  Library does not mutate the active draft. The nested Preset → Appearance → Preset return path is
+  now complete in the preset transaction child; first-use Presets-first intent, live rail refresh,
+  explicit selection, and per-document input prompts remain open in the first-use/certificate
+  children.
+- [x] (2026-08-10) Completed the first-use preset selection follow-up: the rail's Library action
+  focuses Presets without persisting `library_last_catalog`, nested Appearance/Preset saves notify
+  the active shell so the new row is visible, and no preset is auto-selected. Real offscreen
+  first-use integration is green (`4 passed`); full regression is `1367 passed, 20 skipped, 1
+  warning`; optional certificate/placement creation and missing per-document prompts remain in
+  their owning children.
 - [x] (2026-08-10) Added the bounded certificate-readiness increment: the catalog-backed signing
   rail now projects selected PKCS#12 identity, private-key presence, validity, expiry warnings,
   blocking states, password-promptability, and the exact neutral self-signed caveat through a typed

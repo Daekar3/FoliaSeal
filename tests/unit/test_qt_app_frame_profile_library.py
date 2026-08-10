@@ -80,6 +80,56 @@ def test_library_pin_and_duplicate_controls_use_typed_catalog_commands() -> None
     assert rows[1].pinned is False
 
 
+def test_first_use_focuses_presets_without_persisting_navigation_preference() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    preference_changes: list[tuple[str, str]] = []
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        initial_catalog="appearances",
+        on_preferences_changed=lambda catalog, sort: preference_changes.append((catalog, sort)),
+    )
+
+    assert dialog.controls.catalog_selector.currentText() == "Appearances"
+    assert dialog.focus_catalog("presets") is True
+    assert dialog.controls.catalog_selector.currentText() == "Presets"
+    assert preference_changes == []
+
+
+def test_nested_saves_notify_live_workspace_refresh_without_selecting_preset() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    bindings = _fake_bindings()
+    refreshes: list[str] = []
+    dialog = ReusableObjectLibraryDialog(
+        bindings=bindings,
+        parent=None,
+        library=service,
+        on_reusable_objects_changed=lambda: refreshes.append("refresh"),
+    )
+
+    dialog.controls.create_button.click()
+    preset_editor = dialog.controls.preset_editor
+    assert preset_editor is not None
+    preset_editor.controls.name_input.setText("First-use preset")
+    preset_editor.controls.create_appearance_button.click()
+    appearance_editor = preset_editor.appearance_child
+    assert appearance_editor is not None
+    appearance_editor.controls.name_input.setText("First-use appearance")
+    appearance_editor.controls.save_button.click()
+    assert refreshes == ["refresh"]
+    assert preset_editor.controls.appearance_selector.currentText() == "First-use appearance"
+
+    preset_editor.controls.save_button.click()
+    assert refreshes == ["refresh", "refresh"]
+    assert dialog.controls.preset_editor is None
+    assert service.view().preset_names == ("First-use preset",)
+
+
 def test_library_save_button_commits_explicit_detail_transaction() -> None:
     service = ReusableSigningObjects(
         InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))

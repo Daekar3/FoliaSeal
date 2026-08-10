@@ -409,7 +409,7 @@ class FoliaSealAppFrame:
                 recovery_reopen_target=self.open_recovery_pdf_path,
                 on_error=self._emit_error,
                 on_status_change=self._handle_status_change,
-                on_open_signature_library=self.show_reusable_object_library,
+                on_open_signature_library=self.show_first_use_preset_library,
             ),
             workspace_open_port=self._workspace_open_port,
             mount_port=self._workspace_mount,
@@ -811,9 +811,11 @@ class FoliaSealAppFrame:
         self._apply_certificate_dialog_compatibility(outcome.compatibility)
         return outcome.result
 
-    def show_reusable_object_library(self) -> Any:
+    def show_reusable_object_library(self, *, initial_catalog: str | None = None) -> Any:
         """Open Settings management for reusable signing profiles and presets."""
         if self._reusable_object_library is not None:
+            if initial_catalog is not None:
+                self._reusable_object_library.focus_catalog(initial_catalog)
             self._reusable_object_library.refresh()
             self._reusable_object_library.show()
             return self._reusable_object_library
@@ -823,9 +825,12 @@ class FoliaSealAppFrame:
             library=self._reusable_objects,
             certificate_catalog=self._certificate_catalog_store.load_catalog(),
             certificate_catalog_provider=self._certificate_catalog_store.load_catalog,
-            initial_catalog=self._app_settings.ui_settings.library_last_catalog,
+            initial_catalog=(
+                initial_catalog or self._app_settings.ui_settings.library_last_catalog
+            ),
             library_sort=self._app_settings.ui_settings.library_sort.value,
             on_preferences_changed=self._persist_library_preferences,
+            on_reusable_objects_changed=self._refresh_shell_signature_profiles,
             on_toggle_certificate_pin=self._toggle_certificate_pin,
             on_rename_certificate=self._rename_certificate,
             on_delete_certificate=self._delete_certificate,
@@ -843,6 +848,11 @@ class FoliaSealAppFrame:
         self._reusable_object_library = dialog
         dialog.show()
         return dialog
+
+    def show_first_use_preset_library(self) -> Any:
+        """Open the Library at Presets without changing the saved navigation preference."""
+
+        return self.show_reusable_object_library(initial_catalog="presets")
 
     def _persist_library_preferences(self, catalog: str, sort: str) -> None:
         """Persist Library navigation/sort without restoring its open session."""

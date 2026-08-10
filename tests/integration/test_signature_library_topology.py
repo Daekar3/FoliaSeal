@@ -153,3 +153,52 @@ def test_library_real_qt_returns_from_appearance_child_to_preset_editor(tmp_path
     library.controls.dialog.close()
     frame.window.close()
     app.processEvents()
+
+
+def test_first_use_library_forces_presets_and_returns_saved_preset(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-first-use"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={"library_last_catalog": "appearances"},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    library = frame.show_first_use_preset_library()
+    app.processEvents()
+
+    assert library._session.catalog is LibraryCatalog.PRESETS  # noqa: SLF001
+    library.controls.create_button.click()
+    preset_editor = library.controls.preset_editor
+    assert preset_editor is not None
+    preset_editor.controls.name_input.setText("First-use preset")
+    preset_editor.controls.create_appearance_button.click()
+    appearance_editor = preset_editor.appearance_child
+    assert appearance_editor is not None
+    appearance_editor.controls.name_input.setText("First-use appearance")
+    appearance_editor.controls.save_button.click()
+    preset_editor.controls.save_button.click()
+    app.processEvents()
+
+    assert frame._reusable_objects.view().preset_names == ("First-use preset",)  # noqa: SLF001
+    assert library.controls.preset_editor is None
+    library.controls.dialog.close()
+    frame.window.close()
+    app.processEvents()

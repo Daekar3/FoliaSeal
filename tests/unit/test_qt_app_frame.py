@@ -286,6 +286,7 @@ class _FakeLabel:
         self.text = text
         self.word_wrap = False
         self.layout = None
+        self.visible = True
 
     def setText(self, text):  # noqa: N802
         self.text = text
@@ -295,6 +296,12 @@ class _FakeLabel:
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
+
+    def setVisible(self, visible):  # noqa: N802
+        self.visible = bool(visible)
+
+    def deleteLater(self) -> None:  # noqa: N802
+        self.deleted = True
 
 
 class _FakeDialog:
@@ -810,6 +817,7 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_main_window=_FakeMainWindow,
         q_dialog=_FakeDialog,
         q_form_layout=_FakeFormLayout,
+        q_group_box=_FakeLabel,
         q_label=_FakeLabel,
         q_line_edit=_FakeLineEdit,
         q_check_box=_FakeCheckBox,
@@ -1150,6 +1158,59 @@ def test_app_frame_library_action_is_modeless_and_reused(tmp_path: Path) -> None
     assert second is first
     assert first.controls.dialog.show_calls == 2
     assert first.controls.dialog.visible is True
+
+
+def test_first_use_library_is_presets_first_and_refreshes_active_shell_without_selection(
+    tmp_path: Path,
+) -> None:
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
+    from tests.unit.test_qt_signing_shell import _fake_bindings as shell_fake_bindings
+
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "signed"),
+            default_open_directory=str(tmp_path / "source"),
+            linux_packaging_channel="unknown",
+            ui={"library_last_catalog": "appearances"},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+
+    library = frame.show_first_use_preset_library()
+    assert library._session.catalog is LibraryCatalog.PRESETS  # noqa: SLF001
+    assert frame.app_settings.ui_settings.library_last_catalog == "appearances"
+    library = ReusableObjectLibraryDialog(
+        bindings=shell_fake_bindings(),
+        parent=None,
+        library=frame._reusable_objects,  # noqa: SLF001
+        certificate_catalog=frame._certificate_catalog_store.load_catalog(),  # noqa: SLF001
+        on_reusable_objects_changed=frame._refresh_shell_signature_profiles,  # noqa: SLF001
+    )
+    library.controls.create_button.click()
+    preset_editor = library.controls.preset_editor
+    assert preset_editor is not None
+    preset_editor.controls.name_input.setText("First-use preset")
+    preset_editor.controls.create_appearance_button.click()
+    appearance_editor = preset_editor.appearance_child
+    assert appearance_editor is not None
+    appearance_editor.controls.name_input.setText("First-use appearance")
+    appearance_editor.controls.save_button.click()
+    preset_editor.controls.save_button.click()
+
+    assert shell.refresh_signature_profiles_calls == 2
+    assert frame.current_signing_workflow.selected_signature_preset_id is None
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:
