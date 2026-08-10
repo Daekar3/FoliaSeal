@@ -121,6 +121,12 @@ Release tranche:
   Settings callbacks now use the shared typed registry with unique mnemonics, stable IDs/object
   names, Qt descriptions, and callback-routing tests. Edit, Signing, Help, and remaining View
   commands remain open until their truthful behavior seams exist.
+- [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
+  placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
+  drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native
+  close use consequence-verb policy with conditional Sign and save. Focused tests, real offscreen
+  native-close integration, and the full suite are green; display-backed acceptance remains
+  environment-blocked by unavailable xcb `DISPLAY=:0`, and crash recovery remains a separate plan.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -158,6 +164,15 @@ Release tranche:
   than one rectangle and maximized flag.
   Evidence: Loop 7 explorer review, `MainWindowGeometry`, and the window child ExecPlan's explicit
   rail/Library/monitor/DPI/toolbar deferrals.
+- Observation: safe document replacement requires composing and validating the candidate before
+  discarding the active dirty draft.
+  Evidence: `SigningWorkspaceLifecycle.prepare()` / `replace_prepared()` and the lifecycle-focused
+  failed-candidate test.
+- Observation: the current environment has no usable xcb display and cannot claim the local-instance
+  socket under the sandbox, but real offscreen Qt tests provide deterministic close-event evidence.
+  Evidence: bounded CLI audit exited `1` with `SingleInstanceUnavailable`; display audit exited `134`
+  with xcb `DISPLAY=:0`; exact temporary roots and owned processes were cleaned; real offscreen
+  lifecycle integration passed.
 
 ## Decision Log
 
@@ -173,6 +188,12 @@ Release tranche:
 - Decision: mark implementation slices AFK.
   Rationale: the frozen documents already resolve topology and interaction choices; a later human
   usability review may provide evidence but is not an implementation dependency.
+  Date/Author: 2026-08-09 / Codex
+- Decision: keep crash recovery/autosave out of the document-lifecycle slice until the signing
+  transaction exposes owned temporary/final artifact paths.
+  Rationale: a recovery journal without an ownership boundary could present unsafe artifacts or
+  delete unrelated files; the current slice now protects in-memory drafts and secrets without
+  overstating restart recovery.
   Date/Author: 2026-08-09 / Codex
 - Decision: remove legacy compatibility and product-facing phase3 cruft only after each migration
   proves its concrete callers are gone; retain or rename production evidence/backend imports in a
@@ -454,3 +475,6 @@ Updated after blocker review to add explicit implementation tranches and make pl
 contracts prerequisites for reusable-object and signing UI work.
 Updated after the next review wave to add normalized scenario ownership, executable GUI-evidence
 paths, environment preflight, active-versus-historical corpus guidance, and full-suite expectations.
+Updated after the document-lifecycle slice review to record candidate prepare/commit ordering,
+typed dirty-draft/secret lifecycle seams, consequence-verb close policy, real offscreen native-close
+evidence, and the environment-specific display/socket limitations without claiming crash recovery.
