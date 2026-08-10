@@ -24,6 +24,21 @@ class AppearanceMode(StrEnum):
             return cls.SYSTEM
 
 
+class LibrarySortOrder(StrEnum):
+    """Persistent Signature Library ordering choices."""
+
+    NAME_ASCENDING = "name_ascending"
+    NAME_DESCENDING = "name_descending"
+    EXPIRATION_SOONEST = "expiration_soonest"
+
+    @classmethod
+    def from_value(cls, value: object) -> LibrarySortOrder:
+        try:
+            return cls(str(value).strip().lower())
+        except ValueError:
+            return cls.NAME_ASCENDING
+
+
 @dataclass(frozen=True)
 class MainWindowGeometry:
     """Validated JSON-safe geometry for the main application window."""
@@ -80,6 +95,8 @@ class AppUiSettings:
 
     appearance_mode: AppearanceMode = AppearanceMode.SYSTEM
     main_window_geometry: MainWindowGeometry | None = None
+    library_last_catalog: str = "presets"
+    library_sort: LibrarySortOrder = LibrarySortOrder.NAME_ASCENDING
 
     @classmethod
     def from_mapping(cls, payload: dict[str, Any]) -> AppUiSettings:
@@ -90,6 +107,11 @@ class AppUiSettings:
             main_window_geometry=MainWindowGeometry.from_mapping(
                 payload.get("main_window_geometry")
             ),
+            library_last_catalog=(
+                str(payload.get("library_last_catalog", "presets")).strip().lower()
+                or "presets"
+            ),
+            library_sort=LibrarySortOrder.from_value(payload.get("library_sort")),
         )
 
     def to_mapping(self, existing: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -99,4 +121,8 @@ class AppUiSettings:
         mapping["appearance_mode"] = self.appearance_mode.value
         if self.main_window_geometry is not None:
             mapping["main_window_geometry"] = self.main_window_geometry.to_mapping()
+        if "library_last_catalog" in mapping or self.library_last_catalog != "presets":
+            mapping["library_last_catalog"] = self.library_last_catalog
+        if "library_sort" in mapping or self.library_sort is not LibrarySortOrder.NAME_ASCENDING:
+            mapping["library_sort"] = self.library_sort.value
         return mapping

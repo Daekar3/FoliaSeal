@@ -17,6 +17,9 @@ from foliaseal.application import (
 )
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import SavePlacement
+from foliaseal.application.signature_library_session import (
+    CertificateLibraryRef,
+)
 from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialPort,
     RepositoryBackedCertificateSigningMaterialPort,
@@ -767,6 +770,12 @@ class FoliaSealAppFrame:
             library=self._reusable_objects,
             certificate_catalog=self._certificate_catalog_store.load_catalog(),
             certificate_catalog_provider=self._certificate_catalog_store.load_catalog,
+            initial_catalog=self._app_settings.ui_settings.library_last_catalog,
+            library_sort=self._app_settings.ui_settings.library_sort.value,
+            on_preferences_changed=self._persist_library_preferences,
+            on_toggle_certificate_pin=self._toggle_certificate_pin,
+            on_rename_certificate=self._rename_certificate,
+            on_delete_certificate=self._delete_certificate,
             on_create=self._open_reusable_object_editor,
             on_edit=self._open_reusable_object_editor,
             on_create_placement=self._open_placement_profile_editor,
@@ -782,6 +791,110 @@ class FoliaSealAppFrame:
         self._reusable_object_library = dialog
         dialog.show()
         return dialog
+
+    def _persist_library_preferences(self, catalog: str, sort: str) -> None:
+        """Persist Library navigation/sort without restoring its open session."""
+
+        ui = self._app_settings.ui_settings
+        updated_ui = AppUiSettings(
+            appearance_mode=ui.appearance_mode,
+            main_window_geometry=ui.main_window_geometry,
+            library_last_catalog=catalog.strip().lower() or "presets",
+            library_sort=ui.library_sort.__class__.from_value(sort),
+        )
+        ui_mapping = updated_ui.to_mapping(self._app_settings.ui)
+        ui_mapping["library_last_catalog"] = updated_ui.library_last_catalog
+        ui_mapping["library_sort"] = updated_ui.library_sort.value
+        self._app_settings = AppSettings(
+            schema_version=self._app_settings.schema_version,
+            default_output_directory=self._app_settings.default_output_directory,
+            default_open_directory=self._app_settings.default_open_directory,
+            linux_packaging_channel=self._app_settings.linux_packaging_channel,
+            ui=ui_mapping,
+        )
+        try:
+            self._app_settings_store.save_settings(self._app_settings)
+        except (ConfigValidationError, OSError, ValueError) as exc:
+            self._emit_error(f"Unable to save Library preferences: {exc}")
+
+    def _toggle_certificate_pin(self, ref: CertificateLibraryRef, pinned: bool) -> bool:
+        try:
+            catalog = self._certificate_catalog_store.load_catalog()
+            has_managed = any(
+                item.managed_certificate_id == ref.object_id
+                for item in catalog.managed_certificates
+            )
+            updated = (
+                catalog.set_managed_certificate_pinned(ref.object_id, pinned)
+                if has_managed
+                else catalog
+            )
+            if ref.configuration_id is not None:
+                updated = updated.set_configuration_pinned(ref.configuration_id, pinned)
+            elif not has_managed:
+                raise ConfigValidationError("Certificate entry is no longer available.")
+            self._certificate_catalog_store.save_catalog(updated)
+            return True
+        except (ConfigValidationError, KeyError, OSError) as exc:
+            self._emit_error(f"Unable to update certificate pin: {exc}")
+            return False
+
+    def _rename_certificate(self, ref: CertificateLibraryRef, new_name: str) -> bool:
+        try:
+            catalog = self._certificate_catalog_store.load_catalog()
+            normalized = new_name.strip()
+            if not normalized:
+                raise ConfigValidationError("Certificate name is required.")
+            certificate = next(
+                (
+                    item
+                    for item in catalog.managed_certificates
+                    if item.managed_certificate_id == ref.object_id
+                ),
+                None,
+            )
+            if any(
+                item.managed_certificate_id != ref.object_id
+                and item.display_name.casefold() == normalized.casefold()
+                for item in catalog.managed_certificates
+            ):
+                raise ConfigValidationError(f"Certificate '{normalized}' already exists.")
+            updated = (
+                catalog.upsert_managed_certificate(replace(certificate, display_name=normalized))
+                if certificate is not None
+                else catalog
+            )
+            if ref.configuration_id is not None:
+                configuration = catalog.configuration_by_id(ref.configuration_id)
+                if any(
+                    item.certificate_configuration_id != ref.configuration_id
+                    and item.display_name.casefold() == normalized.casefold()
+                    for item in catalog.certificate_configurations
+                ):
+                    raise ConfigValidationError(
+                        f"Certificate configuration '{normalized}' already exists."
+                    )
+                updated = updated.upsert_configuration(
+                    replace(configuration, display_name=normalized)
+                )
+            elif certificate is None:
+                raise ConfigValidationError("Certificate entry is no longer available.")
+            self._certificate_catalog_store.save_catalog(updated)
+            return True
+        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            self._emit_error(f"Unable to rename certificate: {exc}")
+            return False
+
+    def _delete_certificate(self, ref: CertificateLibraryRef) -> bool:
+        try:
+            if ref.configuration_id is not None:
+                self._certificate_manager.delete_configuration(ref.configuration_id)
+            else:
+                self._certificate_manager.delete_managed_certificate(ref.object_id)
+            return True
+        except (ConfigValidationError, KeyError, OSError, ValueError) as exc:
+            self._emit_error(f"Unable to delete certificate: {exc}")
+            return False
 
     def show_document_signatures(self) -> Any | None:
         """Open or refresh the one modeless Document Signatures surface."""
@@ -1336,6 +1449,8 @@ class FoliaSealAppFrame:
         ui_settings = AppUiSettings(
             appearance_mode=self._app_settings.ui_settings.appearance_mode,
             main_window_geometry=geometry,
+            library_last_catalog=self._app_settings.ui_settings.library_last_catalog,
+            library_sort=self._app_settings.ui_settings.library_sort,
         )
         self._app_settings = AppSettings(
             schema_version=self._app_settings.schema_version,

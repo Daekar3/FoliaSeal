@@ -5,7 +5,7 @@ Persistence codecs live in the infra configuration adapter.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from foliaseal.domain.errors import ConfigValidationError
@@ -26,7 +26,7 @@ def _require_bool(value: object, field: str) -> bool:
 def _require_non_empty_str_value(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ConfigValidationError(f"Field '{field}' must be a non-empty str.")
-    return value
+    return value.strip()
 
 
 def _require_optional_non_empty_str_value(value: object, field: str) -> str | None:
@@ -63,6 +63,7 @@ class ManagedCertificate:
     source_kind: str
     created_at: str
     subject_summary: ManagedCertificateSubjectSummary
+    pinned: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -108,6 +109,7 @@ class ManagedCertificate:
             raise ConfigValidationError(
                 "Field 'subject_summary' must be a ManagedCertificateSubjectSummary."
             )
+        object.__setattr__(self, "pinned", _require_bool(self.pinned, "pinned"))
 
 @dataclass(frozen=True)
 class CertificateConfiguration:
@@ -120,6 +122,7 @@ class CertificateConfiguration:
     save_password: bool
     password_secret_ref: str | None = None
     notes: str | None = None
+    pinned: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -168,6 +171,7 @@ class CertificateConfiguration:
             "notes",
             _require_optional_non_empty_str_value(self.notes, "notes"),
         )
+        object.__setattr__(self, "pinned", _require_bool(self.pinned, "pinned"))
 
 @dataclass(frozen=True)
 class CertificateCatalog:
@@ -196,13 +200,38 @@ class CertificateCatalog:
             "certificate_configuration_id",
         )
         seen_names: set[str] = set()
+        managed_names = {
+            certificate.display_name.casefold()
+            for certificate in self.managed_certificates
+        }
+        managed_by_id = {
+            certificate.managed_certificate_id: certificate
+            for certificate in self.managed_certificates
+        }
+        for certificate in self.managed_certificates:
+            normalized_name = certificate.display_name.casefold()
+            if normalized_name in seen_names:
+                raise ConfigValidationError(
+                    "Field 'managed_certificates' must not contain duplicate names."
+                )
+            seen_names.add(normalized_name)
+        seen_names = set()
         seen_managed_certificate_ids: set[str] = set()
         for configuration in self.certificate_configurations:
-            if configuration.display_name in seen_names:
+            normalized_name = configuration.display_name.casefold()
+            if normalized_name in seen_names:
                 raise ConfigValidationError(
                     "Field 'certificate_configurations' must not contain duplicate names."
                 )
-            seen_names.add(configuration.display_name)
+            seen_names.add(normalized_name)
+            paired = managed_by_id.get(configuration.managed_certificate_id)
+            if (
+                normalized_name in managed_names
+                and (paired is None or paired.display_name.casefold() != normalized_name)
+            ):
+                raise ConfigValidationError(
+                    "Certificate names must be unique across unpaired catalog entries."
+                )
             if configuration.managed_certificate_id in seen_managed_certificate_ids:
                 raise ConfigValidationError(
                     "Field 'certificate_configurations' must not contain duplicate "
@@ -278,6 +307,16 @@ class CertificateCatalog:
             ),
             certificate_configurations=self.certificate_configurations,
         )
+
+    def set_managed_certificate_pinned(
+        self, certificate_id: str, pinned: bool
+    ) -> CertificateCatalog:
+        certificate = self.managed_certificate_by_id(certificate_id)
+        return self.upsert_managed_certificate(replace(certificate, pinned=pinned))
+
+    def set_configuration_pinned(self, configuration_id: str, pinned: bool) -> CertificateCatalog:
+        configuration = self.configuration_by_id(configuration_id)
+        return self.upsert_configuration(replace(configuration, pinned=pinned))
 
     def remove_managed_certificate_by_id(self, certificate_id: str) -> CertificateCatalog:
         """Return a catalog without an unreferenced managed certificate."""

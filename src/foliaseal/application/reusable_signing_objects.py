@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from types import MappingProxyType
 from typing import Protocol
+from uuid import uuid4
 
 from foliaseal.application.reusable_signing_models import (
     AppearanceProfile,
@@ -47,6 +48,7 @@ class ReusableObjectSummary:
     ref: ReusableObjectRef
     display_name: str
     details: str
+    pinned: bool = False
 
 
 @dataclass(frozen=True)
@@ -115,7 +117,7 @@ class ReusableCatalogSnapshot:
             ) from exc
 
     def resolve_name(self, kind: ReusableObjectKind, name: str) -> ReusableObjectRef | None:
-        return self._refs_by_name[kind].get(name)
+        return self._refs_by_name[kind].get(name.strip().casefold())
 
     def resolve_preset_selection(
         self, preferred_name: str | None = None, selected_id: str | None = None
@@ -192,7 +194,31 @@ class DeleteObject:
     ref: ReusableObjectRef
 
 
-ReusableObjectCommand = SaveAppearance | SavePlacement | SavePreset | RenameObject | DeleteObject
+@dataclass(frozen=True)
+class DuplicateObject:
+    """Copy one reusable object under a new stable identity, initially unpinned."""
+
+    ref: ReusableObjectRef
+    new_name: str
+
+
+@dataclass(frozen=True)
+class SetPinned:
+    """Set persistent pin state without changing object identity or name."""
+
+    ref: ReusableObjectRef
+    pinned: bool
+
+
+ReusableObjectCommand = (
+    SaveAppearance
+    | SavePlacement
+    | SavePreset
+    | RenameObject
+    | DeleteObject
+    | DuplicateObject
+    | SetPinned
+)
 ResolvedReusableObject = AppearanceProfile | PlacementProfile | ResolvedSignaturePreset
 
 
@@ -320,10 +346,14 @@ class ReusableSigningObjects:
             resolved[ref] = catalog.resolve_preset(preset)
         refs_by_name = {
             ReusableObjectKind.APPEARANCE: {
-                item.display_name: item.ref for item in view.appearances
+                item.display_name.casefold(): item.ref for item in view.appearances
             },
-            ReusableObjectKind.PLACEMENT: {item.display_name: item.ref for item in view.placements},
-            ReusableObjectKind.PRESET: {item.display_name: item.ref for item in view.presets},
+            ReusableObjectKind.PLACEMENT: {
+                item.display_name.casefold(): item.ref for item in view.placements
+            },
+            ReusableObjectKind.PRESET: {
+                item.display_name.casefold(): item.ref for item in view.presets
+            },
         }
         return ReusableCatalogSnapshot(
             view=view,
@@ -340,11 +370,24 @@ class ReusableSigningObjects:
     ) -> SignaturePresetCatalog:
         if isinstance(command, SaveAppearance):
             name = _require_name(command.name, "Appearance profile name is required.")
+            existing = next(
+                (
+                    item
+                    for item in catalog.appearance_profiles
+                    if item.display_name.casefold() == name.casefold()
+                ),
+                None,
+            )
             profile = AppearanceProfile(
                 schema_version=1,
-                appearance_profile_id=_stable_id("appearance", name),
+                appearance_profile_id=(
+                    existing.appearance_profile_id
+                    if existing is not None
+                    else _stable_id("appearance", name)
+                ),
                 display_name=name,
                 appearance=command.appearance,
+                pinned=existing.pinned if existing is not None else False,
             )
             self._check_duplicate(
                 catalog.appearance_profiles,
@@ -357,7 +400,18 @@ class ReusableSigningObjects:
             name = _require_name(command.name, "Placement profile name is required.")
             profile = PlacementProfile(
                 schema_version=2,
-                placement_profile_id=command.placement_profile_id or _stable_id("placement", name),
+                placement_profile_id=(
+                    command.placement_profile_id
+                    or next(
+                        (
+                            item.placement_profile_id
+                            for item in catalog.placement_profiles
+                            if item.display_name.casefold() == name.casefold()
+                        ),
+                        None,
+                    )
+                    or _stable_id("placement", name)
+                ),
                 display_name=name,
                 pinned=command.pinned,
                 page_number=command.page_number,
@@ -376,7 +430,11 @@ class ReusableSigningObjects:
             )
             if command.appearance is not None:
                 existing = next(
-                    (preset for preset in catalog.signature_presets if preset.display_name == name),
+                    (
+                        preset
+                        for preset in catalog.signature_presets
+                        if preset.display_name.casefold() == name.casefold()
+                    ),
                     None,
                 )
                 appearance_id = (
@@ -393,6 +451,8 @@ class ReusableSigningObjects:
                         else name
                     ),
                     appearance=command.appearance,
+                    pinned=(_appearance_by_id(catalog, appearance_id).pinned
+                            if _appearance_by_id(catalog, appearance_id) is not None else False),
                 )
                 updated = catalog.upsert_appearance_profile(appearance_profile)
                 placement_id = existing.placement_profile_id if existing is not None else None
@@ -447,6 +507,7 @@ class ReusableSigningObjects:
                     signature_preset_id=(
                         existing.signature_preset_id if existing is not None else None
                     ),
+                    pinned=existing.pinned if existing is not None else False,
                 )
                 return updated.upsert_reference_preset(preset)
             if command.appearance_profile_id is None:
@@ -465,7 +526,11 @@ class ReusableSigningObjects:
                     ReusableObjectKind.PLACEMENT,
                 )
             existing = next(
-                (item for item in catalog.signature_presets if item.display_name == name),
+                (
+                    item
+                    for item in catalog.signature_presets
+                    if item.display_name.casefold() == name.casefold()
+                ),
                 None,
             )
             preset = SignaturePreset.from_profile_parts(
@@ -476,6 +541,7 @@ class ReusableSigningObjects:
                 signature_preset_id=(
                     existing.signature_preset_id if existing is not None else None
                 ),
+                pinned=existing.pinned if existing is not None else False,
             )
             return catalog.upsert_reference_preset(preset)
         if isinstance(command, RenameObject):
@@ -486,6 +552,58 @@ class ReusableSigningObjects:
             if command.ref.kind is ReusableObjectKind.PLACEMENT:
                 return catalog.rename_placement_profile(name, new_name)
             return catalog.rename_preset(name, new_name)
+        if isinstance(command, DuplicateObject):
+            entries_by_kind = {
+                ReusableObjectKind.APPEARANCE: catalog.appearance_profiles,
+                ReusableObjectKind.PLACEMENT: catalog.placement_profiles,
+                ReusableObjectKind.PRESET: catalog.signature_presets,
+            }
+            source = self._resolve_by_id(
+                entries_by_kind[command.ref.kind],
+                command.ref.object_id,
+                command.ref.kind,
+            )
+            name = _require_name(command.new_name, "Duplicate name is required.")
+            entries = entries_by_kind[command.ref.kind]
+            self._check_duplicate(entries, name, False, command.ref.kind.value.title())
+            if command.ref.kind is ReusableObjectKind.APPEARANCE:
+                duplicate = replace(
+                    source,
+                    appearance_profile_id=f"appearance-{uuid4().hex}",
+                    display_name=name,
+                    pinned=False,
+                )
+                return catalog.upsert_appearance_profile(duplicate)
+            if command.ref.kind is ReusableObjectKind.PLACEMENT:
+                duplicate = replace(
+                    source,
+                    placement_profile_id=f"placement-{uuid4().hex}",
+                    display_name=name,
+                    pinned=False,
+                )
+                return catalog.upsert_placement_profile(duplicate)
+            duplicate = replace(
+                source,
+                signature_preset_id=f"preset-{uuid4().hex}",
+                display_name=name,
+                pinned=False,
+            )
+            return catalog.upsert_reference_preset(duplicate)
+        if isinstance(command, SetPinned):
+            source = self._resolve_by_id(
+                {
+                    ReusableObjectKind.APPEARANCE: catalog.appearance_profiles,
+                    ReusableObjectKind.PLACEMENT: catalog.placement_profiles,
+                    ReusableObjectKind.PRESET: catalog.signature_presets,
+                }[command.ref.kind],
+                command.ref.object_id,
+                command.ref.kind,
+            )
+            if command.ref.kind is ReusableObjectKind.APPEARANCE:
+                return catalog.upsert_appearance_profile(replace(source, pinned=command.pinned))
+            if command.ref.kind is ReusableObjectKind.PLACEMENT:
+                return catalog.upsert_placement_profile(replace(source, pinned=command.pinned))
+            return catalog.upsert_reference_preset(replace(source, pinned=command.pinned))
         if isinstance(command, DeleteObject):
             name = self._name_for_ref(catalog, command.ref)
             if command.ref.kind is ReusableObjectKind.APPEARANCE:
@@ -499,7 +617,10 @@ class ReusableSigningObjects:
     def _check_duplicate(
         entries: tuple[object, ...], name: str, overwrite: bool, label: str
     ) -> None:
-        if any(getattr(entry, "display_name") == name for entry in entries) and not overwrite:
+        if (
+            any(getattr(entry, "display_name").casefold() == name.casefold() for entry in entries)
+            and not overwrite
+        ):
             raise ConfigValidationError(f"{label} '{name}' already exists.")
 
     @staticmethod
@@ -544,6 +665,7 @@ class ReusableSigningObjects:
                     ),
                     display_name=profile.display_name,
                     details="Reusable component; referenced presets cannot be deleted.",
+                    pinned=profile.pinned,
                 )
                 for profile in catalog.appearance_profiles
             ),
@@ -555,6 +677,7 @@ class ReusableSigningObjects:
                     ),
                     display_name=profile.display_name,
                     details="Reusable component; referenced presets cannot be deleted.",
+                    pinned=profile.pinned,
                 )
                 for profile in catalog.placement_profiles
             ),
@@ -568,6 +691,7 @@ class ReusableSigningObjects:
                         "certificate configuration id: "
                         f"{preset.certificate_configuration_id or 'none'}."
                     ),
+                    pinned=preset.pinned,
                 )
                 for preset in catalog.signature_presets
             ),

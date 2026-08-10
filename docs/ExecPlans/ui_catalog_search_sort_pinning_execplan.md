@@ -14,16 +14,28 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
-- [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
+- [x] docs/ExecPlans/ui_signature_library_topology_execplan.md (committed as `a4e97edab`; bounded
+  modeless topology and typed session are available).
+- [x] docs/ExecPlans/ui_window_theme_responsive_execplan.md (typed AppSettings UI projection and
+  atomic persistence are available; this child adds only Library preference keys).
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
-- [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
-- [ ] (2026-08-09) Run focused, regression, and GUI validation; clean processes and artifacts.
-- [ ] (2026-08-09) Update this plan and relevant docs, then commit.
+- [x] (2026-08-10) Audited the governing catalog rules and live models. Only placements had pin
+  metadata; names compared case-sensitively; no duplicate command, sort state, or Library preference
+  bridge existed. Certificate expiration metadata is absent and remains owned by the certificate
+  readiness child.
+- [x] (2026-08-10) Added failing coverage for case-insensitive names, duplicate identity/pin reset,
+  pin ordering, certificate pin round-trip, and AppSettings Library preferences.
+- [x] (2026-08-10) Implemented persistent pins for appearances, placements, presets, managed
+  certificates, and certificate configurations; added typed DuplicateObject/SetPinned commands,
+  normalized uniqueness, pinned-first Name A-Z/Z-A projection, and Library preference persistence.
+- [x] (2026-08-10) Subsequent compliance review found configured-first ordering, orphan-certificate
+  actionability, and merged-name validation gaps; the projection and AppFrame callbacks were corrected
+  and the merged identity semantics are now explicit.
+- [x] (2026-08-10) Ran focused, regression, offscreen GUI, static, diff, and process-cleanup
+  validation; no owned FoliaSeal/PySide6/pytest process remains.
+- [x] (2026-08-10) Updated architecture/parent documentation; commit is the remaining handoff gate.
 
 ## Surprises & Discoveries
 
@@ -42,7 +54,13 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-Not started. Record the demonstrated behavior, evidence, and remaining gaps at completion.
+The application/storage boundary now owns stable pin metadata and duplicate semantics for all
+persisted catalog records. The Library session keeps pinned rows first, configured certificate rows
+before retained unconfigured files, and applies Name A-Z or Z-A ordering while persisting last
+catalog/sort choices without restoring an open window or draft.
+Certificate expiration sorting, certificate import/create/configure UI, nested editors, and
+dirty-detail prompts remain explicit follow-on work owned by certificate/editor children; the
+Library now routes certificate pin, rename, and delete operations through typed AppFrame callbacks.
 
 ## Context and Orientation
 
@@ -64,7 +82,9 @@ rebaselines, V2 features, or packaging work.
 
 ## Plan of Work
 
-Implement case-insensitive live search, Name A-Z/Z-A sorting, expiration sort for certificates, pinned-first ordering, trimmed case-insensitive unique names, and explicit Rename/Duplicate/Delete rules. Prevent dangling references and preserve pins across rename and merged results. Add or preserve typed application and public Qt-port boundaries rather than reaching
+Implement case-insensitive live search, Name A-Z/Z-A sorting, pinned-first ordering, trimmed
+case-insensitive unique names, and explicit Rename/Duplicate/Delete/Pin rules. Prevent dangling
+references and preserve pins across rename and merged results. Add or preserve typed application and public Qt-port boundaries rather than reaching
 through private widgets. Keep schema and terminology aligned with the frozen documents. When a
 legacy path is replaced, prove its callers are migrated before deleting it.
 
@@ -75,9 +95,10 @@ preserved while Library open state/session drafts remain non-restorable.
 
 ## Milestones
 
-Milestone 1 adds model/store tests for normalized names, stable pins, sorting, and AppSettings keys.
-Milestone 2 wires the Library controls and refresh behavior through the catalog authority. Milestone
-3 proves restart persistence and deletion safety in the GUI, then records evidence and cleanup.
+Milestone 1 adds model/store tests for normalized names, stable pins, sorting, duplicate identity,
+and AppSettings keys. Milestone 2 wires the Library controls and refresh behavior through the catalog
+  authority. Milestone 3 proves restart persistence and deletion safety in the GUI, then records
+  evidence and cleanup. Certificate expiration ordering remains a separate certificate-model milestone.
 
 ## Concrete Steps
 
@@ -108,20 +129,32 @@ cleanup result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: Each of the four catalogs has predictable live filtering and sorting; invalid names and referenced-object deletion are explained and cannot corrupt persisted references. Focused tests must pass, shared-code changes must
+Acceptance is behavioral: Each of the four catalogs has predictable live filtering, pinned-first
+ordering, and Name A-Z/Z-A sorting; configured certificate rows precede retained unconfigured files;
+invalid names and referenced-object deletion are explained and
+cannot corrupt persisted references. Focused tests must pass, shared-code changes must
 leave the full suite green, and the GUI audit must record the visible result and cleanup.
 
 ## Required Acceptance Cases
 
-Pins persist by stable object reference across restart; last catalog and sort persist in AppSettings;
+Pins persist by stable object reference across restart; last catalog and Name sort persist in AppSettings;
 search exists only while the Library is open. Names are trimmed and case-insensitively unique.
-Referenced deletion is blocked or resolved without dangling references, and pinned entries remain first
-after rename or merged search results.
+Referenced deletion is blocked or resolved without dangling references, duplicate objects receive a
+new stable identity and start unpinned, and pinned entries remain first after rename or merged search
+results. Certificate expiration sorting and certificate create/import/configure actions remain
+deferred; certificate pin/rename/delete are routed through the existing certificate authority.
 
 ## Evidence Record
 
+Evidence recorded: the focused catalog/session/Qt/AppSettings command passed `58 tests`; the full
+regression passed `1241 passed, 20 skipped, 1 warning`; Ruff and `git diff --check` are clean; the
+offscreen Library/no-document integration passed `2 tests`; process audit was empty. The GUI surface
+now exposes search, Name A-Z/Z-A sort, pin, duplicate, rename, and delete controls, with configured
+certificate rows before retained unconfigured files. Certificate expiration sorting and create/import/
+configure remain deferred to the certificate child.
+
 Before completion, record the exact catalog/AppSettings test command and result, the GUI search,
-sort, pin, rename, and delete sequence with observed rows, the evidence path and restart result,
+sort, pin, duplicate, rename, and delete sequence with observed rows, the evidence path and restart result,
 serialized fixture compatibility result, cleanup, and compatibility grep proof.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
@@ -143,8 +176,15 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 ## Interfaces and Dependencies
 
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
-or workspace ports. The final behavior must be exercised by tests/unit/test_reusable_signing_models.py tests/unit/test_reusable_signing_objects.py tests/unit/test_signature_preset_storage.py. Any temporary adapter must
+or workspace ports. The final behavior must be exercised by the reusable-object, certificate-model,
+AppSettings, Library-session, and Qt Library tests. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+
+Revision note: 2026-08-10 / Codex
+Revised during implementation to record persistent pin metadata across reusable and certificate
+catalogs, typed duplicate/pin commands, case-insensitive uniqueness, pinned-first Name sorting,
+AppSettings Library preferences, focused evidence, and the explicit certificate-expiration/editor
+deferrals.

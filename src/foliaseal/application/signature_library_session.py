@@ -23,6 +23,14 @@ class LibraryCatalog(StrEnum):
     CERTIFICATES = "Certificates"
 
 
+class LibrarySort(StrEnum):
+    """Sort choices shared by the Library session and persisted UI settings."""
+
+    NAME_ASCENDING = "name_ascending"
+    NAME_DESCENDING = "name_descending"
+    EXPIRATION_SOONEST = "expiration_soonest"
+
+
 @dataclass(frozen=True)
 class SignatureLibraryRow:
     """One searchable, display-ready row in the Library master list."""
@@ -30,14 +38,16 @@ class SignatureLibraryRow:
     ref: ReusableObjectRef | CertificateLibraryRef
     display_name: str
     details: str
+    pinned: bool = False
+    configured: bool = False
 
 
 @dataclass(frozen=True)
 class CertificateLibraryRef:
-    """Stable identity for a managed certificate or its signing configuration."""
+    """Stable identity for one user-facing managed certificate entry."""
 
     object_id: str
-    is_configuration: bool = False
+    configuration_id: str | None = None
 
 
 class SignatureLibrarySession:
@@ -52,10 +62,13 @@ class SignatureLibrarySession:
         self,
         library: ReusableSigningObjects,
         certificate_catalog: CertificateCatalog | None = None,
+        initial_catalog: str | LibraryCatalog = LibraryCatalog.PRESETS,
+        sort: str | LibrarySort = LibrarySort.NAME_ASCENDING,
     ) -> None:
         self._library = library
         self._certificate_catalog = certificate_catalog
-        self._catalog = LibraryCatalog.PRESETS
+        self._catalog = _catalog_from_value(initial_catalog)
+        self._sort = _sort_from_value(sort)
         self._search = ""
         self._selected_ref: ReusableObjectRef | CertificateLibraryRef | None = None
         self._draft_name: str | None = None
@@ -68,6 +81,14 @@ class SignatureLibrarySession:
     @property
     def search(self) -> str:
         return self._search
+
+    @property
+    def sort(self) -> LibrarySort:
+        return self._sort
+
+    def set_sort(self, value: str | LibrarySort) -> tuple[SignatureLibraryRow, ...]:
+        self._sort = _sort_from_value(value)
+        return self.rows()
 
     @property
     def selected_ref(self) -> ReusableObjectRef | CertificateLibraryRef | None:
@@ -116,13 +137,18 @@ class SignatureLibrarySession:
                 ref=summary.ref,
                 display_name=summary.display_name,
                 details=summary.details,
+                pinned=summary.pinned,
+                configured=getattr(summary, "configured", False),
             )
             for summary in summaries
             if not query
             or query in summary.display_name.casefold()
             or query in summary.details.casefold()
         )
-        return tuple(sorted(rows, key=lambda row: row.display_name.casefold()))
+        reverse = self._sort is LibrarySort.NAME_DESCENDING
+        name_sorted = sorted(rows, key=lambda row: row.display_name.casefold(), reverse=reverse)
+        configured_sorted = sorted(name_sorted, key=lambda row: not row.configured)
+        return tuple(sorted(configured_sorted, key=lambda row: not row.pinned))
 
     def select(
         self, ref: ReusableObjectRef | CertificateLibraryRef | None
@@ -167,34 +193,85 @@ class SignatureLibrarySession:
             return view.placements
         if self._certificate_catalog is None:
             return ()
-        managed = tuple(
+        configurations = {
+            item.managed_certificate_id: item
+            for item in self._certificate_catalog.certificate_configurations
+        }
+        managed_ids = {
+            item.managed_certificate_id
+            for item in self._certificate_catalog.managed_certificates
+        }
+        rows = [
             SignatureLibraryRow(
-                ref=CertificateLibraryRef(item.managed_certificate_id),
-                display_name=item.display_name,
+                ref=CertificateLibraryRef(
+                    item.managed_certificate_id,
+                    configurations.get(item.managed_certificate_id).certificate_configuration_id
+                    if item.managed_certificate_id in configurations
+                    else None,
+                ),
+                display_name=(
+                    configurations[item.managed_certificate_id].display_name
+                    if item.managed_certificate_id in configurations
+                    else item.display_name
+                ),
                 details=(
-                    f"Certificate file ({item.source_kind}); "
+                    "Configured signing certificate; "
+                    + ("saved password" if configurations[item.managed_certificate_id].save_password
+                       else "password prompted at signing")
+                    if item.managed_certificate_id in configurations
+                    else f"Not configured for signing; certificate file ({item.source_kind}); "
                     f"subject: {item.subject_summary.common_name or 'not supplied'}"
                 ),
+                pinned=item.pinned
+                or (
+                    configurations[item.managed_certificate_id].pinned
+                    if item.managed_certificate_id in configurations
+                    else False
+                ),
+                configured=item.managed_certificate_id in configurations,
             )
             for item in self._certificate_catalog.managed_certificates
-        )
-        configurations = tuple(
+        ]
+        rows.extend(
             SignatureLibraryRow(
-                ref=CertificateLibraryRef(item.certificate_configuration_id, True),
-                display_name=item.display_name,
-                details=(
-                    "Signing configuration; "
-                    + ("saved password" if item.save_password else "password prompted at signing")
+                ref=CertificateLibraryRef(
+                    item.managed_certificate_id,
+                    item.certificate_configuration_id,
                 ),
+                display_name=item.display_name,
+                details="Managed certificate file is unavailable; configure or remove this entry.",
+                pinned=item.pinned,
+                configured=False,
             )
             for item in self._certificate_catalog.certificate_configurations
+            if item.managed_certificate_id not in managed_ids
         )
-        return managed + configurations
+        return tuple(rows)
+
+
+def _catalog_from_value(value: str | LibraryCatalog) -> LibraryCatalog:
+    if isinstance(value, LibraryCatalog):
+        return value
+    normalized = str(value).strip().casefold()
+    return next(
+        (catalog for catalog in LibraryCatalog if catalog.value.casefold() == normalized),
+        LibraryCatalog.PRESETS,
+    )
+
+
+def _sort_from_value(value: str | LibrarySort) -> LibrarySort:
+    if isinstance(value, LibrarySort):
+        return value
+    try:
+        return LibrarySort(str(value).strip().lower())
+    except ValueError:
+        return LibrarySort.NAME_ASCENDING
 
 
 __all__ = [
     "CertificateLibraryRef",
     "LibraryCatalog",
+    "LibrarySort",
     "SignatureLibraryRow",
     "SignatureLibrarySession",
 ]

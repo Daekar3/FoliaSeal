@@ -60,6 +60,7 @@ _EXPORT_MODULES = {
         (
             "CatalogRepository",
             "DeleteObject",
+            "DuplicateObject",
             "InMemoryCatalogRepository",
             "RenameObject",
             "ReusableObjectKind",
@@ -70,6 +71,7 @@ _EXPORT_MODULES = {
             "SaveAppearance",
             "SavePlacement",
             "SavePreset",
+            "SetPinned",
         ),
         "reusable_signing_objects",
     ),

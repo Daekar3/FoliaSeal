@@ -185,7 +185,7 @@ class CertificateManager:
         name = self._normalized_name(request.display_name)
         if any(
             item.certificate_configuration_id != configuration.certificate_configuration_id
-            and item.display_name == name
+            and item.display_name.casefold() == name.casefold()
             for item in catalog.certificate_configurations
         ):
             raise ConfigValidationError(f"Certificate configuration '{name}' already exists.")
@@ -327,7 +327,10 @@ class CertificateManager:
 
     @staticmethod
     def _ensure_unique_name(catalog: CertificateCatalog, name: str) -> None:
-        if any(item.display_name == name for item in catalog.certificate_configurations):
+        if any(
+            item.display_name.casefold() == name.casefold()
+            for item in catalog.certificate_configurations
+        ):
             raise ConfigValidationError(f"Certificate configuration '{name}' already exists.")
 
     def _new_id(self) -> str:

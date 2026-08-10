@@ -6,9 +6,11 @@ from foliaseal.application.reusable_signing_models import (
 from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
     ReusableSigningObjects,
+    SaveAppearance,
     SavePlacement,
 )
 from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
+from tests.support.signing_builders import build_signature_appearance
 from tests.unit.test_qt_signing_shell import _fake_bindings
 
 
@@ -44,3 +46,26 @@ def test_library_exposes_reachable_create_and_edit_placement_actions() -> None:
     dialog.controls.edit_placement_button.click()
 
     assert [profile.display_name for profile in edited] == ["Board"]
+
+
+def test_library_pin_and_duplicate_controls_use_typed_catalog_commands() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.refresh()
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.pin_button.click()
+    dialog.controls.duplicate_button.click()
+
+    rows = service.view().appearances
+    assert rows[0].pinned is True
+    assert len(rows) == 2
+    assert rows[1].pinned is False

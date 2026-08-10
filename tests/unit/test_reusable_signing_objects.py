@@ -10,12 +10,14 @@ from foliaseal.application.reusable_signing_models import (
 )
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
+    DuplicateObject,
     RenameObject,
     ReusableObjectKind,
     ReusableSigningObjects,
     SaveAppearance,
     SavePlacement,
     SavePreset,
+    SetPinned,
 )
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
 from foliaseal.infra.config.schemas import ConfigValidationError
@@ -125,6 +127,23 @@ def test_duplicate_save_requires_overwrite_and_failed_write_keeps_catalog(tmp_pa
     with pytest.raises(OSError, match="disk full"):
         failing.execute(SaveAppearance("New", appearance))
     assert all(item.display_name != "New" for item in service.view().appearances)
+
+
+def test_names_are_case_insensitively_unique_and_duplicate_starts_unpinned(tmp_path: Path) -> None:
+    service = ReusableSigningObjects(SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"))
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    with pytest.raises(ConfigValidationError, match="already exists"):
+        service.execute(SaveAppearance(" approval ", build_signature_appearance()))
+
+    original = service.view().appearances[0].ref
+    service.execute(SetPinned(ref=original, pinned=True))
+    service.execute(DuplicateObject(ref=original, new_name="Approval copy"))
+
+    rows = service.view().appearances
+    assert {row.display_name for row in rows} == {"Approval", "Approval copy"}
+    assert rows[0].pinned is True
+    assert rows[1].pinned is False
+    assert rows[0].ref.object_id != rows[1].ref.object_id
 
 
 def test_inline_preset_overwrite_preserves_component_ids(tmp_path: Path) -> None:

@@ -9,14 +9,17 @@ from typing import Any
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
+    DuplicateObject,
     RenameObject,
     ReusableObjectKind,
     ReusableObjectRef,
     ReusableSigningObjects,
+    SetPinned,
 )
 from foliaseal.application.signature_library_session import (
     CertificateLibraryRef,
     LibraryCatalog,
+    LibrarySort,
     SignatureLibraryRow,
     SignatureLibrarySession,
 )
@@ -41,6 +44,14 @@ def _set_enabled(widget: Any, enabled: bool) -> None:
         widget._enabled = bool(enabled)
 
 
+def _set_text(widget: Any, value: str) -> None:
+    setter = getattr(widget, "setText", None)
+    if callable(setter):
+        setter(value)
+    elif hasattr(widget, "text"):
+        widget.text = value
+
+
 @dataclass(frozen=True)
 class ReusableObjectLibraryControls:
     """Widgets exposed by the reusable-signing-object library dialog."""
@@ -48,12 +59,15 @@ class ReusableObjectLibraryControls:
     dialog: Any
     catalog_selector: Any
     search_input: Any
+    sort_selector: Any
     object_selector: Any
     detail_container: Any
     details_label: Any
     name_input: Any
     rename_button: Any
     delete_button: Any
+    duplicate_button: Any
+    pin_button: Any
     create_button: Any
     edit_button: Any
     create_placement_button: Any
@@ -80,6 +94,12 @@ class ReusableObjectLibraryDialog:
         library: ReusableSigningObjects,
         certificate_catalog: Any | None = None,
         certificate_catalog_provider: Callable[[], Any] | None = None,
+        initial_catalog: str = "presets",
+        library_sort: str = LibrarySort.NAME_ASCENDING.value,
+        on_preferences_changed: Callable[[str, str], None] | None = None,
+        on_toggle_certificate_pin: Callable[[CertificateLibraryRef, bool], bool] | None = None,
+        on_rename_certificate: Callable[[CertificateLibraryRef, str], bool] | None = None,
+        on_delete_certificate: Callable[[CertificateLibraryRef], bool] | None = None,
         on_create: Callable[[], bool] | None = None,
         on_edit: Callable[[], bool] | None = None,
         on_create_placement: Callable[[], bool] | None = None,
@@ -92,7 +112,16 @@ class ReusableObjectLibraryDialog:
         self._on_create_placement = on_create_placement
         self._on_edit_placement = on_edit_placement
         self._certificate_catalog_provider = certificate_catalog_provider
-        self._session = SignatureLibrarySession(library, certificate_catalog)
+        self._on_preferences_changed = on_preferences_changed
+        self._on_toggle_certificate_pin = on_toggle_certificate_pin
+        self._on_rename_certificate = on_rename_certificate
+        self._on_delete_certificate = on_delete_certificate
+        self._session = SignatureLibrarySession(
+            library,
+            certificate_catalog,
+            initial_catalog=initial_catalog,
+            sort=library_sort,
+        )
         self._rows: tuple[SignatureLibraryRow, ...] = ()
         self.controls = self._build_controls(parent)
         self.refresh()
@@ -126,8 +155,17 @@ class ReusableObjectLibraryDialog:
             return False
         ref, _name = selected
         if not isinstance(ref, ReusableObjectRef):
-            self._show_error("Certificate changes are managed from Settings.")
-            return False
+            if self._on_rename_certificate is None:
+                self._show_error("Certificate changes are managed from Settings.")
+                return False
+            if not self._on_rename_certificate(ref, new_name):
+                return False
+            self.refresh()
+            self._session.select(ref)
+            self._session.commit_detail()
+            self._render_master_list()
+            self._render_selection()
+            return True
         try:
             self._library.execute(RenameObject(ref=ref, new_name=new_name))
         except (ConfigValidationError, KeyError) as exc:
@@ -136,6 +174,55 @@ class ReusableObjectLibraryDialog:
         self.refresh()
         self._set_selector_text(new_name)
         self._session.commit_detail()
+        return True
+
+    def duplicate_selected(self) -> bool:
+        selected = self._selected_object()
+        if selected is None or not isinstance(selected[0], ReusableObjectRef):
+            self._show_error("Select a reusable object before duplicating it.")
+            return False
+        ref, name = selected
+        duplicate_name = f"{name} Copy"
+        try:
+            self._library.execute(DuplicateObject(ref=ref, new_name=duplicate_name))
+        except (ConfigValidationError, KeyError) as exc:
+            self._show_error(str(exc))
+            return False
+        self.refresh()
+        self._session.select(
+            next((row.ref for row in self._rows if row.display_name == duplicate_name), None)
+        )
+        self._render_master_list()
+        self._render_selection()
+        return True
+
+    def toggle_pin_selected(self) -> bool:
+        selected = self._selected_object()
+        if selected is None:
+            self._show_error("Select an object before changing its pin.")
+            return False
+        ref, _name = selected
+        row = self._session.selected_row()
+        if row is None:
+            self._session.select(ref)
+            row = self._session.selected_row()
+        if row is None:
+            return False
+        pinned = not row.pinned
+        try:
+            if isinstance(ref, ReusableObjectRef):
+                self._library.execute(SetPinned(ref=ref, pinned=pinned))
+            elif self._on_toggle_certificate_pin is None or not self._on_toggle_certificate_pin(
+                ref, pinned
+            ):
+                return False
+        except (ConfigValidationError, KeyError) as exc:
+            self._show_error(str(exc))
+            return False
+        self.refresh()
+        self._session.select(ref)
+        self._render_master_list()
+        self._render_selection()
         return True
 
     def cancel_detail(self) -> bool:
@@ -153,8 +240,10 @@ class ReusableObjectLibraryDialog:
             return False
         ref, _name = selected
         if not isinstance(ref, ReusableObjectRef):
-            self._show_error("Certificate changes are managed from Settings.")
-            return False
+            if self._on_delete_certificate is None or not self._on_delete_certificate(ref):
+                return False
+            self.refresh()
+            return True
         try:
             self._library.execute(DeleteObject(ref=ref))
         except (ConfigValidationError, KeyError) as exc:
@@ -181,6 +270,20 @@ class ReusableObjectLibraryDialog:
             navigation.setMinimumWidth(130)
         search = self._bindings.q_line_edit()
         search.setPlaceholderText("Search saved objects")
+        sort_selector = self._bindings.q_combo_box()
+        for label, value in (
+            ("Name A–Z", LibrarySort.NAME_ASCENDING.value),
+            ("Name Z–A", LibrarySort.NAME_DESCENDING.value),
+        ):
+            try:
+                sort_selector.addItem(label, value)
+            except TypeError:
+                sort_selector.addItem(label)
+        available_sorts = (LibrarySort.NAME_ASCENDING, LibrarySort.NAME_DESCENDING)
+        available_sort_index = {
+            value: index for index, value in enumerate(available_sorts)
+        }.get(self._session.sort, 0)
+        sort_selector.setCurrentIndex(available_sort_index)
         selector = (
             self._bindings.q_list_widget()
             if self._has_list_widget()
@@ -191,6 +294,8 @@ class ReusableObjectLibraryDialog:
         name_input.setPlaceholderText("New name")
         rename = self._bindings.q_push_button("Rename")
         delete = self._bindings.q_push_button("Delete")
+        duplicate = self._bindings.q_push_button("Duplicate")
+        pin = self._bindings.q_push_button("Pin")
         create = self._bindings.q_push_button("Create in signing workflow")
         edit = self._bindings.q_push_button("Edit in signing workflow")
         create_placement = self._bindings.q_push_button("Create placement")
@@ -211,6 +316,7 @@ class ReusableObjectLibraryDialog:
         master_layout.setContentsMargins(0, 0, 0, 0)
         master_layout.addWidget(self._bindings.q_label("Saved objects"))
         master_layout.addWidget(search)
+        master_layout.addWidget(sort_selector)
         master_layout.addWidget(selector)
 
         detail = self._bindings.q_widget()
@@ -220,7 +326,7 @@ class ReusableObjectLibraryDialog:
         detail_layout.addWidget(details)
         detail_layout.addWidget(self._bindings.q_label("Name"))
         detail_layout.addWidget(name_input)
-        detail_layout.addWidget(_compose_row(self._bindings, rename, delete))
+        detail_layout.addWidget(_compose_row(self._bindings, rename, duplicate, delete, pin))
         detail_layout.addWidget(_compose_row(self._bindings, create, edit))
         detail_layout.addWidget(_compose_row(self._bindings, create_placement, edit_placement))
         add_stretch = getattr(detail_layout, "addStretch", None)
@@ -251,12 +357,15 @@ class ReusableObjectLibraryDialog:
         else:
             navigation.currentTextChanged.connect(self._handle_catalog_text_changed)
         search.textChanged.connect(lambda value: self._handle_search_changed(str(value)))
+        sort_selector.currentIndexChanged.connect(self._handle_sort_changed)
         name_input.textChanged.connect(lambda value: self._session.set_draft_name(str(value)))
         if hasattr(selector, "currentRowChanged"):
             selector.currentRowChanged.connect(lambda _row: self._handle_master_row_changed())
         else:
             selector.currentTextChanged.connect(lambda _value: self._handle_master_row_changed())
         rename.clicked.connect(self.rename_selected)
+        duplicate.clicked.connect(self.duplicate_selected)
+        pin.clicked.connect(self.toggle_pin_selected)
         delete.clicked.connect(self.delete_selected)
         save.clicked.connect(self.rename_selected)
         cancel.clicked.connect(self.cancel_detail)
@@ -279,12 +388,15 @@ class ReusableObjectLibraryDialog:
             dialog=dialog,
             catalog_selector=navigation,
             search_input=search,
+            sort_selector=sort_selector,
             object_selector=selector,
             detail_container=detail,
             details_label=details,
             name_input=name_input,
             rename_button=rename,
             delete_button=delete,
+            duplicate_button=duplicate,
+            pin_button=pin,
             create_button=create,
             edit_button=edit,
             create_placement_button=create_placement,
@@ -361,6 +473,10 @@ class ReusableObjectLibraryDialog:
         catalogs = list(LibraryCatalog)
         if 0 <= int(index) < len(catalogs):
             self._session.select_catalog(catalogs[int(index)])
+            if self._on_preferences_changed is not None:
+                self._on_preferences_changed(
+                    self._session.catalog.value, self._session.sort.value
+                )
             self._rows = self._session.rows()
             self._render_master_list()
             self._render_selection()
@@ -371,12 +487,34 @@ class ReusableObjectLibraryDialog:
         except StopIteration:
             return
         self._session.select_catalog(catalog)
+        if self._on_preferences_changed is not None:
+            self._on_preferences_changed(self._session.catalog.value, self._session.sort.value)
         self._rows = self._session.rows()
         self._render_master_list()
         self._render_selection()
 
     def _handle_search_changed(self, value: str) -> None:
         self._rows = self._session.set_search(value)
+        self._render_master_list()
+        self._render_selection()
+
+    def _handle_sort_changed(self, index: int | None = None) -> None:
+        if not hasattr(self, "controls"):
+            return
+        selector = self.controls.sort_selector
+        if index is None:
+            index = int(getattr(selector, "currentIndex", lambda: 0)())
+        data_getter = getattr(selector, "itemData", None)
+        value = (
+            data_getter(index)
+            if callable(data_getter)
+            else (LibrarySort.NAME_ASCENDING, LibrarySort.NAME_DESCENDING)[index].value
+            if 0 <= index < 2
+            else LibrarySort.NAME_ASCENDING.value
+        )
+        self._rows = self._session.set_sort(str(value))
+        if self._on_preferences_changed is not None:
+            self._on_preferences_changed(self._session.catalog.value, self._session.sort.value)
         self._render_master_list()
         self._render_selection()
 
@@ -395,10 +533,19 @@ class ReusableObjectLibraryDialog:
             else:
                 message = "No saved objects match this catalog or search."
             self.controls.details_label.setText(message)
+            _set_enabled(self.controls.duplicate_button, False)
+            _set_enabled(self.controls.pin_button, False)
             _set_enabled(self.controls.edit_placement_button, False)
             return
         self.controls.details_label.setText(selected.details)
         self.controls.name_input.setText(self._session.draft_name or selected.display_name)
+        _set_text(self.controls.pin_button, "Unpin" if selected.pinned else "Pin")
+        is_reusable = isinstance(selected.ref, ReusableObjectRef)
+        _set_enabled(self.controls.duplicate_button, is_reusable)
+        _set_enabled(
+            self.controls.pin_button,
+            is_reusable or self._on_toggle_certificate_pin is not None,
+        )
         _set_enabled(
             self.controls.edit_placement_button,
             isinstance(selected.ref, ReusableObjectRef)

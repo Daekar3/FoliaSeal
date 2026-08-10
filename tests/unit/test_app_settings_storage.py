@@ -7,7 +7,11 @@ from foliaseal.infra.config.app_settings_storage import (
     AppSettingsStore,
     default_app_settings_directory,
 )
-from foliaseal.infra.config.app_settings_ui import MainWindowGeometry
+from foliaseal.infra.config.app_settings_ui import (
+    AppUiSettings,
+    LibrarySortOrder,
+    MainWindowGeometry,
+)
 from foliaseal.infra.config.schemas import AppSettings, ConfigValidationError
 
 
@@ -101,6 +105,26 @@ def test_app_settings_store_round_trips_main_window_geometry(tmp_path: Path) -> 
         maximized=True,
     )
     assert loaded.ui["future_preference"] == "keep"
+
+
+def test_app_settings_store_round_trips_library_catalog_and_sort(tmp_path: Path) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "out"),
+        default_open_directory=str(tmp_path / "in"),
+        linux_packaging_channel="primary",
+        ui=AppUiSettings(
+            library_last_catalog="placements",
+            library_sort=LibrarySortOrder.NAME_DESCENDING,
+        ).to_mapping(),
+    )
+
+    store.save_settings(settings)
+
+    loaded = store.load_settings()
+    assert loaded.ui_settings.library_last_catalog == "placements"
+    assert loaded.ui_settings.library_sort is LibrarySortOrder.NAME_DESCENDING
 
 
 def test_app_settings_store_removes_temp_file_when_replace_fails(

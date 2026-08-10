@@ -53,6 +53,7 @@ def test_certificate_codec_preserves_catalog_shape_and_round_trip() -> None:
         "source_kind",
         "created_at",
         "subject_summary",
+        "pinned",
     }
 
 
@@ -80,3 +81,16 @@ def test_catalog_policy_remains_application_owned() -> None:
 
     assert catalog.managed_certificates == ()
     assert catalog.certificate_configurations == ()
+
+
+def test_certificate_pin_metadata_round_trips_and_updates_by_stable_id() -> None:
+    original = build_certificate_catalog()
+    managed = original.managed_certificates[0]
+    configuration = original.certificate_configurations[0]
+
+    updated = original.set_managed_certificate_pinned(managed.managed_certificate_id, True)
+    updated = updated.set_configuration_pinned(configuration.certificate_configuration_id, True)
+
+    assert updated.managed_certificates[0].pinned is True
+    assert updated.certificate_configurations[0].pinned is True
+    assert decode_certificate_catalog(encode_certificate_catalog(updated)) == updated

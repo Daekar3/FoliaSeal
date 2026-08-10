@@ -102,10 +102,10 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 The bounded topology outcome now exists: the old single-selector form has been replaced by a
 modeless three-column surface with an AppFrame-owned session, Presets-first navigation, typed search
-rows, certificate projection, and an isolated name draft. The review also established the remaining
-compliance boundary: nested document-independent editors, certificate mutations, Duplicate/Pin,
-dirty close prompts, and Library preference persistence are not implemented by this child and must
-remain visible as follow-on work.
+rows, certificate projection, and an isolated name draft. The follow-on catalog slice now adds
+typed pin/duplicate/name/sort behavior and routes certificate pin/rename/delete through AppFrame;
+nested document-independent editors, certificate create/import/configure flows, dirty close prompts,
+and certificate expiration sorting remain visible as follow-on work.
 
 ## Context and Orientation
 
@@ -202,7 +202,8 @@ Evidence recorded for the bounded slice:
 
 - Governing requirements: `docs/UI_SPEC.md` SUR03, LAY04, WF06 and
   `docs/ui/signature-library-presets-exploratory.svg`. The structural/topology subset is implemented;
-  nested editors, catalog mutations, and preferences are explicitly deferred.
+  nested editors, certificate create/import/configure flows, dirty prompts, and expiration sorting
+  remain explicitly deferred to owning children.
 - Red/green proof: the new session test initially failed collection because
   `signature_library_session.py` did not exist; after implementation the focused suite passed.
 - Focused command/result: `.venv/bin/python -m pytest -q tests/unit/test_signature_library_session.py
@@ -214,8 +215,9 @@ Evidence recorded for the bounded slice:
 - GUI observation: offscreen integration opens the no-document frame, shows one modeless Library,
   verifies four catalog entries with Presets selected, a searchable master list, a detail column, and
   one `QSplitter`, then closes both windows. No FoliaSeal/PySide6/pytest process may remain.
-- Certificate behavior: managed certificate rows are projected with subject/source details; mutation
-  remains behind the certificate-management boundary until its owning child lands.
+- Certificate behavior: configured and unconfigured managed files are projected as one user-facing
+  row per managed certificate; pin/rename/delete are routed through the certificate authority while
+  create/import/configure and expiration sorting remain behind their owning children.
 - Review correction: refreshing while a certificate row is selected no longer routes that typed
   certificate ref through `ReusableSigningObjects.resolve()`, and a reopened Library reloads the
   certificate catalog from its repository.

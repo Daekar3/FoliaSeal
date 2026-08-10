@@ -81,7 +81,8 @@ def _require_str(payload: dict[str, Any], field: str) -> str:
 
 def _require_non_empty_str(payload: dict[str, Any], field: str) -> str:
     value = _require_str(payload, field)
-    if not value.strip():
+    value = value.strip()
+    if not value:
         raise ReusableObjectValidationError(f"Field '{field}' must be a non-empty str.")
     return value
 
@@ -89,7 +90,7 @@ def _require_non_empty_str(payload: dict[str, Any], field: str) -> str:
 def _require_non_empty_str_value(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ReusableObjectValidationError(f"Field '{field}' must be a non-empty str.")
-    return value
+    return value.strip()
 
 
 def _optional_non_empty_str(payload: dict[str, Any], field: str) -> str | None:
@@ -363,6 +364,7 @@ class AppearanceProfile:
     appearance_profile_id: str
     display_name: str
     appearance: SignatureAppearance
+    pinned: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -378,6 +380,8 @@ class AppearanceProfile:
         )
         if not isinstance(self.appearance, SignatureAppearance):
             raise ReusableObjectValidationError("Field 'appearance' must be a SignatureAppearance.")
+        if not isinstance(self.pinned, bool):
+            raise ReusableObjectValidationError("Field 'pinned' must be a bool.")
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> AppearanceProfile:
@@ -386,6 +390,7 @@ class AppearanceProfile:
             appearance_profile_id=_require_non_empty_str(payload, "appearance_profile_id"),
             display_name=_require_non_empty_str(payload, "display_name"),
             appearance=_deserialize_appearance(_require_mapping(payload, "appearance")),
+            pinned=_require_bool(payload, "pinned") if "pinned" in payload else False,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -394,6 +399,7 @@ class AppearanceProfile:
             "appearance_profile_id": self.appearance_profile_id,
             "display_name": self.display_name,
             "appearance": _serialize_appearance(self.appearance),
+            "pinned": self.pinned,
         }
 
 
@@ -551,6 +557,7 @@ class SignaturePreset:
     certificate_configuration_id: str | None = None
     appearance_profile_id: str | None = None
     placement_profile_id: str | None = None
+    pinned: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -572,6 +579,8 @@ class SignaturePreset:
             object.__setattr__(
                 self, field, _require_optional_non_empty_str_value(getattr(self, field), field)
             )
+        if not isinstance(self.pinned, bool):
+            raise ReusableObjectValidationError("Field 'pinned' must be a bool.")
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> SignaturePreset:
@@ -584,6 +593,7 @@ class SignaturePreset:
             ),
             appearance_profile_id=_optional_non_empty_str(payload, "appearance_profile_id"),
             placement_profile_id=_optional_non_empty_str(payload, "placement_profile_id"),
+            pinned=_require_bool(payload, "pinned") if "pinned" in payload else False,
         )
 
     @classmethod
@@ -596,6 +606,7 @@ class SignaturePreset:
         certificate_configuration_id: str | None = None,
         schema_version: int = 2,
         signature_preset_id: str | None = None,
+        pinned: bool = False,
     ) -> SignaturePreset:
         return cls(
             schema_version=schema_version,
@@ -604,6 +615,7 @@ class SignaturePreset:
             certificate_configuration_id=certificate_configuration_id,
             appearance_profile_id=appearance_profile_id,
             placement_profile_id=placement_profile_id,
+            pinned=pinned,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -614,6 +626,7 @@ class SignaturePreset:
             "certificate_configuration_id": self.certificate_configuration_id,
             "appearance_profile_id": self.appearance_profile_id,
             "placement_profile_id": self.placement_profile_id,
+            "pinned": self.pinned,
         }
 
 
@@ -712,11 +725,24 @@ class SignaturePresetCatalog:
         )
         names: set[str] = set()
         for preset in self.signature_presets:
-            if preset.display_name in names:
+            normalized_name = preset.display_name.casefold()
+            if normalized_name in names:
                 raise ReusableObjectValidationError(
                     "Field 'signature_presets' must not contain duplicate names."
                 )
-            names.add(preset.display_name)
+            names.add(normalized_name)
+        for field_name, entries in (
+            ("appearance_profiles", self.appearance_profiles),
+            ("placement_profiles", self.placement_profiles),
+        ):
+            names = set()
+            for entry in entries:
+                normalized_name = entry.display_name.casefold()
+                if normalized_name in names:
+                    raise ReusableObjectValidationError(
+                        f"Field '{field_name}' must not contain duplicate names."
+                    )
+                names.add(normalized_name)
         appearance_ids = {item.appearance_profile_id for item in self.appearance_profiles}
         placement_ids = {item.placement_profile_id for item in self.placement_profiles}
         for preset in self.signature_presets:
@@ -793,21 +819,21 @@ class SignaturePresetCatalog:
     def preset_named(self, name: str) -> ResolvedSignaturePreset:
         normalized = _require_non_empty_str_value(name, "name")
         for preset in self.signature_presets:
-            if preset.display_name == normalized:
+            if preset.display_name.casefold() == normalized.casefold():
                 return self.resolve_preset(preset)
         raise KeyError(normalized)
 
     def appearance_profile_named(self, name: str) -> AppearanceProfile:
         normalized = _require_non_empty_str_value(name, "name")
         for item in self.appearance_profiles:
-            if item.display_name == normalized:
+            if item.display_name.casefold() == normalized.casefold():
                 return item
         raise KeyError(normalized)
 
     def placement_profile_named(self, name: str) -> PlacementProfile:
         normalized = _require_non_empty_str_value(name, "name")
         for item in self.placement_profiles:
-            if item.display_name == normalized:
+            if item.display_name.casefold() == normalized.casefold():
                 return item
         raise KeyError(normalized)
 
@@ -851,7 +877,11 @@ class SignaturePresetCatalog:
             if preset.placement_profile
             else list(self.placement_profiles)
         )
-        presets = [item for item in self.signature_presets if item.display_name != preset.name]
+        presets = [
+            item
+            for item in self.signature_presets
+            if item.display_name.casefold() != preset.name.casefold()
+        ]
         presets.append(preset.preset)
         return SignaturePresetCatalog(
             self.schema_version, tuple(appearances), tuple(placements), tuple(presets)
@@ -861,7 +891,9 @@ class SignaturePresetCatalog:
         if not isinstance(preset, SignaturePreset):
             raise ReusableObjectValidationError("preset must be a SignaturePreset value.")
         values = [
-            item for item in self.signature_presets if item.display_name != preset.display_name
+            item
+            for item in self.signature_presets
+            if item.display_name.casefold() != preset.display_name.casefold()
         ]
         values.append(preset)
         return SignaturePresetCatalog(
@@ -908,7 +940,11 @@ class SignaturePresetCatalog:
 
     def remove_preset(self, name: str) -> SignaturePresetCatalog:
         normalized = _require_non_empty_str_value(name, "name")
-        values = tuple(item for item in self.signature_presets if item.display_name != normalized)
+        values = tuple(
+            item
+            for item in self.signature_presets
+            if item.display_name.casefold() != normalized.casefold()
+        )
         if len(values) == len(self.signature_presets):
             raise KeyError(normalized)
         return SignaturePresetCatalog(
@@ -968,12 +1004,14 @@ class SignaturePresetCatalog:
         normalized = _require_non_empty_str_value(name, "name")
         replacement = _require_non_empty_str_value(new_name, "new_name")
         entries = getattr(self, attribute)
-        if normalized == replacement:
+        if normalized.casefold() == replacement.casefold():
             return self
-        if any(item.display_name == replacement for item in entries):
+        if any(item.display_name.casefold() == replacement.casefold() for item in entries):
             raise ReusableObjectValidationError(f"Reusable object '{replacement}' already exists.")
         renamed = tuple(
-            replace(item, display_name=replacement) if item.display_name == normalized else item
+            replace(item, display_name=replacement)
+            if item.display_name.casefold() == normalized.casefold()
+            else item
             for item in entries
         )
         if renamed == entries:

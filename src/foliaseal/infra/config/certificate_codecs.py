@@ -82,6 +82,7 @@ def _decode_managed_certificate(payload: Mapping[str, Any]) -> ManagedCertificat
         source_kind=_require_non_empty_str(payload, "source_kind"),
         created_at=_require_non_empty_str(payload, "created_at"),
         subject_summary=_decode_subject(_require_mapping(payload, "subject_summary")),
+        pinned=_require_bool(payload, "pinned") if "pinned" in payload else False,
     )
 
 
@@ -96,6 +97,7 @@ def _decode_configuration(payload: Mapping[str, Any]) -> CertificateConfiguratio
         save_password=_require_bool(payload, "save_password"),
         password_secret_ref=_optional_str(payload, "password_secret_ref"),
         notes=_optional_str(payload, "notes"),
+        pinned=_require_bool(payload, "pinned") if "pinned" in payload else False,
     )
 
 
@@ -148,6 +150,7 @@ def _encode_managed_certificate(certificate: ManagedCertificate) -> dict[str, An
         "source_kind": certificate.source_kind,
         "created_at": certificate.created_at,
         "subject_summary": _encode_subject(certificate.subject_summary),
+        "pinned": certificate.pinned,
     }
 
 
@@ -160,6 +163,7 @@ def _encode_configuration(configuration: CertificateConfiguration) -> dict[str, 
         "save_password": configuration.save_password,
         "password_secret_ref": configuration.password_secret_ref,
         "notes": configuration.notes,
+        "pinned": configuration.pinned,
     }
 
 
