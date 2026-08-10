@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from foliaseal.application.coordinate_transform import PdfRect
+
 
 @dataclass(frozen=True)
 class DocumentTextMatch:
@@ -15,6 +17,11 @@ class DocumentTextMatch:
     end_index: int
     text: str
     context: str
+    highlight_rects: tuple[PdfRect, ...] = ()
+
+
+class DocumentTextSearchUnavailable(RuntimeError):
+    """Raised when a PDF cannot provide truthful extractable text search."""
 
 
 @dataclass(frozen=True)
@@ -65,6 +72,11 @@ class DocumentTextSearchSession:
             return self._build_state()
         try:
             self._matches = self._search_engine.search(self._input_pdf_path, normalized_query)
+        except DocumentTextSearchUnavailable as exc:
+            self._matches = ()
+            self._current_index = None
+            self._error_detail = str(exc)
+            return self._build_state()
         except Exception as exc:
             self._matches = ()
             self._current_index = None
@@ -94,6 +106,11 @@ class DocumentTextSearchSession:
         if self._current_index is None or not self._matches:
             return None
         return self._matches[self._current_index].page_index
+
+    def matches_on_page(self, page_index: int) -> tuple[DocumentTextMatch, ...]:
+        """Return the current query's matches on one page in document order."""
+
+        return tuple(match for match in self._matches if match.page_index == page_index)
 
     def current_state(self) -> DocumentTextSearchState:
         return self._build_state()

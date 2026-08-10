@@ -134,14 +134,16 @@ def _build_sidebar(
     *,
     on_review_signature_selected=None,
     on_text_selection_mode_changed=None,
+    on_find_text=None,
+    on_previous_text_match=None,
 ) -> SigningWorkspaceSidebar:
     bindings = _fake_bindings()
     callbacks = {
         "on_choose_output": lambda: None,
         "on_sign": lambda: None,
         "on_open_signed_output": lambda: None,
-        "on_find_text": lambda: None,
-        "on_previous_text_match": lambda: None,
+        "on_find_text": on_find_text or (lambda: None),
+        "on_previous_text_match": on_previous_text_match or (lambda: None),
         "on_next_text_match": lambda: None,
         "on_copy_text_match": lambda: None,
         "on_review_signature_selected": on_review_signature_selected or (lambda index: None),
@@ -269,3 +271,17 @@ def test_signing_workspace_sidebar_does_not_reemit_hidden_checkbox_sync() -> Non
     sidebar._handle_text_selection_mode_changed(1, on_text_selection_mode_changed=calls.append)
 
     assert calls == [True]
+
+
+def test_search_query_return_and_previous_callbacks_are_keyboard_bound() -> None:
+    find_calls: list[None] = []
+    previous_calls: list[None] = []
+    sidebar = _build_sidebar(
+        on_find_text=lambda: find_calls.append(None),
+        on_previous_text_match=lambda: previous_calls.append(None),
+    )
+
+    sidebar.document_text_controls.query_input.returnPressed.emit()
+
+    assert find_calls == [None]
+    assert previous_calls == []

@@ -1,8 +1,12 @@
 from pathlib import Path
 
+import pytest
+
+from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_text_search import (
     DocumentTextMatch,
     DocumentTextSearchSession,
+    DocumentTextSearchUnavailable,
 )
 from foliaseal.infra.document_text_search import QtPdfDocumentTextSearchEngine
 
@@ -130,11 +134,26 @@ def test_qt_pdf_document_text_search_engine_finds_matches(monkeypatch, tmp_path:
     pdf_path.write_bytes(b"%PDF-1.7\n")
 
     class _FakeSelection:
-        def __init__(self, text: str) -> None:
+        def __init__(self, text: str, bounds=()) -> None:
             self._text = text
+            self._bounds = tuple(bounds)
 
         def text(self) -> str:
             return self._text
+
+        def bounds(self):
+            return self._bounds
+
+    class _FakePoint:
+        def __init__(self, x: float, y: float) -> None:
+            self._x = x
+            self._y = y
+
+        def x(self) -> float:
+            return self._x
+
+        def y(self) -> float:
+            return self._y
 
     class _FakeQPdfDocument:
         class Error:
@@ -158,10 +177,28 @@ def test_qt_pdf_document_text_search_engine_finds_matches(monkeypatch, tmp_path:
             return _FakeSelection(self.pages[page])
 
         def getSelectionAtIndex(self, page: int, start_index: int, max_length: int):  # noqa: N802
-            return _FakeSelection(self.pages[page][start_index : start_index + max_length])
+            return _FakeSelection(
+                self.pages[page][start_index : start_index + max_length],
+                bounds=(
+                    (
+                        _FakePoint(10.0 + start_index, 80.0),
+                        _FakePoint(40.0 + start_index, 80.0),
+                        _FakePoint(40.0 + start_index, 92.0),
+                        _FakePoint(10.0 + start_index, 92.0),
+                    ),
+                ),
+            )
+
+        def pagePointSize(self, page: int):  # noqa: N802
+            del page
+            return _FakeSize()
 
         def close(self) -> None:
             return None
+
+    class _FakeSize:
+        def toTuple(self):
+            return (200.0, 100.0)
 
     monkeypatch.setattr(
         "foliaseal.infra.document_text_search.QPdfDocument",
@@ -173,6 +210,9 @@ def test_qt_pdf_document_text_search_engine_finds_matches(monkeypatch, tmp_path:
     assert len(matches) == 2
     assert matches[0].page_index == 0
     assert matches[0].text == "Alpha"
+    assert matches[0].highlight_rects == (
+        PdfRect(x1=10.0, y1=8.0, x2=40.0, y2=20.0),
+    )
     assert "Alpha beta ALPHA" in matches[0].context
     assert matches[1].text == "ALPHA"
 
@@ -186,3 +226,67 @@ def test_qt_pdf_document_text_search_engine_reports_missing_file(tmp_path: Path)
         assert "missing.pdf" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("expected missing file error")
+
+
+def test_qt_pdf_document_text_search_engine_classifies_load_failures() -> None:
+    engine = QtPdfDocumentTextSearchEngine()
+
+    assert "password protected" in engine._describe_load_error("IncorrectPassword")
+    assert "protection scheme" in engine._describe_load_error("UnsupportedSecurityScheme")
+    assert "invalid PDF" in engine._describe_load_error("InvalidFileFormat")
+    assert "parser" in engine._describe_load_error("Unknown")
+
+
+@pytest.mark.parametrize(
+    ("pdf_marker", "expected"),
+    [
+        (b"/Subtype /Image", "image content"),
+        (b"/Type /Page", "no extractable text"),
+    ],
+)
+def test_qt_pdf_document_text_search_engine_distinguishes_empty_text_kinds(
+    monkeypatch,
+    tmp_path: Path,
+    pdf_marker: bytes,
+    expected: str,
+) -> None:
+    pdf_path = tmp_path / "empty-text.pdf"
+    pdf_path.write_bytes(pdf_marker)
+
+    class _FakeSelection:
+        def text(self) -> str:
+            return ""
+
+    class _FakeSize:
+        def toTuple(self):
+            return (200.0, 100.0)
+
+    class _FakeQPdfDocument:
+        class Error:
+            None_ = 0
+
+        def load(self, file_name: str):
+            del file_name
+            return self.Error.None_
+
+        def pageCount(self) -> int:  # noqa: N802
+            return 1
+
+        def getAllText(self, page: int):  # noqa: N802
+            del page
+            return _FakeSelection()
+
+        def pagePointSize(self, page: int):  # noqa: N802
+            del page
+            return _FakeSize()
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "foliaseal.infra.document_text_search.QPdfDocument",
+        _FakeQPdfDocument,
+    )
+
+    with pytest.raises(DocumentTextSearchUnavailable, match=expected):
+        QtPdfDocumentTextSearchEngine().search(str(pdf_path), "Alice")

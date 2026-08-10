@@ -33,6 +33,10 @@ class DocumentReviewWorkspaceViewerEffects:
     highlight_page_index: int | None = None
     highlight_rects: tuple[PdfRect, ...] = ()
     clear_highlights: bool = False
+    search_highlight_page_index: int | None = None
+    search_highlight_rects: tuple[PdfRect, ...] = ()
+    search_secondary_highlight_rects: tuple[PdfRect, ...] = ()
+    clear_search_highlights: bool = False
 
 
 @dataclass(frozen=True)
@@ -197,7 +201,8 @@ class DocumentReviewWorkspaceSession:
 
     def clear_selected_text(self) -> DocumentReviewWorkspaceTransition:
         self._text_selection_state = self._document_text_selection_session.clear()
-        self._document_text_display_source = "selection"
+        if self._document_text_display_source != "search":
+            self._document_text_display_source = "selection"
         return DocumentReviewWorkspaceTransition(
             state=self._build_state(),
             effects=DocumentReviewWorkspaceViewerEffects(clear_highlights=True),
@@ -212,9 +217,20 @@ class DocumentReviewWorkspaceSession:
     def _current_match_effects(self) -> DocumentReviewWorkspaceViewerEffects:
         current_match = self._text_search_state.current_match
         if current_match is None:
-            return DocumentReviewWorkspaceViewerEffects()
+            return DocumentReviewWorkspaceViewerEffects(clear_search_highlights=True)
+        same_page_rects = tuple(
+            rect
+            for match in self._document_text_search_session.matches_on_page(
+                current_match.page_index
+            )
+            if match is not current_match
+            for rect in match.highlight_rects
+        )
         return DocumentReviewWorkspaceViewerEffects(
-            jump_to_page_index=current_match.page_index
+            jump_to_page_index=current_match.page_index,
+            search_highlight_page_index=current_match.page_index,
+            search_highlight_rects=current_match.highlight_rects,
+            search_secondary_highlight_rects=same_page_rects,
         )
 
     def _build_state(self) -> DocumentReviewWorkspaceState:

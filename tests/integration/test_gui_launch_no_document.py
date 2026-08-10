@@ -12,7 +12,7 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
-    from PySide6.QtGui import QPalette
+    from PySide6.QtGui import QKeySequence, QPalette
     from PySide6.QtWidgets import QApplication, QMenu, QPushButton
 
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -114,6 +114,7 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         True,
         False,
         False,
+        False,
     ]
     assert [action.isEnabled() for action in view_menu.actions()] == [
         False,
@@ -121,6 +122,11 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
         False,
         False,
         False,
+        False,
+    ]
+    assert [action.shortcut().toString() for action in view_menu.actions()] == [
+        QKeySequence(definition.shortcut).toString() if definition.shortcut else ""
+        for definition in VIEW_COMMAND_DEFINITIONS
     ]
 
     settings_menu = next(

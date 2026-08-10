@@ -11,6 +11,8 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
     from PySide6.QtWidgets import (
         QApplication,
         QHBoxLayout,
@@ -29,14 +31,16 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
     if app is None:
         app = QApplication(["foliaseal-signing-rail-test"])
 
+    find_calls: list[str] = []
+    previous_calls: list[str] = []
     sidebar = SigningWorkspaceSidebar(
         bindings=SigningShellAdapter()._load_bindings(),
         properties_widget=QWidget(),
         on_choose_output=lambda: None,
         on_sign=lambda: None,
         on_open_signed_output=lambda: None,
-        on_find_text=lambda: None,
-        on_previous_text_match=lambda: None,
+        on_find_text=lambda: find_calls.append("find"),
+        on_previous_text_match=lambda: previous_calls.append("previous"),
         on_next_text_match=lambda: None,
         on_copy_text_match=lambda: None,
         on_review_signature_selected=lambda index: None,
@@ -103,6 +107,12 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
         )
         assert sidebar.open_signed_output_button.toolTip() == "Recommended next action"
         assert viewer.width() > sidebar.container.width()
+        query_input = sidebar.document_text_controls.query_input
+        query_input.setFocus()
+        QTest.keyClick(query_input, Qt.Key_Return)
+        QTest.keyClick(query_input, Qt.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+        assert find_calls == ["find"]
+        assert previous_calls == ["previous"]
     finally:
         window.close()
         app.processEvents()

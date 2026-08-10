@@ -601,6 +601,9 @@ class _FakeViewerWidget(_FakeWidget):
         self.overlay_signature_rect = None
         self.text_highlight_page_index = None
         self.text_highlight_rects = ()
+        self.text_search_highlight_page_index = None
+        self.text_search_highlight_rects = ()
+        self.text_search_secondary_highlight_rects = ()
         self.interaction_mode = "signature"
         self.fit_page_calls = 0
         self.fit_width_calls = 0
@@ -626,6 +629,22 @@ class _FakeViewerWidget(_FakeWidget):
     def clear_text_highlight_overlay(self):
         self.text_highlight_page_index = None
         self.text_highlight_rects = ()
+
+    def set_text_search_highlight_overlay(
+        self,
+        *,
+        page_index,
+        current_highlight_rects,
+        secondary_highlight_rects=(),
+    ):
+        self.text_search_highlight_page_index = page_index
+        self.text_search_highlight_rects = tuple(current_highlight_rects)
+        self.text_search_secondary_highlight_rects = tuple(secondary_highlight_rects)
+
+    def clear_text_search_highlight_overlay(self):
+        self.text_search_highlight_page_index = None
+        self.text_search_highlight_rects = ()
+        self.text_search_secondary_highlight_rects = ()
 
     def set_interaction_mode(self, mode):
         self.interaction_mode = mode
@@ -2149,6 +2168,7 @@ def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
                     end_index=10,
                     text="Alice",
                     context="Signed by Alice Example on page two",
+                    highlight_rects=(PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),),
                 ),
                 DocumentTextMatch(
                     page_index=2,
@@ -2385,6 +2405,7 @@ def test_signing_shell_restores_search_state_when_text_selection_mode_is_disable
                     end_index=10,
                     text="Alice",
                     context="Signed by Alice Example on page two",
+                    highlight_rects=(PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),),
                 ),
             ),
         }
@@ -2418,6 +2439,10 @@ def test_signing_shell_restores_search_state_when_text_selection_mode_is_disable
     )
     assert "Showing 1 of 1 on page 2" in widget.sidebar_surface.document_text_detail_label.text()
     assert widget.viewer_widget.text_highlight_rects == ()
+    assert widget.viewer_widget.text_search_highlight_page_index == 1
+    assert widget.viewer_widget.text_search_highlight_rects == (
+        PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),
+    )
 
 
 def test_signing_shell_flow_summary_returns_to_confirm_after_signed_draft_changes(

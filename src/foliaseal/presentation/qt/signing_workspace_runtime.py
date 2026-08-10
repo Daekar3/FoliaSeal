@@ -138,6 +138,7 @@ class SigningWorkspaceRuntime:
 
     def on_viewer_interaction(self, name: str) -> None:
         if name == "navigation_changed":
+            self.clear_selected_document_text()
             self._refresh_page_navigation_state_required()()
         if name == "text_selection_clear_requested":
             self.clear_selected_document_text()
@@ -150,6 +151,8 @@ class SigningWorkspaceRuntime:
         )
 
     def on_page_change(self, page_number: int) -> None:
+        if self._viewer_workflow_required().session.current_page != page_number - 1:
+            self.clear_selected_document_text()
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().change_page(page_number),
         )
@@ -175,6 +178,14 @@ class SigningWorkspaceRuntime:
         )
         self._review_bridge_required().apply_transition(transition)
         return transition.state.document_text.search_state
+
+    def focus_document_search(self) -> None:
+        focus = getattr(self._document_text_query_input, "setFocus", None)
+        if callable(focus):
+            focus()
+        select_all = getattr(self._document_text_query_input, "selectAll", None)
+        if callable(select_all):
+            select_all()
 
     def next_document_text_match(self) -> DocumentTextSearchState:
         transition = self._document_review_workspace_required().next_text_match()
@@ -334,6 +345,8 @@ class SigningWorkspaceRuntime:
             setter(self._draft_workflow.signature_rect)
 
     def refresh_review_jump_to_page_index(self, page_index: int) -> None:
+        if self._viewer_workflow_required().session.current_page != page_index:
+            self.clear_selected_document_text()
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_navigation_to_page_index(
                 page_index

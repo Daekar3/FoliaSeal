@@ -51,6 +51,7 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.FIT_PAGE,
         AppFrameCommandId.FIT_WIDTH,
+        AppFrameCommandId.FIND,
     ]
     assert EDIT_COMMAND_DEFINITIONS[0].menu == "Edit"
     assert EDIT_COMMAND_DEFINITIONS[0].shortcut == "Ctrl+C"
@@ -64,10 +65,11 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.FIT_PAGE,
         AppFrameCommandId.FIT_WIDTH,
+        AppFrameCommandId.FIND,
     ]
     assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[-2:]] == [
-        "Ctrl+0",
         "Ctrl+Shift+0",
+        "Ctrl+F",
     ]
 
 
@@ -514,6 +516,7 @@ class _FakeShell:
         self.document_text_selection_mode = False
         self.can_copy_selected_text = False
         self.copy_selected_document_text_calls = 0
+        self.focus_document_search_calls = 0
         self.certificate_catalog = CertificateCatalog(schema_version=1)
         self.testing_adapter = object()
         self.close_calls = 0
@@ -603,6 +606,9 @@ class _FakeShell:
 
     def fit_width_view(self) -> None:
         self.fit_width_view_calls = getattr(self, "fit_width_view_calls", 0) + 1
+
+    def focus_document_search(self) -> None:
+        self.focus_document_search_calls += 1
 
     def close(self) -> None:
         self.close_calls += 1
@@ -1150,6 +1156,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "&Select Text",
         "Fit &Page",
         "Fit &Width",
+        "&Find",
     ]
     assert [action.shortcut for action in frame.window.menu_bar.menus[2].actions] == [
         "Page Up",
@@ -1157,8 +1164,10 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         None,
         "Ctrl+0",
         "Ctrl+Shift+0",
+        "Ctrl+F",
     ]
     assert [action.enabled for action in frame.window.menu_bar.menus[2].actions] == [
+        False,
         False,
         False,
         False,
@@ -1438,6 +1447,7 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.FIT_PAGE,
         AppFrameCommandId.FIT_WIDTH,
+        AppFrameCommandId.FIND,
     ]
     assert [definition.text for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Previous Page",
@@ -1445,6 +1455,7 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         "Select Text",
         "Fit Page",
         "Fit Width",
+        "Find",
     ]
     assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS] == [
         "Page Up",
@@ -1452,6 +1463,7 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         None,
         "Ctrl+0",
         "Ctrl+Shift+0",
+        "Ctrl+F",
     ]
 
 
@@ -1468,30 +1480,32 @@ def test_view_page_commands_route_through_the_session_port(tmp_path: Path) -> No
     )
 
     view_actions = frame.window.menu_bar.menus[2].actions
-    assert [action.enabled for action in view_actions] == [False, False, False, False, False]
+    assert [action.enabled for action in view_actions] == [False, False, False, False, False, False]
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
-    assert [action.enabled for action in view_actions] == [False, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [False, True, True, True, True, True]
 
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True]
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, False, True, True, True]
+    assert [action.enabled for action in view_actions] == [True, False, True, True, True, True]
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True]
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [False, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [False, True, True, True, True, True]
 
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True]
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, False, True, True, True]
+    assert [action.enabled for action in view_actions] == [True, False, True, True, True, True]
     shell.go_to_previous_page()
-    assert [action.enabled for action in view_actions] == [True, True, True, True, True]
+    assert [action.enabled for action in view_actions] == [True, True, True, True, True, True]
 
     view_actions[3].trigger()
     view_actions[4].trigger()
     assert shell.fit_page_view_calls == 1
     assert shell.fit_width_view_calls == 1
+    view_actions[5].trigger()
+    assert shell.focus_document_search_calls == 1
 
     assert shell.go_to_previous_page_calls == 3
     assert shell.go_to_next_page_calls == 4

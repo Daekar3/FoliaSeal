@@ -477,6 +477,9 @@ class SigningWorkspaceSidebar:
         layout.setSpacing(4)
         query_input = self._bindings.q_line_edit()
         query_input.setPlaceholderText("Search document text")
+        set_accessible_name = getattr(query_input, "setAccessibleName", None)
+        if callable(set_accessible_name):
+            set_accessible_name("Find text in current PDF")
         find_button = self._bindings.q_push_button("Find")
         previous_button = self._bindings.q_push_button("Previous")
         next_button = self._bindings.q_push_button("Next")
@@ -520,6 +523,9 @@ class SigningWorkspaceSidebar:
         if hasattr(detail_label, "setStyleSheet"):
             detail_label.setStyleSheet("color: #374151;")
         find_button.clicked.connect(on_find_text)  # type: ignore[attr-defined]
+        return_pressed = getattr(query_input, "returnPressed", None)
+        if hasattr(return_pressed, "connect"):
+            return_pressed.connect(on_find_text)
         previous_button.clicked.connect(on_previous_text_match)  # type: ignore[attr-defined]
         next_button.clicked.connect(on_next_text_match)  # type: ignore[attr-defined]
         copy_button.clicked.connect(on_copy_text_match)  # type: ignore[attr-defined]
@@ -531,6 +537,16 @@ class SigningWorkspaceSidebar:
         )
         copy_selection_button.clicked.connect(on_copy_selected_text)  # type: ignore[attr-defined]
         clear_selection_button.clicked.connect(on_clear_selected_text)  # type: ignore[attr-defined]
+        try:
+            shortcut_type = getattr(self._bindings, "q_shortcut", None)
+            key_sequence_type = getattr(self._bindings, "q_key_sequence", None)
+            if shortcut_type is None or key_sequence_type is None:
+                raise RuntimeError("Qt shortcut bindings are unavailable")
+            previous_shortcut = shortcut_type(key_sequence_type("Shift+Return"), query_input)
+            previous_shortcut.activated.connect(on_previous_text_match)
+            setattr(query_input, "_foliaseal_previous_search_shortcut", previous_shortcut)
+        except Exception:  # pragma: no cover - dynamic Qt/test-double boundary
+            pass
         layout.addWidget(controls_row)
         layout.addWidget(selection_row)
         layout.addWidget(status_label)

@@ -355,6 +355,7 @@ class FoliaSealAppFrame:
         self._command_actions: dict[AppFrameCommandId, Any] = {}
         self._text_selection_mode_action: Any | None = None
         self._copy_selected_text_action: Any | None = None
+        self._find_action: Any | None = None
         self._placeholder_open_button: Any | None = None
         self._placeholder_library_button: Any | None = None
         self._reusable_object_library: Any | None = None
@@ -839,6 +840,12 @@ class FoliaSealAppFrame:
             self._fit_width_view,
             enabled=False,
         )
+        self._find_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.FIND,
+            self._focus_document_search,
+            enabled=False,
+        )
         settings_menu = menu_bar.addMenu("Settings")
         self._command_action(
             settings_menu,
@@ -973,6 +980,7 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._copy_selected_text_action, state.copy_selected_text_enabled)
         self._set_action_enabled(self._fit_page_action, state.workspace_open)
         self._set_action_enabled(self._fit_width_action, state.workspace_open)
+        self._set_action_enabled(self._find_action, state.workspace_open)
 
     @staticmethod
     def _set_action_enabled(action: Any | None, enabled: bool) -> None:
@@ -1054,6 +1062,11 @@ class FoliaSealAppFrame:
 
     def _fit_width_view(self) -> None:
         self._with_current_session_port(lambda session_port: session_port.fit_width_view())
+
+    def _focus_document_search(self) -> None:
+        self._with_current_session_port(
+            lambda session_port: session_port.focus_document_search()
+        )
 
     def _copy_selected_text_from_action(self) -> str | None:
         return self._with_current_shell_port(

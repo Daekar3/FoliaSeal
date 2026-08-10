@@ -66,6 +66,18 @@ class SigningWorkspaceReviewBridge:
                     page_index=effects.highlight_page_index,
                     highlight_rects=effects.highlight_rects,
                 )
+        if effects.clear_search_highlights:
+            clearer = getattr(self._viewer_widget, "clear_text_search_highlight_overlay", None)
+            if callable(clearer):
+                clearer()
+        elif effects.search_highlight_page_index is not None:
+            setter = getattr(self._viewer_widget, "set_text_search_highlight_overlay", None)
+            if callable(setter):
+                setter(
+                    page_index=effects.search_highlight_page_index,
+                    current_highlight_rects=effects.search_highlight_rects,
+                    secondary_highlight_rects=effects.search_secondary_highlight_rects,
+                )
         if effects.jump_to_page_index is None:
             return
         self._on_jump_to_page_index(effects.jump_to_page_index)

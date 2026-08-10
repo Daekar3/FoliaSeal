@@ -149,6 +149,7 @@ def test_workspace_search_emits_page_jump_for_current_match() -> None:
                     end_index=5,
                     text="Alice",
                     context="Alice Example on page two",
+                    highlight_rects=(PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),),
                 ),
             )
         },
@@ -160,6 +161,70 @@ def test_workspace_search_emits_page_jump_for_current_match() -> None:
     assert transition.state.document_text.search_state.status_text == "Found 1 matches for 'Alice'."
     assert transition.state.document_text.display_source == "search"
     assert transition.effects.jump_to_page_index == 1
+    assert transition.effects.search_highlight_page_index == 1
+    assert transition.effects.search_highlight_rects == (
+        PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),
+    )
+
+
+def test_workspace_search_emits_current_and_quiet_same_page_highlights() -> None:
+    matches = (
+        DocumentTextMatch(
+            page_index=0,
+            start_index=0,
+            end_index=5,
+            text="Alice",
+            context="Alice one",
+            highlight_rects=(PdfRect(x1=10.0, y1=20.0, x2=40.0, y2=30.0),),
+        ),
+        DocumentTextMatch(
+            page_index=0,
+            start_index=12,
+            end_index=17,
+            text="Alice",
+            context="Alice two",
+            highlight_rects=(PdfRect(x1=10.0, y1=40.0, x2=40.0, y2=50.0),),
+        ),
+        DocumentTextMatch(
+            page_index=1,
+            start_index=0,
+            end_index=5,
+            text="Alice",
+            context="Alice three",
+            highlight_rects=(PdfRect(x1=10.0, y1=60.0, x2=40.0, y2=70.0),),
+        ),
+    )
+    session = _session(
+        summary=DocumentReviewSummary(
+            headline="No signatures found",
+            detail="This PDF does not currently contain embedded signatures.",
+            signature_count=0,
+        ),
+        matches_by_query={"Alice": matches},
+    )
+
+    session.load()
+    transition = session.search_text("Alice")
+
+    assert transition.effects.search_highlight_page_index == 0
+    assert transition.effects.search_highlight_rects == matches[0].highlight_rects
+    assert transition.effects.search_secondary_highlight_rects == matches[1].highlight_rects
+
+
+def test_workspace_empty_search_clears_only_search_highlights() -> None:
+    session = _session(
+        summary=DocumentReviewSummary(
+            headline="No signatures found",
+            detail="This PDF does not currently contain embedded signatures.",
+            signature_count=0,
+        ),
+        matches_by_query={"Alice": ()},
+    )
+
+    session.load()
+    transition = session.search_text("")
+
+    assert transition.effects.clear_search_highlights is True
 
 
 def test_workspace_load_exposes_review_and_document_text_substates() -> None:

@@ -136,6 +136,8 @@ class QtSigningWidgetBindings:
     q_spin_box: type[Any]
     q_push_button: type[Any]
     qt: Any
+    q_shortcut: type[Any] | None = None
+    q_key_sequence: type[Any] | None = None
 
 class SigningRequestExecutor(Protocol):
     """Executes a validated signing request and returns a signing result."""
@@ -378,6 +380,9 @@ class SigningWorkspaceWidget:
     def search_document_text(self) -> DocumentTextSearchState:
         return self._runtime.search_document_text()
 
+    def focus_document_search(self) -> None:
+        self._runtime.focus_document_search()
+
     def next_document_text_match(self) -> DocumentTextSearchState:
         return self._runtime.next_document_text_match()
 
@@ -580,6 +585,8 @@ class SigningShellAdapter:
             q_spin_box=getattr(qt_widgets, "QSpinBox"),
             q_push_button=getattr(qt_widgets, "QPushButton"),
             qt=getattr(qt_core, "Qt"),
+            q_shortcut=getattr(qt_gui, "QShortcut", None),
+            q_key_sequence=getattr(qt_gui, "QKeySequence", None),
         )
 
     def _load_copy_text_callback(self) -> Callable[[str], Any] | None:

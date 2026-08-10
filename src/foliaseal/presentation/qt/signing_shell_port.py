@@ -117,6 +117,7 @@ class SigningWorkspaceSessionPort(Protocol):
     def reset_zoom_view(self) -> None: ...
     def fit_page_view(self) -> None: ...
     def fit_width_view(self) -> None: ...
+    def focus_document_search(self) -> None: ...
     def focus(self) -> None: ...
 
 
@@ -279,6 +280,9 @@ class QtSigningWorkspaceSessionPort:
 
     def fit_width_view(self) -> None:
         self.shell_widget.fit_width_view()
+
+    def focus_document_search(self) -> None:
+        self.shell_widget.focus_document_search()
 
     def focus(self) -> None:
         self.shell_widget.setFocus()

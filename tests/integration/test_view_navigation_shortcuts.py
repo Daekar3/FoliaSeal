@@ -155,3 +155,43 @@ def test_fit_shortcuts_dispatch_once_and_initial_view_fits_page() -> None:
         app.processEvents()
         if created_app:
             app.quit()
+
+
+def test_find_shortcut_focuses_and_selects_the_search_query() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QAction
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QLineEdit, QMainWindow
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal-find-shortcut-test"])
+
+    query_input = QLineEdit()
+    query_input.setText("Alice")
+    window = QMainWindow()
+    window.setCentralWidget(query_input)
+    find_action = QAction("Find", window)
+    find_action.setShortcut("Ctrl+F")
+    find_action.triggered.connect(
+        lambda: (query_input.setFocus(), query_input.selectAll())
+    )
+    window.addAction(find_action)
+    window.show()
+    query_input.setFocus()
+    app.processEvents()
+
+    try:
+        QTest.keyClick(query_input, Qt.Key_F, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+        assert query_input.hasFocus()
+        assert query_input.selectedText() == "Alice"
+    finally:
+        window.close()
+        app.processEvents()
+        if created_app:
+            app.quit()

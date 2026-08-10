@@ -20,6 +20,7 @@ class AppFrameCommandId(StrEnum):
     SELECT_TEXT = "view.select_text"
     FIT_PAGE = "view.fit_page"
     FIT_WIDTH = "view.fit_width"
+    FIND = "view.find"
     APPLICATION_SETTINGS = "settings.application"
     MANAGE_REUSABLE_OBJECTS = "settings.manage_reusable_objects"
     CREATE_CERTIFICATE = "settings.create_certificate"
@@ -135,6 +136,14 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="Ctrl+Shift+0",
         accessible_name="Fit PDF page width in viewer",
         mnemonic_text="Fit &Width",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.FIND,
+        menu="View",
+        text="Find",
+        shortcut="Ctrl+F",
+        accessible_name="Find text in the current PDF",
+        mnemonic_text="&Find",
     ),
 )
 

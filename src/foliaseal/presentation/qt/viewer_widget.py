@@ -79,6 +79,9 @@ class PdfViewerWidgetAdapter:
                 self._interaction_mode = "signature"
                 self._text_highlight_page_index: int | None = None
                 self._text_highlight_rects: tuple[PdfRect, ...] = ()
+                self._text_search_highlight_page_index: int | None = None
+                self._text_search_highlight_rects: tuple[PdfRect, ...] = ()
+                self._text_search_secondary_highlight_rects: tuple[PdfRect, ...] = ()
                 self._initial_fit_pending = True
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
@@ -120,6 +123,20 @@ class PdfViewerWidgetAdapter:
                                 bindings.q_color(255, 235, 59, 96),
                             )
                             painter.setPen(bindings.q_pen(bindings.q_color(245, 158, 11), 1))
+                            painter.drawRect(highlight_rect.normalized())
+                        for highlight_rect in self._current_text_search_secondary_qrects():
+                            fill_rect(
+                                highlight_rect.normalized(),
+                                bindings.q_color(253, 224, 71, 64),
+                            )
+                            painter.setPen(bindings.q_pen(bindings.q_color(161, 98, 7), 1))
+                            painter.drawRect(highlight_rect.normalized())
+                        for highlight_rect in self._current_text_search_qrects():
+                            fill_rect(
+                                highlight_rect.normalized(),
+                                bindings.q_color(250, 204, 21, 150),
+                            )
+                            painter.setPen(bindings.q_pen(bindings.q_color(180, 83, 9), 2))
                             painter.drawRect(highlight_rect.normalized())
 
                     if self._selection_rect is not None:
@@ -416,6 +433,24 @@ class PdfViewerWidgetAdapter:
                 self._text_highlight_rects = ()
                 self.update()
 
+            def set_text_search_highlight_overlay(
+                self,
+                *,
+                page_index: int,
+                current_highlight_rects: tuple[PdfRect, ...],
+                secondary_highlight_rects: tuple[PdfRect, ...] = (),
+            ) -> None:
+                self._text_search_highlight_page_index = page_index
+                self._text_search_highlight_rects = tuple(current_highlight_rects)
+                self._text_search_secondary_highlight_rects = tuple(secondary_highlight_rects)
+                self.update()
+
+            def clear_text_search_highlight_overlay(self) -> None:
+                self._text_search_highlight_page_index = None
+                self._text_search_highlight_rects = ()
+                self._text_search_secondary_highlight_rects = ()
+                self.update()
+
             def set_interaction_mode(self, mode: str) -> None:
                 if mode not in {"signature", "text"}:
                     raise ValueError(f"Unsupported viewer interaction mode: {mode}")
@@ -639,6 +674,41 @@ class PdfViewerWidgetAdapter:
                         )
                     )
                 return tuple(highlight_rects)
+
+            def _current_text_search_qrects(self) -> tuple[Any, ...]:
+                return self._project_text_search_rects(self._text_search_highlight_rects)
+
+            def _current_text_search_secondary_qrects(self) -> tuple[Any, ...]:
+                return self._project_text_search_rects(self._text_search_secondary_highlight_rects)
+
+            def _project_text_search_rects(
+                self,
+                pdf_rects: tuple[PdfRect, ...],
+            ) -> tuple[Any, ...]:
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None:
+                    return ()
+                if self._text_search_highlight_page_index != snapshot.page_index:
+                    return ()
+                projected: list[Any] = []
+                for pdf_rect in pdf_rects:
+                    view_rect = pdf_rect_to_view_rect(
+                        pdf_rect=pdf_rect,
+                        transform=ViewTransform(
+                            zoom=snapshot.zoom,
+                            pan_x=snapshot.pan_x,
+                            pan_y=snapshot.pan_y,
+                        ),
+                        page_box=snapshot.page_box,
+                        rotation=snapshot.rotation,
+                    )
+                    projected.append(
+                        bindings.q_rect(
+                            bindings.q_point(int(view_rect.x1), int(view_rect.y1)),
+                            bindings.q_point(int(view_rect.x2), int(view_rect.y2)),
+                        )
+                    )
+                return tuple(projected)
 
             def _current_page_view_bounds(self) -> ViewRect | None:
                 snapshot = getattr(self._workflow, "snapshot", None)
@@ -913,6 +983,22 @@ def build_qt_pdf_viewer_widget(
 
         def clear_text_highlight_overlay(self) -> None:
             preview_widget.clear_text_highlight_overlay()
+
+        def set_text_search_highlight_overlay(
+            self,
+            *,
+            page_index: int,
+            current_highlight_rects: tuple[PdfRect, ...],
+            secondary_highlight_rects: tuple[PdfRect, ...] = (),
+        ) -> None:
+            preview_widget.set_text_search_highlight_overlay(
+                page_index=page_index,
+                current_highlight_rects=current_highlight_rects,
+                secondary_highlight_rects=secondary_highlight_rects,
+            )
+
+        def clear_text_search_highlight_overlay(self) -> None:
+            preview_widget.clear_text_search_highlight_overlay()
 
         def set_interaction_mode(self, mode: str) -> None:
             preview_widget.set_interaction_mode(mode)

@@ -275,6 +275,32 @@ def test_fit_modes_preserve_signature_overlay_page_and_coordinates(monkeypatch):
         assert actual.y2 == pytest.approx(expected.y2)
 
 
+def test_search_highlights_keep_current_and_quiet_rectangles_independent(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=workflow)
+    preview.attach_scroll_container(_FakeScrollArea())
+    preview.refresh()
+    current = PdfRect(x1=10.0, y1=20.0, x2=30.0, y2=30.0)
+    quiet = PdfRect(x1=10.0, y1=40.0, x2=30.0, y2=50.0)
+
+    preview.set_text_search_highlight_overlay(
+        page_index=0,
+        current_highlight_rects=(current,),
+        secondary_highlight_rects=(quiet,),
+    )
+
+    assert len(preview._current_text_search_qrects()) == 1
+    assert len(preview._current_text_search_secondary_qrects()) == 1
+    preview.clear_text_search_highlight_overlay()
+    assert preview._current_text_search_qrects() == ()
+    assert preview._current_text_search_secondary_qrects() == ()
+
+
 def test_wheel_without_scroll_container_cannot_change_page(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
     workflow = ViewerWorkflow(
