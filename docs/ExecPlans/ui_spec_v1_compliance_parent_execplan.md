@@ -251,6 +251,10 @@ Release tranche:
   clamping; resize joins placement history. Focused viewer/application/runtime validation is green
   and the full suite is `1307 passed, 20 skipped, 1 warning`. Numeric traversal, snap/guides, and
   off-page recovery remain open.
+- [x] (2026-08-10) Made direct placement-field edits history-aware and exposed accessible,
+  deterministic Page/Left/Bottom/Width/Height tab order in the setup form. Focused viewer/form/runtime
+  validation is green; the full suite is `1308 passed, 20 skipped, 1 warning`. Richer numeric
+  traversal commands, snap/guides, and off-page recovery remain open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

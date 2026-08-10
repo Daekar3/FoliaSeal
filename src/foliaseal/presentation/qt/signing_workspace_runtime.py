@@ -202,6 +202,9 @@ class SigningWorkspaceRuntime:
             self._on_status_change(name)
 
     def on_panel_change(self) -> None:
+        record_edit = getattr(self._viewer_widget_required(), "record_signature_edit", None)
+        if callable(record_edit):
+            record_edit(self._draft_workflow.signature_rect)
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_after_panel_change()
         )

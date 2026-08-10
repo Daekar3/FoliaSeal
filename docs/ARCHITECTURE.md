@@ -421,6 +421,7 @@ The canonical repository document split is:
 - Key collaborators: `ViewerWorkflow`, `SignaturePlacementContext`, `SignatureRect`, `presentation/qt/signing_shell.py`.
 - Main entry points: `ViewerInteractionSession.current_placement_context()`, `select_signature_rect()`, `create_centered_signature_rect()`, `move_signature_rect()`, `set_logical_page_index()`, `set_page_number()`.
 - Known constraints: The boundary is intentionally Qt-free and leaves widget refresh/application of overlays to the shell. Centered keyboard placement defaults to 216×72 points and proportionally fits smaller visible pages; movement and bottom/left-anchored resize preserve exact deltas and deliberately do not clamp or snap. `PlacementHistory` owns the viewer-local Delete/undo/redo state seam; external overlay synchronization clears stale history, and lifecycle clearing remains explicit. Numeric traversal, snap/guides, and off-page recovery remain follow-up contracts. It composes with `document_review_workspace.py`: the review/text workspace gets first chance to consume a viewer drag, and only then does the viewer-interaction session translate that drag into a signing placement.
+- The Qt setup-form boundary exposes the Page/Left/Bottom/Width/Height controls with accessible names and deterministic tab order; panel-originated placement edits are routed to the viewer's typed history seam before overlay synchronization.
 - Status: Implemented and confirmed by code and tests.
 
 ### Workspace interaction session

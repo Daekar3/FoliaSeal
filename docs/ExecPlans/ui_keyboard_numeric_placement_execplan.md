@@ -43,6 +43,10 @@ increments because they require additional geometry and focus seams.
   dimensions are rejected without clamping; resize mutations enter the same local history. The
   focused application/viewer/integration/runtime set is green (`49 passed` plus `120 passed`), and
   the full suite is `1307 passed, 20 skipped, 1 warning`.
+- [x] (2026-08-10) Made direct placement-field edits history-aware through the public viewer/runtime
+  seam and gave Page/Left/Bottom/Width/Height controls accessible names plus deterministic tab order.
+  Focused viewer/form/runtime coverage is `50 passed`; the full suite is `1308 passed, 20 skipped,
+  1 warning`. Numeric traversal remains a follow-up only for richer field-level commands.
 - [ ] (2026-08-10) Add numeric-field traversal, snap/guides, and off-page recovery in subsequent
   increments; then perform final documentation/commit closeout for the whole child.
 

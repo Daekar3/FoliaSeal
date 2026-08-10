@@ -344,9 +344,48 @@ class QtVisibleSignatureSetupForm:
         width_spin.setRange(1.0, 100000.0)
         height_spin.setRange(1.0, 100000.0)
 
+        for spin, name in (
+            (page_spin, "Signature page"),
+            (left_spin, "Signature left position in points"),
+            (bottom_spin, "Signature bottom position in points"),
+            (width_spin, "Signature width in points"),
+            (height_spin, "Signature height in points"),
+        ):
+            set_accessible_name = getattr(spin, "setAccessibleName", None)
+            if callable(set_accessible_name):
+                set_accessible_name(name)
+
         layout.addRow("Page", page_spin)
-        layout.addRow("Position", _compose_row(bindings, left_spin, bottom_spin))
-        layout.addRow("Size", _compose_row(bindings, width_spin, height_spin))
+        layout.addRow(
+            "Position",
+            _compose_row(
+                bindings,
+                bindings.q_label("Left (pt)"),
+                left_spin,
+                bindings.q_label("Bottom (pt)"),
+                bottom_spin,
+            ),
+        )
+        layout.addRow(
+            "Size",
+            _compose_row(
+                bindings,
+                bindings.q_label("Width (pt)"),
+                width_spin,
+                bindings.q_label("Height (pt)"),
+                height_spin,
+            ),
+        )
+
+        set_tab_order = getattr(container, "setTabOrder", None)
+        if callable(set_tab_order):
+            for first, second in (
+                (page_spin, left_spin),
+                (left_spin, bottom_spin),
+                (bottom_spin, width_spin),
+                (width_spin, height_spin),
+            ):
+                set_tab_order(first, second)
 
         page_spin.valueChanged.connect(self._on_placement_changed)  # type: ignore[attr-defined]
         left_spin.valueChanged.connect(self._on_placement_changed)  # type: ignore[attr-defined]

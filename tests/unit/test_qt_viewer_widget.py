@@ -944,6 +944,37 @@ def test_keyboard_place_ctrl_arrows_resize_exactly_and_only_in_place_mode(monkey
     assert resized == [(1.0, 0.0), (0.0, 10.0)]
 
 
+def test_external_numeric_edit_enters_placement_history(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    second = SignatureRect(
+        page_index=0,
+        left_pt=15.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    applied = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+    )
+    preview.record_signature_edit(first)
+    preview.record_signature_edit(second)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Z, modifiers=_FakeQt.ControlModifier))
+
+    assert preview._overlay_signature_rect == first
+    assert applied == [first]
+
+
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 

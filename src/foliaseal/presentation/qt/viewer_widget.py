@@ -555,6 +555,12 @@ class PdfViewerWidgetAdapter:
                 self._overlay_signature_rect = signature_rect
                 self.update()
 
+            def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
+                """Record a placement edit originating outside viewer keyboard input."""
+                self._placement_history.commit(signature_rect)
+                self._overlay_signature_rect = signature_rect
+                self.update()
+
             def fit_page_view(self) -> None:
                 self._fit_view(mode="page")
 
@@ -1160,6 +1166,9 @@ def build_qt_pdf_viewer_widget(
 
         def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
             preview_widget.set_signature_overlay(signature_rect)
+
+        def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
+            preview_widget.record_signature_edit(signature_rect)
 
         def clear_signature_overlay(self) -> None:
             preview_widget.clear_signature_overlay()
