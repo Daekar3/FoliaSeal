@@ -77,8 +77,9 @@ corpus remains open for its owning viewer, signing, and support plans.
 - [x] (2026-08-10) Added the Signing menu definitions/actions and corrected Sign and save enablement
   to use the public `can_submit_sign_request()` readiness capability rather than mere workspace-open
   state; readiness-changing runtime events refresh the menu action and active signing disables it.
-- [ ] Implement and validate the Signing menu, reconcile architecture/status documentation, run the
-  bounded GUI audit, clean owned resources, and commit this increment.
+- [x] (2026-08-10) Implemented and validated the Signing menu, reconciled architecture/status
+  documentation, ran the bounded GUI audit, cleaned owned resources, and committed this increment as
+  `64bef66b2`.
 
 ## Surprises & Discoveries
 
@@ -191,14 +192,14 @@ enablement, public session-port routing, and callback synchronization after view
 The offscreen Qt shortcut test proves exactly one transition per key. Loop 8 also migrates the five
 existing Settings callbacks into `SETTINGS_COMMAND_DEFINITIONS`, including unique mnemonics, stable
 object names, Qt descriptions, and trigger-routing tests. The remaining gap is the rest of the
-UI_SPEC command registry and its parent scenario evidence: focus-sensitive Edit actions,
-Signing-menu topology, Help content/actions, and Fit/zoom/search/signature behavior remain deferred
-to their owning viewer/document/support children. The current increment narrows the history gap by
-wiring document-internal Back/Forward actions; browser navigation and unsupported command families
-remain out of scope. Final evidence is `1437 passed, 20 skipped, 1 warning` for the full suite and
-`63 passed` for focused/offscreen command coverage; the bounded launch returned `gui_rc=1` with
+UI_SPEC command registry and its parent scenario evidence: focus-sensitive Edit actions, Help
+content/actions, and remaining View/signing behavior remain deferred to their owning
+viewer/document/support children. The current increment narrows the history gap by wiring
+document-internal Back/Forward actions and adds the two supported Signing actions; browser
+navigation, placement-command placeholders, and other unsupported command families remain out of
+scope. Final evidence is `1439 passed, 20 skipped, 1 warning` for the full suite and `67 passed`
+for focused Signing/menu/runtime coverage; the bounded launch returned `gui_rc=1` with
 `SingleInstanceUnavailable`, then left no matching process or temporary root.
-The next increment must preserve this evidence while adding only the two supported Signing actions.
 
 ## Context and Orientation
 
@@ -295,13 +296,13 @@ enablement/check state, and reach their existing public ports exactly once. Back
 internal link creates history; Back moves to the prior internal destination and enables Forward;
 Forward returns to the next destination; a new internal destination after Back clears Forward. File,
 View page/zoom actions, and Settings remain green under their prior contracts. The full child
-acceptance remains open for focus-sensitive Edit, Signing, Help, remaining View behavior, signed-state
-policy, and parent scenario requirements. Record final focused/full test counts, Ruff, diff checks,
+acceptance remains open for focus-sensitive Edit, Help, remaining View behavior, signed-state policy,
+and parent scenario requirements. Record final focused/full test counts, Ruff, diff checks,
 and the real-Qt menu/action evidence; the display-backed audit remains environment-limited by the
-known QLocalServer/`SingleInstanceUnavailable` failure. For the current increment, the Signing menu
-must expose Signature Library in the no-document frame, expose Sign and save only when a workspace is
-open, route both actions through their existing callbacks exactly once, and omit the three unsupported
-placement commands.
+known QLocalServer/`SingleInstanceUnavailable` failure. The Signing increment is complete: the menu
+exposes Signature Library in the no-document frame, exposes Sign and save only when the active session
+reports readiness and no signing transaction is active, routes both actions through their existing
+callbacks exactly once, and omits the three unsupported placement commands.
 
 ## Evidence Record
 
@@ -312,7 +313,7 @@ assertion for File labels, shortcuts, tooltip/status descriptions, mnemonic text
 enablement; Loop 5 adds `tests/integration/test_view_navigation_shortcuts.py`, whose offscreen
 QTest Page Down/Page Up sequence produced exactly one page transition and one render per key. The
 Loop 8 Settings focused pass is `44 passed`; the prior Select Text/Copy increment's focused pass was
-`165 passed`. The new Back/Forward increment must record its focused result and red-to-green
+`165 passed`. The Back/Forward and Signing increments record their focused results and red-to-green
 registry/state tests, along with the final full-suite count, Ruff, and diff results. The
 bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
 isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
