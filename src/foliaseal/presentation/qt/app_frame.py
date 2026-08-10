@@ -80,6 +80,9 @@ from foliaseal.presentation.qt.external_link_confirmation import (
     ExternalLinkOutcome,
     ExternalLinkRequestResult,
 )
+from foliaseal.presentation.qt.pending_open_request_surface import (
+    PendingOpenRequestSurface,
+)
 from foliaseal.presentation.qt.placement_profile_editor_dialog import (
     PlacementProfileEditorDialog,
 )
@@ -146,6 +149,7 @@ class QtAppFrameBindings:
     q_spin_box: type[Any] | None = None
     q_desktop_services: Any | None = None
     q_url: type[Any] | None = None
+    q_status_bar: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -425,6 +429,14 @@ class FoliaSealAppFrame:
         self.window.setWindowTitle("FoliaSeal")
         setattr(self.window, "_foliaseal_close_event_handler", self._handle_window_close_event)
         self._apply_window_baseline()
+        self._pending_open_surface = PendingOpenRequestSurface(
+            bindings=self._bindings,
+            parent=self.window,
+            on_cancel=self.cancel_pending_open_request,
+        )
+        set_status_bar = getattr(self.window, "setStatusBar", None)
+        if callable(set_status_bar):
+            set_status_bar(self._pending_open_surface.status_bar)
         self._workspace_mount = QtWorkspaceMount(self.window)
         self._workspace_host = SigningWorkspaceHost(
             environment=SigningWorkspaceEnvironment(
@@ -591,6 +603,12 @@ class FoliaSealAppFrame:
 
         return self._pending_open_request
 
+    @property
+    def pending_open_request_surface(self) -> PendingOpenRequestSurface:
+        """Expose the condition-only queued-open surface for UI acceptance tests."""
+
+        return self._pending_open_surface
+
     def handle_open_request(self, request: OpenRequest) -> None:
         """Apply or defer one forwarded request without creating another window."""
 
@@ -600,6 +618,7 @@ class FoliaSealAppFrame:
         if self._signing_transaction_active:
             replaced = self._pending_open_request is not None
             self._pending_open_request = request
+            self._pending_open_surface.show_request(request.pdf_path)
             self._handle_status_change(
                 "open_request_replaced" if replaced else "open_request_deferred"
             )
@@ -619,12 +638,14 @@ class FoliaSealAppFrame:
         if self._pending_open_request is None:
             return False
         self._pending_open_request = None
+        self._pending_open_surface.clear()
         self._handle_status_change("open_request_cancelled")
         return True
 
     def _offer_pending_open_request(self) -> None:
         pending = self._pending_open_request
         self._pending_open_request = None
+        self._pending_open_surface.clear()
         if pending is None or pending.pdf_path is None:
             return
         if not self._ask_pending_open_request(pending.pdf_path):
@@ -757,6 +778,7 @@ class FoliaSealAppFrame:
             return False
         self._close_document_signatures()
         self._workspace_host.close()
+        self.cancel_pending_open_request()
         self._set_placeholder()
         return True
 
@@ -2465,6 +2487,7 @@ class QtAppFrameAdapter:
             q_spin_box=getattr(qt_widgets, "QSpinBox"),
             q_desktop_services=getattr(qt_gui, "QDesktopServices", None),
             q_url=getattr(qt_core, "QUrl", None),
+            q_status_bar=getattr(qt_widgets, "QStatusBar"),
         )
 
 

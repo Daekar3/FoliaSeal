@@ -495,3 +495,60 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     app.processEvents()
     if created_app:
         app.quit()
+
+
+def test_real_qt_pending_open_surface_is_visible_and_cancelable(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication, QPushButton
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+    from foliaseal.presentation.qt.single_instance import OpenRequest
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame.window.show()
+    app.processEvents()
+
+    frame._show_information = lambda message: None
+    frame._handle_status_change("sign_started")
+    frame.handle_open_request(OpenRequest(pdf_path=str(tmp_path / "queued-review.pdf")))
+    app.processEvents()
+
+    surface = frame.pending_open_request_surface
+    assert surface.visible
+    assert "queued-review.pdf" in surface.filename_label.text()
+    assert surface.cancel_button.accessibleName() == "Cancel pending open"
+    assert any(
+        button.objectName() == "cancelPendingOpenButton"
+        for button in frame.window.findChildren(QPushButton)
+    )
+
+    surface.cancel_button.click()
+    app.processEvents()
+    assert frame.pending_open_request is None
+    assert not surface.visible
+
+    frame.window.close()
+    app.processEvents()
+    if created_app:
+        app.quit()

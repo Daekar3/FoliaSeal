@@ -61,7 +61,10 @@ Foundation tranche:
 
 Document-flow tranche:
 
-- [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
+- [x] docs/ExecPlans/ui_single_instance_open_routing_execplan.md — per-user single-owner forwarding,
+  AppFrame newest-request deferral, condition-only queued-filename/Cancel surface, terminal cleanup,
+  focused/offscreen evidence, and architecture reconciliation are complete; QLocalServer bind and
+  display-backed two-process acceptance remain environment-limited.
 - [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
 - [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md — typed fit, zoom, pan, and navigation
   behavior is implemented and validated; final handoff status is reconciled here.
@@ -437,6 +440,14 @@ Release tranche:
   during disposal. Focused coverage, production-composition fake-Qt timer cleanup, and the real
   offscreen timing test are green; full regression is `1435 passed, 20 skipped, 1 warning`.
   Durable transaction journals/autosave remain open.
+- [x] (2026-08-10) Completed the single-instance open-routing child: secondary invocations forward
+  one bounded absolute-path request to the existing frame; active signing keeps the current workspace,
+  replaces older pending requests with the newest basename in an AppFrame-owned condition-only status
+  surface, and exposes keyboard-accessible Cancel pending open. Cancel, terminal acceptance/
+  cancellation, workspace close, and teardown clear the surface. Focused validation is `62 passed,
+  1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`; the real offscreen pending-open
+  widget test passes. QLocalServer remains unable to bind in this sandbox (`Unknown error 1`), so
+  display-backed two-process smoke acceptance and compatibility retirement remain open.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

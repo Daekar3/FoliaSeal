@@ -240,6 +240,7 @@ class _FakeMainWindow:
     def __init__(self) -> None:
         self.title = ""
         self.central_widget = None
+        self.status_bar = None
         self.menu_bar = _FakeMenuBar()
         self.show_calls = 0
         self.minimum_size = None
@@ -275,6 +276,9 @@ class _FakeMainWindow:
 
     def setCentralWidget(self, widget):  # noqa: N802
         self.central_widget = widget
+
+    def setStatusBar(self, status_bar):  # noqa: N802
+        self.status_bar = status_bar
 
     def show(self) -> None:
         self.show_calls += 1
@@ -324,12 +328,20 @@ class _FakeLabel:
         self.word_wrap = False
         self.layout = None
         self.visible = True
+        self.object_name = ""
+        self.accessible_name = ""
 
     def setText(self, text):  # noqa: N802
         self.text = text
 
     def setWordWrap(self, value):  # noqa: N802
         self.word_wrap = bool(value)
+
+    def setObjectName(self, name):  # noqa: N802
+        self.object_name = name
+
+    def setAccessibleName(self, name):  # noqa: N802
+        self.accessible_name = name
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
@@ -504,6 +516,8 @@ class _FakePushButton:
         self.clicked = _FakeSignal()
         self.icon = None
         self.tooltip = None
+        self.object_name = ""
+        self.accessible_name = ""
 
     def click(self) -> None:
         self.clicked.emit()
@@ -513,6 +527,46 @@ class _FakePushButton:
 
     def setToolTip(self, text):  # noqa: N802
         self.tooltip = text
+
+    def setObjectName(self, name):  # noqa: N802
+        self.object_name = name
+
+    def setAccessibleName(self, name):  # noqa: N802
+        self.accessible_name = name
+
+
+class _FakeStatusBar:
+    def __init__(self, parent=None) -> None:
+        self.parent = parent
+        self.visible = True
+        self.permanent_widgets = []
+
+    def setSizeGripEnabled(self, enabled):  # noqa: N802
+        self.size_grip_enabled = bool(enabled)
+
+    def addPermanentWidget(self, widget, stretch=0):  # noqa: N802
+        self.permanent_widgets.append((widget, stretch))
+
+    def show(self) -> None:
+        self.visible = True
+
+    def hide(self) -> None:
+        self.visible = False
+
+    def isVisible(self):  # noqa: N802
+        return self.visible
+
+
+class _FakeStatusWidget(_FakeLabel):
+    def __init__(self, parent=None) -> None:
+        super().__init__("")
+        self.parent = parent
+
+    def hide(self) -> None:
+        self.visible = False
+
+    def show(self) -> None:
+        self.visible = True
 
 
 class _FakeIcon:
@@ -966,9 +1020,10 @@ def _fake_bindings() -> QtAppFrameBindings:
         q_icon=_FakeIcon,
         q_application=_FakeQApplication,
         qpdf_document=_FakeQPdfDocument,
-        q_widget=_FakeLabel,
+        q_widget=_FakeStatusWidget,
         q_hbox_layout=_FakeFormLayout,
         q_vbox_layout=_FakeFormLayout,
+        q_status_bar=_FakeStatusBar,
     )
 
 
@@ -2576,6 +2631,10 @@ def test_app_frame_defers_forwarded_open_requests_during_signing_and_can_cancel(
 
     assert frame.current_workspace is original_workspace
     assert frame.pending_open_request == OpenRequest(pdf_path=str(newer.resolve()))
+    assert frame.pending_open_request_surface.visible
+    assert "newer.pdf" in frame.pending_open_request_surface.filename_label.text
+    assert frame.pending_open_request_surface.cancel_button.text == "Cancel pending open"
+    assert frame.pending_open_request_surface.cancel_button.accessible_name == "Cancel pending open"
     assert len(bindings.q_message_box.information_calls) == 2
     assert "newer.pdf" in bindings.q_message_box.information_calls[-1][2]
 
@@ -2584,6 +2643,31 @@ def test_app_frame_defers_forwarded_open_requests_during_signing_and_can_cancel(
     assert frame.pending_open_request is None
     assert frame.current_workspace is original_workspace
     assert bindings.q_message_box.question_calls[-1][1] == "Open queued PDF?"
+    assert not frame.pending_open_request_surface.visible
+
+
+def test_app_frame_pending_open_surface_cancel_keeps_current_workspace(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    first = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(first),
+        render_backend_factory=lambda: object(),
+    )
+    current = tmp_path / "source" / "current.pdf"
+    newer = tmp_path / "source" / "newer.pdf"
+    frame.open_pdf_path(current)
+    original_workspace = frame.current_workspace
+    frame._handle_status_change("sign_started")
+    frame.handle_open_request(OpenRequest(pdf_path=str(newer.resolve())))
+
+    frame.pending_open_request_surface.cancel_button.click()
+
+    assert frame.pending_open_request is None
+    assert frame.current_workspace is original_workspace
+    assert not frame.pending_open_request_surface.visible
 
 
 def test_app_frame_accepts_deferred_forwarded_open_request_after_signing(

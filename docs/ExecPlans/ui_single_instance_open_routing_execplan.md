@@ -8,10 +8,12 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 ## Purpose / Big Picture
 
 After this slice, a user can route an OS open request or second invocation into one existing FoliaSeal
-window without tabs or a second document window. It is mapped to UI_SPEC LAY01 and WF01. The slice
-is intentionally one vertical path through the relevant persistent
-model, application workflow, Qt surface, focused tests, and observable acceptance; it is not a
-generic refactor.
+window without tabs or a second document window. If a request arrives while signing is active, the
+same window keeps the current document, visibly names the newest queued PDF, and offers an explicit
+Cancel pending open action. The request is considered only after signing succeeds or returns to a
+recoverable draft. It is mapped to UI_SPEC LAY01, WF01, and the active-signing safety rule in §16.
+The slice is intentionally one vertical path through the application workflow, Qt surface, focused
+tests, and observable acceptance; it is not a generic refactor.
 
 ## Child ExecPlan Dependencies
 
@@ -22,23 +24,30 @@ generic refactor.
 
 - [x] (2026-08-09) Audit the current launcher and write failing protocol/launcher/Qt transport tests.
 - [x] (2026-08-09) Implement the bounded single-owner and initial/second-invocation forwarding path.
-- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
+- [x] (2026-08-10) Route forwarded requests through the existing frame and defer the newest request during active signing.
+- [x] (2026-08-10) Add the condition-only queued-filename surface and keyboard-accessible Cancel pending open action.
+- [ ] (2026-08-10) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
 - [x] (2026-08-09) Run focused, regression, and bounded Qt validation; record evidence and clean up.
-- [ ] (2026-08-09) Update relevant architecture/status documentation, complete deferred-draft policy, then commit the whole child outcome.
+- [x] (2026-08-10) Run focused production-widget and regression validation, then reconcile architecture/status documentation; commit remains an explicit parent handoff step.
 
 ## Surprises & Discoveries
 
 - Observation: app-frame open methods are in-process calls and do not by themselves implement a
   second-process handoff; this child must add and test an explicit platform/process boundary.
   Evidence: the live source paths and focused tests listed below are the audit baseline.
-- Observation: the current public workspace ports do not expose dirty-draft or active-signing
-  deferral state, so this loop stops at safe owner/forwarding transport and leaves pending-request
-  UI policy to the document lifecycle child.
-  Evidence: `SigningWorkspacePort`, `SigningWorkspaceSessionPort`, and `SigningWorkspaceHost` expose
-  open/close/session verbs but no dirty or transaction decision contract.
+- Observation: active-signing deferral is an AppFrame policy boundary, not a workspace-port concern.
+  `FoliaSealAppFrame` tracks signing terminal states, retains only the newest `OpenRequest`, and
+  delegates replacement through the existing open/dirty lifecycle policy. Evidence:
+  `handle_open_request()`, `_offer_pending_open_request()`, and `_handle_status_change()` in
+  `src/foliaseal/presentation/qt/app_frame.py`.
 - Observation: the current sandbox's QLocalServer cannot bind a Unix endpoint (`Unknown error 1`),
   so the production transport has an offscreen integration test that skips with an explicit
   environment diagnostic; pure protocol and injected-launch tests remain green.
+
+- Observation: the queued request is transient application state, while its filename/Cancel affordance
+  is a condition-only app-chrome surface. It is hidden with no pending request and cleared on cancel,
+  terminal acceptance/cancellation, or workspace close. Evidence: `PendingOpenRequestSurface` and
+  AppFrame cleanup/terminal-state paths, with unit and real offscreen Qt coverage.
 
 ## Decision Log
 
@@ -50,20 +59,35 @@ generic refactor.
   Date/Author: 2026-08-09 / Codex
 - Decision: Loop 4 delivers a typed bounded JSON protocol, per-user QLocalServer/QLocalSocket owner
   boundary, secondary send-and-exit behavior, Qt-event-loop delivery, and stale-endpoint cleanup;
-  dirty-draft deferral, full content validation, and pending-request UI remain a separate child.
-  Rationale: those policies require public workspace state seams that do not yet exist.
+  dirty-draft validation and policy are routed through the existing frame, and active-signing
+  deferral is owned by the frame and its pending-request surface.
+  Rationale: the frame already owns the signing transaction state and the one-window replacement
+  decision, while the visible queue is an application-chrome concern rather than a document widget.
   Date/Author: 2026-08-09 / Codex
+- Decision: Implement the pending-request affordance as a condition-only Qt status surface owned by
+  the app frame, with the queued basename and a keyboard-accessible Cancel pending open button.
+  Rationale: a status surface does not consume permanent viewer or right-rail space, remains visible
+  while the transaction runs, and gives one stable owner for replacement, cancellation, and cleanup.
+  Date/Author: 2026-08-10 / Codex
+- Decision: Keep the request queue in memory and replace older requests with the newest request;
+  never persist a path or show a second window.
+  Rationale: UI_SPEC defines pending requests as transient safety state and explicitly requires newest
+  request replacement.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-The bounded owner boundary is implemented: a primary FoliaSeal launch claims a per-user local
-endpoint, a second invocation sends an optional absolute PDF path and exits without creating a second
-window, and the owner routes queued requests to the existing frame while raising it. Protocol size,
-shape, absolute-path, owner-lock, and cleanup seams are tested; focused launcher/Qt tests pass
-(`39 passed`, with the environment-limited QLocalServer integration explicitly skipped). Dirty-draft
-deferral, password/restriction/first-render validation, pending filename/cancel UI, and the real
-two-process smoke evidence remain owned by later lifecycle work; stale-endpoint recovery is not
-claimed as live transport evidence in this environment.
+The bounded owner boundary and application-level deferral policy are implemented: a primary FoliaSeal
+launch claims a per-user local endpoint, a second invocation sends an optional absolute PDF path and
+exits without creating a second window, and the owner routes requests to the existing frame while
+raising it. During active signing, the newest request replaces any older request in memory and is
+shown by the AppFrame-owned condition-only status surface. Cancel leaves the current workspace
+untouched; after a terminal signing/recovery state, the existing open/dirty policy decides whether to
+replace it, and terminal/close paths clear the surface. Focused validation is `62 passed, 1 skipped`;
+the full suite is `1447 passed, 20 skipped, 1 warning`; the real offscreen pending-open widget test
+passes. QLocalServer cannot bind a Unix endpoint in this sandbox (`Unknown error 1`), so the
+production transport test remains explicitly skipped; compatibility/phase3 retirement and
+display-backed two-process smoke evidence remain open.
 
 ## Context and Orientation
 
@@ -87,14 +111,14 @@ rebaselines, or packaging changes unless this slice explicitly requires them.
 
 ## Plan of Work
 
-Implement one-process/one-main-window routing for an OS open request or a second invocation. Loop 4
-implements the owner/transport foundation and initial/forwarded delivery. Create
+Implement one-process/one-main-window routing for an OS open request or a second invocation. The owner/
+transport foundation and initial/forwarded delivery are already landed. This slice completes the
+visible active-signing queue behavior. Keep
 `tests/integration/test_single_instance_open_routing.py` as the process-level contract test; it owns
 the primary-owner startup race, second-invocation forwarding, and deferred-request assertions.
-Introduce a small platform/process boundary for forwarding the path to the existing frame; do not
-pretend the current app-frame methods provide IPC. Validate the candidate PDF before replacing the
-current document, defer an external request during active signing, and expose the pending filename
-and cancel action in the dependent lifecycle child. Use a localhost-free `QLocalServer`/`QLocalSocket` endpoint derived from the
+The frame must validate candidates through the existing open service before replacement, defer an
+external request during active signing, and expose the pending filename and Cancel pending open in
+the app chrome. Use a localhost-free `QLocalServer`/`QLocalSocket` endpoint derived from the
 user config directory, with a lock/primary-owner handshake, bounded startup retry, and a clear
 fallback error when the primary process is alive but not listening. Add typed seams where the current code passes raw widget internals or compatibility
 kwargs. Preserve the public frame/workspace contract while migrating consumers, then delete the
@@ -103,10 +127,11 @@ not schema/backend names.
 
 ## Milestones
 
-Milestone 1 prototypes the `QLocalServer`/`QLocalSocket` owner handshake and adds the two-process
-integration test. Milestone 2 wires validation, startup retry, pending-request replacement, and
-dirty-draft deferral into the existing frame. Milestone 3 runs the real two-process smoke command,
-records routing logs, and terminates both processes.
+Milestone 1 established the `QLocalServer`/`QLocalSocket` owner handshake and protocol tests.
+Milestone 2 wired validation, startup retry, pending-request replacement, and active-signing
+deferral into the existing frame. Milestone 3 added the condition-only status surface, proved its
+production Qt visibility and keyboard-accessible Cancel action offscreen, and preserved the explicit
+QLocalServer limitation and cleanup requirement for a future display/environment audit.
 
 ## Concrete Steps
 
@@ -120,6 +145,7 @@ fall back to a system Python or system Qt installation.
     rg -n -e 'open_pdf_path|WorkspaceOpenService' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_workspace_open.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame_workspace_open.py
     .venv/bin/pytest -q tests/integration/test_single_instance_open_routing.py
+    .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py -k pending_open
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
     git diff --check
@@ -140,24 +166,31 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     ! ps -eo pid,cmd | rg 'FoliaSeal|foliaseal|PySide6|pytest' | rg -v 'rg '
     rm -rf "$audit_root"
 
-Expected evidence is the two-process routing logs and a mandatory Qt/integration observation of
-forwarding, pending replacement, and no second window. Record both owned process cleanup results;
-the bounded timeout is only a lifecycle check.
+Evidence is the focused protocol/launcher/widget result, the real offscreen pending-open observation,
+and two-process routing logs where the endpoint is available. The current run records `62 passed, 1
+skipped` for the focused app-frame/open-routing set, `1447 passed, 20 skipped, 1 warning` for the
+full suite, and a passing real offscreen test for queued filename visibility and Cancel activation.
+QLocalServer remains unavailable here (`Unknown error 1`), so the transport skip is retained rather
+than treated as two-process acceptance.
 
 ## Validation and Acceptance
 
-Acceptance for Loop 4 is behavioral for the owner boundary: a second invocation does not create a
-second frame, sends a bounded absolute-path request to the primary, and the primary delivers it on
-the Qt event loop while raising the existing window. Dirty-draft/active-signing policy and complete
-PDF content validation remain explicitly deferred. Focused protocol/launcher tests, the full suite,
-and any available Qt transport evidence must remain green with clean process/socket teardown.
+Acceptance is behavioral for the owner boundary and the active-signing queue: a second invocation
+does not create a second frame, sends a bounded absolute-path request to the primary, and the primary
+delivers it on the Qt event loop while raising the existing window. During signing, the current
+workspace remains mounted; the status surface visibly names the newest queued basename, exposes an
+accessible Cancel pending open button, and removes the surface after cancel, acceptance, or workspace
+close. Focused protocol/launcher/widget tests, the full suite, and any available Qt transport
+evidence must remain green with clean process/socket teardown.
 
 ## Required Acceptance Cases
 
 Before replacement, the candidate must be a content-validated single PDF whose password, page count,
 restrictions, and first-page render succeed. Dropping zero or multiple files is rejected. During an
-active signing transaction, a newer pending request replaces the older one with a notice and an
-explicit cancel action; no second window or tab is created.
+active signing transaction, a newer pending request replaces the older one with a visible filename,
+replacement notice, and explicit Cancel pending open action; cancel leaves the current workspace
+untouched, and accepting after a terminal state applies the existing open/dirty policy. No second
+window or tab is created.
 
 ## Evidence Record
 
@@ -168,8 +201,10 @@ silently treated as a passing two-process audit.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
-Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
-contract, record that the test was red before implementation and green afterward.
+Also record the exact focused command and result (`62 passed, 1 skipped`); the new condition-only
+surface is green in fake-Qt unit coverage and
+`test_real_qt_pending_open_surface_is_visible_and_cancelable`. The full regression result is
+`1447 passed, 20 skipped, 1 warning`.
 
 ## Idempotence and Recovery
 
@@ -186,11 +221,31 @@ absolute paths.
 
 ## Interfaces and Dependencies
 
-Use existing typed application workflows and public Qt ports rather than private child-widget
-reach-through. The final interface must be exercised by tests/unit/test_qt_app_frame_workspace_open.py
-and tests/integration/test_single_instance_open_routing.py.
-workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
+Use existing typed application workflows and a small app-frame-owned Qt surface rather than private
+child-widget reach-through. The implemented
+`src/foliaseal/presentation/qt/pending_open_request_surface.py` with a
+`PendingOpenRequestSurface` that owns a `QStatusBar`-compatible container, a filename label, and a
+Cancel pending open button. Extend `QtAppFrameBindings` with the status-bar class and expose only the
+surface's `show_request`, `clear`, and visibility/widget inspection needed by tests. The final
+interface is exercised by `tests/unit/test_qt_app_frame.py`,
+`tests/unit/test_qt_app_frame_workspace_open.py`,
+`tests/integration/test_single_instance_open_routing.py`, and one real offscreen Qt test. Any
+compatibility adapter retained temporarily must have a named consumer and a
 retirement condition recorded in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as child ui_single_instance_open_routing_execplan.md of the approved SPEC/UI_SPEC compliance breakdown.
+
+Revision note: 2026-08-10 / Codex
+The open-routing policy landed in commit `47c875112`, but the fresh compliance audit found that UI_SPEC
+§16 also requires a persistent queued filename and explicit Cancel pending open surface. This revision
+narrows the remaining child work to that condition-only app-frame status surface, its production
+offscreen coverage, documentation reconciliation, and evidence; it does not reopen the completed IPC
+transport.
+
+Revision note: 2026-08-10 / Codex
+The condition-only AppFrame status surface, replacement/cancel/terminal cleanup behavior, focused
+production-widget coverage, and architecture reconciliation are complete. Focused validation is
+`62 passed, 1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`. QLocalServer bind
+failure (`Unknown error 1`) remains an environment limitation; compatibility retirement and
+display-backed two-process smoke acceptance remain open.
