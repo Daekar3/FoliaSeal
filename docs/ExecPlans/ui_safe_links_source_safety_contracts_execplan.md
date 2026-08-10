@@ -33,11 +33,12 @@ unit tests; no GUI claim is made until the render and workspace seams exist.
   vertically through external confirmation, blocked schemes, and source-change cases; the focused
   matrix now reports 14 passing tests.
 - [x] (2026-08-10) Implemented the typed application contracts with no Qt or renderer coupling.
-- [x] (2026-08-10) Ran focused tests (14 passed), full suite (1332 passed, 20 skipped, 1 warning),
-  Ruff, and diff validation; the bounded GUI launch reached the known isolated single-instance
-  endpoint limitation and left no FoliaSeal/python process or temporary audit root.
+- [x] (2026-08-10) The initial contract baseline ran 14 focused tests and 1332 full-suite tests
+  (20 skipped, 1 warning), plus Ruff and diff validation; the bounded GUI launch reached the known
+  isolated single-instance endpoint limitation and left no FoliaSeal/python process or temporary
+  audit root.
 - [x] (2026-08-10) Reconciled this plan, the safe-links parent, and the compliance parent; the
-  contract slice is ready to commit before renderer/workspace integration.
+  initial contract slice was committed in `0c9b20564`, while hardening remains tracked separately.
 
 ## Surprises & Discoveries
 
@@ -57,10 +58,11 @@ unit tests; no GUI claim is made until the render and workspace seams exist.
 - Decision: classify `http`, `https`, and `mailto` as confirmation-required; allow only internal
   page destinations; block file, executable, JavaScript, embedded-launch, and unknown schemes.
   Rationale: this is the explicit UI_SPEC section 16 policy. Date/Author: 2026-08-10 / Codex.
-- Decision: represent source changes as condition-only decisions (`unchanged`, `changed`,
-  `missing`) with actions (`none`, `reload_or_ignore`, `locate_or_close`). Rationale: a later banner
-  can render these values without inventing a reload operation or auto-reloading. Date/Author:
-  2026-08-10 / Codex.
+- Decision: represent source changes as condition-only decisions (`unchanged`, `changed`, `missing`,
+  or `unknown`) with actions (`none`, `reload_or_ignore`, `locate_or_close`, or
+  `review_required`). Rationale: a later banner can render these values without inventing a reload
+  operation or auto-reloading, and unavailable identity must never be treated as equality.
+  Date/Author: 2026-08-10 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -68,8 +70,9 @@ The pure `document_safety` module now makes the UI_SPEC section 16 policy execut
 I/O. Internal page destinations are allowed only with a valid page index; HTTP, HTTPS, and mailto
 require confirmation; file, executable, JavaScript, embedded-launch, unknown, empty, and invalid
 destinations are blocked. Source fingerprints project to unchanged/no action, changed/reload-or-
-ignore, or missing/locate-or-close. The contracts never launch, open, read, reload, or mutate a
-workspace. The remaining GUI work is explicitly handed to the renderer and lifecycle children.
+ignore, missing/locate-or-close, or unknown/review-required when either identity is unavailable.
+The contracts never launch, open, read, reload, or mutate a workspace. The remaining GUI work is
+explicitly handed to the renderer and lifecycle children.
 
 ## Context and Orientation
 
@@ -98,11 +101,12 @@ empty/unknown destinations as blocked, and never resolve or open a path. Externa
 the display destination but no executable callback. Add `SourceChangeStatus` and
 `SourceChangeDecision`, plus `source_change_decision(*, exists: bool, observed_fingerprint: tuple[object,
 ...] | None, current_fingerprint: tuple[object, ...] | None)`; unchanged returns no action, changed
-returns `reload_or_ignore`, and missing returns `locate_or_close`. Keep the fingerprint opaque: this
-slice does not read files or monitor mtime.
+returns `reload_or_ignore`, missing returns `locate_or_close`, and an existing source with either
+fingerprint unavailable returns `review_required`. Keep the fingerprint opaque: this slice does not
+read files or monitor mtime.
 
 Add `tests/unit/test_document_safety.py` covering every scheme and case, whitespace/case
-normalization, missing/invalid internal page indexes, unchanged/changed/missing source decisions,
+normalization, missing/invalid internal page indexes, unchanged/changed/missing/unknown source decisions,
 and the invariant that no classifier result exposes a launcher or performs I/O. Export the module
 through `src/foliaseal/application/__init__.py` only if the repository's lazy export convention
 requires it; otherwise import the module directly to avoid unnecessary public surface.
@@ -136,16 +140,17 @@ evidence that the safety contracts failed.
 
 Acceptance is observable through tests: every UI_SPEC section 16 destination class maps to exactly
 one safe decision; internal page links are inert without a page index; external destinations require
-confirmation; unsafe and unknown destinations are blocked; unchanged/changed/missing source states
-map to no action/reload-or-ignore/locate-or-close without automatic reload. No test may launch a
+confirmation; unsafe and unknown destinations are blocked; unchanged/changed/missing/unknown source
+states map to no action/reload-or-ignore/locate-or-close/review-required without automatic reload.
+No test may launch a
 process, open a URL, read a PDF, or mutate a workspace. The later GUI plan cannot be marked complete
 from this contract evidence alone.
 
 ## Evidence Record
 
-Evidence covers UI_SPEC section 16 and WF01/WF05. `.venv/bin/pytest -q
-tests/unit/test_document_safety.py` reports 14 passed; `.venv/bin/pytest -q` reports 1332 passed,
-20 skipped, 1 warning; Ruff and `git diff --check` pass. No SVG is owned by this application-only
+Evidence for the initial contract covers UI_SPEC section 16 and WF01/WF05. The current hardened
+evidence is recorded in `ui_safe_links_contract_hardening_execplan.md`: 24 focused tests and 1342
+full-suite tests (20 skipped, 1 warning); Ruff and `git diff --check` pass. No SVG is owned by this application-only
 contract slice. The bounded GUI command exits with the known isolated `SingleInstanceUnavailable`
 endpoint limitation; `AUDIT_ROOT_CLEAN=1` and no process output prove cleanup. The red first test
 was the missing-module import, followed by vertical red-to-green additions for each policy class.
@@ -171,3 +176,7 @@ fingerprints into `source_change_decision` and preserve the active `SigningDraft
 Revision note: 2026-08-10 / Codex. Created after explorer review found the original safe-links
 ExecPlan was architecturally premature; split the policy contracts from renderer and workspace
 integration so each step is independently testable and cannot claim unsafe behavior.
+
+Compliance note: 2026-08-10 / Codex. The post-implementation review found unknown fingerprints,
+mode gating, malformed internal destinations, and architecture ownership gaps; those corrections
+are tracked in `ui_safe_links_contract_hardening_execplan.md`.

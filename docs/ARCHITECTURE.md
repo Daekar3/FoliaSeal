@@ -73,6 +73,7 @@ The canonical repository document split is:
 | `src/foliaseal/application/certificate_secret_store.py` | Application-owned saved-certificate-secret protocol and error boundary. | `CertificateSecretStoreError` is the manager-facing failure type; infrastructure adapters may subclass it without leaking infrastructure imports into application policy. |
 | `src/foliaseal/infra/config/certificate_codecs.py` | Concrete JSON codec for application certificate models. | Owns persisted key/schema-version mapping and malformed-payload validation while `CertificateCatalogStore` owns paths, atomic writes, and managed-file operations. |
 | `src/foliaseal/application/document_review_workspace.py` | Qt-free review/text workspace session plus the nested review-card and document-text state types consumed by the shell. | Returns `DocumentReviewCardState` and `DocumentTextWorkspaceState` inside `DocumentReviewWorkspaceState`, and continues to own viewer-effect intents. |
+| `src/foliaseal/application/document_safety.py` | Pure document-safety policy for PDF destinations and source-change decisions. | Owns non-executable link classification, Pan-only mode gating, bounded display destinations, and unchanged/changed/missing/unknown source projections. It imports only the Python standard library; renderer extraction, filesystem monitoring, Qt banners, URL launching, and draft-preserving reload remain outside this boundary. |
 | `src/foliaseal/presentation/qt/` | Qt viewer/signing widgets and manual/automated harnesses. | Uses dynamic PySide6 imports so tests can use fakes; app-frame, signing-shell, workspace, lifecycle, reporting, matrix, snapshotter, render, runtime, projection, provider, runner-factory, and artifact responsibilities are documented in their focused modules below. `evidence_harness_runtime.py` owns the typed lazy operation bundle, `evidence_harness_projection.py` owns pure matrix projection, `evidence_interactive_capture.py` owns the stable capture DTO/payload projection/JSON normalization/artifact policy, `evidence_runner_providers.py` owns Qt-free operation-scoped provider records, `evidence_runner_factories.py` owns lazy runner graph construction from those records, and `phase3_harness.py` remains the concrete composition root; its capture padding consumes `VisibleSignatureLayoutPolicy` rather than backend-private geometry helpers. The application service/program remains the caller boundary. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_open.py` | App-frame-facing workspace-open boundary for one PDF or preserved recovery artifact. | Owns page-count loading, `ViewerWorkflow` / `SigningDraftWorkflow` creation, output-path defaulting, explicit untrusted-recovery bootstrap context, shell bootstrap assembly, and construction of the typed `WorkspaceHandle`; widget installation and active-handle publication belong to `SigningWorkspaceHost`. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_action_state.py` | Qt-free app-frame projection of workspace QAction policy. | `WorkspaceActionState` and its pure closed/open/selection-result constructors describe whether Save, Save As, Close, Previous Page, Next Page, text selection, and Copy selected text should be enabled or checked. The projection owns policy only; `FoliaSealAppFrame` remains responsible for mutating the concrete QActions. |
@@ -400,6 +401,25 @@ The canonical repository document split is:
 - Main entry points: `DocumentReviewWorkspaceSession.load()`, `refresh_review()`, `select_review_signature()`, `select_review_item()`, `search_text()`, `next_text_match()`, `previous_text_match()`, `set_text_selection_mode()`, `handle_viewer_selection()`, and `clear_selected_text()`.
 - Known constraints: The session is intentionally Qt-free. It returns immutable nested state plus viewer-effect intents using repository types such as `PdfRect`, and the shell remains responsible for applying those effects to the concrete viewer widget and for copying text through the clipboard callback seam. Page changes clear the manual current-page selection while preserving search state/highlights; same-page search navigation does not erase the independent selection overlay. A viewer drag outside text-selection mode is intentionally not consumed so signature placement can remain in the signing workflow.
 - Status: Implemented and confirmed by code and tests.
+
+### Document safety policy
+
+- Location: `src/foliaseal/application/document_safety.py`
+- Responsibility: Provide pure, non-executable decisions for PDF link destinations and source
+  identity changes before any Qt or infrastructure integration.
+- Owns: `LinkDecisionKind`, `LinkInteractionMode`, `LinkDecision`, `classify_link_destination()`,
+  `SourceChangeStatus`, `SourceChangeAction`, `SourceChangeDecision`, and
+  `source_change_decision()`.
+- Does not own: PDF annotation extraction, file fingerprint acquisition, browser/file launching,
+  source reload, signing-draft mutation, or banner rendering.
+- Key collaborators: the future render adapter will provide validated link rectangles/destinations;
+  the future workspace lifecycle will provide opaque fingerprints and interpret review-required
+  source states while preserving `SigningDraftWorkflow`.
+- Known constraints: unknown source identity is never treated as unchanged; only Pan mode can return
+  an allowed or confirmation-required link decision; destinations are bounded for display and no
+  result carries a launcher callback.
+- Status: Implemented and confirmed by focused tests; renderer and lifecycle integration remain
+  open in the safe-links and document-lifecycle ExecPlans.
 
 ### Viewer workflow and coordinate geometry
 

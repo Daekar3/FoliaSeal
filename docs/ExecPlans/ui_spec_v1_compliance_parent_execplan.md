@@ -70,6 +70,9 @@ Document-flow tranche:
 - [x] docs/ExecPlans/ui_safe_links_source_safety_contracts_execplan.md — pure destination safety
   and source-change decision contracts are implemented and tested; renderer and draft-preserving
   workspace integration remain open in the safe-links and lifecycle children.
+- [x] docs/ExecPlans/ui_safe_links_contract_hardening_execplan.md — conservative unknown-source,
+  mode-gating, malformed-destination, and bounded-display corrections implemented and validated
+  (24 focused; 1342 full-suite; commit follows).
 
 Reusable-object and certificate tranche:
 
