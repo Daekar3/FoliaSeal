@@ -57,8 +57,13 @@ increments because they require additional geometry and focus seams.
   red page-edge indicators remain visible while a placement crosses a page boundary. The focused
   viewer/application/integration set is `54 passed`; the full suite is `1314 passed, 20 skipped,
   1 warning`.
-- [ ] (2026-08-10) Add numeric-field traversal, snap/guides, and off-page recovery in subsequent
-  increments; then perform final documentation/commit closeout for the whole child.
+- [x] (2026-08-10) Completed history lifecycle policy: placement edits append to history, non-
+  placement setup changes clear it, external overlay synchronization clears stale branches, and a
+  successful signing transition clears the remaining local history. The focused shell/runtime
+  validation remains green; no compatibility adapter was widened.
+- [x] (2026-08-10) Completed the child behavior tranche: numeric-field traversal, exact placement
+  history, pointer snap/guides, off-page recovery, and lifecycle clearing are implemented. Only
+  final audit/commit closeout remains.
 
 ## Surprises & Discoveries
 
@@ -82,8 +87,11 @@ The creation/movement and history increments are complete: Place-mode Enter crea
 3×1-inch placement scaled proportionally to a smaller page; Arrow/Shift+Arrow move it by exact
 1/10-point deltas; Ctrl+Arrow/Ctrl+Shift+Arrow resize from the fixed anchor by exact 1/10-point
 deltas; Delete removes it; and Ctrl+Z/Ctrl+Shift+Z restore local placement mutations. Escape exits
-Place mode to Pan while preserving a completed overlay. The remaining child scope is numeric-field
-traversal, snap/guides, and off-page recovery.
+Place mode to Pan while preserving a completed overlay. Numeric fields now follow deterministic Tab
+order, pointer snap/guides are Alt-bypassable, off-page placements are visibly recoverable, and the
+history lifecycle clears at product boundaries. The child behavior tranche is complete.
+History also clears on non-placement setup changes and successful signing, while external overlay
+synchronization prevents stale branches from crossing document or panel boundaries.
 
 ## Context and Orientation
 
@@ -176,6 +184,6 @@ or workspace ports. The final behavior must be exercised by tests/unit/test_work
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-10 / Codex
-Implemented keyboard creation/movement, exact resize, and the typed Delete/history tracer after the
-Pan/Place topology landed. The plan remains open for numeric traversal, snap/guides, and off-page
-recovery.
+Implemented the complete keyboard/numeric placement behavior, pointer snap/guides, off-page
+recovery, and explicit history lifecycle after the Pan/Place topology landed. Final audit and
+commit closeout are recorded in the parent plan.

@@ -622,6 +622,7 @@ def _assemble_signing_workspace_composition(
         signing_action_boundary=signing_action_boundary,
         draft_workflow=signing_workflow,
         app_settings_getter=get_app_settings,
+        clear_signature_history=runtime.clear_signature_history,
     )
     interaction_bridge = SigningWorkspaceInteractionBridge(
         review_bridge=review_bridge,

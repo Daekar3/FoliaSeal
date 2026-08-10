@@ -35,6 +35,7 @@ class SigningWorkspaceActionBridge:
         signing_action_boundary: SigningActionBoundary,
         draft_workflow: Any,
         app_settings_getter: Any,
+        clear_signature_history: Any | None = None,
     ) -> None:
         self._widget = widget
         self._bindings = bindings
@@ -43,6 +44,7 @@ class SigningWorkspaceActionBridge:
         self._signing_action_boundary = signing_action_boundary
         self._draft_workflow = draft_workflow
         self._app_settings_getter = app_settings_getter
+        self._clear_signature_history = clear_signature_history
         self._has_explicit_output_pdf_path = False
 
     def has_explicit_output_pdf_path(self) -> bool:
@@ -63,6 +65,11 @@ class SigningWorkspaceActionBridge:
             return None
         result = self._signing_action_boundary.submit()
         self._apply_signing_action_state(result.state)
+        if (
+            self._clear_signature_history is not None
+            and getattr(result.state.last_signing_result, "success", False)
+        ):
+            self._clear_signature_history()
         return result.request
 
     def _confirm_signing_request(self) -> bool:

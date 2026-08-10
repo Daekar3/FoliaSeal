@@ -125,6 +125,7 @@ class SigningWorkspaceRuntime:
         self._refresh_sign_button_state = refresh_sign_button_state
         self._refresh_page_navigation_state = refresh_page_navigation_state
         self._result_label = result_label
+        self._last_panel_signature_rect = self._draft_workflow.signature_rect
 
     def on_viewer_selection(self, pdf_rect: PdfRect) -> None:
         self.apply_workspace_interaction_plan(
@@ -216,12 +217,23 @@ class SigningWorkspaceRuntime:
             self._on_status_change(name)
 
     def on_panel_change(self) -> None:
+        current_signature_rect = self._draft_workflow.signature_rect
         record_edit = getattr(self._viewer_widget_required(), "record_signature_edit", None)
-        if callable(record_edit):
-            record_edit(self._draft_workflow.signature_rect)
+        clear_history = getattr(self._viewer_widget_required(), "clear_signature_history", None)
+        if current_signature_rect != self._last_panel_signature_rect:
+            if callable(record_edit):
+                record_edit(current_signature_rect)
+        elif callable(clear_history):
+            clear_history()
+        self._last_panel_signature_rect = current_signature_rect
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_after_panel_change()
         )
+
+    def clear_signature_history(self) -> None:
+        clear_history = getattr(self._viewer_widget_required(), "clear_signature_history", None)
+        if callable(clear_history):
+            clear_history()
 
     def on_page_change(self, page_number: int) -> None:
         if self._viewer_workflow_required().session.current_page != page_number - 1:

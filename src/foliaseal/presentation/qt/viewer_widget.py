@@ -737,6 +737,11 @@ class PdfViewerWidgetAdapter:
                 self._overlay_signature_rect = signature_rect
                 self.update()
 
+            def clear_signature_history(self) -> None:
+                """Clear placement history while preserving the visible overlay."""
+                self._placement_history.clear(current=self._overlay_signature_rect)
+                self.update()
+
             def fit_page_view(self) -> None:
                 self._fit_view(mode="page")
 
@@ -1357,6 +1362,9 @@ def build_qt_pdf_viewer_widget(
 
         def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
             preview_widget.record_signature_edit(signature_rect)
+
+        def clear_signature_history(self) -> None:
+            preview_widget.clear_signature_history()
 
         def clear_signature_overlay(self) -> None:
             preview_widget.clear_signature_overlay()
