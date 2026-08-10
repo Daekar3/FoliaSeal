@@ -14,10 +14,10 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
-- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
+- [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [x] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
+- [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
+- [x] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
 
 ## Progress
 
@@ -40,7 +40,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   known isolated `SingleInstanceUnavailable` transport limit. Temporary configuration roots and
   processes were cleaned.
 - [x] (2026-08-10) Updated this plan, the parent progress record, and `docs/ARCHITECTURE.md`; the
-  implementation is ready for the commit gate and the remaining dependency gaps are recorded below.
+  implementation landed in `42bbbb421` and the remaining certificate-lifecycle gaps are recorded
+  below.
 
 ## Surprises & Discoveries
 

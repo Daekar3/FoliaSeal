@@ -46,7 +46,9 @@ Foundation tranche:
 
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md — fixed 320px signing rail, protected
+  read-only status region, typed recommended action, and offscreen geometry evidence are complete
+  in `8d67d1652`; asynchronous/state-machine follow-up remains open.
 - [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
 - [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 
@@ -86,7 +88,10 @@ Reusable-object and certificate tranche:
 - [x] docs/ExecPlans/ui_certificate_validity_expiration_sort_execplan.md — persist public issuer,
   validity, subject-DN, and fingerprint metadata and expose the already-declared expiration sort;
   focused/full validation and cleanup are recorded in the child.
-- [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+- [x] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md — catalog-backed certificate
+  selection, typed readiness projection, self-signed caveat, expiry warning, and blocking invalid
+  material are implemented and validated in `42bbbb421`; broader certificate lifecycle remains in
+  its owning plans.
 
 Placement, preview, and signing tranche:
 
@@ -282,6 +287,10 @@ Release tranche:
   placement profiles are rejected with a manual-resolution explanation. Full validation is
   `1318 passed, 20 skipped, 1 warning`; bounded GUI cleanup is clean and the isolated socket
   limitation remains the only launch-audit blocker.
+- [x] (2026-08-10) Reconciled the already-landed certificate-selection/readiness slice against
+  its implementation commit `42bbbb421`: catalog-backed selection, typed ready/warning/blocked
+  projections, self-signed caveat, and password-promptable handling are complete; broader
+  certificate lifecycle and signing-rail stage-machine work remain explicitly open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

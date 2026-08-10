@@ -31,7 +31,9 @@ acceptance, not a generic refactor.
 - [x] (2026-08-09) Move interactive signing controls above a read-only status region, add visible and accessible recommended-action treatment, and prove the real Qt geometry.
 - [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the named sidebar/coordinator modules was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and real offscreen Qt validation; record evidence and clean up.
-- [x] (2026-08-09) Update this plan and relevant architecture/status documentation; commit remains the final handoff gate.
+- [x] (2026-08-09) Updated this plan and relevant architecture/status documentation; the bounded
+  implementation and correction are committed in `8d67d1652`, with remaining async/state-machine
+  scope explicitly deferred to its owning children.
 
 ## Surprises & Discoveries
 
@@ -93,6 +95,7 @@ coverage, and real offscreen Qt geometry evidence. The coordinator still support
 setup, placement, readiness, signing-result, and failure states; full asynchronous Signing,
 Saved-but-not-verified, verification, dirty-draft policy, independently scrollable split regions,
 and remembered divider width remain deferred to their owning plans.
+This bounded child is complete in `8d67d1652`.
 
 ## Context and Orientation
 
