@@ -12,6 +12,7 @@ from foliaseal.application.certificate_catalog_repository import CertificateCata
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.document_review_workspace import DocumentReviewWorkspaceState
+from foliaseal.application.document_safety import LinkDecision
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
@@ -45,6 +46,7 @@ class SigningWorkspaceBootstrap:
     on_open_signed_output: Callable[[str | Path], Any | None] | None = None
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
+    on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
     untrusted_recovery: bool = False
 
@@ -126,6 +128,10 @@ class SigningWorkspaceSessionPort(Protocol):
     def go_to_next_page(self) -> None: ...
     def can_go_previous_page(self) -> bool: ...
     def can_go_next_page(self) -> bool: ...
+    def go_back_link(self) -> None: ...
+    def go_forward_link(self) -> None: ...
+    def can_go_back_link(self) -> bool: ...
+    def can_go_forward_link(self) -> bool: ...
     def reset_zoom_view(self) -> None: ...
     def zoom_in_view(self) -> None: ...
     def zoom_out_view(self) -> None: ...
@@ -310,6 +316,20 @@ class QtSigningWorkspaceSessionPort:
 
     def can_go_next_page(self) -> bool:
         capability = getattr(self.shell_widget, "can_go_next_page", None)
+        return bool(capability()) if callable(capability) else False
+
+    def go_back_link(self) -> None:
+        self.shell_widget.go_back_link()
+
+    def go_forward_link(self) -> None:
+        self.shell_widget.go_forward_link()
+
+    def can_go_back_link(self) -> bool:
+        capability = getattr(self.shell_widget, "can_go_back_link", None)
+        return bool(capability()) if callable(capability) else False
+
+    def can_go_forward_link(self) -> bool:
+        capability = getattr(self.shell_widget, "can_go_forward_link", None)
         return bool(capability()) if callable(capability) else False
 
     def reset_zoom_view(self) -> None:

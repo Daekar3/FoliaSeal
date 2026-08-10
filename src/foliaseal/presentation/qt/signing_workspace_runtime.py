@@ -6,15 +6,23 @@ from collections.abc import Callable
 from typing import Any
 
 from foliaseal.application import (
+    DocumentLinkActivationService,
+    DocumentLinkInspector,
     SignaturePlacementContext,
     SigningDraftWorkflow,
     WorkspaceInteractionPlan,
     WorkspaceInteractionSession,
 )
 from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.document_link_activation import ViewerLinkHistory
 from foliaseal.application.document_review import DocumentReviewSummary
 from foliaseal.application.document_review_workspace import (
     DocumentReviewWorkspaceSession,
+)
+from foliaseal.application.document_safety import (
+    LinkDecision,
+    LinkDecisionKind,
+    LinkInteractionMode,
 )
 from foliaseal.application.document_text_search import DocumentTextSearchState
 from foliaseal.application.document_text_selection import DocumentTextSelectionState
@@ -77,11 +85,17 @@ class SigningWorkspaceRuntime:
         on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        document_link_inspector: DocumentLinkInspector | None = None,
+        on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None,
     ) -> None:
         self._draft_workflow = draft_workflow
         self._on_copy_text = on_copy_text
         self._on_error = on_error
         self._on_status_change = on_status_change
+        self._document_link_inspector = document_link_inspector
+        self._on_external_link_confirmation = on_external_link_confirmation
+        self._link_activation_service = DocumentLinkActivationService()
+        self._link_history = ViewerLinkHistory()
         self._viewer_interaction_session: ViewerInteractionSession | None = None
         self._viewer_workflow: ViewerWorkflow | None = None
         self._document_review_workspace: DocumentReviewWorkspaceSession | None = None
@@ -127,6 +141,7 @@ class SigningWorkspaceRuntime:
         self._refresh_page_navigation_state = refresh_page_navigation_state
         self._result_label = result_label
         self._last_panel_signature_rect = self._draft_workflow.signature_rect
+        self._link_history.reset(viewer_workflow.session.current_page)
 
     def on_viewer_selection(self, pdf_rect: PdfRect) -> None:
         self.apply_workspace_interaction_plan(
@@ -137,6 +152,89 @@ class SigningWorkspaceRuntime:
 
     def on_viewer_error(self, message: str) -> None:
         self.emit_error(message)
+
+    def on_viewer_link_click(self, pdf_x: float, pdf_y: float) -> None:
+        """Resolve a Pan click through link policy and route its typed outcome."""
+        workflow = self._viewer_workflow_required()
+        snapshot = workflow.snapshot
+        if snapshot is None:
+            self._emit_link_status("link_inspection_unavailable")
+            return
+        inspector = self._document_link_inspector
+        if inspector is None:
+            inspector_candidate = getattr(workflow.render_backend, "inspect_links", None)
+            if callable(inspector_candidate):
+                inspector = workflow.render_backend  # type: ignore[assignment]
+        if inspector is None:
+            self._emit_link_status("link_inspection_unavailable")
+            return
+        try:
+            links = inspector.inspect_links(workflow.document_path, snapshot.page_index)
+        except Exception:
+            self._emit_link_status("link_inspection_unavailable")
+            return
+        activation = self._link_activation_service.resolve(
+            page_index=snapshot.page_index,
+            pdf_x=pdf_x,
+            pdf_y=pdf_y,
+            links=tuple(links),
+            interaction_mode=LinkInteractionMode.PAN,
+        )
+        decision = activation.decision
+        if decision is None:
+            return
+        if decision.page_index is not None and decision.kind is LinkDecisionKind.ALLOW_INTERNAL:
+            from_page = snapshot.page_index
+            try:
+                self.refresh_review_jump_to_page_index(decision.page_index)
+            except Exception:
+                self._emit_link_status("link_navigation_failed")
+                return
+            self._link_history.record_internal_navigation(
+                from_page_index=from_page,
+                to_page_index=decision.page_index,
+            )
+            self._emit_link_status("link_internal_navigation")
+            return
+        if decision.kind is LinkDecisionKind.CONFIRM_EXTERNAL:
+            if self._on_external_link_confirmation is not None:
+                self._on_external_link_confirmation(decision)
+            else:
+                self._emit_link_status("link_external_confirmation_required")
+            return
+        self._emit_link_status("link_blocked")
+
+    def go_back_link(self) -> None:
+        target = self._link_history.back()
+        if target is None:
+            self._emit_link_status("link_history_back_unavailable")
+            return
+        try:
+            self.refresh_review_jump_to_page_index(target, preserve_link_history=True)
+        except Exception:
+            self._link_history.reset(self._viewer_workflow_required().session.current_page)
+            self._emit_link_status("link_navigation_failed")
+            return
+        self._emit_link_status("link_history_back")
+
+    def go_forward_link(self) -> None:
+        target = self._link_history.forward()
+        if target is None:
+            self._emit_link_status("link_history_forward_unavailable")
+            return
+        try:
+            self.refresh_review_jump_to_page_index(target, preserve_link_history=True)
+        except Exception:
+            self._link_history.reset(self._viewer_workflow_required().session.current_page)
+            self._emit_link_status("link_navigation_failed")
+            return
+        self._emit_link_status("link_history_forward")
+
+    def can_go_back_link(self) -> bool:
+        return self._link_history.can_go_back
+
+    def can_go_forward_link(self) -> bool:
+        return self._link_history.can_go_forward
 
     def create_keyboard_placement(self) -> SignatureRect | None:
         result = self._viewer_interaction_session_required().create_centered_signature_rect()
@@ -242,6 +340,7 @@ class SigningWorkspaceRuntime:
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().change_page(page_number),
         )
+        self._link_history.reset(self._viewer_workflow_required().session.current_page)
         self._refresh_page_navigation_state_required()()
 
     def on_document_review_signature_selected(self, index: int) -> None:
@@ -347,6 +446,7 @@ class SigningWorkspaceRuntime:
 
     def set_logical_page_index(self, page_index: int) -> None:
         self._viewer_interaction_session_required().set_logical_page_index(page_index)
+        self._link_history.reset(page_index)
         self._refresh_page_navigation_state_required()()
 
     def logical_page_index(self) -> int:
@@ -472,7 +572,12 @@ class SigningWorkspaceRuntime:
         if callable(setter):
             setter(self._draft_workflow.signature_rect)
 
-    def refresh_review_jump_to_page_index(self, page_index: int) -> None:
+    def refresh_review_jump_to_page_index(
+        self,
+        page_index: int,
+        *,
+        preserve_link_history: bool = False,
+    ) -> None:
         if self._viewer_workflow_required().session.current_page != page_index:
             self.clear_selected_document_text()
             self.clear_document_review_highlight()
@@ -481,7 +586,13 @@ class SigningWorkspaceRuntime:
                 page_index
             ),
         )
+        if not preserve_link_history:
+            self._link_history.reset(page_index)
         self._refresh_page_navigation_state_required()()
+
+    def _emit_link_status(self, status: str) -> None:
+        if self._on_status_change is not None:
+            self._on_status_change(status)
 
     def emit_error(self, message: str) -> None:
         self._set_sign_result_text(message, success=False)

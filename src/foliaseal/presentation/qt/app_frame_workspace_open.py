@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 from foliaseal.application import SigningDraftWorkflow, suggest_signed_output_path
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
+from foliaseal.application.document_safety import LinkDecision
 from foliaseal.application.document_source_monitor import DocumentSourceMonitor
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
@@ -45,6 +46,7 @@ class OpenWorkspaceCommand:
     reopen_target: Callable[[str | Path], Any | None] | None = None
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
+    on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
     untrusted_recovery: bool = False
 
@@ -155,6 +157,7 @@ class SigningWorkspaceCompositionService:
                 on_open_signed_output=command.reopen_target,
                 on_error=command.on_error,
                 on_status_change=command.on_status_change,
+                on_external_link_confirmation=command.on_external_link_confirmation,
                 on_open_signature_library=command.on_open_signature_library,
                 untrusted_recovery=command.untrusted_recovery,
             )

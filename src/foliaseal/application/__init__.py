@@ -7,6 +7,14 @@ from importlib import import_module
 _EXPORT_MODULES = {
     **dict.fromkeys(
         (
+            "DocumentLinkActivation",
+            "DocumentLinkActivationService",
+            "ViewerLinkHistory",
+        ),
+        "document_link_activation",
+    ),
+    **dict.fromkeys(
+        (
             "CertificateCatalog",
             "CertificateConfiguration",
             "ManagedCertificate",
@@ -370,6 +378,9 @@ __all__ = [
     "source_change_decision",
     "DocumentLink",
     "DocumentLinkInspector",
+    "DocumentLinkActivation",
+    "DocumentLinkActivationService",
+    "ViewerLinkHistory",
     "SigningReadiness",
     "SigningReadinessAction",
     "SigningReadinessInputs",

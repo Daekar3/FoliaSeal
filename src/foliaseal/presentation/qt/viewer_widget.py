@@ -15,6 +15,7 @@ from foliaseal.application.coordinate_transform import (
     pdf_point_to_view,
     pdf_rect_to_view_rect,
     snap_pdf_rect_to_page_guides,
+    view_point_to_pdf,
 )
 from foliaseal.application.placement_history import PlacementHistory
 from foliaseal.application.viewer_workflow import ViewerWorkflow
@@ -52,6 +53,7 @@ class PdfViewerWidgetAdapter:
         *,
         workflow: ViewerWorkflow,
         on_selection: Callable[[object], None] | None = None,
+        on_link_click: Callable[[float, float], None] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_interaction: Callable[[str], None] | None = None,
         on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
@@ -67,6 +69,7 @@ class PdfViewerWidgetAdapter:
                 super().__init__()
                 self._workflow = workflow
                 self._on_selection = on_selection
+                self._on_link_click = on_link_click
                 self._on_error = on_error
                 self._on_interaction = on_interaction
                 self._on_keyboard_create = on_keyboard_create
@@ -81,6 +84,7 @@ class PdfViewerWidgetAdapter:
                 self._pan_origin: Any | None = None
                 self._pan_start_x = 0
                 self._pan_start_y = 0
+                self._pan_click_candidate = False
                 self._overlay_signature_rect: SignatureRect | None = None
                 self._placement_history = PlacementHistory()
                 self._placement_snap_guides: tuple[str, ...] = ()
@@ -455,6 +459,7 @@ class PdfViewerWidgetAdapter:
                     self._pan_origin = event.position().toPoint()
                     self._pan_start_x = self._horizontal_scroll_bar().value()
                     self._pan_start_y = self._vertical_scroll_bar().value()
+                    self._pan_click_candidate = not self._has_shift_modifier(event)
                     self.grabMouse()
                     event.accept()
                     return
@@ -464,6 +469,7 @@ class PdfViewerWidgetAdapter:
                     self._pan_origin = event.position().toPoint()
                     self._pan_start_x = self._horizontal_scroll_bar().value()
                     self._pan_start_y = self._vertical_scroll_bar().value()
+                    self._pan_click_candidate = False
                     self.grabMouse()
                     event.accept()
                     return
@@ -500,6 +506,8 @@ class PdfViewerWidgetAdapter:
                     current = event.position().toPoint()
                     delta_x = current.x() - self._pan_origin.x()
                     delta_y = current.y() - self._pan_origin.y()
+                    if delta_x != 0 or delta_y != 0:
+                        self._pan_click_candidate = False
                     self._horizontal_scroll_bar().setValue(self._pan_start_x - delta_x)
                     self._vertical_scroll_bar().setValue(self._pan_start_y - delta_y)
                     self._sync_pan_from_scrollbars()
@@ -527,8 +535,18 @@ class PdfViewerWidgetAdapter:
 
             def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 if self._pan_origin is not None and self._is_pan_release(event):
+                    click_candidate = self._pan_click_candidate
+                    click_point = event.position().toPoint()
+                    should_activate = (
+                        click_candidate
+                        and self._interaction_mode == "pan"
+                        and event.button() == bindings.qt.LeftButton
+                    )
                     self._pan_origin = None
+                    self._pan_click_candidate = False
                     self.releaseMouse()
+                    if should_activate:
+                        self._emit_link_click(click_point)
                     event.accept()
                     return
                 if (
@@ -817,6 +835,31 @@ class PdfViewerWidgetAdapter:
                     if cursor is not None:
                         set_cursor(cursor)
 
+            def _emit_link_click(self, point: Any) -> None:
+                if self._on_link_click is None:
+                    return
+                snapshot = getattr(self._workflow, "snapshot", None)
+                if snapshot is None:
+                    return
+                try:
+                    self._sync_pan_from_scrollbars()
+                    pdf_x, pdf_y = view_point_to_pdf(
+                        view_x=float(point.x()),
+                        view_y=float(point.y()),
+                        transform=ViewTransform(
+                            zoom=snapshot.zoom,
+                            pan_x=snapshot.pan_x,
+                            pan_y=snapshot.pan_y,
+                        ),
+                        page_box=snapshot.page_box,
+                        rotation=snapshot.rotation,
+                    )
+                except (RuntimeError, ValueError):
+                    self._emit_interaction("link_click_mapping_unavailable")
+                    return
+                self._emit_interaction("link_click")
+                self._on_link_click(pdf_x, pdf_y)
+
             def attach_scroll_container(self, scroll_container: Any) -> None:
                 self._scroll_container = scroll_container
                 self._sync_pan_from_scrollbars()
@@ -824,6 +867,7 @@ class PdfViewerWidgetAdapter:
             def hideEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 if self._pan_origin is not None:
                     self._pan_origin = None
+                    self._pan_click_candidate = False
                     self.releaseMouse()
                 super().hideEvent(event)
 
@@ -1316,6 +1360,7 @@ def build_qt_pdf_viewer_widget(
     *,
     workflow: ViewerWorkflow,
     on_selection: Callable[[object], None] | None = None,
+    on_link_click: Callable[[float, float], None] | None = None,
     on_error: Callable[[str], None] | None = None,
     on_interaction: Callable[[str], None] | None = None,
     on_keyboard_create: Callable[[], SignatureRect | None] | None = None,
@@ -1330,6 +1375,7 @@ def build_qt_pdf_viewer_widget(
     preview_widget = adapter.create(
         workflow=workflow,
         on_selection=on_selection,
+        on_link_click=on_link_click,
         on_error=on_error,
         on_interaction=on_interaction,
         on_keyboard_create=on_keyboard_create,

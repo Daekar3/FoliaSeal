@@ -22,6 +22,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   unknown-identity, mode-gating, malformed-destination, and architecture-documentation findings.
 - [x] docs/ExecPlans/ui_pdf_link_inspection_execplan.md provides neutral QtPdf page-link facts;
   Pan-mode hit testing, destination confirmation, history, and source-change recovery remain here.
+- [x] docs/ExecPlans/ui_safe_links_pan_activation_execplan.md consumes the link facts for Pan-only
+  hit testing, internal navigation/history, and non-executing external/blocked outcomes; source
+  reload and condition-only banner behavior remain separate.
 
 ## Progress
 
@@ -36,6 +39,15 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   annotations now cross a neutral `DocumentLink` DTO with PDF-space rectangles and the existing
   pure safety classifier. URL activation, hit testing, history, and source-change recovery remain
   intentionally unimplemented in this parent.
+- [x] (2026-08-10) Added the Pan-only consumer child: stationary clicks now resolve neutral link
+  facts through the safety policy, internal destinations use page-index Back/Forward history, and
+  external/blocked outcomes remain non-executing typed/status results. Real offscreen Qt and
+  rotated/non-zero-origin fixtures pass; external confirmation UI and source-change recovery remain
+  open.
+- [x] (2026-08-10) Reconciled the activation child with `docs/ARCHITECTURE.md`; focused validation
+  is `183 passed` and the full regression is `1417 passed, 20 skipped, 1 warning`. The parent is
+  still open only for external-confirmation UI, source-change recovery, and its remaining cleanup
+  requirements.
 
 - [ ] (2026-08-09) Audit current behavior and add a failing focused test.
 - [ ] (2026-08-09) Implement the smallest complete model/application/Qt path.

@@ -22,6 +22,7 @@ from foliaseal.application.document_review import (
     DocumentReviewInspector,
     DocumentReviewSummary,
 )
+from foliaseal.application.document_safety import LinkDecision
 from foliaseal.application.document_text_search import (
     DocumentTextSearchEngine,
     DocumentTextSearchState,
@@ -201,6 +202,7 @@ class SigningWorkspaceWidget:
         on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None,
         on_open_signature_library: Callable[[], Any] | None = None,
         untrusted_recovery: bool = False,
     ) -> None:
@@ -250,6 +252,7 @@ class SigningWorkspaceWidget:
                 on_copy_text=on_copy_text,
                 on_error=on_error,
                 on_status_change=on_status_change,
+                on_external_link_confirmation=on_external_link_confirmation,
                 on_open_signature_library=on_open_signature_library,
                 untrusted_recovery=untrusted_recovery,
                 viewer_widget_builder=build_qt_pdf_viewer_widget,
@@ -373,6 +376,18 @@ class SigningWorkspaceWidget:
 
     def can_go_next_page(self) -> bool:
         return self._viewer_workflow.session.can_go_next()
+
+    def go_back_link(self) -> None:
+        self._runtime.go_back_link()
+
+    def go_forward_link(self) -> None:
+        self._runtime.go_forward_link()
+
+    def can_go_back_link(self) -> bool:
+        return self._runtime.can_go_back_link()
+
+    def can_go_forward_link(self) -> bool:
+        return self._runtime.can_go_forward_link()
 
     def reset_zoom_view(self) -> None:
         self._viewer_widget.reset_zoom_view()
@@ -543,6 +558,7 @@ class SigningShellAdapter:
         on_copy_text: Callable[[str], Any] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
+        on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None,
         on_open_signature_library: Callable[[], Any] | None = None,
         untrusted_recovery: bool = False,
     ) -> Any:
@@ -566,6 +582,7 @@ class SigningShellAdapter:
             on_copy_text=copy_text_callback,
             on_error=on_error,
             on_status_change=on_status_change,
+            on_external_link_confirmation=on_external_link_confirmation,
             on_open_signature_library=on_open_signature_library,
             untrusted_recovery=untrusted_recovery,
         )
@@ -585,6 +602,7 @@ class SigningShellAdapter:
             on_open_signed_output=bootstrap.on_open_signed_output,
             on_error=bootstrap.on_error,
             on_status_change=bootstrap.on_status_change,
+            on_external_link_confirmation=bootstrap.on_external_link_confirmation,
             on_open_signature_library=bootstrap.on_open_signature_library,
             untrusted_recovery=bootstrap.untrusted_recovery,
         )

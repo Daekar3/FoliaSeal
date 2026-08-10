@@ -12,6 +12,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.document_links import DocumentLinkInspector
 from foliaseal.application.document_review import (
     DocumentReviewInspector,
     PyHankoDocumentReviewInspector,
@@ -20,6 +21,7 @@ from foliaseal.application.document_review_workspace import (
     DocumentReviewWorkspaceSession,
     DocumentTextWorkspaceState,
 )
+from foliaseal.application.document_safety import LinkDecision
 from foliaseal.application.document_text_search import (
     DocumentTextSearchEngine,
     DocumentTextSearchSession,
@@ -163,6 +165,8 @@ class QtSigningWorkspaceCompositionRequest:
     on_copy_text: Callable[[str], Any] | None = None
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
+    document_link_inspector: DocumentLinkInspector | None = None
+    on_external_link_confirmation: Callable[[LinkDecision], Any] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
     untrusted_recovery: bool = False
 
@@ -194,6 +198,8 @@ class QtSigningWorkspaceComposition:
             on_copy_text=self.request.on_copy_text,
             on_error=self.request.on_error,
             on_status_change=self.request.on_status_change,
+            document_link_inspector=self.request.document_link_inspector,
+            on_external_link_confirmation=self.request.on_external_link_confirmation,
         )
         try:
             self._assembled = _assemble_signing_workspace_composition(
@@ -312,6 +318,7 @@ def _assemble_signing_workspace_composition(
     viewer_kwargs = {
         "workflow": viewer_workflow,
         "on_selection": runtime.on_viewer_selection,
+        "on_link_click": runtime.on_viewer_link_click,
         "on_error": runtime.on_viewer_error,
         "on_interaction": runtime.on_viewer_interaction,
         "on_keyboard_create": runtime.create_keyboard_placement,
@@ -349,6 +356,8 @@ def _assemble_signing_workspace_composition(
     viewer_navigation_row.setSpacing(4)
     previous_page_button = bindings.q_push_button("<")
     next_page_button = bindings.q_push_button(">")
+    back_link_button = bindings.q_push_button("Back")
+    forward_link_button = bindings.q_push_button("Forward")
     page_input = bindings.q_line_edit("1")
     total_pages_label = bindings.q_label(f"of {viewer_workflow.session.page_count}")
     interaction_mode_label = bindings.q_label(
@@ -364,6 +373,10 @@ def _assemble_signing_workspace_composition(
         button_fixed_width = getattr(button, "setFixedWidth", None)
         if callable(button_fixed_width):
             button_fixed_width(28)
+    for button in (back_link_button, forward_link_button):
+        button_fixed_width = getattr(button, "setFixedWidth", None)
+        if callable(button_fixed_width):
+            button_fixed_width(52)
     for button, width in (
         (pan_button, 48),
         (place_button, 52),
@@ -416,11 +429,15 @@ def _assemble_signing_workspace_composition(
             set_tooltip(tooltip)
     previous_page_button.setEnabled(False)
     next_page_button.setEnabled(viewer_workflow.session.page_count > 1)
+    back_link_button.setEnabled(False)
+    forward_link_button.setEnabled(False)
     copy_selection_button.setEnabled(False)
     viewer_navigation_row.addWidget(previous_page_button)
     viewer_navigation_row.addWidget(page_input)
     viewer_navigation_row.addWidget(total_pages_label)
     viewer_navigation_row.addWidget(next_page_button)
+    viewer_navigation_row.addWidget(back_link_button)
+    viewer_navigation_row.addWidget(forward_link_button)
     if hasattr(viewer_navigation_row, "addSpacing"):
         viewer_navigation_row.addSpacing(8)
     else:
@@ -444,6 +461,8 @@ def _assemble_signing_workspace_composition(
         page_count = viewer_workflow.session.page_count
         previous_page_button.setEnabled(current_page > 0)
         next_page_button.setEnabled(current_page < (page_count - 1))
+        back_link_button.setEnabled(runtime.can_go_back_link())
+        forward_link_button.setEnabled(runtime.can_go_forward_link())
         _set_text(page_input, str(current_page + 1))
         _set_text(total_pages_label, f"of {page_count}")
 
@@ -457,6 +476,14 @@ def _assemble_signing_workspace_composition(
             viewer_workflow.session.page_count - 1,
         )
         runtime.refresh_review_jump_to_page_index(target)
+
+    def go_back_link() -> None:
+        runtime.go_back_link()
+        refresh_page_navigation_state()
+
+    def go_forward_link() -> None:
+        runtime.go_forward_link()
+        refresh_page_navigation_state()
 
     def jump_to_entered_page() -> None:
         page_number = _safe_int(_text(page_input).strip())
@@ -526,6 +553,8 @@ def _assemble_signing_workspace_composition(
 
     previous_page_button.clicked.connect(go_previous_page)  # type: ignore[attr-defined]
     next_page_button.clicked.connect(go_next_page)  # type: ignore[attr-defined]
+    back_link_button.clicked.connect(go_back_link)  # type: ignore[attr-defined]
+    forward_link_button.clicked.connect(go_forward_link)  # type: ignore[attr-defined]
     text_selection_button.clicked.connect(toggle_text_selection_mode)  # type: ignore[attr-defined]
     pan_button.clicked.connect(lambda: set_viewer_mode("pan"))  # type: ignore[attr-defined]
     place_button.clicked.connect(lambda: set_viewer_mode("signature"))  # type: ignore[attr-defined]
@@ -541,6 +570,8 @@ def _assemble_signing_workspace_composition(
         "page_input": page_input,
         "total_pages_label": total_pages_label,
         "next_page_button": next_page_button,
+        "back_link_button": back_link_button,
+        "forward_link_button": forward_link_button,
         "text_selection_button": text_selection_button,
         "pan_button": pan_button,
         "place_button": place_button,

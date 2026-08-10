@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.document_links import DocumentLink
 from foliaseal.infra.render import (
     PdfPageGeometry,
     PopplerPdfRenderBackend,
@@ -23,6 +25,16 @@ class _GeometryBackend:
     def render_page(self, request: RenderPageRequest):  # pragma: no cover - protocol helper
         raise AssertionError("Poppler owns page rasterisation")
 
+    def inspect_links(self, document_path: str, page_index: int) -> tuple[DocumentLink, ...]:
+        return (
+            DocumentLink(
+                page_index=page_index,
+                rectangles=(PdfRect(0, 0, 10, 10),),
+                raw_destination="#page=2",
+                internal_page_index=1,
+            ),
+        )
+
 
 class _UnavailableGeometryBackend(_GeometryBackend):
     def diagnostics(self) -> RenderBackendDiagnostic:
@@ -35,6 +47,24 @@ def test_poppler_backend_delegates_geometry_to_qt_compatible_backend() -> None:
     geometry = backend.get_page_geometry("example.pdf", 0)
 
     assert geometry.crop_box == (0.0, 0.0, 612.0, 792.0)
+
+
+def test_poppler_backend_delegates_optional_link_inspection() -> None:
+    backend = PopplerPdfRenderBackend(geometry_backend=_GeometryBackend())
+
+    links = backend.inspect_links("example.pdf", 0)
+
+    assert links[0].internal_page_index == 1
+
+
+def test_poppler_backend_reports_unavailable_optional_link_inspection() -> None:
+    class _NoLinksBackend(_GeometryBackend):
+        inspect_links = None
+
+    backend = PopplerPdfRenderBackend(geometry_backend=_NoLinksBackend())
+
+    with pytest.raises(RuntimeError, match="link inspection is unavailable"):
+        backend.inspect_links("example.pdf", 0)
 
 
 def test_poppler_backend_rejects_invalid_zoom_before_running_command(tmp_path: Path) -> None:

@@ -621,10 +621,18 @@ class _FakeRenderBackend:
 
 
 class _FakeViewerWidget(_FakeWidget):
-    def __init__(self, workflow, on_selection=None, on_error=None, on_interaction=None) -> None:
+    def __init__(
+        self,
+        workflow,
+        on_selection=None,
+        on_link_click=None,
+        on_error=None,
+        on_interaction=None,
+    ) -> None:
         super().__init__()
         self.workflow = workflow
         self.on_selection = on_selection
+        self.on_link_click = on_link_click
         self.on_error = on_error
         self.on_interaction = on_interaction
         self.refresh_calls = []

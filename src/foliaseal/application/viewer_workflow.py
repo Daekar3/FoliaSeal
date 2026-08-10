@@ -64,6 +64,11 @@ class ViewerWorkflow:
         return self._performance_tracker
 
     @property
+    def render_backend(self) -> PdfRenderBackend:
+        """Return the concrete render adapter for optional capabilities."""
+        return self._render_backend
+
+    @property
     def session(self) -> ViewerSession:
         return self._session
 

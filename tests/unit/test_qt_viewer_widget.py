@@ -15,6 +15,7 @@ from foliaseal.infra.render import PdfPageGeometry, RenderPageResult
 from foliaseal.presentation.qt import PdfViewerWidgetAdapter, QtViewerBindingsUnavailable
 from foliaseal.presentation.qt.viewer_widget import (
     QtWidgetBindings,
+    build_qt_pdf_viewer_widget,
 )
 
 
@@ -584,6 +585,36 @@ def test_mouse_release_event_handles_selection_conversion_failures(monkeypatch):
     widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=20))
 
     assert selected == []
+
+
+def test_pan_click_emits_pdf_link_callback_but_drag_and_other_modes_do_not(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    workflow = ViewerWorkflow(
+        document_path="/tmp/sample.pdf",
+        render_backend=_OverlayRenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    links = []
+    viewer = build_qt_pdf_viewer_widget(
+        workflow=workflow,
+        on_link_click=lambda pdf_x, pdf_y: links.append((pdf_x, pdf_y)),
+    )
+    viewer.refresh()
+
+    viewer.set_interaction_mode("pan")
+    viewer.widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=25, y=25))
+    viewer.widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=25, y=25))
+    assert links == [(25.0, 75.0)]
+
+    viewer.widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=25, y=25))
+    viewer.widget.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=30, y=25))
+    viewer.widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=30, y=25))
+    assert links == [(25.0, 75.0)]
+
+    viewer.set_interaction_mode("text")
+    viewer.widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=25, y=25))
+    viewer.widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=25, y=25))
+    assert links == [(25.0, 75.0)]
 
 
 def test_plain_click_does_not_emit_selection(monkeypatch):

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from foliaseal.application.document_links import DocumentLink
 from foliaseal.infra.render.base import (
     PdfPageGeometry,
     PdfRenderBackend,
@@ -71,6 +72,13 @@ class PopplerPdfRenderBackend:
 
     def get_page_geometry(self, document_path: str, page_index: int) -> PdfPageGeometry:
         return self._geometry_backend.get_page_geometry(document_path, page_index)
+
+    def inspect_links(self, document_path: str, page_index: int) -> tuple[DocumentLink, ...]:
+        """Delegate optional link inspection to the QtPdf geometry adapter."""
+        inspector = getattr(self._geometry_backend, "inspect_links", None)
+        if not callable(inspector):
+            raise RuntimeError("PDF link inspection is unavailable for this render backend.")
+        return tuple(inspector(document_path, page_index))
 
     def render_page(self, request: RenderPageRequest) -> RenderPageResult:
         if request.zoom <= 0:

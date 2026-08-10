@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from foliaseal.application.coordinate_transform import PageBox, PdfRect
+from foliaseal.application.document_links import DocumentLink
 from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.domain.models import SignatureRect, SigningResult
 from foliaseal.presentation.qt.signing_workspace_diagnostics import (
@@ -61,6 +62,9 @@ class _FakeReviewBridge:
 
     def select_review_signature(self, index: int) -> None:
         self.selected_indices.append(index)
+
+    def clear_review_highlight(self) -> None:
+        return None
 
     def apply_state(self, state) -> None:
         self.states.append(state)
@@ -174,6 +178,9 @@ class _FakeViewerInteractionSession:
 class _FakeViewerWorkflow:
     def __init__(self, order=None) -> None:
         self.session = SimpleNamespace(current_page=1)
+        self.document_path = "/tmp/sample.pdf"
+        self.render_backend = SimpleNamespace()
+        self.snapshot = SimpleNamespace(page_index=1)
         self.jump_calls = []
         self._order = order
 
@@ -228,6 +235,8 @@ def _bind_runtime(
     on_copy_text=None,
     on_error=None,
     on_status_change=None,
+    document_link_inspector=None,
+    on_external_link_confirmation=None,
 ):
     order = []
     runtime = SigningWorkspaceRuntime(
@@ -235,6 +244,8 @@ def _bind_runtime(
         on_copy_text=on_copy_text,
         on_error=on_error,
         on_status_change=on_status_change,
+        document_link_inspector=document_link_inspector,
+        on_external_link_confirmation=on_external_link_confirmation,
     )
     viewer_interaction_session = _FakeViewerInteractionSession(order)
     viewer_workflow = _FakeViewerWorkflow(order)
@@ -296,6 +307,83 @@ def test_signing_workspace_runtime_routes_viewer_selection_through_workspace_ses
 
     assert bound.interaction_session.selection_rects == [pdf_rect]
     assert bound.orchestrator.plans == [bound.interaction_session.select_plan]
+
+
+def test_signing_workspace_runtime_routes_internal_link_and_history() -> None:
+    class _Inspector:
+        def inspect_links(self, document_path, page_index):
+            assert document_path == "/tmp/sample.pdf"
+            assert page_index == 1
+            return (
+                DocumentLink(
+                    page_index=1,
+                    rectangles=(PdfRect(0, 0, 10, 10),),
+                    internal_page_index=3,
+                ),
+            )
+
+    statuses = []
+    bound = _bind_runtime(
+        on_status_change=statuses.append,
+        document_link_inspector=_Inspector(),
+    )
+
+    bound.runtime.on_viewer_link_click(5, 5)
+    bound.runtime.go_back_link()
+    bound.runtime.go_forward_link()
+
+    assert "link_internal_navigation" in statuses
+    assert "link_history_back" in statuses
+    assert "link_history_forward" in statuses
+    assert ("jump", 3) in bound.orchestrator.plans
+    assert ("jump", 1) in bound.orchestrator.plans
+
+
+def test_signing_workspace_runtime_emits_external_confirmation_without_launching() -> None:
+    class _Inspector:
+        def inspect_links(self, document_path, page_index):
+            return (
+                DocumentLink(
+                    page_index=page_index,
+                    rectangles=(PdfRect(0, 0, 10, 10),),
+                    raw_destination="https://example.test/review",
+                ),
+            )
+
+    confirmations = []
+    bound = _bind_runtime(
+        document_link_inspector=_Inspector(),
+        on_external_link_confirmation=confirmations.append,
+    )
+
+    bound.runtime.on_viewer_link_click(5, 5)
+
+    assert len(confirmations) == 1
+    assert confirmations[0].destination == "https://example.test/review"
+    assert bound.viewer_workflow.jump_calls == []
+
+
+def test_signing_workspace_runtime_blocks_unsafe_link_with_status() -> None:
+    class _Inspector:
+        def inspect_links(self, document_path, page_index):
+            return (
+                DocumentLink(
+                    page_index=page_index,
+                    rectangles=(PdfRect(0, 0, 10, 10),),
+                    raw_destination="file:///tmp/private.pdf",
+                ),
+            )
+
+    statuses = []
+    bound = _bind_runtime(
+        on_status_change=statuses.append,
+        document_link_inspector=_Inspector(),
+    )
+
+    bound.runtime.on_viewer_link_click(5, 5)
+
+    assert statuses == ["link_blocked"]
+    assert bound.viewer_workflow.jump_calls == []
 
 
 def test_signing_workspace_runtime_routes_panel_page_and_refresh_changes() -> None:

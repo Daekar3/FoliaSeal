@@ -70,6 +70,7 @@ The canonical repository document split is:
 | `src/foliaseal/application/signing_readiness.py` | Pure ordered projection of the active signing workspace's readiness state. | Consumes document-safety status first, then converts selected-preset, certificate, placement, validation, and signability facts into one immutable stage/detail/action result; it has no Qt, persistence, certificate parsing, or source-monitor mutation ownership. |
 | `src/foliaseal/application/document_source_monitor.py` | Application-owned source identity/fingerprint boundary for mounted workspaces. | Captures the open-time `(device, inode, size, mtime_ns)` identity and projects changed, missing, or unknown source status without reloading or mutating the workspace; AppFrame/workspace composition owns its lifecycle. |
 | `src/foliaseal/application/document_links.py` | Neutral read-only document-link inspection contract. | `DocumentLink` carries page-local PDF-space rectangles and raw URL/internal-page destinations; `DocumentLinkInspector` keeps extraction behind the concrete PDF adapter. |
+| `src/foliaseal/application/document_link_activation.py` | Pure Pan-only link hit-testing, activation policy projection, and internal-page history. | `DocumentLinkActivationService` resolves one PDF-space pointer location through `document_safety.py`; `ViewerLinkHistory` owns bounded Back/Forward page-index state without launching URLs or mutating widgets. |
 | `src/foliaseal/application/certificate_models.py` | Canonical application-owned managed-certificate records and catalog policy. | Owns certificate/configuration invariants, stable-id/name lookup, public subject/issuer/validity/fingerprint metadata, upsert, and reference-guarded removal without JSON, filesystem, Qt, or secret-storage imports. |
 | `src/foliaseal/application/certificate_catalog_repository.py` | Application-owned certificate-catalog persistence port and in-memory adapter. | Defines the `CertificateCatalogRepository` protocol used by application services plus `InMemoryCertificateCatalogRepository` for state and boundary tests; the production filesystem implementation remains in `infra/config/certificate_storage.py`. |
 | `src/foliaseal/application/certificate_manager.py` | Application-owned certificate policy and user-facing operations. | Owns naming/ID policy, guided five-year PKCS#12 generation with subject fields and confirmation, public issuer/validity/fingerprint projection, parsing/non-mutating `CertificateImportInspection`, retained-file configuration, export-password validation, saved-secret compensation, and typed operation results; delegates managed-file/catalog commit and delete sequencing to `CertificateCatalogRepository`. |
@@ -125,7 +126,7 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/signing_workspace_refinement_dialog.py` | Focused Qt adapter for contextual visible-signature refinement. | Owns modal control construction and reusable appearance/placement/preset save callbacks, returning a typed draft result while the panel applies accepted state. |
 | `src/foliaseal/presentation/qt/signing_workspace_composition.py` | Typed Qt workspace-composition boundary for one signing workspace. | Owns the request/context, semantic host-actions adapter, constructor-time session/bridge/widget assembly, shell-local runtime, surfaces, orchestrator, and idempotent partial-build cleanup. It returns the existing internal composition record; `signing_shell.py` remains the outer shell facade and `SigningWorkspaceShellController` remains the installation/bootstrap/close delegate. |
 | `src/foliaseal/presentation/qt/signing_workspace_shell_controller.py` | Typed controller for one signing-shell composition lifecycle. | Owns publication of the assembled composition onto the public widget edge, idempotent bootstrap, and close delegation. The typed Qt composition boundary now owns assembly and partial-build cleanup; `signing_shell.py` retains only Qt container setup and public behavior forwarding. |
-| `src/foliaseal/presentation/qt/signing_workspace_runtime.py` | Shell-local runtime/controller for the signing workspace. | Owns the live workspace verbs for viewer/panel/page routing, review/text refresh and navigation, logical-page and signature-rectangle operations, current-request/testing reads, placement-context application, overlay sync, and shell-edge error/status handling, while delegating startup ordering and ordered interaction-plan execution to `signing_workspace_orchestrator.py`. |
+| `src/foliaseal/presentation/qt/signing_workspace_runtime.py` | Shell-local runtime/controller for the signing workspace. | Owns the live workspace verbs for viewer/panel/page routing, Pan-only link activation and Back/Forward history outcomes, review/text refresh and navigation, logical-page and signature-rectangle operations, current-request/testing reads, placement-context application, overlay sync, and shell-edge error/status handling, while delegating startup ordering and ordered interaction-plan execution to `signing_workspace_orchestrator.py`. |
 | `src/foliaseal/presentation/qt/phase3_harness_capture_assembler.py` | Pure capture-assembly helper for the interactive Phase 3 harness. | Owns signed-run bundle assembly and final capture-payload shaping from raw `Phase3HarnessSessionResult` state while leaving Qt session control in `phase3_harness_session_runner.py` and report writing in `phase3_harness_reporting.py`. |
 | `src/foliaseal/presentation/qt/signing_action_boundary.py` | Shell-facing boundary for the signing-action flow. | Bridges the shell to `SigningActionCoordinator` while keeping dialog/callback orchestration separate from the state machine. |
 | `src/foliaseal/presentation/qt/signature_preview_layout.py` | Widget-facing preview geometry planning and application. | Owns preview card sizing, orientation, ordering, and widget visibility decisions. |
@@ -445,13 +446,15 @@ The canonical repository document split is:
   `document_source_monitor.py`, and the future workspace lifecycle/safe-links children.
 - Known constraints: `QtPdfRenderBackend.inspect_links()` reads QtPdf link-model rows without
   activating destinations and normalizes each Qt top-left rectangle into PDF bottom-left
-  `PdfRect` coordinates. Unknown source identity is never treated as unchanged; only Pan mode can
-  return an allowed or confirmation-required link decision; destinations are bounded for display
-  and no result carries a launcher callback. Pan hit testing, activation/history, and source
-  reload/banner lifecycle remain explicitly deferred to the safe-links and document-lifecycle
-  children.
-- Status: Implemented and confirmed by focused tests; link extraction is now integrated at the
-  QtPdf adapter edge while interaction/lifecycle integration remains deferred.
+  `PdfRect` coordinates. `DocumentLinkActivationService` performs pure PDF-space hit testing and
+  applies Pan-only destination policy; `SigningWorkspaceRuntime.on_viewer_link_click()` routes
+  allowed internal-page jumps, external-confirmation outcomes, and blocked/unavailable statuses,
+  while `ViewerLinkHistory` supplies internal-page Back/Forward outcomes. Unknown source identity
+  is never treated as unchanged; destinations are bounded for display and no result carries a
+  launcher callback. URL launching and external confirmation UI, plus source reload/banner
+  lifecycle, remain explicitly deferred to safe-links and document-lifecycle children.
+- Status: Implemented and confirmed by focused tests; extraction, Pan hit testing, internal-page
+  activation, and history are integrated while URL/lifecycle effects remain deferred.
 
 ### Document source monitor
 
@@ -461,6 +464,17 @@ The canonical repository document split is:
 - Does not own: PDF reload, source locating, ignore/acknowledgement UI, banner mutation, renderer refresh, or signing-draft mutation.
 - Key collaborators: `document_safety.py`, `signing_readiness.py`, `app_frame_workspace_open.py`, and the future workspace lifecycle/safe-links children.
 - Known constraints: The fingerprint is metadata-only `(st_dev, st_ino, st_size, st_mtime_ns)` and missing/unreadable sources produce unknown/missing decisions through the pure safety policy. `decision()` is read-only; only an owning reload or explicit ignore flow may call `acknowledge_current_source()`. Reload/locate/ignore actions, safety banners, and draft-preserving lifecycle mutation remain explicitly deferred to the safe-links and document-lifecycle children rather than this application boundary.
+- Status: Implemented and confirmed by focused tests.
+
+### Document link activation and history
+
+- Location: `src/foliaseal/application/document_link_activation.py`
+- Responsibility: Resolve one stationary Pan click against inspected PDF-space links and keep internal-page navigation history as typed, side-effect-free application state.
+- Owns: `DocumentLinkActivation`, `DocumentLinkActivationService`, `ViewerLinkHistory`, PDF-space rectangle containment, and Back/Forward page-index transitions.
+- Does not own: URL launching, external confirmation widgets, PDF link extraction, viewer mouse-event classification, source reload, or banner lifecycle.
+- Key collaborators: `DocumentLink`, `document_safety.py`, `DocumentLinkInspector`, and `SigningWorkspaceRuntime`.
+- Main entry points: `DocumentLinkActivationService.resolve()`, `ViewerLinkHistory.record_internal_navigation()`, `.back()`, and `.forward()`.
+- Known constraints: Activation policy is forced to `LinkInteractionMode.PAN`; internal destinations produce page-jump outcomes and history entries, while external destinations produce confirmation-required outcomes for a presentation callback. `PdfViewerWidgetAdapter`/`PdfPreviewWidget` calls the runtime only for a stationary Pan click; a Pan drag remains navigation/panning and is not treated as a link activation. The adapter maps the click from view coordinates through the current zoom/pan/page transform into PDF coordinates before invoking `SigningWorkspaceRuntime.on_viewer_link_click()`.
 - Status: Implemented and confirmed by focused tests.
 
 ### Viewer workflow and coordinate geometry
@@ -505,7 +519,7 @@ The canonical repository document split is:
 - Does not own: Viewer workflow state or Qt widget controls.
 - Key collaborators: `ViewerWorkflow`, `presentation/qt/viewer_widget.py`.
 - Main entry points: `PopplerPdfRenderBackend.render_page()`, `PopplerPdfRenderBackend.get_page_geometry()`, `QtPdfRenderBackend.render_page()`, `QtPdfRenderBackend.get_page_geometry()`, `QtPdfRenderBackend.inspect_links()`, and `diagnostics()`.
-- Known constraints: The live `FoliaSealAppFrame` defaults to `PopplerPdfRenderBackend`. That adapter delegates page boxes, rotation, placement-coordinate geometry, and read-only link inspection to `QtPdfRenderBackend`, but delegates interactive page pixels to `pdftoppm` and returns opaque RGBA bytes. `QtPdfRenderBackend.inspect_links()` uses QtPdf's link model and normalizes top-left rectangles to PDF bottom-left coordinates without activating destinations. `pdftoppm` is a late-resolved Linux runtime requirement: a missing executable or unavailable Qt geometry is reported through diagnostics instead of failing on import. QtPdf remains the intentional default for canonical-preview generation and Phase 2/Phase 3 evidence, whose generated-preview scope was not implicated by the reopened signed-PDF rasterisation defect. `QtPdfRenderBackend` dynamically imports PySide6/QtPdf and includes fallback PDF metadata parsing to support page boxes/rotation.
+- Known constraints: The live `FoliaSealAppFrame` defaults to `PopplerPdfRenderBackend`. That adapter delegates page boxes, rotation, placement-coordinate geometry, and optional read-only link inspection to `QtPdfRenderBackend`; `PopplerPdfRenderBackend.inspect_links()` fails clearly when the geometry adapter does not expose inspection, while interactive page pixels still come from `pdftoppm` as opaque RGBA bytes. `QtPdfRenderBackend.inspect_links()` uses QtPdf's link model and normalizes top-left rectangles to PDF bottom-left coordinates without activating destinations. `pdftoppm` is a late-resolved Linux runtime requirement: a missing executable or unavailable Qt geometry is reported through diagnostics instead of failing on import. QtPdf remains the intentional default for canonical-preview generation and Phase 2/Phase 3 evidence, whose generated-preview scope was not implicated by the reopened signed-PDF rasterisation defect. `QtPdfRenderBackend` dynamically imports PySide6/QtPdf and includes fallback PDF metadata parsing to support page boxes/rotation.
 - Status: Confirmed by code and tests.
 
 ### Qt presentation layer
@@ -639,11 +653,11 @@ boundary fakeable while preserving native Qt shortcuts.
 
 - Location: `src/foliaseal/presentation/qt/signing_workspace_runtime.py`
 - Responsibility: Own live shell-local workspace verbs and produce the consistent diagnostic snapshot used by testing and Phase 3.
-- Owns: Viewer/panel/page routing, review/text refresh and navigation, placement and overlay operations, shell-edge status/error handling, and `SigningWorkspaceSnapshot` production from bound workflow state.
+- Owns: Viewer/panel/page routing, Pan-only link activation and internal-page Back/Forward history, review/text refresh and navigation, placement and overlay operations, shell-edge status/error handling, and `SigningWorkspaceSnapshot` production from bound workflow state.
 - Does not own: app-frame production-port policy, widget-export compatibility, signing-action state-machine ownership, or Phase 3 evidence serialization.
 - Key collaborators: `SigningDraftWorkflow`, `ViewerWorkflow`, `DocumentReviewWorkspaceSession`, `SignaturePropertiesPanel`, `signing_workspace_diagnostics.py`, `signing_workspace_testing_adapter.py`, and `signing_workspace_orchestrator.py`.
-- Main entry points: `SigningWorkspaceRuntime.snapshot()` and its existing workspace mutation/read verbs.
-- Known constraints: Snapshot production must preserve the same binding errors and live values as the existing individual accessors; action-coordinator result state is supplied by the explicit testing adapter rather than duplicated in runtime.
+- Main entry points: `SigningWorkspaceRuntime.snapshot()`, `on_viewer_link_click()`, `go_back_link()`, `go_forward_link()`, and its existing workspace mutation/read verbs.
+- Known constraints: Snapshot production must preserve the same binding errors and live values as the existing individual accessors; action-coordinator result state is supplied by the explicit testing adapter rather than duplicated in runtime. Link activation reports typed status/confirmation outcomes and delegates actual external URL launching/confirmation UI to an injected presentation callback.
 - Status: Confirmed by code and tests.
 
 ### Qt canonical preview lifecycle
@@ -1627,7 +1641,8 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
-| 2026-08-10 | Added the QtPdf document-link inspection boundary. | `DocumentLink`/`DocumentLinkInspector` now carry read-only page-local link facts, and `QtPdfRenderBackend.inspect_links()` extracts valid URL/internal-page links without activation while normalizing Qt top-left rectangles to PDF bottom-left coordinates. Pan hit testing, activation/history, and reload/banner lifecycle remain deferred to safe-links/document-lifecycle children. |
+| 2026-08-10 | Added Pan-only document-link activation and internal-page history. | `DocumentLinkActivationService` performs pure PDF-space hit testing, `ViewerLinkHistory` owns Back/Forward page outcomes, `PopplerPdfRenderBackend.inspect_links()` delegates optionally to QtPdf, `SigningWorkspaceRuntime` routes typed activation/history outcomes, and `PdfViewerWidgetAdapter` maps stationary Pan clicks through zoom/pan/page transforms while keeping drags as pan gestures. URL launching, external confirmation UI, and source reload/banner lifecycle remain deferred. |
+| 2026-08-10 | Added the QtPdf document-link inspection boundary. | Historical precursor: `DocumentLink`/`DocumentLinkInspector` first carried read-only page-local link facts, and `QtPdfRenderBackend.inspect_links()` extracted valid URL/internal-page links without activation while normalizing Qt top-left rectangles to PDF bottom-left coordinates; Pan hit testing and activation/history were added by the subsequent slice. Reload/banner lifecycle remains deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added the document-source safety readiness boundary. | `DocumentSourceMonitor` now owns metadata-only source fingerprints and changed/missing/unknown decisions at workspace composition; `signing_readiness.py` consumes document safety before setup/readiness stages. Reload, locate, ignore, banner mutation, and draft-preserving lifecycle actions remain deferred to safe-links/document-lifecycle children. |
 | 2026-08-10 | Added real signed-appearance raster parity evidence. | A Qt-backed integration test signs a real PDF, renders its embedded annotation appearance, and asserts pixel-identical RGBA output against the frozen canonical preview for text-only and managed-image alpha-preserved/flattened cases. |
 | 2026-08-10 | Added exact bundled-font glyph validation and frozen visible-signature semantics parity. | `VisibleSignatureSemanticsService` now checks each visible text value against the selected bundled face's FontTools cmap, emits blocking field/codepoint issues, and shares the frozen preview time and prepared layout decision with final signing; `fonttools>=4.33.3` is an explicit runtime dependency. Existing Phase 3 names/contracts remain unchanged. |

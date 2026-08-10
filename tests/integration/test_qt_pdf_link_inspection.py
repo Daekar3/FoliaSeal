@@ -11,9 +11,11 @@ from pyhanko.pdf_utils.generic import ArrayObject, NameObject, NumberObject, Tex
 from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
 
 from foliaseal.application.coordinate_transform import PdfRect
+from foliaseal.application.document_link_activation import DocumentLinkActivationService
 from foliaseal.application.document_links import DocumentLink
 from foliaseal.application.document_safety import (
     LinkDecisionKind,
+    LinkInteractionMode,
     classify_link_destination,
 )
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
@@ -66,6 +68,36 @@ def _write_link_fixture(path: Path) -> None:
         writer.write(handle)
 
 
+def _write_transformed_link_fixture(path: Path, *, rotation: int) -> None:
+    writer = PdfFileWriter()
+    contents = writer.add_object(generic.StreamObject(stream_data=b""))
+    page = writer.insert_page(PageObject(contents=contents, media_box=(10, 20, 210, 320)))
+    page_object = page.get_object()
+    page_object[NameObject("/Rotate")] = NumberObject(rotation)
+    page_object[NameObject("/CropBox")] = ArrayObject(
+        [NumberObject(30), NumberObject(40), NumberObject(180), NumberObject(280)]
+    )
+    action = generic.DictionaryObject(
+        {
+            NameObject("/S"): NameObject("/URI"),
+            NameObject("/URI"): TextStringObject("https://example.test/transformed"),
+        }
+    )
+    annotation = generic.DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Link"),
+            NameObject("/Rect"): ArrayObject(
+                [NumberObject(50), NumberObject(60), NumberObject(100), NumberObject(90)]
+            ),
+            NameObject("/A"): action,
+        }
+    )
+    page_object[NameObject("/Annots")] = ArrayObject([writer.add_object(annotation)])
+    with path.open("wb") as handle:
+        writer.write(handle)
+
+
 def test_qtpdf_inspector_normalizes_internal_and_external_links(tmp_path: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
@@ -107,3 +139,37 @@ def test_document_link_dto_preserves_multiple_hit_rectangles() -> None:
         raw_destination="https://example.com",
     )
     assert len(link.rectangles) == 2
+
+
+@pytest.mark.parametrize(
+    ("rotation", "expected_rect"),
+    [
+        (0, PdfRect(20.0, 20.0, 70.0, 50.0)),
+        (90, PdfRect(20.0, 80.0, 50.0, 130.0)),
+        (180, PdfRect(80.0, 190.0, 130.0, 220.0)),
+        (270, PdfRect(190.0, 20.0, 220.0, 70.0)),
+    ],
+)
+def test_qtpdf_inspector_normalizes_rotated_nonzero_origin_link_rectangles(
+    tmp_path: Path,
+    rotation: int,
+    expected_rect: PdfRect,
+) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+    source = tmp_path / f"transformed-{rotation}.pdf"
+    _write_transformed_link_fixture(source, rotation=rotation)
+
+    links = QtPdfRenderBackend().inspect_links(str(source), 0)
+    rectangle = links[0].rectangles[0].normalized()
+    activation = DocumentLinkActivationService().resolve(
+        page_index=0,
+        pdf_x=(expected_rect.x1 + expected_rect.x2) / 2.0,
+        pdf_y=(expected_rect.y1 + expected_rect.y2) / 2.0,
+        links=links,
+        interaction_mode=LinkInteractionMode.PAN,
+    )
+
+    assert rectangle == expected_rect
+    assert activation.decision is not None
+    assert activation.decision.kind is LinkDecisionKind.CONFIRM_EXTERNAL
