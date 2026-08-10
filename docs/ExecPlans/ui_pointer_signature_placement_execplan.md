@@ -30,6 +30,12 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Focused viewer/interaction and offscreen pointer integration validation passed
   (`40 passed`); the full suite passed (`1296 passed, 20 skipped, 1 warning`), with GUI audit,
   docs, and commit gates remaining.
+- [x] (2026-08-10) Added explicit mutually exclusive Pan and Place viewer tools at the production
+  toolbar and public session boundary; Pan is the production default, consumes left-drag as panning,
+  Place consumes pointer rectangles/handles, and completed overlays persist across mode switches.
+  Focused shell/viewer/composition/integration validation is `156 passed`; full-suite validation is
+  `1297 passed, 20 skipped, 1 warning`; final GUI audit, documentation reconciliation, and commit
+  remain.
 
 ## Surprises & Discoveries
 
@@ -48,10 +54,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-The bounded pointer path was already present in the current viewer/session/bridge seams; this slice
-adds the missing Escape cancellation contract. Broader UI_SPEC mode-group topology (explicit Pan/
-Place buttons, keyboard placement, snap/guides, undo history, and off-page recovery) remains owned by
-the navigation/placement follow-up work and is not claimed here.
+The bounded pointer path and explicit Pan/Place mode topology are implemented through the current
+viewer/session/composition seams. Keyboard placement, snap/guides, undo history, and off-page
+recovery remain explicit follow-up work and are not claimed here.
 
 ## Context and Orientation
 

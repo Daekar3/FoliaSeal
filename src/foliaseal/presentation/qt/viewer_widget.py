@@ -298,6 +298,18 @@ class PdfViewerWidgetAdapter:
                 super().keyPressEvent(event)
 
             def mousePressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                if (
+                    self._interaction_mode == "pan"
+                    and event.button() == bindings.qt.LeftButton
+                ):
+                    if self._scroll_container is None:
+                        return super().mousePressEvent(event)
+                    self._pan_origin = event.position().toPoint()
+                    self._pan_start_x = self._horizontal_scroll_bar().value()
+                    self._pan_start_y = self._vertical_scroll_bar().value()
+                    self.grabMouse()
+                    event.accept()
+                    return
                 if self._is_pan_press(event):
                     if self._scroll_container is None:
                         return super().mousePressEvent(event)
@@ -489,7 +501,7 @@ class PdfViewerWidgetAdapter:
                 self.update()
 
             def set_interaction_mode(self, mode: str) -> None:
-                if mode not in {"signature", "text"}:
+                if mode not in {"pan", "signature", "text"}:
                     raise ValueError(f"Unsupported viewer interaction mode: {mode}")
                 self._interaction_mode = mode
                 set_cursor = getattr(self, "setCursor", None)
@@ -497,6 +509,8 @@ class PdfViewerWidgetAdapter:
                     cursor = (
                         getattr(bindings.qt, "IBeamCursor", None)
                         if mode == "text"
+                        else getattr(bindings.qt, "OpenHandCursor", None)
+                        if mode == "pan"
                         else getattr(bindings.qt, "CrossCursor", None)
                     )
                     if cursor is not None:

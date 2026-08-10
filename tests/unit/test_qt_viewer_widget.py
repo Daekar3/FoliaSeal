@@ -57,6 +57,7 @@ class _FakeQt:
     NoModifier = 0
     IBeamCursor = "ibeam"
     CrossCursor = "cross"
+    OpenHandCursor = "open-hand"
     Key_Plus = 10
     Key_Equal = 11
     Key_Minus = 12
@@ -793,6 +794,10 @@ def test_set_interaction_mode_changes_cursor(monkeypatch):
     preview.set_interaction_mode("signature")
 
     assert preview.cursor == _FakeQt.CrossCursor
+
+    preview.set_interaction_mode("pan")
+
+    assert preview.cursor == _FakeQt.OpenHandCursor
 
 
 def test_overlay_resize_handle_clamps_before_inverting_rectangle(monkeypatch):

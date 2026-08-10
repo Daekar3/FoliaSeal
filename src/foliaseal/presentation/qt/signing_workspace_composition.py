@@ -315,6 +315,9 @@ def _assemble_signing_workspace_composition(
         on_error=runtime.on_viewer_error,
         on_interaction=runtime.on_viewer_interaction,
     )
+    set_viewer_mode = getattr(viewer_widget, "set_interaction_mode", None)
+    if callable(set_viewer_mode):
+        set_viewer_mode("pan")
     viewer_navigation_container = bindings.q_widget()
     viewer_navigation_row = bindings.q_hbox_layout(viewer_navigation_container)
     viewer_navigation_row.setContentsMargins(0, 0, 0, 0)
@@ -324,8 +327,10 @@ def _assemble_signing_workspace_composition(
     page_input = bindings.q_line_edit("1")
     total_pages_label = bindings.q_label(f"of {viewer_workflow.session.page_count}")
     interaction_mode_label = bindings.q_label(
-        "Placement mode — drag on the page to draw or resize the signature"
+        "Pan mode — drag to move around the page"
     )
+    pan_button = bindings.q_push_button("Pan")
+    place_button = bindings.q_push_button("Place")
     text_selection_button = bindings.q_push_button("")
     copy_selection_button = bindings.q_push_button("")
     fit_page_button = bindings.q_push_button("Fit Page")
@@ -334,7 +339,12 @@ def _assemble_signing_workspace_composition(
         button_fixed_width = getattr(button, "setFixedWidth", None)
         if callable(button_fixed_width):
             button_fixed_width(28)
-    for button, width in ((text_selection_button, 32), (copy_selection_button, 32)):
+    for button, width in (
+        (pan_button, 48),
+        (place_button, 52),
+        (text_selection_button, 32),
+        (copy_selection_button, 32),
+    ):
         button_fixed_width = getattr(button, "setFixedWidth", None)
         if callable(button_fixed_width):
             button_fixed_width(width)
@@ -348,6 +358,17 @@ def _assemble_signing_workspace_composition(
     set_checkable = getattr(text_selection_button, "setCheckable", None)
     if callable(set_checkable):
         set_checkable(True)
+    for mode_button in (pan_button, place_button):
+        set_checkable = getattr(mode_button, "setCheckable", None)
+        if callable(set_checkable):
+            set_checkable(True)
+    for button, tooltip in (
+        (pan_button, "Pan the document viewer"),
+        (place_button, "Place or resize a visible signature"),
+    ):
+        set_tooltip = getattr(button, "setToolTip", None)
+        if callable(set_tooltip):
+            set_tooltip(tooltip)
     for button, tooltip, icon_name in (
         (text_selection_button, "Text selection mode", "text-select.svg"),
         (copy_selection_button, "Copy selected text", "copy.svg"),
@@ -381,6 +402,8 @@ def _assemble_signing_workspace_composition(
             set_fixed_width(8)
         viewer_navigation_row.addWidget(toolbar_gap)
     viewer_navigation_row.addWidget(text_selection_button)
+    viewer_navigation_row.addWidget(pan_button)
+    viewer_navigation_row.addWidget(place_button)
     viewer_navigation_row.addWidget(copy_selection_button)
     viewer_navigation_row.addWidget(fit_page_button)
     viewer_navigation_row.addWidget(fit_width_button)
@@ -418,6 +441,8 @@ def _assemble_signing_workspace_composition(
             return
         runtime.refresh_review_jump_to_page_index(target)
 
+    selected_viewer_mode = {"value": "pan"}
+
     def refresh_text_selection_toolbar_state(
         document_text_state: DocumentTextWorkspaceState,
     ) -> None:
@@ -425,12 +450,22 @@ def _assemble_signing_workspace_composition(
         if callable(set_checked):
             set_checked(document_text_state.selection_mode_enabled)
         copy_selection_button.setEnabled(document_text_state.selection_state.can_copy)
+        if document_text_state.selection_mode_enabled:
+            selected_viewer_mode["value"] = "text"
+        set_pan_checked = getattr(pan_button, "setChecked", None)
+        set_place_checked = getattr(place_button, "setChecked", None)
+        if callable(set_pan_checked):
+            set_pan_checked(selected_viewer_mode["value"] == "pan")
+        if callable(set_place_checked):
+            set_place_checked(selected_viewer_mode["value"] == "signature")
         _set_text(
             interaction_mode_label,
-            (
-                "Text selection mode — drag across PDF text to select and copy"
-                if document_text_state.selection_mode_enabled
-                else "Placement mode — drag on the page to draw or resize the signature"
+            "Text selection mode — drag across PDF text to select and copy"
+            if document_text_state.selection_mode_enabled
+            else (
+                "Pan mode — drag to move around the page"
+                if selected_viewer_mode["value"] == "pan"
+                else "Place mode — drag on the page to draw or resize the signature"
             ),
         )
 
@@ -438,9 +473,22 @@ def _assemble_signing_workspace_composition(
         is_checked = getattr(text_selection_button, "isChecked", None)
         enabled = bool(is_checked()) if callable(is_checked) else False
         result = runtime.set_document_text_selection_mode(enabled)
+        selected_viewer_mode["value"] = "text" if result else "signature"
+        runtime.set_viewer_interaction_mode(selected_viewer_mode["value"])
         set_checked = getattr(text_selection_button, "setChecked", None)
         if callable(set_checked):
             set_checked(result)
+
+    def set_viewer_mode(mode: str) -> None:
+        selected_viewer_mode["value"] = mode
+        runtime.set_viewer_interaction_mode(mode)
+        set_checked = getattr(text_selection_button, "setChecked", None)
+        if callable(set_checked):
+            set_checked(False)
+        for button, value in ((pan_button, "pan"), (place_button, "signature")):
+            setter = getattr(button, "setChecked", None)
+            if callable(setter):
+                setter(mode == value)
 
     def fit_page_view() -> None:
         viewer_widget.fit_page_view()
@@ -451,6 +499,8 @@ def _assemble_signing_workspace_composition(
     previous_page_button.clicked.connect(go_previous_page)  # type: ignore[attr-defined]
     next_page_button.clicked.connect(go_next_page)  # type: ignore[attr-defined]
     text_selection_button.clicked.connect(toggle_text_selection_mode)  # type: ignore[attr-defined]
+    pan_button.clicked.connect(lambda: set_viewer_mode("pan"))  # type: ignore[attr-defined]
+    place_button.clicked.connect(lambda: set_viewer_mode("signature"))  # type: ignore[attr-defined]
     copy_selection_button.clicked.connect(copy_selected_document_text)  # type: ignore[attr-defined]
     fit_page_button.clicked.connect(fit_page_view)  # type: ignore[attr-defined]
     fit_width_button.clicked.connect(fit_width_view)  # type: ignore[attr-defined]
@@ -464,6 +514,8 @@ def _assemble_signing_workspace_composition(
         "total_pages_label": total_pages_label,
         "next_page_button": next_page_button,
         "text_selection_button": text_selection_button,
+        "pan_button": pan_button,
+        "place_button": place_button,
         "copy_selection_button": copy_selection_button,
         "fit_page_button": fit_page_button,
         "fit_width_button": fit_width_button,

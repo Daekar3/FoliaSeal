@@ -228,6 +228,12 @@ Release tranche:
   interaction and offscreen integration coverage is `40 passed`; current full suite is `1296 passed,
   20 skipped, 1 warning`. Broader explicit Pan/Place tool topology, keyboard placement, snap/guides,
   undo history, and off-page recovery remain open in later placement work.
+- [x] (2026-08-10) Completed the explicit Pan/Place topology follow-up: the production viewer now
+  starts in Pan, exposes checkable Pan and Place tools through the typed session boundary, prevents
+  accidental placement while panning, and preserves completed overlays across mode changes. Focused
+  shell/viewer/composition/integration validation is `156 passed`; full-suite validation is `1297
+  passed, 20 skipped, 1 warning`, and final commit gates remain. Keyboard placement, snap/guides,
+  undo history, and off-page recovery remain open.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

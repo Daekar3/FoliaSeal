@@ -103,6 +103,7 @@ class SigningWorkspaceSessionPort(Protocol):
     def document_review_state(self) -> DocumentReviewWorkspaceState: ...
     def select_document_review_item(self, signature_id: str) -> DocumentReviewWorkspaceState: ...
     def clear_document_review_highlight(self) -> None: ...
+    def set_viewer_interaction_mode(self, mode: str) -> str: ...
 
     def set_signature_rect(
         self,
@@ -254,6 +255,9 @@ class QtSigningWorkspaceSessionPort:
         clearer = getattr(self.shell_widget, "clear_document_review_highlight", None)
         if callable(clearer):
             clearer()
+
+    def set_viewer_interaction_mode(self, mode: str) -> str:
+        return self.shell_widget.set_viewer_interaction_mode(mode)
 
     def set_signature_rect(
         self,

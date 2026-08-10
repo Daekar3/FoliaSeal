@@ -223,6 +223,21 @@ class SigningWorkspaceRuntime:
             self._on_status_change("document_text_mode_changed")
         return transition.state.document_text.selection_mode_enabled
 
+    def set_viewer_interaction_mode(self, mode: str) -> str:
+        """Select the explicit Pan, Place, or Text viewer tool."""
+        if mode not in {"pan", "signature", "text"}:
+            raise ValueError(f"Unsupported viewer interaction mode: {mode}")
+        if mode != "text" and self.document_text_selection_mode_enabled():
+            transition = self._document_review_workspace_required().set_text_selection_mode(False)
+            self._review_bridge_required().apply_transition(transition)
+        setter = getattr(self._viewer_widget_required(), "set_interaction_mode", None)
+        if not callable(setter):
+            raise RuntimeError("The active viewer does not expose interaction modes.")
+        setter(mode)
+        if self._on_status_change is not None:
+            self._on_status_change(f"viewer_mode_{mode}")
+        return mode
+
     def document_text_selection_mode_enabled(self) -> bool:
         state = self._document_review_workspace_required().current_state()
         return state.document_text.selection_mode_enabled

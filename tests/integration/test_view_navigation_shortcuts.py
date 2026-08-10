@@ -250,3 +250,50 @@ def test_pointer_drag_creates_one_page_local_signature_rectangle_and_escape_canc
         app.processEvents()
         if created_app:
             app.quit()
+
+
+def test_pan_and_place_tools_are_explicit_and_mutually_exclusive() -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QMainWindow
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal-pan-place-mode-test"])
+
+    workflow = ViewerWorkflow(
+        document_path="/tmp/pan-place-mode-test.pdf",
+        render_backend=_RenderBackend(),
+        session=ViewerSession(page_count=1),
+    )
+    selected = []
+    viewer = build_qt_pdf_viewer_widget(workflow=workflow, on_selection=selected.append)
+    window = QMainWindow()
+    window.resize(240, 240)
+    window.setCentralWidget(viewer)
+    viewer.refresh()
+    window.show()
+    viewer.widget().setFocus()
+    app.processEvents()
+
+    try:
+        viewer.set_interaction_mode("pan")
+        QTest.mousePress(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(20, 20))
+        QTest.mouseMove(viewer.widget(), pos=QPoint(100, 100))
+        QTest.mouseRelease(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(100, 100))
+        assert selected == []
+
+        viewer.set_interaction_mode("signature")
+        QTest.mousePress(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(20, 20))
+        QTest.mouseMove(viewer.widget(), pos=QPoint(100, 100))
+        QTest.mouseRelease(viewer.widget(), Qt.MouseButton.LeftButton, pos=QPoint(100, 100))
+        assert len(selected) == 1
+    finally:
+        window.close()
+        app.processEvents()
+        if created_app:
+            app.quit()

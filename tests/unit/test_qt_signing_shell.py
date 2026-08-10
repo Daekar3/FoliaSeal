@@ -1635,7 +1635,7 @@ def test_signing_shell_document_review_page_navigation_buttons_track_viewer_stat
     assert controls["fit_page_button"].tooltip == "Fit the whole PDF page in the viewer"
     assert controls["fit_width_button"].tooltip == "Fit the PDF page width in the viewer"
     assert controls["interaction_mode_label"].text() == (
-        "Placement mode — drag on the page to draw or resize the signature"
+        "Pan mode — drag to move around the page"
     )
     assert controls["previous_page_button"]._enabled is False
     assert controls["next_page_button"]._enabled is True
@@ -2410,8 +2410,14 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
     assert widget.viewer_widget.interaction_mode == "signature"
     assert controls["text_selection_button"].isChecked() is False
     assert controls["interaction_mode_label"].text() == (
-        "Placement mode — drag on the page to draw or resize the signature"
+        "Place mode — drag on the page to draw or resize the signature"
     )
+
+    controls["pan_button"].click()
+
+    assert widget.viewer_widget.interaction_mode == "pan"
+    assert controls["pan_button"].isChecked() is True
+    assert controls["place_button"].isChecked() is False
     assert widget.signature_rect() is not None
     assert widget.signature_rect().left_pt == 1.0
 
