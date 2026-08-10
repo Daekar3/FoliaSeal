@@ -11,11 +11,19 @@ def test_placement_history_undo_redo_and_branch_invalidation() -> None:
     second = _rect(2)
     third = _rect(3)
     history = PlacementHistory()
+    assert history.can_undo is False
+    assert history.can_redo is False
 
     history.commit(first)
+    assert history.can_undo is True
+    assert history.can_redo is False
     history.commit(second)
     assert history.undo() == first
+    assert history.can_undo is True
+    assert history.can_redo is True
     assert history.redo() == second
+    assert history.can_undo is True
+    assert history.can_redo is False
     assert history.undo() == first
     history.commit(third)
 

@@ -58,6 +58,8 @@ def test_app_frame_builds_a_lazy_signing_executor_by_default(tmp_path: Path) -> 
 
 def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
     assert [definition.command_id for definition in EDIT_COMMAND_DEFINITIONS] == [
+        AppFrameCommandId.UNDO,
+        AppFrameCommandId.REDO,
         AppFrameCommandId.COPY
     ]
     assert [definition.command_id for definition in VIEW_COMMAND_DEFINITIONS] == [
@@ -75,7 +77,11 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
         AppFrameCommandId.DOCUMENT_SIGNATURES,
     ]
     assert EDIT_COMMAND_DEFINITIONS[0].menu == "Edit"
-    assert EDIT_COMMAND_DEFINITIONS[0].shortcut == "Ctrl+C"
+    assert [definition.shortcut for definition in EDIT_COMMAND_DEFINITIONS] == [
+        "Ctrl+Z",
+        "Ctrl+Shift+Z",
+        "Ctrl+C",
+    ]
     assert VIEW_COMMAND_DEFINITIONS[-1].menu == "View"
 
 
@@ -400,6 +406,10 @@ class _FakeLineEdit:
     def __init__(self, text="") -> None:
         self._text = text
         self.textChanged = _FakeSignal()
+        self.undo_available = False
+        self.redo_available = False
+        self.undo_calls = 0
+        self.redo_calls = 0
 
     def setText(self, text):  # noqa: N802
         self._text = text
@@ -410,6 +420,22 @@ class _FakeLineEdit:
 
     def setPlaceholderText(self, text):  # noqa: N802
         self.placeholder_text = text
+
+    def isUndoAvailable(self):  # noqa: N802
+        return self.undo_available
+
+    def isRedoAvailable(self):  # noqa: N802
+        return self.redo_available
+
+    def undo(self) -> None:
+        self.undo_calls += 1
+        self.undo_available = False
+        self.redo_available = True
+
+    def redo(self) -> None:
+        self.redo_calls += 1
+        self.redo_available = False
+        self.undo_available = True
 
 
 class _FakeCheckBox:
@@ -563,6 +589,7 @@ class _FakeQApplication:
     exec_result = 0
     exec_calls = 0
     quit_calls = 0
+    focus_widget = None
 
     def __init__(self, argv) -> None:
         self.argv = list(argv)
@@ -572,6 +599,10 @@ class _FakeQApplication:
     @classmethod
     def instance(cls):
         return cls._instance
+
+    @classmethod
+    def focusWidget(cls):  # noqa: N802
+        return cls.focus_widget
 
     def exec(self):
         type(self).exec_calls += 1
@@ -596,6 +627,10 @@ class _FakeShell:
         self.can_remove_signature_placement_value = False
         self.set_viewer_interaction_mode_calls = []
         self.remove_signature_placement_calls = 0
+        self.can_undo_placement_value = False
+        self.can_redo_placement_value = False
+        self.undo_placement_calls = 0
+        self.redo_placement_calls = 0
         self.explicit_output_pdf_path = False
         self.set_document_text_selection_mode_calls = []
         self.document_text_selection_mode = False
@@ -676,6 +711,24 @@ class _FakeShell:
     def remove_signature_placement(self) -> bool:
         self.remove_signature_placement_calls += 1
         return True
+
+    def can_undo_placement(self) -> bool:
+        return self.can_undo_placement_value
+
+    def can_redo_placement(self) -> bool:
+        return self.can_redo_placement_value
+
+    def undo_placement(self):
+        self.undo_placement_calls += 1
+        self.can_undo_placement_value = False
+        self.can_redo_placement_value = True
+        return "undo-target"
+
+    def redo_placement(self):
+        self.redo_placement_calls += 1
+        self.can_redo_placement_value = False
+        self.can_undo_placement_value = True
+        return "redo-target"
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         self.set_document_text_selection_mode_calls.append(bool(enabled))
@@ -896,6 +949,7 @@ def _fake_bindings() -> QtAppFrameBindings:
     _FakeQApplication.exec_result = 0
     _FakeQApplication.exec_calls = 0
     _FakeQApplication.quit_calls = 0
+    _FakeQApplication.focus_widget = None
     return QtAppFrameBindings(
         q_main_window=_FakeMainWindow,
         q_dialog=_FakeDialog,
@@ -1396,6 +1450,47 @@ def test_signing_menu_routes_library_and_sign_save_through_existing_boundaries(
     assert shell.submit_sign_request_calls == 1
 
 
+def test_edit_undo_redo_routes_to_placement_history_unless_text_editor_has_focus(
+    tmp_path: Path,
+) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    actions = frame.command_actions()
+    undo_action = actions[AppFrameCommandId.UNDO]
+    redo_action = actions[AppFrameCommandId.REDO]
+    assert undo_action.enabled is False
+    assert redo_action.enabled is False
+
+    shell.can_undo_placement_value = True
+    frame._sync_edit_history_actions()
+    assert undo_action.enabled is True
+    undo_action.trigger()
+    assert shell.undo_placement_calls == 1
+    assert undo_action.enabled is False
+    assert redo_action.enabled is True
+    redo_action.trigger()
+    assert shell.redo_placement_calls == 1
+    assert undo_action.enabled is True
+    assert redo_action.enabled is False
+
+    editor = _FakeLineEdit("12")
+    editor.undo_available = True
+    _FakeQApplication.focus_widget = editor
+    frame._sync_edit_history_actions()
+    assert undo_action.enabled is True
+    assert redo_action.enabled is False
+    undo_action.trigger()
+    assert editor.undo_calls == 1
+    assert shell.undo_placement_calls == 1
+
 def test_first_use_library_is_presets_first_and_refreshes_active_shell_without_selection(
     tmp_path: Path,
 ) -> None:
@@ -1497,10 +1592,12 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
     assert [action.status_tip for action in frame.window.menu_bar.menus[0].actions] == [
         definition.accessible_name for definition in FILE_COMMAND_DEFINITIONS
     ]
-    assert [action.text for action in frame.window.menu_bar.menus[1].actions] == ["&Copy"]
-    assert frame.window.menu_bar.menus[1].actions[0].checkable is False
-    assert frame.window.menu_bar.menus[1].actions[0].enabled is False
-    assert frame.window.menu_bar.menus[1].actions[0].icon.path.endswith("copy.svg")
+    assert [action.text for action in frame.window.menu_bar.menus[1].actions] == [
+        definition.mnemonic_text for definition in EDIT_COMMAND_DEFINITIONS
+    ]
+    assert all(action.checkable is False for action in frame.window.menu_bar.menus[1].actions)
+    assert all(action.enabled is False for action in frame.window.menu_bar.menus[1].actions)
+    assert frame.window.menu_bar.menus[1].actions[2].icon.path.endswith("copy.svg")
     assert [action.text for action in frame.window.menu_bar.menus[2].actions] == [
         "Previous &Page",
         "Next P&age",
@@ -1633,7 +1730,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     save_action = frame.window.menu_bar.menus[0].actions[1]
     save_as_action = frame.window.menu_bar.menus[0].actions[2]
     close_action = frame.window.menu_bar.menus[0].actions[3]
-    copy_selection_action = frame.window.menu_bar.menus[1].actions[0]
+    copy_selection_action = frame.window.menu_bar.menus[1].actions[2]
     text_selection_action = frame.window.menu_bar.menus[2].actions[4]
 
     assert save_action.enabled is False

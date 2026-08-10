@@ -14,6 +14,8 @@ class WorkspaceActionState:
     text_selection_enabled: bool
     text_selection_checked: bool
     copy_selected_text_enabled: bool
+    undo_placement_enabled: bool = False
+    redo_placement_enabled: bool = False
     previous_page_enabled: bool = False
     next_page_enabled: bool = False
     back_link_enabled: bool = False
@@ -46,6 +48,8 @@ def workspace_action_state_closed() -> WorkspaceActionState:
 
 def workspace_action_state_open(
     *,
+    undo_placement_enabled: bool = False,
+    redo_placement_enabled: bool = False,
     previous_page_enabled: bool = False,
     next_page_enabled: bool = False,
     back_link_enabled: bool = False,
@@ -59,6 +63,8 @@ def workspace_action_state_open(
         text_selection_enabled=True,
         text_selection_checked=False,
         copy_selected_text_enabled=False,
+        undo_placement_enabled=undo_placement_enabled,
+        redo_placement_enabled=redo_placement_enabled,
         previous_page_enabled=previous_page_enabled,
         next_page_enabled=next_page_enabled,
         back_link_enabled=back_link_enabled,

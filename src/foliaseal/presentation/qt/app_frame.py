@@ -397,6 +397,8 @@ class FoliaSealAppFrame:
         self._save_as_action: Any | None = None
         self._close_action: Any | None = None
         self._exit_action: Any | None = None
+        self._undo_action: Any | None = None
+        self._redo_action: Any | None = None
         self._previous_page_action: Any | None = None
         self._next_page_action: Any | None = None
         self._back_link_action: Any | None = None
@@ -456,6 +458,7 @@ class FoliaSealAppFrame:
         )
         self._install_menus()
         self._set_placeholder()
+        self._connect_focus_change_signal()
 
     @property
     def container(self) -> Any:
@@ -877,6 +880,104 @@ class FoliaSealAppFrame:
     def _go_forward_link(self) -> None:
         self._with_current_session_port(lambda session: session.go_forward_link())
         self._sync_page_navigation_actions()
+
+    def _focused_text_editor(self) -> Any | None:
+        """Return the focused native text editor, if one owns the current focus."""
+
+        application_type = self._bindings.q_application
+        instance_factory = getattr(application_type, "instance", None)
+        application = instance_factory() if callable(instance_factory) else None
+        focus_getter = getattr(application, "focusWidget", None)
+        if not callable(focus_getter):
+            focus_getter = getattr(application_type, "focusWidget", None)
+        focused = focus_getter() if callable(focus_getter) else None
+        if focused is None:
+            return None
+        text_types = tuple(
+            widget_type
+            for widget_type in (self._bindings.q_line_edit, self._bindings.q_text_edit)
+            if widget_type is not None
+        )
+        if text_types:
+            try:
+                if isinstance(focused, text_types):
+                    return focused
+            except TypeError:
+                pass
+        class_name = type(focused).__name__.lower()
+        if "lineedit" not in class_name and "textedit" not in class_name:
+            return None
+        if not callable(getattr(focused, "undo", None)):
+            return None
+        return focused
+
+    def _connect_focus_change_signal(self) -> None:
+        """Keep Edit action enablement aligned when focus moves between controls."""
+
+        application_type = self._bindings.q_application
+        instance_factory = getattr(application_type, "instance", None)
+        application = instance_factory() if callable(instance_factory) else None
+        signal = getattr(application, "focusChanged", None)
+        connect = getattr(signal, "connect", None)
+        if callable(connect):
+            connect(lambda _old, _new: self._sync_edit_history_actions())
+
+    def _sync_edit_history_actions(self) -> None:
+        """Project native-text or placement-history undo state onto Edit actions."""
+
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            self._apply_workspace_action_state(
+                replace(
+                    self._workspace_action_state,
+                    undo_placement_enabled=False,
+                    redo_placement_enabled=False,
+                )
+            )
+            return
+        editor = self._focused_text_editor()
+        if editor is not None:
+            undo_getter = getattr(editor, "isUndoAvailable", None)
+            redo_getter = getattr(editor, "isRedoAvailable", None)
+            undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
+            redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+        else:
+            session = workspace.session
+            undo_getter = getattr(session, "can_undo_placement", None)
+            redo_getter = getattr(session, "can_redo_placement", None)
+            undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
+            redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+        self._apply_workspace_action_state(
+            replace(
+                self._workspace_action_state,
+                undo_placement_enabled=undo_enabled,
+                redo_placement_enabled=redo_enabled,
+            )
+        )
+
+    def _undo_edit(self) -> Any | None:
+        editor = self._focused_text_editor()
+        if editor is not None:
+            undo = getattr(editor, "undo", None)
+            result = undo() if callable(undo) else None
+        else:
+            result = self._with_current_session_port(
+                lambda session_port: session_port.undo_placement()
+            )
+        self._sync_edit_history_actions()
+        return result
+
+    def _redo_edit(self) -> Any | None:
+        editor = self._focused_text_editor()
+        if editor is not None:
+            redo = getattr(editor, "redo", None)
+            result = redo() if callable(redo) else None
+        else:
+            result = self._with_current_session_port(
+                lambda session_port: session_port.redo_placement()
+            )
+        self._sync_edit_history_actions()
+        return result
 
     def _place_signature(self) -> None:
         self._with_current_session_port(
@@ -1303,6 +1404,18 @@ class FoliaSealAppFrame:
             self._exit_application,
         )
         edit_menu = menu_bar.addMenu("Edit")
+        self._undo_action = self._command_action(
+            edit_menu,
+            AppFrameCommandId.UNDO,
+            self._undo_edit,
+            enabled=False,
+        )
+        self._redo_action = self._command_action(
+            edit_menu,
+            AppFrameCommandId.REDO,
+            self._redo_edit,
+            enabled=False,
+        )
         self._copy_selected_text_action = self._command_action(
             edit_menu,
             AppFrameCommandId.COPY,
@@ -1543,6 +1656,8 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._save_action, state.save_enabled)
         self._set_action_enabled(self._save_as_action, state.save_as_enabled)
         self._set_action_enabled(self._close_action, state.close_enabled)
+        self._set_action_enabled(self._undo_action, state.undo_placement_enabled)
+        self._set_action_enabled(self._redo_action, state.redo_placement_enabled)
         self._set_action_enabled(self._previous_page_action, state.previous_page_enabled)
         self._set_action_enabled(self._next_page_action, state.next_page_enabled)
         self._set_action_enabled(self._back_link_action, state.back_link_enabled)
@@ -1593,6 +1708,7 @@ class FoliaSealAppFrame:
         )
         self._sync_document_text_actions()
         self._sync_signing_command_action()
+        self._sync_edit_history_actions()
 
     def _sync_signing_command_action(self) -> None:
         workspace = self._workspace_host.active()
@@ -1900,6 +2016,7 @@ class FoliaSealAppFrame:
             self._offer_pending_external_link()
         self._sync_signing_command_action()
         self._sync_signing_placement_actions()
+        self._sync_edit_history_actions()
         if self._on_status_change is not None:
             self._on_status_change(status)
 

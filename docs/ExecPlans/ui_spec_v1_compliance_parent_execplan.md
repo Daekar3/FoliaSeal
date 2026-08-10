@@ -319,6 +319,13 @@ Release tranche:
   coordinator/output-policy/bridge/shell coverage is `136 passed`, current full suite is `1440
   passed, 20 skipped, 1 warning`, and the typed summary/authorization/staging boundaries are
   documented. The bounded dialog audit remains limited by `SingleInstanceUnavailable`.
+- [x] (2026-08-10) Added the typed Edit Undo/Redo increment inside the still-open command-model
+  child: `Ctrl+Z`/`Ctrl+Shift+Z` now route through native focused text-editor history or the public
+  placement-history session boundary, with capability-driven QAction state and real offscreen
+  coverage, including direct viewer history replay and native editor Redo. Current focused
+  command/viewer/runtime coverage is `112 passed`; the current full suite is `1443 passed, 20
+  skipped, 1 warning`. Cut/Paste, Help, and remaining command-family evidence
+  remain open in their owning plans.
 - [x] (2026-08-10) Added the bounded pointer-placement cancellation contract: existing pointer drags
   already cross the typed viewer/session/workspace bridge into a page-local `SignatureRect`; Escape
   now cancels unfinished placement or handle drags without emitting a new rectangle. Focused viewer/

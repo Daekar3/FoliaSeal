@@ -55,6 +55,22 @@ class _Shell:
         self.calls.append("can_remove")
         return True
 
+    def can_undo_placement(self):
+        self.calls.append("can_undo")
+        return True
+
+    def can_redo_placement(self):
+        self.calls.append("can_redo")
+        return True
+
+    def undo_placement(self):
+        self.calls.append("undo")
+        return "undo-rect"
+
+    def redo_placement(self):
+        self.calls.append("redo")
+        return "redo-rect"
+
     def remove_signature_placement(self):
         self.calls.append("remove_placement")
         return True
@@ -110,6 +126,10 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
     assert session.can_adjust_signature_placement() is True
     assert session.can_remove_signature_placement() is True
     assert session.remove_signature_placement() is True
+    assert session.can_undo_placement() is True
+    assert session.can_redo_placement() is True
+    assert session.undo_placement() == "undo-rect"
+    assert session.redo_placement() == "redo-rect"
     assert session.open_signed_output() == "output.pdf"
     session.go_to_previous_page()
     session.go_to_next_page()
@@ -132,6 +152,10 @@ def test_session_port_delegates_primary_workflow_without_widget_introspection() 
         "can_adjust",
         "can_remove",
         "remove_placement",
+        "can_undo",
+        "can_redo",
+        "undo",
+        "redo",
         "open_signed_output",
         "previous",
         "next",

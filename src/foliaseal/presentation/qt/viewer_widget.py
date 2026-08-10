@@ -755,6 +755,36 @@ class PdfViewerWidgetAdapter:
                 self._overlay_signature_rect = signature_rect
                 self.update()
 
+            def can_undo_signature_placement(self) -> bool:
+                """Return whether the viewer can restore a prior placement state."""
+
+                return self._placement_history.can_undo
+
+            def can_redo_signature_placement(self) -> bool:
+                """Return whether the viewer can restore a newer placement state."""
+
+                return self._placement_history.can_redo
+
+            def undo_signature_placement(self) -> SignatureRect | None:
+                """Restore one prior placement state through the typed runtime callback."""
+
+                target = self._placement_history.undo()
+                if self._on_keyboard_apply is not None:
+                    self._on_keyboard_apply(target)
+                self._overlay_signature_rect = target
+                self.update()
+                return target
+
+            def redo_signature_placement(self) -> SignatureRect | None:
+                """Restore one newer placement state through the typed runtime callback."""
+
+                target = self._placement_history.redo()
+                if self._on_keyboard_apply is not None:
+                    self._on_keyboard_apply(target)
+                self._overlay_signature_rect = target
+                self.update()
+                return target
+
             def clear_signature_history(self) -> None:
                 """Clear placement history while preserving the visible overlay."""
                 self._placement_history.clear(current=self._overlay_signature_rect)
@@ -1425,6 +1455,18 @@ def build_qt_pdf_viewer_widget(
 
         def clear_signature_history(self) -> None:
             preview_widget.clear_signature_history()
+
+        def can_undo_signature_placement(self) -> bool:
+            return preview_widget.can_undo_signature_placement()
+
+        def can_redo_signature_placement(self) -> bool:
+            return preview_widget.can_redo_signature_placement()
+
+        def undo_signature_placement(self) -> SignatureRect | None:
+            return preview_widget.undo_signature_placement()
+
+        def redo_signature_placement(self) -> SignatureRect | None:
+            return preview_widget.redo_signature_placement()
 
         def clear_signature_overlay(self) -> None:
             preview_widget.clear_signature_overlay()

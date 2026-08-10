@@ -7,12 +7,14 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, the two already-supported text commands use the same typed command registry as
-File, View, and Settings: View contains a checkable Select Text action, and Edit contains Copy. The
-commands retain their existing public workspace callbacks and state synchronization, so keyboard
-and menu users see the correct topology without inventing unsupported editing features. This is a
-bounded increment toward UI_SPEC section 7 and acceptance scenarios 1 and 8; the broader command
-corpus remains open for its owning viewer, signing, and support plans.
+After this slice, the already-supported text commands and placement history use the same typed
+command registry as File, View, Settings, and Signing. Edit contains focus-sensitive Undo and Redo
+with Ctrl+Z/Ctrl+Shift+Z: a focused native text editor keeps its own Qt undo stack, while viewer or
+placement focus routes to the public workspace placement-history boundary. The commands retain
+truthful capability state after placement mutations and lifecycle clearing, so keyboard and menu
+users see the correct topology without inventing unsupported editing features. This is a bounded
+increment toward UI_SPEC section 7 and acceptance scenarios 1 and 8; Help and other unsupported
+command families remain open for their owning plans.
 
 ## Child ExecPlan Dependencies
 
@@ -86,6 +88,19 @@ corpus remains open for its owning viewer, signing, and support plans.
 - [x] (2026-08-10) Added typed placement command definitions, public session capabilities/actions,
   truthful frame enablement/status synchronization, focused and real offscreen action coverage, and
   fixed-field protection through the runtime boundary.
+- [x] (2026-08-10) Fresh-scan selected the next truthful command increment: Edit Undo and Redo over
+  the existing placement-history seam. Native QLineEdit undo/redo remains authoritative when a text
+  editor owns focus; placement history is used only for viewer/placement focus.
+- [x] (2026-08-10) Added red/green command, focus-routing, capability, and real offscreen menu tests;
+  implemented the public session/runtime boundary and synchronized action state after mutations and
+  lifecycle clearing.
+- [x] (2026-08-10) Added direct viewer `PlacementHistory` public-method coverage and native text
+  editor Redo coverage; the focused command/viewer/runtime/session/offscreen set is `112 passed`.
+- [x] (2026-08-10) Reconciled architecture/status documentation for the public Undo/Redo boundary,
+  focus-sensitive native text routing, and placement-history semantics. Full validation is `1443
+  passed, 20 skipped, 1 warning`; the bounded GUI audit exits at `SingleInstanceUnavailable`, with
+  no matching processes or temporary audit root remaining. Commit and remaining command-family
+  status remain the parent handoff gates.
 
 ## Surprises & Discoveries
 
@@ -202,12 +217,14 @@ enablement, public session-port routing, and callback synchronization after view
 The offscreen Qt shortcut test proves exactly one transition per key. Loop 8 also migrates the five
 existing Settings callbacks into `SETTINGS_COMMAND_DEFINITIONS`, including unique mnemonics, stable
 object names, Qt descriptions, and trigger-routing tests. The remaining gap is the rest of the
-UI_SPEC command registry and its parent scenario evidence: focus-sensitive Edit actions, Help
-content/actions, and remaining View behavior remain deferred to their owning viewer/document/support
-children. The current increment narrows the history gap by wiring document-internal Back/Forward and
-completes all five Signing actions; browser navigation and other unsupported command families remain
-out of scope. Final evidence is `1440 passed, 20 skipped, 1 warning` for the full suite and `68
-passed` for focused Signing/menu/runtime coverage; the bounded launch returned `gui_rc=1` with
+UI_SPEC command registry and its parent scenario evidence: Help content/actions and remaining View
+behavior remain deferred to their owning viewer/document/support children. The current increment
+wires document-internal Back/Forward, completes all five Signing actions, and adds focus-sensitive
+Undo/Redo over native text-editor and placement histories; browser navigation, Cut/Paste, and other
+unsupported command families remain
+out of scope. Final evidence for this increment is `1443 passed, 20 skipped, 1 warning` for the
+full suite and `112 passed` for focused command/viewer/runtime/session/offscreen coverage; the
+bounded launch returned `gui_rc=1` with
 `SingleInstanceUnavailable`, then left no matching process or temporary root.
 
 ## Context and Orientation
@@ -257,6 +274,19 @@ session action that clears only editable visible-signature placement. Fixed unsi
 targets remain disabled for all placement mutations. Preserve all File/View/Settings ordering
 contracts and update menu tests to use menu titles or typed action lookup where practical.
 
+For the Undo/Redo increment, add `UNDO` and `REDO` to `AppFrameCommandId` and place them first in
+`EDIT_COMMAND_DEFINITIONS` with `Ctrl+Z` and `Ctrl+Shift+Z`. Add public capability and action methods
+to `SigningWorkspaceSessionPort`, `QtSigningWorkspaceSessionPort`, and
+`SigningWorkspaceRuntime`; the runtime delegates to the viewer's existing `PlacementHistory` and
+applies the restored rectangle through the existing typed placement callback. Add
+`undo_placement_enabled` and `redo_placement_enabled` to `WorkspaceActionState`, and synchronize
+them after placement edits, panel changes, undo/redo, open/close, discard, and successful signing.
+At the frame edge, inspect the current Qt application focus before routing: if the focus widget
+exposes native `undo()`/`redo()` and is a text editor, invoke that method and derive enablement from
+its `isUndoAvailable()`/`isRedoAvailable()` state; otherwise route through the session port. This
+keeps numeric fields' local editing history separate from document-placement history and avoids
+private widget reach-through from the app frame.
+
 ## Milestones
 
 Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
@@ -269,7 +299,9 @@ have their owning slices and scenario evidence. Milestone 5 adds the two support
 proves no-document Library availability and readiness-aware Sign and save enablement/routing, and
 runs a real offscreen menu-topology test. Milestone 6 adds Place Signature, Adjust Placement, and
 Remove Placement over the public placement seam, proves fixed-field protection and truthful state
-transitions, and runs the real offscreen Signing-menu test.
+transitions, and runs the real offscreen Signing-menu test. Milestone 7 adds Edit Undo/Redo, proves
+focus-sensitive native-text versus placement-history routing and capability transitions, and runs a
+real offscreen menu/action test that creates, mutates, undoes, and redoes a placement.
 
 ## Concrete Steps
 
@@ -282,6 +314,7 @@ fall back to a system Python or system Qt installation.
 
     rg -n -e '_install_menus|_command_action|text_selection|copy_selected|SIGNING_COMMAND_DEFINITIONS|VIEW_COMMAND_DEFINITIONS|EDIT_COMMAND_DEFINITIONS' src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_app_frame_workspace_action_state.py tests/integration/test_gui_launch_no_document.py
+    .venv/bin/pytest -q tests/unit/test_placement_history.py tests/unit/test_qt_signing_workspace_runtime.py tests/unit/test_signing_workspace_session_port.py
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py tests/integration/test_view_navigation_shortcuts.py
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py
     .venv/bin/ruff check src tests
@@ -308,7 +341,7 @@ enablement/check state, and reach their existing public ports exactly once. Back
 internal link creates history; Back moves to the prior internal destination and enables Forward;
 Forward returns to the next destination; a new internal destination after Back clears Forward. File,
 View page/zoom actions, and Settings remain green under their prior contracts. The full child
-acceptance remains open for focus-sensitive Edit, Help, remaining View behavior, signed-state policy,
+acceptance remains open for Help, remaining View behavior, signed-state policy,
 and parent scenario requirements. Record final focused/full test counts, Ruff, diff checks,
 and the real-Qt menu/action evidence; the display-backed audit remains environment-limited by the
 known QLocalServer/`SingleInstanceUnavailable` failure. The Signing increment is complete: the menu
@@ -317,6 +350,16 @@ only for a new editable placement, enables Adjust/Remove only for an existing ed
 protects fixed unsigned fields, and disables placement actions during active signing. Sign and save
 remains readiness/transaction gated; production Qt action routing and state transitions are covered
 by the focused and real offscreen tests.
+
+For the Undo/Redo increment, Edit presents Undo and Redo before Copy with the stated shortcuts.
+With a placement-focused viewer, creating or moving a placement enables Undo, Ctrl+Z restores the
+previous rectangle (or no placement), and Ctrl+Shift+Z restores the newer rectangle; the menu
+actions update after every operation. With a focused numeric `QLineEdit`, the same shortcuts call
+the line edit's native undo/redo and do not alter the placement rectangle. Changing non-placement
+setup, opening or closing a document, discarding a draft, or successfully signing clears placement
+history and disables both actions. The new focused tests must fail before the boundary exists and
+pass afterward; full regression, Ruff, diff checks, and offscreen lifecycle cleanup must remain
+green.
 
 ## Evidence Record
 
@@ -331,14 +374,16 @@ Loop 8 Settings focused pass is `44 passed`; the prior Select Text/Copy incremen
 registry/state tests, along with the final full-suite count, Ruff, and diff results. The current
 Signing focused command was `.venv/bin/pytest -q tests/unit/test_qt_app_frame.py
 tests/unit/test_qt_signing_workspace_runtime.py tests/unit/test_signing_workspace_session_port.py
-tests/integration/test_gui_launch_no_document.py` (`68 passed`), including production QAction
-Place/Adjust/Remove routing. The
+tests/integration/test_gui_launch_no_document.py` (`112 passed`), including production QAction
+Undo/Redo and Place/Adjust/Remove routing. The
 bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
 isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
 FoliaSeal/PySide6 processes after cleanup.
 
-Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
-"no SVG" decision alongside the evidence row.
+The contributing UI_SPEC scenarios are 3 (create/adjust/remove/undo/restore one placement) and 8
+(keyboard-only signing workflow); this increment changes command behavior but adds no new SVG, so
+the evidence record explicitly uses the existing command-model topology drawings without a new
+SVG artifact.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
@@ -360,7 +405,12 @@ absolute paths.
 Use existing typed application workflows and public Qt ports rather than private child-widget
 reach-through. The final interface must be exercised by tests/unit/test_qt_app_frame.py,
 tests/unit/test_app_frame_workspace_action_state.py, tests/integration/test_gui_launch_no_document.py,
-and the command-state assertions added for Settings.
+and the command-state assertions added for Settings. The Undo/Redo increment additionally requires
+tests/unit/test_placement_history.py, tests/unit/test_qt_signing_workspace_runtime.py, and
+tests/unit/test_signing_workspace_session_port.py. `QtSigningWorkspaceSessionPort` must expose
+`can_undo_placement()`, `can_redo_placement()`, `undo_placement()`, and `redo_placement()`;
+`SigningWorkspaceRuntime` must provide the corresponding typed methods and leave placement
+application/history ownership in the viewer boundary.
 workspace surface. Any compatibility adapter retained temporarily must have a named consumer and a
 retirement condition recorded in this plan.
 
@@ -384,3 +434,8 @@ Revision note: 2026-08-10 / Codex
 Selected the next bounded correction: add typed Place Signature, Adjust Placement, and Remove
 Placement commands over the existing runtime placement behavior, with public capability gates that
 keep fixed unsigned signature-field targets protected.
+Revision note: 2026-08-10 / Codex
+Selected the next bounded correction: add focus-sensitive typed Edit Undo/Redo over the existing
+placement-history seam. Native text-editor undo remains local to the focused editor; viewer and
+placement focus use the public workspace session boundary. This closes the direct UI_SPEC command
+gap without adding unsupported editing commands.

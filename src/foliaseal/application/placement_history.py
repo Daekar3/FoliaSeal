@@ -17,6 +17,18 @@ class PlacementHistory:
     def current(self) -> SignatureRect | None:
         return self._current
 
+    @property
+    def can_undo(self) -> bool:
+        """Return whether one prior placement state can be restored."""
+
+        return bool(self._undo)
+
+    @property
+    def can_redo(self) -> bool:
+        """Return whether one undone placement state can be restored."""
+
+        return bool(self._redo)
+
     def synchronize(self, current: SignatureRect | None) -> None:
         """Adopt external state and clear history when it differs."""
         if current != self._current:

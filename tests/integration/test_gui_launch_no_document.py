@@ -197,7 +197,7 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
 
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QApplication, QWidget
+    from PySide6.QtWidgets import QApplication, QLineEdit, QWidget
 
     from foliaseal.application.certificate_models import CertificateCatalog
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -227,6 +227,10 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
             self.place_available = True
             self.adjust_available = False
             self.remove_available = False
+            self.undo_available = False
+            self.redo_available = False
+            self.undo_calls = 0
+            self.redo_calls = 0
             self.container = self
 
         def has_unsaved_changes(self) -> bool:
@@ -287,6 +291,24 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
         def remove_signature_placement(self) -> bool:
             self.remove_placement_calls += 1
             return True
+
+        def can_undo_placement(self) -> bool:
+            return self.undo_available
+
+        def can_redo_placement(self) -> bool:
+            return self.redo_available
+
+        def undo_placement(self):
+            self.undo_calls += 1
+            self.undo_available = False
+            self.redo_available = True
+            return "undo-target"
+
+        def redo_placement(self):
+            self.redo_calls += 1
+            self.redo_available = False
+            self.undo_available = True
+            return "redo-target"
 
         def go_to_previous_page(self) -> None:
             return None
@@ -385,14 +407,58 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     actions = frame.command_actions()
     back_action = actions[AppFrameCommandId.BACK]
     forward_action = actions[AppFrameCommandId.FORWARD]
+    undo_action = actions[AppFrameCommandId.UNDO]
+    redo_action = actions[AppFrameCommandId.REDO]
     place_action = actions[AppFrameCommandId.PLACE_SIGNATURE]
     adjust_action = actions[AppFrameCommandId.ADJUST_PLACEMENT]
     remove_action = actions[AppFrameCommandId.REMOVE_PLACEMENT]
     assert back_action.isEnabled() is False
     assert forward_action.isEnabled() is False
+    assert undo_action.isEnabled() is False
+    assert redo_action.isEnabled() is False
     assert place_action.isEnabled() is True
     assert adjust_action.isEnabled() is False
     assert remove_action.isEnabled() is False
+
+    shell.undo_available = True
+    shell.status_callback("signing_readiness_changed")
+    app.processEvents()
+    assert undo_action.isEnabled() is True
+    assert redo_action.isEnabled() is False
+    frame.window.activateWindow()
+    QTest.keyClick(frame.window, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
+    assert shell.undo_calls == 1
+    assert undo_action.isEnabled() is False
+    assert redo_action.isEnabled() is True
+    QTest.keyClick(
+        frame.window,
+        Qt.Key.Key_Z,
+        Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+    )
+    assert shell.redo_calls == 1
+    assert undo_action.isEnabled() is True
+    assert redo_action.isEnabled() is False
+
+    editor = QLineEdit(frame.window)
+    editor.show()
+    editor.setText("12")
+    editor.setFocus(Qt.FocusReason.OtherFocusReason)
+    QTest.keyClicks(editor, "3")
+    frame.window.activateWindow()
+    editor.setFocus(Qt.FocusReason.OtherFocusReason)
+    app.processEvents()
+    frame._sync_edit_history_actions()
+    assert undo_action.isEnabled() is True
+    undo_action.trigger()
+    app.processEvents()
+    assert editor.text() == "12"
+    assert shell.undo_calls == 1
+    assert redo_action.isEnabled() is True
+    redo_action.trigger()
+    app.processEvents()
+    assert editor.text() == "123"
+    assert shell.redo_calls == 1
+    editor.deleteLater()
 
     place_action.trigger()
     assert shell.placement_mode_calls == ["signature"]

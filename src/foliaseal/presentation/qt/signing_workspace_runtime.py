@@ -301,9 +301,41 @@ class SigningWorkspaceRuntime:
             self._properties_panel_required().set_signature_rect(None)
             self.sync_signature_overlay()
             self._refresh_sign_button_state_required()()
+            if self._on_status_change is not None:
+                self._on_status_change("signing_readiness_changed")
             return None
         self.apply_signature_rect_placement(signature_rect)
         return signature_rect
+
+    def can_undo_placement(self) -> bool:
+        """Return whether the active viewer can undo a placement mutation."""
+
+        capability = getattr(self._viewer_widget_required(), "can_undo_signature_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def can_redo_placement(self) -> bool:
+        """Return whether the active viewer can redo a placement mutation."""
+
+        capability = getattr(self._viewer_widget_required(), "can_redo_signature_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def undo_placement(self) -> SignatureRect | None:
+        """Undo one placement mutation and refresh readiness projections."""
+
+        undo = getattr(self._viewer_widget_required(), "undo_signature_placement", None)
+        result = undo() if callable(undo) else self._draft_workflow.signature_rect
+        if self._on_status_change is not None:
+            self._on_status_change("signing_readiness_changed")
+        return result
+
+    def redo_placement(self) -> SignatureRect | None:
+        """Redo one placement mutation and refresh readiness projections."""
+
+        redo = getattr(self._viewer_widget_required(), "redo_signature_placement", None)
+        result = redo() if callable(redo) else self._draft_workflow.signature_rect
+        if self._on_status_change is not None:
+            self._on_status_change("signing_readiness_changed")
+        return result
 
     def on_viewer_interaction(self, name: str) -> None:
         if name == "navigation_changed":
@@ -517,6 +549,8 @@ class SigningWorkspaceRuntime:
         self.apply_placement_context(placement_context)
         self.sync_signature_overlay()
         self._refresh_sign_button_state_required()()
+        if self._on_status_change is not None:
+            self._on_status_change("signing_readiness_changed")
 
     def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None:
         """Target an existing unsigned field and lock its page/geometry."""

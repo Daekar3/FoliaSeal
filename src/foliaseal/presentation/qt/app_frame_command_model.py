@@ -14,6 +14,8 @@ class AppFrameCommandId(StrEnum):
     SAVE_AS = "file.save_as"
     CLOSE = "file.close"
     EXIT = "file.exit"
+    UNDO = "edit.undo"
+    REDO = "edit.redo"
     COPY = "edit.copy"
     PREVIOUS_PAGE = "view.previous_page"
     NEXT_PAGE = "view.next_page"
@@ -96,6 +98,22 @@ FILE_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
 
 
 EDIT_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.UNDO,
+        menu="Edit",
+        text="Undo",
+        shortcut="Ctrl+Z",
+        accessible_name="Undo the last placement or text edit",
+        mnemonic_text="&Undo",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.REDO,
+        menu="Edit",
+        text="Redo",
+        shortcut="Ctrl+Shift+Z",
+        accessible_name="Redo the last undone placement or text edit",
+        mnemonic_text="&Redo",
+    ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.COPY,
         menu="Edit",

@@ -114,6 +114,10 @@ class SigningWorkspaceSessionPort(Protocol):
     def can_adjust_signature_placement(self) -> bool: ...
     def can_remove_signature_placement(self) -> bool: ...
     def remove_signature_placement(self) -> bool: ...
+    def can_undo_placement(self) -> bool: ...
+    def can_redo_placement(self) -> bool: ...
+    def undo_placement(self) -> SignatureRect | None: ...
+    def redo_placement(self) -> SignatureRect | None: ...
 
     def set_signature_rect(
         self,
@@ -293,6 +297,22 @@ class QtSigningWorkspaceSessionPort:
     def remove_signature_placement(self) -> bool:
         remove = getattr(self.shell_widget, "remove_signature_placement", None)
         return bool(remove()) if callable(remove) else False
+
+    def can_undo_placement(self) -> bool:
+        capability = getattr(self.shell_widget, "can_undo_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def can_redo_placement(self) -> bool:
+        capability = getattr(self.shell_widget, "can_redo_placement", None)
+        return bool(capability()) if callable(capability) else False
+
+    def undo_placement(self) -> SignatureRect | None:
+        undo = getattr(self.shell_widget, "undo_placement", None)
+        return undo() if callable(undo) else None
+
+    def redo_placement(self) -> SignatureRect | None:
+        redo = getattr(self.shell_widget, "redo_placement", None)
+        return redo() if callable(redo) else None
 
     def set_signature_rect(
         self,

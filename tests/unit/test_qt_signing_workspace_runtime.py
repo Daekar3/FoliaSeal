@@ -78,6 +78,8 @@ class _FakeViewerWidget:
         self.overlays = []
         self.refresh_calls = []
         self._order = order
+        self.undo_available = False
+        self.redo_available = False
 
     def set_signature_overlay(self, signature_rect) -> None:
         if self._order is not None:
@@ -88,6 +90,22 @@ class _FakeViewerWidget:
         if self._order is not None:
             self._order.append(("refresh", navigation))
         self.refresh_calls.append(navigation)
+
+    def can_undo_signature_placement(self) -> bool:
+        return self.undo_available
+
+    def can_redo_signature_placement(self) -> bool:
+        return self.redo_available
+
+    def undo_signature_placement(self):
+        self.undo_available = False
+        self.redo_available = True
+        return "undo-target"
+
+    def redo_signature_placement(self):
+        self.undo_available = True
+        self.redo_available = False
+        return "redo-target"
 
 
 class _FakeResultLabel:
@@ -518,6 +536,22 @@ def test_signing_workspace_runtime_placement_commands_protect_fixed_fields() -> 
     assert bound.runtime.can_adjust_signature_placement() is False
     assert bound.runtime.can_remove_signature_placement() is False
     assert bound.runtime.remove_signature_placement() is False
+
+
+def test_signing_workspace_runtime_exposes_placement_undo_redo_capabilities() -> None:
+    statuses = []
+    bound = _bind_runtime(on_status_change=statuses.append)
+    bound.viewer_widget.undo_available = True
+
+    assert bound.runtime.can_undo_placement() is True
+    assert bound.runtime.can_redo_placement() is False
+    assert bound.runtime.undo_placement() == "undo-target"
+    assert bound.runtime.can_undo_placement() is False
+    assert bound.runtime.can_redo_placement() is True
+    assert bound.runtime.redo_placement() == "redo-target"
+    assert bound.runtime.can_undo_placement() is True
+    assert bound.runtime.can_redo_placement() is False
+    assert statuses == ["signing_readiness_changed", "signing_readiness_changed"]
 
 
 def test_signing_workspace_runtime_snapshot_is_complete_and_immutable() -> None:
