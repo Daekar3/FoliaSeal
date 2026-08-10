@@ -202,6 +202,7 @@ class SigningWorkspaceWidget:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
         on_open_signature_library: Callable[[], Any] | None = None,
+        untrusted_recovery: bool = False,
     ) -> None:
         if reusable_objects is None:
             raise ValueError("reusable_objects is required for the signing workspace widget.")
@@ -250,6 +251,7 @@ class SigningWorkspaceWidget:
                 on_error=on_error,
                 on_status_change=on_status_change,
                 on_open_signature_library=on_open_signature_library,
+                untrusted_recovery=untrusted_recovery,
                 viewer_widget_builder=build_qt_pdf_viewer_widget,
                 host_actions=QtSigningWorkspaceHostActions(
                     choose_output_pdf_path=self.choose_output_pdf_path,
@@ -303,7 +305,12 @@ class SigningWorkspaceWidget:
 
     def discard_draft(self) -> None:
         """Clear the draft and session credentials before lifecycle disposal."""
+        self.cleanup_recovery_artifact()
         self._draft_workflow.discard_draft()
+
+    def cleanup_recovery_artifact(self) -> None:
+        """Release a preserved recovery artifact without changing draft state."""
+        self._composition_boundary.action_bridge.cleanup_recovery_artifact()
 
     def clear_session_secrets(self) -> None:
         """Clear credentials retained for this mounted signing session."""
@@ -525,6 +532,7 @@ class SigningShellAdapter:
         on_error: Callable[[str], None] | None = None,
         on_status_change: Callable[[str], None] | None = None,
         on_open_signature_library: Callable[[], Any] | None = None,
+        untrusted_recovery: bool = False,
     ) -> Any:
         copy_text_callback = on_copy_text or self._load_copy_text_callback()
         return SigningWorkspaceWidget(
@@ -547,6 +555,7 @@ class SigningShellAdapter:
             on_error=on_error,
             on_status_change=on_status_change,
             on_open_signature_library=on_open_signature_library,
+            untrusted_recovery=untrusted_recovery,
         )
 
     def create_from_bootstrap(self, bootstrap: Any) -> SigningWorkspaceWidget:
@@ -565,6 +574,7 @@ class SigningShellAdapter:
             on_error=bootstrap.on_error,
             on_status_change=bootstrap.on_status_change,
             on_open_signature_library=bootstrap.on_open_signature_library,
+            untrusted_recovery=bootstrap.untrusted_recovery,
         )
 
     def _load_bindings(self) -> QtSigningWidgetBindings:

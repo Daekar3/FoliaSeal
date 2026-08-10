@@ -57,7 +57,8 @@ Document-flow tranche:
 - [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
 - [ ] docs/ExecPlans/ui_document_search_selection_execplan.md
 - [x] docs/ExecPlans/ui_document_signatures_review_execplan.md — bounded signature projection and
-  modeless review surface are committed; later-approval permission policy remains open.
+  modeless review surface are committed; the bounded later-approval permission gate is now covered
+  by the verification-recovery child, while broader reopen/display policy remains open.
 - [ ] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
 
 Reusable-object and certificate tranche:
@@ -212,10 +213,15 @@ Release tranche:
 - [x] (2026-08-10) Added the bounded verification-recovery increment: post-write verification
   failures now preserve an explicitly untrusted sibling artifact, expose its path through
   `SigningResult`, and project Verify again, Return to draft, and Open preserved copy through typed
-  coordinator/boundary/sidebar actions. Later-approval permission analysis and full reopen policy
-  remain open; focused recovery/coordinator/sidebar/application coverage is green (`205 passed`),
-  full suite is `1288 passed, 20 skipped, 1 warning`, and the bounded GUI launch remains limited by
-  the isolated single-instance endpoint with cleanup confirmed.
+  coordinator/boundary/sidebar actions. Broader reopen policy remains open; focused
+  recovery/coordinator/sidebar/application coverage was green (`205 passed`), full suite was
+  `1288 passed, 20 skipped, 1 warning`, and the bounded GUI launch remained limited by the isolated
+  single-instance endpoint with cleanup confirmed.
+- [x] (2026-08-10) Extended recovery with a distinct untrusted preserved-copy reopen intent and a
+  permission-aware later-approval gate: reopened recovery workspaces block signing until every
+  signature verifies and DocMDP permissions are known to allow approval changes; lifecycle disposal
+  cleans the app-owned recovery artifact. Focused app-frame/action/sidebar coverage is `64 passed`;
+  current full suite is `1292 passed, 20 skipped, 1 warning`.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

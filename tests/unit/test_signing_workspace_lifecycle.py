@@ -47,11 +47,11 @@ class _View:
 
 
 class _Outcome:
-    def __init__(self, widget) -> None:
+    def __init__(self, widget, maintenance=None) -> None:
         self.handle = WorkspaceHandle(
             source_pdf=object(),
             view=_View(widget),
-            maintenance=object(),
+            maintenance=maintenance or object(),
             session=object(),
             testing=object(),
             viewer_workflow=object(),
@@ -89,6 +89,20 @@ def _command():
     return object()
 
 
+class _RecoveryMaintenance:
+    def __init__(self, events: list[str], name: str) -> None:
+        self.events = events
+        self.name = name
+
+    def cleanup_recovery_artifact(self) -> None:
+        self.events.append(f"cleanup:{self.name}")
+
+
+class _FailingRecoveryMaintenance:
+    def cleanup_recovery_artifact(self) -> None:
+        raise OSError("recovery artifact could not be removed")
+
+
 def test_replace_mounts_candidate_before_closing_previous_workspace() -> None:
     events: list[str] = []
     first = _Widget("first", events)
@@ -109,6 +123,54 @@ def test_replace_mounts_candidate_before_closing_previous_workspace() -> None:
     assert first.close_calls == 1
     assert first.delete_later_calls == 1
     assert second.close_calls == 0
+
+
+def test_close_and_replace_cleanup_clean_recovery_workspaces_before_view_disposal() -> None:
+    events: list[str] = []
+    first = _Widget("first", events)
+    second = _Widget("second", events)
+    mount = _Mount(events)
+    lifecycle = SigningWorkspaceLifecycle(
+        workspace_open_port=_OpenPort(
+            [
+                _Outcome(first, _RecoveryMaintenance(events, "first")),
+                _Outcome(second, _RecoveryMaintenance(events, "second")),
+            ]
+        ),
+        mount_port=mount,
+    )
+
+    lifecycle.replace(_command())
+    lifecycle.replace(_command())
+    lifecycle.close()
+
+    assert events == [
+        "mount:first",
+        "mount:second",
+        "cleanup:first",
+        "close:first",
+        "delete:first",
+        "cleanup:second",
+        "close:second",
+        "delete:second",
+    ]
+
+
+def test_cleanup_failure_still_disposes_workspace_view() -> None:
+    events: list[str] = []
+    widget = _Widget("failing-cleanup", events)
+    lifecycle = SigningWorkspaceLifecycle(
+        workspace_open_port=_OpenPort([_Outcome(widget, _FailingRecoveryMaintenance())]),
+        mount_port=_Mount(events),
+    )
+
+    lifecycle.replace(_command())
+
+    with pytest.raises(OSError, match="could not be removed"):
+        lifecycle.close()
+
+    assert events == ["mount:failing-cleanup", "close:failing-cleanup", "delete:failing-cleanup"]
+    assert lifecycle.active() is None
 
 
 def test_failed_composition_preserves_current_workspace() -> None:

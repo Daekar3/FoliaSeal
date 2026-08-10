@@ -109,6 +109,9 @@ class SigningActionBoundary:
     def return_to_draft(self) -> SigningActionBoundaryResult:
         return SigningActionBoundaryResult(state=self._coordinator.return_to_draft())
 
+    def cleanup_recovery_artifact(self) -> None:
+        self._coordinator.cleanup_recovery_artifact()
+
     def open_preserved_copy(self) -> SigningActionBoundaryResult:
         output_path = self._coordinator.open_preserved_copy()
         if output_path is not None and self._on_open_signed_output is not None:

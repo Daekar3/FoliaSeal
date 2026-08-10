@@ -45,6 +45,7 @@ class OpenWorkspaceCommand:
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
+    untrusted_recovery: bool = False
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,7 @@ class SigningWorkspaceCompositionService:
                 on_error=command.on_error,
                 on_status_change=command.on_status_change,
                 on_open_signature_library=command.on_open_signature_library,
+                untrusted_recovery=command.untrusted_recovery,
             )
         )
         return WorkspaceHandle(

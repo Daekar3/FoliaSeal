@@ -66,6 +66,7 @@ class SigningActionCoordinator:
         verify_preserved_artifact: Callable[[str], object] | None = None,
         can_open_preserved_copy: bool = False,
         cleanup_preserved_artifact: Callable[[str], None] | None = None,
+        untrusted_recovery: bool = False,
     ) -> None:
         self._workflow = workflow
         self._apply_changes = apply_changes
@@ -77,7 +78,10 @@ class SigningActionCoordinator:
         self._verify_preserved_artifact = verify_preserved_artifact
         self._can_open_preserved_copy = can_open_preserved_copy
         self._cleanup_preserved_artifact = cleanup_preserved_artifact
+        self._untrusted_recovery = untrusted_recovery
+        self._recovery_dismissed = False
         self._preserved_artifact_verified = False
+        self._recovery_permission_allows = False
         self._last_signing_result: SigningResult | None = None
         self._last_successful_output_path: str | None = None
         self._result_text = ""
@@ -213,6 +217,12 @@ class SigningActionCoordinator:
                     error_message=self._result_text,
                     status_event="verify_failure",
                 )
+            self._recovery_permission_allows = (
+                not bool(getattr(summary, "certification_restricted", False))
+                and getattr(summary, "restriction_reason", None) is None
+                and getattr(summary, "docmdp_permission", None)
+                in {None, "fill_forms", "annotate"}
+            )
         except Exception as exc:  # pragma: no cover - defensive integration guard
             self._preserved_artifact_verified = False
             self._result_kind = "error"
@@ -242,12 +252,23 @@ class SigningActionCoordinator:
         if artifact_path is not None and self._cleanup_preserved_artifact is not None:
             self._cleanup_preserved_artifact(artifact_path)
         self._last_signing_result = None
+        self._recovery_dismissed = True
         self._result_text = "Returned to the signing draft."
         self._result_kind = "neutral"
         self._preserved_artifact_verified = False
+        self._recovery_permission_allows = False
         self._recovery_timestamp_required = False
         self._recovery_trust_required = False
         return self._build_state()
+
+    def cleanup_recovery_artifact(self) -> None:
+        """Release a preserved artifact when its workspace is being disposed."""
+
+        artifact_path = self._preserved_artifact_path()
+        if artifact_path is not None and self._cleanup_preserved_artifact is not None:
+            self._cleanup_preserved_artifact(artifact_path)
+        self._last_signing_result = None
+        self._recovery_dismissed = True
 
     def open_preserved_copy(self) -> str | None:
         """Return the preserved artifact only after explicit user choice."""
@@ -270,11 +291,16 @@ class SigningActionCoordinator:
 
     def _preserved_artifact_path(self) -> str | None:
         if self._last_signing_result is None:
+            if self._untrusted_recovery and not self._recovery_dismissed:
+                return self._workflow.input_pdf_path
             return None
         return self._last_signing_result.preserved_artifact_path
 
     def _build_state(self) -> SigningActionState:
-        can_sign = self._is_ready_to_sign()
+        can_sign = self._is_ready_to_sign() and (
+            not self._untrusted_recovery
+            or (self._preserved_artifact_verified and self._recovery_permission_allows)
+        )
         has_successful_output = (
             self._last_signing_result is not None
             and self._last_signing_result.success
@@ -289,7 +315,7 @@ class SigningActionCoordinator:
                 "trust caveats in mind. Add another approval signature only if document "
                 "permissions permit it."
             )
-        elif has_recovery_artifact:
+        elif has_recovery_artifact and not can_sign:
             stage_text = "Step 6 of 6 — Recover verification result"
             detail_text = (
                 "The signed artifact was preserved but is not trusted yet. Verify again, return "
@@ -349,6 +375,12 @@ class SigningActionCoordinator:
                 )
                 else "open_preserved_copy"
                 if has_recovery_artifact and self._can_open_preserved_copy
+                else "sign"
+                if can_sign
+                and (
+                    self._last_signing_result is None
+                    or not self._last_signing_result.success
+                )
                 else "return_to_draft"
                 if has_recovery_artifact
                 else "sign"

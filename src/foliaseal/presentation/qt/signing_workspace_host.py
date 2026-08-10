@@ -40,8 +40,14 @@ class SigningWorkspaceEnvironment:
     on_status_change: Callable[[str], None] | None
     on_open_signature_library: Callable[[], Any] | None = None
     certificate_material_port: CertificateSigningMaterialPort | None = None
+    recovery_reopen_target: Callable[[str | Path], Any | None] | None = None
 
-    def command_for(self, source_pdf: Path) -> OpenWorkspaceCommand:
+    def command_for(
+        self,
+        source_pdf: Path,
+        *,
+        untrusted_recovery: bool = False,
+    ) -> OpenWorkspaceCommand:
         return OpenWorkspaceCommand(
             source_pdf=source_pdf,
             app_settings=self.app_settings(),
@@ -51,10 +57,13 @@ class SigningWorkspaceEnvironment:
             reusable_objects=self.reusable_objects,
             sign_executor=self.sign_executor,
             on_sign_request=self.on_sign_request,
-            reopen_target=self.reopen_target,
+            reopen_target=(
+                self.recovery_reopen_target if untrusted_recovery else self.reopen_target
+            ),
             on_error=self.on_error,
             on_status_change=self.on_status_change,
             on_open_signature_library=self.on_open_signature_library,
+            untrusted_recovery=untrusted_recovery,
         )
 
 
@@ -82,6 +91,13 @@ class SigningWorkspaceHost:
     def prepare(self, source_pdf: str | Path) -> WorkspaceHandle:
         """Compose a candidate without changing the active mounted workspace."""
         return self._lifecycle.prepare(self._environment.command_for(Path(source_pdf)))
+
+    def prepare_recovery(self, source_pdf: str | Path) -> WorkspaceHandle:
+        """Compose a preserved artifact with an explicit untrusted-open mode."""
+
+        return self._lifecycle.prepare(
+            self._environment.command_for(Path(source_pdf), untrusted_recovery=True)
+        )
 
     def replace_prepared(self, handle: WorkspaceHandle) -> WorkspaceHandle:
         """Mount and publish a candidate after the frame's discard decision."""

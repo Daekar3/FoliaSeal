@@ -410,6 +410,7 @@ class FoliaSealAppFrame:
                 sign_executor=self._sign_executor,
                 on_sign_request=self._on_sign_request,
                 reopen_target=self.open_pdf_path,
+                recovery_reopen_target=self.open_recovery_pdf_path,
                 on_error=self._emit_error,
                 on_status_change=self._handle_status_change,
                 on_open_signature_library=self.show_reusable_object_library,
@@ -548,6 +549,27 @@ class FoliaSealAppFrame:
             self._emit_error(f"Unable to open PDF: {exc}")
             return None
 
+        self._apply_workspace_action_state(workspace_action_state_open())
+        self._sync_page_navigation_actions()
+        return handle.view.mount_target()
+
+    def open_recovery_pdf_path(self, pdf_path: str | Path) -> Any | None:
+        """Open a preserved artifact in an explicit untrusted recovery workspace."""
+
+        try:
+            candidate = self._workspace_host.prepare_recovery(pdf_path)
+        except Exception as exc:
+            self._emit_error(f"Unable to open preserved PDF: {exc}")
+            return None
+        if not self._confirm_discard_if_dirty(action="open preserved copy"):
+            candidate.view.dispose()
+            return None
+        self._close_document_signatures()
+        try:
+            handle = self._workspace_host.replace_prepared(candidate)
+        except Exception as exc:
+            self._emit_error(f"Unable to open preserved PDF: {exc}")
+            return None
         self._apply_workspace_action_state(workspace_action_state_open())
         self._sync_page_navigation_actions()
         return handle.view.mount_target()

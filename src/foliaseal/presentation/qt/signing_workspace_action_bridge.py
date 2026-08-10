@@ -101,6 +101,9 @@ class SigningWorkspaceActionBridge:
     def return_to_draft(self) -> None:
         self._apply_signing_action_state(self._signing_action_boundary.return_to_draft().state)
 
+    def cleanup_recovery_artifact(self) -> None:
+        self._signing_action_boundary.cleanup_recovery_artifact()
+
     def open_preserved_copy(self) -> str | None:
         result = self._signing_action_boundary.open_preserved_copy()
         self._apply_signing_action_state(result.state)

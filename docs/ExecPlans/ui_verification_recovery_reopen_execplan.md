@@ -27,18 +27,29 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implemented the bounded application/Qt recovery path: failed post-write
   verification preserves an explicitly untrusted sibling, `SigningResult` carries its path, and
   the action rail exposes Verify again, Return to draft, and Open preserved copy.
+- [x] (2026-08-10) Added a distinct untrusted-recovery workspace mode for Open preserved copy.
+  Its reopen callback carries recovery context, the new workspace blocks Sign and save, and the
+  rail keeps Verify again as the recommended action until explicit verification succeeds. The
+  original preserved file remains app-owned until Return to draft cleanup.
+- [x] (2026-08-10) Added the bounded permission-aware reopen gate: a preserved workspace remains
+  non-signable until Verify again proves every signature and the summary reports no certification
+  restriction (or an allowed `fill_forms`/`annotate` DocMDP permission). Known restrictions and
+  uncertain/unknown trust remain blocked with the recovery warning.
 - [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No safe retirement condition
   was met; historical evidence names remain external contracts and no new product-facing phase3
   nomenclature was introduced.
-- [x] (2026-08-10) Run focused, regression, and GUI validation; clean processes and artifacts:
-  focused application/action/sidebar/composition command `205 passed`; full suite `1288 passed,
-  20 skipped, 1 warning`; backend/recovery subset `149 passed`; Ruff and diff checks clean. The
+- [x] (2026-08-10) Ran focused, regression, and GUI validation; clean processes and artifacts:
+  focused app-frame/action/sidebar/composition command `64 passed`; full suite `1292 passed,
+  20 skipped, 1 warning`; backend/recovery subset remains green; Ruff and diff checks clean. The
   bounded offscreen app launch exits at `SingleInstanceUnavailable`, leaves no matching processes,
-  and removes its temporary configuration root.
-- [x] (2026-08-10) Updated this plan, the parent plan, and `docs/ARCHITECTURE.md`; independent
+  and removes its temporary configuration root. Lifecycle disposal now also removes an app-owned
+  preserved artifact when the recovery workspace is discarded or replaced, and a `try/finally`
+  guard releases the view even if cleanup itself raises.
+- [ ] (2026-08-10) Update this plan, the parent plan, and `docs/ARCHITECTURE.md`; independent
   review findings were addressed for strict validity, required timestamp/trust, every-signature
-  verification, and explicit artifact cleanup. Display-backed recovery acceptance remains
-  environment-blocked; the commit is the remaining gate.
+  verification, explicit artifact cleanup, and the distinct untrusted reopen/permission gate.
+  Display-backed recovery acceptance remains environment-blocked; final review and commit are
+  the remaining gates for this increment.
 - [ ] (2026-08-10) Commit the completed slice and record the next dependency-ordered blocker.
 
 ## Surprises & Discoveries
@@ -73,6 +84,16 @@ Qt surface, focused tests, and observable acceptance.
   Rationale: a non-raising verifier result or a valid newest signature must not make an older or
   trust-incomplete artifact appear safe for later approval.
   Date/Author: 2026-08-10 / Codex
+- Decision: Open preserved copy uses a distinct recovery reopen intent and mounts an untrusted
+  workspace that cannot sign until recovery verification succeeds.
+  Rationale: routing through the ordinary verified-output callback would lose the warning state and
+  allow an unverified artifact to look like a normal signing source.
+  Date/Author: 2026-08-10 / Codex
+- Decision: only an explicitly verified artifact with a non-restrictive/allowed DocMDP projection
+  re-enables Sign and save in a recovery workspace; unknown or restricted permission remains blocked.
+  Rationale: later approval must never be enabled by a generic successful open or an ambiguous
+  certification result.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
@@ -80,8 +101,9 @@ The bounded recovery path now preserves post-write verification failures and pro
 return, and preserved-copy actions into the signing rail. Verification retry interprets structured
 cryptographic validity, every-signature coverage, required timestamp, and required timestamp trust;
 it remains read-only and never promotes the preserved artifact to `last_successful_output_path`.
-Explicit Return to draft removes only the app-owned preserved file. Later-approval permission
-analysis and full document reopen policy remain explicit follow-up work.
+Explicit Return to draft removes only the app-owned preserved file. The bounded later-approval
+permission gate is implemented; broader document-reopen policy and display-backed acceptance remain
+explicit follow-up work.
 
 ## Context and Orientation
 
@@ -188,6 +210,7 @@ New help/diagnostic surfaces must not expose secrets, PDF contents, selected
 text, Reason, Location, or private keys.
 
 Revision note: 2026-08-10 / Codex
-Implemented the bounded preserved-artifact recovery vertical slice after the live audit and red
-tests; updated dependencies and the architecture boundary. Full validation, GUI audit, independent
-review, and commit remain the final gates.
+Implemented and validated the bounded preserved-artifact recovery vertical slice after the live
+audit and red tests; updated dependencies and the architecture boundary. The isolated GUI launch
+still stops before frame creation at `SingleInstanceUnavailable`; no process or temporary-config
+debris remains. Independent review and commit are the remaining gates for this slice.

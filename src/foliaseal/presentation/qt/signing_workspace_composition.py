@@ -164,6 +164,7 @@ class QtSigningWorkspaceCompositionRequest:
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
+    untrusted_recovery: bool = False
 
 
 class QtSigningWorkspaceComposition:
@@ -524,6 +525,7 @@ def _assemble_signing_workspace_composition(
         verify_preserved_artifact=getattr(sign_executor, "verify_preserved_artifact", None),
         can_open_preserved_copy=on_open_signed_output is not None,
         cleanup_preserved_artifact=lambda path: Path(path).unlink(missing_ok=True),
+        untrusted_recovery=request.untrusted_recovery,
     )
     signing_action_boundary = SigningActionBoundary(
         coordinator=signing_action_coordinator,

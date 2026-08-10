@@ -48,6 +48,14 @@ class _MissingTimestampVerificationSummary:
     timestamp_present = False
 
 
+class _RestrictedVerificationSummary:
+    signatures_cryptographically_valid = True
+    timestamp_present = True
+    certification_restricted = True
+    restriction_reason = "Certification forbids changes."
+    docmdp_permission = "no_changes"
+
+
 def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
     workflow = SigningDraftWorkflow(
         input_pdf_path=str(tmp_path / "input.pdf"),
@@ -407,6 +415,74 @@ def test_signing_action_coordinator_rejects_missing_required_timestamp_on_retry(
 
     assert retry.status_event == "verify_failure"
     assert "trusted preserved artifact" in retry.state.result_text
+
+
+def test_untrusted_recovery_workspace_blocks_signing_until_verified(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    executor = _FakeRecoveryExecutor()
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: True,
+        validation_text=lambda: "",
+        verify_preserved_artifact=executor.verify_preserved_artifact,
+        can_open_preserved_copy=False,
+        untrusted_recovery=True,
+    )
+
+    state = coordinator.load()
+
+    assert state.can_sign is False
+    assert state.can_verify_again is True
+    assert state.can_return_to_draft is True
+    assert state.recommended_action == "verify_again"
+
+    retry = coordinator.verify_again()
+
+    assert retry.state.can_sign is True
+    assert retry.state.recommended_action == "sign"
+
+
+def test_untrusted_recovery_workspace_blocks_restricted_later_approval(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: True,
+        validation_text=lambda: "",
+        verify_preserved_artifact=lambda _path: _RestrictedVerificationSummary(),
+        untrusted_recovery=True,
+    )
+
+    coordinator.load()
+    retry = coordinator.verify_again()
+
+    assert retry.state.can_sign is False
+    assert retry.state.recommended_action == "return_to_draft"
+
+
+def test_recovery_cleanup_hook_releases_preserved_workspace_artifact(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    cleaned: list[str] = []
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        is_ready_to_sign=lambda: True,
+        validation_text=lambda: "",
+        verify_preserved_artifact=lambda _path: _MissingTimestampVerificationSummary(),
+        cleanup_preserved_artifact=cleaned.append,
+        untrusted_recovery=True,
+    )
+
+    coordinator.load()
+    coordinator.cleanup_recovery_artifact()
+
+    assert cleaned == [workflow.input_pdf_path]
+    assert coordinator.load().can_return_to_draft is False
 
 
 def test_signing_action_coordinator_exception_uses_emit_error_path(tmp_path: Path) -> None:

@@ -86,7 +86,7 @@ class SigningWorkspaceLifecycle:
         try:
             self._mount_port.mount(candidate)
         except Exception:
-            handle.view.dispose()
+            self._dispose_handle(handle)
             raise
 
         self._active = _ActiveWorkspace(handle=handle)
@@ -94,7 +94,7 @@ class SigningWorkspaceLifecycle:
             previous is not None
             and previous.handle.view.mount_target() is not candidate
         ):
-            previous.handle.view.dispose()
+            self._dispose_handle(previous.handle)
         return handle
 
     def active(self) -> WorkspaceHandle | None:
@@ -108,4 +108,14 @@ class SigningWorkspaceLifecycle:
         active = self._active
         self._active = None
         if active is not None:
-            active.handle.view.dispose()
+            self._dispose_handle(active.handle)
+
+    @staticmethod
+    def _dispose_handle(handle: WorkspaceHandle) -> None:
+        """Run idempotent recovery cleanup before releasing the mounted view."""
+        cleanup = getattr(handle.maintenance, "cleanup_recovery_artifact", None)
+        try:
+            if callable(cleanup):
+                cleanup()
+        finally:
+            handle.view.dispose()

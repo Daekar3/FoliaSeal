@@ -46,6 +46,7 @@ class SigningWorkspaceBootstrap:
     on_error: Callable[[str], None] | None = None
     on_status_change: Callable[[str], None] | None = None
     on_open_signature_library: Callable[[], Any] | None = None
+    untrusted_recovery: bool = False
 
 
 class SigningWorkspacePort(Protocol):
@@ -56,6 +57,9 @@ class SigningWorkspacePort(Protocol):
 
     def discard_draft(self) -> None:
         """Discard the in-memory draft before its workspace is disposed."""
+
+    def cleanup_recovery_artifact(self) -> None:
+        """Release any app-owned preserved recovery artifact before disposal."""
 
     def clear_session_secrets(self) -> None:
         """Clear credentials retained only for the current signing session."""
@@ -184,6 +188,9 @@ class QtSigningWorkspacePort:
 
     def discard_draft(self) -> None:
         self.shell_widget.discard_draft()
+
+    def cleanup_recovery_artifact(self) -> None:
+        self.shell_widget.cleanup_recovery_artifact()
 
     def clear_session_secrets(self) -> None:
         self.shell_widget.clear_session_secrets()
